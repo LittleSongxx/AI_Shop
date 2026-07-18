@@ -1,0 +1,376 @@
+<template>
+  <div v-if="showAi" class="bubble-row ai">
+    <div class="ai-avatar-mini">
+      <el-icon :size="16"><Service /></el-icon>
+    </div>
+    <div class="bubble ai-bubble" :class="{ 'is-wide': isWideBubble }">
+      <div v-if="messageStatus === 0 && !hasRenderableContent" class="cancel-tip">已取消回复</div>
+      <template v-else>
+      <template v-if="productList?.length">
+        <MarkdownContent
+          v-if="productIntro"
+          class="product-intro"
+          :content="productIntro"
+        />
+        <p v-else class="biz-title">为您推荐以下商品</p>
+        <AgentProductList :list="productList" />
+      </template>
+      <template v-else-if="isProductSearchEmpty">
+        <p class="biz-title">商品搜索</p>
+        <p class="empty-hint">未找到相关商品，请换个关键词试试，或让我为您推荐热销商品。</p>
+      </template>
+      <template v-else-if="orderList?.length">
+        <p class="biz-title">为您查询到以下订单</p>
+        <AgentOrderList :list="orderList" />
+      </template>
+      <template v-else-if="actionConfirmCard">
+        <AgentConfirmCard :card="actionConfirmCard" @updated="onActionCardUpdated" />
+      </template>
+      <template v-else-if="isOrderSearchEmpty">
+        <p class="biz-title">订单查询</p>
+        <p class="empty-hint">未查询到相关订单，请核对订单号或稍后再试。</p>
+      </template>
+      <template v-else-if="isStreaming && streamText">
+        <p class="stream-text">
+          <span>{{ streamText }}</span>
+          <span class="stream-cursor" aria-hidden="true" />
+        </p>
+      </template>
+      <template v-else-if="isStreaming || waiting">
+        <p class="typing">正在为您查询，请稍候…</p>
+      </template>
+      <template v-else-if="displayText">
+        <MarkdownContent :content="displayText" :agent-rich="agentRich" />
+      </template>
+      <p v-if="messageStatus === 3 && hasRenderableContent" class="interrupt-tip">回复已中断，以上为已生成内容</p>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { Service } from '@element-plus/icons-vue';
+import MarkdownContent from '@/components/common/MarkdownContent.vue';
+import AgentProductList from '@/components/agent/AgentProductList.vue';
+import AgentOrderList from '@/components/agent/AgentOrderList.vue';
+import AgentConfirmCard, { type ActionConfirmCardData } from '@/components/agent/AgentConfirmCard.vue';
+import { cleanAgentActionStreamText, containsAgentTable, stripEmbeddedProductJson } from '@/utils/agentMessageRender';
+
+const props = defineProps<{
+  data: Record<string, any>;
+  waiting?: boolean;
+}>();
+
+const messageStatus = computed(() => Number(props.data.status ?? 2));
+
+const isStreaming = computed(() => messageStatus.value === 1);
+
+const parseJsonList = (raw?: string | null) => {
+  if (!raw || typeof raw !== 'string') return null;
+  const text = raw.trim();
+  if (!text.startsWith('[') && !text.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.list)) return parsed.list;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const isEmptyJsonList = (raw?: string | null) => {
+  const parsed = parseJsonList(raw);
+  if (parsed !== null) return parsed.length === 0;
+  return typeof raw === 'string' && raw.trim() === '[]';
+};
+
+const isProductBiz = (bizType?: string | null) =>
+  bizType === 'product_search' ||
+  bizType === 'product_search.txt' ||
+  bizType === 'BROWSE_RECOMMEND';
+
+const isOrderBiz = (bizType?: string | null) => bizType === 'query_order';
+
+const parseJsonObject = (raw?: string | null) => {
+  if (!raw || typeof raw !== 'string') return null;
+  const text = raw.trim();
+  if (!text.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const actionConfirmCard = ref<ActionConfirmCardData | null>(null);
+
+const syncActionConfirmCard = () => {
+  if (isStreaming.value) {
+    actionConfirmCard.value = null;
+    return;
+  }
+  const parsed = parseJsonObject(props.data.assistantMessage);
+  if (parsed?.type === 'ACTION_CONFIRM') {
+    actionConfirmCard.value = {
+      ...(parsed as ActionConfirmCardData),
+      status: Number((parsed as ActionConfirmCardData).status ?? 0)
+    };
+    return;
+  }
+  actionConfirmCard.value = null;
+};
+
+watch(
+  () => [props.data.assistantMessage, props.data.bizType, props.data.status, props.waiting] as const,
+  () => syncActionConfirmCard(),
+  { immediate: true }
+);
+
+const onActionCardUpdated = (card: ActionConfirmCardData) => {
+  actionConfirmCard.value = card;
+};
+
+const productSearchPayload = computed(() => {
+  if (isStreaming.value) return null;
+  const raw = props.data.assistantMessage;
+  if (!raw || typeof raw !== 'string') return null;
+  const text = raw.trim();
+  if (!text.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed?.type === 'PRODUCT_SEARCH_RESULT' && Array.isArray(parsed.products)) {
+      return {
+        intro: typeof parsed.intro === 'string' ? parsed.intro.trim() : '',
+        products: parsed.products
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+});
+
+const productList = computed(() => {
+  if (isStreaming.value) return null;
+  const wrapped = productSearchPayload.value;
+  if (wrapped?.products?.length) return wrapped.products;
+  const raw = props.data.assistantMessage;
+  const parsed = parseJsonList(raw);
+  if (!parsed?.length) return null;
+  if (isProductBiz(props.data.bizType)) return parsed;
+  if (parsed[0]?.productId && parsed[0]?.productName) return parsed;
+  return null;
+});
+
+const productIntro = computed(() =>
+  stripEmbeddedProductJson(productSearchPayload.value?.intro || '')
+);
+
+const isProductSearchEmpty = computed(() => {
+  if (isStreaming.value || props.waiting) return false;
+  if (!isProductBiz(props.data.bizType)) return false;
+  if (productSearchPayload.value) return !productSearchPayload.value.products.length;
+  return isEmptyJsonList(props.data.assistantMessage);
+});
+
+const orderList = computed(() => {
+  if (isStreaming.value) return null;
+  if (!isOrderBiz(props.data.bizType)) return null;
+  const parsed = parseJsonList(props.data.assistantMessage);
+  if (!parsed?.length) return null;
+  return parsed;
+});
+
+const isOrderSearchEmpty = computed(() => {
+  if (isStreaming.value || props.waiting) return false;
+  if (!isOrderBiz(props.data.bizType)) return false;
+  return isEmptyJsonList(props.data.assistantMessage);
+});
+
+const streamText = computed(() => cleanAgentActionStreamText(props.data.assistantMessage));
+
+const displayText = computed(() => {
+  if (productList.value?.length || orderList.value?.length) return '';
+  if (actionConfirmCard.value) return '';
+  if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return '';
+  const parsed = parseJsonObject(props.data.assistantMessage);
+  if (parsed?.type === 'ACTION_CONFIRM') return '';
+  const text = (props.data.assistantMessage || '').trim();
+  if (text === '[]') return '';
+  return text;
+});
+
+const agentRich = computed(
+  () =>
+    props.data.bizType === 'query_logistics' ||
+    props.data.bizType === 'product_consult' ||
+    containsAgentTable(displayText.value)
+);
+
+const showAi = computed(() => {
+  if (messageStatus.value === 0) return hasRenderableContent.value;
+  if (props.waiting) return true;
+  if (isStreaming.value) return true;
+  if (messageStatus.value === 3) return hasRenderableContent.value;
+  if (productList.value?.length || orderList.value?.length) return true;
+  if (actionConfirmCard.value) return true;
+  if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return true;
+  if (displayText.value) return true;
+  return false;
+});
+
+const hasRenderableContent = computed(
+  () =>
+    !!(productList.value?.length ||
+      orderList.value?.length ||
+      actionConfirmCard.value ||
+      isProductSearchEmpty.value ||
+      isOrderSearchEmpty.value ||
+      displayText.value ||
+      props.waiting ||
+      (isStreaming.value && streamText.value))
+);
+
+const isWideBubble = computed(
+  () =>
+    !!(
+      productList.value?.length ||
+      orderList.value?.length ||
+      actionConfirmCard.value ||
+      isProductSearchEmpty.value ||
+      isOrderSearchEmpty.value ||
+      agentRich.value
+    )
+);
+</script>
+
+<style scoped lang="scss">
+@use '@/styles/variables' as *;
+
+.bubble-row.ai {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+
+.bubble {
+  width: fit-content;
+  max-width: min(75%, 520px);
+  padding: 9px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  border-radius: 12px;
+  word-break: break-word;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.ai-avatar-mini {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: $color-card;
+  color: $color-primary;
+  display: grid;
+  place-items: center;
+  box-shadow: $shadow-xs;
+}
+
+.ai-bubble {
+  background: $color-card;
+  color: $color-text-body;
+  border-bottom-left-radius: 4px;
+  box-shadow: $shadow-xs;
+
+  &.is-wide {
+    width: auto;
+    max-width: calc(100% - 36px);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+.biz-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: $color-text-title;
+}
+
+.typing,
+.cancel-tip,
+.interrupt-tip,
+.empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: $color-text-muted;
+}
+
+.interrupt-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: $color-text-muted;
+}
+
+.empty-hint {
+  line-height: 1.55;
+}
+
+.product-intro {
+  margin: 0 0 8px;
+}
+
+.stream-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: $color-text-body;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: $color-primary;
+  animation: blink 0.9s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+:deep(.markdown-content) {
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 100%;
+
+  p {
+    margin: 0;
+
+    & + p {
+      margin-top: 6px;
+    }
+  }
+}
+
+.ai-bubble:not(.is-wide) :deep(.markdown-content) {
+  width: fit-content;
+}
+
+:deep(.agent-orders) {
+  font-size: 12px;
+}
+</style>

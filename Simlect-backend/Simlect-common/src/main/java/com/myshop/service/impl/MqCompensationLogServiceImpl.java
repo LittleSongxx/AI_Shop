@@ -1,0 +1,330 @@
+package com.myshop.service.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.myshop.compensation.StockBatchCompensatePort;
+import com.myshop.compensation.UserCouponStatusCompensatePort;
+import com.myshop.component.MqCompensationStore;
+import com.myshop.component.MqIdempotencyGuard;
+import com.myshop.constants.InternalApiHeaders;
+import com.myshop.constants.ReliableMessageSender;
+import com.myshop.entity.dto.MqCompensationRecord;
+import com.myshop.entity.enums.MessageReliabilityLevelEnum;
+import com.myshop.entity.enums.MqCompensationLogStatusEnum;
+import com.myshop.entity.enums.PageSize;
+import com.myshop.entity.po.MqCompensationLog;
+import com.myshop.entity.po.ProductItem;
+import com.myshop.entity.query.MqCompensationLogQuery;
+import com.myshop.entity.query.SimplePage;
+import com.myshop.entity.vo.PaginationResultVO;
+import com.myshop.exception.BusinessException;
+import com.myshop.mappers.MqCompensationLogMapper;
+import com.myshop.service.MqCompensationLogService;
+import com.myshop.support.MqConsumeReplayRouter;
+import com.myshop.utils.StringTools;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.List;
+
+@Service("mqCompensationLogService")
+@Slf4j
+public class MqCompensationLogServiceImpl implements MqCompensationLogService {
+
+    @Resource
+    private MqCompensationLogMapper<MqCompensationLog, MqCompensationLogQuery> mqCompensationLogMapper;
+    @Resource
+    private MqIdempotencyGuard mqIdempotencyGuard;
+    @Resource
+    private MqCompensationStore mqCompensationStore;
+    @Lazy
+    @Resource
+    private ReliableMessageSender reliableMessageSender;
+    @Lazy
+    @Resource
+    private ObjectProvider<StockBatchCompensatePort> stockBatchCompensatePort;
+    @Lazy
+    @Resource
+    private ObjectProvider<UserCouponStatusCompensatePort> userCouponStatusCompensatePort;
+
+    @Override
+    public PaginationResultVO<MqCompensationLog> findListByPage(MqCompensationLogQuery param) {
+        int count = mqCompensationLogMapper.selectCount(param);
+        int pageSize = param.getPageSize() == null ? PageSize.SIZE15.getSize() : param.getPageSize();
+        SimplePage page = new SimplePage(param.getPageNo(), count, pageSize);
+        param.setSimplePage(page);
+        List<MqCompensationLog> list = mqCompensationLogMapper.selectList(param);
+        return new PaginationResultVO<>(count, page.getPageSize(), page.getPageNo(), page.getPageTotal(), list);
+    }
+
+    @Override
+    public MqCompensationLog getByLogId(Integer logId) {
+        return mqCompensationLogMapper.selectByLogId(logId);
+    }
+
+    @Override
+    public void saveFromFailure(MqCompensationRecord record) {
+        if (record == null || StringTools.isEmpty(record.getIdempotencyKey())) {
+            return;
+        }
+        Date now = new Date();
+        MqCompensationLog existing = mqCompensationLogMapper.selectByIdempotencyKey(record.getIdempotencyKey());
+        if (existing != null) {
+            MqCompensationLog patch = new MqCompensationLog();
+            patch.setErrorMessage(record.getErrorMessage());
+            patch.setRetryCount((existing.getRetryCount() == null ? 0 : existing.getRetryCount()));
+            patch.setStatus(MqCompensationLogStatusEnum.PENDING.getStatus());
+            patch.setUpdateTime(now);
+            mqCompensationLogMapper.updateByLogId(patch, existing.getLogId());
+            return;
+        }
+        MqCompensationLog logRow = new MqCompensationLog();
+        logRow.setIdempotencyKey(record.getIdempotencyKey());
+        logRow.setExchange(record.getExchange());
+        logRow.setRoutingKey(record.getRoutingKey());
+        logRow.setBizScene(resolveBizScene(record));
+        logRow.setPayloadJson(JSON.toJSONString(record.getPayload()));
+        logRow.setReliabilityLevel(record.getReliabilityLevel() == null
+                ? MessageReliabilityLevelEnum.HIGH.getCode()
+                : record.getReliabilityLevel().getCode());
+        logRow.setErrorMessage(record.getErrorMessage());
+        logRow.setRetryCount(record.getRetryCount());
+        logRow.setStatus(MqCompensationLogStatusEnum.PENDING.getStatus());
+        logRow.setCreateTime(now);
+        logRow.setUpdateTime(now);
+        mqCompensationLogMapper.insert(logRow);
+    }
+
+    @Override
+    public void updateHandleStatus(Integer logId, Integer status, String handleRemark) {
+        MqCompensationLog existing = mqCompensationLogMapper.selectByLogId(logId);
+        if (existing == null) {
+            throw new BusinessException("补偿日志不存在");
+        }
+        MqCompensationLogStatusEnum statusEnum = MqCompensationLogStatusEnum.getByStatus(status);
+        if (statusEnum == null) {
+            throw new BusinessException("无效的处理状态");
+        }
+        Date now = new Date();
+        MqCompensationLog patch = new MqCompensationLog();
+        patch.setStatus(status);
+        patch.setHandleRemark(handleRemark);
+        patch.setHandleTime(now);
+        patch.setUpdateTime(now);
+        mqCompensationLogMapper.updateByLogId(patch, logId);
+    }
+
+    @Override
+    public void replay(Integer logId) {
+        MqCompensationLog existing = mqCompensationLogMapper.selectByLogId(logId);
+        if (existing == null) {
+            throw new BusinessException("补偿日志不存在");
+        }
+        if (MqCompensationLogStatusEnum.REPLAYED.getStatus().equals(existing.getStatus())
+                || MqCompensationLogStatusEnum.IGNORED.getStatus().equals(existing.getStatus())) {
+            throw new BusinessException("当前状态不可重放");
+        }
+        if (InternalApiHeaders.REMOTE_COMPENSATE_EXCHANGE.equals(existing.getExchange())) {
+            replayRemoteCompensate(existing);
+            return;
+        }
+        if (MqConsumeReplayRouter.isConsumeFailure(existing.getExchange())) {
+            replayConsumeFailure(existing);
+            return;
+        }
+        replaySendFailure(existing);
+    }
+
+    @Override
+    public int autoReplayPendingSendFailures(int batchSize, int maxRetryCount) {
+        if (batchSize <= 0) {
+            batchSize = 10;
+        }
+        MqCompensationLogQuery query = new MqCompensationLogQuery();
+        query.setStatus(MqCompensationLogStatusEnum.PENDING.getStatus());
+        query.setOrderBy("log_id asc");
+        query.setPageNo(1);
+        query.setPageSize(batchSize * 2);
+        SimplePage page = new SimplePage(1, batchSize * 2, batchSize * 2);
+        query.setSimplePage(page);
+        List<MqCompensationLog> list = mqCompensationLogMapper.selectList(query);
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        int replayed = 0;
+        for (MqCompensationLog row : list) {
+            if (replayed >= batchSize) {
+                break;
+            }
+            if (MqConsumeReplayRouter.isConsumeFailure(row.getExchange())) {
+                continue;
+            }
+            int retry = row.getRetryCount() == null ? 0 : row.getRetryCount();
+            if (retry >= maxRetryCount) {
+                continue;
+            }
+            try {
+                if (InternalApiHeaders.REMOTE_COMPENSATE_EXCHANGE.equals(row.getExchange())) {
+                    replayRemoteCompensate(row);
+                } else {
+                    replaySendFailure(row);
+                }
+                replayed++;
+            } catch (Exception e) {
+                log.warn("MQ 自动补偿重放失败 logId={}", row.getLogId(), e);
+            }
+        }
+        return replayed;
+    }
+
+    private void replayRemoteCompensate(MqCompensationLog existing) {
+        Date now = new Date();
+        markProcessing(existing.getLogId(), now);
+        try {
+            String routingKey = existing.getRoutingKey();
+            if (InternalApiHeaders.REMOTE_STOCK_CHANGE_BATCH.equals(routingKey)) {
+                List<ProductItem> items = JSON.parseArray(existing.getPayloadJson(), ProductItem.class);
+                StockBatchCompensatePort stockPort = stockBatchCompensatePort.getIfAvailable();
+                if (stockPort == null) {
+                    throw new BusinessException("库存补偿能力不可用（缺少 stock-api）");
+                }
+                stockPort.changeStockBatch(items);
+            } else if (InternalApiHeaders.REMOTE_COUPON_UNLOCK.equals(routingKey)) {
+                JSONObject payload = JSON.parseObject(existing.getPayloadJson());
+                UserCouponStatusCompensatePort couponPort = userCouponStatusCompensatePort.getIfAvailable();
+                if (couponPort == null) {
+                    throw new BusinessException("优惠券补偿能力不可用（缺少 coupon-api）");
+                }
+                couponPort.changeUserCouponStatus(
+                        payload.getString("userCouponId"),
+                        payload.getString("userId"),
+                        payload.getInteger("fromStatus"),
+                        payload.getInteger("toStatus"),
+                        null);
+            } else {
+                throw new BusinessException("未知远程补偿类型：" + routingKey);
+            }
+            markReplayed(existing, now);
+            mqCompensationStore.remove(existing.getIdempotencyKey());
+        } catch (Exception e) {
+            log.error("远程补偿重放失败 logId={}", existing.getLogId(), e);
+            markReplayFailed(existing, e.getMessage());
+            throw new BusinessException("远程补偿重放失败：" + e.getMessage());
+        }
+    }
+
+    private void replaySendFailure(MqCompensationLog existing) {
+        Date now = new Date();
+        markProcessing(existing.getLogId(), now);
+        mqIdempotencyGuard.releaseSend(existing.getIdempotencyKey());
+        try {
+            Object payload = JSON.parse(existing.getPayloadJson());
+            reliableMessageSender.replaySend(
+                    existing.getExchange(),
+                    existing.getRoutingKey(),
+                    payload,
+                    existing.getIdempotencyKey());
+            markReplayed(existing, now);
+            mqCompensationStore.remove(existing.getIdempotencyKey());
+        } catch (Exception e) {
+            log.error("MQ 补偿重放失败 logId={}", existing.getLogId(), e);
+            markReplayFailed(existing, e.getMessage());
+            throw new BusinessException("重放失败：" + e.getMessage());
+        }
+    }
+
+    private void replayConsumeFailure(MqCompensationLog existing) {
+        MqConsumeReplayRouter.Target target = MqConsumeReplayRouter.resolve(existing.getRoutingKey());
+        if (target == null) {
+            throw new BusinessException("未知消费队列，无法重放：" + existing.getRoutingKey());
+        }
+        Date now = new Date();
+        markProcessing(existing.getLogId(), now);
+        mqIdempotencyGuard.releaseSend(existing.getIdempotencyKey());
+        try {
+            Object payload = JSON.parse(existing.getPayloadJson());
+            reliableMessageSender.replaySend(
+                    target.exchange(),
+                    target.routingKey(),
+                    payload,
+                    existing.getIdempotencyKey());
+            markReplayed(existing, now);
+            mqCompensationStore.remove(existing.getIdempotencyKey());
+        } catch (Exception e) {
+            log.error("MQ 消费补偿重放失败 logId={}", existing.getLogId(), e);
+            markReplayFailed(existing, e.getMessage());
+            throw new BusinessException("重放失败：" + e.getMessage());
+        }
+    }
+
+    private void markProcessing(Integer logId, Date now) {
+        MqCompensationLog processing = new MqCompensationLog();
+        processing.setStatus(MqCompensationLogStatusEnum.PROCESSING.getStatus());
+        processing.setUpdateTime(now);
+        mqCompensationLogMapper.updateByLogId(processing, logId);
+    }
+
+    private void markReplayed(MqCompensationLog existing, Date now) {
+        MqCompensationLog success = new MqCompensationLog();
+        success.setStatus(MqCompensationLogStatusEnum.REPLAYED.getStatus());
+        success.setRetryCount((existing.getRetryCount() == null ? 0 : existing.getRetryCount()) + 1);
+        success.setHandleTime(now);
+        success.setUpdateTime(now);
+        mqCompensationLogMapper.updateByLogId(success, existing.getLogId());
+    }
+
+    private void markReplayFailed(MqCompensationLog existing, String errorMessage) {
+        MqCompensationLog failed = new MqCompensationLog();
+        failed.setStatus(MqCompensationLogStatusEnum.REPLAY_FAILED.getStatus());
+        failed.setRetryCount((existing.getRetryCount() == null ? 0 : existing.getRetryCount()) + 1);
+        failed.setErrorMessage(errorMessage);
+        failed.setUpdateTime(new Date());
+        mqCompensationLogMapper.updateByLogId(failed, existing.getLogId());
+    }
+
+    static String resolveBizScene(MqCompensationRecord record) {
+        if (InternalApiHeaders.REMOTE_COMPENSATE_EXCHANGE.equals(record.getExchange())) {
+            return "REMOTE_" + resolveBizScene(record.getRoutingKey());
+        }
+        if (MqConsumeReplayRouter.isConsumeFailure(record.getExchange())) {
+            return "CONSUME_" + resolveBizScene(record.getRoutingKey());
+        }
+        return resolveBizScene(record.getRoutingKey());
+    }
+
+    static String resolveBizScene(String routingKey) {
+        if (StringTools.isEmpty(routingKey)) {
+            return "OTHER";
+        }
+        String key = routingKey.toLowerCase();
+        if (key.contains("stock")) {
+            return "STOCK";
+        }
+        if (key.contains("coupon")) {
+            return "COUPON";
+        }
+        if (key.contains("rag")) {
+            return "RAG";
+        }
+        if (key.contains("notify")) {
+            return "NOTIFY";
+        }
+        if (key.contains("browse")) {
+            return "BROWSE";
+        }
+        if (key.contains("sign")) {
+            return "SIGN";
+        }
+        if (key.contains("pay") || key.contains("timeout") || key.contains("logistics") || key.contains("confirm")) {
+            return "PAY";
+        }
+        if (key.contains("ban")) {
+            return "BAN";
+        }
+        return "OTHER";
+    }
+}

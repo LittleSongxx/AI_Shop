@@ -1,0 +1,292 @@
+package com.myshop.controller;
+
+import com.myshop.annotation.GlobalInterceptor;
+import com.myshop.annotation.RateLimit;
+import com.myshop.component.RedisComponent;
+import com.myshop.component.UserTempBanService;
+import com.myshop.constants.Constants;
+import com.myshop.entity.dto.TokenUserInfoDTO;
+import com.myshop.entity.enums.DateTimePatternEnum;
+import com.myshop.entity.enums.UserSexEnum;
+import com.myshop.entity.enums.UserStatusEnum;
+import com.myshop.entity.po.UserInfo;
+import com.myshop.entity.query.UserInfoQuery;
+import com.myshop.entity.vo.CheckCodeVO;
+import com.myshop.entity.vo.ResponseVO;
+import com.myshop.entity.vo.UserVO;
+import com.myshop.exception.BusinessException;
+import com.myshop.biz.EmailService;
+import com.myshop.biz.impl.AliEmailServiceImpl;
+import com.myshop.biz.impl.UserInfoServiceImpl;
+import com.myshop.service.SlideCaptchaVerifier;
+import com.myshop.utils.AuthCookieHelper;
+import com.myshop.utils.CheckCodeGenerator;
+import com.myshop.utils.DateUtil;
+import com.myshop.utils.StringTools;
+import com.myshop.service.PasswordService;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.constraints.*;
+import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
+@RequestMapping("/account")
+@RestController
+@Validated
+public class AccountController extends ABaseController{
+
+    @Resource
+    private RedisComponent redisComponent;
+
+    @Resource
+    private UserInfoServiceImpl userInfoService;
+
+    @Resource
+    private AliEmailServiceImpl aliEmailServiceImpl;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private UserTempBanService userTempBanService;
+
+    @Resource
+    private SlideCaptchaVerifier slideCaptchaVerifier;
+
+    @Resource
+    private AuthCookieHelper authCookieHelper;
+
+    @Resource
+    private PasswordService passwordService;
+
+    private void throwIfAccountDisabled(String userId) {
+        Long unbanAt = userTempBanService.getUnbanAtMs(userId);
+        if (unbanAt != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("errorType", "ACCOUNT_TEMP_BANNED");
+            data.put("unbanAt", unbanAt);
+            throw new BusinessException(600, userTempBanService.buildTempBanMessage(unbanAt), data);
+        }
+        throw new BusinessException("账号被禁用！");
+    }
+
+    // 自动登录，检验当前token是否有效
+    @GetMapping("/autoLogin")
+    public ResponseVO autoLogin(){
+        // 从请求头中获取token
+        TokenUserInfoDTO tokenUserInfoDTO = getTokenUserInfo();
+        // 如果token不存在，则返回null
+        if(tokenUserInfoDTO == null || StringTools.isEmpty(tokenUserInfoDTO.getToken()) ){
+            return getSuccessResponseVO(null);
+        }
+        // 从redis验证token是否有效
+        TokenUserInfoDTO validUserInfo = redisComponent.getTokenUserInfo(tokenUserInfoDTO.getToken());
+        if (validUserInfo == null){
+            // token无效，返回null
+            return getSuccessResponseVO(null);
+        }
+        // 判断当前用户是否被封禁：status=0为封禁
+        // 根据userId查询用户（Redis 残留 token / 库重导后用户不存在时勿 NPE）
+        UserInfo userInfo = userInfoService.getUserInfoByUserId(validUserInfo.getUserId());
+        if (userInfo == null || Objects.equals(userInfo.getStatus(), UserStatusEnum.DISABLE.getStatus())){
+            return getSuccessResponseVO(null);
+        }
+        validUserInfo.setEmail(userInfo.getEmail());
+        validUserInfo.setNickName(userInfo.getNickName());
+        validUserInfo.setAvatar(userInfo.getAvatar());
+        // 否则存入新token，刷新redis
+        String newToken = redisComponent.saveTokenUserInfo(validUserInfo);
+        validUserInfo.setToken(newToken);
+        HttpServletRequest request = currentRequest();
+        HttpServletResponse response = currentResponse();
+        authCookieHelper.writeWebTokenCookie(request, response, newToken);
+        validUserInfo.setToken(null);
+        return getSuccessResponseVO(validUserInfo);
+    }
+
+    // 获取验证码
+    @GetMapping("/checkCode")
+    public ResponseVO checkCode(){
+        CheckCodeVO checkCodeVO = CheckCodeGenerator.generate(redisComponent);
+        return getSuccessResponseVO(checkCodeVO);
+    }
+
+    // 注册
+    // 邮箱email，昵称nickName，密码password，验证码checkCode，验证码key checkCodeKey
+    @PostMapping("/register")
+    public ResponseVO register(@NotEmpty @Email @Size(max = 150) String email,
+                               @NotEmpty @Size(max = 20) String nickName,
+                               @NotEmpty @Pattern(regexp = Constants.REGEX_PASSWORD) String registerPassword,
+                               @NotEmpty String checkCode){
+            // 注册
+            userInfoService.register(email, nickName, registerPassword, checkCode);
+            return getSuccessResponseVO(null);
+    }
+
+    // 登录
+    // 邮箱email，密码password，验证码checkCode，验证码key checkCodeKey
+    @PostMapping("/login")
+    public ResponseVO login(@NotEmpty @Email @Size(max = 150) String email,
+                            @NotEmpty String password,
+                            @NotEmpty String checkCodeKey,
+                            @NotEmpty String checkCode
+                            ){
+        try {
+            // 验证验证码
+            if (!checkCode.equalsIgnoreCase(redisComponent.getCheckCode(checkCodeKey))){
+                throw new BusinessException("验证码错误！");
+            }
+            // 检查账号或密码
+            // 查询UserInfo
+            UserInfo userInfo = userInfoService.getUserInfoByEmail(email);
+            if (userInfo == null || !passwordService.matches(password, userInfo.getPassword())){
+                throw new BusinessException("账号或密码错误！");
+            }
+            if (!passwordService.isBcrypt(userInfo.getPassword())) {
+                UserInfo upgrade = new UserInfo();
+                upgrade.setPassword(passwordService.encode(password));
+                UserInfoQuery upgradeQuery = new UserInfoQuery();
+                upgradeQuery.setUserId(userInfo.getUserId());
+                userInfoService.updateByParam(upgrade, upgradeQuery);
+            }
+            if (UserStatusEnum.DISABLE.getStatus().equals(userInfo.getStatus())){
+                throwIfAccountDisabled(userInfo.getUserId());
+            }
+            // 登录成功，返回userId,nickName,avatar,token:TokenUserInfoDTO
+            TokenUserInfoDTO tokenUserInfoDTO = new TokenUserInfoDTO();
+            tokenUserInfoDTO.setUserId(userInfo.getUserId());
+            tokenUserInfoDTO.setEmail(userInfo.getEmail());
+            tokenUserInfoDTO.setNickName(userInfo.getNickName());
+            tokenUserInfoDTO.setAvatar(userInfo.getAvatar());
+            tokenUserInfoDTO.setToken(redisComponent.saveTokenUserInfo(tokenUserInfoDTO));
+            HttpServletRequest request = currentRequest();
+            HttpServletResponse response = currentResponse();
+            authCookieHelper.writeWebTokenCookie(request, response, tokenUserInfoDTO.getToken());
+            tokenUserInfoDTO.setToken(null);
+            // 更新最近登录时间和ip
+            Date now = DateUtil.parse(DateUtil.getTimeOnParttern(0, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()), DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern());
+            String ip = getClientIp();
+            userInfo.setLastLoginTime(now);
+            userInfo.setLastLoginIp(ip);
+            UserInfoQuery userInfoQuery = new UserInfoQuery();
+            userInfoQuery.setUserId(userInfo.getUserId());
+            userInfoService.updateByParam(userInfo, userInfoQuery);
+            return getSuccessResponseVO(tokenUserInfoDTO);
+        }finally {
+            redisComponent.cleanCheckCode(checkCodeKey);
+        }
+    }
+
+    // 退出登录（不要求 Redis 中 token 仍有效，始终清除 Cookie）
+    @PostMapping("/logout")
+    public ResponseVO logout(){
+        HttpServletRequest request = currentRequest();
+        HttpServletResponse response = currentResponse();
+        String token = authCookieHelper.resolveWebToken(request);
+        if (!StringTools.isEmpty(token)){
+            redisComponent.cleanTokenUserInfo(token);
+        }
+        authCookieHelper.clearWebTokenCookie(request, response);
+        return getSuccessResponseVO(null);
+    }
+
+    // 获取个人信息
+    @GetMapping("/getUserInfo")
+    @GlobalInterceptor(checkLogin = true)
+    public ResponseVO getUserInfo(){
+        String userId = getTokenUserInfo().getUserId();
+        UserInfo userInfo = userInfoService.getUserInfoByUserId(userId);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(userInfo, userVO);
+        return getSuccessResponseVO(userVO);
+    }
+
+    // 修改个人信息
+    @PostMapping("/updateUserInfo")
+    @GlobalInterceptor(checkLogin = true)
+    public ResponseVO updateUserInfo(String avatar,@NotEmpty String nickName,@NotNull Integer sex){
+        String userId = getTokenUserInfo().getUserId();
+        userInfoService.updateUserInfo(userId, avatar, nickName, sex);
+        return getSuccessResponseVO(null);
+    }
+
+    // 修改密码
+    @PostMapping("/updatePassword")
+    @GlobalInterceptor(checkLogin = true)
+    public ResponseVO updatePassword(@NotEmpty String oldPassword,@NotEmpty String password){
+        String userId = getTokenUserInfo().getUserId();
+        userInfoService.updatePassword(userId, oldPassword, password);
+        return getSuccessResponseVO(null);
+    }
+
+    private String getClientIp() {
+        HttpServletRequest request = currentRequest();
+
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+
+        // 如果是多个IP，取第一个
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+
+        return ip;
+    }
+
+    private HttpServletRequest currentRequest() {
+        return ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+    }
+
+    private HttpServletResponse currentResponse() {
+        return ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getResponse();
+    }
+
+    // 获取邮件验证码
+    @PostMapping("/getEmailCode")
+    @RateLimit(limitType = RateLimit.LimitType.IP, windowSeconds = 20, maxCount = 1, message = "获取验证码过于频繁，请稍后再试")
+    public ResponseVO getEmailCode(@NotEmpty @Email @Size(max = 150) String email,
+                                   @NotEmpty String captchaVerification){
+        slideCaptchaVerifier.verify(captchaVerification);
+        // 60秒内只能获取一次
+        String existingCode = redisComponent.getEmailCode(email);
+        if (existingCode != null){
+            // 获取剩余时间，单位为毫秒
+            Long expire = stringRedisTemplate.getExpire(Constants.REDIS_KEY_EMAIL_CODE + email, TimeUnit.MILLISECONDS);
+            // 判断是否大于四分钟
+            if (expire > 4 * 60 * 1000){
+                throw new BusinessException("验证码已发送，请" + ((expire / 1000) - 240) + "秒后再试");
+            }
+        }
+        String code = aliEmailServiceImpl.sendVerificationCode(email);
+        // 存入redis，有效期5分钟
+        redisComponent.saveEmailCode(email, code);
+        return getSuccessResponseVO(null);
+    }
+
+    // 找回密码
+    @PostMapping("/forgetPassword")
+    public ResponseVO forgetPassword(@NotEmpty @Email @Size(max = 150) String email, @NotEmpty @Pattern(regexp = Constants.REGEX_PASSWORD) String newPassword, @NotEmpty String checkCode){
+        // 更新密码
+        userInfoService.forgetPassword(email, newPassword, checkCode);
+        return getSuccessResponseVO(null);
+    }
+}

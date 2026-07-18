@@ -1,0 +1,1681 @@
+package com.myshop.biz.impl;
+
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import com.myshop.api.dto.CartDeleteItemDTO;
+import com.myshop.api.dto.ProductSnapshotBatchVO;
+import com.myshop.api.dto.UserCouponCreateDTO;
+import com.myshop.api.support.CartFeignSupport;
+import com.myshop.api.support.CouponFeignSupport;
+import com.myshop.api.support.PayFeignSupport;
+import com.myshop.api.support.ProductFeignSupport;
+import com.myshop.api.support.StockFeignSupport;
+import com.myshop.api.support.UserFeignSupport;
+import com.myshop.api.vo.CouponBriefVO;
+import com.myshop.api.vo.CouponLockResultVO;
+import com.myshop.api.vo.DiscountCouponVO;
+import com.myshop.api.vo.ProductInfoSnapshotVO;
+import com.myshop.api.vo.ProductPropertyValueSnapshotVO;
+import com.myshop.api.vo.ProductSkuSnapshotVO;
+import com.myshop.api.vo.UserAddressVO;
+import com.myshop.api.vo.UserBriefVO;
+import com.myshop.api.vo.UserCouponVO;
+import com.myshop.component.RedisComponent;
+import com.myshop.component.RemoteCompensateRecorder;
+import com.myshop.constants.Constants;
+import com.myshop.constants.RabbitMQConfig;
+import com.myshop.constants.ReliableMessageSender;
+import com.myshop.constants.TransactionalMqSender;
+import com.myshop.support.MqIdempotencyKeys;
+import io.seata.spring.annotation.GlobalTransactional;
+import com.myshop.entity.config.AppConfig;
+import com.myshop.entity.dto.*;
+import com.myshop.entity.enums.*;
+import com.myshop.entity.po.*;
+import com.myshop.entity.query.*;
+import com.myshop.entity.vo.OrderCountVO;
+import com.myshop.exception.BusinessException;
+import com.myshop.exception.PayOrderLifecycleBusyException;
+import com.myshop.mappers.*;
+import jakarta.annotation.Resource;
+
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.myshop.entity.vo.PaginationResultVO;
+import com.myshop.biz.OrderInfoService;
+import com.myshop.utils.OrderListPayAmountHelper;
+import com.myshop.utils.OrderPayAmountUtil;
+import com.myshop.utils.StringTools;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service("orderInfoService")
+@Slf4j
+public class OrderInfoServiceImpl implements OrderInfoService {
+
+	@Resource
+	private OrderInfoMapper<OrderInfo, OrderInfoQuery> orderInfoMapper;
+
+	@Resource
+	private StockFeignSupport stockFeignSupport;
+
+	@Resource
+	private ProductFeignSupport productFeignSupport;
+
+	@Resource
+	private UserFeignSupport userFeignSupport;
+
+	@Resource
+	private CouponFeignSupport couponFeignSupport;
+
+	@Resource
+	private OrderItemMapper<OrderItem, OrderItemQuery> orderItemMapper;
+
+	@Resource
+	private CartFeignSupport cartFeignSupport;
+    @Autowired
+    private RedisComponent redisComponent;
+    @Autowired
+    private AppConfig appConfig;
+
+	@Resource
+	private OrderCouponRelMapper<OrderCouponRel, OrderCouponRelQuery> orderCouponRelMapper;
+
+	@Resource
+	private OrderLogisticsInfoMapper<OrderLogisticsInfo, OrderLogisticsInfoQuery> orderLogisticsInfoMapper;
+
+	@Resource
+	private PayFeignSupport payFeignSupport;
+
+	@Resource
+	private ReliableMessageSender reliableMessageSender;
+	@Resource
+	private TransactionalMqSender transactionalMqSender;
+	@Resource
+	private RemoteCompensateRecorder remoteCompensateRecorder;
+
+	@Override
+	public List<OrderInfo> findListByParam(OrderInfoQuery param) {
+		List<OrderInfo> list = this.orderInfoMapper.selectList(param);
+		if (list != null && !list.isEmpty()) {
+			if (Boolean.TRUE.equals(param.isQueryItems())) {
+				enrichCouponInfo(list);
+			}
+			if (Boolean.TRUE.equals(param.getQueryUser())) {
+				enrichUserBrief(list);
+			}
+		}
+		return list;
+	}
+
+	@Override
+	public Integer findCountByParam(OrderInfoQuery param) {
+		return this.orderInfoMapper.selectCount(param);
+	}
+
+	@Override
+	public PaginationResultVO<OrderInfo> findListByPage(OrderInfoQuery param) {
+		int count = this.findCountByParam(param);
+		int pageSize = param.getPageSize() == null ? PageSize.SIZE15.getSize() : param.getPageSize();
+
+		SimplePage page = new SimplePage(param.getPageNo(), count, pageSize);
+		param.setSimplePage(page);
+		List<OrderInfo> list = this.findListByParam(param);
+		PaginationResultVO<OrderInfo> result = new PaginationResultVO(count, pageSize, page.getPageNo(), page.getPageTotal(), list);
+		return result;
+	}
+
+	@Override
+	public Integer add(OrderInfo bean) {
+		return this.orderInfoMapper.insert(bean);
+	}
+
+	@Override
+	public Integer addBatch(List<OrderInfo> listBean) {
+		if (listBean == null || listBean.isEmpty()) {
+			return 0;
+		}
+		return this.orderInfoMapper.insertBatch(listBean);
+	}
+
+	@Override
+	public Integer addOrUpdateBatch(List<OrderInfo> listBean) {
+		if (listBean == null || listBean.isEmpty()) {
+			return 0;
+		}
+		return this.orderInfoMapper.insertOrUpdateBatch(listBean);
+	}
+
+	@Override
+	public Integer updateByParam(OrderInfo bean, OrderInfoQuery param) {
+		StringTools.checkParam(param);
+		return this.orderInfoMapper.updateByParam(bean, param);
+	}
+
+	@Override
+	public Integer deleteByParam(OrderInfoQuery param) {
+		StringTools.checkParam(param);
+		return this.orderInfoMapper.deleteByParam(param);
+	}
+
+	@Override
+	public OrderInfo getOrderInfoByOrderId(String orderId) {
+		return this.orderInfoMapper.selectByOrderId(orderId);
+	}
+
+	@Override
+	public Integer updateOrderInfoByOrderId(OrderInfo bean, String orderId) {
+		return this.orderInfoMapper.updateByOrderId(bean, orderId);
+	}
+
+	@Override
+	public Integer deleteOrderInfoByOrderId(String orderId) {
+		return this.orderInfoMapper.deleteByOrderId(orderId);
+	}
+
+	@Override
+	@GlobalTransactional(name = "simlect-post-order", rollbackFor = Exception.class)
+	@Transactional(rollbackFor = Exception.class)
+	public PayInfoDTO postOrder(String userId, PostOrderDTO postOrderDTO) {
+		PayChannelEnum payChannelEnum = PayChannelEnum.getByPayScene(postOrderDTO.getPayMethod());
+		if (payChannelEnum == null) {
+			throw new BusinessException(ResponseCodeEnum.CODE_600);
+		}
+
+		OrderFromTypeEnum orderFromTypeEnum = OrderFromTypeEnum.getByType(postOrderDTO.getOrderFrom());
+		if (orderFromTypeEnum == null) {
+			throw new BusinessException(ResponseCodeEnum.CODE_600);
+		}
+
+		// PostOrderDTO中的数据有：订单列表(商品Id，商品属性Ids，购买数量，备注)，支付方式，地址ID，订单来源
+		// 存入order_info表的数据有：订单Id，数量，用户Id，创建订单时间，订单状态，支付渠道，支付场景，支付订单Id，渠道订单Id，评价状态
+		// 存入order_item表数据有：订单明细Id，订单Id，封面图，商品Id，商品名称，商品属性IdHash，property_info,item总价格，购买数量，订单明细状态，备注，refund_order_id
+		// 同一个商品id的放在同一个订单中，分为不同的订单明细，同一个商品属性id的放在同一个订单明细中
+		// 根据addressId获取地址信息
+		// 根据addressId获取地址信息（user 服务）
+		UserAddressVO userAddress = userFeignSupport.getAddress(postOrderDTO.getAddressId(), userId);
+		// 若地址不存在则抛出异常
+		if (userAddress == null || StringTools.isEmpty(userAddress.getAddress())) {
+			throw new BusinessException("当前地址不存在");
+		}
+
+		List<ProductItem> orderList = postOrderDTO.getOrderList();
+		List<String> productIdList = orderList.stream().map(ProductItem::getProductId).collect(Collectors.toList());
+        // 遍历orderList
+		// 创建Map：productId -> OrderInfo；productId -> OrderItem
+		Map<String, OrderInfo> productIdOrderInfoMap = new HashMap<>();
+		Map<String, OrderItem> productIdOrderItemMap = new HashMap<>();
+		Map<String, Integer> productItemCountMap = new HashMap<>();
+		ProductSnapshotBatchVO snapshot = productFeignSupport.snapshotBatch(productIdList);
+		Map<String, ProductInfoSnapshotVO> productInfoMap = productFeignSupport.toProductInfoMap(snapshot);
+		Map<String, ProductPropertyValueSnapshotVO> productPropertyValueMap = productFeignSupport.toPropertyValueMap(snapshot);
+		Map<String, ProductSkuSnapshotVO> productSkuMap = productFeignSupport.toSkuMapByPropertyValueIds(snapshot);
+		// 获取当前时间
+		Date now = new Date();
+		List<ProductItem> newList = new ArrayList<>();
+		List<OrderItem> orderItemList = new ArrayList<>();
+		// 购物车列表
+		List<CartDeleteItemDTO> productCartList = new ArrayList<>();
+		// 物流信息
+		OrderLogisticsInfo orderLogisticsInfo = new OrderLogisticsInfo();
+		String unifiedPayOrderId = StringTools.createPayOrderId();
+		for (ProductItem productItem : orderList) {
+			// 根据productId获取productInfoMap中的productInfo
+			ProductInfoSnapshotVO productInfo = productInfoMap.get(productItem.getProductId());
+			// 根据productId+productPropertyValueId获取productPropertyValueMap中的productPropertyValue
+			// 遍历每个属性值ID，分别查询
+			String[] propertyValueIdArray = productItem.getPropertyValueIds().split("-");
+			List<ProductPropertyValueSnapshotVO> propertyValueList = new ArrayList<>();
+			for (String propertyValueId : propertyValueIdArray) {
+				ProductPropertyValueSnapshotVO pv = productPropertyValueMap.get(productItem.getProductId() + propertyValueId);
+				if (pv != null) {
+					propertyValueList.add(pv);
+				}
+			}
+			// 根据productId+productPropertyValueIds获取productSkuMap中的productSku
+			ProductSkuSnapshotVO productSku = productSkuMap.get(productItem.getProductId() + productItem.getPropertyValueIds());
+			// 先判断productInfo,productPropertyValue,productSku是否存在
+			if (productInfo == null || !ProductStatusEnum.ON_SALE.getStatus().equals(productInfo.getStatus())) {
+				throw new BusinessException("商品不存在或已下架");
+			}
+			if (propertyValueList.isEmpty()) {
+				throw new BusinessException("商品属性不存在");
+			}
+			if (productSku == null) {
+				throw new BusinessException("商品sku不存在");
+			}
+			if (productItem.getBuyCount() == null || productItem.getBuyCount() < 1
+					|| productItem.getBuyCount() > Constants.ORDER_MAX_BUY_COUNT_PER_SKU) {
+				throw new BusinessException("单件商品购买数量为 1~" + Constants.ORDER_MAX_BUY_COUNT_PER_SKU + " 件");
+			}
+			// 判断库存（真相源：simlect_stock）
+			if (StringTools.isEmpty(productItem.getPropertyValueIdHash())) {
+				productItem.setPropertyValueIdHash(productSku.getPropertyValueIdHash());
+			}
+			int available = stockFeignSupport.getAvailable(productItem.getProductId(), productItem.getPropertyValueIdHash());
+			if (available < productItem.getBuyCount()) {
+				throw new BusinessException("商品【" + productInfo.getProductName() + "】库存不足");
+			}
+
+			OrderInfo orderInfo = new OrderInfo();
+			// 检查当前productId的商品是否已经加入过订单，通过Map<productId,OrderInfo>
+			// 新建一个OrderItem
+			OrderItem orderItem = new OrderItem();
+			// 若没有则新生成一个订单
+			if (!productIdOrderInfoMap.containsKey(productItem.getProductId())) {
+				// 将productItem中的数据赋给orderInfo
+				orderInfo.setOrderId(StringTools.createOrderId());
+				// 先将amount总金额设置为0.0
+				orderInfo.setAmount(new BigDecimal(Constants.ZERO_STR));
+				orderInfo.setUserId(userId);
+				orderInfo.setOrderTime(now);
+				// 订单状态为待付款
+				orderInfo.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+				// 评论状态为未评论
+				orderInfo.setCommentStatus(CommentStatusEnum.NORMAL.getStatus());
+				orderInfo.setPayChannel(postOrderDTO.getPayMethod());
+				orderInfo.setPayScene(postOrderDTO.getOrderFrom().toString());
+				orderInfo.setPayOrderId(unifiedPayOrderId);
+				orderInfo.setOrderItemList(new ArrayList<>());
+				// 记录地址信息
+				orderLogisticsInfo.setOrderId(orderInfo.getOrderId());
+				orderLogisticsInfo.setUserId(userId);
+				orderLogisticsInfo.setReceiverName(userAddress.getAddressee());
+				orderLogisticsInfo.setReceiverPhone(userAddress.getPhone());
+				orderLogisticsInfo.setReceiverAddress(userAddress.getAddress());
+				orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.PENDING_SHIPMENT.getStatus());
+				// 设置默认发货信息:发货人、发货电话、发货地
+				// 从redis中取出发货信息
+				LogisticsSendDTO logisticsSendDTO = redisComponent.getLogisticsInfo();
+				if (logisticsSendDTO != null) {
+					orderLogisticsInfo.setSenderName(logisticsSendDTO.getSenderName());
+					orderLogisticsInfo.setSenderPhone(logisticsSendDTO.getSenderPhone());
+					orderLogisticsInfo.setSenderAddress(logisticsSendDTO.getSenderAddress());
+				}
+				// 将orderInfo加入到Map
+				productIdOrderInfoMap.put(productItem.getProductId(), orderInfo);
+			} else {
+				orderInfo = productIdOrderInfoMap.get(productItem.getProductId());
+			}
+			// 为orderItem填充属性
+			orderItem.setOrderId(orderInfo.getOrderId());
+			// 获取当前商品的订单项序号
+			Integer itemCount = productItemCountMap.getOrDefault(productItem.getProductId(), 0) + 1;
+			productItemCountMap.put(productItem.getProductId(), itemCount);
+			// 填充orderItemId，为orderId加上当前的商品数量，即为同一个productId的第几个商品
+			orderItem.setOrderItemId(orderInfo.getOrderId() + "_" + itemCount);
+			// 填充productId、productName、property_value_id_hash
+			orderItem.setProductId(productItem.getProductId());
+			orderItem.setProductName(productInfo.getProductName());
+			orderItem.setPropertyValueIdHash(productSku.getPropertyValueIdHash());
+			// 组装属性信息：属性名称:属性值;属性名称:属性值
+			List<String> propertyData = new ArrayList<>();
+			for (String propertyValueId : propertyValueIdArray) {
+				ProductPropertyValueSnapshotVO productPropertyValue = productPropertyValueMap.get(productItem.getProductId() + propertyValueId);
+				if (productPropertyValue != null) {
+					propertyData.add(productPropertyValue.getPropertyName() + ":" + productPropertyValue.getPropertyValue());
+				}
+			}
+			orderItem.setPropertyInfo(String.join(";", propertyData));
+			orderItem.setBuyCount(productItem.getBuyCount());
+			orderItem.setItemAmount(productSku.getPrice().multiply(new BigDecimal(productItem.getBuyCount())));
+			orderItem.setOrderItemStatus(OrderItemStatusEnum.NORMAL.getStatus());
+			orderItem.setRemark(productItem.getRemark());
+			orderItem.setRefundOrderId(null);
+			String cover = null;
+			// 优先取 propertyValue 中的 cover
+			for (ProductPropertyValueSnapshotVO pv : propertyValueList) {
+				if (!StringTools.isEmpty(pv.getPropertyCover())) {
+					cover = pv.getPropertyCover();
+					break;
+				}
+			}
+			// 如果 propertyValue 中没有 cover，则取 productInfo 中的 cover
+			if (StringTools.isEmpty(cover)) {
+				cover = productInfo.getCover();
+				if (!StringTools.isEmpty(cover) && cover.contains(",")) {
+					cover = cover.split(",")[0];
+				}
+			}
+			orderItem.setCover(cover);
+			productIdOrderItemMap.put(productItem.getProductId(), orderItem);
+			orderInfo.setAmount(orderInfo.getAmount().add(orderItem.getItemAmount()));
+			orderInfo.getOrderItemList().add(orderItem);
+			orderItemList.add(orderItem);
+			newList.add(productItem);
+			// 如果是在购物车提交的订单，记录商品购物车信息
+			if (OrderFromTypeEnum.CART == orderFromTypeEnum) {
+				productCartList.add(new CartDeleteItemDTO(
+						userId,
+						productItem.getProductId(),
+						productSku.getPropertyValueIdHash(),
+						productSku.getPropertyValueIds()));
+			}
+		}
+		String subject;
+		if (OrderFromTypeEnum.CART == orderFromTypeEnum) {
+			subject = String.format(Constants.CART_PAY_NAME, orderItemList.size());
+		} else {
+			// 直接从第一个 ProductItem 获取名称，或者从 orderItemList 获取
+			subject = orderItemList.get(0).getProductName();
+		}
+		// 将productIdOrderInfoMap中的订单添加到orderInfoList
+        List<OrderInfo> orderInfoList = new ArrayList<>(productIdOrderInfoMap.values());
+		// 设置订单标题
+		for(OrderInfo orderInfo : orderInfoList){
+			orderInfo.setSubject(subject);
+		}
+
+		// --- 下单使用优惠券（可选）：经 coupon 服务校验并预占 ---
+		String userCouponId = postOrderDTO.getUserCouponId();
+		boolean couponLocked = false;
+		if (!StringTools.isEmpty(userCouponId)) {
+			BigDecimal orderAmountBeforeDiscount = orderInfoList.stream()
+					.map(OrderInfo::getAmount)
+					.reduce(BigDecimal.ZERO, BigDecimal::add);
+			CouponLockResultVO lockResult = couponFeignSupport.validateAndLock(userId, userCouponId, orderAmountBeforeDiscount);
+			if (Boolean.TRUE.equals(lockResult.getLocked()) && lockResult.getDiscountAmount() != null
+					&& lockResult.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+				distributeCouponDiscount(orderInfoList, lockResult.getDiscountAmount());
+				OrderListPayAmountHelper.ensureOrderListMinTotalPay(orderInfoList);
+
+				OrderCouponRel rel = new OrderCouponRel();
+				rel.setOrderId(orderInfoList.get(0).getOrderId());
+				rel.setUserCouponId(userCouponId);
+				rel.setCouponId(lockResult.getCouponId());
+				rel.setDiscountAmount(lockResult.getDiscountAmount());
+				rel.setCreateTime(now);
+				orderCouponRelMapper.insert(rel);
+				couponLocked = true;
+			}
+		}
+		// 统一操作数据库
+		if (newList.isEmpty()) {
+			throw new BusinessException("请选择商品");
+		}
+		boolean stockDeducted = false;
+		try {
+			stockFeignSupport.lockAndVerify(newList);
+			// 插入数据库
+			orderInfoMapper.insertBatch(orderInfoList);
+			orderItemMapper.insertBatch(orderItemList);
+			orderLogisticsInfoMapper.insert(orderLogisticsInfo);
+			// 远程扣减库存（与本地订单事务分离；后续步骤失败时补偿回补）
+			List<ProductItem> deductList = copyItemsWithSignedBuyCount(newList, true);
+			stockFeignSupport.changeStockBatch(deductList);
+			stockDeducted = true;
+			if (OrderFromTypeEnum.CART == orderFromTypeEnum) {
+				cartFeignSupport.deleteBatch(productCartList);
+			}
+			BigDecimal totalAmount = orderInfoList.stream().map(OrderInfo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+			totalAmount = OrderPayAmountUtil.normalizeChannelPayAmount(totalAmount);
+
+			log.info("提交订单,payOrderId={}, 订单数量={}, 总金额={}", unifiedPayOrderId, orderInfoList.size(), totalAmount);
+
+			PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(
+					payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount);
+
+			payFeignSupport.createPending(userId, unifiedPayOrderId, orderInfoList.get(0).getOrderId(),
+					totalAmount, postOrderDTO.getPayMethod());
+
+			for (OrderInfo orderInfo : orderInfoList) {
+				PayOrderMessageDTO dto = new PayOrderMessageDTO();
+				dto.setOrderId(orderInfo.getOrderId());
+				transactionalMqSender.sendAfterCommit(
+						RabbitMQConfig.PAY_EXCHANGE,
+						RabbitMQConfig.PAY_TIMEOUT_DELAY_KEY,
+						dto,
+						MqIdempotencyKeys.payTimeout(orderInfo.getOrderId()),
+						MessageReliabilityLevelEnum.STANDARD);
+			}
+			return payInfoDTO;
+		} catch (RuntimeException ex) {
+			if (stockDeducted) {
+				try {
+					stockFeignSupport.changeStockBatch(copyItemsWithSignedBuyCount(newList, false));
+				} catch (Exception compensateEx) {
+					log.error("下单失败后库存回补失败, payOrderId={}", unifiedPayOrderId, compensateEx);
+					remoteCompensateRecorder.recordStockChangeBatch(
+							unifiedPayOrderId, copyItemsWithSignedBuyCount(newList, false), compensateEx);
+				}
+			}
+			if (couponLocked) {
+				try {
+					couponFeignSupport.changeUserCouponStatus(userCouponId, userId,
+							UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(), null);
+				} catch (Exception compensateEx) {
+					log.error("下单失败后优惠券解锁失败, payOrderId={}, userCouponId={}",
+							unifiedPayOrderId, userCouponId, compensateEx);
+					remoteCompensateRecorder.recordCouponUnlock(
+							unifiedPayOrderId, userCouponId, userId,
+							UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(),
+							compensateEx);
+				}
+			}
+			throw ex;
+		}
+	}
+
+	private DiscountCouponVO validateCouponRush(String couponId) {
+		DiscountCouponVO discountCoupon = couponFeignSupport.getCoupon(couponId);
+		if (discountCoupon == null) {
+			throw new BusinessException("优惠券不存在");
+		}
+		if (RushingCouponStatusEnum.NO.getStatus().equals(discountCoupon.getRushingstatus())) {
+			throw new BusinessException("该优惠券不是抢购状态");
+		}
+		Date now = new Date();
+		if (discountCoupon.getRushingStartTime() != null && now.before(discountCoupon.getRushingStartTime())) {
+			throw new BusinessException("该优惠券未开始抢购");
+		}
+		if (discountCoupon.getRushingEndTime() != null && now.after(discountCoupon.getRushingEndTime())) {
+			throw new BusinessException("该优惠券已结束抢购");
+		}
+		couponFeignSupport.assertRushNotBlocked(couponId);
+		if (!couponFeignSupport.hasAvailableRushStock(couponId)) {
+			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
+			if (!couponFeignSupport.hasAvailableRushStock(couponId)) {
+				throw new BusinessException("库存不足！");
+			}
+		}
+		return discountCoupon;
+	}
+
+	private void assertRushCode(int rushCode) {
+		if (rushCode == 1) {
+			throw new BusinessException("库存不足！");
+		}
+		if (rushCode == 2) {
+			throw new BusinessException("不能重复下单！");
+		}
+		if (rushCode == 3) {
+			throw new BusinessException("网络异常，请稍后再试~");
+		}
+	}
+
+	private String buildCouponRushOrderSubject(String couponName) {
+		String name = StringTools.isEmpty(couponName) ? "优惠券" : couponName.trim();
+		return Constants.COUPON_RUSH_ORDER_SUBJECT_PREFIX + name;
+	}
+
+	private OrderInfo createCouponRushOrder(String userId, String couponId, String userCouponId, DiscountCouponVO discountCoupon) {
+		Date now = new Date();
+		String orderId = StringTools.createOrderId();
+		String payOrderId = StringTools.createPayOrderId();
+		BigDecimal payAmount = new BigDecimal(Constants.RUSHING_COUPON_PAY_AMOUNT);
+
+		OrderInfo orderInfo = new OrderInfo();
+		orderInfo.setOrderId(orderId);
+		orderInfo.setAmount(payAmount);
+		orderInfo.setUserId(userId);
+		orderInfo.setOrderTime(now);
+		orderInfo.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		orderInfo.setCommentStatus(OrderCommentStatusEnum.NOT_EVALUATED.getStatus());
+		orderInfo.setPayScene(String.valueOf(OrderFromTypeEnum.COUPON.getType()));
+		orderInfo.setPayChannel(PayChannelEnum.ALIPAY_PC.getPayScene());
+		orderInfo.setPayOrderId(payOrderId);
+		orderInfo.setSubject(buildCouponRushOrderSubject(discountCoupon.getCouponName()));
+		orderInfoMapper.insert(orderInfo);
+
+		UserCouponCreateDTO createDTO = new UserCouponCreateDTO();
+		createDTO.setUserCouponId(userCouponId);
+		createDTO.setUserId(userId);
+		createDTO.setCouponId(couponId);
+		createDTO.setStatus(UserCouponStatusEnum.CANT.getStatus());
+		couponFeignSupport.createUserCoupon(createDTO);
+
+		OrderCouponRel rel = new OrderCouponRel();
+		rel.setOrderId(orderId);
+		rel.setUserCouponId(userCouponId);
+		rel.setCouponId(couponId);
+		rel.setDiscountAmount(payAmount);
+		rel.setCreateTime(now);
+		orderCouponRelMapper.insert(rel);
+
+		OrderItem orderItem = new OrderItem();
+		orderItem.setOrderItemId(orderId + "_1");
+		orderItem.setOrderId(orderId);
+		orderItem.setProductId(couponId);
+		orderItem.setProductName(discountCoupon.getCouponName());
+		orderItem.setPropertyValueIdHash("coupon_rush");
+		orderItem.setPropertyInfo("优惠券秒杀");
+		orderItem.setBuyCount(1);
+		orderItem.setItemAmount(payAmount);
+		orderItem.setOrderItemStatus(OrderItemStatusEnum.NORMAL.getStatus());
+		orderItem.setCover("");
+		orderItemMapper.insert(orderItem);
+
+		PayOrderMessageDTO payTimeoutDto = new PayOrderMessageDTO();
+		payTimeoutDto.setOrderId(orderId);
+		transactionalMqSender.sendAfterCommit(
+				RabbitMQConfig.PAY_EXCHANGE,
+				RabbitMQConfig.PAY_TIMEOUT_DELAY_KEY,
+				payTimeoutDto,
+				MqIdempotencyKeys.payTimeout(orderId),
+				MessageReliabilityLevelEnum.STANDARD);
+		log.info("优惠券秒杀订单已创建 orderId={}, payOrderId={}", orderId, payOrderId);
+		return orderInfo;
+	}
+
+	private OrderInfo findCouponRushOrderByUserCoupon(String userCouponId) {
+		if (StringTools.isEmpty(userCouponId)) {
+			return null;
+		}
+		OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+		relQuery.setUserCouponId(userCouponId);
+		List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+		if (rels == null || rels.isEmpty()) {
+			return null;
+		}
+		return orderInfoMapper.selectByOrderId(rels.get(0).getOrderId());
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public CouponRushPrepareDTO prepareCouponRush(String userId, String couponId) {
+		DiscountCouponVO discountCoupon = validateCouponRush(couponId);
+		String userCouponId = StringTools.createUserCouponId();
+		BigDecimal payAmount = new BigDecimal(Constants.RUSHING_COUPON_PAY_AMOUNT);
+
+		int rushCode = redisComponent.rushingCoupon(couponId, userId, userCouponId);
+		if (rushCode == 1) {
+			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
+			throw new BusinessException("库存不足！");
+		}
+		assertRushCode(rushCode);
+
+		try {
+			DiscountCouponVO lockedCoupon = couponFeignSupport.getCoupon(couponId);
+			boolean unlimited = lockedCoupon != null && lockedCoupon.isUnlimitedStock();
+			if (lockedCoupon == null
+					|| (!unlimited && (lockedCoupon.getRemainCount() == null || lockedCoupon.getRemainCount() <= 0))) {
+				couponFeignSupport.releaseRushRedisReserve(couponId, userId);
+				throw new BusinessException("库存不足");
+			}
+
+			int affected = couponFeignSupport.deductStock(couponId);
+			if (affected == 0) {
+				couponFeignSupport.releaseRushRedisReserve(couponId, userId);
+				throw new BusinessException("库存不足或并发冲突");
+			}
+			couponFeignSupport.invalidateCouponCache(couponId);
+
+			OrderInfo orderInfo;
+			try {
+				orderInfo = createCouponRushOrder(userId, couponId, userCouponId, discountCoupon);
+			} catch (Exception e) {
+				couponFeignSupport.releaseRushCouponReserve(couponId, userId);
+				if (e instanceof BusinessException) {
+					throw (BusinessException) e;
+				}
+				log.error("优惠券秒杀建单失败 couponId={}, userId={}", couponId, userId, e);
+				throw new BusinessException("下单失败，请稍后重试");
+			}
+
+			long payExpireAt = orderInfo.getOrderTime().getTime() + appConfig.getOrderExpireMinute() * 60 * 1000L;
+
+			CouponRushPrepareDTO dto = new CouponRushPrepareDTO();
+			dto.setCouponId(couponId);
+			dto.setUserCouponId(userCouponId);
+			dto.setCouponName(discountCoupon.getCouponName());
+			dto.setPayAmount(payAmount);
+			dto.setOrderId(orderInfo.getOrderId());
+			dto.setPayOrderId(orderInfo.getPayOrderId());
+			dto.setPayExpireAt(payExpireAt);
+			log.info("优惠券秒杀预占并建单成功 couponId={}, orderId={}", couponId, orderInfo.getOrderId());
+			return dto;
+		} finally {
+			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
+		}
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public PayInfoDTO postCouponRushOrder(String userId, String couponId, String payMethod) {
+		PayChannelEnum payChannelEnum = PayChannelEnum.resolve(payMethod);
+		if (payChannelEnum == null) {
+			throw new BusinessException("支付方式无效");
+		}
+		couponFeignSupport.assertRushNotBlocked(couponId);
+
+		String userCouponId = redisComponent.getRushUserCouponId(userId, couponId);
+		if (StringTools.isEmpty(userCouponId)) {
+			throw new BusinessException("抢购资格已失效，请返回重新抢购");
+		}
+
+		DiscountCouponVO discountCoupon = couponFeignSupport.getCoupon(couponId);
+		if (discountCoupon == null) {
+			throw new BusinessException("优惠券不存在");
+		}
+
+		OrderInfo orderInfo = findCouponRushOrderByUserCoupon(userCouponId);
+		if (orderInfo == null || !userId.equals(orderInfo.getUserId())) {
+			throw new BusinessException("订单不存在，请返回重新抢购");
+		}
+		if (!OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(orderInfo.getOrderStatus())) {
+			if (OrderStatusEnum.CLOSED.getStatus().equals(orderInfo.getOrderStatus())
+					|| OrderStatusEnum.CANCELLED.getStatus().equals(orderInfo.getOrderStatus())) {
+				throw new BusinessException("订单已关闭，请重新抢购");
+			}
+			throw new BusinessException("当前订单已支付");
+		}
+
+		OrderInfo updatePay = new OrderInfo();
+		updatePay.setPayChannel(payMethod);
+		OrderInfoQuery payUpdateQuery = new OrderInfoQuery();
+		payUpdateQuery.setOrderId(orderInfo.getOrderId());
+		payUpdateQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		orderInfoMapper.updateByParam(updatePay, payUpdateQuery);
+
+		orderInfo.setPayChannel(payMethod);
+		BigDecimal payAmount = OrderPayAmountUtil.normalizeChannelPayAmount(orderInfo.getAmount());
+		PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(
+				payChannelEnum.getPayScene(), orderInfo.getPayOrderId(), orderInfo.getSubject(), payAmount);
+		payInfoDTO.setOrderId(orderInfo.getOrderId());
+		payFeignSupport.createPending(userId, orderInfo.getPayOrderId(), orderInfo.getOrderId(),
+				payAmount, payMethod);
+		log.info("优惠券秒杀发起支付 orderId={}, payOrderId={}", orderInfo.getOrderId(), orderInfo.getPayOrderId());
+		return payInfoDTO;
+	}
+
+	private void distributeCouponDiscount(List<OrderInfo> orderInfoList, BigDecimal discount) {
+		BigDecimal remaining = discount;
+		for (OrderInfo order : orderInfoList) {
+			if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+				break;
+			}
+			BigDecimal amt = order.getAmount() == null ? BigDecimal.ZERO : order.getAmount();
+			BigDecimal off = remaining.min(amt);
+			order.setAmount(amt.subtract(off).setScale(2, BigDecimal.ROUND_HALF_UP));
+			remaining = remaining.subtract(off);
+		}
+	}
+
+	// 获取支付信息
+	@Override
+	public PayInfoDTO getPayInfo(String userId, String orderId) {
+		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
+		if (orderInfo == null) {
+			OrderInfoQuery payQuery = new OrderInfoQuery();
+			payQuery.setPayOrderId(orderId);
+			payQuery.setUserId(userId);
+			List<OrderInfo> payOrders = orderInfoMapper.selectList(payQuery);
+			if (!payOrders.isEmpty()) {
+				orderInfo = payOrders.get(0);
+			}
+		}
+		if (orderInfo == null || !orderInfo.getUserId().equals(userId)) {
+			throw new BusinessException("订单不存在");
+		}
+		// 判断当前订单状态是否为待支付
+		if (orderInfo.getOrderStatus() != OrderStatusEnum.WAIT_PAYMENT.getStatus()) {
+			if (OrderStatusEnum.CLOSED.getStatus().equals(orderInfo.getOrderStatus())
+					|| OrderStatusEnum.CANCELLED.getStatus().equals(orderInfo.getOrderStatus())) {
+				throw new BusinessException("订单已关闭，请重新抢购");
+			}
+			throw new BusinessException("当前订单已支付");
+		}
+		PayChannelEnum payChannelEnum = resolveWaitPayChannel(orderInfo);
+		String subject = orderInfo.getSubject();
+		// 查询同一payOrderId下的所有订单,计算总金额
+		OrderInfoQuery query = new OrderInfoQuery();
+		query.setPayOrderId(orderInfo.getPayOrderId());
+		List<OrderInfo> payOrderList = orderInfoMapper.selectList(query);
+		BigDecimal amount = payOrderList.stream()
+				.map(OrderInfo::getAmount)
+				.reduce(BigDecimal.ZERO, BigDecimal::add);  // 累加所有订单金额
+		amount = OrderPayAmountUtil.normalizeChannelPayAmount(amount);
+		String payOrderId = orderInfo.getPayOrderId();
+
+		PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(payChannelEnum.getPayScene(), payOrderId, subject, amount);
+		//将之前的订单取消
+		cancelOrder4Channel(orderInfo);
+
+		//更新支付订单ID
+		OrderInfo updateOrderInfo = new OrderInfo();
+		updateOrderInfo.setPayOrderId(payOrderId);
+		orderInfoMapper.updateByOrderId(updateOrderInfo, orderInfo.getOrderId());
+		return payInfoDTO;
+	}
+
+	// 取消订单
+	// 从orderStatusEnum状态取消
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void cancelOrder(String userId, String orderId, OrderStatusEnum orderStatusEnum) {
+		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
+		if (orderInfo == null) {
+			throw new BusinessException("订单不存在");
+		}
+		String payOrderId = orderInfo.getPayOrderId();
+		if (StringTools.isEmpty(payOrderId)) {
+			cancelOrderInLock(userId, orderId);
+			return;
+		}
+		redisComponent.runWithPayOrderLifecycleLock(payOrderId, () -> cancelOrderInLock(userId, orderId));
+	}
+
+	private void cancelOrderInLock(String userId, String orderId) {
+		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
+		if (orderInfo == null) {
+			throw new BusinessException("订单不存在");
+		}
+		if (orderInfo.getOrderStatus() == OrderStatusEnum.PAID.getStatus()) {
+			throw new BusinessException("当前订单已支付无法取消");
+		}
+		if (userId != null && !orderInfo.getUserId().equals(userId)) {
+			throw new BusinessException("订单不存在");
+		}
+		if (orderInfo.getOrderStatus() != OrderStatusEnum.WAIT_PAYMENT.getStatus()) {
+			throw new BusinessException("当前订单状态不能取消");
+		}
+		if (isCouponRushOrder(orderInfo)) {
+			cancelCouponRushOrder(orderId, userId);
+			return;
+		}
+		if (userId == null && !StringTools.isEmpty(orderInfo.getPayOrderId())) {
+			closeUnpaidPayOrderForTimeout(orderInfo.getPayOrderId());
+			return;
+		}
+		OrderInfo updateBean = new OrderInfo();
+		if (userId != null) {
+			updateBean.setOrderStatus(OrderStatusEnum.CANCELLED.getStatus());
+		} else {
+			updateBean.setOrderStatus(OrderStatusEnum.CLOSED.getStatus());
+		}
+		OrderInfoQuery statusQuery = new OrderInfoQuery();
+		statusQuery.setOrderId(orderId);
+		statusQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		Integer rows = orderInfoMapper.updateByParam(updateBean, statusQuery);
+		if (rows == null || rows == 0) {
+			if (userId != null) {
+				throw new BusinessException("当前订单状态不能取消");
+			}
+			return;
+		}
+		markPayOrderClosedIfNeeded(orderInfo.getPayOrderId());
+		payFeignSupport.markClosed(orderInfo.getPayOrderId());
+		restoreStockForPayOrderId(orderInfo.getPayOrderId());
+		if (StringTools.isEmpty(orderInfo.getChannelOrderId())) {
+			releaseCouponIfNeeded(orderInfo.getPayOrderId());
+			return;
+		}
+		cancelOrder4Channel(orderInfo);
+		releaseCouponIfNeeded(orderInfo.getPayOrderId());
+	}
+
+	private boolean isPaidOrBeyond(Integer status) {
+		if (status == null) {
+			return false;
+		}
+		return OrderStatusEnum.PAID.getStatus().equals(status)
+				|| OrderStatusEnum.SHIPPED.getStatus().equals(status)
+				|| OrderStatusEnum.COMPLETED.getStatus().equals(status)
+				|| OrderStatusEnum.PARTIALLY_REFUNDED.getStatus().equals(status)
+				|| OrderStatusEnum.WAIT_COMMENT.getStatus().equals(status);
+	}
+
+	private void closeUnpaidPayOrderForTimeout(String payOrderId) {
+		OrderInfoQuery listQuery = new OrderInfoQuery();
+		listQuery.setPayOrderId(payOrderId);
+		List<OrderInfo> orderList = orderInfoMapper.selectList(listQuery);
+		if (orderList.isEmpty()) {
+			return;
+		}
+		for (OrderInfo order : orderList) {
+			if (isPaidOrBeyond(order.getOrderStatus())) {
+				log.info("支付超时关单跳过：存在已支付子单 payOrderId={}", payOrderId);
+				return;
+			}
+		}
+		if (!redisComponent.tryMarkPayOrderCloseOnce(payOrderId)) {
+			log.info("支付超时关单幂等跳过 payOrderId={}", payOrderId);
+			return;
+		}
+		OrderInfo updateBean = new OrderInfo();
+		updateBean.setOrderStatus(OrderStatusEnum.CLOSED.getStatus());
+		OrderInfoQuery statusQuery = new OrderInfoQuery();
+		statusQuery.setPayOrderId(payOrderId);
+		statusQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		Integer rows = orderInfoMapper.updateByParam(updateBean, statusQuery);
+		if (rows == null || rows == 0) {
+			log.info("支付超时关单无待付款子单 payOrderId={}", payOrderId);
+			return;
+		}
+		payFeignSupport.markClosed(payOrderId);
+		restoreStockForPayOrderId(payOrderId);
+		OrderInfo channelRef = orderList.stream()
+				.filter(o -> !StringTools.isEmpty(o.getChannelOrderId()))
+				.findFirst()
+				.orElse(orderList.get(0));
+		if (!StringTools.isEmpty(channelRef.getChannelOrderId())) {
+			cancelOrder4Channel(channelRef);
+		}
+		releaseCouponIfNeeded(payOrderId);
+	}
+
+	private void restoreStockForPayOrderId(String payOrderId) {
+		if (StringTools.isEmpty(payOrderId)) {
+			return;
+		}
+		OrderInfoQuery orderInfoQuery = new OrderInfoQuery();
+		orderInfoQuery.setPayOrderId(payOrderId);
+		List<OrderInfo> orderList = orderInfoMapper.selectList(orderInfoQuery);
+		List<ProductItem> newList = new ArrayList<>();
+		for (OrderInfo orderInfo1 : orderList) {
+			OrderItemQuery orderItemQuery = new OrderItemQuery();
+			orderItemQuery.setOrderId(orderInfo1.getOrderId());
+			List<OrderItem> orderItemList = orderItemMapper.selectList(orderItemQuery);
+			for (OrderItem orderItem : orderItemList) {
+				ProductItem productItem = new ProductItem();
+				productItem.setProductId(orderItem.getProductId());
+				productItem.setPropertyValueIdHash(orderItem.getPropertyValueIdHash());
+				productItem.setBuyCount(orderItem.getBuyCount());
+				newList.add(productItem);
+			}
+		}
+		if (newList.isEmpty()) {
+			throw new BusinessException("商品列表为空");
+		}
+		try {
+			stockFeignSupport.changeStockBatch(newList);
+		} catch (Exception e) {
+			log.error("关单库存回补失败, payOrderId={}", payOrderId, e);
+			remoteCompensateRecorder.recordStockChangeBatch(payOrderId, newList, e);
+			throw new BusinessException("库存回补失败，已登记补偿任务，请稍后重试或联系客服");
+		}
+	}
+
+		// 支付成功信息
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void paySuccess(PayOrderNotifyDTO payOrderNotifyDTO) {
+		if (payOrderNotifyDTO == null || StringTools.isEmpty(payOrderNotifyDTO.getPayOrderId())) {
+			throw new BusinessException("支付订单号无效");
+		}
+		String payOrderId = payOrderNotifyDTO.getPayOrderId();
+		redisComponent.runWithPayOrderLifecycleLock(payOrderId,
+				() -> paySuccessInLock(payOrderNotifyDTO));
+	}
+
+	private void paySuccessInLock(PayOrderNotifyDTO payOrderNotifyDTO) {
+		String payOrderId = payOrderNotifyDTO.getPayOrderId();
+		List<OrderInfo> orderInfoList = loadOrdersByPayOrderId(payOrderId);
+		if (orderInfoList.isEmpty()) {
+			throw new BusinessException("订单不存在");
+		}
+		if (orderInfoList.stream().anyMatch(this::isCouponRushOrder)) {
+			paySuccessForCouponRush(orderInfoList, payOrderNotifyDTO);
+			return;
+		}
+		if (orderInfoList.stream().allMatch(o -> isPaidOrBeyond(o.getOrderStatus()))) {
+			log.info("paySuccess 幂等跳过 payOrderId={}", payOrderId);
+			return;
+		}
+		if (redisComponent.isPayOrderCloseMarked(payOrderId)) {
+			handlePaySuccessConflict(payOrderId, payOrderNotifyDTO);
+			return;
+		}
+		// 获取同一payOrderId下的订单中不为null的收货信息
+		OrderLogisticsInfo logisticsInfo = new OrderLogisticsInfo();
+		// 根据orderId查询不为null的收货信息
+		for (OrderInfo orderInfo : orderInfoList) {
+			if (orderInfo == null ) {
+				throw new BusinessException("订单不存在");
+			}
+			String orderId = orderInfo.getOrderId();
+			logisticsInfo = orderLogisticsInfoMapper.selectByOrderId(orderId);
+			if (logisticsInfo == null) {
+				continue;
+			}
+            break;
+        }
+		// 从redis中获得默认发货信息
+		LogisticsSendDTO sendLogisticsSendDTO = redisComponent.getLogisticsInfo();
+		// 把所有同一payOrderId下的订单都设置同样的收货信息
+		for (OrderInfo orderInfo : orderInfoList) {
+			// 根据orderId查询物流Info
+			OrderLogisticsInfo orderLogisticsInfo = orderLogisticsInfoMapper.selectByOrderId(orderInfo.getOrderId());
+			if (orderLogisticsInfo == null){
+				// 如果没有则插入
+				orderLogisticsInfo = new OrderLogisticsInfo();
+				orderLogisticsInfo.setOrderId(orderInfo.getOrderId());
+				orderLogisticsInfo.setUserId(orderInfo.getUserId());
+				orderLogisticsInfo.setReceiverName(logisticsInfo.getReceiverName());
+				orderLogisticsInfo.setReceiverPhone(logisticsInfo.getReceiverPhone());
+				orderLogisticsInfo.setReceiverAddress(logisticsInfo.getReceiverAddress());
+				orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.PENDING_SHIPMENT.getStatus());
+				if (sendLogisticsSendDTO != null) {
+					orderLogisticsInfo.setSenderName(sendLogisticsSendDTO.getSenderName());
+					orderLogisticsInfo.setSenderPhone(sendLogisticsSendDTO.getSenderPhone());
+					orderLogisticsInfo.setSenderAddress(sendLogisticsSendDTO.getSenderAddress());
+				}
+				orderLogisticsInfoMapper.insert(orderLogisticsInfo);
+			}else {
+				// 更新
+				OrderLogisticsInfoQuery orderLogisticsInfoQuery = new OrderLogisticsInfoQuery();
+				orderLogisticsInfoQuery.setOrderId(orderInfo.getOrderId());
+				orderLogisticsInfoQuery.setUserId(orderInfo.getUserId());
+                orderLogisticsInfo.setReceiverName(logisticsInfo.getReceiverName());
+				orderLogisticsInfo.setReceiverPhone(logisticsInfo.getReceiverPhone());
+				orderLogisticsInfo.setReceiverAddress(logisticsInfo.getReceiverAddress());
+				if (sendLogisticsSendDTO != null) {
+					orderLogisticsInfo.setSenderName(sendLogisticsSendDTO.getSenderName());
+					orderLogisticsInfo.setSenderPhone(sendLogisticsSendDTO.getSenderPhone());
+					orderLogisticsInfo.setSenderAddress(sendLogisticsSendDTO.getSenderAddress());
+				}
+				orderLogisticsInfoMapper.updateByParam(orderLogisticsInfo, orderLogisticsInfoQuery);
+			}
+		}
+		OrderInfoQuery updateQuery = new OrderInfoQuery();
+		updateQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		int updatedCount = 0;
+		for (OrderInfo orderInfo : orderInfoList) {
+			updateQuery.setOrderId(orderInfo.getOrderId());
+			orderInfo.setChannelOrderId(payOrderNotifyDTO.getChannelOrderId());
+			orderInfo.setOrderStatus(OrderStatusEnum.PAID.getStatus());
+			Integer rows = orderInfoMapper.updateByParam(orderInfo, updateQuery);
+			if (rows != null && rows > 0) {
+				updatedCount++;
+				PayOrderMessageDTO dto = new PayOrderMessageDTO();
+				dto.setOrderId(orderInfo.getOrderId());
+				dto.setLogisticsStep(0);
+				transactionalMqSender.sendAfterCommit(
+						RabbitMQConfig.PAY_EXCHANGE,
+						RabbitMQConfig.PAY_LOGISTICS_DELAY_KEY,
+						dto,
+						MqIdempotencyKeys.payLogistics(orderInfo.getOrderId(), 0),
+						MessageReliabilityLevelEnum.STANDARD);
+			}
+		}
+		if (updatedCount == 0) {
+			handlePaySuccessConflict(payOrderId, payOrderNotifyDTO);
+			return;
+		}
+		if (updatedCount < orderInfoList.size()) {
+			throw new BusinessException("支付成功处理失败，部分订单状态异常");
+		}
+
+		useCouponIfNeeded(orderInfoList);
+		payFeignSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
+	}
+
+	private PayChannelEnum resolveWaitPayChannel(OrderInfo orderInfo) {
+		PayChannelEnum payChannelEnum = PayChannelEnum.resolve(orderInfo.getPayChannel());
+		if (payChannelEnum != null) {
+			return payChannelEnum;
+		}
+		payChannelEnum = PayChannelEnum.ALIPAY_PC;
+		OrderInfo patch = new OrderInfo();
+		patch.setPayChannel(payChannelEnum.getPayScene());
+		OrderInfoQuery patchQuery = new OrderInfoQuery();
+		patchQuery.setOrderId(orderInfo.getOrderId());
+		patchQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		orderInfoMapper.updateByParam(patch, patchQuery);
+		orderInfo.setPayChannel(payChannelEnum.getPayScene());
+		return payChannelEnum;
+	}
+
+	private boolean isCouponRushOrder(OrderInfo orderInfo) {
+		if (orderInfo == null || orderInfo.getPayScene() == null) {
+			return false;
+		}
+		return String.valueOf(OrderFromTypeEnum.COUPON.getType()).equals(orderInfo.getPayScene());
+	}
+
+	private void cancelCouponRushOrder(String orderId, String userId) {
+		OrderInfo updateBean = new OrderInfo();
+		if (userId != null) {
+			updateBean.setOrderStatus(OrderStatusEnum.CANCELLED.getStatus());
+		} else {
+			updateBean.setOrderStatus(OrderStatusEnum.CLOSED.getStatus());
+		}
+		OrderInfoQuery statusQuery = new OrderInfoQuery();
+		statusQuery.setOrderId(orderId);
+		statusQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		Integer rows = orderInfoMapper.updateByParam(updateBean, statusQuery);
+		if (rows == null || rows == 0) {
+			return;
+		}
+		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
+		if (orderInfo == null) {
+			return;
+		}
+		markPayOrderClosedIfNeeded(orderInfo.getPayOrderId());
+		OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+		relQuery.setOrderId(orderId);
+		List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+		for (OrderCouponRel rel : rels) {
+			if (!StringTools.isEmpty(rel.getCouponId())) {
+				couponFeignSupport.releaseRushCouponReserve(rel.getCouponId(), orderInfo.getUserId());
+			}
+		}
+	}
+
+	private void activateCouponRushUserCoupon(String userId, String userCouponId) {
+		if (StringTools.isEmpty(userCouponId) || StringTools.isEmpty(userId)) {
+			return;
+		}
+		try {
+			couponFeignSupport.changeUserCouponStatus(userCouponId, userId,
+					UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(), null);
+		} catch (BusinessException ignore) {
+			// 幂等：已激活则忽略
+		}
+	}
+
+	@Override
+	public void syncPaidCouponRushUserCoupons(String userId) {
+		OrderInfoQuery orderQuery = new OrderInfoQuery();
+		orderQuery.setUserId(userId);
+		orderQuery.setPayScene(String.valueOf(OrderFromTypeEnum.COUPON.getType()));
+		orderQuery.setOrderStatusList(new Integer[]{
+				OrderStatusEnum.PAID.getStatus(),
+				OrderStatusEnum.SHIPPED.getStatus(),
+				OrderStatusEnum.COMPLETED.getStatus()
+		});
+		List<OrderInfo> orders = orderInfoMapper.selectList(orderQuery);
+		if (orders == null || orders.isEmpty()) {
+			return;
+		}
+		int activated = 0;
+		for (OrderInfo orderInfo : orders) {
+			OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+			relQuery.setOrderId(orderInfo.getOrderId());
+			List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+			for (OrderCouponRel rel : rels) {
+				if (StringTools.isEmpty(rel.getUserCouponId())) {
+					continue;
+				}
+				UserCouponVO uc = couponFeignSupport.getUserCoupon(rel.getUserCouponId());
+				if (uc != null && UserCouponStatusEnum.CANT.getStatus().equals(uc.getStatus())) {
+					activateCouponRushUserCoupon(orderInfo.getUserId(), rel.getUserCouponId());
+					activated++;
+				}
+			}
+		}
+		if (activated > 0) {
+			log.info("同步秒杀已付订单用户券为未使用 userId={}, count={}", userId, activated);
+		}
+	}
+
+	private void paySuccessForCouponRush(List<OrderInfo> orderInfoList, PayOrderNotifyDTO payOrderNotifyDTO) {
+		String payOrderId = payOrderNotifyDTO.getPayOrderId();
+		if (orderInfoList.stream().allMatch(o -> OrderStatusEnum.COMPLETED.getStatus().equals(o.getOrderStatus()))) {
+			log.info("couponRush paySuccess 幂等跳过 payOrderId={}", payOrderId);
+			return;
+		}
+		if (redisComponent.isPayOrderCloseMarked(payOrderId)) {
+			handlePaySuccessConflict(payOrderId, payOrderNotifyDTO);
+			return;
+		}
+		int updatedCount = 0;
+		for (OrderInfo orderInfo : orderInfoList) {
+			OrderInfoQuery updateQuery = new OrderInfoQuery();
+			updateQuery.setOrderId(orderInfo.getOrderId());
+			updateQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+			orderInfo.setChannelOrderId(payOrderNotifyDTO.getChannelOrderId());
+			orderInfo.setOrderStatus(OrderStatusEnum.COMPLETED.getStatus());
+			Integer rows = orderInfoMapper.updateByParam(orderInfo, updateQuery);
+			if (rows == null || rows == 0) {
+				continue;
+			}
+			updatedCount++;
+			OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+			relQuery.setOrderId(orderInfo.getOrderId());
+			List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+			for (OrderCouponRel rel : rels) {
+				activateCouponRushUserCoupon(orderInfo.getUserId(), rel.getUserCouponId());
+			}
+		}
+		if (updatedCount == 0) {
+			handlePaySuccessConflict(payOrderId, payOrderNotifyDTO);
+			return;
+		}
+		if (updatedCount < orderInfoList.size()) {
+			throw new BusinessException("支付成功处理失败，部分订单状态异常");
+		}
+		payFeignSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
+		log.info("优惠券秒杀支付成功 payOrderId={}, 券数量={}", payOrderId, orderInfoList.size());
+	}
+
+	private List<OrderInfo> loadOrdersByPayOrderId(String payOrderId) {
+		OrderInfoQuery query = new OrderInfoQuery();
+		query.setPayOrderId(payOrderId);
+		return orderInfoMapper.selectList(query);
+	}
+
+	private boolean isClosedOrCancelled(Integer status) {
+		return OrderStatusEnum.CLOSED.getStatus().equals(status)
+				|| OrderStatusEnum.CANCELLED.getStatus().equals(status);
+	}
+
+	private void markPayOrderClosedIfNeeded(String payOrderId) {
+		if (!StringTools.isEmpty(payOrderId)) {
+			redisComponent.tryMarkPayOrderCloseOnce(payOrderId);
+		}
+	}
+
+	private void handlePaySuccessConflict(String payOrderId, PayOrderNotifyDTO payOrderNotifyDTO) {
+		List<OrderInfo> latest = loadOrdersByPayOrderId(payOrderId);
+		if (latest.isEmpty()) {
+			throw new BusinessException("订单不存在");
+		}
+		if (latest.stream().allMatch(o -> isPaidOrBeyond(o.getOrderStatus())
+				|| OrderStatusEnum.COMPLETED.getStatus().equals(o.getOrderStatus()))) {
+			log.info("paySuccess 幂等跳过 payOrderId={}", payOrderId);
+			return;
+		}
+		if (latest.stream().anyMatch(o -> isClosedOrCancelled(o.getOrderStatus()))
+				|| redisComponent.isPayOrderCloseMarked(payOrderId)) {
+			refundLatePaymentAfterClose(payOrderId, payOrderNotifyDTO, latest);
+			return;
+		}
+		throw new BusinessException("支付成功处理失败，订单状态异常");
+	}
+
+	private void refundLatePaymentAfterClose(String payOrderId, PayOrderNotifyDTO payOrderNotifyDTO,
+			List<OrderInfo> orders) {
+		if (!redisComponent.tryMarkLatePaymentRefundOnce(payOrderId)) {
+			log.info("关单后迟到支付退款幂等跳过 payOrderId={}", payOrderId);
+			return;
+		}
+		BigDecimal total = orders.stream()
+				.map(OrderInfo::getAmount)
+				.filter(Objects::nonNull)
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
+		if (total.compareTo(BigDecimal.ZERO) <= 0) {
+			log.warn("关单后迟到支付退款金额为0 payOrderId={}", payOrderId);
+			return;
+		}
+		OrderInfo refOrder = orders.get(0);
+		PayChannelEnum payChannelEnum = resolveWaitPayChannel(refOrder);
+		String refundRequestNo = "LATE" + StringTools.getRandomNumber(Constants.LENGTH_30);
+		try {
+			payFeignSupport.refund(payOrderId, refundRequestNo, total, payChannelEnum.getPayScene());
+			payFeignSupport.markRefunded(payOrderId);
+			log.warn("关单后迟到的支付已原路退款 payOrderId={}, channelOrderId={}, amount={}",
+					payOrderId, payOrderNotifyDTO.getChannelOrderId(), total);
+		} catch (Exception e) {
+			redisComponent.clearLatePaymentRefundMark(payOrderId);
+			throw new BusinessException("关单后支付退款失败：" + e.getMessage(), e);
+		}
+	}
+
+	private void releaseCouponIfNeeded(String payOrderId) {
+		if (StringTools.isEmpty(payOrderId)) {
+			return;
+		}
+		OrderInfoQuery q = new OrderInfoQuery();
+		q.setPayOrderId(payOrderId);
+		List<OrderInfo> orders = orderInfoMapper.selectList(q);
+		for (OrderInfo o : orders) {
+			if (isCouponRushOrder(o)) {
+				continue;
+			}
+			OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+			relQuery.setOrderId(o.getOrderId());
+			List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+			for (OrderCouponRel rel : rels) {
+				if (StringTools.isEmpty(rel.getUserCouponId())) {
+					continue;
+				}
+				UserCouponVO uc = couponFeignSupport.getUserCoupon(rel.getUserCouponId());
+				if (uc != null && UserCouponStatusEnum.CANT.getStatus().equals(uc.getStatus())) {
+					try {
+						couponFeignSupport.changeUserCouponStatus(uc.getUserCouponId(), uc.getUserId(),
+								UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(), null);
+					} catch (Exception compensateEx) {
+						log.error("关单优惠券解锁失败, payOrderId={}, userCouponId={}",
+								payOrderId, uc.getUserCouponId(), compensateEx);
+						remoteCompensateRecorder.recordCouponUnlock(
+								payOrderId, uc.getUserCouponId(), uc.getUserId(),
+								UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(),
+								compensateEx);
+					}
+				}
+			}
+		}
+	}
+
+	private void useCouponIfNeeded(List<OrderInfo> orderInfoList) {
+		if (orderInfoList == null || orderInfoList.isEmpty()) {
+			return;
+		}
+		Date now = new Date();
+		for (OrderInfo o : orderInfoList) {
+			OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+			relQuery.setOrderId(o.getOrderId());
+			List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+			for (OrderCouponRel rel : rels) {
+				if (StringTools.isEmpty(rel.getUserCouponId())) {
+					continue;
+				}
+				try {
+					couponFeignSupport.changeUserCouponStatus(rel.getUserCouponId(), o.getUserId(),
+							UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.USED.getStatus(), now);
+				} catch (BusinessException ex) {
+					// 幂等：券已是 USED 时忽略；其它业务失败需抛出以便支付回调重试
+					UserCouponVO uc = null;
+					try {
+						uc = couponFeignSupport.getUserCoupon(rel.getUserCouponId());
+					} catch (Exception ignore) {
+					}
+					if (uc != null && UserCouponStatusEnum.USED.getStatus().equals(uc.getStatus())) {
+						continue;
+					}
+					log.error("支付成功后核销优惠券失败, orderId={}, userCouponId={}, msg={}",
+							o.getOrderId(), rel.getUserCouponId(), ex.getMessage());
+					throw ex;
+				}
+			}
+		}
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void refund(OrderItem orderItem, String userId) {
+		if (orderItem == null){
+			throw new BusinessException("订单项不存在");
+		}
+		String orderId = orderItem.getOrderId();
+		OrderInfoQuery query = new OrderInfoQuery();
+		query.setOrderId(orderId);
+		query.setQueryItems(true);
+		List<OrderInfo> orderInfoList = orderInfoMapper.selectList(query);
+		if (orderInfoList == null || orderInfoList.isEmpty()) {
+			throw new BusinessException("订单不存在");
+		}
+		OrderInfo orderInfo = orderInfoList.get(0);
+		if (orderItem == null || !orderInfo.getUserId().equals(userId)){
+			throw new BusinessException("订单不存在");
+		}
+		// 只有订单状态为1:已付款,待发货，2:已发货，7:部分退款才可申请退款
+		if (orderInfo.getOrderStatus() != OrderStatusEnum.PAID.getStatus()
+				&& orderInfo.getOrderStatus() != OrderStatusEnum.SHIPPED.getStatus()
+				&& orderInfo.getOrderStatus() != OrderStatusEnum.PARTIALLY_REFUNDED.getStatus()
+				) {
+			throw new BusinessException("当前订单状态不能申请退款");
+		}
+		// 判断订单项状态为1正常才可退款
+		if (orderItem.getOrderItemStatus() != OrderItemStatusEnum.NORMAL.getStatus()) {
+			throw new BusinessException("当前订单项状态不能申请退款");
+		}
+		// 退款金额
+		 BigDecimal refundAmount = orderItem.getItemAmount();
+		 if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			 throw new BusinessException("退款金额不能小于0");
+		 }
+		 // 判断当前退款项是不是该订单的全部商品
+		// 若是则将订单状态改为已退款，否则改为部分退款
+		// 获取当前的orderInfo下的orderItem有几个是正常的状态的
+		int count = 0;
+		List<OrderItem> orderItemList = orderInfo.getOrderItemList();
+		if (orderItemList != null) {
+			for (OrderItem orderItem1 : orderItemList) {
+				if (orderItem1.getOrderItemStatus() == OrderItemStatusEnum.NORMAL.getStatus()) {
+					count++;
+				}
+			}
+		}
+		 // 将orderItem的状态改为已退款
+		 orderItem.setOrderItemStatus(OrderItemStatusEnum.REFUND.getStatus());
+		 // 计算要退的金额
+		 BigDecimal amount4Refund = orderItem.getItemAmount();
+		 // 生成30位的随机长度的refundOrderId
+		 String refundOrderId = StringTools.getRandomNumber(Constants.LENGTH_30);
+		 orderItem.setRefundOrderId(refundOrderId);
+		 // 退还库存（simlect_stock）
+		List<ProductItem> newList = new ArrayList<>();
+		ProductItem productItem = new ProductItem();
+		productItem.setProductId(orderItem.getProductId());
+		productItem.setPropertyValueIdHash(orderItem.getPropertyValueIdHash());
+		productItem.setBuyCount(orderItem.getBuyCount());
+		newList.add(productItem);
+		try {
+			stockFeignSupport.changeStockBatch(newList);
+		} catch (BusinessException e) {
+			throw new BusinessException("库存回滚失败，无法完成退款，请稍后重试");
+		}
+		OrderItemQuery updateQuery = new OrderItemQuery();
+		updateQuery.setOrderItemId(orderItem.getOrderItemId());
+		if (count == 1) {
+			orderInfo.setOrderStatus(OrderStatusEnum.REFUNDED.getStatus());
+		} else {
+			orderInfo.setOrderStatus(OrderStatusEnum.PARTIALLY_REFUNDED.getStatus());
+		}
+		orderItemMapper.updateByParam(orderItem, updateQuery);
+		orderInfoMapper.updateByParam(orderInfo, query);
+
+		// 操作支付宝退款
+		// public void refund(String sourcePayOrderId, String refundOrderId, BigDecimal refundAmount)
+		String sourcePayOrderId = orderInfo.getPayOrderId();
+		PayChannelEnum refundChannel = PayChannelEnum.resolve(orderInfo.getPayChannel());
+		payFeignSupport.refund(sourcePayOrderId, refundOrderId, amount4Refund,
+				refundChannel == null ? null : refundChannel.getPayScene());
+	}
+
+	@Override
+	public List<OrderCountVO> getOrderCountInfo(String userId) {
+		OrderInfoQuery query = new OrderInfoQuery();
+		query.setUserId(userId);
+		List<OrderInfo> orderInfoList = orderInfoMapper.selectList(query);
+		OrderCountVO orderCountVO1 = new OrderCountVO();
+		OrderCountVO orderCountVO2 = new OrderCountVO();
+		OrderCountVO orderCountVO3 = new OrderCountVO();
+		OrderCountVO orderCountVO4 = new OrderCountVO();
+		OrderCountVO orderCountVO5 = new OrderCountVO();
+		List<OrderCountVO> orderCountVOList = new ArrayList<>();
+		Integer waitPayCount = 0;
+		Integer waitShipCount = 0;
+		Integer waitReceiveCount = 0;
+		Integer waitCommentCount = 0;
+		Set<String> completedPayOrderIds = new HashSet<>();
+		for (OrderInfo orderInfo : orderInfoList) {
+			boolean isCouponOrder = "2".equals(orderInfo.getPayScene());
+			// 已删除的不统计
+			if (orderInfo.getOrderStatus() == OrderStatusEnum.DELETE.getStatus()){
+				continue;
+			}
+			if (orderInfo.getOrderStatus() == OrderStatusEnum.WAIT_PAYMENT.getStatus()){
+				waitPayCount++;
+			} else if (orderInfo.getOrderStatus() == OrderStatusEnum.PAID.getStatus()) {
+				waitShipCount++;
+			}else if(orderInfo.getOrderStatus() == OrderStatusEnum.SHIPPED.getStatus()){
+				waitReceiveCount++;
+			}else if (orderInfo.getOrderStatus() == OrderStatusEnum.COMPLETED.getStatus()
+				&& !isCouponOrder
+				&& orderInfo.getCommentStatus() == OrderCommentStatusEnum.NOT_EVALUATED.getStatus()){
+			waitCommentCount++;
+			}
+			if (orderInfo.getOrderStatus() == OrderStatusEnum.COMPLETED.getStatus()){
+				completedPayOrderIds.add(orderInfo.getOrderId());
+			}
+		}
+		Integer completedCount = completedPayOrderIds.size();
+		orderCountVO1.setCode("pendingPayment");
+		orderCountVO1.setCount(waitPayCount);
+		orderCountVOList.add(orderCountVO1);
+		orderCountVO2.setCode("pendingShipment");
+		orderCountVO2.setCount(waitShipCount);
+		orderCountVOList.add(orderCountVO2);
+		orderCountVO3.setCode("pendingReceipt");
+		orderCountVO3.setCount(waitReceiveCount);
+		orderCountVOList.add(orderCountVO3);
+		orderCountVO4.setCode("pendingComment");
+		orderCountVO4.setCount(waitCommentCount);
+		orderCountVOList.add(orderCountVO4);
+		orderCountVO5.setCode("completed");
+		orderCountVO5.setCount(completedCount);
+		orderCountVOList.add(orderCountVO5);
+		return orderCountVOList;
+	}
+
+	@Override
+	public PaginationResultVO<OrderInfo> findByProductNameFuzzy(PaginationResultVO<OrderInfo> resultVO, String productNameFuzzy) {
+		List<OrderInfo> orderInfoList = resultVO.getList();
+		List<OrderInfo> newList = new ArrayList<>();
+		int flag;
+		for (OrderInfo orderInfo : orderInfoList) {
+			flag = 0;
+			for (OrderItem orderItem : orderInfo.getOrderItemList()){
+				if (!orderItem.getProductName().contains(productNameFuzzy)) {
+					continue;
+				}
+				if (flag == 1) {
+					continue;
+				}
+				flag = 1;
+				newList.add(orderInfo);
+			}
+		}
+		resultVO.setList(newList);
+		return resultVO;
+	}
+
+	@Override
+	public void addAllOrderToDelayQueue(List<OrderInfo> orderInfoList) {
+		// 将orderId逐个加入到延迟队列（事务提交后发送）
+		for (OrderInfo orderInfo : orderInfoList) {
+			PayOrderMessageDTO dto = new PayOrderMessageDTO();
+			dto.setOrderId(orderInfo.getOrderId());
+			transactionalMqSender.sendAfterCommit(
+					RabbitMQConfig.PAY_EXCHANGE,
+					RabbitMQConfig.PAY_TIMEOUT_DELAY_KEY,
+					dto,
+					MqIdempotencyKeys.payTimeout(orderInfo.getOrderId()),
+					MessageReliabilityLevelEnum.STANDARD);
+		}
+	}
+
+	@Override
+	public void enrichCouponInfo(OrderInfo orderInfo) {
+		if (orderInfo == null) {
+			return;
+		}
+		if (isCouponRushOrder(orderInfo)) {
+			BigDecimal amt = orderInfo.getAmount() == null ? BigDecimal.ZERO : orderInfo.getAmount();
+			orderInfo.setOriginalAmount(amt);
+			orderInfo.setCouponDiscountAmount(BigDecimal.ZERO);
+			return;
+		}
+		BigDecimal original = sumItemAmount(orderInfo.getOrderItemList(), true);
+		BigDecimal payAmount = orderInfo.getAmount() == null ? BigDecimal.ZERO : orderInfo.getAmount();
+		orderInfo.setOriginalAmount(original);
+		BigDecimal discount = original.subtract(payAmount);
+		if (discount.compareTo(BigDecimal.ZERO) < 0) {
+			discount = BigDecimal.ZERO;
+		}
+		discount = discount.setScale(2, BigDecimal.ROUND_HALF_UP);
+		orderInfo.setCouponDiscountAmount(discount);
+		if (discount.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		OrderCouponRel rel = findCouponRelForOrder(orderInfo);
+		if (rel == null || StringTools.isEmpty(rel.getCouponId())) {
+			return;
+		}
+		CouponBriefVO coupon = couponFeignSupport.getCouponBrief(rel.getCouponId());
+		if (coupon != null) {
+			orderInfo.setCouponName(coupon.getCouponName());
+			orderInfo.setCouponType(coupon.getCouponType());
+		}
+	}
+
+	@Override
+	public void enrichCouponInfo(List<OrderInfo> orderInfoList) {
+		if (orderInfoList == null || orderInfoList.isEmpty()) {
+			return;
+		}
+		for (OrderInfo orderInfo : orderInfoList) {
+			enrichCouponInfo(orderInfo);
+		}
+	}
+
+	private void enrichUserBrief(List<OrderInfo> list) {
+		List<String> userIds = list.stream()
+				.map(OrderInfo::getUserId)
+				.filter(id -> !StringTools.isEmpty(id))
+				.distinct()
+				.collect(Collectors.toList());
+		Map<String, UserBriefVO> map = userFeignSupport.mapBriefByUserIds(userIds);
+		for (OrderInfo order : list) {
+			UserBriefVO brief = map.get(order.getUserId());
+			if (brief != null) {
+				order.setNickName(brief.getNickName());
+				order.setAvatar(brief.getAvatar());
+			}
+		}
+	}
+
+	private BigDecimal sumItemAmount(List<OrderItem> items, boolean normalOnly) {
+		BigDecimal total = BigDecimal.ZERO;
+		if (items == null) {
+			return total;
+		}
+		for (OrderItem item : items) {
+			if (normalOnly && !OrderItemStatusEnum.NORMAL.getStatus().equals(item.getOrderItemStatus())) {
+				continue;
+			}
+			BigDecimal itemAmount = item.getItemAmount() == null ? BigDecimal.ZERO : item.getItemAmount();
+			total = total.add(itemAmount);
+		}
+		return total.setScale(2, BigDecimal.ROUND_HALF_UP);
+	}
+
+	private OrderCouponRel findCouponRelForOrder(OrderInfo orderInfo) {
+		OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+		relQuery.setOrderId(orderInfo.getOrderId());
+		List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+		if (rels != null && !rels.isEmpty()) {
+			return rels.get(0);
+		}
+		if (StringTools.isEmpty(orderInfo.getPayOrderId())) {
+			return null;
+		}
+		OrderInfoQuery siblingQuery = new OrderInfoQuery();
+		siblingQuery.setPayOrderId(orderInfo.getPayOrderId());
+		List<OrderInfo> siblings = orderInfoMapper.selectList(siblingQuery);
+		if (siblings == null) {
+			return null;
+		}
+		for (OrderInfo sibling : siblings) {
+			if (sibling == null || orderInfo.getOrderId().equals(sibling.getOrderId())) {
+				continue;
+			}
+			relQuery.setOrderId(sibling.getOrderId());
+			rels = orderCouponRelMapper.selectList(relQuery);
+			if (rels != null && !rels.isEmpty()) {
+				return rels.get(0);
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public void onOrderConfirmed(String userId, String orderId) {
+		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
+		if (orderInfo != null && orderInfo.getAmount() != null) {
+			userFeignSupport.addGrowthOnPay(userId, orderInfo.getAmount());
+		}
+		if (orderInfo != null && OrderCommentStatusEnum.EVALUATED.getStatus().equals(orderInfo.getCommentStatus())) {
+			userFeignSupport.sendNotifyAsync(userId, "追评提醒",
+					"订单已完成，欢迎追加评价分享购物体验", "comment_re", orderId);
+		} else {
+			userFeignSupport.sendNotifyAsync(userId, "确认收货成功",
+					"订单已完成，欢迎评价商品获取成长值", "order", orderId);
+		}
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public boolean confirmOrderReceipt(String userId, String orderId) {
+		if (StringTools.isEmpty(orderId)) {
+			throw new BusinessException("订单不存在");
+		}
+		OrderInfo existing = orderInfoMapper.selectByOrderId(orderId);
+		if (existing == null) {
+			throw new BusinessException("订单不存在");
+		}
+		if (userId != null && !userId.equals(existing.getUserId())) {
+			throw new BusinessException("订单不存在");
+		}
+		if (OrderStatusEnum.COMPLETED.getStatus().equals(existing.getOrderStatus())) {
+			return false;
+		}
+		OrderInfoQuery statusQuery = new OrderInfoQuery();
+		statusQuery.setOrderId(orderId);
+		statusQuery.setOrderStatusList(new Integer[]{
+				OrderStatusEnum.SHIPPED.getStatus(),
+				OrderStatusEnum.PARTIALLY_REFUNDED.getStatus()
+		});
+		OrderInfo updateBean = new OrderInfo();
+		updateBean.setOrderStatus(OrderStatusEnum.COMPLETED.getStatus());
+		Integer rows = orderInfoMapper.updateByParam(updateBean, statusQuery);
+		if (rows == null || rows == 0) {
+			return false;
+		}
+		increaseProductSalesForOrder(orderId);
+		return true;
+	}
+
+	@Override
+	public boolean cancelUnpaidOrderForPayTimeout(String orderId) {
+		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
+		if (orderInfo == null) {
+			return true;
+		}
+		if (!Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.WAIT_PAYMENT.getStatus())) {
+			return true;
+		}
+		String payId = orderInfo.getPayOrderId();
+		if (payId != null) {
+			OrderInfoQuery query = new OrderInfoQuery();
+			query.setPayOrderId(payId);
+			List<OrderInfo> orderInfoList = orderInfoMapper.selectList(query);
+			for (OrderInfo order : orderInfoList) {
+				if (isPaidOrBeyond(order.getOrderStatus())) {
+					return true;
+				}
+			}
+		}
+		try {
+			cancelOrder(null, orderId, OrderStatusEnum.CLOSED);
+		} catch (PayOrderLifecycleBusyException e) {
+			log.warn("支付超时关单生命周期锁忙，稍后 requeue orderId={}", orderId);
+			return false;
+		}
+		return true;
+	}
+
+	private void increaseProductSalesForOrder(String orderId) {
+		OrderItemQuery itemQuery = new OrderItemQuery();
+		itemQuery.setOrderId(orderId);
+		List<OrderItem> items = orderItemMapper.selectList(itemQuery);
+		if (items == null || items.isEmpty()) {
+			log.warn("确认收货无商品明细 orderId={}", orderId);
+			return;
+		}
+		Map<String, Integer> qtyByProduct = new HashMap<>();
+		for (OrderItem item : items) {
+			if (StringTools.isEmpty(item.getProductId()) || item.getBuyCount() == null) {
+				continue;
+			}
+			qtyByProduct.merge(item.getProductId(), item.getBuyCount(), Integer::sum);
+		}
+		for (Map.Entry<String, Integer> entry : qtyByProduct.entrySet()) {
+			try {
+				productFeignSupport.increaseSales(entry.getKey(), entry.getValue());
+			} catch (BusinessException e) {
+				log.warn("确认收货加销量跳过 productId={}, msg={}", entry.getKey(), e.getMessage());
+			}
+		}
+	}
+
+	// 关闭订单（支付系统官方）
+	private void cancelOrder4Channel(OrderInfo orderInfo) {
+		PayChannelEnum payChannelEnum = PayChannelEnum.resolve(orderInfo.getPayChannel());
+		if (payChannelEnum == null) {
+			return;
+		}
+		payFeignSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
+	}
+
+	private List<ProductItem> copyItemsWithSignedBuyCount(List<ProductItem> source, boolean negate) {
+		List<ProductItem> copy = new ArrayList<>(source.size());
+		for (ProductItem item : source) {
+			ProductItem pi = new ProductItem();
+			pi.setProductId(item.getProductId());
+			pi.setPropertyValueIdHash(item.getPropertyValueIdHash());
+			int qty = item.getBuyCount() == null ? 0 : item.getBuyCount();
+			pi.setBuyCount(negate ? -Math.abs(qty) : Math.abs(qty));
+			copy.add(pi);
+		}
+		return copy;
+	}
+}

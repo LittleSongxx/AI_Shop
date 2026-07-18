@@ -1,0 +1,212 @@
+from fastapi import APIRouter, Depends, Form, Header, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from app.api.deps import TokenUserInfo, get_request_token, require_login
+from app.config.settings import get_settings
+from app.models.response import ResponseVO, error, success
+from app.services.action_execute_service import action_execute_service
+from app.services.agent_service import agent_orchestrator
+from app.services.message_service import agent_message_service
+from app.services.pending_action_service import pending_action_service
+from app.services.rate_limit_service import rate_limit_service
+from app.services.redis_service import redis_service
+
+router = APIRouter(prefix="/agent", tags=["agent"])
+
+limiter = Limiter(key_func=get_remote_address)
+
+def _user_key(request: Request) -> str:
+
+    token = get_request_token(request)
+    return token or get_remote_address(request)
+
+def _form_bool(value: str | bool | None) -> bool:
+
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ("true", "1", "yes")
+
+def _require_internal_token(x_internal_token: str | None = Header(None, alias="X-Internal-Token")) -> str:
+
+    expected = get_settings().internal_token
+    if not x_internal_token or x_internal_token != expected:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="invalid internal token")
+    return x_internal_token
+
+async def _read_admin_body(request: Request) -> dict:
+
+    ct = (request.headers.get("content-type") or "").lower()
+    if "application/json" in ct:
+        data = await request.json()
+        return data if isinstance(data, dict) else {}
+    form = await request.form()
+    return {k: form.get(k) for k in form.keys()}
+
+def _as_int(value, default: int | None = None) -> int | None:
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+@router.post("/loadHistoryMessage")
+async def load_history_message(
+    pageNo: int = Form(1),
+    maxMessageId: int | None = Form(None),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    data = await agent_message_service.load_history(user.user_id, pageNo, maxMessageId)
+    return success(data)
+
+@router.post("/sendMessage")
+@limiter.limit("1/second", key_func=_user_key)
+async def send_message(
+    request: Request,
+    message: str = Form(...),
+    fromProduct: str | None = Form(None),
+    consultProductId: str | None = Form(None),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        data = await agent_orchestrator.send_message(
+            user.user_id,
+            message,
+            _form_bool(fromProduct),
+            consultProductId,
+        )
+        return success(data)
+    except ValueError as e:
+
+        return error(600, str(e))
+
+@router.post("/cancelMessage")
+@limiter.limit("1/second", key_func=_user_key)
+async def cancel_message(
+    request: Request,
+    messageId: int = Form(...),
+    assistantMessage: str | None = Form(None),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    await agent_orchestrator.cancel_message(user.user_id, messageId, assistantMessage)
+    return success(None)
+
+@router.post("/clearProductConsult")
+async def clear_product_consult(user: TokenUserInfo = Depends(require_login)) -> ResponseVO:
+
+    await redis_service.clear_consult(user.user_id)
+    return success(None)
+
+@router.post("/pauseProductConsult")
+async def pause_product_consult(user: TokenUserInfo = Depends(require_login)) -> ResponseVO:
+
+    await redis_service.pause_consult(user.user_id)
+    return success(None)
+
+@router.post("/getProductConsultContext")
+async def get_product_consult_context(
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    ctx = await agent_orchestrator.get_consult_context(user.user_id)
+    return success(ctx)
+
+@router.post("/confirmAction")
+@limiter.limit("3/second", key_func=_user_key)
+async def confirm_action(
+    request: Request,
+    actionToken: str = Form(...),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+
+    if not await rate_limit_service.allow(user.user_id, "confirmAction", 1, 3):
+        return success({
+            "actionType": None,
+            "success": False,
+            "resultMessage": "操作过于频繁，请稍后再试",
+        })
+    token = get_request_token(request) or user.token or ""
+
+    async def executor(pending: dict) -> str:
+        return await action_execute_service.execute(pending, token)
+
+    try:
+        action_type, ok, msg = await pending_action_service.confirm(
+            user.user_id, actionToken, executor
+        )
+        return success({
+            "actionType": action_type,
+            "success": ok,
+            "resultMessage": msg,
+        })
+    except ValueError as e:
+        return success({
+            "actionType": None,
+            "success": False,
+            "resultMessage": str(e),
+        })
+
+@router.post("/cancelAction")
+@limiter.limit("3/second", key_func=_user_key)
+async def cancel_action(
+    request: Request,
+    actionToken: str = Form(...),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    if not await rate_limit_service.allow(user.user_id, "cancelAction", 1, 3):
+        return success({
+            "actionType": None,
+            "success": False,
+            "resultMessage": "操作过于频繁，请稍后再试",
+        })
+    try:
+        await pending_action_service.cancel(user.user_id, actionToken)
+        return success(None)
+    except ValueError as e:
+        return success({
+            "actionType": None,
+            "success": False,
+            "resultMessage": str(e),
+        })
+
+@router.post("/admin/loadMessages")
+async def admin_load_messages(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    page_no = _as_int(body.get("pageNo"), 1) or 1
+    page_size = _as_int(body.get("pageSize"), 15) or 15
+    user_id = body.get("userId") or None
+    if user_id is not None:
+        user_id = str(user_id).strip() or None
+    data = await agent_message_service.admin_load_messages(page_no, page_size, user_id)
+    return success(data)
+
+@router.post("/admin/getMessage")
+async def admin_get_message(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    message_id = _as_int(body.get("messageId"))
+    if not message_id:
+        return error(600, "messageId 不能为空")
+    data = await agent_message_service.admin_get_message(message_id)
+    return success(data)
+
+@router.post("/admin/deleteMessage")
+async def admin_delete_message(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    message_id = _as_int(body.get("messageId"))
+    if not message_id:
+        return error(600, "messageId 不能为空")
+    ok = await agent_message_service.admin_delete_message(message_id)
+    return success({"deleted": ok})

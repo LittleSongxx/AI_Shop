@@ -1,0 +1,355 @@
+# Simlect
+
+**体验地址：[www.simlect.com](https://www.simlect.com)**
+
+B2C 单商家电商在线平台。面向“只能手动搜商品”的传统体验，把**对话导购、混合搜索与可执行智能客服**融入电商全流程：浏览、咨询、下单、售后均可在对话里完成读操作，写操作经“提案 -> 用户确认 -> Java 执行”闭环，模型不直改业务库。
+
+Java 侧按领域拆成商品、订单、支付、营销（优惠券）、库存等微服务，基于 Spring Cloud 协作；智能客服为 **Python Agent 独立进程**，经 Gateway 统一对外。
+
+---
+
+## 目录
+
+- [项目亮点](#项目亮点)
+- [技术栈与版本](#技术栈与版本)
+- [架构](#架构)
+- [可扩展方向](#可扩展方向)
+- [仓库结构](#仓库结构)
+- [设计片段](#设计片段)
+- [快速开始](#快速开始)
+- [配置说明](#配置说明)
+- [服务端口](#服务端口)
+- [文档索引](#文档索引)
+- [License](#license)
+
+---
+
+## 项目亮点
+
+
+| 能力            | 说明                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------ |
+| **AI + 传统电商** | LangGraph 编排 LLM + 10 个业务工具（6 读 / 4 写提案，可在 Agent 工具层拓展）；流式对话经 WebSocket；商品咨询从 Redis 带入快照 |
+| **交易与库存**     | SKU：MySQL 行锁预检 + 条件更新防超卖；超时未支付经 RabbitMQ TTL/DLX 关单并回补。秒杀券：Redis Lua 原子预扣 + DB 兜底    |
+| **签到与异步**     | Redis Bitmap + Lua 签到/补签与跨月连续天数；签到落库、通知削峰经 MQ，消费端手动 ACK                              |
+| **搜索与 RAG**   | ES 关键词检索；应用层 RRF 融合关键词与向量结果；热销/足迹作兜底推荐；FAQ 向量检索；商品变更经 MQ 异步向量化                       |
+| **支付与订单**     | 支付宝异步回调；延时关单 / 自动收货；状态条件更新，处理支付与关单并发                                                 |
+| **微服务边界**     | 一域一库；跨库禁止直连 Mapper，统一 OpenFeign `/internal/**` + MQ；Gateway 鉴权与限流                    |
+
+
+---
+
+## 技术栈与版本
+
+### 后端（Java）
+
+
+| 组件                   | 版本                           |
+| -------------------- | ---------------------------- |
+| JDK                  | 17                           |
+| Spring Boot          | 3.5.4                        |
+| Spring Cloud         | 2025.0.0                     |
+| Spring Cloud Alibaba | 2025.0.0.0（Nacos / Sentinel） |
+| MyBatis Spring Boot  | 3.0.5                        |
+| MySQL Connector/J    | 8.3.0                        |
+| Redis / Redisson     | Redis 7 · Redisson 4.0.0     |
+| RabbitMQ             | 3.13（客户端随 Spring AMQP）       |
+| Elasticsearch        | 9.2.1（本地镜像含 IK）              |
+| 支付宝 SDK              | 4.40.576.ALL                 |
+
+
+### 智能客服（Python）
+
+
+| 组件                            | 版本约束（见 `requirements.txt`） |
+| ----------------------------- | -------------------------- |
+| FastAPI                       | ≥0.115 / <0.116            |
+| Uvicorn                       | ≥0.32                      |
+| LangChain                     | ≥0.3.14 / <0.4             |
+| LangGraph                     | ≥0.2.60 / <0.3             |
+| Redis / Elasticsearch / httpx | 异步客户端                      |
+
+
+### 前端
+
+
+| 组件                                | 说明                                    |
+| --------------------------------- | ------------------------------------- |
+| Vue 3 + Vite + TypeScript         | C 端 `Simlect-web`、管理端 `Simlect-admin` |
+| Element Plus / Pinia / Vue Router | UI 与状态                                |
+
+
+### 中间件（本地 Docker 默认）
+
+MySQL 8.3 · Redis 7 · RabbitMQ 3.13 · Nacos 2.4.3 · Elasticsearch 9.2.1-IK · Sentinel · Seata（可选，默认未开启）
+
+---
+
+## 架构
+
+```text
+                 ┌───────────────────┐
+                 |浏览器 C 端 / 管理端| www.simlect.com
+                 └────────┬──────────┘
+                          │ Nginx
+                          ▼
+                 ┌─────────────────┐
+                 │  Gateway :8080  │  /api/**  /admin-api/**  /ws/**
+                 └────────┬────────┘
+          ┌───────────────┼────────────────┐
+          ▼               ▼                ▼
+   Java 微服务集群    Python Agent     （静态前端）
+   Nacos 注册发现       :7050
+   Feign + Sentinel   LangGraph + Tools
+          │               │
+          └───────┬───────┘
+                  ▼
+     MySQL(分库) · Redis · RabbitMQ · Elasticsearch
+```
+
+**微服务模块：** `gateway` · `user` · `product` · `stock` · `cart` · `order` · `pay` · `coupon` · `search` · `admin` · `agent(Python)`
+
+分库表归属见 [sql/TABLE_OWNERSHIP.md](sql/TABLE_OWNERSHIP.md)。
+
+---
+
+## 可扩展方向
+
+项目按领域拆分，以下能力可按需加长，而不必推倒重来：
+
+
+| 方向                  | 现状                                               | 扩展方式                                                                                                                           |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| **支付渠道**            | 已实现支付宝 PC / WAP（`PayChannel` + `PayChannelEnum`） | 新增实现类（如微信支付），在枚举中注册 `beanName`，复用统一下单 / 回调 / 关单与订单状态机                                                                          |
+| **Agent 工具（MCP）**   | 10 个工具：6 读 + 4 写提案                               | 在 `Simlect-agent/app/mcp/tools.py` 注册工具 → `mcp_tools_service` 实现 → 写操作走”提案 → confirm → Java `/internal` 或业务 API“；提示词与意图规则可同步补充 |
+| **LLM / Embedding** | DeepSeek 对话 + 通义兼容 Embedding（可换）                 | 改 `.env` 中 `LLM_*` / `EMBEDDING_*` 即可换厂商，无需改业务代码                                                                               |
+| **搜索与 RAG**         | ES 关键词 + 向量 + RRF；FAQ / 商品异步入库                   | 增索引字段、改 RRF 权重、接新知识库；商品变更已走 MQ 向量化                                                                                             |
+| **营销**              | 优惠券 / 秒杀券（`simlect-coupon`）                      | 可加满减活动、会员价、分销等，保持「券库存 Lua + DB」或独立活动服务                                                                                         |
+| **通知与触达**           | MQ 削峰落库 + 站内信                                    | 可接短信 / 邮件 / 企微，复用现有通知 Outbox 与消费者模式                                                                                            |
+| **前端能力**            | C 端 + 管理端                                        | 新域经 Gateway `/api`、`/admin-api` 扩展即可                                                                             |
+
+
+写工具务必保持：**模型只提案，真正改库由 Java 执行**，避免 LLM 幻觉写库。
+
+---
+
+## 仓库结构
+
+```text
+Simlect/
+├── Simlect-backend/          # Java 微服务 + Python Agent
+│   ├── Simlect-common/       # 基建、Feign 契约、Redis/MQ
+│   ├── Simlect-gateway/
+│   ├── Simlect-{user,product,stock,cart,order,pay,coupon,search,admin}/
+│   └── Simlect-agent/        # FastAPI + LangGraph（独立进程）
+├── Simlect-front/
+│   ├── Simlect-web/          # C 端
+│   └── Simlect-admin/        # 管理端
+├── sql/                      # 分库 DDL、Nacos/Seata
+└── deploy/                   # Docker 中间件、环境变量、Nginx、上线清单
+```
+
+---
+
+## 设计片段
+
+### 智能客服：读工具直连，写工具提案
+
+Agent 进程内挂载 10 个工具。读类（搜商品、查订单/物流/评价/优惠券、商品详情）经 HTTP 调 Java；写类（确认收货、退款、评价、追评）只写入 Redis **待确认提案**，用户点确认后由 Java API 真正改库——避免 LLM 幻觉写库。
+
+### 下单超时关单
+
+下单事务提交后经 Outbox/MQ 投递 **支付超时延迟队列**（TTL → 死信）。消费者校验仍为待支付后关单，并按订单行回补库存（秒杀券走券库存释放 + Lua 对齐）。支付成功与关单并发时，依赖”仅当 `WAIT_PAYMENT` 才更新“的条件写与关单标记，晚到支付走退款路径。
+
+### 搜索：RRF + 兜底
+
+Agent 侧对 ES 关键词召回与向量召回做 **RRF 融合排序**；若结果为空或命中逛逛意图，再回落足迹推荐 / 热销，而不是把四路信号硬塞进同一套 RRF 分。
+
+---
+
+## 快速开始
+
+> 建议本机内存 **≥16GB**（全中间件 + 全服务更舒适）。以下以 Windows / PowerShell 为例，Linux/macOS 命令等价。
+
+### 0. 环境要求
+
+- JDK 17、Maven 3.9+
+- Docker Desktop（中间件）
+- Node.js 20+（前端）
+- Python 3.11+（Agent，建议 venv）
+- LLM / Embedding API Key（Agent 与 RAG；可用 DeepSeek + 通义兼容接口）
+
+### 1. 启动中间件
+
+```powershell
+cd deploy
+powershell -ExecutionPolicy Bypass -File .\start-middleware.ps1
+# 或：docker compose -f docker-compose.middleware.yml up -d
+```
+
+说明见 [deploy/MIDDLEWARE_DOCKER.md](deploy/MIDDLEWARE_DOCKER.md)。
+
+### 2. 导入数据库
+
+MySQL 就绪后，按序执行（可用 `docker exec -i simlect-mysql mysql -uroot -proot`）：
+
+```text
+sql/00_create_databases.sql          # 业务分库
+sql/00b_nacos_seata_databases.sql    # nacos / seata 库
+sql/14_nacos.sql
+sql/15_seata.sql
+sql/16_seata_undo_log.sql
+sql/01_user.sql … sql/10_admin.sql   # 业务表（含 order outbox）
+sql/13_mq_infra_per_service.sql      # 其他服务 Outbox / 补偿表
+```
+
+也可先跑：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\init-mysql-meta.ps1
+```
+
+再按 [deploy/GO_LIVE.md](deploy/GO_LIVE.md) 补全 `01`～`10`、`13`。
+
+### 3. 构建并启动 Java 服务
+
+```powershell
+cd Simlect-backend
+mvn -q package -DskipTests
+```
+
+建议启动顺序：
+
+1. **Gateway** `:8080`
+2. `user` / `product` / `stock` / `cart` / `coupon` / `order` / `pay` / `search` / `admin`
+3. 确认 [Nacos](http://127.0.0.1:8848/nacos) 实例全部 UP
+
+本地默认连接：`127.0.0.1` 的 MySQL（`root`/`root`）、Redis、RabbitMQ（`simlect`/`simlect`）、Nacos。内部调用令牌默认 `your-token`（仅开发，与各服务 `simlect.internal.token` / Agent `.env` 保持一致）。
+
+### 4. 启动 Python Agent
+
+Windows 可一键启动（自动创建 venv、按需装依赖、缺 `.env` 时从 `.env.example` 复制）：
+
+```powershell
+cd Simlect-backend\Simlect-agent
+.\start.bat
+```
+
+首次请编辑 `.env`，填写 `LLM_API_KEY`、`EMBEDDING_API_KEY` 等。
+
+也可手动：
+
+```powershell
+cd Simlect-backend\Simlect-agent
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env   # 填写 LLM_API_KEY、EMBEDDING_API_KEY 等
+uvicorn app.main:app --host 0.0.0.0 --port 7050
+```
+
+健康检查：`GET http://127.0.0.1:7050/health`
+
+### 5. 启动前端
+
+```powershell
+# C 端
+cd Simlect-front\Simlect-web
+npm install
+npm run dev
+
+# 管理端
+cd Simlect-front\Simlect-admin
+npm install
+npm run dev
+```
+
+开发环境 API 指向 Gateway `http://localhost:8080`（见各自 `.env.development`）。
+
+### 6. 生产部署摘要
+
+1. 复制 [deploy/env.production.example](deploy/env.production.example)，设置 `SIMLECT_PRODUCTION_READY=true`、强 `SIMLECT_INTERNAL_TOKEN` / 数据库与管理员密码。
+2. Nginx 反代示例：[deploy/nginx.simlect.conf.example](deploy/nginx.simlect.conf.example)
+3. 完整清单：[deploy/GO_LIVE.md](deploy/GO_LIVE.md)
+
+---
+
+## 配置说明
+
+
+| 配置项                                | 用途                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| `NACOS_ADDR`                       | 服务注册发现，默认 `127.0.0.1:8848`                                          |
+| `MYSQL_*` / 各库 URL                 | 一服务一库（`simlect_user` 等）                                             |
+| `REDIS_*` / `RABBIT_*`             | 缓存、签到 Bitmap、会话、MQ                                                  |
+| `ES_URIS`                          | 商品检索与向量索引                                                           |
+| `SIMLECT_INTERNAL_TOKEN`           | 服务间与 Agent 调用 `/internal/**` 的共享密钥（请求头 `X-Internal-Token`），**全服务一致** |
+| `ADMIN_ACCOUNT` / `ADMIN_PASSWORD` | 管理端账号                                                               |
+| `ALIPAY_*`                         | 支付宝证书与网关（开放支付时必填）                                                   |
+| `LLM_*` / `EMBEDDING_*`            | Agent 对话与 RAG 向量化                                                   |
+| `JAVA_WEB_URL` / `AGENT_HOST`      | Agent ↔ Gateway；Gateway 反代 Agent                                    |
+| `SIMLECT_DEV_LOGIN_BYPASS`         | 仅本地；**禁止生产开启**                                                      |
+
+
+Agent 环境变量模板：`Simlect-backend/Simlect-agent/.env.example`。
+
+### Agent 常用参数（`.env`）
+
+
+| 参数                      | 默认示例  | 含义                                                         |
+| ----------------------- | ----- | ---------------------------------------------------------- |
+| `AI_CHAT_LIMIT`         | `200` | 单用户累计可发送的对话轮次上限（护栏）；`<=0` 表示不限制。超限后拒绝继续聊天，防止刷 LLM。         |
+| `RAG_TOP_K`             | `15`  | 向量 / FAQ 检索时最多取回的文档条数（Top-K）。越大召回越宽，延迟与噪声也可能增加。            |
+| `RAG_SCORE_THRESHOLD`   | `0.5` | 向量相似度分数下限；低于该阈值的命中会被丢掉，减少”答不实“的弱相关片段。                      |
+| `HISTORY_MESSAGE_LIMIT` | `15`  | 组装 LLM 上下文时参考的历史轮次数量相关上限（实现里会按此倍数从库中拉取再筛选）。越大上下文越长、费用越高。   |
+| `TASK_QUEUE_MAX`        | `300` | Agent 进程内同时进行的对话任务上限；达到后新请求排队失败/拒绝，保护本机 LLM 与下游 Java 不被打满。 |
+
+
+其余如 `CIRCUIT_LLM_*`（熔断）、`GRAPH_MAX_REACT_ROUNDS`（工具循环轮数）等见 `Simlect-backend/Simlect-agent/app/config/settings.py`。
+
+---
+
+## 服务端口
+
+
+| 服务             | 端口   |
+| -------------- | ---- |
+| Gateway        | 8080 |
+| Agent (Python) | 7050 |
+| cart           | 8084 |
+| coupon         | 8087 |
+| order          | 8093 |
+| pay            | 8096 |
+| product        | 8099 |
+| stock          | 8102 |
+| user           | 8105 |
+| search         | 8108 |
+| admin          | 8111 |
+
+
+中间件控制台（本地）：Nacos `8848` · RabbitMQ Management `15672` · ES `9200` · Sentinel `8858`
+
+---
+
+## 文档索引
+
+
+| 文档                                                                                 | 内容               |
+| ---------------------------------------------------------------------------------- | ---------------- |
+| [deploy/GO_LIVE.md](deploy/GO_LIVE.md)                                             | 上线检查清单           |
+| [deploy/MIDDLEWARE_DOCKER.md](deploy/MIDDLEWARE_DOCKER.md)                         | 中间件 Docker       |
+| [deploy/env.production.example](deploy/env.production.example)                     | 生产环境变量模板         |
+| [sql/TABLE_OWNERSHIP.md](sql/TABLE_OWNERSHIP.md)                                   | 分库表归属与包命名约定      |
+| [Simlect-backend/Simlect-agent/.env.example](Simlect-backend/Simlect-agent/.env.example) | Agent 环境变量模板 |
+| [deploy/FULL_STACK.md](deploy/FULL_STACK.md)                                       | 本机全栈启动与内存建议 |
+
+
+---
+
+## License
+
+本项目仅供学习与演示。商用请自行评估第三方依赖协议（支付宝、地图、LLM、Embedding 等）及合规要求。
+
+---
+
+**在线体验：** [https://www.simlect.com](https://www.simlect.com)
