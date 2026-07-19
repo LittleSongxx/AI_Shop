@@ -63,10 +63,10 @@ Java 侧按领域拆成商品、订单、支付、营销（优惠券）、库存
 
 | 组件                            | 版本约束（见 `requirements-runtime.txt`） |
 | ----------------------------- | ---------------------------------- |
-| FastAPI                       | ≥0.115                             |
-| Uvicorn                       | ≥0.32                              |
-| LangChain / LangGraph         | ≥0.3 / ≥0.2                        |
-| MCP                           | ≥1.9（Streamable HTTP）              |
+| FastAPI                       | >=0.115                             |
+| Uvicorn                       | >=0.32                              |
+| LangChain / LangGraph         | >=0.3 / >=0.2                        |
+| MCP                           | >=1.9（Streamable HTTP）              |
 | Redis / Elasticsearch / httpx | 异步客户端                              |
 
 
@@ -112,7 +112,7 @@ MySQL 8.3 · Redis 7 · RabbitMQ 3.13 · Nacos 2.4.3 · Elasticsearch 9.2.1-IK �
      MySQL(分库) · Redis · RabbitMQ · Elasticsearch
 ```
 
-Agent 不直连业务库改写；读/写工具由 **MCP Server** 实现，经 Gateway `/internal/**` 调 Java。写操作仍走「提案 → 用户确认 → Java 执行」。
+Agent 不直连业务库改写；读/写工具由 **MCP Server** 实现，经 Gateway `/internal/**` 调 Java。写操作仍走<提案 -> 用户确认 -> Java 执行>。
 
 **微服务模块：** `gateway` · `user` · `product` · `stock` · `cart` · `order` · `pay` · `coupon` · `search` · `admin` · `agent(Python)` · `mcp-server(Python :7060)`
 
@@ -189,7 +189,7 @@ Agent 通过 **MCP Streamable HTTP**（默认 `:7060/mcp`）调用 10 个工具�
 
 ### 搜索：RRF + 相关性过滤 + 兜底文案
 
-1. 口语归一化（如<我要吃零食>→<零食>）后做 **ES 关键词 + 向量 RRF**。
+1. 口语归一化（如"我要吃零食"→"零食"）后做 **ES 关键词 + 向量 RRF**。
 2. 对召回标题做 **品类/同义词相关性过滤**；全部不相关则视为未命中。
 3. 未命中再回落足迹 / 热销，工具文案为"暂未找到…"+【另荐热销/浏览推荐】。
 
@@ -197,7 +197,7 @@ Agent 通过 **MCP Streamable HTTP**（默认 `:7060/mcp`）调用 10 个工具�
 
 ## 快速开始
 
-> 建议本机内存 **≥16GB**（全中间件 + 全服务更舒适）。以下以 Windows / PowerShell 为例，Linux/macOS 命令等价。
+> 建议本机内存 **>=16GB**（全中间件 + 全服务更舒适）。以下以 Windows / PowerShell 为例，Linux/macOS 命令等价。
 
 ### 0. 环境要求
 
