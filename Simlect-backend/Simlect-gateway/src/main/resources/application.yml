@@ -82,6 +82,22 @@ spring:
               uri: ws://${AGENT_HOST:127.0.0.1}:${AGENT_PORT:7050}
               predicates:
                 - Path=/ws/**
+            - id: internal-order
+              uri: lb://simlect-order
+              predicates:
+                - Path=/internal/order/**
+            - id: internal-product
+              uri: lb://simlect-product
+              predicates:
+                - Path=/internal/product/**
+            - id: internal-coupon
+              uri: lb://simlect-coupon
+              predicates:
+                - Path=/internal/coupon/**
+            - id: internal-user
+              uri: lb://simlect-user
+              predicates:
+                - Path=/internal/user/**
             - id: admin-user
               uri: lb://simlect-user
               predicates:

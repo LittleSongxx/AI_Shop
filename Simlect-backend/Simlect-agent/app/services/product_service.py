@@ -6,6 +6,10 @@ from app.domain.intent.rules import looks_like_browse_recommend
 from app.rag.retriever import rag_retriever
 from app.rag.rrf import rrf_merge
 from app.services.java_internal_client import java_internal_client
+from app.services.product_search_query import (
+    filter_products_by_query_relevance,
+    normalize_product_search_query,
+)
 from app.services.search_recommend_service import search_recommend_service
 from app.utils.biz_payload import build_product_payload, first_cover
 
@@ -55,7 +59,8 @@ def derive_search_keyword(
         category_id = consult_product.get("categoryId") or consult_product.get("category_id")
         if category_id:
             return f"category:{category_id}"
-    return kw
+    # 「我要吃零食」→「零食」，提升关键词/向量命中率
+    return normalize_product_search_query(kw) or kw
 
 class ProductService:
 
@@ -98,6 +103,24 @@ class ProductService:
             products = await self._load_products_by_ids(product_ids)
             if products:
                 source = "hybrid"
+                # Vector/keyword often returns unrelated hot junk — drop non-matching titles.
+                relevant = filter_products_by_query_relevance(products, query)
+                if not relevant:
+                    logger.info(
+                        "hybrid_relevance_miss",
+                        query=query,
+                        candidates=len(products),
+                    )
+                    products = []
+                    source = "none"
+                elif len(relevant) < len(products):
+                    logger.info(
+                        "hybrid_relevance_filtered",
+                        query=query,
+                        before=len(products),
+                        after=len(relevant),
+                    )
+                    products = relevant
         else:
             products = []
 
@@ -151,7 +174,7 @@ class ProductService:
         return (
             f"商品：{row.get('product_name')} | ID：{row.get('product_id')} | "
             f"价格：{row.get('min_price')}~{row.get('max_price')}元 | "
-            f"销量：{row.get('total_sale') or 0} | 简介：{desc}"
+            f"销量：{row.get('total_sale') or row.get('sales') or 0} | 简介：{desc}"
         )
 
     async def _load_products_by_ids(self, product_ids: list[str]) -> list[dict]:
@@ -212,9 +235,14 @@ def format_search_tool_message(
     source: str,
 ) -> str:
 
+    from app.domain.intent.rules import looks_like_browse_recommend, looks_like_hot_sale_recommend
+    from app.services.product_search_query import filter_products_by_query_relevance
+
     consult_name = (consult or {}).get("productName") or (consult or {}).get("product_name") or "当前商品"
     similar_intent = _similar_intent(keyword, consult)
     alternative_sources = {"browse", "hot_sale"}
+    kw = (keyword or "").strip()
+    kw_display = (normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求"
 
     if similar_intent and source in alternative_sources:
         return (
@@ -223,6 +251,37 @@ def format_search_tool_message(
         )
     if similar_intent and source == "category":
         return f"【同品类推荐】找到 {len(products)} 个同品类商品（请查看下方卡片）。"
+
+    # Even if source claims hybrid, never brand irrelevant titles as「找到」.
+    if products and kw and source not in ("category",):
+        relevant = filter_products_by_query_relevance(products, kw)
+        intentional_alt = looks_like_hot_sale_recommend(kw) or looks_like_browse_recommend(kw)
+        if not relevant and not intentional_alt:
+            return (
+                f"【搜索结果】暂未找到与「{kw_display}」相关的商品。\n"
+                f"【另荐热销】已为您另外推荐热销商品，请查看下方卡片。"
+            )
+
+    # Keyword search missed → hot-sale / browse backfill: never label as「搜索结果找到」.
+    if products and source in alternative_sources:
+        intentional_alt = looks_like_hot_sale_recommend(kw) or looks_like_browse_recommend(kw)
+        if intentional_alt and source == "hot_sale":
+            return f"【热销推荐】为您推荐 {len(products)} 个热销商品（请查看下方卡片）。"
+        if intentional_alt and source == "browse":
+            return f"【浏览推荐】根据你的浏览为你推荐 {len(products)} 个商品（请查看下方卡片）。"
+        alt_label = "【另荐热销】" if source == "hot_sale" else "【浏览推荐】"
+        alt_body = (
+            "已为您另外推荐热销商品，请查看下方卡片。"
+            if source == "hot_sale"
+            else "已根据浏览为您另外推荐商品，请查看下方卡片。"
+        )
+        return (
+            f"【搜索结果】暂未找到与「{kw_display}」相关的商品。\n"
+            f"{alt_label}{alt_body}"
+        )
+
     if not products:
+        if kw:
+            return f"【搜索结果】暂未找到与「{kw_display}」相关的商品。"
         return "【搜索结果】未找到相关商品。"
     return f"【搜索结果】找到 {len(products)} 个商品（请查看下方卡片）。"

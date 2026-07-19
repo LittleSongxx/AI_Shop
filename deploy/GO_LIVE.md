@@ -2,7 +2,9 @@
 
 ## 结论口径
 
-完成下列 **必做项** 并冒烟通过后，可视为 **READY WITH CONDITIONS**（无 Seata，跨库靠 Feign + Outbox/补偿）。
+完成下列 **必做项** 并冒烟通过后，可视为 **READY WITH CONDITIONS**（Seata AT 默认开启；跨库另有 Feign + Outbox/补偿兜底）。
+
+生产建议启动 Seata Server，并保持 `SEATA_ENABLED=true`（默认）。若临时关闭分布式事务，显式设 `SEATA_ENABLED=false`，此时带 `@GlobalTransactional` 的下单路径行为取决于 Seata 客户端是否仍尝试连 Server——本地无 Seata 时应关闭开关。
 
 ## 0. 构建
 
@@ -43,17 +45,20 @@ mvn -q package -DskipTests
 - `MYSQL_PASSWORD` / `RABBIT_PASSWORD`
 - `ADMIN_PASSWORD`
 - `PROJECT_FOLDER` / `PROJECT_DOMAIN`
-- 支付宝证书与 `ALIPAY_*`（若开放支付）
+- 支付宝证书与 `ALIPAY`_*（若开放支付）
 
 ## 4. 启动顺序
 
 1. gateway:8080
 2. user / product / stock / cart / coupon / order / pay / search / admin
-3. Python agent:7050（`JAVA_WEB_URL` 指向 Gateway）
-4. Nginx 反代（见 `deploy/nginx.simlect.conf.example`）
-5. 前端 production 构建，相对路径 `/api`、`/admin-api`
+3. Python MCP Server:7060（`start-mcp.bat` / `python -m app.mcp_server`；**无热重载，发版或改工具后须重启**）
+4. Python agent:7050（`JAVA_WEB_URL` 与 `MCP_SERVER_URL` 指向 Gateway / MCP）
+5. Nginx 反代（见 `deploy/nginx.simlect.conf.example`）
+6. 前端 production 构建，相对路径 `/api`、`/admin-api`
 
-## 5. 冒烟
+> Java 根包与 Maven `groupId` 均为 `com.simlect`。ES 商品索引 `simlect-index`，向量索引默认 `simlect_vectorstore`（`VECTOR_INDEX` / Agent `ES_INDEX`）。密钥仅环境变量 / `.env`，勿写入 IDE Run Configuration。
+
+## 5. Smoke Test
 
 - Nacos 服务全部 UP  
 - C 端注册/登录  
@@ -62,12 +67,13 @@ mvn -q package -DskipTests
 - 订单超时关单 / Outbox 有 SENT 记录  
 - 管理端登录与订单列表  
 - 管理端首页今日数据 / 库存预警（依赖 order、user、product、stock 均 UP）  
-- Agent HTTP/WS 经 Gateway
+- Agent HTTP/WS 经 Gateway；MCP `tools/list` 可用（`:7060/mcp`）
+- 对话：订单卡 / 商品卡正常；搜索未命中文案为<暂未找到>而非误报<找到 N 个>
 
 ## 6. 安全确认
 
 - 业务端口（8084–8111、7050）不对公网  
 - 未使用 `-Ddev` / `SIMLECT_DEV_LOGIN_BYPASS=true`  
 - Nginx 未反代 `/actuator`  
-- 各服务启动日志出现「生产就绪校验通过」
+- 各服务启动日志出现"生产就绪校验通过"
 

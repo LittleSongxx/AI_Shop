@@ -1,5 +1,9 @@
 from app.services.java_internal_client import java_internal_client
 from app.utils.biz_payload import first_cover
+import structlog
+
+logger = structlog.get_logger()
+
 
 class SearchRecommendService:
 
@@ -38,10 +42,22 @@ class SearchRecommendService:
 
     async def _load_hot_sale(self, size: int) -> list[dict]:
 
+        try:
+            rows = await java_internal_client.search_on_sale(
+                keyword="",
+                limit=size,
+                hot_sale=True,
+            )
+            cards = self._normalize_cards(rows)
+            if cards:
+                return cards
+        except Exception as e:
+            # Product service may still run old bytecode (order by sales vs total_sale).
+            logger.warning("hot_sale_load_failed_fallback_recent", error=str(e))
         rows = await java_internal_client.search_on_sale(
             keyword="",
             limit=size,
-            hot_sale=True,
+            hot_sale=False,
         )
         return self._normalize_cards(rows)
 

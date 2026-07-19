@@ -108,7 +108,25 @@ def should_force_product_cards(
 
     if is_consult_turn:
         return False
-    if "QUERY_ORDERS" in (tools_called or []):
+    called = tools_called or []
+    if any(
+        t in called
+        for t in (
+            "QUERY_ORDERS",
+            "QUERY_LOGISTICS",
+            "QUERY_COMMENT",
+            "QUERY_USER_COUPONS",
+            "PROPOSE_REFUND",
+            "PROPOSE_CONFIRM_RECEIPT",
+            "PROPOSE_PRODUCT_REVIEW",
+            "PROPOSE_RECOMMENT",
+            "GET_PRODUCT_DETAIL",
+        )
+    ):
+        return False
+    from app.utils.biz_payload import looks_like_aftersales_or_order_text
+
+    if looks_like_aftersales_or_order_text(full_text) or looks_like_aftersales_or_order_text(assistant):
         return False
     if is_order_cards_json(assistant_cards):
         return False

@@ -68,8 +68,8 @@ spring:
         default-requeue-rejected: false
 
 mybatis:
-  mapper-locations: classpath*:com/myshop/mappers/*.xml
-  type-aliases-package: com.myshop.entity
+  mapper-locations: classpath*:com/simlect/mappers/*.xml
+  type-aliases-package: com.simlect.entity
   configuration:
     map-underscore-to-camel-case: true
 

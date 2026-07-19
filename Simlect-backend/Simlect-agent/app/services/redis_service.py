@@ -35,6 +35,9 @@ class RedisService:
 
     async def connect(self) -> None:
 
+        if self._client is not None:
+            return
+
         settings = get_settings()
 
         self._client = aioredis.from_url(
@@ -44,10 +47,15 @@ class RedisService:
             max_connections=20,
         )
 
+    async def ensure_connected(self) -> None:
+        """Idempotent connect for Agent lifespan and MCP server process."""
+        await self.connect()
+
     async def close(self) -> None:
 
         if self._client:
             await self._client.aclose()
+            self._client = None
 
     @property
     def client(self) -> aioredis.Redis:
@@ -140,6 +148,15 @@ class RedisService:
     async def delete_pending_action(self, token: str) -> None:
 
         await self.client.delete(f"{REDIS_AGENT_PENDING_ACTION}{token}")
+
+    async def try_lock_pending_action(self, token: str, ttl_seconds: int = 120) -> bool:
+        """NX lock so confirm/cancel cannot double-execute the same token."""
+        key = f"{REDIS_AGENT_PENDING_ACTION}lock:{token}"
+        ok = await self.client.set(key, "1", nx=True, ex=max(1, int(ttl_seconds)))
+        return bool(ok)
+
+    async def unlock_pending_action(self, token: str) -> None:
+        await self.client.delete(f"{REDIS_AGENT_PENDING_ACTION}lock:{token}")
 
     async def get_sensitive_words(self) -> list[dict]:
 

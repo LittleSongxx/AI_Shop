@@ -73,15 +73,28 @@ class ActionExecuteService:
         import json
         params = json.loads(pending.get("paramsJson") or "{}")
         if action_type == "REFUND":
-            return await self._bridge.refund_order(token, params["orderItemId"])
+            order_item_id = params.get("orderItemId")
+            if not order_item_id:
+                raise ValueError("退款参数缺失，请重新发起提案")
+            return await self._bridge.refund_order(token, order_item_id)
         if action_type == "CONFIRM_RECEIPT":
-            return await self._bridge.confirm_order(token, params["orderId"])
+            order_id = params.get("orderId")
+            if not order_id:
+                raise ValueError("确认收货参数缺失，请重新发起提案")
+            return await self._bridge.confirm_order(token, order_id)
         if action_type == "PRODUCT_REVIEW":
-            return await self._bridge.post_comment(
-                token, params["orderId"], params["commentContent"], int(params["star"])
-            )
+            order_id = params.get("orderId")
+            content = params.get("commentContent")
+            star = params.get("star")
+            if not order_id or not content or star is None:
+                raise ValueError("评价参数缺失，请重新发起提案")
+            return await self._bridge.post_comment(token, order_id, content, int(star))
         if action_type == "RECOMMENT":
-            return await self._bridge.post_recomment(token, params["orderId"], params["reCommentContent"])
+            order_id = params.get("orderId")
+            content = params.get("reCommentContent")
+            if not order_id or not content:
+                raise ValueError("追评参数缺失，请重新发起提案")
+            return await self._bridge.post_recomment(token, order_id, content)
         raise ValueError("该操作不支持执行")
 
 action_execute_service = ActionExecuteService()

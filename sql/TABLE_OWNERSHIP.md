@@ -46,6 +46,8 @@ local_message_outbox, mq_compensation_log（管理端补偿重放；见 `10_admi
 
 | 位置 | 包名 | 说明 |
 |------|------|------|
-| 各业务微服务 `app` | `com.myshop.biz` / `biz.impl` | 领域业务实现（订单、商品、用户等） |
-| `Simlect-common` | `com.myshop.service` / `service.impl` | 跨服务基础设施（密码、Outbox、MQ 补偿等） |
-| Feign 契约 | `com.myshop.api` | `*-api` 模块；降级工具统一用 `com.myshop.api.support.FeignFallbackResponses` |
+| Maven 坐标 | `com.simlect:*` | 全模块 `groupId` |
+| 各业务微服务 `app` | `com.simlect.biz` / `biz.impl` | 领域业务实现（订单、商品、用户等） |
+| `Simlect-common` | `com.simlect.service` / `service.impl` | 跨服务基础设施（密码、Outbox、MQ 补偿等） |
+| Feign 契约 | `com.simlect.api` | `*-api` 模块；降级工具统一用 `com.simlect.api.support.FeignFallbackResponses` |
+| ES 索引 | `simlect-index` / `simlect_vectorstore` | 商品关键词索引 / RAG 向量索引 |

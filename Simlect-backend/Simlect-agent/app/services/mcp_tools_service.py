@@ -62,20 +62,47 @@ async def query_logistics(user_id: str, order_id: str) -> str:
         logistics = await java_internal_client.get_logistics(user_id, order_id)
         if not logistics:
             return "【查询物流失败】订单物流信息不存在"
-        records = logistics.pop("record_list", None) or logistics.pop("recordList", None) or []
-        for k, v in list(logistics.items()):
-            if isinstance(v, datetime):
-                logistics[k] = v.strftime("%Y-%m-%d %H:%M:%S")
-        logistics["recordList"] = [
-            {
-                kk: (vv.strftime("%Y-%m-%d %H:%M:%S") if isinstance(vv, datetime) else vv)
-                for kk, vv in (r.items() if isinstance(r, dict) else [])
-            }
-            for r in records
-        ]
-        return json.dumps(logistics, ensure_ascii=False, default=str)
+        records = logistics.get("record_list") or logistics.get("recordList") or []
+        company = logistics.get("logistics_company") or logistics.get("logisticsCompany") or "快递"
+        logistics_no = logistics.get("logistics_no") or logistics.get("logisticsNo") or "-"
+        status = logistics.get("logistics_status")
+        if status is None:
+            status = logistics.get("logisticsStatus")
+        status_name = {
+            0: "待揽收",
+            1: "已揽收",
+            2: "运输中",
+            3: "派送中",
+            4: "已签收",
+            5: "异常",
+        }.get(int(status) if status is not None else -1, "运输中")
+
+        rows: list[str] = []
+        for r in records:
+            if not isinstance(r, dict):
+                continue
+            t = r.get("record_time") or r.get("recordTime") or ""
+            if hasattr(t, "strftime"):
+                t = t.strftime("%Y-%m-%d %H:%M:%S")
+            addr = r.get("record_address") or r.get("recordAddress") or ""
+            rows.append("<tr><td>%s</td><td>%s</td></tr>" % (t, addr))
+
+        header = "【订单%s查询物流成功】" % order_id
+        header += chr(10) + "承运商：%s，运单号：%s，状态：%s" % (company, logistics_no, status_name)
+        if not rows:
+            return header + chr(10) + "暂无物流轨迹明细。"
+
+        table = "<table>" + chr(10)
+        table += "<tr><th>时间</th><th>地点</th></tr>" + chr(10)
+        table += chr(10).join(rows) + chr(10) + "</table>"
+        latest = records[0] if records and isinstance(records[0], dict) else {}
+        latest_addr = latest.get("record_address") or latest.get("recordAddress") or ""
+        footer = (chr(10) + "当前包裹最新位置：" + str(latest_addr)) if latest_addr else ""
+        return header + chr(10) + table + footer
     except Exception as e:
-        return f"【查询物流失败】系统处理异常，请稍后重试或联系客服。错误信息：{e}"
+        return "【查询物流失败】系统处理异常，请稍后重试或联系客服。错误信息：%s" % e
+
+
 
 async def query_comment(user_id: str, order_id: str) -> str:
 
@@ -187,9 +214,44 @@ async def propose_refund(user_id: str, order_item_id: str) -> str:
     if not order_item_id:
         return "【退款失败】请输入要退款的订单项ID"
     try:
-        item = await order_service.get_order_item(order_item_id)
+        from app.utils.order_ids import extract_order_id, extract_order_item_id
+
+        # Normalize: keep xxx_1 as item id; bare order id falls back below.
+        normalized = extract_order_item_id(order_item_id) or (order_item_id or "").strip()
+        item = await order_service.get_order_item(normalized)
         if not item:
-            return "【退款失败】订单项不存在，请确认订单项ID是否正确"
+            # LLM / force path often passes orderId instead of orderItemId.
+            order_id = extract_order_id(normalized) or normalized
+            refundable = await order_service.list_refundable_items(user_id, order_id)
+            if len(refundable) == 1:
+                item = refundable[0]
+                normalized = str(item.get("order_item_id") or "")
+            elif len(refundable) > 1:
+                lines = []
+                for row in refundable[:8]:
+                    oid = row.get("order_item_id")
+                    name = row.get("product_name") or "商品"
+                    lines.append(f"- {name}（订单项ID：{oid}）")
+                return (
+                    "【退款失败】该订单有多个可退款商品，请指定其中一个订单项ID后再试：\n"
+                    + "\n".join(lines)
+                )
+            else:
+                order = await order_service.get_order(order_id)
+                if order and order.get("user_id") == user_id:
+                    st = order.get("order_status")
+                    return (
+                        f"【退款失败】订单存在，但当前状态为{_status_name(st)}，"
+                        "仅待发货/已发货/部分退款订单可申请退款。"
+                        "若订单项ID形如「订单号_1」，请使用完整订单项ID重试。"
+                    )
+                return (
+                    "【退款失败】订单项不存在，请确认订单项ID是否正确"
+                    "（格式一般为：订单号_1）。"
+                )
+        order_item_id = normalized
+        if not item or not order_item_id:
+            return "【退款失败】订单项不存在，请确认订单项ID是否正确（格式一般为：订单号_1）。"
         order = await order_service.get_order(item["order_id"])
         if not order or order["user_id"] != user_id:
             return "【退款失败】您没有权限操作此订单项"

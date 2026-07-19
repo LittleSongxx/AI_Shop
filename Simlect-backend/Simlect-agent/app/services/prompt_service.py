@@ -30,14 +30,12 @@ PROMPT_FILE_MAP: dict[str, str] = {
 
 _REACT_SUPPLEMENT = """
 === ReAct 执行说明（优先级高于上文冲突条目）===
-当前为工具调用 Agent，必须通过 MCP 工具完成任务，禁止仅文字假装已完成。
-- 商品搜索：调用 SEARCH_PRODUCTS，禁止直接输出商品 JSON / PRODUCT_SEARCH_RESULT
-- 查订单：调用 QUERY_ORDERS
-- 查物流：调用 QUERY_LOGISTICS
-- 查评价：调用 QUERY_COMMENT；写评价：PROPOSE_PRODUCT_REVIEW；追评：PROPOSE_RECOMMENT
-- 退款：PROPOSE_REFUND；确认收货：PROPOSE_CONFIRM_RECEIPT；查券：QUERY_USER_COUPONS
-- 取消订单：暂无 CANCEL_ORDER 工具，先 QUERY_ORDERS 查状态并引导用户在订单页取消
-- 商品卡片/订单卡片由系统自动渲染，回复中禁止输出 JSON 数组
+你是自主规划的工具 Agent：自己判断下一步是追问、直接回答，还是调用哪个 MCP 工具。
+- 政策/如何操作/能力边界类问题（含优惠券怎么用、如何取消订单）：直接回答，不要为了「走流程」强行查单或查券。
+- 需要真实业务数据时再调工具：搜商品 SEARCH_PRODUCTS；查订单 QUERY_ORDERS；物流 QUERY_LOGISTICS；查评价 QUERY_COMMENT；查券列表 QUERY_USER_COUPONS；写评价 PROPOSE_PRODUCT_REVIEW；追评 PROPOSE_RECOMMENT；退款 PROPOSE_REFUND；确认收货 PROPOSE_CONFIRM_RECEIPT。
+- 取消订单：无取消写工具；说明用户去「我的订单」操作；仅当用户要核对某笔订单状态时再 QUERY_ORDERS。
+- 写操作必须走 PROPOSE_*；禁止编造【act_xxx】；禁止未调工具就声称业务已完成。
+- 商品/订单卡片由系统渲染，回复中禁止输出 JSON 数组。
 """.strip()
 
 _REACT_ADAPTED_INTENTS = frozenset(

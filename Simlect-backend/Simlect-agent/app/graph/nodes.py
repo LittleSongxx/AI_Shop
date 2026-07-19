@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import structlog
 from langchain_core.messages import SystemMessage, ToolMessage
 
@@ -20,9 +22,35 @@ from app.rag.retriever import rag_retriever
 from app.utils.product_consult import is_product_consult_turn
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.redis_service import redis_service
+from app.utils.order_ids import extract_order_id, extract_order_item_id, extract_refund_target_id
+from app.utils.biz_payload import is_order_cards_json, is_product_cards_json
 
 logger = structlog.get_logger()
 output_guard = OutputGuardrail()
+
+_ORDER_LIST_UI_HINTS = (
+    "我的订单",
+    "最近订单",
+    "最近的订单",
+    "查订单",
+    "订单列表",
+    "买了什么",
+    "买过什么",
+    "最近买了",
+    "最近买的",
+    "最近购买",
+    "再买一次",
+    "复购",
+    "上次买",
+)
+
+
+def _wants_order_list_cards(user_text: str | None) -> bool:
+    """UI contract: these asks must render order cards, not markdown tables."""
+    t = (user_text or "").strip()
+    if not t:
+        return False
+    return any(k in t for k in _ORDER_LIST_UI_HINTS)
 
 async def entry_guard(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
@@ -88,9 +116,21 @@ async def build_context_node(state: AgentGraphState) -> dict:
         consult_card=consult_card,
         message_card=card,
     )
-    if switching_away or category_switch_search:
-        intent = IntentKind.PRODUCT_SEARCH
 
+    _keep_intent = {
+        IntentKind.QUERY_ORDER,
+        IntentKind.QUERY_LOGISTICS,
+        IntentKind.QUERY_COMMENT,
+        IntentKind.QUERY_COUPON,
+        IntentKind.PRODUCT_REVIEW,
+        IntentKind.RECOMMENT,
+        IntentKind.REFUND,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.CANCEL_ORDER,
+    }
+    if (switching_away or category_switch_search) and intent not in _keep_intent:
+        intent = IntentKind.PRODUCT_SEARCH
+        intent_source = "category_switch"
     faq_text = ""
     knowledge_text = ""
     if intent in (IntentKind.PRODUCT_CONSULT, IntentKind.CHAT):
@@ -134,8 +174,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
             SystemMessage(
                 content=(
                     "【系统提示】用户可能在找类似/推荐商品。"
-                    "请先调用 SEARCH_PRODUCTS 获取结果后再回复；"
-                    "禁止自行编造商品名或价格，回复时引导查看下方卡片。"
+                    "若需要真实商品列表，请调用 SEARCH_PRODUCTS 后再回复；"
+                    "不要编造商品名或价格；有结果时引导查看下方卡片。"
                 )
             )
         )
@@ -144,14 +184,35 @@ async def build_context_node(state: AgentGraphState) -> dict:
         messages.append(
             SystemMessage(
                 content=(
-                    "【系统提示】用户已切换品类或发起新的商品搜索。"
-                    "请调用 SEARCH_PRODUCTS（keyword 用用户意图中的品类/品牌/特征），"
-                    "禁止再围绕旧咨询商品作答，禁止拒绝搜索。"
+                    "【系统提示】用户可能已切换品类或发起新的商品搜索。"
+                    "请按最新意图作答；需要商品列表时调用 SEARCH_PRODUCTS"
+                    "（keyword 用品类/品牌/特征），不要强行围绕旧咨询商品拒绝切换。"
                 )
             )
         )
 
     await redis_service.bind_message_id(user_id, message_id)
+    if intent == IntentKind.QUERY_ORDER:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "【系统提示】本轮更像查订单。"
+                    "若要陈述用户订单事实，请先调用 QUERY_ORDERS；"
+                    "政策/如何查看订单类问题可直接说明入口。"
+                )
+            )
+        )
+    elif intent == IntentKind.QUERY_LOGISTICS:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "【系统提示】本轮更像查物流。"
+                    "若要陈述物流轨迹，请先调用 QUERY_LOGISTICS；"
+                    "缺订单号时先追问，不要编造轨迹。"
+                )
+            )
+        )
+
     return {
         "llm_messages": messages,
         "working_turns": working_turns,
@@ -159,10 +220,181 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "card": consult_card or card,
         "message_card": card,
         "category_switch_search": category_switch_search,
+        "intent": intent.value,
+        "intent_data": intent_data or None,
         "react_round": 0,
         "pending_tool_calls": [],
         "route": "agent_loop",
     }
+
+
+_STAR_RE = re.compile(
+    r"(?:评[价分]|打)\s*([1-5])\s*星|([1-5])\s*星|星级\s*[：:]*\s*([1-5])|给.{0,8}([1-5])\s*分",
+    re.I,
+)
+_POSITIVE_STAR_HINTS = ("好评", "很好", "不错", "可以", "满意", "推荐", "赞", "棒", "给力", "喜欢")
+_NEGATIVE_STAR_HINTS = ("差评", "很差", "太差", "失望", "糟糕", "垃圾", "坑")
+_NEUTRAL_STAR_HINTS = ("一般", "还行", "凑合", "普通")
+
+_TOOL_REQUIRED_INTENTS = frozenset(
+    {
+        IntentKind.QUERY_ORDER.value,
+        IntentKind.QUERY_LOGISTICS.value,
+        IntentKind.QUERY_COMMENT.value,
+        IntentKind.QUERY_COUPON.value,
+        IntentKind.REFUND.value,
+        IntentKind.CONFIRM_RECEIPT.value,
+        IntentKind.PRODUCT_REVIEW.value,
+        IntentKind.RECOMMENT.value,
+    }
+)
+
+
+def _extract_order_id(*texts: str | None) -> str | None:
+    return extract_order_id(*texts)
+
+
+def _extract_review_star(text: str) -> int | None:
+    t = text or ""
+    m = _STAR_RE.search(t)
+    if m:
+        for g in m.groups():
+            if g:
+                return int(g)
+    if any(k in t for k in _NEGATIVE_STAR_HINTS):
+        return 1
+    if any(k in t for k in _NEUTRAL_STAR_HINTS):
+        return 3
+    if any(k in t for k in _POSITIVE_STAR_HINTS):
+        return 5
+    if "评价" in t or "打分" in t or "评星" in t:
+        return 5
+    return None
+
+
+def _extract_review_content(text: str, order_id: str | None) -> str | None:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    cleaned = raw
+    if order_id:
+        cleaned = cleaned.replace(order_id, " ")
+    cleaned = _STAR_RE.sub(" ", cleaned)
+
+    sentiment = ""
+    for k in _POSITIVE_STAR_HINTS + _NEGATIVE_STAR_HINTS + _NEUTRAL_STAR_HINTS:
+        if k in cleaned and k not in ("可以",):
+            sentiment = k
+            break
+    if "可以" in cleaned and not sentiment:
+        sentiment = "可以"
+    cleaned = re.sub(
+        r"(请?帮我)?(申请)?退款|(确认收货)|评价一下|评价|好评|差评|追评|打分|评星|星级|订单号|订单",
+        " ",
+        cleaned,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ，。、：:;；~～")
+    if len(cleaned) >= 1:
+        return cleaned[:200]
+    if sentiment:
+        return sentiment
+    return None
+
+
+def _missing_write_args_prompt(intent: str | None, intent_data: str | None, user_text: str) -> str:
+    oid = (intent_data or "").strip() or _extract_order_id(user_text) or ""
+    if intent == IntentKind.PRODUCT_REVIEW.value:
+        if not oid:
+            return "请提供要评价的订单号，并说明星级（1-5）和评价内容，例如：订单号xxx 5星 物流很快。"
+        return (
+            f"已识别订单 {oid}。请补充评价星级（1-5星）和评价内容，"
+            "例如：「5星 包装完好物流很快」，我再为您生成确认卡片。"
+        )
+    if intent == IntentKind.RECOMMENT.value:
+        if not oid:
+            return "请提供要追评的订单号和追评内容。"
+        return f"已识别订单 {oid}。请补充追评内容，我再为您生成确认卡片。"
+    if intent == IntentKind.REFUND.value:
+        return "请提供要退款的订单号或订单项ID，我再为您生成退款确认卡片。"
+    if intent == IntentKind.CONFIRM_RECEIPT.value:
+        return "请提供要确认收货的订单号。"
+    return "请补充订单相关信息后重试。"
+
+
+async def _required_tool_for_intent(
+    intent: str | None,
+    intent_data: str | None,
+    user_text: str,
+    user_id: str,
+) -> tuple[str, dict] | None:
+    """Return (tool_name, args) that must run for this intent, or None."""
+    if intent == IntentKind.QUERY_ORDER.value:
+        args: dict = {}
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        if oid:
+            args["orderId"] = oid
+        return "QUERY_ORDERS", args
+    if intent == IntentKind.QUERY_LOGISTICS.value:
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        if not oid:
+            return None
+        return "QUERY_LOGISTICS", {"orderId": oid}
+    if intent == IntentKind.QUERY_COMMENT.value:
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        if not oid:
+            return None
+        return "QUERY_COMMENT", {"orderId": oid}
+    if intent == IntentKind.QUERY_COUPON.value:
+        return "QUERY_USER_COUPONS", {}
+    if intent == IntentKind.CANCEL_ORDER.value:
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        if not oid:
+            return None
+        return "QUERY_ORDERS", {"orderId": oid}
+    if intent == IntentKind.CONFIRM_RECEIPT.value:
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        if not oid:
+            return None
+        return "PROPOSE_CONFIRM_RECEIPT", {"orderId": oid}
+    if intent == IntentKind.REFUND.value:
+        from app.services.order_service import order_service
+
+        raw_id = (
+            extract_order_item_id(user_text, intent_data)
+            or extract_refund_target_id(intent_data, user_text)
+            or ""
+        ).strip()
+        if not raw_id:
+            return None
+        item = await order_service.get_order_item(raw_id)
+        if item and item.get("order_item_id"):
+            return "PROPOSE_REFUND", {"orderItemId": str(item["order_item_id"])}
+        order_id = extract_order_id(raw_id) or raw_id
+        refundable = await order_service.list_refundable_items(user_id, order_id)
+        if len(refundable) == 1 and refundable[0].get("order_item_id"):
+            return "PROPOSE_REFUND", {"orderItemId": str(refundable[0]["order_item_id"])}
+        if len(refundable) > 1:
+            return "QUERY_ORDERS", {"orderId": order_id}
+        return "PROPOSE_REFUND", {"orderItemId": raw_id}
+    if intent == IntentKind.PRODUCT_REVIEW.value:
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        star = _extract_review_star(user_text)
+        content = _extract_review_content(user_text, oid)
+        if not oid or star is None or not content:
+            return None
+        return "PROPOSE_PRODUCT_REVIEW", {
+            "orderId": oid,
+            "commentContent": content,
+            "star": star,
+        }
+    if intent == IntentKind.RECOMMENT.value:
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        content = _extract_review_content(user_text, oid)
+        if not oid or not content:
+            return None
+        return "PROPOSE_RECOMMENT", {"orderId": oid, "reCommentContent": content}
+    return None
+
 
 async def agent_loop_node(state: AgentGraphState) -> dict:
     if state.get("cancelled") or state.get("finished"):
@@ -210,8 +442,16 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         )
         and "SEARCH_PRODUCTS" not in tools_called
     )
+    intent_name = state.get("intent")
+    intent_data = state.get("intent_data")
+    tool_required_first_turn = (
+        bool(settings.force_mcp_on_llm_skip)
+        and state.get("react_round", 0) == 0
+        and intent_name in _TOOL_REQUIRED_INTENTS
+        and not state.get("search_fallback_done")
+    )
     try:
-        if similar_first_turn or category_switch_first_turn:
+        if similar_first_turn or category_switch_first_turn or tool_required_first_turn:
             response = await llm.ainvoke(messages)
         else:
             response = await rt.stream_llm_turn(
@@ -301,7 +541,104 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             "route": "finalize",
         }
 
+    if tool_required_first_turn and not tool_calls:
+        forced = await _required_tool_for_intent(intent_name, intent_data, user_text, user_id)
+        if forced:
+            tool_name, tool_args = forced
+            result = await mcp_tool_router.invoke(tool_name, tool_args, user_id)
+            biz_dict = result.to_biz_dict() or {}
+            tool_text = result.to_tool_message() or ""
+            messages.append(
+                ToolMessage(content=tool_text or "未查询到相关记录。", tool_call_id="forced_mcp")
+            )
+            logger.warning(
+                "forced_mcp_after_llm_skip",
+                user_id=user_id,
+                intent=intent_name,
+                tool=tool_name,
+                has_cards=bool(result.assistant_cards),
+                has_act_token="act_" in tool_text.lower(),
+            )
+            if result.assistant_cards and result.assistant_cards.strip() not in ("", "[]"):
+                chunks_out: list[str] = []
+            else:
+                chunks_out = [tool_text or "未查询到相关记录。"]
+            if intent_name == IntentKind.CANCEL_ORDER.value:
+                guide = (
+                    "客服侧暂不支持直接取消订单，请到「我的订单」页面自行取消。"
+                )
+                if chunks_out:
+                    chunks_out = [guide + "\n" + chunks_out[0]]
+                else:
+                    chunks_out = [guide]
+            biz_type = result.biz_type
+            if not biz_type:
+                if tool_name == "QUERY_ORDERS":
+                    biz_type = "query_order"
+                elif tool_name == "QUERY_LOGISTICS":
+                    biz_type = "query_logistics"
+                elif tool_name == "QUERY_COMMENT":
+                    biz_type = "query_comment"
+                elif tool_name == "QUERY_USER_COUPONS":
+                    biz_type = "query_coupon"
+                elif tool_name.startswith("PROPOSE_"):
+                    biz_type = "action_confirm"
+            return {
+                "llm_messages": messages,
+                "tools_called": [tool_name],
+                "tool_biz": biz_dict or None,
+                "biz_type": biz_type,
+                "biz_data": result.biz_data,
+                "assistant_cards": result.assistant_cards,
+                "search_tool_hint": result.to_tool_message() if tool_name == "SEARCH_PRODUCTS" else None,
+                "search_fallback_done": True,
+                "chunks": chunks_out,
+                "pending_tool_calls": [],
+                "route": "finalize",
+            }
+
+    if (
+        state.get("react_round", 0) == 0
+        and not tool_calls
+        and not state.get("search_fallback_done")
+        and (
+            intent_name == IntentKind.QUERY_ORDER.value
+            or _wants_order_list_cards(user_text)
+        )
+    ):
+        oid = (intent_data or "").strip() or _extract_order_id(user_text)
+        tool_args = {"orderId": oid} if oid else {}
+        result = await mcp_tool_router.invoke("QUERY_ORDERS", tool_args, user_id)
+        biz_dict = result.to_biz_dict() or {}
+        tool_text = result.to_tool_message() or ""
+        messages.append(
+            ToolMessage(content=tool_text or "未查询到相关订单。", tool_call_id="forced_orders_ui")
+        )
+        logger.warning(
+            "forced_query_orders_for_cards",
+            user_id=user_id,
+            intent=intent_name,
+            has_cards=bool(result.assistant_cards),
+        )
+        return {
+            "llm_messages": messages,
+            "tools_called": ["QUERY_ORDERS"],
+            "tool_biz": biz_dict or None,
+            "biz_type": result.biz_type or "query_order",
+            "biz_data": result.biz_data,
+            "assistant_cards": result.assistant_cards,
+            "search_tool_hint": None,
+            "search_fallback_done": True,
+            "chunks": [],
+            "pending_tool_calls": [],
+            "route": "finalize",
+        }
+
     messages.append(response)
+    if not turn_chunks:
+        llm_body = strip_emojis(rt.chunk_text(getattr(response, "content", "") or ""))
+        if llm_body:
+            turn_chunks = [llm_body]
     return {
         "llm_messages": messages,
         "chunks": turn_chunks,
@@ -348,6 +685,10 @@ async def tools_node(state: AgentGraphState) -> dict:
             assistant_cards = result.assistant_cards
             biz_type = result.biz_type or biz_type
             biz_data = result.biz_data or biz_data
+        if tc["name"] == "QUERY_ORDERS":
+            biz_type = result.biz_type or biz_type or "query_order"
+            if not result.assistant_cards:
+                logger.warning("query_orders_missing_cards_in_tools_node", user_id=user_id)
         if tc["name"] == "SEARCH_PRODUCTS":
             search_tool_hint = result.to_tool_message()
         if tc["name"] == "GET_PRODUCT_DETAIL":
@@ -356,6 +697,34 @@ async def tools_node(state: AgentGraphState) -> dict:
                 await product_snapshot_service.ensure_consult_snapshot(user_id, str(product_id))
 
     settings = get_settings()
+    if is_order_cards_json(assistant_cards) and "QUERY_ORDERS" in called:
+        logger.info("finalize_after_order_cards", user_id=user_id)
+        return {
+            "llm_messages": messages,
+            "tools_called": called,
+            "pending_tool_calls": [],
+            "tool_biz": tool_biz or None,
+            "biz_type": biz_type or "query_order",
+            "biz_data": biz_data,
+            "assistant_cards": assistant_cards,
+            "search_tool_hint": search_tool_hint,
+            "chunks": [],
+            "route": "finalize",
+        }
+    if is_product_cards_json(assistant_cards) and "SEARCH_PRODUCTS" in called:
+        return {
+            "llm_messages": messages,
+            "tools_called": called,
+            "pending_tool_calls": [],
+            "tool_biz": tool_biz or None,
+            "biz_type": biz_type or "product_search",
+            "biz_data": biz_data,
+            "assistant_cards": assistant_cards,
+            "search_tool_hint": search_tool_hint,
+            "chunks": [],
+            "route": "finalize",
+        }
+
     next_route = "agent_loop" if state.get("react_round", 0) < settings.graph_max_react_rounds else "finalize"
     return {
         "llm_messages": messages,

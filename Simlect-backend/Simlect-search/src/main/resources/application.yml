@@ -90,11 +90,11 @@ spring:
       elasticsearch:
         initialize-schema: true
         dimensions: 1024
-        index-name: ${VECTOR_INDEX:myshop_vectorstore}
+        index-name: ${VECTOR_INDEX:simlect_vectorstore}
 
 mybatis:
-  mapper-locations: classpath*:com/myshop/mappers/*.xml
-  type-aliases-package: com.myshop.entity
+  mapper-locations: classpath*:com/simlect/mappers/*.xml
+  type-aliases-package: com.simlect.entity
   configuration:
     map-underscore-to-camel-case: true
 

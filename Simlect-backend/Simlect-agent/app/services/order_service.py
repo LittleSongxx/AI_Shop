@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.config.settings import get_settings
 from app.constants import ORDER_ITEM_STATUS_NORMAL, REFUNDABLE_ORDER_STATUSES
 from app.services.java_internal_client import java_internal_client
 from app.utils.biz_payload import build_order_payload
@@ -11,8 +12,10 @@ class OrderService:
         if order_id:
             orders = await self._fetch_orders(user_id, order_id=order_id)
         else:
+            # Default window must cover "最近订单/买了什么"; 15d was too short for demo/history data.
+            days = max(1, int(get_settings().order_query_lookback_days))
             end = datetime.now()
-            start = end - timedelta(days=15)
+            start = end - timedelta(days=days)
             orders = await self._fetch_orders(
                 user_id,
                 time_start=start.strftime("%Y-%m-%d 00:00:00"),

@@ -1,0 +1,58 @@
+package com.simlect.api.fallback;
+
+import com.simlect.api.UserFeignClient;
+import com.simlect.api.dto.UserAddressQueryDTO;
+import com.simlect.api.dto.UserGrowthAddDTO;
+import com.simlect.api.dto.UserIdsDTO;
+import com.simlect.api.dto.UserJoinCountDTO;
+import com.simlect.api.dto.UserNotifyDTO;
+import com.simlect.api.support.FeignFallbackResponses;
+import com.simlect.api.vo.UserAddressVO;
+import com.simlect.api.vo.UserBriefVO;
+import com.simlect.entity.vo.ResponseVO;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.openfeign.FallbackFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Slf4j
+@Component
+public class UserFeignFallbackFactory implements FallbackFactory<UserFeignClient> {
+
+    @Override
+    public UserFeignClient create(Throwable cause) {
+        log.warn("User Feign fallback: {}", cause == null ? "unknown" : cause.toString());
+        return new UserFeignClient() {
+            @Override
+            public ResponseVO<UserAddressVO> getAddress(UserAddressQueryDTO dto) {
+                return FeignFallbackResponses.unavailable("用户服务");
+            }
+
+            @Override
+            public ResponseVO<Void> addGrowthOnPay(UserGrowthAddDTO dto) {
+                return FeignFallbackResponses.unavailable("用户服务");
+            }
+
+            @Override
+            public ResponseVO<Void> sendNotifyAsync(UserNotifyDTO dto) {
+                return FeignFallbackResponses.unavailable("用户服务");
+            }
+
+            @Override
+            public ResponseVO<List<String>> listAllUserIds() {
+                return FeignFallbackResponses.unavailable("用户服务");
+            }
+
+            @Override
+            public ResponseVO<List<UserBriefVO>> listBriefByUserIds(UserIdsDTO dto) {
+                return FeignFallbackResponses.unavailable("用户服务");
+            }
+
+            @Override
+            public ResponseVO<Integer> countByJoinDate(UserJoinCountDTO dto) {
+                return FeignFallbackResponses.unavailable("用户服务");
+            }
+        };
+    }
+}

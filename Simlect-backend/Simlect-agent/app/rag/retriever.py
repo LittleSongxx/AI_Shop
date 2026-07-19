@@ -10,7 +10,7 @@ from app.services.java_internal_client import java_internal_client
 
 logger = structlog.get_logger()
 
-PRODUCT_INDEX = "myshop-index"
+PRODUCT_INDEX = "simlect-index"
 
 class RagRetriever:
 

@@ -91,7 +91,14 @@ const isProductBiz = (bizType?: string | null) =>
   bizType === 'product_search.txt' ||
   bizType === 'BROWSE_RECOMMEND';
 
-const isOrderBiz = (bizType?: string | null) => bizType === 'query_order';
+const isOrderBiz = (bizType?: string | null) =>
+  bizType === 'query_order' || bizType === 'query_order.txt';
+
+const looksLikeOrderCards = (list: unknown[] | null) => {
+  if (!list?.length) return false;
+  const first = list[0] as Record<string, unknown> | null;
+  return !!(first && typeof first === 'object' && (first.orderId || first.order_id));
+};
 
 const parseJsonObject = (raw?: string | null) => {
   if (!raw || typeof raw !== 'string') return null;
@@ -156,12 +163,17 @@ const productSearchPayload = computed(() => {
 const productList = computed(() => {
   if (isStreaming.value) return null;
   const wrapped = productSearchPayload.value;
-  if (wrapped?.products?.length) return wrapped.products;
+  const fromWrapped = (wrapped?.products || []).filter(
+    (p: any) => p?.productId && (p?.productName || p?.product_name)
+  );
+  if (fromWrapped.length) return fromWrapped;
   const raw = props.data.assistantMessage;
   const parsed = parseJsonList(raw);
   if (!parsed?.length) return null;
-  if (isProductBiz(props.data.bizType)) return parsed;
-  if (parsed[0]?.productId && parsed[0]?.productName) return parsed;
+  const usable = parsed.filter((p: any) => p?.productId && (p?.productName || p?.product_name));
+  if (!usable.length) return null;
+  if (isProductBiz(props.data.bizType)) return usable;
+  if (usable[0]?.productId && usable[0]?.productName) return usable;
   return null;
 });
 
@@ -178,8 +190,9 @@ const isProductSearchEmpty = computed(() => {
 
 const orderList = computed(() => {
   if (isStreaming.value) return null;
-  if (!isOrderBiz(props.data.bizType)) return null;
   const parsed = parseJsonList(props.data.assistantMessage);
+  if (looksLikeOrderCards(parsed)) return parsed;
+  if (!isOrderBiz(props.data.bizType)) return null;
   if (!parsed?.length) return null;
   return parsed;
 });
@@ -187,6 +200,7 @@ const orderList = computed(() => {
 const isOrderSearchEmpty = computed(() => {
   if (isStreaming.value || props.waiting) return false;
   if (!isOrderBiz(props.data.bizType)) return false;
+  if (looksLikeOrderCards(parseJsonList(props.data.assistantMessage))) return false;
   return isEmptyJsonList(props.data.assistantMessage);
 });
 
@@ -198,8 +212,18 @@ const displayText = computed(() => {
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return '';
   const parsed = parseJsonObject(props.data.assistantMessage);
   if (parsed?.type === 'ACTION_CONFIRM') return '';
-  const text = (props.data.assistantMessage || '').trim();
+  if (parsed?.type === 'PRODUCT_SEARCH_RESULT') return '';
+  let text = (props.data.assistantMessage || '').trim();
   if (text === '[]') return '';
+  // Hide bare product-id JSON arrays the model sometimes dumps.
+  const asList = parseJsonList(text);
+  if (
+    asList?.length &&
+    asList.every((p: any) => p?.productId && !(p?.productName || p?.product_name))
+  ) {
+    return '';
+  }
+  text = stripEmbeddedProductJson(text);
   return text;
 });
 

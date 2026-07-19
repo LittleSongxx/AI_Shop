@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 7050
     java_web_url: str = "http://localhost:8080"
+    mcp_server_url: str = Field(
+        default="http://127.0.0.1:7060",
+        validation_alias=AliasChoices("MCP_SERVER_URL", "mcp_server_url"),
+    )
 
     internal_token: str = Field(
         default="your-token",
@@ -28,10 +32,6 @@ class Settings(BaseSettings):
             "internal_token",
         ),
     )
-    order_service_url: str = "http://127.0.0.1:8093"
-    product_service_url: str = "http://127.0.0.1:8099"
-    coupon_service_url: str = "http://127.0.0.1:8087"
-    user_service_url: str = "http://127.0.0.1:8105"
 
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     redis_db: int = 0
 
     es_hosts: str = "http://localhost:9200"
-    es_index: str = "myshop_vectorstore"
+    es_index: str = "simlect_vectorstore"
     es_vector_dimensions: int = 1024
 
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
@@ -89,6 +89,8 @@ class Settings(BaseSettings):
 
     intent_use_llm: bool = True
     intent_rule_fallback: bool = True
+    order_query_lookback_days: int = 90
+    force_mcp_on_llm_skip: bool = False
 
     @property
     def mysql_dsn(self) -> str:

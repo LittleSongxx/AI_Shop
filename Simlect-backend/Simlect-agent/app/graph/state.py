@@ -37,6 +37,8 @@ class AgentGraphState(TypedDict, total=False):
     search_tool_hint: str | None
     search_fallback_done: bool
     category_switch_search: bool
+    intent: str | None
+    intent_data: str | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -66,6 +68,8 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "search_tool_hint": None,
         "search_fallback_done": False,
         "category_switch_search": False,
+        "intent": None,
+        "intent_data": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

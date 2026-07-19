@@ -114,6 +114,58 @@ export const stripEmbeddedProductJson = (content?: string | null) => {
     }
     text = `${before}${after}`.trim();
   }
+
+  // Strip bare [{"productId":"..."}, ...] echoed by the model.
+  for (let n = 0; n < 8; n += 1) {
+    const start = text.indexOf('[');
+    if (start < 0) break;
+    let depth = 0;
+    let end = -1;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < text.length; i += 1) {
+      const ch = text[i];
+      if (inString) {
+        if (escape) escape = false;
+        else if (ch === '\\') escape = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      else if (ch === '[') depth += 1;
+      else if (ch === ']') {
+        depth -= 1;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    if (end < 0) break;
+    const blob = text.slice(start, end);
+    try {
+      const parsed = JSON.parse(blob);
+      const isProductArr =
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        parsed.every(
+          (item) =>
+            item &&
+            typeof item === 'object' &&
+            !Array.isArray(item) &&
+            (item.productId != null || item.product_id != null)
+        );
+      if (!isProductArr) break;
+      let before = text.slice(0, start).trimEnd();
+      const after = text.slice(end).trimStart();
+      if (before.endsWith(':') || before.endsWith('：')) {
+        before = before.slice(0, -1).trimEnd();
+      }
+      text = `${before}${after}`.trim();
+    } catch {
+      break;
+    }
+  }
   return text.trim();
 };
 

@@ -99,8 +99,20 @@ RABBIT_USER=guest
 RABBIT_PASSWORD=guest
 NACOS_ADDR=127.0.0.1:8848
 ES_URIS=http://127.0.0.1:9200
+VECTOR_INDEX=simlect_vectorstore
 SENTINEL_DASHBOARD=127.0.0.1:8858
+SEATA_ENABLED=true
 ```
+
+Agent / MCP（另开终端）：
+
+```powershell
+cd Simlect-backend\Simlect-agent
+.\start-mcp.bat
+.\start.bat
+```
+
+> MCP **无热重载**：改搜索/工具代码后必须重启 `start-mcp.bat`，否则对话仍可能走旧逻辑。
 
 ---
 
@@ -109,7 +121,11 @@ SENTINEL_DASHBOARD=127.0.0.1:8858
 - `docker compose ps` 六个中间件 Up（ES/Nacos healthy）
 - Nacos：[http://localhost:8848/nacos](http://localhost:8848/nacos) 能看到各服务实例
 - 网关 `8080` 通；前端能登录/浏览/加购
-- 搜索走 ES；下单走 order/pay/coupon
+- 搜索走 ES（索引 `simlect-index` / `simlect_vectorstore`）；下单走 order/pay/coupon
+- Agent + MCP 工具可对话查单 / 搜商品
+  - 查<我的订单>应出**订单卡片**（非仅表格）
+  - 搜不存在品类应提示**暂未找到**并另荐，而非<搜索结果找到 N 个>无关品
+  - 正文不应出现裸 `[{"productId":...}]` JSON
 
 一键中间件脚本：`[start-middleware.ps1](./start-middleware.ps1)`  
 中间件说明：`[MIDDLEWARE_DOCKER.md](./MIDDLEWARE_DOCKER.md)`

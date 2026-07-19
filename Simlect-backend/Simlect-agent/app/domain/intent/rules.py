@@ -117,9 +117,24 @@ def looks_like_direct_product_keyword(user_text: str) -> bool:
     t = (user_text or "").strip()
     if not t or len(t) > 16:
         return False
+    # Order-history phrases contain 「买」 but are not product search
+    if any(
+        k in t
+        for k in (
+            "买了什么",
+            "买过什么",
+            "最近买",
+            "最近购买",
+            "我的订单",
+            "最近的订单",
+            "最近订单",
+        )
+    ):
+        return False
     if _mentions_any(t, _ALL_PRODUCT_HINTS):
         return True
-    if re.search(r"买(点|些|个|一款)?[\u4e00-\u9fff]{1,8}", t):
+    # 买点零食/买个手机 — classifier required; exclude 买了什么
+    if re.search(r"买(点|些|个|一款)[\u4e00-\u9fff]{1,8}", t):
         return True
     return False
 
@@ -127,6 +142,24 @@ def looks_like_new_product_search(user_text: str) -> bool:
 
     t = (user_text or "").strip()
     if not t:
+        return False
+    from app.utils.order_ids import extract_order_id, extract_order_item_id
+
+    if extract_order_item_id(t) or extract_order_id(t):
+        return False
+    if any(
+        k in t
+        for k in (
+            "买了什么",
+            "买过什么",
+            "最近买",
+            "最近购买",
+            "我的订单",
+            "最近的订单",
+            "最近订单",
+            "查订单",
+        )
+    ):
         return False
     if looks_like_direct_product_keyword(t):
         return True

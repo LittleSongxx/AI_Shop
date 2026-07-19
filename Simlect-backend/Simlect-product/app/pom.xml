@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.myshop</groupId>
+    <groupId>com.simlect</groupId>
     <artifactId>simlect-product-reactor</artifactId>
     <version>1.0.0</version>
     <relativePath>../pom.xml</relativePath>
@@ -13,16 +13,20 @@
   <name>Simlect-product</name>
   <dependencies>
     <dependency>
-      <groupId>com.myshop</groupId>
+      <groupId>com.simlect</groupId>
       <artifactId>simlect-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.myshop</groupId>
+      <groupId>com.simlect</groupId>
       <artifactId>simlect-stock-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.myshop</groupId>
+      <groupId>com.simlect</groupId>
       <artifactId>simlect-product-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.simlect</groupId>
+      <artifactId>simlect-user-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.alibaba.cloud</groupId>

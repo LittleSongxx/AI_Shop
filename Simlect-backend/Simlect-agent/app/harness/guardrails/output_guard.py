@@ -11,6 +11,15 @@ FALSE_COMPLETION_PATTERNS = [
     r"追评已完成",
 ]
 
+# Claims a confirm card exists when PROPOSE_* never ran.
+FALSE_CONFIRM_CARD_PATTERNS = [
+    r"已生成.{0,12}确认卡片",
+    r"请在下方.{0,8}确认",
+    r"请查看下方.{0,8}卡片",
+    r"下方确认卡片",
+    r"确认卡片中完成",
+]
+
 FALSE_CAPABILITY_PATTERNS = [
     r"帮你处理下单",
     r"帮你下单",
@@ -60,12 +69,24 @@ class OutputGuardrail:
     def validate_no_false_completion(self, text: str, tools_called: list[str]) -> str:
 
         propose_called = any(t.startswith("PROPOSE_") for t in tools_called)
+        cleaned = strip_emojis(text)
+        # Strip invented act tokens when no write tool ran.
+        if not propose_called:
+            cleaned = ACT_TOKEN_PATTERN.sub("", cleaned).strip()
+            cleaned = re.sub(r"act_[a-f0-9]{32}", "", cleaned, flags=re.I).strip()
+            if any(re.search(p, cleaned) for p in FALSE_CONFIRM_CARD_PATTERNS):
+                return (
+                    "系统尚未生成确认卡片。请提供订单号；评价还需星级(1-5)和内容，"
+                    "退款请提供订单项ID，我再为您正式发起确认。"
+                )
         for pattern in FALSE_COMPLETION_PATTERNS:
-            if re.search(pattern, text) and not propose_called:
+            if re.search(pattern, cleaned) and not propose_called:
+                return (
+                    "系统尚未执行该操作，也未生成确认卡片。"
+                    "请重新说明订单号与操作需求。"
+                )
 
-                return strip_emojis(text) + "\n\n（请在下方确认卡片中完成操作）"
-
-        return self.validate_no_false_capability(text, tools_called)
+        return self.validate_no_false_capability(cleaned, tools_called)
 
     def validate_no_false_capability(self, text: str, tools_called: list[str]) -> str:
 

@@ -51,7 +51,7 @@ simlect:
     feign-rules-enabled: ${SIMLECT_SENTINEL_FEIGN_RULES:true}
 
 seata:
-  enabled: ${SEATA_ENABLED:false}
+  enabled: ${SEATA_ENABLED:true}
   application-id: ${spring.application.name:simlect}
   tx-service-group: ${SEATA_TX_GROUP:simlect_tx_group}
   enable-auto-data-source-proxy: true

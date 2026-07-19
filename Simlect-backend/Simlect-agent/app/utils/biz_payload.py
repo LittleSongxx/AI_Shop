@@ -112,9 +112,18 @@ def intro_from_search_tool_hint(hint: str | None) -> str:
 
     if any("【类似商品】" in ln for ln in bracket_lines):
         similar = next((ln for ln in bracket_lines if "【类似商品】" in ln), bracket_lines[0])
-        alt = next((ln for ln in bracket_lines if "【另荐热销】" in ln), "")
+        alt = next((ln for ln in bracket_lines if "【另荐热销】" in ln or "【浏览推荐】" in ln), "")
         intro = similar if not alt else f"{similar} {alt}"
         return intro[:MAX_PRODUCT_SEARCH_INTRO_LEN]
+
+    # Search miss + alternative recommend (hot-sale / browse backfill).
+    miss = next((ln for ln in bracket_lines if "暂未找到" in ln or "未找到" in ln), "")
+    alt = next(
+        (ln for ln in bracket_lines if "【另荐热销】" in ln or "【浏览推荐】" in ln or "【热销推荐】" in ln),
+        "",
+    )
+    if miss and alt and miss != alt:
+        return f"{miss} {alt}"[:MAX_PRODUCT_SEARCH_INTRO_LEN]
     return " ".join(bracket_lines[:2])[:MAX_PRODUCT_SEARCH_INTRO_LEN]
 
 def _find_balanced_json_span(text: str, start: int) -> tuple[int, int] | None:
@@ -144,8 +153,47 @@ def _find_balanced_json_span(text: str, start: int) -> tuple[int, int] | None:
                 return start, i + 1
     return None
 
-def strip_embedded_product_json(text: str | None) -> str:
+def _find_balanced_json_array_span(text: str, start: int) -> tuple[int, int] | None:
 
+    if start >= len(text) or text[start] != "[":
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return start, i + 1
+    return None
+
+
+def _is_product_id_array(obj: object) -> bool:
+    if not isinstance(obj, list) or not obj:
+        return False
+    for item in obj:
+        if not isinstance(item, dict):
+            return False
+        if not (item.get("productId") or item.get("product_id")):
+            return False
+    return True
+
+
+def strip_embedded_product_json(text: str | None) -> str:
+    """Remove PRODUCT_SEARCH_RESULT blobs and bare product card JSON arrays from prose."""
     if not text:
         return ""
     s = text
@@ -166,18 +214,33 @@ def strip_embedded_product_json(text: str | None) -> str:
             s = s[:start].rstrip()
             break
         a, b = span
+        before = s[:a].rstrip()
+        after = s[b:].lstrip()
+        if before.endswith(":") or before.endswith("："):
+            before = before[:-1].rstrip()
+        s = f"{before}{after}".strip()
+
+    # Strip bare [{"productId":...}, ...] the model often echoes.
+    guard = 0
+    while guard < 8:
+        guard += 1
+        start = s.find("[")
+        if start < 0:
+            break
+        span = _find_balanced_json_array_span(s, start)
+        if not span:
+            break
+        a, b = span
         blob = s[a:b]
         try:
             obj = json.loads(blob)
-            if isinstance(obj, dict) and obj.get("type") == PRODUCT_SEARCH_RESULT_TYPE:
-                before = s[:a].rstrip()
-                after = s[b:].lstrip()
-                if before.endswith(":") or before.endswith("："):
-                    before = before[:-1].rstrip()
-                s = f"{before}{after}".strip()
-                continue
         except json.JSONDecodeError:
-            pass
+            # Skip past this '[' and continue scanning.
+            s = s[:start] + s[start + 1 :]
+            continue
+        if not _is_product_id_array(obj):
+            # Not a product array — leave remaining text as-is.
+            break
         before = s[:a].rstrip()
         after = s[b:].lstrip()
         if before.endswith(":") or before.endswith("："):
@@ -205,11 +268,19 @@ def _clean_llm_intro_body(llm_text: str | None) -> str:
     return "\n".join(kept).strip()
 
 def compact_product_search_intro(llm_text: str | None, tool_hint: str | None = None) -> str:
+    """Prefer tool miss/alt copy so LLM cannot rebrand fallbacks as「搜索结果找到」."""
+    hint = tool_hint or ""
+    hint_intro = intro_from_search_tool_hint(tool_hint)
+    miss_or_alt = any(
+        m in hint
+        for m in ("暂未找到", "【另荐热销】", "【浏览推荐】", "【热销推荐】")
+    )
+    if miss_or_alt and hint_intro:
+        return hint_intro[:MAX_PRODUCT_SEARCH_INTRO_LEN]
 
     llm_intro = _clean_llm_intro_body(llm_text)
     if llm_intro:
         return llm_intro[:MAX_PRODUCT_SEARCH_INTRO_LEN]
-    hint_intro = intro_from_search_tool_hint(tool_hint)
     return hint_intro[:MAX_PRODUCT_SEARCH_INTRO_LEN] if hint_intro else ""
 
 def build_product_search_message(intro: str | None, cards_json: str) -> str:
@@ -293,7 +364,55 @@ def is_product_cards_json(raw: str | None) -> bool:
         return False
     if first.get("orderId") or first.get("order_id"):
         return False
-    return bool(first.get("productId") or first.get("product_id"))
+    # Require a display name — id-only arrays are LLM noise, not cards.
+    has_id = bool(first.get("productId") or first.get("product_id"))
+    has_name = bool(first.get("productName") or first.get("product_name"))
+    return has_id and has_name
+
+
+def is_action_confirm_json(raw: str | None) -> bool:
+    """True when text is a full ACTION_CONFIRM card JSON (valid or fabricated)."""
+    if not raw or not isinstance(raw, str):
+        return False
+    text = raw.strip()
+    if not text.startswith("{"):
+        return False
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(obj, dict) and obj.get("type") == "ACTION_CONFIRM"
+
+
+_AFTERSALES_HINTS = (
+    "退款",
+    "退货",
+    "退钱",
+    "确认收货",
+    "追评",
+    "取消订单",
+    "物流",
+    "快递",
+    "到哪了",
+)
+
+
+def looks_like_aftersales_or_order_text(text: str | None) -> bool:
+    """Used to avoid hijacking aftersales turns into product-search backfill.
+
+    Keep narrow — howto / 优惠券 / bare「评价」不应触发僵硬兜底文案。
+    """
+    t = (text or "").strip()
+    if not t:
+        return False
+    from app.utils.order_ids import extract_order_id, extract_order_item_id
+
+    if extract_order_item_id(t) or extract_order_id(t):
+        return True
+    if any(k in t for k in ("如何", "怎么", "怎样", "在哪", "哪里", "方法", "步骤")):
+        return False
+    return any(k in t for k in _AFTERSALES_HINTS)
+
 
 def build_order_payload(orders: list[dict], items_map: dict[str, list[dict]]) -> tuple[str, str | None]:
 

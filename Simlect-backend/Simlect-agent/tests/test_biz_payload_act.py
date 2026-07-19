@@ -58,14 +58,27 @@ def test_compact_product_search_intro_strips_product_lines():
         "要直接下单吗？"
     )
     intro = compact_product_search_intro(llm, hint)
-    assert "抱歉，没有找到" in intro
-    assert "【类似商品】" not in intro or "抱歉" in intro
+    assert "暂未找到" in intro
+    assert "另荐热销" in intro or "另外推荐" in intro
     assert "旺旺雪饼" not in intro
     assert "12元" not in intro
 
+
+def test_compact_prefers_miss_hint_over_llm_found_claim():
+    hint = (
+        "【搜索结果】暂未找到与「我要吃零食」相关的商品。\n"
+        "【另荐热销】已为您另外推荐热销商品，请查看下方卡片。"
+    )
+    llm = "为你找到以下零食，请查看下方卡片。"
+    intro = compact_product_search_intro(llm, hint)
+    assert "暂未找到" in intro
+    assert "另荐热销" in intro or "另外推荐" in intro
+    assert "为你找到以下零食" not in intro
+
+
 def test_compact_product_search_intro_keeps_full_llm_when_present():
     llm = "这款吉他音色均衡，适合初学者弹唱。\n请查看下方推荐卡片。"
-    hint = "【另荐热销】已为您另外推荐热销商品（非同款，请查看下方卡片）。"
+    hint = "【搜索结果】找到 3 个商品（请查看下方卡片）。"
     intro = compact_product_search_intro(llm, hint)
     assert "这款吉他音色均衡" in intro
     assert "请查看下方推荐卡片" in intro
@@ -98,12 +111,21 @@ def test_build_action_confirm_unavailable_payload():
     import json
 
     token = "act_" + "d" * 32
-    raw, _ = build_action_confirm_unavailable_payload(token, "已生成提案")
+    raw, _ = build_action_confirm_unavailable_payload(token, "已生成提案", reason="wrong_user")
     card = json.loads(raw)
     assert card["type"] == "ACTION_CONFIRM"
     assert card["status"] == 3
     assert card["token"] == token
-    assert "过期" in card["summary"] or "不存在" in card["summary"]
+    assert "无权" in card["summary"]
+
+
+def test_extract_review_helpers():
+    from app.graph.nodes import _extract_review_content, _extract_review_star
+
+    text = "订单 20260612204304352OBbW6OiMj2BUUhY 给个5星 物流很快包装完好"
+    assert _extract_review_star(text) == 5
+    content = _extract_review_content(text, "20260612204304352OBbW6OiMj2BUUhY")
+    assert content and "物流很快" in content
 
 def test_extract_real_act_token():
     token = "act_" + "a" * 32
