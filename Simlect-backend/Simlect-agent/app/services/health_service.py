@@ -15,6 +15,7 @@ class HealthService:
             "mysql": False,
             "elasticsearch": False,
             "java_web": False,
+            "worker": False,
             "status": "ok",
         }
 
@@ -48,6 +49,14 @@ class HealthService:
                 checks["java_web"] = resp.status_code < 500
         except Exception as e:
             logger.warning("health_java_web_failed", error=str(e))
+            checks["status"] = "degraded"
+
+        try:
+            checks["worker"] = await redis_service.worker_is_alive()
+            if not checks["worker"]:
+                checks["status"] = "degraded"
+        except Exception as e:
+            logger.warning("health_worker_failed", error=str(e))
             checks["status"] = "degraded"
 
         if not checks["redis"] or not checks["mysql"]:

@@ -39,6 +39,7 @@ class AgentGraphState(TypedDict, total=False):
     category_switch_search: bool
     intent: str | None
     intent_data: str | None
+    intent_decision: dict | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -70,6 +71,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "category_switch_search": False,
         "intent": None,
         "intent_data": None,
+        "intent_decision": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

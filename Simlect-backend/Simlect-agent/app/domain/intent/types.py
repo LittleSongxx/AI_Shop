@@ -1,5 +1,7 @@
 from enum import Enum
 
+from pydantic import BaseModel, Field
+
 
 class IntentKind(str, Enum):
     PRODUCT_CONSULT = "PRODUCT_CONSULT"
@@ -13,7 +15,65 @@ class IntentKind(str, Enum):
     PRODUCT_REVIEW = "PRODUCT_REVIEW"
     RECOMMENT = "RECOMMENT"
     QUERY_COMMENT = "QUERY_COMMENT"
+    COMPLAINT = "COMPLAINT"
+    HUMAN_REQUEST = "HUMAN_REQUEST"
+    PAYMENT_ISSUE = "PAYMENT_ISSUE"
+    DAMAGED_OR_WRONG_ITEM = "DAMAGED_OR_WRONG_ITEM"
+    INVOICE = "INVOICE"
+    ADDRESS_CHANGE = "ADDRESS_CHANGE"
+    REFUND_STATUS = "REFUND_STATUS"
+    AFTERSALES_UNKNOWN = "AFTERSALES_UNKNOWN"
     CHAT = "CHAT"
+
+
+class SentimentKind(str, Enum):
+    POSITIVE = "POSITIVE"
+    NEUTRAL = "NEUTRAL"
+    NEGATIVE = "NEGATIVE"
+    VERY_NEGATIVE = "VERY_NEGATIVE"
+
+
+class UrgencyKind(str, Enum):
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class RiskLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class NextAction(str, Enum):
+    ANSWER = "ANSWER"
+    ASK_CLARIFICATION = "ASK_CLARIFICATION"
+    TOOL = "TOOL"
+    HANDOFF = "HANDOFF"
+    HANDOFF_SUGGESTED = "HANDOFF_SUGGESTED"
+
+
+class IntentDecision(BaseModel):
+    intent: IntentKind
+    confidence: float = Field(ge=0, le=1)
+    entities: dict[str, str] = Field(default_factory=dict)
+    sentiment: SentimentKind = SentimentKind.NEUTRAL
+    urgency: UrgencyKind = UrgencyKind.NORMAL
+    risk_level: RiskLevel = RiskLevel.LOW
+    next_action: NextAction = NextAction.ANSWER
+    handoff_reason: str | None = None
+    source: str = "default"
+    data: str = ""
+
+    @property
+    def should_handoff(self) -> bool:
+        return self.next_action == NextAction.HANDOFF
+
+    @property
+    def should_suggest_handoff(self) -> bool:
+        return self.next_action == NextAction.HANDOFF_SUGGESTED
+
 
 INTENT_PROMPT_KEY: dict[IntentKind, str] = {
     IntentKind.PRODUCT_CONSULT: "product_consult",
@@ -27,5 +87,13 @@ INTENT_PROMPT_KEY: dict[IntentKind, str] = {
     IntentKind.PRODUCT_REVIEW: "product_review",
     IntentKind.RECOMMENT: "recomment",
     IntentKind.QUERY_COMMENT: "query_comment",
+    IntentKind.COMPLAINT: "chat",
+    IntentKind.HUMAN_REQUEST: "chat",
+    IntentKind.PAYMENT_ISSUE: "chat",
+    IntentKind.DAMAGED_OR_WRONG_ITEM: "chat",
+    IntentKind.INVOICE: "chat",
+    IntentKind.ADDRESS_CHANGE: "chat",
+    IntentKind.REFUND_STATUS: "chat",
+    IntentKind.AFTERSALES_UNKNOWN: "chat",
     IntentKind.CHAT: "chat",
 }

@@ -47,6 +47,10 @@ spring:
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:your-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}

@@ -1,19 +1,91 @@
 from __future__ import annotations
 
 import json
+import re
 
 import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
-from app.domain.intent.types import IntentKind
+from app.domain.intent.types import (
+    IntentDecision,
+    IntentKind,
+    NextAction,
+    RiskLevel,
+    SentimentKind,
+    UrgencyKind,
+)
 from app.harness.metrics.runtime_sensors import INTENT_TOTAL
 from app.services.llm_factory import create_memory_llm
 from app.services.prompt_service import load_user_intent_classifier_prompt
-from app.utils.order_ids import extract_order_id
+from app.utils.order_ids import extract_order_id, extract_order_item_id
 from app.utils.product_consult import is_product_consult_turn, normalize_consult_card
 
 logger = structlog.get_logger()
+
+_HUMAN_HINTS = (
+    "转人工",
+    "人工客服",
+    "找客服",
+    "真人客服",
+    "人工处理",
+    "人工介入",
+    "找你们主管",
+)
+_VERY_NEGATIVE_HINTS = (
+    "诈骗",
+    "骗子",
+    "报警",
+    "起诉",
+    "曝光",
+    "消费者协会",
+    "12315",
+    "太垃圾",
+    "气死",
+    "再也不买",
+)
+_NEGATIVE_HINTS = (
+    "生气",
+    "愤怒",
+    "失望",
+    "不满意",
+    "差劲",
+    "糟糕",
+    "投诉",
+    "没用",
+    "没解决",
+    "一直不",
+    "怎么还",
+    "烦",
+)
+_POSITIVE_HINTS = ("谢谢", "满意", "很好", "不错", "喜欢", "解决了")
+_FUND_RISK_HINTS = (
+    "重复扣款",
+    "扣款了",
+    "扣了钱",
+    "钱没退",
+    "退款没到账",
+    "支付成功没订单",
+    "资金",
+    "盗刷",
+)
+_UNRESOLVED_HINTS = ("还是没解决", "没有解决", "又不行", "还是不行", "说了没用", "重复问")
+
+_TOOL_INTENTS = frozenset(
+    {
+        IntentKind.PRODUCT_SEARCH,
+        IntentKind.QUERY_ORDER,
+        IntentKind.REFUND,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.QUERY_LOGISTICS,
+        IntentKind.QUERY_COUPON,
+        IntentKind.PRODUCT_REVIEW,
+        IntentKind.RECOMMENT,
+        IntentKind.QUERY_COMMENT,
+        IntentKind.REFUND_STATUS,
+    }
+)
+
 
 def _structural_intent(
     user_text: str,
@@ -22,12 +94,12 @@ def _structural_intent(
     consult_card: dict | None = None,
     message_card: dict | None = None,
 ) -> IntentKind | None:
-
     if is_product_consult_turn(
         user_text, message_card, consult_card, from_product=from_product
     ):
         return IntentKind.PRODUCT_CONSULT
     return None
+
 
 def classify_intent_by_rules(
     user_text: str,
@@ -36,19 +108,19 @@ def classify_intent_by_rules(
     consult_card: dict | None = None,
     message_card: dict | None = None,
 ) -> IntentKind | None:
-
     from app.domain.intent.rules import (
         looks_like_category_switch,
         looks_like_new_product_search,
     )
     from app.services.product_service import is_similar_or_recommend_request
 
-    t = (user_text or "").strip()
-    if not t:
+    text = (user_text or "").strip()
+    lower = text.lower()
+    if not text:
         return IntentKind.CHAT
 
     structural = _structural_intent(
-        user_text,
+        text,
         from_product=from_product,
         consult_card=consult_card,
         message_card=message_card,
@@ -56,8 +128,23 @@ def classify_intent_by_rules(
     if structural:
         return structural
 
-    _howto = any(
-        k in t
+    if any(hint in text for hint in _HUMAN_HINTS):
+        return IntentKind.HUMAN_REQUEST
+    if any(k in text for k in ("退款进度", "退款到哪", "退款到账", "退款什么时候", "退款状态")):
+        return IntentKind.REFUND_STATUS
+    if any(k in text for k in ("支付失败", "付款失败", "重复支付", "重复扣款", "扣款了", "扣了钱", "支付异常", "盗刷")):
+        return IntentKind.PAYMENT_ISSUE
+    if any(k in text for k in ("破损", "损坏", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
+        return IntentKind.DAMAGED_OR_WRONG_ITEM
+    if any(k in text for k in ("开发票", "发票", "抬头", "税号")):
+        return IntentKind.INVOICE
+    if any(k in text for k in ("修改地址", "改地址", "收货地址错", "地址填错", "换地址")):
+        return IntentKind.ADDRESS_CHANGE
+    if "投诉" in text or any(k in text for k in _VERY_NEGATIVE_HINTS):
+        return IntentKind.COMPLAINT
+
+    howto = any(
+        k in text
         for k in (
             "如何",
             "怎么",
@@ -77,9 +164,8 @@ def classify_intent_by_rules(
             "哪里看",
         )
     )
-    # 操作说明类：交给 Agent 直接答，勿强行查库
-    if _howto and any(
-        k in t
+    if howto and any(
+        k in text
         for k in (
             "取消",
             "优惠券",
@@ -92,37 +178,36 @@ def classify_intent_by_rules(
             "物流",
             "快递",
             "订单",
+            "发票",
+            "地址",
         )
     ):
         return IntentKind.CHAT
 
-    if any(k in t for k in ("追评", "再评", "二次评价")):
+    if any(k in text for k in ("追评", "再评", "二次评价")):
         return IntentKind.RECOMMENT
-    if any(k in t for k in ("退款", "退货", "退钱")):
+    if any(k in text for k in ("退款", "退货", "退钱")):
         return IntentKind.REFUND
-    if any(k in t for k in ("确认收货", "已收到", "收货确认")):
+    if any(k in text for k in ("确认收货", "已收到", "收货确认")):
         return IntentKind.CONFIRM_RECEIPT
-    if any(k in t for k in ("取消这个订单", "不要这个订单", "帮我取消", "给我取消")) or (
-        "取消订单" in t
-    ):
+    if any(k in text for k in ("取消这个订单", "不要这个订单", "帮我取消", "给我取消", "取消订单")):
         return IntentKind.CANCEL_ORDER
-    if any(k in t for k in ("物流", "快递", "到哪了", "运单", "包裹")):
+    if any(k in text for k in ("物流", "快递", "到哪了", "运单", "包裹")):
         return IntentKind.QUERY_LOGISTICS
-    if any(k in t for k in ("查看评价", "评价内容", "写了什么评价", "我的评价")):
+    if any(k in text for k in ("查看评价", "评价内容", "写了什么评价", "我的评价")):
         return IntentKind.QUERY_COMMENT
-    if any(k in t for k in ("评价", "好评", "差评", "打分", "评星", "星级")) and any(
-        k in t for k in ("订单", "给", "写", "提交")
+    if any(k in text for k in ("评价", "好评", "差评", "打分", "评星", "星级")) and any(
+        k in text for k in ("订单", "给", "写", "提交")
     ):
         return IntentKind.PRODUCT_REVIEW
-    if any(k in t for k in ("我的优惠券", "查优惠券", "有哪些券", "还有几张券", "可用券", "未使用券")):
+    if any(k in text for k in ("我的优惠券", "查优惠券", "有哪些券", "还有几张券", "可用券", "未使用券")):
         return IntentKind.QUERY_COUPON
-    if any(k in t for k in ("优惠券", "优惠卷")) and any(
-        k in t for k in ("查", "看看", "有没有", "还有", "几张", "列表")
+    if any(k in text for k in ("优惠券", "优惠卷")) and any(
+        k in text for k in ("查", "看看", "有没有", "还有", "几张", "列表")
     ):
         return IntentKind.QUERY_COUPON
-    # 「取消订单」含「订单」字样，勿误判为查单
-    if "取消" not in t and any(
-        k in t
+    if "取消" not in text and any(
+        k in text
         for k in (
             "我的订单",
             "查订单",
@@ -135,17 +220,21 @@ def classify_intent_by_rules(
         )
     ):
         return IntentKind.QUERY_ORDER
-    # bare 订单 太宽，留给 LLM；规则不抢
 
-    if is_similar_or_recommend_request(t) or looks_like_new_product_search(t):
+    if is_similar_or_recommend_request(text) or looks_like_new_product_search(text):
         return IntentKind.PRODUCT_SEARCH
 
-    consult_name = (consult_card or {}).get("productName") or (consult_card or {}).get("product_name")
-    if consult_card and looks_like_category_switch(t, consult_name):
+    consult_name = (consult_card or {}).get("productName") or (consult_card or {}).get(
+        "product_name"
+    )
+    if consult_card and looks_like_category_switch(text, consult_name):
         return IntentKind.PRODUCT_SEARCH
-
-    if any(k in t for k in ("搜索", "找", "买", "推荐", "热销", "爆款")) and len(t) <= 40:
+    if any(k in text for k in ("搜索", "找", "买", "推荐", "热销", "爆款")) and len(text) <= 40:
         return IntentKind.PRODUCT_SEARCH
+    if any(k in text for k in ("售后", "退换", "商品有问题", "订单有问题")):
+        return IntentKind.AFTERSALES_UNKNOWN
+    if lower in {"你好", "您好", "hello", "hi", "在吗", "谢谢"}:
+        return IntentKind.CHAT
     return None
 
 
@@ -155,20 +244,28 @@ def classify_high_confidence_order_intent(user_text: str) -> IntentKind | None:
 
 
 def classify_high_confidence_intent(user_text: str) -> tuple[IntentKind | None, str]:
-    """Minimal anti-misfire rules only.
-
-    Do NOT encode full business policy here — Agent + LLM intent classifier decide
-    refund/review/cancel/howto. Rules only beat clear PRODUCT_SEARCH misfires.
-    """
-    t = (user_text or "").strip()
-    if not t:
+    text = (user_text or "").strip()
+    if not text:
         return None, ""
-    oid = extract_order_id(t) or ""
+    order_id = extract_order_id(text) or ""
 
-    if oid and any(k in t for k in ("到哪里", "到哪了", "物流", "快递", "运单", "包裹", "轨迹")):
-        return IntentKind.QUERY_LOGISTICS, oid
+    ruled = classify_intent_by_rules(text)
+    if ruled in {
+        IntentKind.HUMAN_REQUEST,
+        IntentKind.COMPLAINT,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.REFUND_STATUS,
+        IntentKind.INVOICE,
+        IntentKind.ADDRESS_CHANGE,
+    }:
+        return ruled, order_id
+    if order_id and any(
+        k in text for k in ("到哪里", "到哪了", "物流", "快递", "运单", "包裹", "轨迹")
+    ):
+        return IntentKind.QUERY_LOGISTICS, order_id
     if any(
-        k in t
+        k in text
         for k in (
             "我的订单",
             "最近的订单",
@@ -182,30 +279,54 @@ def classify_high_confidence_intent(user_text: str) -> tuple[IntentKind | None, 
             "最近购买",
         )
     ):
-        return IntentKind.QUERY_ORDER, oid
+        return IntentKind.QUERY_ORDER, order_id
     return None, ""
 
 
-def _parse_intent_json(raw: str) -> tuple[IntentKind | None, str]:
+def analyze_sentiment(user_text: str) -> SentimentKind:
+    text = (user_text or "").strip()
+    if any(k in text for k in _VERY_NEGATIVE_HINTS):
+        return SentimentKind.VERY_NEGATIVE
+    negative_hits = sum(1 for k in _NEGATIVE_HINTS if k in text)
+    if negative_hits >= 2 or ("!" in text and negative_hits):
+        return SentimentKind.VERY_NEGATIVE
+    if negative_hits:
+        return SentimentKind.NEGATIVE
+    if any(k in text for k in _POSITIVE_HINTS):
+        return SentimentKind.POSITIVE
+    return SentimentKind.NEUTRAL
+
+
+def extract_entities(user_text: str, data: str = "") -> dict[str, str]:
+    text = user_text or ""
+    entities: dict[str, str] = {}
+    order_item_id = extract_order_item_id(text, data)
+    order_id = extract_order_id(text, data)
+    if order_item_id:
+        entities["orderItemId"] = order_item_id
+    if order_id:
+        entities["orderId"] = order_id
+    amount = re.search(r"(?:¥|￥)?\s*(\d+(?:\.\d{1,2})?)\s*元", text)
+    if amount:
+        entities["amount"] = amount.group(1)
+    product_id = re.search(r"(?:商品(?:ID|id)?)[：:\s]*([A-Za-z0-9_-]{3,32})", text)
+    if product_id:
+        entities["productId"] = product_id.group(1)
+    return entities
+
+
+def _parse_intent_json(raw: str) -> dict | None:
     text = (raw or "").strip()
-    if not text:
-        return None, ""
     start = text.find("{")
     end = text.rfind("}")
     if start < 0 or end <= start:
-        return None, ""
+        return None
     try:
         obj = json.loads(text[start : end + 1])
     except json.JSONDecodeError:
-        return None, ""
-    if not isinstance(obj, dict):
-        return None, ""
-    key = (obj.get("intentType") or obj.get("intent_type") or "").strip().upper()
-    data = (obj.get("data") or obj.get("keyword") or "").strip()
-    try:
-        return IntentKind(key), data
-    except ValueError:
-        return None, data
+        return None
+    return obj if isinstance(obj, dict) else None
+
 
 def _build_intent_context(
     user_id: str,
@@ -231,6 +352,7 @@ def _build_intent_context(
         lines.append("用户消息含订单号样式文本：是")
     return "\n".join(lines)
 
+
 async def classify_intent_by_llm(
     user_id: str,
     user_text: str,
@@ -238,10 +360,10 @@ async def classify_intent_by_llm(
     from_product: bool = False,
     consult_card: dict | None = None,
     message_card: dict | None = None,
-) -> tuple[IntentKind | None, str]:
+) -> IntentDecision | None:
     template = await load_user_intent_classifier_prompt()
     if not template.strip():
-        return None, ""
+        return None
 
     context = _build_intent_context(
         user_id,
@@ -256,29 +378,61 @@ async def classify_intent_by_llm(
         base = f"{template}\n\n用户ID：{user_id}\n用户问题：{user_text}"
 
     prompt = f"{base}\n\n{context}"
-
     try:
         llm = create_memory_llm()
         response = await llm.ainvoke(
             [
                 SystemMessage(
                     content=(
-                        "你是电商客服意图分类器。"
-                        "只输出一行 JSON：{\"intentType\":\"类型\",\"data\":\"订单号或搜索关键词或空\"}。"
-                        "禁止解释、禁止 markdown。"
+                        "你是电商客服意图分类器。只输出一行 JSON，字段为："
+                        "intentType、confidence、data、entities、sentiment、urgency、"
+                        "riskLevel、nextAction、handoffReason。禁止解释、禁止 markdown。"
                     )
                 ),
                 HumanMessage(content=prompt),
             ]
         )
-        content = response.content if isinstance(response.content, str) else str(response.content or "")
-        intent, data = _parse_intent_json(content)
-        if intent is None:
+        content = (
+            response.content
+            if isinstance(response.content, str)
+            else str(response.content or "")
+        )
+        obj = _parse_intent_json(content)
+        if not obj:
             logger.warning("intent_llm_parse_failed", raw=content[:200])
-        return intent, data
-    except Exception as e:
-        logger.warning("intent_llm_failed", error=str(e))
-        return None, ""
+            return None
+        try:
+            intent = IntentKind(
+                str(obj.get("intentType") or obj.get("intent_type") or "").upper()
+            )
+        except ValueError:
+            logger.warning("intent_llm_unknown_intent", raw=content[:200])
+            return None
+        data = str(obj.get("data") or obj.get("keyword") or "").strip()
+        entities = obj.get("entities") if isinstance(obj.get("entities"), dict) else {}
+        entities = {str(k): str(v) for k, v in entities.items() if v not in (None, "")}
+        return IntentDecision(
+            intent=intent,
+            confidence=_clamp_confidence(obj.get("confidence"), 0.75),
+            entities={**extract_entities(user_text, data), **entities},
+            sentiment=_enum_or_default(
+                SentimentKind, obj.get("sentiment"), analyze_sentiment(user_text)
+            ),
+            urgency=_enum_or_default(UrgencyKind, obj.get("urgency"), UrgencyKind.NORMAL),
+            risk_level=_enum_or_default(
+                RiskLevel, obj.get("riskLevel") or obj.get("risk_level"), RiskLevel.LOW
+            ),
+            next_action=_enum_or_default(
+                NextAction, obj.get("nextAction") or obj.get("next_action"), NextAction.ANSWER
+            ),
+            handoff_reason=str(obj.get("handoffReason") or "").strip() or None,
+            source="llm",
+            data=data,
+        )
+    except Exception as exc:
+        logger.warning("intent_llm_failed", error=str(exc))
+        return None
+
 
 async def resolve_intent(
     user_id: str,
@@ -287,8 +441,9 @@ async def resolve_intent(
     from_product: bool = False,
     consult_card: dict | None = None,
     message_card: dict | None = None,
-) -> tuple[IntentKind, str, str]:
-
+    unresolved_count: int = 0,
+    allow_llm: bool = True,
+) -> IntentDecision:
     structural = _structural_intent(
         user_text,
         from_product=from_product,
@@ -296,27 +451,33 @@ async def resolve_intent(
         message_card=message_card,
     )
     if structural is not None:
-        INTENT_TOTAL.labels(intent=structural.value, source="structural").inc()
-        return structural, "structural", ""
+        decision = _build_decision(
+            structural, user_text, confidence=0.99, source="structural"
+        )
+        return _record_and_apply(decision, user_text, unresolved_count)
 
-    hi_intent, hi_data = classify_high_confidence_intent(user_text)
-    if hi_intent is not None:
-        INTENT_TOTAL.labels(intent=hi_intent.value, source="rule_priority").inc()
-        return hi_intent, "rule_priority", hi_data
+    high_intent, high_data = classify_high_confidence_intent(user_text)
+    if high_intent is not None:
+        decision = _build_decision(
+            high_intent,
+            user_text,
+            confidence=0.96,
+            source="rule_priority",
+            data=high_data,
+        )
+        return _record_and_apply(decision, user_text, unresolved_count)
 
     settings = get_settings()
-    intent_data = ""
-    if settings.intent_use_llm:
-        llm_intent, intent_data = await classify_intent_by_llm(
+    if allow_llm and settings.intent_use_llm:
+        llm_decision = await classify_intent_by_llm(
             user_id,
             user_text,
             from_product=from_product,
             consult_card=consult_card,
             message_card=message_card,
         )
-        if llm_intent is not None:
-            INTENT_TOTAL.labels(intent=llm_intent.value, source="llm").inc()
-            return llm_intent, "llm", intent_data
+        if llm_decision is not None:
+            return _record_and_apply(llm_decision, user_text, unresolved_count)
 
     if settings.intent_rule_fallback:
         ruled = classify_intent_by_rules(
@@ -326,8 +487,167 @@ async def resolve_intent(
             message_card=message_card,
         )
         if ruled is not None:
-            INTENT_TOTAL.labels(intent=ruled.value, source="rule").inc()
-            return ruled, "rule", ""
+            confidence = 0.9 if ruled != IntentKind.AFTERSALES_UNKNOWN else 0.65
+            decision = _build_decision(
+                ruled, user_text, confidence=confidence, source="rule"
+            )
+            return _record_and_apply(decision, user_text, unresolved_count)
 
-    INTENT_TOTAL.labels(intent=IntentKind.CHAT.value, source="default").inc()
-    return IntentKind.CHAT, "default", ""
+    decision = _build_decision(
+        IntentKind.CHAT,
+        user_text,
+        confidence=0.4,
+        source="default",
+        next_action=NextAction.ASK_CLARIFICATION,
+    )
+    return _record_and_apply(decision, user_text, unresolved_count)
+
+
+def _build_decision(
+    intent: IntentKind,
+    user_text: str,
+    *,
+    confidence: float,
+    source: str,
+    data: str = "",
+    next_action: NextAction | None = None,
+) -> IntentDecision:
+    sentiment = analyze_sentiment(user_text)
+    risk = RiskLevel.HIGH if any(k in user_text for k in _FUND_RISK_HINTS) else RiskLevel.LOW
+    if risk == RiskLevel.LOW and intent in {
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.COMPLAINT,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+    }:
+        risk = RiskLevel.MEDIUM
+    urgency = UrgencyKind.NORMAL
+    if sentiment == SentimentKind.VERY_NEGATIVE or risk == RiskLevel.HIGH:
+        urgency = UrgencyKind.CRITICAL
+    elif sentiment == SentimentKind.NEGATIVE or intent in {
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.REFUND_STATUS,
+    }:
+        urgency = UrgencyKind.HIGH
+
+    if next_action is None:
+        next_action = NextAction.TOOL if intent in _TOOL_INTENTS else NextAction.ANSWER
+        if intent == IntentKind.AFTERSALES_UNKNOWN:
+            next_action = NextAction.ASK_CLARIFICATION
+
+    return IntentDecision(
+        intent=intent,
+        confidence=confidence,
+        entities=extract_entities(user_text, data),
+        sentiment=sentiment,
+        urgency=urgency,
+        risk_level=risk,
+        next_action=next_action,
+        source=source,
+        data=data,
+    )
+
+
+def _record_and_apply(
+    decision: IntentDecision, user_text: str, unresolved_count: int
+) -> IntentDecision:
+    entities = {
+        **extract_entities(user_text, decision.data),
+        **decision.entities,
+    }
+    if (
+        decision.data
+        and "orderId" not in entities
+        and decision.intent
+        in {
+            IntentKind.QUERY_ORDER,
+            IntentKind.QUERY_LOGISTICS,
+            IntentKind.REFUND_STATUS,
+            IntentKind.CANCEL_ORDER,
+            IntentKind.CONFIRM_RECEIPT,
+        }
+    ):
+        entities["orderId"] = decision.data
+    if entities != decision.entities:
+        decision = decision.model_copy(update={"entities": entities})
+    decision = _apply_handoff_policy(decision, user_text, unresolved_count)
+    INTENT_TOTAL.labels(intent=decision.intent.value, source=decision.source).inc()
+    return decision
+
+
+def _apply_handoff_policy(
+    decision: IntentDecision, user_text: str, unresolved_count: int
+) -> IntentDecision:
+    explicit_human = decision.intent == IntentKind.HUMAN_REQUEST or any(
+        hint in user_text for hint in _HUMAN_HINTS
+    )
+    threshold = get_settings().intent_handoff_confidence
+    current_unresolved = (
+        decision.confidence < threshold
+        or decision.next_action == NextAction.ASK_CLARIFICATION
+    )
+    unresolved = (
+        unresolved_count >= 1 and current_unresolved
+    ) or any(k in user_text for k in _UNRESOLVED_HINTS)
+    severe = decision.sentiment == SentimentKind.VERY_NEGATIVE
+    fund_dispute = decision.risk_level == RiskLevel.HIGH
+
+    if explicit_human:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "USER_REQUEST",
+                "urgency": UrgencyKind.HIGH,
+            }
+        )
+    if fund_dispute:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "FUND_DISPUTE",
+                "urgency": UrgencyKind.CRITICAL,
+            }
+        )
+    if severe and decision.intent in {
+        IntentKind.COMPLAINT,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.REFUND,
+        IntentKind.REFUND_STATUS,
+    }:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "SEVERE_NEGATIVE_SENTIMENT",
+            }
+        )
+    if unresolved:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "REPEATED_UNRESOLVED",
+                "urgency": UrgencyKind.HIGH,
+            }
+        )
+    if decision.confidence < threshold:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF_SUGGESTED,
+                "handoff_reason": "LOW_CONFIDENCE",
+            }
+        )
+    return decision
+
+
+def _clamp_confidence(value, default: float) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _enum_or_default(enum_type, value, default):
+    try:
+        return enum_type(str(value).upper())
+    except (TypeError, ValueError):
+        return default

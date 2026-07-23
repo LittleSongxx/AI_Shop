@@ -2,9 +2,9 @@ package com.simlect.biz.impl;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
-import com.simlect.component.SpringContext;
-import com.simlect.constants.Constants;
+import com.simlect.biz.KnowledgeBaseService;
 import com.simlect.constants.RabbitMQConfig;
 import com.simlect.constants.ReliableMessageSender;
 import com.simlect.support.MqIdempotencyKeys;
@@ -16,6 +16,8 @@ import jakarta.annotation.Resource;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.simlect.entity.enums.PageSize;
 import com.simlect.entity.query.RagQuestionQuery;
@@ -34,6 +36,10 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 	private RagQuestionMapper<RagQuestion, RagQuestionQuery> ragQuestionMapper;
 	@Resource
 	private ReliableMessageSender reliableMessageSender;
+	@Resource
+	private JdbcTemplate jdbcTemplate;
+	@Resource
+	private KnowledgeBaseService knowledgeBaseService;
 
 	@Override
 	public List<RagQuestion> findListByParam(RagQuestionQuery param) {
@@ -115,17 +121,25 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 					MqIdempotencyKeys.ragFaq(String.valueOf(questionId), ragDataDTO.getVersion()),
 					MessageReliabilityLevelEnum.HIGH);
 			log.info("已添加删除任务到RAG队列, questionId: {}", questionId);
+			knowledgeBaseService.invalidateCaches();
 		}
 		return result;
 	}
 
 	@Override
-	public void saveRagQuestion(Integer questionId, String similarQuestion, String question, String answer) {
+	@Transactional(rollbackFor = Exception.class)
+	public void saveRagQuestion(RagQuestion input) {
+		if (input == null || StringTools.isEmpty(input.getQuestion())
+				|| StringTools.isEmpty(input.getAnswer())) {
+			throw new BusinessException("问题和答案不能为空");
+		}
+		Integer questionId = input.getQuestionId();
 		RagQuestion bean = new RagQuestion();
+		int version = 1;
 		if (questionId == null){
-			bean.setQuestion(question);
-			bean.setSimilarQuestion(similarQuestion);
-			bean.setAnswer(answer);
+			bean.setQuestion(input.getQuestion().trim());
+			bean.setSimilarQuestion(input.getSimilarQuestion());
+			bean.setAnswer(input.getAnswer().trim());
 			bean.setCreateTime(new Date());
 			this.add(bean);
 			questionId = bean.getQuestionId();
@@ -134,11 +148,32 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 			if (bean == null){
 				throw new BusinessException(" ragQuestionId 不存在");
 			}
-			bean.setQuestion(question);
-			bean.setSimilarQuestion(similarQuestion);
-			bean.setAnswer(answer);
+			bean.setQuestion(input.getQuestion().trim());
+			bean.setSimilarQuestion(input.getSimilarQuestion());
+			bean.setAnswer(input.getAnswer().trim());
+			version = (bean.getVersion() == null ? 1 : bean.getVersion()) + 1;
 			this.updateRagQuestionByQuestionId(bean, questionId);
 		}
+		jdbcTemplate.update(
+				"""
+				UPDATE rag_question
+				SET normalized_question=?, category=?, language=?, channel=?, priority=?,
+				    version=?, effective_start=?, effective_end=?, publish_status=?,
+				    source=?, owner=?, update_time=NOW()
+				WHERE question_id=?
+				""",
+				normalizeQuestion(input.getQuestion()),
+				defaultText(input.getCategory(), "general"),
+				defaultText(input.getLanguage(), "zh-CN"),
+				defaultText(input.getChannel(), "all"),
+				input.getPriority() == null ? 0 : input.getPriority(),
+				version,
+				input.getEffectiveStart(),
+				input.getEffectiveEnd(),
+				defaultText(input.getPublishStatus(), "PUBLISHED").toUpperCase(Locale.ROOT),
+				defaultText(input.getSource(), "ADMIN"),
+				input.getOwner(),
+				questionId);
 		RagDataDTO ragDataDTO = new RagDataDTO(questionId.toString(), RagDataTypeEnum.FAQ.getType());
 		reliableMessageSender.sendMessage(
 				RabbitMQConfig.RAG_EXCHANGE,
@@ -146,5 +181,15 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 				ragDataDTO,
 				MqIdempotencyKeys.ragFaq(String.valueOf(questionId), ragDataDTO.getVersion()),
 				MessageReliabilityLevelEnum.HIGH);
+		knowledgeBaseService.invalidateCaches();
+	}
+
+	private String normalizeQuestion(String value) {
+		return value == null ? "" : value.trim().toLowerCase(Locale.ROOT)
+				.replaceAll("[\\s，。！？、,.!?;；:：\"'（）()\\[\\]【】]+", "");
+	}
+
+	private String defaultText(String value, String defaultValue) {
+		return StringTools.isEmpty(value) ? defaultValue : value.trim();
 	}
 }

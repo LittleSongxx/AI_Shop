@@ -30,5 +30,5 @@ public interface RagQuestionService {
 
 	Integer deleteRagQuestionByQuestionId(Integer questionId);
 
-    void saveRagQuestion(Integer questionId, String similarQuestion, String question, String answer);
+    void saveRagQuestion(RagQuestion question);
 }

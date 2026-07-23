@@ -4,7 +4,12 @@ from dataclasses import dataclass
 
 from fastapi import Cookie, Header, Request
 
-from app.constants import REDIS_TOKEN_WEB, TOKEN_COOKIE_NAME, TOKEN_HEADER_NAME
+from app.constants import (
+    REDIS_TOKEN_ADMIN,
+    REDIS_TOKEN_WEB,
+    TOKEN_COOKIE_NAME,
+    TOKEN_HEADER_NAME,
+)
 from app.exceptions import BusinessException
 from app.services.redis_service import redis_service
 
@@ -53,6 +58,27 @@ async def get_user_by_token(token: str) -> TokenUserInfo | None:
         avatar=data.get("avatar"),
         token=data.get("token") or token,
     )
+
+
+async def get_admin_by_token(token: str) -> str | None:
+    if not token:
+        return None
+    raw = await redis_service.client.get(f"{REDIS_TOKEN_ADMIN}{token}")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, str):
+            return parsed.strip() or None
+        if isinstance(parsed, dict):
+            account = parsed.get("account") or parsed.get("adminId")
+            return str(account).strip() if account else None
+    except json.JSONDecodeError:
+        pass
+    return value.strip('"') or None
 
 def resolve_token(
     request: Request,

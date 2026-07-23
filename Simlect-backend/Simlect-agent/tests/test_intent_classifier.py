@@ -5,13 +5,13 @@ from app.domain.intent.classifier import (
     classify_intent_by_rules,
     resolve_intent,
 )
-from app.domain.intent.types import IntentKind
+from app.domain.intent.types import IntentKind, NextAction, SentimentKind
 
 
 def test_parse_intent_json():
-    intent, data = _parse_intent_json('{"intentType":"REFUND","data":"oid1"}')
-    assert intent == IntentKind.REFUND
-    assert data == "oid1"
+    parsed = _parse_intent_json('{"intentType":"REFUND","data":"oid1"}')
+    assert parsed["intentType"] == "REFUND"
+    assert parsed["data"] == "oid1"
 
 def test_rule_fallback_refund():
     intent = classify_intent_by_rules("我要退款")
@@ -23,7 +23,14 @@ def test_rule_chat_returns_none_without_keywords():
 @pytest.mark.asyncio
 async def test_resolve_intent_llm_primary(monkeypatch):
     async def fake_llm(*args, **kwargs):
-        return IntentKind.QUERY_LOGISTICS, "oid123"
+        from app.domain.intent.types import IntentDecision
+
+        return IntentDecision(
+            intent=IntentKind.QUERY_LOGISTICS,
+            confidence=0.88,
+            data="oid123",
+            source="llm",
+        )
 
     async def fake_load():
         return "分类 %s %s"
@@ -31,9 +38,10 @@ async def test_resolve_intent_llm_primary(monkeypatch):
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", fake_load)
     monkeypatch.setattr("app.domain.intent.classifier.classify_intent_by_llm", fake_llm)
 
-    intent, source, data = await resolve_intent("u1", "快递到哪了")
-    assert intent == IntentKind.QUERY_LOGISTICS
-    assert source == "llm"
+    decision = await resolve_intent("u1", "快递到哪了")
+    assert decision.intent == IntentKind.QUERY_LOGISTICS
+    assert decision.source == "llm"
+    assert decision.entities["orderId"] == "oid123"
 
 @pytest.mark.asyncio
 async def test_resolve_intent_structural_product_consult(monkeypatch):
@@ -42,11 +50,20 @@ async def test_resolve_intent_structural_product_consult(monkeypatch):
 
     monkeypatch.setattr("app.domain.intent.classifier.classify_intent_by_llm", fail_llm)
     consult = {"productId": "1", "productName": "FG800"}
-    intent, source, _ = await resolve_intent(
+    decision = await resolve_intent(
         "u1",
         "这款内存多大",
         from_product=True,
         consult_card=consult,
     )
-    assert intent == IntentKind.PRODUCT_CONSULT
-    assert source == "structural"
+    assert decision.intent == IntentKind.PRODUCT_CONSULT
+    assert decision.source == "structural"
+
+
+@pytest.mark.asyncio
+async def test_negative_fund_dispute_is_handoff():
+    decision = await resolve_intent(
+        "u1", "钱扣了但是退款没到账，我要投诉", allow_llm=False
+    )
+    assert decision.next_action == NextAction.HANDOFF
+    assert decision.sentiment in {SentimentKind.NEGATIVE, SentimentKind.VERY_NEGATIVE}

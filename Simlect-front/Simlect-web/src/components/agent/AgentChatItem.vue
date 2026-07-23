@@ -44,6 +44,24 @@
       </template>
       <p v-if="messageStatus === 3 && hasRenderableContent" class="interrupt-tip">回复已中断，以上为已生成内容</p>
       </template>
+      <div v-if="canFeedback" class="feedback-row" aria-label="回复反馈">
+        <button
+          type="button"
+          :class="{ active: feedbackValue === 1 }"
+          :disabled="feedbackSubmitting"
+          @click="submitFeedback(1)"
+        >
+          有用
+        </button>
+        <button
+          type="button"
+          :class="{ active: feedbackValue === -1 }"
+          :disabled="feedbackSubmitting"
+          @click="submitFeedback(-1)"
+        >
+          需改进
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -55,7 +73,9 @@ import MarkdownContent from '@/components/common/MarkdownContent.vue';
 import AgentProductList from '@/components/agent/AgentProductList.vue';
 import AgentOrderList from '@/components/agent/AgentOrderList.vue';
 import AgentConfirmCard, { type ActionConfirmCardData } from '@/components/agent/AgentConfirmCard.vue';
+import { agentApi } from '@/api/modules';
 import { cleanAgentActionStreamText, containsAgentTable, stripEmbeddedProductJson } from '@/utils/agentMessageRender';
+import { toast } from '@/utils/toast';
 
 const props = defineProps<{
   data: Record<string, any>;
@@ -269,6 +289,39 @@ const isWideBubble = computed(
       agentRich.value
     )
 );
+
+const feedbackByMessage = ref<Record<string, 1 | -1>>({});
+const feedbackSubmitting = ref(false);
+const feedbackMessageKey = computed(() => String(props.data.messageId || ''));
+const feedbackValue = computed(() =>
+  feedbackMessageKey.value ? feedbackByMessage.value[feedbackMessageKey.value] : undefined
+);
+const canFeedback = computed(
+  () =>
+    messageStatus.value === 2 &&
+    !!feedbackMessageKey.value &&
+    hasRenderableContent.value &&
+    !isStreaming.value
+);
+
+const submitFeedback = async (rating: 1 | -1) => {
+  const id = Number(props.data.messageId);
+  if (!id || feedbackSubmitting.value) return;
+  feedbackSubmitting.value = true;
+  try {
+    await agentApi.feedback(
+      id,
+      rating,
+      rating > 0 ? 'HELPFUL' : 'NEEDS_IMPROVEMENT'
+    );
+    feedbackByMessage.value[feedbackMessageKey.value] = rating;
+    toast.success(rating > 0 ? '感谢反馈' : '已记录，会用于优化回复');
+  } catch {
+    toast.error('反馈提交失败，请稍后重试');
+  } finally {
+    feedbackSubmitting.value = false;
+  }
+};
 </script>
 
 <style scoped lang="scss">
@@ -396,5 +449,33 @@ const isWideBubble = computed(
 
 :deep(.agent-orders) {
   font-size: 12px;
+}
+
+.feedback-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+
+  button {
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid $color-border-gray;
+    border-radius: $radius-pill;
+    background: #fff;
+    color: $color-text-muted;
+    font-size: 12px;
+    cursor: pointer;
+
+    &.active {
+      color: $color-primary;
+      border-color: rgba($color-primary, 0.36);
+      background: $color-primary-soft;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
 }
 </style>

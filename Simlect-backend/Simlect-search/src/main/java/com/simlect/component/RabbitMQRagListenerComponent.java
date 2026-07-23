@@ -26,6 +26,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,7 +111,14 @@ public class RabbitMQRagListenerComponent {
             throw new BusinessException("FAQ dataId格式错误: " + dataId, e);  // 抛到外层 → NACK → DLQ
         }
         // 判断是否存在
-        if (ragQuestion == null){
+        Date now = new Date();
+        boolean unavailable = ragQuestion == null
+                || !"PUBLISHED".equalsIgnoreCase(ragQuestion.getPublishStatus())
+                || (ragQuestion.getEffectiveStart() != null
+                    && ragQuestion.getEffectiveStart().after(now))
+                || (ragQuestion.getEffectiveEnd() != null
+                    && !ragQuestion.getEffectiveEnd().after(now));
+        if (unavailable){
             vectorStore.delete(List.of(documentId));
             return;
         }
@@ -122,6 +130,13 @@ public class RabbitMQRagListenerComponent {
         metaData.put("dataType",RagDataTypeEnum.FAQ.getType());
         metaData.put("question", ragQuestion.getQuestion());
         metaData.put("answer", ragQuestion.getAnswer());
+        metaData.put("category", ragQuestion.getCategory());
+        metaData.put("language", ragQuestion.getLanguage());
+        metaData.put("channel", ragQuestion.getChannel());
+        metaData.put("priority", ragQuestion.getPriority());
+        metaData.put("version", ragQuestion.getVersion());
+        metaData.put("source", ragQuestion.getSource());
+        metaData.put("owner", ragQuestion.getOwner());
         // 如果有相似问题则填充
         if(!StringUtils.isEmpty(ragQuestion.getSimilarQuestion())){
             metaData.put("similarQuestion", ragQuestion.getSimilarQuestion());
@@ -161,17 +176,23 @@ public class RabbitMQRagListenerComponent {
         List<Document> documentList = new ArrayList<>();
         // 判断商品是否在售
         if (ProductStatusEnum.ON_SALE.getStatus().equals(productInfo.getStatus())) {
-            // 基础文档
+            // 基础信息切片
             String baseId = prefixId;
             newDocIds.add(baseId);
-            // Document(Id, 内容, 元数据)
             StringBuilder context = new StringBuilder();
-            context.append(productInfo.getProductName()).append("\n");
+            context.append("商品：").append(productInfo.getProductName()).append("\n");
+            appendLine(context, "品牌", productInfo.getBrand());
+            appendLine(context, "类目", productInfo.getCategoryId());
+            appendLine(context, "父类目", productInfo.getParentCategoryId());
+            appendLine(context, "描述", productInfo.getProductDesc());
             Map<String, Object> metaData = new HashMap<>();
-            // 第一个不带SKU
             metaData.put("productId", productId);
             metaData.put("dataType", RagDataTypeEnum.PRODUCT.getType());
+            metaData.put("chunkType", "base");
             metaData.put("productName", productInfo.getProductName());
+            putIfNotBlank(metaData, "brand", productInfo.getBrand());
+            putIfNotBlank(metaData, "categoryId", productInfo.getCategoryId());
+            putIfNotBlank(metaData, "parentCategoryId", productInfo.getParentCategoryId());
             Document document = new Document(prefixId, context.toString(), metaData);
             documentList.add(document);
             log.info("添加基础商品文档 - ID: {}, content: {}, metaData: {}",
@@ -180,6 +201,30 @@ public class RabbitMQRagListenerComponent {
                     ? List.of() : productInfo.getPropertyValues();
             Map<String, ProductRagPropertyVO> propertyMap = dbPropertyList.stream().collect(Collectors.toMap(ProductRagPropertyVO::getPropertyValueId,
                     Function.identity(), (data1, data2) -> data2));
+            if (!dbPropertyList.isEmpty()) {
+                String attributesId = prefixId + "_attributes";
+                StringBuilder attributes = new StringBuilder();
+                attributes.append("商品：").append(productInfo.getProductName()).append("\n属性与卖点：\n");
+                for (ProductRagPropertyVO property : dbPropertyList) {
+                    attributes.append(property.getPropertyName()).append("：")
+                            .append(property.getPropertyValue()).append("\n");
+                }
+                Map<String, Object> attributesMeta = new HashMap<>(metaData);
+                attributesMeta.put("chunkType", "attributes");
+                documentList.add(new Document(attributesId, attributes.toString(), attributesMeta));
+                newDocIds.add(attributesId);
+            }
+            if (StringUtils.isNotBlank(productInfo.getProductDesc())) {
+                String scenarioId = prefixId + "_scenarios";
+                Map<String, Object> scenarioMeta = new HashMap<>(metaData);
+                scenarioMeta.put("chunkType", "scenarios");
+                documentList.add(new Document(
+                        scenarioId,
+                        "商品：" + productInfo.getProductName()
+                                + "\n使用场景与适用人群：" + productInfo.getProductDesc(),
+                        scenarioMeta));
+                newDocIds.add(scenarioId);
+            }
             List<ProductRagSkuVO> dbSkuList = productInfo.getSkus() == null
                     ? List.of() : productInfo.getSkus();
             // 存带SKU的商品属性
@@ -212,7 +257,10 @@ public class RabbitMQRagListenerComponent {
                 }
                 metaDataWithSKU.put("productId", productId);
                 metaDataWithSKU.put("dataType", RagDataTypeEnum.PRODUCT.getType());
+                metaDataWithSKU.put("chunkType", "sku");
                 metaDataWithSKU.put("productName", productInfo.getProductName());
+                putIfNotBlank(metaDataWithSKU, "brand", productInfo.getBrand());
+                putIfNotBlank(metaDataWithSKU, "categoryId", productInfo.getCategoryId());
                 skuMap.put("skuProperty", contextWithSKU);
                 metaDataWithSKU.put("skuList", skuMap);
                 Document documentWithSKU = new Document(prefixId + "_" + dbSku.getPropertyValueIdHash(), contextWithSKU.toString(), metaDataWithSKU);
@@ -307,5 +355,17 @@ public class RabbitMQRagListenerComponent {
         return documents.stream()
                 .filter(doc -> doc != null && doc.getText() != null && !doc.getText().trim().isEmpty())
                 .collect(Collectors.toList());
+    }
+
+    private void appendLine(StringBuilder builder, String label, String value) {
+        if (StringUtils.isNotBlank(value)) {
+            builder.append(label).append("：").append(value).append("\n");
+        }
+    }
+
+    private void putIfNotBlank(Map<String, Object> metadata, String key, String value) {
+        if (StringUtils.isNotBlank(value)) {
+            metadata.put(key, value);
+        }
     }
 }

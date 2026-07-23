@@ -4,8 +4,8 @@ import json
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.auth.token_service import get_user_by_token
-from app.constants import WS_MESSAGE_TOPIC_AGENT
+from app.auth.token_service import get_admin_by_token, get_user_by_token
+from app.constants import WS_MESSAGE_TOPIC_ADMIN, WS_MESSAGE_TOPIC_AGENT
 from app.services.redis_service import redis_service
 from app.utils.ws_token import resolve_ws_token as _resolve_ws_token
 
@@ -44,13 +44,42 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+
+class AdminConnectionManager:
+
+    def __init__(self):
+        self._connections: set[WebSocket] = set()
+
+    async def connect(self, ws: WebSocket) -> None:
+        await ws.accept()
+        self._connections.add(ws)
+
+    def disconnect(self, ws: WebSocket) -> None:
+        self._connections.discard(ws)
+
+    async def broadcast(self, data: dict) -> None:
+        dead: list[WebSocket] = []
+        for ws in self._connections:
+            try:
+                await ws.send_json(data)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+
+admin_manager = AdminConnectionManager()
+
 _listener_task: asyncio.Task | None = None
 
 async def _topic_listener(redis_client) -> None:
 
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe(WS_MESSAGE_TOPIC_AGENT)
-    logger.info("ws_topic_subscribed", topic=WS_MESSAGE_TOPIC_AGENT)
+    await pubsub.subscribe(WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN)
+    logger.info(
+        "ws_topic_subscribed",
+        topics=[WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN],
+    )
     try:
         async for message in pubsub.listen():
             if message["type"] != "message":
@@ -59,12 +88,15 @@ async def _topic_listener(redis_client) -> None:
                 data = json.loads(message["data"])
             except (json.JSONDecodeError, TypeError):
                 continue
-            user_id = data.get("userId")
-            if user_id:
-                await manager.send_json(user_id, data)
+            if message.get("channel") == WS_MESSAGE_TOPIC_ADMIN:
+                await admin_manager.broadcast(data)
+            else:
+                user_id = data.get("userId")
+                if user_id:
+                    await manager.send_json(user_id, data)
     except asyncio.CancelledError:
 
-        await pubsub.unsubscribe(WS_MESSAGE_TOPIC_AGENT)
+        await pubsub.unsubscribe(WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN)
         raise
 
 async def stop_ws_listener() -> None:
@@ -121,3 +153,30 @@ async def websocket_endpoint(ws: WebSocket, query_token: str | None = None) -> N
 
         manager.disconnect(user_id, ws)
         logger.info("ws_disconnected", user_id=user_id)
+
+
+async def admin_websocket_endpoint(
+    ws: WebSocket, query_token: str | None = None
+) -> None:
+    token = _resolve_ws_token(
+        query_token,
+        ws.cookies.get("adminToken"),
+        ws.headers.get("adminToken"),
+    )
+    if not token:
+        await ws.close(code=1008, reason="admin token required")
+        return
+    account = await get_admin_by_token(token)
+    if not account:
+        await ws.close(code=1008, reason="invalid admin token")
+        return
+    await admin_manager.connect(ws)
+    logger.info("admin_ws_connected", account=account)
+    try:
+        while True:
+            data = await ws.receive_text()
+            if data.lower() == "ping":
+                await ws.send_text("pong")
+    except WebSocketDisconnect:
+        admin_manager.disconnect(ws)
+        logger.info("admin_ws_disconnected", account=account)

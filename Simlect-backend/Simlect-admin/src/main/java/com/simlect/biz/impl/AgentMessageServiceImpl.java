@@ -67,6 +67,9 @@ public class AgentMessageServiceImpl implements AgentMessageService {
 		if (param != null && !StringTools.isEmpty(param.getUserId())) {
 			body.put("userId", param.getUserId());
 		}
+		if (param != null && !StringTools.isEmpty(param.getBizType())) {
+			body.put("bizType", param.getBizType());
+		}
 		Map<String, Object> data = post(
 				"/api/agent/admin/loadMessages",
 				body,
@@ -91,6 +94,14 @@ public class AgentMessageServiceImpl implements AgentMessageService {
 			return 1;
 		}
 		return 0;
+	}
+
+	@Override
+	public Object callSupport(String action, Map<String, Object> body) {
+		return post(
+				"/api/agent/admin/" + action,
+				body,
+				new ParameterizedTypeReference<ResponseVO<Object>>() {});
 	}
 
 	private List<AgentMessage> mapMessages(Object raw) {

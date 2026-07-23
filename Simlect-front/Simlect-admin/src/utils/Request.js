@@ -103,6 +103,7 @@ const request = (config) => {
         showLoading: showLoading,
         errorCallback: config.errorCallback,
         showError: showError,
+        timeout: config.timeout,
     }).catch(error => {
         if (error.showError) {
             Message.error(error.msg);

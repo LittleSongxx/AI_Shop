@@ -52,9 +52,10 @@ mvn -q package -DskipTests
 1. gateway:8080
 2. user / product / stock / cart / coupon / order / pay / search / admin
 3. Python MCP Server:7060（`start-mcp.bat` / `python -m app.mcp_server`；**无热重载，发版或改工具后须重启**）
-4. Python agent:7050（`JAVA_WEB_URL` 与 `MCP_SERVER_URL` 指向 Gateway / MCP）
-5. Nginx 反代（见 `deploy/nginx.simlect.conf.example`）
-6. 前端 production 构建，相对路径 `/api`、`/admin-api`
+4. Python agent API:7050（`JAVA_WEB_URL` 与 `MCP_SERVER_URL` 指向 Gateway / MCP）
+5. Python agent worker（`python -m app.worker`，必须与 API 使用同一 `.env`）
+6. Nginx 反代（见 `deploy/nginx.simlect.conf.example`）
+7. 前端 production 构建，相对路径 `/api`、`/admin-api`
 
 > Java 根包与 Maven `groupId` 均为 `com.simlect`。ES 商品索引 `simlect-index`，向量索引默认 `simlect_vectorstore`（`VECTOR_INDEX` / Agent `ES_INDEX`）。密钥仅环境变量 / `.env`，勿写入 IDE Run Configuration。
 
@@ -67,7 +68,7 @@ mvn -q package -DskipTests
 - 订单超时关单 / Outbox 有 SENT 记录  
 - 管理端登录与订单列表  
 - 管理端首页今日数据 / 库存预警（依赖 order、user、product、stock 均 UP）  
-- Agent HTTP/WS 经 Gateway；MCP `tools/list` 可用（`:7060/mcp`）
+- Agent HTTP/WS 经 Gateway；Agent `/health` 返回 `worker=true`；MCP `tools/list` 可用（`:7060/mcp`）
 - 对话：订单卡 / 商品卡正常；搜索未命中文案为<暂未找到>而非误报<找到 N 个>
 
 ## 6. 安全确认
@@ -76,4 +77,3 @@ mvn -q package -DskipTests
 - 未使用 `-Ddev` / `SIMLECT_DEV_LOGIN_BYPASS=true`  
 - Nginx 未反代 `/actuator`  
 - 各服务启动日志出现"生产就绪校验通过"
-

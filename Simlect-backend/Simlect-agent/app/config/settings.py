@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     embedding_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     embedding_model: str = "text-embedding-v4"
     embedding_dimensions: int = 1024
+    embedding_cache_ttl_seconds: int = 7 * 24 * 60 * 60
+
+    rerank_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("DASHSCOPE_API_KEY", "RERANK_API_KEY", "rerank_api_key"),
+    )
+    rerank_base_url: str = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
+    rerank_model: str = "gte-rerank-v2"
+    rerank_timeout: int = 20
+    rerank_top_n: int = 6
 
     mysql_host: str = "localhost"
     mysql_port: int = 3306
@@ -69,10 +79,23 @@ class Settings(BaseSettings):
     es_vector_dimensions: int = 1024
 
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    agent_queue_exchange: str = "agent.tasks"
+    agent_worker_high_concurrency: int = 4
+    agent_worker_fast_concurrency: int = 4
+    agent_worker_low_concurrency: int = 2
+    agent_task_max_retries: int = 5
+    agent_task_deadline_seconds: int = 120
+    agent_task_recovery_interval_seconds: int = 5
+    agent_user_lock_ttl_seconds: int = 180
+    agent_support_summary_limit: int = 12
+    agent_worker_heartbeat_ttl_seconds: int = 30
 
     ai_chat_limit: int = 200
     rag_top_k: int = 15
     rag_score_threshold: float = 0.5
+    rag_cache_ttl_seconds: int = 30 * 60
+    faq_exact_cache_ttl_seconds: int = 6 * 60 * 60
+    faq_fast_path_timeout_seconds: float = 1.5
     history_message_limit: int = 15
     task_queue_max: int = 300
 
@@ -92,6 +115,7 @@ class Settings(BaseSettings):
 
     intent_use_llm: bool = True
     intent_rule_fallback: bool = True
+    intent_handoff_confidence: float = 0.55
     order_query_lookback_days: int = 90
     force_mcp_on_llm_skip: bool = False
 

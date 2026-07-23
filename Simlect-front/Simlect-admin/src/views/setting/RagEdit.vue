@@ -5,6 +5,66 @@
       <el-form-item label="问题" prop="question">
         <el-input clearable placeholder="请输入问题" v-model.trim="formData.question"></el-input>
       </el-form-item>
+      <el-row :gutter="12">
+        <el-col :span="6">
+          <el-form-item label="分类" prop="category">
+            <el-input v-model.trim="formData.category" maxlength="64" placeholder="general" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="6">
+          <el-form-item label="渠道" prop="channel">
+            <el-select v-model="formData.channel">
+              <el-option label="全部渠道" value="all" />
+              <el-option label="Web" value="web" />
+              <el-option label="移动端" value="mobile" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="6">
+          <el-form-item label="语言" prop="language">
+            <el-select v-model="formData.language">
+              <el-option label="简体中文" value="zh-CN" />
+              <el-option label="全部语言" value="all" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="6">
+          <el-form-item label="优先级" prop="priority">
+            <el-input-number v-model="formData.priority" :min="0" :max="100" controls-position="right" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="12">
+        <el-col :span="8">
+          <el-form-item label="状态" prop="publishStatus">
+            <el-radio-group v-model="formData.publishStatus">
+              <el-radio-button value="PUBLISHED">发布</el-radio-button>
+              <el-radio-button value="DRAFT">草稿</el-radio-button>
+              <el-radio-button value="ARCHIVED">归档</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="生效时间">
+            <el-date-picker
+              v-model="formData.effectiveStart"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              placeholder="立即生效"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="失效时间">
+            <el-date-picker
+              v-model="formData.effectiveEnd"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              placeholder="长期有效"
+            />
+          </el-form-item>
+        </el-col>
+      </el-row>
       <el-form-item label="相似问题" prop="similarQuestion">
         <div class="similar-questions-panel">
           <el-button @click="addSimilarQuestion" type="primary">增加相似问题</el-button>
@@ -52,10 +112,16 @@ const show = async (data = {}) => {
   dialogConfig.value.show = true
   await nextTick()
   formDataRef.value.resetFields()
-  formData.value = { ...data }
-  if (!formData.value.similarQuestion) {
-    formData.value.similarQuestion = []
+  formData.value = {
+    similarQuestion: [],
+    category: 'general',
+    language: 'zh-CN',
+    channel: 'all',
+    priority: 0,
+    publishStatus: 'PUBLISHED',
+    ...data,
   }
+  formData.value.similarQuestion = formData.value.similarQuestion || []
 }
 
 defineExpose({
@@ -64,12 +130,18 @@ defineExpose({
 
 const formData = ref({
   similarQuestion: [],
+  category: 'general',
+  language: 'zh-CN',
+  channel: 'all',
+  priority: 0,
+  publishStatus: 'PUBLISHED',
 })
 
 const formDataRef = ref()
 const rules = {
   question: [{ required: true, message: '请输入问题', trigger: 'blur' }],
   answer: [{ required: true, message: '请输入答案', trigger: 'blur' }],
+  category: [{ required: true, message: '请输入分类', trigger: 'blur' }],
   similarQuestion: [
     {
       validator: (rule, value, callback) => {
@@ -114,6 +186,14 @@ const sumitForm = () => {
     }
     let params = {}
     Object.assign(params, formData.value)
+    if (
+      params.effectiveStart
+      && params.effectiveEnd
+      && new Date(params.effectiveEnd).getTime() <= new Date(params.effectiveStart).getTime()
+    ) {
+      proxy.Message.error('失效时间必须晚于生效时间')
+      return
+    }
     if (params.similarQuestion.length > 0) {
       params.similarQuestion = JSON.stringify(params.similarQuestion)
     } else {

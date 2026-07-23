@@ -3,6 +3,8 @@ from enum import Enum
 
 import structlog
 
+from app.harness.metrics.runtime_sensors import CIRCUIT_STATE
+
 logger = structlog.get_logger()
 
 class CircuitState(str, Enum):
@@ -37,8 +39,9 @@ class CircuitBreaker:
         return self._state
 
     def allow_request(self) -> bool:
-
-        return self.state != CircuitState.OPEN
+        state = self.state
+        self._set_metric(state)
+        return state != CircuitState.OPEN
 
     def record_success(self) -> None:
 
@@ -46,6 +49,7 @@ class CircuitBreaker:
         if self._state != CircuitState.CLOSED:
             logger.info("circuit_closed", breaker=self.name)
         self._state = CircuitState.CLOSED
+        self._set_metric(self._state)
 
     def record_failure(self) -> None:
 
@@ -58,6 +62,15 @@ class CircuitBreaker:
                 breaker=self.name,
                 failures=self._failure_count,
             )
+        self._set_metric(self._state)
+
+    def _set_metric(self, state: CircuitState) -> None:
+        value = {
+            CircuitState.CLOSED: 0,
+            CircuitState.OPEN: 1,
+            CircuitState.HALF_OPEN: 2,
+        }[state]
+        CIRCUIT_STATE.labels(breaker=self.name).set(value)
 
     async def sync_to_redis(self, redis_client, key: str) -> None:
 

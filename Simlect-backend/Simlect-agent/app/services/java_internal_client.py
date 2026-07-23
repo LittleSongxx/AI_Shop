@@ -169,5 +169,47 @@ class JavaInternalClient:
             return str(pid) if pid else None
         return str(data)
 
+    async def knowledge_version(self) -> int:
+        data = await self.post_json("/internal/search/knowledge/version", {})
+        try:
+            return int(data)
+        except (TypeError, ValueError):
+            return 1
+
+    async def exact_faq(
+        self,
+        question: str,
+        language: str = "zh-CN",
+        channel: str = "web",
+    ) -> dict | None:
+        data = await self.post_json(
+            "/internal/search/knowledge/faqExact",
+            {"question": question, "language": language, "channel": channel},
+        )
+        return normalize_keys(data) if data else None
+
+    async def top_faq(self, limit: int = 100) -> list[dict]:
+        data = await self.post_json(
+            "/internal/search/knowledge/topFaq",
+            {"limit": limit},
+        )
+        return normalize_keys(data or [])
+
+    async def submit_faq_candidate(
+        self,
+        question: str,
+        answer: str,
+        source_message_id: int | None = None,
+        category: str = "general",
+    ) -> None:
+        body: dict[str, Any] = {
+            "question": question,
+            "answer": answer,
+            "category": category,
+        }
+        if source_message_id is not None:
+            body["sourceMessageId"] = source_message_id
+        await self.post_json("/internal/search/knowledge/faqCandidate", body)
+
 
 java_internal_client = JavaInternalClient()

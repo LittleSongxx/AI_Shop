@@ -89,6 +89,15 @@
         @keydown="onTextareaKeydown"
       />
       <button
+        type="button"
+        class="btn-human btn-send-native"
+        aria-label="转人工客服"
+        :disabled="answering"
+        @click="requestHumanSupport"
+      >
+        人工
+      </button>
+      <button
         v-if="!answering"
         type="button"
         class="btn-send btn-send-native"
@@ -382,6 +391,18 @@ const sendProductConsult = async () => {
   if (ok) {
     pendingProduct.value = null;
     clearAgentConsultProduct(currentUserId());
+  }
+};
+
+const requestHumanSupport = async () => {
+  if (answering.value) return;
+  const reason = input.value.trim();
+  const text = reason ? `转人工客服。原因：${reason}` : '转人工客服';
+  const ok = await dispatchSend(text);
+  if (ok) {
+    input.value = '';
+    adjustTextareaHeight();
+    toast.success('已提交人工客服请求');
   }
 };
 
@@ -736,6 +757,13 @@ onUnmounted(() => {
       color: $color-error;
       background: #fff;
       border: 1px solid $color-error-border;
+    }
+
+    &.btn-human {
+      min-width: 60px;
+      color: $color-primary;
+      background: #fff;
+      border: 1px solid rgba($color-primary, 0.32);
     }
   }
 }

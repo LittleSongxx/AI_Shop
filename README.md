@@ -272,7 +272,7 @@ cd Simlect-backend\Simlect-agent
 .\start-mcp.bat
 ```
 
-再启动 Agent HTTP/WebSocket（`:7050`）。Windows 可一键启动（自动创建 venv、按需装依赖、缺 `.env` 时从 `.env.example` 复制）：
+再启动 Agent HTTP/WebSocket（`:7050`）和 Agent Worker（消费 RabbitMQ 任务）。Windows 可一键启动 API：
 
 ```powershell
 cd Simlect-backend\Simlect-agent
@@ -287,14 +287,16 @@ cd Simlect-backend\Simlect-agent
 cd Simlect-backend\Simlect-agent
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -r requirements-runtime.txt
+pip install -r requirements.lock
 copy .env.example .env   # 填写 LLM_API_KEY、EMBEDDING_API_KEY 等
 python -m app.mcp_server
 # 另一终端：
 uvicorn app.main:app --host 0.0.0.0 --port 7050
+# 再开一个终端消费 Agent 任务：
+python -m app.worker
 ```
 
-健康检查：`GET http://127.0.0.1:7050/health`；MCP 端点：`http://127.0.0.1:7060/mcp`。
+Windows 可直接运行 `start-worker.bat` 启动消费者。健康检查中的 `worker` 必须为 `true`，否则 API 虽然存活，消息仍会停留在队列中。健康检查：`GET http://127.0.0.1:7050/health`；MCP 端点：`http://127.0.0.1:7060/mcp`。
 
 > **重要：** MCP 进程**无热重载**。修改 `mcp_tools_service` / `product_service` 等工具实现后，必须重启 `python -m app.mcp_server`（或 `start-mcp.bat`），否则 Agent 仍可能拿到旧逻辑。Agent 侧对 `SEARCH_PRODUCTS` 会再跑一遍本地实现作兜底，但 MCP 进程仍应保持与代码同步。
 

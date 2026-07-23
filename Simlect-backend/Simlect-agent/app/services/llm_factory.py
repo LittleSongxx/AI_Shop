@@ -3,16 +3,26 @@ from langchain_openai import ChatOpenAI
 from app.config.settings import Settings, get_settings
 
 
-def create_chat_llm() -> ChatOpenAI:
+def create_chat_llm(*, fallback: bool = False) -> ChatOpenAI:
 
     s = get_settings()
     _require_api_key(s.llm_api_key, "LLM_API_KEY")
+    model = s.llm_fallback_model if fallback else s.llm_model
     return ChatOpenAI(
         api_key=s.llm_api_key,
         base_url=s.llm_base_url,
-        model=s.llm_model,
+        model=model,
         timeout=s.llm_timeout,
+        max_retries=s.llm_max_retries,
         streaming=True,
+    )
+
+
+def has_fallback_chat_llm() -> bool:
+    s = get_settings()
+    return bool(
+        s.llm_fallback_model.strip()
+        and s.llm_fallback_model.strip() != s.llm_model.strip()
     )
 
 def create_memory_llm() -> ChatOpenAI:

@@ -125,6 +125,12 @@ export const agentApi = {
       '/agent/getProductConsultContext',
       {}
     ),
+  requestHuman: (reason?: string, sourceMessageId?: number) =>
+    request.postForm('/agent/requestHuman', { reason, sourceMessageId }),
+  cancelHuman: () => request.postForm('/agent/cancelHuman', {}),
+  humanStatus: () => request.postForm('/agent/humanStatus', {}),
+  feedback: (messageId: number, rating: 1 | -1, reason?: string, detail?: string) =>
+    request.postForm('/agent/feedback', { messageId, rating, reason, detail }),
   confirmAction: (actionToken: string) =>
     request.postForm<{ actionType?: string; success?: boolean; resultMessage?: string }>(
       '/agent/confirmAction',

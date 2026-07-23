@@ -98,6 +98,10 @@ spring:
               uri: lb://simlect-user
               predicates:
                 - Path=/internal/user/**
+            - id: internal-search
+              uri: lb://simlect-search
+              predicates:
+                - Path=/internal/search/**
             - id: admin-user
               uri: lb://simlect-user
               predicates:
@@ -137,7 +141,7 @@ spring:
             - id: admin-search
               uri: lb://simlect-search
               predicates:
-                - Path=/admin-api/rag/**,/admin-api/ragQuestion/**,/admin-api/ragSyncFailure/**,/admin-api/searchHotKeyword/**
+                - Path=/admin-api/rag/**,/admin-api/ragSyncFailure/**,/admin-api/searchHotKeyword/**,/admin-api/knowledge/**
               filters:
                 - RewritePath=/admin-api/(?<segment>.*), /admin/$\{segment}
             - id: admin-bff

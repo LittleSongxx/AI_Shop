@@ -1,4 +1,5 @@
 import json
+import random
 import time
 
 import redis.asyncio as aioredis
@@ -15,6 +16,8 @@ from app.constants import (
     REDIS_AGENT_HISTORY_CONDENSED,
     REDIS_AGENT_PENDING_ACTION,
     REDIS_AGENT_PENDING_MSG,
+    REDIS_AGENT_USER_LOCK,
+    REDIS_AGENT_WORKER_HEARTBEAT,
     REDIS_CANCEL_AGENT,
     REDIS_HEARTBEAT_TTL,
     REDIS_PROMPT,
@@ -116,6 +119,56 @@ class RedisService:
 
         await self.client.delete(f"{REDIS_AGENT_PENDING_MSG}{user_id}")
 
+    async def acquire_agent_user_lock(
+        self,
+        user_id: str,
+        owner: str,
+        ttl_seconds: int,
+    ) -> bool:
+        ok = await self.client.set(
+            f"{REDIS_AGENT_USER_LOCK}{user_id}",
+            owner,
+            nx=True,
+            ex=max(1, int(ttl_seconds)),
+        )
+        return bool(ok)
+
+    async def release_agent_user_lock(self, user_id: str, owner: str) -> None:
+        await self.client.eval(
+            """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+            """,
+            1,
+            f"{REDIS_AGENT_USER_LOCK}{user_id}",
+            owner,
+        )
+
+    async def set_worker_heartbeat(self, worker_id: str, ttl_seconds: int) -> None:
+        await self.client.setex(
+            REDIS_AGENT_WORKER_HEARTBEAT,
+            max(5, int(ttl_seconds)),
+            worker_id,
+        )
+
+    async def worker_is_alive(self) -> bool:
+        return await self.client.exists(REDIS_AGENT_WORKER_HEARTBEAT) > 0
+
+    async def clear_worker_heartbeat(self, worker_id: str) -> None:
+        await self.client.eval(
+            """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+            """,
+            1,
+            REDIS_AGENT_WORKER_HEARTBEAT,
+            worker_id,
+        )
+
     async def save_history_condensed(self, user_id: str, message_id: int, text: str) -> None:
 
         key = f"{REDIS_AGENT_HISTORY_CONDENSED}{user_id}:msg:{message_id}"
@@ -156,14 +209,35 @@ class RedisService:
         await self.client.delete(f"{REDIS_AGENT_PENDING_ACTION}lock:{token}")
 
     async def get_sensitive_words(self) -> list[dict]:
-
         raw = await self.client.get(REDIS_SENSITIVE_WORD_PAYLOAD)
         if not raw:
             return []
         try:
+            value = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return value if isinstance(value, list) else []
+
+    async def get_json(self, key: str):
+        raw = await self.client.get(key)
+        if not raw:
+            return None
+        try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            return []
+            return None
+
+    async def set_json(
+        self,
+        key: str,
+        value,
+        ttl_seconds: int,
+        jitter_seconds: int = 0,
+    ) -> None:
+        ttl = max(1, int(ttl_seconds))
+        if jitter_seconds > 0:
+            ttl += random.randint(0, int(jitter_seconds))
+        await self.client.setex(key, ttl, json.dumps(value, ensure_ascii=False))
 
     async def publish_ws(self, payload: dict) -> None:
 

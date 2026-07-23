@@ -9,5 +9,6 @@ echo "Ensure env loaded (SIMLECT_PRODUCTION_READY, SIMLECT_INTERNAL_TOKEN, ...)"
 echo "Starting gateway..."
 # java $JAVA_OPTS -jar "$BACKEND/Simlect-gateway/target/simlect-gateway-1.0.0.jar" &
 echo "Then start: user product stock cart coupon order pay logistics search admin"
-echo "Agent: cd $BACKEND/Simlect-agent && uvicorn app.main:app --host 0.0.0.0 --port 7050"
+echo "Agent API: cd $BACKEND/Simlect-agent && uvicorn app.main:app --host 0.0.0.0 --port 7050"
+echo "Agent worker: cd $BACKEND/Simlect-agent && python -m app.worker"
 echo "See deploy/GO_LIVE.md for full checklist."

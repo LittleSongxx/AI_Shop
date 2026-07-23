@@ -20,7 +20,7 @@ if not exist ".venv\Scripts\python.exe" (
 ".venv\Scripts\python.exe" -c "import mcp" 1>nul 2>nul
 if errorlevel 1 (
     echo [Simlect MCP] installing mcp deps...
-    call ".venv\Scripts\pip.exe" install -r requirements-runtime.txt -q
+    call ".venv\Scripts\pip.exe" install -r requirements.lock -q
     if errorlevel 1 (
         echo [error] pip install failed
         pause

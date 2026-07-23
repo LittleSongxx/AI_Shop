@@ -8,7 +8,7 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from app.config.settings import get_settings
 from app.domain.intent.classifier import resolve_intent
 from app.domain.intent.rules import looks_like_category_switch, looks_like_new_product_search
-from app.domain.intent.types import IntentKind
+from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
 from app.memory.context_builder import context_builder
@@ -16,6 +16,7 @@ from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
+from app.services.llm_factory import has_fallback_chat_llm
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.message_service import agent_message_service
 from app.services.product_service import is_similar_or_recommend_request
@@ -109,13 +110,23 @@ async def build_context_node(state: AgentGraphState) -> dict:
             "categoryId": card.get("categoryId"),
         }
 
-    intent, intent_source, intent_data = await resolve_intent(
-        user_id,
-        user_text,
-        from_product=from_product,
-        consult_card=consult_card,
-        message_card=card,
-    )
+    raw_decision = state["agent_msg"].get("intentDecision")
+    try:
+        decision = IntentDecision.model_validate(raw_decision) if raw_decision else None
+    except (TypeError, ValueError):
+        decision = None
+    if decision is None:
+        decision = await resolve_intent(
+            user_id,
+            user_text,
+            from_product=from_product,
+            consult_card=consult_card,
+            message_card=card,
+            unresolved_count=int(state["agent_msg"].get("unresolvedCount") or 0),
+        )
+    intent = decision.intent
+    intent_source = decision.source
+    intent_data = decision.data
 
     _keep_intent = {
         IntentKind.QUERY_ORDER,
@@ -131,6 +142,13 @@ async def build_context_node(state: AgentGraphState) -> dict:
     if (switching_away or category_switch_search) and intent not in _keep_intent:
         intent = IntentKind.PRODUCT_SEARCH
         intent_source = "category_switch"
+        decision = decision.model_copy(
+            update={
+                "intent": intent,
+                "source": intent_source,
+                "next_action": NextAction.TOOL,
+            }
+        )
     faq_text = ""
     knowledge_text = ""
     if intent in (IntentKind.PRODUCT_CONSULT, IntentKind.CHAT):
@@ -222,6 +240,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "category_switch_search": category_switch_search,
         "intent": intent.value,
         "intent_data": intent_data or None,
+        "intent_decision": decision.model_dump(mode="json"),
         "react_round": 0,
         "pending_tool_calls": [],
         "route": "agent_loop",
@@ -450,8 +469,9 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         and intent_name in _TOOL_REQUIRED_INTENTS
         and not state.get("search_fallback_done")
     )
+    non_stream_turn = similar_first_turn or category_switch_first_turn or tool_required_first_turn
     try:
-        if similar_first_turn or category_switch_first_turn or tool_required_first_turn:
+        if non_stream_turn:
             response = await llm.ainvoke(messages)
         else:
             response = await rt.stream_llm_turn(
@@ -462,11 +482,44 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                 agent_msg.get("userMessage"),
                 turn_chunks,
             )
-    except Exception as e:
-        logger.warning("llm_turn_failed", error=str(e), error_type=type(e).__name__)
-        await rt.push_chat_error(agent_msg, "agent", "".join(state.get("chunks") or []))
-        await redis_service.clear_bound_message_id(user_id)
-        return {"finished": True, "route": "end"}
+    except Exception as primary_error:
+        response = None
+        can_retry = not turn_chunks and has_fallback_chat_llm()
+        logger.warning(
+            "llm_turn_failed",
+            error=str(primary_error),
+            error_type=type(primary_error).__name__,
+            retry_fallback=can_retry,
+        )
+        if can_retry:
+            try:
+                fallback_llm = rt.bind_agent_llm(fallback=True)
+                if non_stream_turn:
+                    response = await fallback_llm.ainvoke(messages)
+                else:
+                    response = await rt.stream_llm_turn(
+                        fallback_llm,
+                        messages,
+                        user_id,
+                        message_id,
+                        agent_msg.get("userMessage"),
+                        turn_chunks,
+                    )
+                logger.info(
+                    "llm_fallback_succeeded",
+                    fallback_model=settings.llm_fallback_model,
+                )
+            except Exception as fallback_error:
+                logger.warning(
+                    "llm_fallback_failed",
+                    error=str(fallback_error),
+                    error_type=type(fallback_error).__name__,
+                )
+        if response is None:
+            partial = "".join((state.get("chunks") or []) + turn_chunks)
+            await rt.push_chat_error(agent_msg, "agent", partial)
+            await redis_service.clear_bound_message_id(user_id)
+            return {"finished": True, "route": "end"}
 
     if response is None:
         partial = "".join((state.get("chunks") or []) + turn_chunks)

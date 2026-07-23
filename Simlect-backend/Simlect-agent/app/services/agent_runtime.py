@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 
 import structlog
 
@@ -14,7 +15,7 @@ from app.harness.guardrails.product_text_guard import (
     text_contains_product_info,
     text_promises_product_cards,
 )
-from app.harness.metrics.runtime_sensors import STREAM_TOKENS
+from app.harness.metrics.runtime_sensors import LLM_LATENCY, STREAM_TOKENS
 from app.mcp.tools import build_mcp_tools
 from app.services.llm_factory import create_chat_llm
 from app.services.message_service import agent_message_service
@@ -103,21 +104,27 @@ async def stream_llm_turn(
     user_message: str | None,
     chunks: list[str],
 ):
+    started = time.perf_counter()
     gathered = None
     sent_visible = ""
-    async for chunk in llm.astream(messages):
-        if await is_cancelled(user_id, message_id):
-            return None
-        gathered = chunk if gathered is None else gathered + chunk
-        visible = strip_embedded_product_json(strip_emojis(chunk_text(gathered.content)))
-        delta = visible[len(sent_visible) :]
-        sent_visible = visible
-        if not delta:
-            continue
-        chunks.append(delta)
-        STREAM_TOKENS.inc(len(delta))
-        await stream_service.push_chunk(user_id, message_id, delta, user_message)
-    return gathered
+    try:
+        async for chunk in llm.astream(messages):
+            if await is_cancelled(user_id, message_id):
+                return None
+            gathered = chunk if gathered is None else gathered + chunk
+            visible = strip_embedded_product_json(
+                strip_emojis(chunk_text(gathered.content))
+            )
+            delta = visible[len(sent_visible) :]
+            sent_visible = visible
+            if not delta:
+                continue
+            chunks.append(delta)
+            STREAM_TOKENS.inc(len(delta))
+            await stream_service.push_chunk(user_id, message_id, delta, user_message)
+        return gathered
+    finally:
+        LLM_LATENCY.observe(max(0.0, time.perf_counter() - started))
 
 def _strip_emojis_from_assistant(assistant: str) -> str:
     text = (assistant or "").strip()
@@ -523,8 +530,8 @@ async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") 
         message_id, partial or "服务异常", prompt_type, None
     )
 
-def bind_agent_llm():
-    return create_chat_llm().bind_tools(build_mcp_tools())
+def bind_agent_llm(*, fallback: bool = False):
+    return create_chat_llm(fallback=fallback).bind_tools(build_mcp_tools())
 
 def parse_agent_message(agent_msg: dict) -> tuple[dict | None, str]:
     return parse_consult_card(agent_msg.get("userMessage") or "")

@@ -24,6 +24,10 @@ public class RagQuestionQuery extends BaseParam {
 
 	private String createTimeEnd;
 
+	private String category;
+
+	private String publishStatus;
+
 	public void setQuestionId(Integer questionId){
 		this.questionId = questionId;
 	}
@@ -101,6 +105,22 @@ public class RagQuestionQuery extends BaseParam {
 
 	public String getCreateTimeEnd(){
 		return this.createTimeEnd;
+	}
+
+	public String getCategory() {
+		return category;
+	}
+
+	public void setCategory(String category) {
+		this.category = category;
+	}
+
+	public String getPublishStatus() {
+		return publishStatus;
+	}
+
+	public void setPublishStatus(String publishStatus) {
+		this.publishStatus = publishStatus;
 	}
 
 }

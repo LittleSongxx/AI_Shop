@@ -15,12 +15,26 @@
 		<result column="answer" property="answer"  />
 		<!--创建时间-->
 		<result column="create_time" property="createTime"  />
+		<result column="category" property="category" />
+		<result column="language" property="language" />
+		<result column="channel" property="channel" />
+		<result column="priority" property="priority" />
+		<result column="version" property="version" />
+		<result column="effective_start" property="effectiveStart" />
+		<result column="effective_end" property="effectiveEnd" />
+		<result column="publish_status" property="publishStatus" />
+		<result column="source" property="source" />
+		<result column="owner" property="owner" />
+		<result column="hit_count" property="hitCount" />
+		<result column="update_time" property="updateTime" />
 	</resultMap>
 
 
 	<!-- 通用查询结果列-->
 	<sql id="base_column_list">
-		 r.question_id,r.question,r.similar_question,r.answer,r.create_time
+		 r.question_id,r.question,r.similar_question,r.answer,r.create_time,
+		 r.category,r.language,r.channel,r.priority,r.version,r.effective_start,
+		 r.effective_end,r.publish_status,r.source,r.owner,r.hit_count,r.update_time
 		 
 	</sql>
 
@@ -39,6 +53,12 @@
 			</if>
 			<if test="query.createTime != null and query.createTime!=''">
 				 <![CDATA[ and  r.create_time=str_to_date(#{query.createTime}, '%Y-%m-%d %H:%i:%s') ]]>
+			</if>
+			<if test="query.category != null and query.category!=''">
+				 and r.category = #{query.category}
+			</if>
+			<if test="query.publishStatus != null and query.publishStatus!=''">
+				 and r.publish_status = #{query.publishStatus}
 			</if>
 	</sql>
 

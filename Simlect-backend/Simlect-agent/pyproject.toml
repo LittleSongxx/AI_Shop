@@ -35,6 +35,9 @@ dependencies = [
   "websockets>=13,<16",
 ]
 
+[project.scripts]
+ai-shop-agent-worker = "app.worker:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3,<9",

@@ -146,6 +146,7 @@ CREATE TABLE agent_task
     status             varchar(16)                         NOT NULL,
     retry_count        int DEFAULT 0                       NOT NULL,
     deadline_at        datetime                            NULL,
+    payload_json       json                                NOT NULL,
     error_message      varchar(512)                        NULL,
     created_at         datetime DEFAULT CURRENT_TIMESTAMP  NOT NULL,
     updated_at         datetime DEFAULT CURRENT_TIMESTAMP  NOT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -210,6 +211,7 @@ CREATE TABLE user_recommend_event
 USE simlect_search;
 
 ALTER TABLE rag_question
+    ADD COLUMN normalized_question varchar(300) NULL,
     ADD COLUMN category varchar(64) DEFAULT 'general' NOT NULL,
     ADD COLUMN language varchar(16) DEFAULT 'zh-CN' NOT NULL,
     ADD COLUMN channel varchar(32) DEFAULT 'all' NOT NULL,
@@ -222,7 +224,15 @@ ALTER TABLE rag_question
     ADD COLUMN owner varchar(100) NULL,
     ADD COLUMN hit_count bigint DEFAULT 0 NOT NULL,
     ADD COLUMN update_time datetime DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP,
-    ADD INDEX idx_rag_publish (publish_status, effective_start, effective_end, priority);
+    ADD INDEX idx_rag_publish (publish_status, effective_start, effective_end, priority),
+    ADD INDEX idx_rag_exact (normalized_question, language, channel, publish_status);
+
+UPDATE rag_question
+SET normalized_question = LOWER(
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        question, ' ', ''), '，', ''), '。', ''), '？', ''), '?', ''), '！', '')
+    )
+WHERE normalized_question IS NULL;
 
 CREATE TABLE knowledge_document
 (
@@ -279,6 +289,7 @@ CREATE TABLE faq_candidate
 (
     candidate_id       bigint AUTO_INCREMENT PRIMARY KEY,
     question           varchar(300)                        NOT NULL,
+    normalized_hash    varchar(64)                         NOT NULL,
     answer             text                                NOT NULL,
     category           varchar(64) DEFAULT 'general'       NOT NULL,
     source_message_id  int                                 NULL,
@@ -288,6 +299,7 @@ CREATE TABLE faq_candidate
     review_remark      varchar(500)                        NULL,
     created_at         datetime DEFAULT CURRENT_TIMESTAMP  NOT NULL,
     updated_at         datetime DEFAULT CURRENT_TIMESTAMP  NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_faq_candidate_hash UNIQUE (normalized_hash),
     KEY idx_faq_candidate_status (status, frequency, created_at)
 ) COMMENT 'human-reviewed FAQ candidates' CHARSET = utf8mb4;
 

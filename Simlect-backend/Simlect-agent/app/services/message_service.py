@@ -9,6 +9,7 @@ from app.constants import (
     MSG_STATUS_NORMAL,
 )
 from app.db.pool import acquire
+from app.domain.intent.types import IntentDecision, NextAction
 from app.memory.assistant_condense import (
     schedule_assistant_condense,
     truncate_assistant_for_history,
@@ -19,24 +20,98 @@ from app.utils.biz_payload import trim_assistant
 
 class AgentMessageService:
 
-    async def save_user_message(self, user_id: str, message: str) -> dict:
+    async def save_user_message(
+        self,
+        user_id: str,
+        message: str,
+        *,
+        decision: IntentDecision | None = None,
+        previous_unresolved_count: int = 0,
+        queue_name: str | None = None,
+        session_id: str | None = None,
+        trace_id: str | None = None,
+    ) -> dict:
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        unresolved_count = _next_unresolved_count(
+            decision, previous_unresolved_count
+        )
 
         async with acquire() as cur:
             await cur.execute(
-                "INSERT INTO agent_message (user_message, send_time, user_id, status) VALUES (%s, %s, %s, %s)",
-                (message, now, user_id, MSG_STATUS_NORMAL),
+                """
+                INSERT INTO agent_message
+                    (user_message, send_time, user_id, status, session_id, intent,
+                     intent_confidence, sentiment, urgency, risk_level, trace_id,
+                     unresolved_count, queue_name)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    message,
+                    now,
+                    user_id,
+                    MSG_STATUS_NORMAL,
+                    session_id,
+                    decision.intent.value if decision else None,
+                    decision.confidence if decision else None,
+                    decision.sentiment.value if decision else None,
+                    decision.urgency.value if decision else None,
+                    decision.risk_level.value if decision else None,
+                    trace_id,
+                    unresolved_count,
+                    queue_name,
+                ),
             )
             message_id = cur.lastrowid
 
-        return {
+        result = {
             "messageId": message_id,
             "userId": user_id,
             "userMessage": message,
             "status": MSG_STATUS_NORMAL,
             "sendTime": now,
+            "sessionId": session_id,
+            "traceId": trace_id,
+            "queueName": queue_name,
+            "unresolvedCount": unresolved_count,
         }
+        if decision:
+            result["intentDecision"] = decision.model_dump(mode="json")
+            result.update(_decision_to_public_fields(decision))
+        return result
+
+    async def update_decision(
+        self,
+        message_id: int,
+        decision: IntentDecision,
+        unresolved_count: int | None = None,
+    ) -> None:
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                UPDATE agent_message
+                SET intent=%s, intent_confidence=%s, sentiment=%s, urgency=%s,
+                    risk_level=%s,
+                    unresolved_count=COALESCE(%s, unresolved_count)
+                WHERE message_id=%s
+                """,
+                (
+                    decision.intent.value,
+                    decision.confidence,
+                    decision.sentiment.value,
+                    decision.urgency.value,
+                    decision.risk_level.value,
+                    unresolved_count,
+                    message_id,
+                ),
+            )
+
+    async def bind_session(self, message_id: int, session_id: str) -> None:
+        async with acquire() as cur:
+            await cur.execute(
+                "UPDATE agent_message SET session_id=%s WHERE message_id=%s",
+                (session_id, message_id),
+            )
 
     async def complete_message(
         self,
@@ -44,22 +119,54 @@ class AgentMessageService:
         assistant_message: str,
         biz_type: str | None = None,
         biz_data: str | None = None,
+        source_refs: list[dict] | dict | None = None,
+        latency_ms: int | None = None,
     ) -> None:
 
         trimmed = trim_assistant(assistant_message)
+        source_refs_json = (
+            json.dumps(source_refs, ensure_ascii=False)
+            if source_refs is not None
+            else None
+        )
         async with acquire() as cur:
 
             rows = await cur.execute(
-                """UPDATE agent_message SET assistant_message=%s, biz_type=%s, biz_data=%s, status=%s
+                """UPDATE agent_message
+                   SET assistant_message=%s, biz_type=%s, biz_data=%s,
+                       source_refs=%s,
+                       latency_ms=COALESCE(%s, TIMESTAMPDIFF(MICROSECOND, send_time, NOW()) DIV 1000),
+                       status=%s
                    WHERE message_id=%s AND status=%s""",
-                (trimmed, biz_type, biz_data, MSG_STATUS_COMPLETE, message_id, MSG_STATUS_NORMAL),
+                (
+                    trimmed,
+                    biz_type,
+                    biz_data,
+                    source_refs_json,
+                    latency_ms,
+                    MSG_STATUS_COMPLETE,
+                    message_id,
+                    MSG_STATUS_NORMAL,
+                ),
             )
             if rows == 0:
 
                 await cur.execute(
-                    """UPDATE agent_message SET assistant_message=%s, biz_type=%s, biz_data=%s, status=%s
+                    """UPDATE agent_message
+                       SET assistant_message=%s, biz_type=%s, biz_data=%s,
+                           source_refs=%s,
+                           latency_ms=COALESCE(%s, TIMESTAMPDIFF(MICROSECOND, send_time, NOW()) DIV 1000),
+                           status=%s
                        WHERE message_id=%s""",
-                    (trimmed, biz_type, biz_data, MSG_STATUS_COMPLETE, message_id),
+                    (
+                        trimmed,
+                        biz_type,
+                        biz_data,
+                        source_refs_json,
+                        latency_ms,
+                        MSG_STATUS_COMPLETE,
+                        message_id,
+                    ),
                 )
 
     async def cancel_message(self, user_id: str, message_id: int) -> None:
@@ -108,7 +215,7 @@ class AgentMessageService:
             count_row = await cur.fetchone()
             total = count_row["cnt"] if count_row else 0
             await cur.execute(
-                f"""SELECT message_id, assistant_message, user_message, send_time, user_id, status, biz_type, biz_data
+                f"""SELECT {_MESSAGE_SELECT_COLUMNS}
                     FROM agent_message WHERE {where} ORDER BY message_id DESC LIMIT %s OFFSET %s""",
                 params + [page_size, offset],
             )
@@ -198,11 +305,40 @@ class AgentMessageService:
             row = await cur.fetchone()
         return row["cnt"] if row else 0
 
+    async def get_unresolved_count(self, user_id: str) -> int:
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT unresolved_count
+                FROM agent_message
+                WHERE user_id=%s
+                ORDER BY message_id DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = await cur.fetchone()
+        return int(row.get("unresolved_count") or 0) if row else 0
+
+    async def get_message_for_task(self, message_id: int) -> dict | None:
+        async with acquire() as cur:
+            await cur.execute(
+                f"""
+                SELECT {_MESSAGE_SELECT_COLUMNS}
+                FROM agent_message
+                WHERE message_id=%s
+                """,
+                (message_id,),
+            )
+            row = await cur.fetchone()
+        return _row_to_dict(row) if row else None
+
     async def admin_load_messages(
         self,
         page_no: int = 1,
         page_size: int = 15,
         user_id: str | None = None,
+        biz_type: str | None = None,
     ) -> dict:
 
         page_no = max(int(page_no or 1), 1)
@@ -213,12 +349,15 @@ class AgentMessageService:
         if user_id:
             where += " AND user_id=%s"
             params.append(user_id)
+        if biz_type:
+            where += " AND biz_type=%s"
+            params.append(biz_type)
         async with acquire() as cur:
             await cur.execute(f"SELECT COUNT(*) AS cnt FROM agent_message WHERE {where}", params)
             count_row = await cur.fetchone()
             total = count_row["cnt"] if count_row else 0
             await cur.execute(
-                f"""SELECT message_id, assistant_message, user_message, send_time, user_id, status, biz_type, biz_data
+                f"""SELECT {_MESSAGE_SELECT_COLUMNS}
                     FROM agent_message WHERE {where}
                     ORDER BY message_id DESC LIMIT %s OFFSET %s""",
                 params + [page_size, offset],
@@ -237,7 +376,7 @@ class AgentMessageService:
 
         async with acquire() as cur:
             await cur.execute(
-                """SELECT message_id, assistant_message, user_message, send_time, user_id, status, biz_type, biz_data
+                f"""SELECT {_MESSAGE_SELECT_COLUMNS}
                    FROM agent_message WHERE message_id=%s""",
                 (message_id,),
             )
@@ -264,7 +403,64 @@ def _row_to_dict(row: dict) -> dict:
         "status": row["status"],
         "bizType": row.get("biz_type"),
         "bizData": row.get("biz_data"),
+        "sessionId": row.get("session_id"),
+        "intent": row.get("intent"),
+        "intentConfidence": (
+            float(row["intent_confidence"])
+            if row.get("intent_confidence") is not None
+            else None
+        ),
+        "sentiment": row.get("sentiment"),
+        "urgency": row.get("urgency"),
+        "riskLevel": row.get("risk_level"),
+        "traceId": row.get("trace_id"),
+        "sourceRefs": _json_value(row.get("source_refs")),
+        "latencyMs": row.get("latency_ms"),
+        "unresolvedCount": int(row.get("unresolved_count") or 0),
+        "queueName": row.get("queue_name"),
     }
+
+_MESSAGE_SELECT_COLUMNS = """
+    message_id, assistant_message, user_message, send_time, user_id, status,
+    biz_type, biz_data, session_id, intent, intent_confidence, sentiment,
+    urgency, risk_level, trace_id, source_refs, latency_ms, unresolved_count,
+    queue_name
+"""
+
+
+def _next_unresolved_count(
+    decision: IntentDecision | None, previous_unresolved_count: int
+) -> int:
+    if not decision:
+        return 0
+    unresolved = decision.next_action in {
+        NextAction.ASK_CLARIFICATION,
+        NextAction.HANDOFF_SUGGESTED,
+    } or decision.handoff_reason == "REPEATED_UNRESOLVED"
+    return max(0, previous_unresolved_count) + 1 if unresolved else 0
+
+
+def _decision_to_public_fields(decision: IntentDecision) -> dict:
+    return {
+        "intent": decision.intent.value,
+        "intentConfidence": decision.confidence,
+        "sentiment": decision.sentiment.value,
+        "urgency": decision.urgency.value,
+        "riskLevel": decision.risk_level.value,
+        "nextAction": decision.next_action.value,
+        "handoffReason": decision.handoff_reason,
+        "entities": decision.entities,
+    }
+
+
+def _json_value(value):
+    if isinstance(value, (dict, list)) or value is None:
+        return value
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
 
 agent_message_service = AgentMessageService()
 

@@ -158,6 +158,9 @@ public class ProductInternalService {
         ProductRagIndexVO vo = new ProductRagIndexVO();
         vo.setProductId(product.getProductId());
         vo.setProductName(product.getProductName());
+        vo.setProductDesc(product.getProductDesc());
+        vo.setCategoryId(product.getCategoryId());
+        vo.setParentCategoryId(product.getpCategoryId());
         vo.setStatus(product.getStatus());
 
         ProductPropertyValueQuery propertyValueQuery = new ProductPropertyValueQuery();
@@ -172,6 +175,10 @@ public class ProductInternalService {
                 item.setPropertyName(pv.getPropertyName());
                 item.setPropertyValue(pv.getPropertyValue());
                 propertyVos.add(item);
+                if (vo.getBrand() == null && pv.getPropertyName() != null
+                        && pv.getPropertyName().contains("品牌")) {
+                    vo.setBrand(pv.getPropertyValue());
+                }
             }
         }
         vo.setPropertyValues(propertyVos);

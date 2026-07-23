@@ -28,7 +28,7 @@ if not exist ".venv\Scripts\python.exe" (
 
 if not exist ".venv\Scripts\uvicorn.exe" (
     echo [Simlect Agent] installing deps first time, may be slow...
-    call ".venv\Scripts\pip.exe" install -r requirements-runtime.txt -q
+    call ".venv\Scripts\pip.exe" install -r requirements.lock -q
     if errorlevel 1 (
         echo [error] pip install failed
         pause
