@@ -2,9 +2,11 @@ from langchain_openai import ChatOpenAI
 
 from app.config.settings import Settings, get_settings
 
+
 def create_chat_llm() -> ChatOpenAI:
 
     s = get_settings()
+    _require_api_key(s.llm_api_key, "LLM_API_KEY")
     return ChatOpenAI(
         api_key=s.llm_api_key,
         base_url=s.llm_base_url,
@@ -17,6 +19,7 @@ def create_memory_llm() -> ChatOpenAI:
 
     s = get_settings()
     api_key, base_url, model, timeout = _resolve_memory_llm_config(s)
+    _require_api_key(api_key, "MEMORY_LLM_API_KEY or LLM_API_KEY")
     return ChatOpenAI(
         api_key=api_key,
         base_url=base_url,
@@ -37,3 +40,8 @@ def _resolve_memory_llm_config(s: Settings) -> tuple[str, str, str, int]:
 def create_llm() -> ChatOpenAI:
 
     return create_chat_llm()
+
+
+def _require_api_key(value: str, setting_name: str) -> None:
+    if not value.strip():
+        raise ValueError(f"{setting_name} is required before creating an LLM client")

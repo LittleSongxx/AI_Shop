@@ -3,12 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langgraph.graph import END
 
 from app.constants import MSG_STATUS_NORMAL
 from app.graph.builder import build_agent_graph
 from app.graph.runner import _should_resume
 from app.graph.state import initial_state, thread_id_for
+
 
 def test_graph_compiles():
     graph = build_agent_graph()

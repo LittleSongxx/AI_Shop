@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+
 def test_load_history_without_token_returns_901_json():
     client = TestClient(app)
     resp = client.post("/api/agent/loadHistoryMessage")

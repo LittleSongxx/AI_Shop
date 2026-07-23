@@ -8,6 +8,7 @@ from app.constants import REDIS_TOKEN_WEB, TOKEN_COOKIE_NAME, TOKEN_HEADER_NAME
 from app.exceptions import BusinessException
 from app.services.redis_service import redis_service
 
+
 @dataclass
 class TokenUserInfo:
 

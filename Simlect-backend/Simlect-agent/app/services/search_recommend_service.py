@@ -1,6 +1,7 @@
+import structlog
+
 from app.services.java_internal_client import java_internal_client
 from app.utils.biz_payload import first_cover
-import structlog
 
 logger = structlog.get_logger()
 

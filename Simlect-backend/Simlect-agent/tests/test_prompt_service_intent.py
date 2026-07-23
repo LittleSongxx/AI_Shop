@@ -1,7 +1,8 @@
 import pytest
 
 from app.domain.intent.types import IntentKind
-from app.services.prompt_service import _safe_format, build_agent_system_prompt
+from app.services.prompt_service import build_agent_system_prompt
+
 
 @pytest.mark.asyncio
 async def test_build_agent_system_prompt_includes_global_and_intent(monkeypatch):

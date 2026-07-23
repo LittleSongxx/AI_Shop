@@ -1,4 +1,5 @@
 import re
+
 import structlog
 
 from app.constants import PRODUCT_CANDIDATE_SIZE, PRODUCT_RESULT_SIZE, PRODUCT_STATUS_ON_SALE

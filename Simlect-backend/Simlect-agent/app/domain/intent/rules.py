@@ -73,7 +73,6 @@ def looks_like_category_switch(user_text: str, consult_product_name: str | None 
     t = (user_text or "").strip()
     if not t:
         return False
-    tl = t.lower()
     if any(h in t for h in _SWITCH_HINTS):
         return True
 

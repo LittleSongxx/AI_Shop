@@ -3,10 +3,10 @@ from __future__ import annotations
 import structlog
 
 from app.constants import MSG_STATUS_NORMAL
+from app.db.pool import acquire
 from app.graph.builder import get_compiled_graph
 from app.graph.checkpoint.redis_saver import get_checkpointer
 from app.graph.state import initial_state, thread_id_for
-from app.db.pool import acquire
 from app.services.agent_runtime import parse_agent_message
 from app.services.redis_service import redis_service
 

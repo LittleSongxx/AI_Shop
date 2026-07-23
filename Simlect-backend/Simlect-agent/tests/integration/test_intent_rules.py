@@ -5,6 +5,7 @@ from app.domain.intent.rules import (
     looks_like_new_product_search,
 )
 
+
 def test_browse_recommend_keywords():
     assert looks_like_browse_recommend("根据浏览记录推荐")
     assert looks_like_browse_recommend("根据我看过的推荐几款")

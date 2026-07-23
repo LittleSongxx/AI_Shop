@@ -1,13 +1,9 @@
 from contextlib import asynccontextmanager
 
 import structlog
-
 import uvicorn
-
 from fastapi import FastAPI, WebSocket
-
 from prometheus_client import make_asgi_app
-
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -15,17 +11,12 @@ from slowapi.util import get_remote_address
 
 from app.api.exception_handlers import business_exception_handler
 from app.api.routes import agent
-from app.exceptions import BusinessException
-
 from app.api.websocket import start_ws_listener, stop_ws_listener, websocket_endpoint
-
 from app.config.settings import get_settings
-
 from app.db.pool import close_pool, init_pool
-
-from app.services.health_service import health_service
-
+from app.exceptions import BusinessException
 from app.graph.checkpoint.redis_saver import close_checkpointer
+from app.services.health_service import health_service
 from app.services.redis_service import redis_service
 
 structlog.configure(
@@ -37,6 +28,7 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
+    get_settings().validate_runtime()
     await redis_service.connect()
     await init_pool()
     from app.memory.session_memory_service import session_memory_service

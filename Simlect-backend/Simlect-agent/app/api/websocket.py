@@ -7,6 +7,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.auth.token_service import get_user_by_token
 from app.constants import WS_MESSAGE_TOPIC_AGENT
 from app.services.redis_service import redis_service
+from app.utils.ws_token import resolve_ws_token as _resolve_ws_token
 
 logger = structlog.get_logger()
 
@@ -44,8 +45,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 _listener_task: asyncio.Task | None = None
-
-from app.utils.ws_token import resolve_ws_token as _resolve_ws_token
 
 async def _topic_listener(redis_client) -> None:
 

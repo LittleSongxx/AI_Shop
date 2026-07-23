@@ -16,6 +16,7 @@ from app.services.product_service import (
     is_vague_search_keyword,
 )
 
+
 def test_estimate_chinese_tokens():
     assert estimate_text_tokens("你好") == 4
     assert estimate_text_tokens("hello") >= 1

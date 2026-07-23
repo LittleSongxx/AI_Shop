@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class MessageSendDTO(BaseModel):
     message_id: int | None = Field(None, alias="messageId")
     user_id: str | None = Field(None, alias="userId")

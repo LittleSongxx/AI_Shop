@@ -5,7 +5,10 @@ import re
 
 import structlog
 
-from app.memory.assistant_condense import schedule_assistant_condense, truncate_assistant_for_history
+from app.memory.assistant_condense import (
+    schedule_assistant_condense,
+    truncate_assistant_for_history,
+)
 from app.memory.compress_service import compress_service
 from app.memory.models import SessionMemory
 from app.memory.session_memory_service import session_memory_service

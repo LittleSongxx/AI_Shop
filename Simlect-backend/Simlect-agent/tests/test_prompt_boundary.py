@@ -1,11 +1,11 @@
 from app.utils.prompt_boundary import (
     RULE_MARKER,
-    UNTRUSTED_INPUT_RULE,
     append_untrusted_rule,
     escape_xml,
     isolate_user_message,
     wrap_user_input,
 )
+
 
 def test_escape_xml():
     assert escape_xml("a<b>&\"c") == "a&lt;b&gt;&amp;&quot;c"

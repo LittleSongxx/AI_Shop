@@ -84,7 +84,12 @@ class McpToolRouter:
 
     def _to_mcp_args(self, tool_name: str, args: dict) -> dict:
         """Normalize to camelCase keys expected by MCP tool schemas."""
-        g = lambda *keys: next((args[k] for k in keys if k in args and args[k] is not None), None)
+        def g(*keys):
+            return next(
+                (args[key] for key in keys if key in args and args[key] is not None),
+                None,
+            )
+
         uid = g("userId", "user_id")
         if tool_name == "SEARCH_PRODUCTS":
             out = {"userId": uid, "keyword": g("keyword") or ""}

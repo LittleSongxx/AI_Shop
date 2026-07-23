@@ -6,6 +6,7 @@ from app.utils.biz_payload import (
     parse_product_search_message,
 )
 
+
 def test_strip_embedded_product_json():
     from app.utils.biz_payload import strip_embedded_product_json
 
@@ -107,8 +108,9 @@ def test_collect_act_token_ids_prefers_tool_message():
     assert ids[0] == tool_token
 
 def test_build_action_confirm_unavailable_payload():
-    from app.utils.biz_payload import build_action_confirm_unavailable_payload
     import json
+
+    from app.utils.biz_payload import build_action_confirm_unavailable_payload
 
     token = "act_" + "d" * 32
     raw, _ = build_action_confirm_unavailable_payload(token, "已生成提案", reason="wrong_user")

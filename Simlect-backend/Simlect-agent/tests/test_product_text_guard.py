@@ -8,6 +8,7 @@ from app.harness.guardrails.product_text_guard import (
 )
 from app.utils.biz_payload import build_product_search_message, parse_product_search_message
 
+
 def test_text_contains_product_listing():
     text = (
         "旺旺雪饼厚烧海苔385g—12元，经典零食\n"

@@ -6,24 +6,24 @@ import structlog
 from langchain_core.messages import SystemMessage, ToolMessage
 
 from app.config.settings import get_settings
+from app.domain.intent.classifier import resolve_intent
+from app.domain.intent.rules import looks_like_category_switch, looks_like_new_product_search
+from app.domain.intent.types import IntentKind
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
 from app.memory.context_builder import context_builder
 from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
-from app.services import agent_runtime as rt
-from app.services.message_service import agent_message_service
-from app.services.mcp_tool_router import mcp_tool_router
-from app.services.product_service import is_similar_or_recommend_request
-from app.domain.intent.classifier import resolve_intent
-from app.domain.intent.types import IntentKind
-from app.domain.intent.rules import looks_like_category_switch, looks_like_new_product_search
 from app.rag.retriever import rag_retriever
-from app.utils.product_consult import is_product_consult_turn
+from app.services import agent_runtime as rt
+from app.services.mcp_tool_router import mcp_tool_router
+from app.services.message_service import agent_message_service
+from app.services.product_service import is_similar_or_recommend_request
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.redis_service import redis_service
-from app.utils.order_ids import extract_order_id, extract_order_item_id, extract_refund_target_id
 from app.utils.biz_payload import is_order_cards_json, is_product_cards_json
+from app.utils.order_ids import extract_order_id, extract_order_item_id, extract_refund_target_id
+from app.utils.product_consult import is_product_consult_turn
 
 logger = structlog.get_logger()
 output_guard = OutputGuardrail()
@@ -647,7 +647,6 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
     }
 
 async def tools_node(state: AgentGraphState) -> dict:
-    agent_msg = state["agent_msg"]
     user_id = state["user_id"]
     message_id = state["message_id"]
     messages = list(state.get("llm_messages") or [])
@@ -741,7 +740,6 @@ async def tools_node(state: AgentGraphState) -> dict:
 async def finalize_node(state: AgentGraphState) -> dict:
     agent_msg = state["agent_msg"]
     user_id = state["user_id"]
-    message_id = state["message_id"]
 
     try:
         if state.get("cancelled"):

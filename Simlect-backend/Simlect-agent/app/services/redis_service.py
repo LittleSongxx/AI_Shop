@@ -1,13 +1,9 @@
 import json
-
 import time
-
-from typing import Any
 
 import redis.asyncio as aioredis
 
 from app.config.settings import get_settings
-
 from app.constants import (
     CANCEL_FLAG_TTL,
     CONSULT_ACTIVE_TTL,
@@ -16,9 +12,9 @@ from app.constants import (
     PENDING_MSG_TTL,
     REDIS_AGENT_CONSULT_ACTIVE,
     REDIS_AGENT_CONSULT_PRODUCT,
+    REDIS_AGENT_HISTORY_CONDENSED,
     REDIS_AGENT_PENDING_ACTION,
     REDIS_AGENT_PENDING_MSG,
-    REDIS_AGENT_HISTORY_CONDENSED,
     REDIS_CANCEL_AGENT,
     REDIS_HEARTBEAT_TTL,
     REDIS_PROMPT,
@@ -26,6 +22,7 @@ from app.constants import (
     REDIS_WS_USER_HEARTBEAT,
     WS_MESSAGE_TOPIC_AGENT,
 )
+
 
 class RedisService:
 

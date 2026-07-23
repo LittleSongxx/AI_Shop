@@ -1,5 +1,6 @@
-from app.config.settings import Settings
+from app.config.settings import Settings, get_settings
 from app.services.llm_factory import _resolve_memory_llm_config, create_chat_llm, create_memory_llm
+
 
 def test_memory_llm_falls_back_to_chat_config(monkeypatch):
     s = Settings(
@@ -30,8 +31,11 @@ def test_memory_llm_uses_dedicated_config(monkeypatch):
     assert model == "mem-model"
     assert timeout == 90
 
-def test_chat_and_memory_llm_streaming_flag():
+def test_chat_and_memory_llm_streaming_flag(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    get_settings.cache_clear()
     chat = create_chat_llm()
     memory = create_memory_llm()
     assert chat.streaming is True
     assert memory.streaming is False
+    get_settings.cache_clear()

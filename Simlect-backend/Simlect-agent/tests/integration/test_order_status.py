@@ -1,11 +1,11 @@
 from app.constants import (
     CONFIRM_RECEIPT_ORDER_STATUSES,
+    ORDER_STATUS_NAMES,
     REFUNDABLE_ORDER_STATUSES,
     REVIEWABLE_ORDER_STATUSES,
-    ORDER_STATUS_COMPLETED,
-    ORDER_STATUS_NAMES,
 )
 from app.utils.biz_payload import ORDER_STATUS_NAMES as BIZ_NAMES
+
 
 def test_order_status_names_java_parity():
     assert ORDER_STATUS_NAMES[7] == "部分退款"

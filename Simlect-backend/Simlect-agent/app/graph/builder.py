@@ -16,6 +16,7 @@ from app.graph.nodes import (
 from app.graph.state import AgentGraphState
 from app.services.redis_service import redis_service
 
+
 def _after_entry(state: AgentGraphState) -> str:
 
     if state.get("cancelled"):

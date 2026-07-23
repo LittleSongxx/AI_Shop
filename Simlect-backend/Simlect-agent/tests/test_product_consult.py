@@ -6,6 +6,7 @@ from app.utils.product_consult import (
     parse_consult_card,
 )
 
+
 def test_normalize_consult_card_camel_case():
     card = normalize_consult_card(
         {"productId": "100", "productName": "车充", "minPrice": 99, "categoryId": "9"}

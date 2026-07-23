@@ -3,12 +3,13 @@ from __future__ import annotations
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
+from app.domain.intent.types import IntentKind
 from app.memory.models import SessionMemory
 from app.memory.token_estimator import estimate_text_tokens
 from app.services.message_service import agent_message_service
-from app.domain.intent.types import IntentKind
 from app.services.prompt_service import build_agent_system_prompt
 from app.utils.prompt_boundary import isolate_user_message
+
 
 def _assistant_for_context(turn: dict) -> str:
 

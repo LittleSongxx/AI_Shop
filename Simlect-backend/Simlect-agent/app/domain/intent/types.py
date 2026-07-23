@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class IntentKind(str, Enum):
     PRODUCT_CONSULT = "PRODUCT_CONSULT"
     PRODUCT_SEARCH = "PRODUCT_SEARCH"

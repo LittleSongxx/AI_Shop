@@ -1,10 +1,9 @@
 from fastapi import Request
-
 from fastapi.responses import JSONResponse
 
 from app.exceptions import BusinessException
-
 from app.models.response import error
+
 
 async def business_exception_handler(_: Request, exc: BusinessException) -> JSONResponse:
 

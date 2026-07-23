@@ -1,5 +1,6 @@
 from app.constants import RRF_K
 
+
 def rrf_merge(keyword_ids: list[str], vector_ids: list[str], limit: int) -> list[str]:
 
     scores: dict[str, float] = {}

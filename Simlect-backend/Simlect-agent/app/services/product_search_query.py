@@ -94,7 +94,7 @@ _FILLERS = re.compile(
     r"看看|买点|来点|吃点|搜一下|搜索一下|搜索|"
     r"找找|找|买|要|吃)"
 )
-_PUNCT = re.compile(r"[的了吗呢啊哦呀呗嘛～~，。！？、；：""''\s]+")
+_PUNCT = re.compile(r"""[的了吗呢啊哦呀呗嘛～~，。！？、；：""''\s]+""")
 
 
 def normalize_product_search_query(text: str | None) -> str:

@@ -4,6 +4,7 @@ import json
 
 from app.services.product_snapshot_service import ProductSnapshotService
 
+
 def test_normalize_snapshot_keys_snake_to_camel():
     svc = ProductSnapshotService()
     raw = {

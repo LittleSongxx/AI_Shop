@@ -7,6 +7,7 @@ from app.domain.intent.classifier import (
 )
 from app.domain.intent.types import IntentKind
 
+
 def test_parse_intent_json():
     intent, data = _parse_intent_json('{"intentType":"REFUND","data":"oid1"}')
     assert intent == IntentKind.REFUND

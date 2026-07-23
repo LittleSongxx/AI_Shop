@@ -5,6 +5,7 @@ from app.constants import ORDER_ITEM_STATUS_NORMAL, REFUNDABLE_ORDER_STATUSES
 from app.services.java_internal_client import java_internal_client
 from app.utils.biz_payload import build_order_payload
 
+
 class OrderService:
 
     async def query_orders(self, user_id: str, order_id: str | None = None) -> tuple[str, str | None, str]:

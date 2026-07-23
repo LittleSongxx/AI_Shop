@@ -1,6 +1,6 @@
 import json
-
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from app.constants import (
     CONFIRM_RECEIPT_ORDER_STATUSES,
@@ -9,10 +9,12 @@ from app.constants import (
     REFUNDABLE_ORDER_STATUSES,
     REVIEWABLE_ORDER_STATUSES,
 )
-
 from app.services.java_internal_client import java_internal_client
 from app.services.order_service import order_service
 from app.services.pending_action_service import pending_action_service
+
+if TYPE_CHECKING:
+    from app.services.tool_invoke_result import ToolInvokeResult
 
 def _status_name(status: int | None) -> str:
 
@@ -392,8 +394,9 @@ async def tool_search_products(
 
 async def tool_query_orders(user_id: str, order_id: str | None = None) -> "ToolInvokeResult":
 
-    from app.services.tool_invoke_result import ToolInvokeResult
     import json
+
+    from app.services.tool_invoke_result import ToolInvokeResult
 
     assistant, biz_data, biz_type = await order_service.query_orders(user_id, order_id or None)
     if assistant == "[]":

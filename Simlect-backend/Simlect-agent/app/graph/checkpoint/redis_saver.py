@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pickle
-from collections import defaultdict
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
@@ -13,8 +12,6 @@ from langgraph.checkpoint.base import (
     Checkpoint,
     CheckpointMetadata,
     CheckpointTuple,
-    get_checkpoint_id,
-    get_checkpoint_metadata,
 )
 from langgraph.checkpoint.memory import InMemorySaver
 

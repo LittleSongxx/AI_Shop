@@ -1,5 +1,6 @@
 from app.services.redis_service import redis_service
 
+
 class SensitiveWordService:
 
     async def replace(self, text: str) -> str:

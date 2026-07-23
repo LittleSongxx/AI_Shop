@@ -3,6 +3,8 @@ import re
 from decimal import Decimal
 from typing import Any
 
+from app.constants import ORDER_STATUS_NAMES
+
 ASSISTANT_MESSAGE_MAX_LEN = 16000
 MAX_PRODUCT_SEARCH_INTRO_LEN = 12000
 MAX_ORDER_CARDS = 30
@@ -16,8 +18,6 @@ ACTION_LABELS = {
     "PRODUCT_REVIEW": ("提交评价", "确认提交评价", "评价提交后不可修改"),
     "RECOMMENT": ("提交追评", "确认提交追评", "追评提交后不可修改"),
 }
-
-from app.constants import ORDER_STATUS_NAMES
 
 def _json_default(obj: Any) -> Any:
 

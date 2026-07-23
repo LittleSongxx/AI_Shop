@@ -1,5 +1,4 @@
 import json
-import re
 
 CONSULT_PREFIX = "<<<PRODUCT_CONSULT>>>"
 CONSULT_SUFFIX = "<<<END_CARD>>>"

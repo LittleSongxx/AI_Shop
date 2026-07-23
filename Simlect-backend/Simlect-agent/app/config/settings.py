@@ -1,8 +1,8 @@
 from functools import lru_cache
 
 from pydantic import AliasChoices, Field
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
 
@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     app_host: str = "0.0.0.0"
     app_port: int = 7050
+    app_env: str = "development"
+    allow_development_auth_bypass: bool = False
     java_web_url: str = "http://localhost:8080"
     mcp_server_url: str = Field(
         default="http://127.0.0.1:7060",
@@ -91,6 +93,22 @@ class Settings(BaseSettings):
     intent_rule_fallback: bool = True
     order_query_lookback_days: int = 90
     force_mcp_on_llm_skip: bool = False
+
+    def validate_runtime(self) -> None:
+        if self.app_env.lower() != "production":
+            return
+
+        errors: list[str] = []
+        if not self.internal_token.strip() or self.internal_token == "your-token":
+            errors.append("SIMLECT_INTERNAL_TOKEN must be configured")
+        if not self.llm_api_key.strip():
+            errors.append("LLM_API_KEY must be configured")
+        if not self.embedding_api_key.strip():
+            errors.append("EMBEDDING_API_KEY must be configured")
+        if self.allow_development_auth_bypass:
+            errors.append("ALLOW_DEVELOPMENT_AUTH_BYPASS must be false")
+        if errors:
+            raise ValueError("Invalid production configuration: " + "; ".join(errors))
 
     @property
     def mysql_dsn(self) -> str:

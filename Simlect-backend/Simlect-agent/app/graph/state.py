@@ -1,5 +1,5 @@
 import operator
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict

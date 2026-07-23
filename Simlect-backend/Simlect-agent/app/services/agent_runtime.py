@@ -4,7 +4,6 @@ import json
 import re
 
 import structlog
-from app.services.llm_factory import create_chat_llm
 
 from app.harness.guardrails.output_guard import strip_emojis
 from app.harness.guardrails.product_text_guard import (
@@ -17,6 +16,7 @@ from app.harness.guardrails.product_text_guard import (
 )
 from app.harness.metrics.runtime_sensors import STREAM_TOKENS
 from app.mcp.tools import build_mcp_tools
+from app.services.llm_factory import create_chat_llm
 from app.services.message_service import agent_message_service
 from app.services.pending_action_service import pending_action_service
 from app.services.product_service import (

@@ -1,19 +1,21 @@
+import json
 from datetime import datetime
 
-import json
-
 from app.config.settings import get_settings
-
-from app.constants import MSG_STATUS_CANCEL, MSG_STATUS_COMPLETE, MSG_STATUS_INTERRUPTED, MSG_STATUS_NORMAL
-
+from app.constants import (
+    MSG_STATUS_CANCEL,
+    MSG_STATUS_COMPLETE,
+    MSG_STATUS_INTERRUPTED,
+    MSG_STATUS_NORMAL,
+)
 from app.db.pool import acquire
-
 from app.memory.assistant_condense import (
     schedule_assistant_condense,
     truncate_assistant_for_history,
 )
 from app.services.redis_service import redis_service
 from app.utils.biz_payload import trim_assistant
+
 
 class AgentMessageService:
 

@@ -5,7 +5,7 @@
 <script setup>
 import { getCurrentInstance, onMounted } from 'vue'
 import { useWebSocket } from '@vueuse/core'
-import { useMessageStore } from '@/stores/messagestore'
+import { useMessageStore } from '@/stores/messageStore'
 
 const { proxy } = getCurrentInstance()
 const messageStore = useMessageStore()

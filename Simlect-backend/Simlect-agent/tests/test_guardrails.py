@@ -1,6 +1,7 @@
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
 from app.harness.guardrails.tool_guard import ToolGuardrail
 
+
 def test_output_guard_act_token():
     guard = OutputGuardrail()
     valid = "请确认操作【act_" + "a" * 32 + "】"

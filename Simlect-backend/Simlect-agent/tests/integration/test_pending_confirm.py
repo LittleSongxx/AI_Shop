@@ -7,6 +7,7 @@ import pytest
 
 from app.services.pending_action_service import PendingActionService
 
+
 @pytest.fixture
 def service():
     return PendingActionService()
@@ -27,6 +28,9 @@ async def test_confirm_success_deletes_pending(service):
 
     with patch.object(service, "load_owned", AsyncMock(return_value=pending)):
         with patch("app.services.pending_action_service.redis_service") as redis:
+            redis.ensure_connected = AsyncMock()
+            redis.try_lock_pending_action = AsyncMock(return_value=True)
+            redis.unlock_pending_action = AsyncMock()
             redis.delete_pending_action = AsyncMock()
             action_type, ok, msg = await service.confirm("u1", "act_test", executor)
 
@@ -50,6 +54,9 @@ async def test_confirm_failure_keeps_pending(service):
 
     with patch.object(service, "load_owned", AsyncMock(return_value=pending)):
         with patch("app.services.pending_action_service.redis_service") as redis:
+            redis.ensure_connected = AsyncMock()
+            redis.try_lock_pending_action = AsyncMock(return_value=True)
+            redis.unlock_pending_action = AsyncMock()
             redis.delete_pending_action = AsyncMock()
             action_type, ok, msg = await service.confirm("u1", "act_fail", executor)
 
@@ -63,5 +70,9 @@ async def test_confirm_idempotent_on_processed(service):
     pending = {"token": "act_done", "userId": "u1", "status": 1}
 
     with patch.object(service, "load_owned", AsyncMock(return_value=pending)):
-        with pytest.raises(ValueError, match="已处理"):
-            await service.confirm("u1", "act_done", AsyncMock())
+        with patch("app.services.pending_action_service.redis_service") as redis:
+            redis.ensure_connected = AsyncMock()
+            redis.try_lock_pending_action = AsyncMock(return_value=True)
+            redis.unlock_pending_action = AsyncMock()
+            with pytest.raises(ValueError, match="已处理"):
+                await service.confirm("u1", "act_done", AsyncMock())
