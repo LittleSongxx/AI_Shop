@@ -35,6 +35,32 @@ create table if not exists order_item
     refund_order_id        varchar(32)    null comment '退款订单号'
 ) comment '订单明细表' collate = utf8mb4_general_ci row_format = DYNAMIC;
 
+create table if not exists refund_request
+(
+    refund_request_id       varchar(32)                         not null primary key,
+    refund_order_no         varchar(32)                         not null,
+    source_pay_order_id     varchar(32)                         not null,
+    order_id                varchar(32)                         not null,
+    order_item_id           varchar(40)                         not null,
+    user_id                 varchar(15)                         not null,
+    product_id              varchar(15)                         not null,
+    property_value_id_hash  varchar(32)                         not null,
+    buy_count               int                                 not null,
+    refund_amount           decimal(10, 2)                      not null,
+    pay_channel             varchar(20)                         null,
+    status                  varchar(32)                         not null comment 'PENDING_PAYMENT/PAYMENT_CONFIRMED/STOCK_PENDING/COMPLETED/MANUAL_REVIEW',
+    retry_count             int       default 0                 not null,
+    next_retry_time         datetime                            null,
+    last_error              varchar(512)                        null,
+    created_at              datetime  default current_timestamp not null,
+    updated_at              datetime  default current_timestamp not null on update current_timestamp,
+    payment_confirmed_at    datetime                            null,
+    completed_at            datetime                            null,
+    constraint uk_refund_order_no unique (refund_order_no),
+    constraint uk_refund_order_item unique (order_item_id),
+    key idx_refund_retry (status, next_retry_time)
+) comment '持久化退款 Saga' charset = utf8mb4;
+
 create table if not exists order_comment
 (
     order_id          varchar(32)       not null comment '订单ID' primary key,
@@ -90,11 +116,15 @@ create table if not exists local_message_outbox
     status            tinyint     default 0          not null comment '0待发送 1发送中 2已发送 3失败',
     retry_count       int         default 0          not null comment '重试次数',
     error_message     varchar(512)                   null comment '最近失败原因',
+    lease_owner       varchar(64)                    null comment '当前投递实例',
+    lease_until       datetime                       null comment '发送租约截止时间',
+    next_retry_time   datetime                       null comment '下次可重试时间',
     create_time       datetime                       not null comment '创建时间',
     update_time       datetime                       null comment '更新时间',
     sent_time         datetime                       null comment '成功发送时间',
     constraint uk_outbox_idempotency unique (idempotency_key),
-    key idx_outbox_status_ctime (status, create_time)
+    key idx_outbox_status_ctime (status, create_time),
+    key idx_outbox_dispatch (status, next_retry_time, lease_until, id)
 ) comment '本地消息 Outbox（事务后可靠投递）' charset = utf8mb4;
 
 create table if not exists mq_compensation_log

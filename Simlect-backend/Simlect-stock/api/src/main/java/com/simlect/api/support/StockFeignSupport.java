@@ -3,6 +3,7 @@ package com.simlect.api.support;
 import com.simlect.api.StockFeignClient;
 import com.simlect.api.dto.LessStockPageDTO;
 import com.simlect.api.dto.ProductIdDTO;
+import com.simlect.api.dto.RefundStockRestoreDTO;
 import com.simlect.api.dto.SkuStockBatchChangeDTO;
 import com.simlect.api.dto.SkuStockChangeDTO;
 import com.simlect.api.dto.SkuStockDTO;
@@ -53,6 +54,20 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         dto.setPropertyValueIdHash(propertyValueIdHash);
         dto.setChangeAmount(changeAmount);
         feignResponseSupport.run(() -> stockFeignClient.changeStock(dto), "库存变更失败");
+    }
+
+    public int restoreRefundStock(RefundStockRestoreDTO dto) {
+        StockChangeResultVO result = feignResponseSupport.call(
+                () -> stockFeignClient.restoreRefundStock(dto), "退款库存恢复失败");
+        return result == null || result.getAffectedRows() == null ? 0 : result.getAffectedRows();
+    }
+
+    public boolean isRefundStockApplied(String businessKey) {
+        RefundStockRestoreDTO dto = new RefundStockRestoreDTO();
+        dto.setBusinessKey(businessKey);
+        Boolean result = feignResponseSupport.call(
+                () -> stockFeignClient.isRefundStockApplied(dto), "查询退款库存恢复状态失败");
+        return Boolean.TRUE.equals(result);
     }
 
     public void setStock(String productId, String propertyValueIdHash, int stock) {

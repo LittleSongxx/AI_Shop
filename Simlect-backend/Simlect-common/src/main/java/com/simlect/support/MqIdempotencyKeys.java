@@ -7,12 +7,12 @@ public final class MqIdempotencyKeys {
     private MqIdempotencyKeys() {
     }
 
-    public static String ragProduct(String productId) {
-        return "rag:product:" + require(productId);
+    public static String ragProduct(String productId, long version) {
+        return "rag:product:" + require(productId) + ":v:" + version;
     }
 
-    public static String ragFaq(String questionId) {
-        return "rag:faq:" + require(questionId);
+    public static String ragFaq(String questionId, long version) {
+        return "rag:faq:" + require(questionId) + ":v:" + version;
     }
 
     public static String payTimeout(String orderId) {
@@ -29,6 +29,14 @@ public final class MqIdempotencyKeys {
 
     public static String payConfirm(String orderId) {
         return "pay:confirm:" + require(orderId);
+    }
+
+    public static String refundStock(String refundRequestId, int attempt) {
+        return "refund:stock:" + require(refundRequestId) + ":attempt:" + attempt;
+    }
+
+    public static String refundResult(String refundRequestId) {
+        return "refund:result:" + require(refundRequestId);
     }
 
     public static String browseRecord(String userId, String productId) {

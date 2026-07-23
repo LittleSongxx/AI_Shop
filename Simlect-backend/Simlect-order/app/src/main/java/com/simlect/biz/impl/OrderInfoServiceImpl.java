@@ -5,6 +5,7 @@ import com.simlect.api.enums.*;
 import com.simlect.api.support.*;
 import com.simlect.api.vo.*;
 import com.simlect.biz.OrderInfoService;
+import com.simlect.biz.RefundSagaService;
 import com.simlect.component.RedisComponent;
 import com.simlect.component.RemoteCompensateRecorder;
 import com.simlect.constants.Constants;
@@ -77,6 +78,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 
 	@Resource
 	private PayFeignSupport payFeignSupport;
+	@Resource
+	private RefundSagaService refundSagaService;
 
 	@Resource
 	private ReliableMessageSender reliableMessageSender;
@@ -1264,86 +1267,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	}
 
 	@Override
-	@Transactional(rollbackFor = Exception.class)
 	public void refund(OrderItem orderItem, String userId) {
-		if (orderItem == null){
-			throw new BusinessException("订单项不存在");
-		}
-		String orderId = orderItem.getOrderId();
-		OrderInfoQuery query = new OrderInfoQuery();
-		query.setOrderId(orderId);
-		query.setQueryItems(true);
-		List<OrderInfo> orderInfoList = orderInfoMapper.selectList(query);
-		if (orderInfoList == null || orderInfoList.isEmpty()) {
-			throw new BusinessException("订单不存在");
-		}
-		OrderInfo orderInfo = orderInfoList.get(0);
-		if (orderItem == null || !orderInfo.getUserId().equals(userId)){
-			throw new BusinessException("订单不存在");
-		}
-		// 只有订单状态为1:已付款,待发货，2:已发货，7:部分退款才可申请退款
-		if (orderInfo.getOrderStatus() != OrderStatusEnum.PAID.getStatus()
-				&& orderInfo.getOrderStatus() != OrderStatusEnum.SHIPPED.getStatus()
-				&& orderInfo.getOrderStatus() != OrderStatusEnum.PARTIALLY_REFUNDED.getStatus()
-				) {
-			throw new BusinessException("当前订单状态不能申请退款");
-		}
-		// 判断订单项状态为1正常才可退款
-		if (orderItem.getOrderItemStatus() != OrderItemStatusEnum.NORMAL.getStatus()) {
-			throw new BusinessException("当前订单项状态不能申请退款");
-		}
-		// 退款金额
-		 BigDecimal refundAmount = orderItem.getItemAmount();
-		 if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			 throw new BusinessException("退款金额不能小于0");
-		 }
-		 // 判断当前退款项是不是该订单的全部商品
-		// 若是则将订单状态改为已退款，否则改为部分退款
-		// 获取当前的orderInfo下的orderItem有几个是正常的状态的
-		int count = 0;
-		List<OrderItem> orderItemList = orderInfo.getOrderItemList();
-		if (orderItemList != null) {
-			for (OrderItem orderItem1 : orderItemList) {
-				if (orderItem1.getOrderItemStatus() == OrderItemStatusEnum.NORMAL.getStatus()) {
-					count++;
-				}
-			}
-		}
-		 // 将orderItem的状态改为已退款
-		 orderItem.setOrderItemStatus(OrderItemStatusEnum.REFUND.getStatus());
-		 // 计算要退的金额
-		 BigDecimal amount4Refund = orderItem.getItemAmount();
-		 // 生成30位的随机长度的refundOrderId
-		 String refundOrderId = StringTools.getRandomNumber(Constants.LENGTH_30);
-		 orderItem.setRefundOrderId(refundOrderId);
-		 // 退还库存（simlect_stock）
-		List<ProductItem> newList = new ArrayList<>();
-		ProductItem productItem = new ProductItem();
-		productItem.setProductId(orderItem.getProductId());
-		productItem.setPropertyValueIdHash(orderItem.getPropertyValueIdHash());
-		productItem.setBuyCount(orderItem.getBuyCount());
-		newList.add(productItem);
-		try {
-			stockFeignSupport.changeStockBatch(newList);
-		} catch (BusinessException e) {
-			throw new BusinessException("库存回滚失败，无法完成退款，请稍后重试");
-		}
-		OrderItemQuery updateQuery = new OrderItemQuery();
-		updateQuery.setOrderItemId(orderItem.getOrderItemId());
-		if (count == 1) {
-			orderInfo.setOrderStatus(OrderStatusEnum.REFUNDED.getStatus());
-		} else {
-			orderInfo.setOrderStatus(OrderStatusEnum.PARTIALLY_REFUNDED.getStatus());
-		}
-		orderItemMapper.updateByParam(orderItem, updateQuery);
-		orderInfoMapper.updateByParam(orderInfo, query);
-
-		// 操作支付宝退款
-		// public void refund(String sourcePayOrderId, String refundOrderId, BigDecimal refundAmount)
-		String sourcePayOrderId = orderInfo.getPayOrderId();
-		PayChannelEnum refundChannel = PayChannelEnum.resolve(orderInfo.getPayChannel());
-		payFeignSupport.refund(sourcePayOrderId, refundOrderId, amount4Refund,
-				refundChannel == null ? null : refundChannel.getPayScene());
+		refundSagaService.requestRefund(orderItem, userId);
 	}
 
 	@Override

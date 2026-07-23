@@ -75,10 +75,13 @@ create table if not exists local_message_outbox
     status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败',
     retry_count       int         default 0           not null comment '重试次数',
     error_message     varchar(512)                    null comment '最近失败原因',
+    lease_owner       varchar(64)                     null comment '当前投递实例',
+    lease_until       datetime                        null comment '发送租约截止时间',
+    next_retry_time   datetime                        null comment '下次可重试时间',
     create_time       datetime                        not null comment '创建时间',
     update_time       datetime                        null comment '更新时间',
     sent_time         datetime                        null comment '成功发送时间',
     constraint uk_outbox_idempotency unique (idempotency_key),
-    key idx_outbox_status_ctime (status, create_time)
+    key idx_outbox_status_ctime (status, create_time),
+    key idx_outbox_dispatch (status, next_retry_time, lease_until, id)
 ) comment '本地消息 Outbox' charset = utf8mb4;
-

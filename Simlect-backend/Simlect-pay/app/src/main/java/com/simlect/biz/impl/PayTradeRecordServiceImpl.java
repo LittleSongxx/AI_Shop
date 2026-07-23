@@ -9,6 +9,7 @@ import com.simlect.mappers.PayTradeRecordMapper;
 import com.simlect.biz.PayTradeRecordService;
 import com.simlect.utils.StringTools;
 import jakarta.annotation.Resource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,12 +34,6 @@ public class PayTradeRecordServiceImpl implements PayTradeRecordService {
         if (StringTools.isEmpty(payOrderId) || payAmount == null) {
             return;
         }
-        PayTradeRecordQuery exist = new PayTradeRecordQuery();
-        exist.setPayOrderId(payOrderId);
-        exist.setTradeStatus(STATUS_PENDING);
-        if (payTradeRecordMapper.selectCount(exist) > 0) {
-            return;
-        }
         PayTradeRecord record = new PayTradeRecord();
         record.setTradeId(StringTools.createTradeId());
         record.setOrderId(orderId);
@@ -48,7 +43,11 @@ public class PayTradeRecordServiceImpl implements PayTradeRecordService {
         record.setPayAmount(payAmount);
         record.setTradeStatus(STATUS_PENDING);
         record.setCreateTime(new Date());
-        payTradeRecordMapper.insert(record);
+        try {
+            payTradeRecordMapper.insert(record);
+        } catch (DuplicateKeyException ignored) {
+            // Database uniqueness is the idempotency boundary for concurrent create requests.
+        }
     }
 
     @Override

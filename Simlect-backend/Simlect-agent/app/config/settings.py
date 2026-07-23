@@ -25,6 +25,7 @@ class Settings(BaseSettings):
         default="http://127.0.0.1:7060",
         validation_alias=AliasChoices("MCP_SERVER_URL", "mcp_server_url"),
     )
+    mcp_timeout: int = 20
 
     internal_token: str = Field(
         default="your-token",

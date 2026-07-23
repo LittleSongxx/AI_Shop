@@ -63,10 +63,8 @@ public class ReliableMessageSender {
         if (StringTools.isEmpty(idempotencyKey)) {
             throw new IllegalArgumentException("MQ 重放必须指定 idempotencyKey");
         }
-        if (!mqIdempotencyGuard.tryAcquireSend(idempotencyKey, STANDARD_IDEMPOTENCY_TTL_SECONDS)) {
-            log.info("MQ 重放幂等跳过, key={}", idempotencyKey);
-            return;
-        }
+        // The outbox database lease owns replay idempotency. Redis send guards may outlive
+        // a crashed publisher, so consulting them here can turn an unsent row into false SENT.
         sendStandardInternal(exchange, routingKey, message, idempotencyKey);
     }
 

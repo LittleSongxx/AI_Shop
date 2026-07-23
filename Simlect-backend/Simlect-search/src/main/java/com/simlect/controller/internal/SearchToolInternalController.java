@@ -44,7 +44,7 @@ public class SearchToolInternalController extends ABaseController {
                     RabbitMQConfig.RAG_EXCHANGE,
                     RabbitMQConfig.RAG_QUEUE_KEY,
                     ragDataDTO,
-                    MqIdempotencyKeys.ragProduct(productId),
+                    MqIdempotencyKeys.ragProduct(productId, ragDataDTO.getVersion()),
                     MessageReliabilityLevelEnum.HIGH);
         }
         return getSuccessResponseVO(null);
@@ -61,7 +61,8 @@ public class SearchToolInternalController extends ABaseController {
                         RabbitMQConfig.RAG_EXCHANGE,
                         RabbitMQConfig.RAG_QUEUE_KEY,
                         ragDataDTO,
-                        MqIdempotencyKeys.ragFaq(String.valueOf(ragQuestion.getQuestionId())),
+                        MqIdempotencyKeys.ragFaq(
+                                String.valueOf(ragQuestion.getQuestionId()), ragDataDTO.getVersion()),
                         MessageReliabilityLevelEnum.HIGH);
             }
         }

@@ -7,6 +7,7 @@ import com.simlect.api.dto.SkuStockDTO;
 import com.simlect.api.dto.SkuStockQueryDTO;
 import com.simlect.api.dto.SkuStockSetDTO;
 import com.simlect.api.dto.ProductIdDTO;
+import com.simlect.api.dto.RefundStockRestoreDTO;
 import com.simlect.api.vo.ProductTotalStockVO;
 import com.simlect.api.vo.StockChangeResultVO;
 import com.simlect.api.fallback.StockFeignFallbackFactory;
@@ -28,6 +29,12 @@ public interface StockFeignClient {
 
     @PostMapping("/changeBatch")
     ResponseVO<StockChangeResultVO> changeStockBatch(@RequestBody SkuStockBatchChangeDTO dto);
+
+    @PostMapping("/refund/restore")
+    ResponseVO<StockChangeResultVO> restoreRefundStock(@RequestBody RefundStockRestoreDTO dto);
+
+    @PostMapping("/refund/applied")
+    ResponseVO<Boolean> isRefundStockApplied(@RequestBody RefundStockRestoreDTO dto);
 
     @PostMapping("/lockAndVerify")
     ResponseVO<Void> lockAndVerify(@RequestBody SkuStockBatchChangeDTO dto);

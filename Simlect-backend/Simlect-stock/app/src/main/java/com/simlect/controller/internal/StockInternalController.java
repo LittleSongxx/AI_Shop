@@ -2,6 +2,7 @@ package com.simlect.controller.internal;
 
 import com.simlect.api.dto.LessStockPageDTO;
 import com.simlect.api.dto.ProductIdDTO;
+import com.simlect.api.dto.RefundStockRestoreDTO;
 import com.simlect.api.dto.SkuStockBatchChangeDTO;
 import com.simlect.api.dto.SkuStockChangeDTO;
 import com.simlect.api.dto.SkuStockDTO;
@@ -40,6 +41,18 @@ public class StockInternalController extends ABaseController {
     @PostMapping("/changeBatch")
     public ResponseVO<StockChangeResultVO> changeStockBatch(@Valid @RequestBody SkuStockBatchChangeDTO dto) {
         return getSuccessResponseVO(new StockChangeResultVO(skuStockService.changeStockBatch(dto)));
+    }
+
+    @PostMapping("/refund/restore")
+    public ResponseVO<StockChangeResultVO> restoreRefundStock(
+            @Valid @RequestBody RefundStockRestoreDTO dto) {
+        return getSuccessResponseVO(new StockChangeResultVO(skuStockService.restoreRefundStock(dto)));
+    }
+
+    @PostMapping("/refund/applied")
+    public ResponseVO<Boolean> isRefundStockApplied(@RequestBody RefundStockRestoreDTO dto) {
+        return getSuccessResponseVO(dto != null
+                && skuStockService.isRefundStockApplied(dto.getBusinessKey()));
     }
 
     @PostMapping("/lockAndVerify")

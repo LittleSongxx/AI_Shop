@@ -42,6 +42,7 @@ public class RabbitMQConfig {
     public static final String BROWSE_EXCHANGE = "browse.exchange";
     // 通知交换机
     public static final String NOTIFY_EXCHANGE = "notify.exchange";
+    public static final String REFUND_EXCHANGE = "refund.exchange";
 
     // 队列
     public static final String RUSHING_ORDER_QUEUE = "rushing.order.queue";
@@ -50,6 +51,10 @@ public class RabbitMQConfig {
     // Rag死信队列
     public static final String RAG_DEAD_QUEUE = "rag.dead.queue";
     public static final String BROWSE_RECORD_QUEUE = "browse.record.queue";
+    public static final String REFUND_STOCK_QUEUE = "refund.stock.queue";
+    public static final String REFUND_STOCK_DEAD_QUEUE = "refund.stock.dead.queue";
+    public static final String REFUND_RESULT_QUEUE = "refund.result.queue";
+    public static final String REFUND_RESULT_DEAD_QUEUE = "refund.result.dead.queue";
 
     // 死信队列（超时未支付释放库存）
     public static final String RUSHING_DELAY_QUEUE = "rushing.delay.queue";
@@ -80,6 +85,10 @@ public class RabbitMQConfig {
     public static final String RAG_QUEUE_KEY = "rag.queue";
     public static final String RAG_DEAD_QUEUE_KEY = "rag.dead.queue";
     public static final String BROWSE_RECORD_KEY = "browse.record";
+    public static final String REFUND_STOCK_KEY = "refund.stock";
+    public static final String REFUND_STOCK_DEAD_KEY = "refund.stock.dead";
+    public static final String REFUND_RESULT_KEY = "refund.result";
+    public static final String REFUND_RESULT_DEAD_KEY = "refund.result.dead";
 
     // 通知队列
     public static final String NOTIFY_QUEUE = "notify.queue";
@@ -239,6 +248,59 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(payConfirmDeadQueue())
                 .to(payExchange())
                 .with(PAY_CONFIRM_DEAD_KEY);
+    }
+
+    @Bean
+    public DirectExchange refundExchange() {
+        return new DirectExchange(REFUND_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue refundStockQueue() {
+        return QueueBuilder.durable(REFUND_STOCK_QUEUE)
+                .withArgument("x-dead-letter-exchange", REFUND_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", REFUND_STOCK_DEAD_KEY)
+                .build();
+    }
+
+    @Bean
+    public Queue refundStockDeadQueue() {
+        return QueueBuilder.durable(REFUND_STOCK_DEAD_QUEUE).build();
+    }
+
+    @Bean
+    public Queue refundResultQueue() {
+        return QueueBuilder.durable(REFUND_RESULT_QUEUE)
+                .withArgument("x-dead-letter-exchange", REFUND_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", REFUND_RESULT_DEAD_KEY)
+                .build();
+    }
+
+    @Bean
+    public Queue refundResultDeadQueue() {
+        return QueueBuilder.durable(REFUND_RESULT_DEAD_QUEUE).build();
+    }
+
+    @Bean
+    public Binding refundStockBinding() {
+        return BindingBuilder.bind(refundStockQueue()).to(refundExchange()).with(REFUND_STOCK_KEY);
+    }
+
+    @Bean
+    public Binding refundStockDeadBinding() {
+        return BindingBuilder.bind(refundStockDeadQueue())
+                .to(refundExchange()).with(REFUND_STOCK_DEAD_KEY);
+    }
+
+    @Bean
+    public Binding refundResultBinding() {
+        return BindingBuilder.bind(refundResultQueue()).to(refundExchange()).with(REFUND_RESULT_KEY);
+    }
+
+    @Bean
+    public Binding refundResultDeadBinding() {
+        return BindingBuilder.bind(refundResultDeadQueue())
+                .to(refundExchange()).with(REFUND_RESULT_DEAD_KEY);
     }
 
     // ========== 浏览足迹异步落库 ==========

@@ -152,7 +152,7 @@ public class RabbitMQRagListenerComponent {
         ProductRagIndexVO productInfo = productFeignSupport.getRagIndex(productId);
         if (productInfo == null) {
             // 商品不存在 → 全部删掉
-            deleteByPrefix(prefixId);
+            deleteByProductId(productId);
             return;
         }
         // 先收集所有要写入的文档 ID
@@ -260,6 +260,10 @@ public class RabbitMQRagListenerComponent {
         deleteStaleDocuments(productId, newDocIds);
     }
     private void deleteStaleDocuments(String productId, List<String> keepIds) {
+        if (keepIds == null || keepIds.isEmpty()) {
+            deleteByProductId(productId);
+            return;
+        }
         try {
             String endpoint = "/" + indexName + "/_delete_by_query";
             String idsJson = keepIds.stream()
@@ -278,10 +282,11 @@ public class RabbitMQRagListenerComponent {
             log.info("已清理商品 {} 的旧文档, 保留 {} 条", productId, keepIds.size());
         } catch (IOException e) {
             log.error("清理旧文档失败, productId: {}", productId, e);
+            throw new BusinessException("清理商品旧向量文档失败", e);
         }
     }
 
-    private void deleteByPrefix(String productId) {
+    private void deleteByProductId(String productId) {
         try {
             String endpoint = "/" + indexName + "/_delete_by_query";
             String body = "{ \"query\": { \"bool\": { \"must\": ["
@@ -294,6 +299,7 @@ public class RabbitMQRagListenerComponent {
             log.info("已删除商品 {} 的所有向量文档", productId);
         } catch (IOException e) {
             log.error("删除商品向量文档失败, productId: {}", productId, e);
+            throw new BusinessException("删除商品向量文档失败", e);
         }
     }
 

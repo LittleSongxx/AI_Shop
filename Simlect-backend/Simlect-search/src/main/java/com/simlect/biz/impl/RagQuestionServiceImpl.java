@@ -112,7 +112,7 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 					RabbitMQConfig.RAG_EXCHANGE,
 					RabbitMQConfig.RAG_QUEUE_KEY,
 					ragDataDTO,
-					MqIdempotencyKeys.ragFaq(String.valueOf(questionId)),
+					MqIdempotencyKeys.ragFaq(String.valueOf(questionId), ragDataDTO.getVersion()),
 					MessageReliabilityLevelEnum.HIGH);
 			log.info("已添加删除任务到RAG队列, questionId: {}", questionId);
 		}
@@ -144,7 +144,7 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 				RabbitMQConfig.RAG_EXCHANGE,
 				RabbitMQConfig.RAG_QUEUE_KEY,
 				ragDataDTO,
-				MqIdempotencyKeys.ragFaq(String.valueOf(questionId)),
+				MqIdempotencyKeys.ragFaq(String.valueOf(questionId), ragDataDTO.getVersion()),
 				MessageReliabilityLevelEnum.HIGH);
 	}
 }

@@ -454,6 +454,20 @@
  		 <include refid="query_condition" />
 	</update>
 
+	<select id="selectByOrderItemIdForUpdate" resultMap="base_result_map">
+		SELECT <include refid="base_column_list" />
+		FROM order_item o
+		WHERE order_item_id = #{orderItemId}
+		FOR UPDATE
+	</select>
+
+	<select id="countNormalByOrderId" resultType="java.lang.Integer">
+		SELECT COUNT(1)
+		FROM order_item
+		WHERE order_id = #{orderId}
+		  AND order_item_status = 1
+	</select>
+
 	<!--多条件删除-->
 	<delete id="deleteByParam">
 		 delete o from order_item o

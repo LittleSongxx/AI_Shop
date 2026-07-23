@@ -10,5 +10,6 @@ create table if not exists pay_trade_record
     pay_amount       decimal(10, 2)       not null,
     trade_status     tinyint(1) default 0 not null comment '0待支付 1成功 2关闭 3退款',
     pay_time         datetime             null,
-    create_time      datetime             not null
+    create_time      datetime             not null,
+    constraint uk_pay_trade_pay_order unique (pay_order_id)
 ) comment '支付流水' collate = utf8mb4_general_ci row_format = DYNAMIC;

@@ -13,6 +13,9 @@
         <result column="status" property="status"/>
         <result column="retry_count" property="retryCount"/>
         <result column="error_message" property="errorMessage"/>
+        <result column="lease_owner" property="leaseOwner"/>
+        <result column="lease_until" property="leaseUntil"/>
+        <result column="next_retry_time" property="nextRetryTime"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
         <result column="sent_time" property="sentTime"/>
@@ -35,26 +38,69 @@
         select * from local_message_outbox where idempotency_key = #{idempotencyKey}
     </select>
 
-    <update id="updateStatus">
+    <update id="claimForDispatch">
         update local_message_outbox
-        set status = #{toStatus},
+        set status = #{sendingStatus},
             update_time = now(),
-            error_message = #{errorMessage},
-            sent_time = #{sentTime}
-            <if test="incRetry">
-                , retry_count = ifnull(retry_count, 0) + 1
-            </if>
+            lease_owner = #{leaseOwner},
+            lease_until = #{leaseUntil},
+            error_message = null
         where id = #{id}
-          and status = #{fromStatus}
+          and (
+            (
+              status in (#{pendingStatus}, #{failedStatus})
+              and (next_retry_time is null or next_retry_time &lt;= #{now})
+            )
+            or
+            (
+              status = #{sendingStatus}
+              and (lease_until is null or lease_until &lt;= #{now})
+            )
+          )
+    </update>
+
+    <update id="markSent">
+        update local_message_outbox
+        set status = #{sentStatus},
+            update_time = now(),
+            sent_time = #{sentTime},
+            lease_owner = null,
+            lease_until = null,
+            next_retry_time = null,
+            error_message = null
+        where id = #{id}
+          and status = #{sendingStatus}
+          and lease_owner = #{leaseOwner}
+    </update>
+
+    <update id="markFailed">
+        update local_message_outbox
+        set status = #{failedStatus},
+            update_time = now(),
+            retry_count = ifnull(retry_count, 0) + 1,
+            error_message = #{errorMessage},
+            next_retry_time = #{nextRetryTime},
+            lease_owner = null,
+            lease_until = null
+        where id = #{id}
+          and status = #{sendingStatus}
+          and lease_owner = #{leaseOwner}
     </update>
 
     <select id="selectDispatchBatch" resultMap="base_result_map">
         select * from local_message_outbox
-        where status in
-        <foreach collection="statuses" item="s" open="(" separator="," close=")">
-            #{s}
-        </foreach>
-        and create_time &lt;= #{beforeTime}
+        where create_time &lt;= #{beforeTime}
+          and (
+            (
+              status in (#{pendingStatus}, #{failedStatus})
+              and (next_retry_time is null or next_retry_time &lt;= #{now})
+            )
+            or
+            (
+              status = #{sendingStatus}
+              and (lease_until is null or lease_until &lt;= #{now})
+            )
+          )
         order by id asc
         limit #{limit}
     </select>

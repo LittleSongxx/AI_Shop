@@ -3,9 +3,11 @@ package com.simlect.biz;
 import com.simlect.api.dto.SkuStockBatchChangeDTO;
 import com.simlect.api.dto.SkuStockChangeDTO;
 import com.simlect.api.dto.SkuStockDTO;
+import com.simlect.api.dto.RefundStockRestoreDTO;
 import com.simlect.domain.SkuStock;
 import com.simlect.exception.BusinessException;
 import com.simlect.mappers.SkuStockMapper;
+import com.simlect.mappers.StockChangeRecordMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,8 @@ public class SkuStockService {
 
     @Resource
     private SkuStockMapper skuStockMapper;
+    @Resource
+    private StockChangeRecordMapper stockChangeRecordMapper;
 
     public SkuStockDTO getStock(String productId, String propertyValueIdHash) {
         SkuStock row = skuStockMapper.selectByKey(productId, propertyValueIdHash);
@@ -88,6 +92,32 @@ public class SkuStockService {
             total += affected;
         }
         return total;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public int restoreRefundStock(RefundStockRestoreDTO dto) {
+        if (dto == null || dto.getChangeAmount() == null || dto.getChangeAmount() <= 0) {
+            throw new BusinessException("退款库存恢复数量必须大于0");
+        }
+        int inserted = stockChangeRecordMapper.insertIgnore(
+                dto.getBusinessKey(),
+                "REFUND_RESTORE",
+                dto.getProductId(),
+                dto.getPropertyValueIdHash(),
+                dto.getChangeAmount());
+        if (inserted == 0) {
+            return 0;
+        }
+        int affected = skuStockMapper.changeStock(
+                dto.getProductId(), dto.getPropertyValueIdHash(), dto.getChangeAmount());
+        if (affected <= 0) {
+            throw new BusinessException("退款库存恢复失败");
+        }
+        return affected;
+    }
+
+    public boolean isRefundStockApplied(String businessKey) {
+        return businessKey != null && stockChangeRecordMapper.exists(businessKey) > 0;
     }
 
     @Transactional(rollbackFor = Exception.class)

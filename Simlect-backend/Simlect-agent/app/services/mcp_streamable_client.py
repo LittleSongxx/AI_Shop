@@ -19,6 +19,8 @@ class McpStreamableClient:
     def __init__(self, base_url: str | None = None):
         settings = get_settings()
         self._url = (base_url or settings.mcp_server_url).rstrip("/")
+        self._headers = {"X-Internal-Token": settings.internal_token}
+        self._timeout = settings.mcp_timeout
 
     @asynccontextmanager
     async def _session(self) -> AsyncIterator[Any]:
@@ -26,7 +28,11 @@ class McpStreamableClient:
         from mcp.client.streamable_http import streamablehttp_client
 
         endpoint = self._url if self._url.endswith("/mcp") else f"{self._url}/mcp"
-        async with streamablehttp_client(endpoint) as (read, write, _get_session_id):
+        async with streamablehttp_client(
+            endpoint,
+            headers=self._headers,
+            timeout=self._timeout,
+        ) as (read, write, _get_session_id):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 yield session

@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import os
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import FastMCP
+from starlette.responses import JSONResponse
 
+from app.config.settings import get_settings
 from app.services import mcp_tools_service as tools
 from app.services.redis_service import redis_service
 from app.services.tool_invoke_result import ToolInvokeResult
 
-_MCP_HOST = os.getenv("FASTMCP_HOST", "0.0.0.0")
+_MCP_HOST = os.getenv("FASTMCP_HOST", "127.0.0.1")
 _MCP_PORT = int(os.getenv("FASTMCP_PORT", "7060"))
 
 
@@ -114,8 +117,32 @@ async def propose_recomment(userId: str, orderId: str, reCommentContent: str) ->
 
 
 def main() -> None:
-    # http://{_MCP_HOST}:{_MCP_PORT}/mcp  (Agent expects :7060)
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    settings = get_settings()
+    settings.validate_runtime()
+    app = InternalTokenMiddleware(mcp.streamable_http_app(), settings.internal_token)
+    uvicorn.run(app, host=_MCP_HOST, port=_MCP_PORT)
+
+
+class InternalTokenMiddleware:
+
+    def __init__(self, app, expected_token: str):
+        self.app = app
+        self.expected_token = expected_token
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            headers = {
+                key.decode("latin-1").lower(): value.decode("latin-1")
+                for key, value in scope.get("headers", [])
+            }
+            supplied = headers.get("x-internal-token", "")
+            if not supplied or not secrets.compare_digest(supplied, self.expected_token):
+                response = JSONResponse({"detail": "invalid internal token"}, status_code=401)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 if __name__ == "__main__":

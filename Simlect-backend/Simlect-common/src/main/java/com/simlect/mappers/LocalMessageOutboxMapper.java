@@ -14,14 +14,31 @@ public interface LocalMessageOutboxMapper {
 
     LocalMessageOutbox selectByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
 
-    Integer updateStatus(@Param("id") Long id,
-                         @Param("fromStatus") Integer fromStatus,
-                         @Param("toStatus") Integer toStatus,
-                         @Param("errorMessage") String errorMessage,
-                         @Param("sentTime") Date sentTime,
-                         @Param("incRetry") boolean incRetry);
+    Integer claimForDispatch(@Param("id") Long id,
+                             @Param("pendingStatus") Integer pendingStatus,
+                             @Param("failedStatus") Integer failedStatus,
+                             @Param("sendingStatus") Integer sendingStatus,
+                             @Param("leaseOwner") String leaseOwner,
+                             @Param("leaseUntil") Date leaseUntil,
+                             @Param("now") Date now);
 
-    List<LocalMessageOutbox> selectDispatchBatch(@Param("statuses") List<Integer> statuses,
+    Integer markSent(@Param("id") Long id,
+                     @Param("sendingStatus") Integer sendingStatus,
+                     @Param("sentStatus") Integer sentStatus,
+                     @Param("leaseOwner") String leaseOwner,
+                     @Param("sentTime") Date sentTime);
+
+    Integer markFailed(@Param("id") Long id,
+                       @Param("sendingStatus") Integer sendingStatus,
+                       @Param("failedStatus") Integer failedStatus,
+                       @Param("leaseOwner") String leaseOwner,
+                       @Param("errorMessage") String errorMessage,
+                       @Param("nextRetryTime") Date nextRetryTime);
+
+    List<LocalMessageOutbox> selectDispatchBatch(@Param("pendingStatus") Integer pendingStatus,
+                                                 @Param("failedStatus") Integer failedStatus,
+                                                 @Param("sendingStatus") Integer sendingStatus,
                                                  @Param("beforeTime") Date beforeTime,
+                                                 @Param("now") Date now,
                                                  @Param("limit") int limit);
 }

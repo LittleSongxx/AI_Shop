@@ -3,6 +3,7 @@ package com.simlect.api.fallback;
 import com.simlect.api.StockFeignClient;
 import com.simlect.api.dto.LessStockPageDTO;
 import com.simlect.api.dto.ProductIdDTO;
+import com.simlect.api.dto.RefundStockRestoreDTO;
 import com.simlect.api.dto.SkuStockBatchChangeDTO;
 import com.simlect.api.dto.SkuStockChangeDTO;
 import com.simlect.api.dto.SkuStockDTO;
@@ -37,6 +38,16 @@ public class StockFeignFallbackFactory implements FallbackFactory<StockFeignClie
 
             @Override
             public ResponseVO<StockChangeResultVO> changeStockBatch(SkuStockBatchChangeDTO dto) {
+                return FeignFallbackResponses.unavailable("库存服务");
+            }
+
+            @Override
+            public ResponseVO<StockChangeResultVO> restoreRefundStock(RefundStockRestoreDTO dto) {
+                return FeignFallbackResponses.unavailable("库存服务");
+            }
+
+            @Override
+            public ResponseVO<Boolean> isRefundStockApplied(RefundStockRestoreDTO dto) {
                 return FeignFallbackResponses.unavailable("库存服务");
             }
 

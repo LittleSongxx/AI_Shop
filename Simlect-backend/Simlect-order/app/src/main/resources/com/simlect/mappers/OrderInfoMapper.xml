@@ -535,4 +535,8 @@
 		select <include refid="base_column_list" /> from order_info o where order_id=#{orderId}
 	</select>
 
+	<select id="selectByOrderIdForUpdate" resultMap="base_result_map" >
+		select <include refid="base_column_list" /> from order_info o where order_id=#{orderId} for update
+	</select>
+
 </mapper>

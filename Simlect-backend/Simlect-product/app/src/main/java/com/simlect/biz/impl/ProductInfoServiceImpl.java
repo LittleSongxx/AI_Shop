@@ -256,7 +256,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 						RabbitMQConfig.RAG_EXCHANGE,
 						RabbitMQConfig.RAG_QUEUE_KEY,
 						ragDataDTO,
-						MqIdempotencyKeys.ragProduct(productInfo.getProductId()),
+						MqIdempotencyKeys.ragProduct(productInfo.getProductId(), ragDataDTO.getVersion()),
 						MessageReliabilityLevelEnum.HIGH);
 			}
 		});
@@ -403,7 +403,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 						RabbitMQConfig.RAG_EXCHANGE,
 						RabbitMQConfig.RAG_QUEUE_KEY,
 						ragDataDTO,
-						MqIdempotencyKeys.ragProduct(productId),
+						MqIdempotencyKeys.ragProduct(productId, ragDataDTO.getVersion()),
 						MessageReliabilityLevelEnum.HIGH);
 			}
 		});
@@ -435,7 +435,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 				RabbitMQConfig.RAG_EXCHANGE,
 				RabbitMQConfig.RAG_QUEUE_KEY,
 				ragDataDTO,
-				MqIdempotencyKeys.ragProduct(productId),
+				MqIdempotencyKeys.ragProduct(productId, ragDataDTO.getVersion()),
 				MessageReliabilityLevelEnum.HIGH);
 	}
 

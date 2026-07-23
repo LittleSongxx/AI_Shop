@@ -14,6 +14,9 @@ public class LocalMessageOutbox implements Serializable {
     private Integer status;
     private Integer retryCount;
     private String errorMessage;
+    private String leaseOwner;
+    private Date leaseUntil;
+    private Date nextRetryTime;
     private Date createTime;
     private Date updateTime;
     private Date sentTime;
@@ -88,6 +91,30 @@ public class LocalMessageOutbox implements Serializable {
 
     public void setErrorMessage(String errorMessage) {
         this.errorMessage = errorMessage;
+    }
+
+    public String getLeaseOwner() {
+        return leaseOwner;
+    }
+
+    public void setLeaseOwner(String leaseOwner) {
+        this.leaseOwner = leaseOwner;
+    }
+
+    public Date getLeaseUntil() {
+        return leaseUntil;
+    }
+
+    public void setLeaseUntil(Date leaseUntil) {
+        this.leaseUntil = leaseUntil;
+    }
+
+    public Date getNextRetryTime() {
+        return nextRetryTime;
+    }
+
+    public void setNextRetryTime(Date nextRetryTime) {
+        this.nextRetryTime = nextRetryTime;
     }
 
     public Date getCreateTime() {

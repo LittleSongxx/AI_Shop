@@ -12,6 +12,10 @@ public interface OrderItemMapper<T,P> extends BaseMapper<T,P> {
 
 	 T selectByOrderItemId(@Param("orderItemId") String orderItemId);
 
+	 T selectByOrderItemIdForUpdate(@Param("orderItemId") String orderItemId);
+
+	 Integer countNormalByOrderId(@Param("orderId") String orderId);
+
 	 List<T> selectByOrderIds(@Param("orderIds") List<String> orderIds);
 
 }
