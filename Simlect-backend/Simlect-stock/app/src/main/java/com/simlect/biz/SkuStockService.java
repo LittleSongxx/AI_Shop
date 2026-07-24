@@ -4,6 +4,7 @@ import com.simlect.api.dto.SkuStockBatchChangeDTO;
 import com.simlect.api.dto.SkuStockChangeDTO;
 import com.simlect.api.dto.SkuStockDTO;
 import com.simlect.api.dto.RefundStockRestoreDTO;
+import com.simlect.api.vo.ProductTotalStockVO;
 import com.simlect.domain.SkuStock;
 import com.simlect.exception.BusinessException;
 import com.simlect.mappers.SkuStockMapper;
@@ -13,8 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -55,6 +59,33 @@ public class SkuStockService {
     public int totalByProductId(String productId) {
         Integer total = skuStockMapper.selectTotalStockByProductId(productId);
         return total == null ? 0 : total;
+    }
+
+    public Map<String, Integer> totalByProductIds(List<String> productIds) {
+        if (CollectionUtils.isEmpty(productIds)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (String productId : productIds) {
+            if (productId != null && !productId.trim().isEmpty()) {
+                result.putIfAbsent(productId, 0);
+            }
+        }
+        if (result.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<ProductTotalStockVO> rows =
+                skuStockMapper.selectTotalStockByProductIds(new ArrayList<>(result.keySet()));
+        if (rows != null) {
+            for (ProductTotalStockVO row : rows) {
+                if (row != null && row.getProductId() != null) {
+                    result.put(
+                            row.getProductId(),
+                            row.getTotalStock() == null ? 0 : row.getTotalStock());
+                }
+            }
+        }
+        return result;
     }
 
     public com.simlect.entity.vo.PaginationResultVO<SkuStockDTO> listLessThan(Integer pageNo, Integer pageSize, Integer threshold) {

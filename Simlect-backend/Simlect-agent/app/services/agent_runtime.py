@@ -26,6 +26,7 @@ from app.services.product_service import (
     product_service,
 )
 from app.services.redis_service import redis_service
+from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
 from app.utils.biz_payload import (
     build_action_confirm_payload,
@@ -282,7 +283,13 @@ async def _ensure_product_search_cards(
         user_text=user_text or "",
         consult_product=consult,
     )
-    hint = format_search_tool_message(keyword or "", consult, products, source)
+    hint = format_search_tool_message(
+        keyword or "",
+        consult,
+        products,
+        source,
+        profile=await shopping_profile_service.get_profile(user_id),
+    )
     return cards_json, biz_data, hint, "product_search"
 
 async def _resolve_cards_when_text_mentions_products(
@@ -332,7 +339,13 @@ async def _resolve_cards_when_text_mentions_products(
     )
     if not products:
         return None, None, None
-    hint = format_search_tool_message(keyword or "", consult, products, source)
+    hint = format_search_tool_message(
+        keyword or "",
+        consult,
+        products,
+        source,
+        profile=await shopping_profile_service.get_profile(user_id),
+    )
     return cards_json, hint, biz_data
 
 async def finalize_agent_response(
@@ -345,6 +358,7 @@ async def finalize_agent_response(
     tools_called: list[str] | None = None,
     tool_biz: dict | None = None,
     search_tool_hint: str | None = None,
+    source_refs: list[dict] | dict | None = None,
     user_text: str | None = None,
     consult_card: dict | None = None,
     message_card: dict | None = None,
@@ -520,7 +534,13 @@ async def finalize_agent_response(
     await stream_service.push_done(
         user_id, message_id, assistant, biz_type, agent_msg.get("userMessage")
     )
-    await agent_message_service.complete_message(message_id, assistant, biz_type, biz_data)
+    await agent_message_service.complete_message(
+        message_id,
+        assistant,
+        biz_type,
+        biz_data,
+        source_refs,
+    )
 
 async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") -> None:
     user_id = agent_msg["userId"]

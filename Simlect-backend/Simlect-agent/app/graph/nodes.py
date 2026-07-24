@@ -151,8 +151,13 @@ async def build_context_node(state: AgentGraphState) -> dict:
         )
     faq_text = ""
     knowledge_text = ""
+    rag_source_refs: list[dict] = []
+    rag_trace: dict | None = None
     if intent in (IntentKind.PRODUCT_CONSULT, IntentKind.CHAT):
-        faq_text = await rag_retriever.search_faq(user_text)
+        rag_result = await rag_retriever.search_faq_with_trace(user_text)
+        faq_text = str(rag_result.get("text") or "")
+        rag_source_refs = list(rag_result.get("source_refs") or [])
+        rag_trace = rag_result.get("trace")
     if intent == IntentKind.CHAT:
         knowledge_text = faq_text
 
@@ -241,6 +246,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "intent": intent.value,
         "intent_data": intent_data or None,
         "intent_decision": decision.model_dump(mode="json"),
+        "rag_source_refs": rag_source_refs,
+        "rag_trace": rag_trace,
         "react_round": 0,
         "pending_tool_calls": [],
         "route": "agent_loop",
@@ -817,6 +824,14 @@ async def finalize_node(state: AgentGraphState) -> dict:
             tools_called=tools_called,
             tool_biz=state.get("tool_biz"),
             search_tool_hint=state.get("search_tool_hint"),
+            source_refs=(
+                {
+                    "trace": state.get("rag_trace"),
+                    "sources": state.get("rag_source_refs") or [],
+                }
+                if state.get("rag_trace")
+                else state.get("rag_source_refs")
+            ),
             user_text=state.get("user_text"),
             consult_card=state.get("card"),
             message_card=state.get("message_card"),

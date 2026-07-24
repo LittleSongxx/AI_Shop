@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.openfeign.FallbackFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Slf4j
 @Component
 public class StockFeignFallbackFactory implements FallbackFactory<StockFeignClient> {
@@ -63,6 +65,11 @@ public class StockFeignFallbackFactory implements FallbackFactory<StockFeignClie
 
             @Override
             public ResponseVO<ProductTotalStockVO> totalByProduct(ProductIdDTO dto) {
+                return FeignFallbackResponses.unavailable("库存服务");
+            }
+
+            @Override
+            public ResponseVO<List<ProductTotalStockVO>> totalByProducts(List<String> productIds) {
                 return FeignFallbackResponses.unavailable("库存服务");
             }
 

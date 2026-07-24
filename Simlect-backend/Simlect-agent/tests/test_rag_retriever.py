@@ -53,3 +53,42 @@ async def test_exact_faq_fast_path_times_out_without_blocking_chat(monkeypatch):
         assert await retriever.exact_faq_answer("配送范围是什么") is None
     finally:
         get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_returns_bounded_source_trace(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(retriever, "_knowledge_version", AsyncMock(return_value=9))
+    monkeypatch.setattr(retriever, "_exact_faq", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        retriever,
+        "_search_knowledge_docs",
+        AsyncMock(
+            return_value=[
+                {
+                    "id": "knowledge_7_1_0",
+                    "content": "配送范围覆盖全国大部分地区。",
+                    "metadata": {
+                        "dataType": "knowledge",
+                        "documentId": "7",
+                        "chunkId": "knowledge_7_1_0",
+                        "title": "配送规则",
+                        "source": "配送说明",
+                        "version": 1,
+                        "heading": "配送范围",
+                    },
+                    "score": 0.91,
+                    "source": "rerank",
+                }
+            ],
+        ),
+    )
+
+    result = await retriever.search_faq_with_trace("配送范围")
+
+    assert "配送范围覆盖全国" in result["text"]
+    assert result["trace"]["mode"] == "hybrid"
+    assert result["trace"]["knowledgeVersion"] == 9
+    assert result["source_refs"][0]["documentId"] == "7"
+    assert result["source_refs"][0]["chunkId"] == "knowledge_7_1_0"
+    assert result["source_refs"][0]["retrieval"] == "rerank"

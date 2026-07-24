@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from collections import Counter
 from datetime import datetime
 
 import structlog
@@ -342,6 +343,45 @@ class SupportService:
             "list": [self._public_session(item) for item in rows],
         }
 
+    async def sla_stats(
+        self,
+        window_hours: int = 24,
+        first_response_sla_seconds: int | None = None,
+        queue_alert_seconds: int | None = None,
+    ) -> dict:
+        settings = get_settings()
+        window_hours = max(1, min(int(window_hours or 24), 720))
+        first_response_target = max(
+            1,
+            int(first_response_sla_seconds or settings.support_first_response_sla_seconds),
+        )
+        queue_alert_target = max(
+            1,
+            int(queue_alert_seconds or settings.support_queue_alert_seconds),
+        )
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT s.*,
+                       (
+                         SELECT MIN(m.created_at)
+                         FROM support_message m
+                         WHERE m.session_id=s.session_id
+                           AND m.sender_type='ADMIN'
+                       ) AS first_response_at
+                FROM support_session s
+                WHERE s.created_at >= DATE_SUB(NOW(), INTERVAL %s HOUR)
+                """,
+                (window_hours,),
+            )
+            rows = list(await cur.fetchall())
+        return build_sla_stats(
+            rows,
+            window_hours=window_hours,
+            first_response_target=first_response_target,
+            queue_alert_target=queue_alert_target,
+        )
+
     async def history(self, session_id: str, limit: int = 100) -> list[dict]:
         async with acquire() as cur:
             await cur.execute(
@@ -670,3 +710,76 @@ def _eligible_faq_candidate(row: dict | None) -> bool:
 
 
 support_service = SupportService()
+
+
+def build_sla_stats(
+    rows: list[dict],
+    *,
+    window_hours: int,
+    first_response_target: int,
+    queue_alert_target: int,
+    now: datetime | None = None,
+) -> dict:
+    current = now or datetime.now()
+    status_counts = Counter(str(row.get("status") or "UNKNOWN") for row in rows)
+    active_statuses = set(_ACTIVE_STATUSES)
+    queue_waits: list[float] = []
+    first_response_times: list[float] = []
+    resolution_times: list[float] = []
+    sla_hits = 0
+    overdue_first_response = 0
+    overdue_queue = 0
+    active_by_admin: Counter[str] = Counter()
+
+    for row in rows:
+        created = row.get("created_at")
+        if not isinstance(created, datetime):
+            continue
+        assigned = row.get("assigned_at")
+        first_response = row.get("first_response_at")
+        resolved = row.get("resolved_at")
+        if isinstance(assigned, datetime):
+            queue_waits.append(max(0.0, (assigned - created).total_seconds()))
+        if isinstance(first_response, datetime):
+            seconds = max(0.0, (first_response - created).total_seconds())
+            first_response_times.append(seconds)
+            if seconds <= first_response_target:
+                sla_hits += 1
+        elif str(row.get("status") or "") in {
+            SUPPORT_STATUS_ASSIGNED,
+            SUPPORT_STATUS_ACTIVE,
+        }:
+            if (current - created).total_seconds() > first_response_target:
+                overdue_first_response += 1
+        if isinstance(resolved, datetime):
+            resolution_times.append(max(0.0, (resolved - created).total_seconds()))
+        if (
+            str(row.get("status") or "") == SUPPORT_STATUS_QUEUED
+            and (current - created).total_seconds() > queue_alert_target
+        ):
+            overdue_queue += 1
+        admin = str(row.get("assigned_admin") or "").strip()
+        if admin and str(row.get("status") or "") in active_statuses:
+            active_by_admin[admin] += 1
+
+    response_count = len(first_response_times)
+    active_count = sum(status_counts[status] for status in active_statuses)
+
+    def average(values: list[float]) -> float:
+        return round(sum(values) / len(values), 1) if values else 0.0
+
+    return {
+        "windowHours": window_hours,
+        "firstResponseSlaSeconds": first_response_target,
+        "queueAlertSeconds": queue_alert_target,
+        "totalSessions": len(rows),
+        "statusCounts": dict(status_counts),
+        "activeSessions": active_count,
+        "averageQueueWaitSeconds": average(queue_waits),
+        "averageFirstResponseSeconds": average(first_response_times),
+        "averageResolutionSeconds": average(resolution_times),
+        "firstResponseSlaRate": round(sla_hits / response_count, 4) if response_count else 0.0,
+        "overdueFirstResponse": overdue_first_response,
+        "overdueQueued": overdue_queue,
+        "activeByAdmin": dict(active_by_admin),
+    }

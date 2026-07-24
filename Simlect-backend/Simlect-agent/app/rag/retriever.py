@@ -46,31 +46,41 @@ class RagRetriever:
             logger.warning("faq_cache_warmup_skipped", error=str(exc))
 
     async def search_faq(self, query: str, top_k: int | None = None) -> str:
+        result = await self.search_faq_with_trace(query, top_k)
+        return str(result.get("text") or "")
+
+    async def search_faq_with_trace(
+        self,
+        query: str,
+        top_k: int | None = None,
+    ) -> dict[str, Any]:
+        """Search FAQ/knowledge and retain bounded evidence for observability."""
         started = time.perf_counter()
         cleaned = self._rewrite_query(query)
         if not cleaned:
             self._observe_search(started, False, "empty")
-            return ""
+            return self._trace_result(cleaned, 1, "empty", False, [], started)
 
         version = await self._knowledge_version()
         exact = await self._exact_faq(cleaned, version)
         if exact:
+            docs = [self._faq_row_to_doc(exact, score=1.0)]
             self._observe_search(started, True, "exact")
-            return self._format_docs([self._faq_row_to_doc(exact, score=1.0)])
+            return self._trace_result(cleaned, version, "exact", True, docs, started)
 
         cache_key = f"mall:rag:semantic:v{version}:{_sha256(cleaned)}"
         cached = await self._get_cache(cache_key)
         if cached:
             self._observe_search(started, True, "cache")
-            return self._format_docs(cached)
+            return self._trace_result(cleaned, version, "cache", True, cached, started)
 
         docs = await self._search_knowledge_docs(cleaned, top_k or get_settings().rag_top_k)
         if not self._has_enough_evidence(docs):
             self._observe_search(started, False, "hybrid")
-            return ""
+            return self._trace_result(cleaned, version, "hybrid", False, docs, started)
         await self._set_cache(cache_key, docs, get_settings().rag_cache_ttl_seconds)
         self._observe_search(started, True, "hybrid")
-        return self._format_docs(docs)
+        return self._trace_result(cleaned, version, "hybrid", True, docs, started)
 
     async def exact_faq_answer(self, query: str) -> dict | None:
         """Return a curated FAQ answer without invoking the LLM."""
@@ -337,6 +347,75 @@ class RagRetriever:
         RAG_HIT_RATE.set(1 if hit else 0)
         RAG_SEARCH_TOTAL.labels(result="hit" if hit else "miss", mode=mode).inc()
         RAG_LATENCY.observe(max(0.0, time.perf_counter() - started))
+
+    def _trace_result(
+        self,
+        query: str,
+        version: int,
+        mode: str,
+        hit: bool,
+        docs: list[dict],
+        started: float,
+    ) -> dict[str, Any]:
+        refs = self._source_refs(docs, version)
+        elapsed_ms = round(max(0.0, time.perf_counter() - started) * 1000, 2)
+        return {
+            "text": self._format_docs(docs) if hit else "",
+            "source_refs": refs,
+            "trace": {
+                "queryHash": _sha256(query),
+                "mode": mode,
+                "hit": hit,
+                "knowledgeVersion": version,
+                "sourceCount": len(refs),
+                "topScore": max(
+                    (float(doc.get("score") or 0) for doc in docs),
+                    default=0.0,
+                ),
+                "latencyMs": elapsed_ms,
+            },
+        }
+
+    def _source_refs(self, docs: list[dict], version: int) -> list[dict]:
+        refs: list[dict] = []
+        seen: set[str] = set()
+        for doc in docs[: get_settings().rerank_top_n]:
+            metadata = doc.get("metadata") or {}
+            doc_id = str(
+                doc.get("id")
+                or metadata.get("chunkId")
+                or metadata.get("questionId")
+                or ""
+            )
+            if not doc_id or doc_id in seen:
+                continue
+            seen.add(doc_id)
+            data_type = str(metadata.get("dataType") or "knowledge")
+            ref = {
+                "type": "faq" if data_type == "faq" else "knowledge_chunk",
+                "id": doc_id,
+                "dataType": data_type,
+                "source": (
+                    metadata.get("source")
+                    or metadata.get("title")
+                    or metadata.get("question")
+                    or "知识库"
+                ),
+                "retrieval": doc.get("source") or "unknown",
+                "score": round(float(doc.get("score") or 0), 6),
+                "knowledgeVersion": metadata.get("version") or version,
+                "snippet": self._doc_text(doc)[:240],
+            }
+            for metadata_key, ref_key in (
+                ("documentId", "documentId"),
+                ("chunkId", "chunkId"),
+                ("questionId", "questionId"),
+                ("heading", "heading"),
+            ):
+                if metadata.get(metadata_key) is not None:
+                    ref[ref_key] = metadata[metadata_key]
+            refs.append(ref)
+        return refs
 
     async def _product_search_fallback(self, query: str, limit: int) -> list[str]:
         try:

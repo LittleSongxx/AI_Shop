@@ -16,6 +16,7 @@ from app.constants import (
     REDIS_AGENT_HISTORY_CONDENSED,
     REDIS_AGENT_PENDING_ACTION,
     REDIS_AGENT_PENDING_MSG,
+    REDIS_AGENT_SHOPPING_PROFILE,
     REDIS_AGENT_USER_LOCK,
     REDIS_AGENT_WORKER_HEARTBEAT,
     REDIS_CANCEL_AGENT,
@@ -23,6 +24,7 @@ from app.constants import (
     REDIS_PROMPT,
     REDIS_SENSITIVE_WORD_PAYLOAD,
     REDIS_WS_USER_HEARTBEAT,
+    SHOPPING_PROFILE_TTL,
     WS_MESSAGE_TOPIC_AGENT,
 )
 
@@ -101,6 +103,18 @@ class RedisService:
             f"{REDIS_AGENT_CONSULT_PRODUCT}{user_id}",
             f"{REDIS_AGENT_CONSULT_ACTIVE}{user_id}",
         )
+
+    async def save_shopping_profile(self, user_id: str, profile: dict) -> None:
+        await self.set_json(
+            f"{REDIS_AGENT_SHOPPING_PROFILE}{user_id}",
+            profile,
+            SHOPPING_PROFILE_TTL,
+            jitter_seconds=60 * 60,
+        )
+
+    async def get_shopping_profile(self, user_id: str) -> dict | None:
+        value = await self.get_json(f"{REDIS_AGENT_SHOPPING_PROFILE}{user_id}")
+        return value if isinstance(value, dict) else None
 
     async def pause_consult(self, user_id: str) -> None:
 

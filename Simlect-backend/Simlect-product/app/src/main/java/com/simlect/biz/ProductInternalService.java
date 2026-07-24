@@ -9,6 +9,7 @@ import com.simlect.api.vo.ProductRagSkuVO;
 import com.simlect.api.vo.ProductSearchIndexVO;
 import com.simlect.api.vo.ProductSkuSnapshotVO;
 import com.simlect.api.enums.ProductStatusEnum;
+import com.simlect.api.support.StockFeignSupport;
 import com.simlect.entity.po.ProductInfo;
 import com.simlect.entity.po.ProductPropertyValue;
 import com.simlect.entity.po.ProductSku;
@@ -40,6 +41,8 @@ public class ProductInternalService {
     private ProductSkuMapper<ProductSku, ProductSkuQuery> productSkuMapper;
     @Resource
     private ProductPropertyValueMapper<ProductPropertyValue, ProductPropertyValueQuery> productPropertyValueMapper;
+    @Resource
+    private StockFeignSupport stockFeignSupport;
 
     public ProductSnapshotBatchVO snapshotBatch(List<String> productIds) {
         ProductSnapshotBatchVO vo = new ProductSnapshotBatchVO();
@@ -47,6 +50,7 @@ public class ProductInternalService {
             vo.setProducts(Collections.emptyList());
             vo.setSkus(Collections.emptyList());
             vo.setPropertyValues(Collections.emptyList());
+            vo.setTotalStocks(Collections.emptyMap());
             return vo;
         }
         ProductInfoQuery productInfoQuery = new ProductInfoQuery();
@@ -60,6 +64,7 @@ public class ProductInternalService {
             item.setStatus(p.getStatus());
             item.setCover(p.getCover());
             item.setMinPrice(p.getMinPrice());
+            item.setMaxPrice(p.getMaxPrice());
             item.setCategoryId(p.getCategoryId());
             item.setTotalSale(p.getTotalSale());
             productVos.add(item);
@@ -92,6 +97,7 @@ public class ProductInternalService {
             pvVos.add(item);
         }
         vo.setPropertyValues(pvVos);
+        vo.setTotalStocks(stockFeignSupport.totalByProducts(productIds));
         return vo;
     }
 

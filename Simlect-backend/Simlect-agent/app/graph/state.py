@@ -40,6 +40,8 @@ class AgentGraphState(TypedDict, total=False):
     intent: str | None
     intent_data: str | None
     intent_decision: dict | None
+    rag_source_refs: list[dict] | None
+    rag_trace: dict | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -72,6 +74,8 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "intent": None,
         "intent_data": None,
         "intent_decision": None,
+        "rag_source_refs": [],
+        "rag_trace": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

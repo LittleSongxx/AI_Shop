@@ -1,7 +1,10 @@
 package com.simlect.mappers;
 
 import com.simlect.domain.SkuStock;
+import com.simlect.api.vo.ProductTotalStockVO;
 import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 public interface SkuStockMapper {
 
@@ -16,6 +19,8 @@ public interface SkuStockMapper {
                     @Param("changeAmount") Integer changeAmount);
 
     Integer selectTotalStockByProductId(@Param("productId") String productId);
+
+    List<ProductTotalStockVO> selectTotalStockByProductIds(@Param("productIds") List<String> productIds);
 
     int upsert(@Param("productId") String productId,
                @Param("propertyValueIdHash") String propertyValueIdHash,

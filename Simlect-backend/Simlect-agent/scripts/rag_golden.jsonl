@@ -1,0 +1,5 @@
+# Replace relevantIds with IDs from the current knowledge release before a real evaluation.
+{"query":"发票在哪里申请","relevantIds":["faq_1","1"],"answerKeywords":["发票","订单"]}
+{"query":"配送范围是什么","relevantIds":["faq_2","2"],"answerKeywords":["配送"]}
+{"query":"商品可以退货吗","relevantIds":["faq_3","3"],"answerKeywords":["退货"]}
+{"query":"这条规则不存在的测试问题","relevantIds":[],"answerKeywords":[]}

@@ -2,6 +2,7 @@ package com.simlect.controller.internal;
 
 import com.simlect.controller.ABaseController;
 import com.simlect.api.enums.ProductStatusEnum;
+import com.simlect.api.support.StockFeignSupport;
 import com.simlect.entity.po.ProductInfo;
 import com.simlect.entity.po.ProductPropertyValue;
 import com.simlect.entity.po.ProductSku;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,8 @@ public class ProductAgentInternalController extends ABaseController {
     private ProductSkuMapper<ProductSku, ProductSkuQuery> productSkuMapper;
     @Resource
     private ProductPropertyValueMapper<ProductPropertyValue, ProductPropertyValueQuery> productPropertyValueMapper;
+    @Resource
+    private StockFeignSupport stockFeignSupport;
 
     @PostMapping("/searchOnSale")
     public ResponseVO<List<Map<String, Object>>> searchOnSale(@RequestBody Map<String, Object> body) {
@@ -69,10 +73,42 @@ public class ProductAgentInternalController extends ABaseController {
         }
         query.setSimplePage(new SimplePage(0, limit));
         List<ProductInfo> list = productInfoMapper.selectList(query);
+        Map<String, String> brandByProduct = new HashMap<>();
+        Map<String, Integer> stockByProduct = Collections.emptyMap();
+        if (list != null && !list.isEmpty()) {
+            List<String> productIds = new ArrayList<>();
+            for (ProductInfo p : list) {
+                productIds.add(p.getProductId());
+            }
+            stockByProduct = stockFeignSupport.totalByProducts(productIds);
+            ProductPropertyValueQuery propertyQuery = new ProductPropertyValueQuery();
+            propertyQuery.setProductIdList(productIds);
+            List<ProductPropertyValue> properties = productPropertyValueMapper.selectList(propertyQuery);
+            if (properties != null) {
+                for (ProductPropertyValue property : properties) {
+                    if (!brandByProduct.containsKey(property.getProductId())
+                            && property.getPropertyName() != null
+                            && property.getPropertyName().contains("品牌")
+                            && !StringTools.isEmpty(property.getPropertyValue())) {
+                        brandByProduct.put(property.getProductId(), property.getPropertyValue());
+                    }
+                }
+            }
+        }
         List<Map<String, Object>> result = new ArrayList<>();
         if (list != null) {
             for (ProductInfo p : list) {
-                result.add(toAgentProductCard(p));
+                Map<String, Object> card = toAgentProductCard(p);
+                String brand = brandByProduct.get(p.getProductId());
+                if (!StringTools.isEmpty(brand)) {
+                    card.put("brand", brand);
+                }
+                if (stockByProduct.containsKey(p.getProductId())) {
+                    Integer totalStock = stockByProduct.get(p.getProductId());
+                    card.put("totalStock", totalStock);
+                    card.put("inStock", totalStock != null && totalStock > 0);
+                }
+                result.add(card);
             }
         }
         return getSuccessResponseVO(result);
@@ -104,6 +140,22 @@ public class ProductAgentInternalController extends ABaseController {
         pvQuery.setProductId(productId);
         List<ProductPropertyValue> pvs = productPropertyValueMapper.selectList(pvQuery);
         m.put("propertyValues", pvs == null ? Collections.emptyList() : pvs);
+        if (pvs != null) {
+            for (ProductPropertyValue property : pvs) {
+                if (property.getPropertyName() != null
+                        && property.getPropertyName().contains("品牌")
+                        && !StringTools.isEmpty(property.getPropertyValue())) {
+                    m.put("brand", property.getPropertyValue());
+                    break;
+                }
+            }
+        }
+        Map<String, Integer> stockByProduct = stockFeignSupport.totalByProducts(List.of(productId));
+        if (stockByProduct.containsKey(productId)) {
+            Integer totalStock = stockByProduct.get(productId);
+            m.put("totalStock", totalStock);
+            m.put("inStock", totalStock != null && totalStock > 0);
+        }
         return getSuccessResponseVO(m);
     }
 
@@ -113,7 +165,9 @@ public class ProductAgentInternalController extends ABaseController {
         m.put("productId", p.getProductId());
         m.put("productName", p.getProductName());
         m.put("cover", p.getCover());
+        m.put("status", p.getStatus());
         m.put("minPrice", p.getMinPrice());
+        m.put("maxPrice", p.getMaxPrice());
         m.put("categoryId", p.getCategoryId());
         m.put("totalSale", p.getTotalSale());
         m.put("sales", p.getTotalSale());

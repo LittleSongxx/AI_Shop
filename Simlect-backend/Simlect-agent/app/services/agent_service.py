@@ -15,6 +15,7 @@ from app.services.product_snapshot_service import product_snapshot_service
 from app.services.rate_limit_service import rate_limit_service
 from app.services.redis_service import redis_service
 from app.services.sensitive_word_service import sensitive_word_service
+from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
 from app.services.support_service import support_service
 from app.services.task_service import agent_task_service
@@ -62,6 +63,7 @@ class AgentOrchestrator:
             await product_snapshot_service.resolve_active_snapshot(user_id, card)
             await redis_service.set_consult_active(user_id)
 
+        await shopping_profile_service.update_profile(user_id, original_user_text)
         previous_unresolved = await agent_message_service.get_unresolved_count(user_id)
         consult_card = await redis_service.get_consult_product(user_id)
         decision = await resolve_intent(

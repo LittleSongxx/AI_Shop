@@ -89,6 +89,8 @@ class Settings(BaseSettings):
     agent_user_lock_ttl_seconds: int = 180
     agent_support_summary_limit: int = 12
     agent_worker_heartbeat_ttl_seconds: int = 30
+    support_first_response_sla_seconds: int = 300
+    support_queue_alert_seconds: int = 600
 
     ai_chat_limit: int = 200
     rag_top_k: int = 15

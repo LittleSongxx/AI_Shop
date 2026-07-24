@@ -20,7 +20,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class StockFeignSupport implements StockBatchCompensatePort {
@@ -80,6 +83,31 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         ProductTotalStockVO vo = feignResponseSupport.call(
                 () -> stockFeignClient.totalByProduct(new ProductIdDTO(productId)), "查询商品总库存失败");
         return vo == null || vo.getTotalStock() == null ? 0 : vo.getTotalStock();
+    }
+
+    public Map<String, Integer> totalByProducts(List<String> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            List<ProductTotalStockVO> rows = feignResponseSupport.call(
+                    () -> stockFeignClient.totalByProducts(productIds),
+                    "批量查询商品库存失败");
+            Map<String, Integer> result = new HashMap<>();
+            if (rows != null) {
+                for (ProductTotalStockVO row : rows) {
+                    if (row != null && row.getProductId() != null) {
+                        result.put(
+                                row.getProductId(),
+                                row.getTotalStock() == null ? 0 : row.getTotalStock());
+                    }
+                }
+            }
+            return result;
+        } catch (RuntimeException ignored) {
+            // Stock is advisory for recommendation cards; product search remains available.
+            return Collections.emptyMap();
+        }
     }
 
     public PaginationResultVO<SkuStockDTO> listLessThan(Integer pageNo, Integer pageSize, Integer threshold) {

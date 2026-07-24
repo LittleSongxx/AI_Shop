@@ -44,6 +44,17 @@
         WHERE product_id = #{productId}
     </select>
 
+    <select id="selectTotalStockByProductIds"
+            resultType="com.simlect.api.vo.ProductTotalStockVO">
+        SELECT product_id AS productId, COALESCE(SUM(stock), 0) AS totalStock
+        FROM sku_stock
+        WHERE product_id IN
+        <foreach item="item" collection="productIds" separator="," open="(" close=")">
+            #{item}
+        </foreach>
+        GROUP BY product_id
+    </select>
+
     <select id="countLessThan" resultType="java.lang.Integer">
         SELECT COUNT(1)
         FROM sku_stock

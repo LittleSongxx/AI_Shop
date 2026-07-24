@@ -12,6 +12,7 @@ from app.services.product_search_query import (
     normalize_product_search_query,
 )
 from app.services.search_recommend_service import search_recommend_service
+from app.services.shopping_profile_service import shopping_profile_service
 from app.utils.biz_payload import build_product_payload, first_cover
 
 logger = structlog.get_logger()
@@ -30,6 +31,15 @@ def is_vague_search_keyword(text: str | None) -> bool:
     return False
 
 _SIMILAR_HINTS = ("类似", "同款", "相近", "同类型", "同款式", "别的款", "其他款")
+
+
+def filter_known_available_products(products: list[dict]) -> list[dict]:
+    return [
+        product
+        for product in products
+        if not shopping_profile_service.is_known_out_of_stock(product)
+    ]
+
 
 def is_similar_or_recommend_request(text: str | None) -> bool:
 
@@ -74,11 +84,25 @@ class ProductService:
         exclude_product_id: str | None = None,
     ) -> tuple[str, str | None, str, list[dict], str]:
 
+        profile = await shopping_profile_service.get_profile(user_id)
+        if shopping_profile_service.should_clarify(
+            user_text,
+            keyword,
+            profile,
+            consult_product,
+        ):
+            assistant, biz_data = build_product_payload([])
+            return assistant, biz_data, "product_search", [], "clarify"
+
         query = derive_search_keyword(keyword, consult_product)
         if not query:
             query = (keyword or "").strip()
         if is_vague_search_keyword(query):
-            query = derive_search_keyword(None, consult_product) or query
+            query = (
+                derive_search_keyword(None, consult_product)
+                or str(profile.get("category") or "").strip()
+                or query
+            )
 
         biz_type = "product_search"
         product_ids: list[str] = []
@@ -161,6 +185,36 @@ class ProductService:
                 biz_type = "product_search"
                 source = "hot_sale"
 
+        candidates_before_stock_filter = len(products)
+        products = filter_known_available_products(products)
+        if candidates_before_stock_filter and not products:
+            logger.info(
+                "product_stock_miss",
+                user_id=user_id,
+                candidates=candidates_before_stock_filter,
+            )
+            source = "out_of_stock"
+
+        if shopping_profile_service.has_hard_constraints(profile):
+            filtered = shopping_profile_service.filter_products(products, profile)
+            if products and not filtered:
+                logger.info(
+                    "shopping_profile_constraint_miss",
+                    user_id=user_id,
+                    profile=shopping_profile_service.summary(profile),
+                    candidates=len(products),
+                )
+                source = "constraint_miss"
+            products = filtered
+            if not products and source != "out_of_stock":
+                source = "constraint_miss"
+        for product in products:
+            product["_recommend_reason"] = shopping_profile_service.recommend_reason(
+                product,
+                profile,
+                source,
+            )
+
         assistant, biz_data = build_product_payload(products)
         return assistant, biz_data, biz_type, products, source
 
@@ -194,7 +248,22 @@ class ProductService:
                     rows.append(detail)
 
         id_map: dict[str, dict] = {}
+        property_values_by_product: dict[str, list[dict]] = {}
+        skus_by_product: dict[str, list[dict]] = {}
+        total_stocks: dict[str, int] = {}
+        if batch:
+            if isinstance(batch.get("total_stocks"), dict):
+                total_stocks = batch["total_stocks"]
+            for prop in batch.get("property_values") or []:
+                pid = str(prop.get("product_id") or "")
+                if pid:
+                    property_values_by_product.setdefault(pid, []).append(prop)
+            for sku in batch.get("skus") or []:
+                pid = str(sku.get("product_id") or "")
+                if pid:
+                    skus_by_product.setdefault(pid, []).append(sku)
         for r in rows:
+            r = dict(r)
             pid = str(r.get("product_id") or "")
             if not pid:
                 continue
@@ -202,6 +271,30 @@ class ProductService:
             if status is not None and status != PRODUCT_STATUS_ON_SALE:
                 continue
             r["cover"] = first_cover(r.get("cover"))
+            properties = property_values_by_product.get(pid)
+            if properties:
+                r["property_values"] = properties
+                brand = next(
+                    (
+                        prop.get("property_value")
+                        for prop in properties
+                        if "品牌" in str(prop.get("property_name") or "")
+                        and prop.get("property_value")
+                    ),
+                    None,
+                )
+                if brand:
+                    r["brand"] = brand
+            skus = skus_by_product.get(pid)
+            if skus:
+                r["skus"] = skus
+            if pid in total_stocks:
+                total_stock = total_stocks[pid]
+                r["total_stock"] = total_stock
+                try:
+                    r["in_stock"] = total_stock is not None and float(total_stock) > 0
+                except (TypeError, ValueError):
+                    r.pop("total_stock", None)
             id_map[pid] = r
 
         ordered = []
@@ -234,6 +327,7 @@ def format_search_tool_message(
     consult: dict | None,
     products: list[dict],
     source: str,
+    profile: dict | None = None,
 ) -> str:
 
     from app.domain.intent.rules import looks_like_browse_recommend, looks_like_hot_sale_recommend
@@ -244,6 +338,24 @@ def format_search_tool_message(
     alternative_sources = {"browse", "hot_sale"}
     kw = (keyword or "").strip()
     kw_display = (normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求"
+
+    if source == "clarify":
+        return (
+            "【需求澄清】为了更准确地推荐，请告诉我商品类别、预算或使用场景，"
+            "例如“3000元以内的办公笔记本”。"
+        )
+    if source == "constraint_miss":
+        summary = shopping_profile_service.summary(profile)
+        detail = f"（{summary}）" if summary else ""
+        return (
+            f"【筛选结果】暂未找到同时满足你的条件{detail}的在售商品。\n"
+            "可以放宽预算或品牌范围，也可以告诉我可接受的替代条件。"
+        )
+    if source == "out_of_stock":
+        return (
+            f"【库存提示】与「{kw_display}」匹配的商品当前均已售罄。\n"
+            "你可以换个关键词，或告诉我可接受的替代品类和品牌。"
+        )
 
     if similar_intent and source in alternative_sources:
         return (

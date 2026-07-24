@@ -9,7 +9,14 @@
     >
       <ProductImage :product="item" :width="52" :height="52" />
       <p class="name">{{ item.productName }}</p>
-      <p class="price">¥{{ formatPrice(item.minPrice ?? item.price) }}</p>
+      <p class="price">{{ formatPriceRange(item) }}</p>
+      <p v-if="item.brand || item.inStock != null" class="meta">
+        <span v-if="item.brand">{{ item.brand }}</span>
+        <span v-if="item.inStock != null" :class="{ unavailable: item.inStock === false }">
+          {{ item.inStock === false ? '暂时缺货' : '有货' }}
+        </span>
+      </p>
+      <p v-if="item.reason" class="reason">{{ item.reason }}</p>
     </RouterLink>
     <p v-if="!list.length" class="empty">暂无相关商品</p>
   </div>
@@ -39,6 +46,15 @@ const onProductClick = (item: Record<string, any>) => {
 };
 
 const formatPrice = (val: unknown) => Number(val ?? 0).toFixed(2);
+
+const formatPriceRange = (item: Record<string, any>) => {
+  const min = Number(item.minPrice ?? item.price ?? 0);
+  const max = item.maxPrice == null ? null : Number(item.maxPrice);
+  if (max != null && Number.isFinite(max) && max > min) {
+    return `¥${formatPrice(min)} - ¥${formatPrice(max)}`;
+  }
+  return `¥${formatPrice(min)}`;
+};
 </script>
 
 <style scoped lang="scss">
@@ -83,6 +99,29 @@ const formatPrice = (val: unknown) => Number(val ?? 0).toFixed(2);
     font-size: 13px;
     font-weight: 600;
     color: $color-price;
+  }
+
+  .meta {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    margin: 0;
+    font-size: 11px;
+    color: $color-text-muted;
+
+    .unavailable {
+      color: $color-error;
+    }
+  }
+
+  .reason {
+    margin: 0;
+    overflow: hidden;
+    color: $color-text-secondary;
+    font-size: 11px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

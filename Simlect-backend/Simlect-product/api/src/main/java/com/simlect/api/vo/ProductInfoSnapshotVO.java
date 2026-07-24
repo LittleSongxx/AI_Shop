@@ -11,6 +11,7 @@ public class ProductInfoSnapshotVO implements Serializable {
     private Integer status;
     private String cover;
     private BigDecimal minPrice;
+    private BigDecimal maxPrice;
     private String categoryId;
     private Integer totalSale;
 
@@ -52,6 +53,14 @@ public class ProductInfoSnapshotVO implements Serializable {
 
     public void setMinPrice(BigDecimal minPrice) {
         this.minPrice = minPrice;
+    }
+
+    public BigDecimal getMaxPrice() {
+        return maxPrice;
+    }
+
+    public void setMaxPrice(BigDecimal maxPrice) {
+        this.maxPrice = maxPrice;
     }
 
     public String getCategoryId() {

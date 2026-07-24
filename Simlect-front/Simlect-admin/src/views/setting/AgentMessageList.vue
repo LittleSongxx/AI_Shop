@@ -45,6 +45,16 @@
       </el-tab-pane>
 
       <el-tab-pane label="人工会话" name="support">
+        <div v-if="supportStats" class="support-stats">
+          <el-tag type="info">近{{ supportStats.windowHours }}小时 {{ supportStats.totalSessions }}个会话</el-tag>
+          <el-tag type="success">首次响应达标 {{ formatRate(supportStats.firstResponseSlaRate) }}</el-tag>
+          <el-tag type="warning">超时排队 {{ supportStats.overdueQueued }}</el-tag>
+          <el-tag type="danger">待响应超时 {{ supportStats.overdueFirstResponse }}</el-tag>
+          <span class="support-stat-text">
+            平均排队 {{ formatSeconds(supportStats.averageQueueWaitSeconds) }}，
+            平均首次响应 {{ formatSeconds(supportStats.averageFirstResponseSeconds) }}
+          </span>
+        </div>
         <div class="search-panel">
           <el-form :model="supportForm" @submit.prevent>
             <el-row :gutter="10">
@@ -185,6 +195,7 @@ const activeTab = ref('messages')
 const tableRef = ref()
 const tableData = ref({})
 const supportData = ref({})
+const supportStats = ref(null)
 const badcaseData = ref({})
 const searchForm = ref({ userId: '', bizType: '' })
 const supportForm = ref({ status: 'QUEUED', userId: '' })
@@ -240,6 +251,7 @@ const badcaseColumns = [
 const onTabChange = (tabName) => {
   if (tabName === 'support') {
     loadSupportSessions()
+    loadSupportStats()
   } else if (tabName === 'badcases') {
     loadBadcases()
   } else {
@@ -278,6 +290,15 @@ const loadSupportSessions = async () => {
   Object.assign(supportData.value, result.data)
 }
 
+const loadSupportStats = async () => {
+  const result = await proxy.Request({
+    url: proxy.Api.agentSupportStats,
+    params: { windowHours: 24 },
+    showLoading: false,
+  })
+  if (result) supportStats.value = result.data || null
+}
+
 const loadBadcases = async () => {
   const params = {
     pageNo: badcaseData.value.pageNo,
@@ -297,6 +318,7 @@ const callSupport = async (url, params, successText) => {
   if (!result) return null
   if (successText) proxy.Message.success(successText)
   loadSupportSessions()
+  loadSupportStats()
   return result.data
 }
 
@@ -417,6 +439,12 @@ const supportStatusType = (status) => ({
   RESOLVED: 'info',
   CANCELLED: 'info',
 }[status] || '')
+const formatRate = (value) => `${(Number(value || 0) * 100).toFixed(1)}%`
+const formatSeconds = (value) => {
+  const seconds = Math.max(0, Number(value || 0))
+  if (seconds < 60) return `${seconds.toFixed(0)}秒`
+  return `${(seconds / 60).toFixed(1)}分钟`
+}
 const senderText = (sender) => ({
   USER: '用户',
   ADMIN: '人工客服',
@@ -470,6 +498,19 @@ const delRow = (row) => {
     display: flex;
     flex-direction: column;
   }
+}
+
+.support-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.support-stat-text {
+  color: #606266;
+  font-size: 13px;
 }
 
 .table-panel {

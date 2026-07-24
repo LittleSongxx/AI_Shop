@@ -21,6 +21,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/internal/stock")
 public class StockInternalController extends ABaseController {
@@ -71,6 +75,16 @@ public class StockInternalController extends ABaseController {
     public ResponseVO<ProductTotalStockVO> totalByProduct(@Valid @RequestBody ProductIdDTO dto) {
         return getSuccessResponseVO(new ProductTotalStockVO(dto.getProductId(),
                 skuStockService.totalByProductId(dto.getProductId())));
+    }
+
+    @PostMapping("/totalByProducts")
+    public ResponseVO<List<ProductTotalStockVO>> totalByProducts(@RequestBody List<String> productIds) {
+        Map<String, Integer> totals = skuStockService.totalByProductIds(productIds);
+        List<ProductTotalStockVO> result = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : totals.entrySet()) {
+            result.add(new ProductTotalStockVO(entry.getKey(), entry.getValue()));
+        }
+        return getSuccessResponseVO(result);
     }
 
     @PostMapping("/listLessThan")

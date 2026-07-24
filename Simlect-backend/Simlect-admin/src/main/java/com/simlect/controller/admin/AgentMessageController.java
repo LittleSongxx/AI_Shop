@@ -55,6 +55,13 @@ public class AgentMessageController extends com.simlect.controller.admin.ABaseCo
 		return getSuccessResponseVO(agentMessageService.callSupport("supportSessions", body));
 	}
 
+	@PostMapping("/supportStats")
+	public ResponseVO supportStats(Integer windowHours) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("windowHours", windowHours == null ? 24 : windowHours);
+		return getSuccessResponseVO(agentMessageService.callSupport("supportStats", body));
+	}
+
 	@PostMapping("/supportClaim")
 	public ResponseVO supportClaim(String sessionId, HttpServletRequest request) {
 		return getSuccessResponseVO(agentMessageService.callSupport(

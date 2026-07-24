@@ -293,6 +293,20 @@ async def admin_support_sessions(
     return success(data)
 
 
+@router.post("/admin/supportStats")
+async def admin_support_stats(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    data = await support_service.sla_stats(
+        _as_int(body.get("windowHours"), 24) or 24,
+        _as_int(body.get("firstResponseSlaSeconds")),
+        _as_int(body.get("queueAlertSeconds")),
+    )
+    return success(data)
+
+
 @router.post("/admin/supportClaim")
 async def admin_support_claim(
     request: Request,

@@ -2,7 +2,9 @@ package com.simlect.api.dto;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.simlect.api.vo.ProductInfoSnapshotVO;
 import com.simlect.api.vo.ProductPropertyValueSnapshotVO;
@@ -15,6 +17,7 @@ public class ProductSnapshotBatchVO implements Serializable {
     private List<ProductInfoSnapshotVO> products = new ArrayList<>();
     private List<ProductSkuSnapshotVO> skus = new ArrayList<>();
     private List<ProductPropertyValueSnapshotVO> propertyValues = new ArrayList<>();
+    private Map<String, Integer> totalStocks = new LinkedHashMap<>();
 
     public List<ProductInfoSnapshotVO> getProducts() {
         return products;
@@ -38,5 +41,13 @@ public class ProductSnapshotBatchVO implements Serializable {
 
     public void setPropertyValues(List<ProductPropertyValueSnapshotVO> propertyValues) {
         this.propertyValues = propertyValues;
+    }
+
+    public Map<String, Integer> getTotalStocks() {
+        return totalStocks;
+    }
+
+    public void setTotalStocks(Map<String, Integer> totalStocks) {
+        this.totalStocks = totalStocks;
     }
 }

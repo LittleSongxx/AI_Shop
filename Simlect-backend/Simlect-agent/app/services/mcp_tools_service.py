@@ -376,13 +376,21 @@ async def tool_search_products(
         consult_product=consult,
         exclude_product_id=exclude_product_id,
     )
-    if not products:
-        return ToolInvokeResult(content="【搜索结果】未找到相关商品。")
     from app.services.product_service import format_search_tool_message
+    from app.services.shopping_profile_service import shopping_profile_service
+
+    content = format_search_tool_message(
+        keyword,
+        consult,
+        products,
+        source,
+        profile=await shopping_profile_service.get_profile(user_id),
+    )
+    if not products:
+        return ToolInvokeResult(content=content, biz_type=biz_type)
 
     names = [str(p.get("product_name") or p.get("productName") or "") for p in products]
     ids = [str(p.get("product_id") or p.get("productId") or "") for p in products if p.get("product_id") or p.get("productId")]
-    content = format_search_tool_message(keyword, consult, products, source)
     return ToolInvokeResult(
         content=content,
         biz_type=biz_type,

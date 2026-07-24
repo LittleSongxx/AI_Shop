@@ -37,6 +37,21 @@ def _to_number(value: Any) -> Any:
         return float(value)
     return value
 
+def _to_bool(value: Any) -> bool | None:
+
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        return value != 0
+    normalized = str(value).strip().lower()
+    if normalized in {"true", "1", "yes"}:
+        return True
+    if normalized in {"false", "0", "no"}:
+        return False
+    return None
+
 def trim_assistant(text: str | None) -> str | None:
 
     if text is None:
@@ -75,12 +90,48 @@ def build_product_payload(products: list[dict]) -> tuple[str, str | None]:
         if pid in ids:
             continue
         ids.append(pid)
-        cards.append({
+        card = {
             "productId": pid,
             "productName": p.get("product_name") or p.get("productName", ""),
             "cover": first_cover(p.get("cover")),
             "minPrice": _to_number(p.get("min_price") or p.get("minPrice")),
-        })
+        }
+        max_price = p.get("max_price") if p.get("max_price") is not None else p.get("maxPrice")
+        if max_price is not None:
+            card["maxPrice"] = _to_number(max_price)
+        brand = p.get("brand")
+        if brand:
+            card["brand"] = str(brand)
+        total_stock = (
+            p.get("total_stock")
+            if p.get("total_stock") is not None
+            else p.get("totalStock")
+        )
+        if total_stock is not None:
+            total_stock = _to_number(total_stock)
+            card["totalStock"] = total_stock
+        in_stock = _to_bool(
+            p.get("in_stock")
+            if p.get("in_stock") is not None
+            else p.get("inStock")
+        )
+        if in_stock is None and isinstance(total_stock, (int, float)):
+            in_stock = total_stock > 0
+        if in_stock is not None:
+            card["inStock"] = in_stock
+        status = p.get("status")
+        if status is not None and str(status) != "1":
+            card["availability"] = "UNAVAILABLE"
+        elif in_stock is False:
+            card["availability"] = "OUT_OF_STOCK"
+        elif status is not None:
+            card["availability"] = (
+                "ON_SALE" if str(status) == "1" else "UNAVAILABLE"
+            )
+        reason = p.get("_recommend_reason") or p.get("recommend_reason")
+        if reason:
+            card["reason"] = str(reason)[:80]
+        cards.append(card)
     cards = _dedupe_product_cards(cards)
     return _json_dumps(cards), _json_dumps(ids) if ids else None
 

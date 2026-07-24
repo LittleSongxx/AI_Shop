@@ -116,6 +116,7 @@ const Api = {
     agentMessageDelete: "/agentMessage/deleteAgentMessageByMessageId",
     agentSupportQueue: "/agentMessage/supportQueue",
     agentSupportSessions: "/agentMessage/supportSessions",
+    agentSupportStats: "/agentMessage/supportStats",
     agentSupportClaim: "/agentMessage/supportClaim",
     agentSupportActivate: "/agentMessage/supportActivate",
     agentSupportReply: "/agentMessage/supportReply",

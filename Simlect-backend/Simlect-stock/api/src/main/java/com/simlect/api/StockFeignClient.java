@@ -17,6 +17,8 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.List;
+
 @FeignClient(name = "simlect-stock", contextId = "stockFeignClient", path = "/internal/stock",
         fallbackFactory = StockFeignFallbackFactory.class)
 public interface StockFeignClient {
@@ -44,6 +46,9 @@ public interface StockFeignClient {
 
     @PostMapping("/totalByProduct")
     ResponseVO<ProductTotalStockVO> totalByProduct(@RequestBody ProductIdDTO dto);
+
+    @PostMapping("/totalByProducts")
+    ResponseVO<List<ProductTotalStockVO>> totalByProducts(@RequestBody List<String> productIds);
 
     @PostMapping("/listLessThan")
     ResponseVO<PaginationResultVO<SkuStockDTO>> listLessThan(@RequestBody LessStockPageDTO dto);
