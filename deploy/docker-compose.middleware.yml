@@ -1,14 +1,14 @@
 
 networks:
-  simlect-net:
-    name: simlect-net
+  aishop-net:
+    name: aishop-net
     driver: bridge
 
 services:
   mysql:
     image: mysql:8.3
-    container_name: simlect-mysql
-    networks: [simlect-net]
+    container_name: aishop-mysql
+    networks: [aishop-net]
     ports:
       - "3306:3306"
     environment:
@@ -21,7 +21,7 @@ services:
       - --innodb_buffer_pool_size=1G
       - --max_connections=300
     volumes:
-      - simlect_mysql:/var/lib/mysql
+      - aishop_mysql:/var/lib/mysql
     mem_limit: 2g
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
@@ -32,8 +32,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: simlect-redis
-    networks: [simlect-net]
+    container_name: aishop-redis
+    networks: [aishop-net]
     ports:
       - "6379:6379"
     command:
@@ -45,7 +45,7 @@ services:
       - --maxmemory-policy
       - allkeys-lru
     volumes:
-      - simlect_redis:/data
+      - aishop_redis:/data
     mem_limit: 640m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -56,18 +56,18 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management
-    container_name: simlect-rabbitmq
-    networks: [simlect-net]
+    container_name: aishop-rabbitmq
+    networks: [aishop-net]
     ports:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: simlect
-      RABBITMQ_DEFAULT_PASS: simlect
+      RABBITMQ_DEFAULT_USER: aishop
+      RABBITMQ_DEFAULT_PASS: aishop
       RABBITMQ_DEFAULT_VHOST: /
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-memory 1024M"
     volumes:
-      - simlect_rabbit:/var/lib/rabbitmq
+      - aishop_rabbit:/var/lib/rabbitmq
     mem_limit: 1536m
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -78,8 +78,8 @@ services:
 
   nacos:
     image: nacos/nacos-server:v2.4.3
-    container_name: simlect-nacos
-    networks: [simlect-net]
+    container_name: aishop-nacos
+    networks: [aishop-net]
     ports:
       - "8848:8848"
       - "9848:9848"
@@ -112,9 +112,9 @@ services:
     build:
       context: ./elasticsearch
       dockerfile: Dockerfile
-    image: simlect-elasticsearch:9.2.1-ik
-    container_name: simlect-es
-    networks: [simlect-net]
+    image: aishop-elasticsearch:9.2.1-ik
+    container_name: aishop-es
+    networks: [aishop-net]
     ports:
       - "9200:9200"
     environment:
@@ -122,10 +122,10 @@ services:
       xpack.security.enabled: "false"
       xpack.security.http.ssl.enabled: "false"
       ES_JAVA_OPTS: -Xms1g -Xmx2g
-      cluster.name: simlect-es
+      cluster.name: aishop-es
       bootstrap.memory_lock: "false"
     volumes:
-      - simlect_es:/usr/share/elasticsearch/data
+      - aishop_es:/usr/share/elasticsearch/data
     mem_limit: 3g
     ulimits:
       memlock:
@@ -144,8 +144,8 @@ services:
 
   sentinel:
     image: bladex/sentinel-dashboard:1.8.8
-    container_name: simlect-sentinel
-    networks: [simlect-net]
+    container_name: aishop-sentinel
+    networks: [aishop-net]
     ports:
       - "8858:8858"
     environment:
@@ -157,9 +157,9 @@ services:
     build:
       context: ./seata
       dockerfile: Dockerfile
-    image: simlect-seata-server:2.2.0
-    container_name: simlect-seata
-    networks: [simlect-net]
+    image: aishop-seata-server:2.2.0
+    container_name: aishop-seata
+    networks: [aishop-net]
     ports:
       - "8091:8091"
       - "7091:7091"
@@ -182,7 +182,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  simlect_mysql:
-  simlect_redis:
-  simlect_rabbit:
-  simlect_es:
+  aishop_mysql:
+  aishop_redis:
+  aishop_rabbit:
+  aishop_es:

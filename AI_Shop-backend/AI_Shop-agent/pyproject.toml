@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aishop-agent"
+version = "1.0.0"
+description = "AI customer service and shopping guide service for AI Shop"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "alembic>=1.14,<2",
+  "aio-pika>=9.4,<10",
+  "aiomysql>=0.2,<0.3",
+  "fastapi==0.115.14",
+  "httpx>=0.28,<0.29",
+  "langchain-openai==0.3.35",
+  "langgraph==0.2.76",
+  "mcp==1.28.0",
+  "opentelemetry-api>=1.29,<2",
+  "opentelemetry-exporter-otlp-proto-grpc>=1.29,<2",
+  "opentelemetry-instrumentation-fastapi>=0.50b0,<1",
+  "opentelemetry-instrumentation-httpx>=0.50b0,<1",
+  "opentelemetry-instrumentation-redis>=0.50b0,<1",
+  "opentelemetry-instrumentation-sqlalchemy>=0.50b0,<1",
+  "opentelemetry-sdk>=1.29,<2",
+  "prometheus-client>=0.21,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "pymysql>=1.1,<2",
+  "python-dotenv>=1.0,<2",
+  "python-multipart>=0.0.12,<1",
+  "pyyaml>=6,<7",
+  "redis>=5.2,<7",
+  "sqlalchemy>=2.0,<3",
+  "slowapi>=0.1.9,<1",
+  "structlog>=24.4,<26",
+  "tenacity>=9,<10",
+  "uvicorn[standard]>=0.32,<0.33",
+  "websockets>=13,<16",
+]
+
+[project.scripts]
+ai-shop-agent-worker = "app.worker:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<1",
+  "ruff>=0.8,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+  "mysql: tests that require a real MySQL server",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["E501"]

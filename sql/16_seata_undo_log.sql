@@ -3,7 +3,7 @@
 -- 参与库（下单 @GlobalTransactional 会写）：order / stock / coupon / cart / pay
 -- 不参与写库的 user、product 等无需 undo_log
 
-USE simlect_order;
+USE aishop_order;
 CREATE TABLE IF NOT EXISTS `undo_log`
 (
     `branch_id`     BIGINT       NOT NULL COMMENT 'branch transaction id',
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `undo_log`
     KEY `ix_log_created` (`log_created`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COMMENT ='AT transaction mode undo table';
 
-USE simlect_stock;
+USE aishop_stock;
 CREATE TABLE IF NOT EXISTS `undo_log`
 (
     `branch_id`     BIGINT       NOT NULL COMMENT 'branch transaction id',
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS `undo_log`
     KEY `ix_log_created` (`log_created`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COMMENT ='AT transaction mode undo table';
 
-USE simlect_coupon;
+USE aishop_coupon;
 CREATE TABLE IF NOT EXISTS `undo_log`
 (
     `branch_id`     BIGINT       NOT NULL COMMENT 'branch transaction id',
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS `undo_log`
     KEY `ix_log_created` (`log_created`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COMMENT ='AT transaction mode undo table';
 
-USE simlect_cart;
+USE aishop_cart;
 CREATE TABLE IF NOT EXISTS `undo_log`
 (
     `branch_id`     BIGINT       NOT NULL COMMENT 'branch transaction id',
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `undo_log`
     KEY `ix_log_created` (`log_created`)
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 DEFAULT CHARSET = utf8mb4 COMMENT ='AT transaction mode undo table';
 
-USE simlect_pay;
+USE aishop_pay;
 CREATE TABLE IF NOT EXISTS `undo_log`
 (
     `branch_id`     BIGINT       NOT NULL COMMENT 'branch transaction id',

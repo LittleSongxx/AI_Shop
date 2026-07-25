@@ -1,0 +1,60 @@
+name: Online AI evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: Golden Set path relative to the Agent directory
+        required: true
+        default: scripts/rag_golden.jsonl
+
+permissions:
+  contents: read
+
+jobs:
+  online-ai:
+    name: Live LLM, Embedding, Rerank and RAG gate
+    runs-on: ubuntu-latest
+    environment: ai-evaluation
+    defaults:
+      run:
+        working-directory: AI_Shop-backend/AI_Shop-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: AI_Shop-backend/AI_Shop-agent/requirements.lock
+      - run: python -m pip install --requirement requirements.lock
+      - run: python -m pip install --no-deps --editable .
+      - run: python scripts/check_online_models.py
+        env:
+          APP_ENV: development
+          LLM_API_KEY: ${{ secrets.AI_EVAL_LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.AI_EVAL_LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.AI_EVAL_LLM_MODEL }}
+          EMBEDDING_API_KEY: ${{ secrets.AI_EVAL_EMBEDDING_API_KEY }}
+          EMBEDDING_BASE_URL: ${{ vars.AI_EVAL_EMBEDDING_BASE_URL }}
+          EMBEDDING_MODEL: ${{ vars.AI_EVAL_EMBEDDING_MODEL }}
+          RERANK_API_KEY: ${{ secrets.AI_EVAL_RERANK_API_KEY }}
+          RERANK_BASE_URL: ${{ vars.AI_EVAL_RERANK_BASE_URL }}
+          RERANK_MODEL: ${{ vars.AI_EVAL_RERANK_MODEL }}
+          REDIS_HOST: ${{ vars.AI_EVAL_REDIS_HOST }}
+          REDIS_PORT: ${{ vars.AI_EVAL_REDIS_PORT }}
+      - run: python scripts/eval_rag.py --dataset "${{ inputs.dataset }}"
+        env:
+          APP_ENV: development
+          JAVA_WEB_URL: ${{ vars.AI_EVAL_JAVA_WEB_URL }}
+          ES_HOSTS: ${{ vars.AI_EVAL_ES_HOSTS }}
+          ES_INDEX: ${{ vars.AI_EVAL_ES_INDEX }}
+          VECTOR_FIELD: embedding
+          ES_VECTOR_DIMENSIONS: "1024"
+          EMBEDDING_API_KEY: ${{ secrets.AI_EVAL_EMBEDDING_API_KEY }}
+          EMBEDDING_BASE_URL: ${{ vars.AI_EVAL_EMBEDDING_BASE_URL }}
+          EMBEDDING_MODEL: ${{ vars.AI_EVAL_EMBEDDING_MODEL }}
+          RERANK_API_KEY: ${{ secrets.AI_EVAL_RERANK_API_KEY }}
+          RERANK_BASE_URL: ${{ vars.AI_EVAL_RERANK_BASE_URL }}
+          RERANK_MODEL: ${{ vars.AI_EVAL_RERANK_MODEL }}
+          REDIS_HOST: ${{ vars.AI_EVAL_REDIS_HOST }}
+          REDIS_PORT: ${{ vars.AI_EVAL_REDIS_PORT }}

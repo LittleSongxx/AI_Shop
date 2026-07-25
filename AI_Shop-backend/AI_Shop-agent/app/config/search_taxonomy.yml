@@ -1,0 +1,64 @@
+contract: current
+fillers:
+  - 我想要
+  - 我要
+  - 想要
+  - 想买
+  - 帮我
+  - 给我
+  - 麻烦
+  - 请你
+  - 请
+  - 有没有
+  - 能不能
+  - 可以吗
+  - 可以
+  - 推荐一下
+  - 推荐
+  - 看看
+  - 买点
+  - 来点
+  - 吃点
+  - 搜一下
+  - 搜索一下
+  - 搜索
+  - 找找
+  - 找
+  - 买
+  - 要
+  - 吃
+punctuation: "的了吗呢啊哦呀呗嘛～~，。！？、；：\"'"
+topics:
+  - id: snack
+    canonical: 零食
+    aliases: [小吃, 坚果, 糖果, 饼干]
+    terms:
+      [零食, 小吃, 坚果, 糖果, 饼干, 薯片, 雪饼, 辣条, 巧克力, 膨化, 果干, 肉脯, 糕点, 锅巴, 虾条, 牛肉干, 瓜子, 旺旺, 奥利奥]
+  - id: phone
+    canonical: 手机
+    aliases: [iphone, 苹果手机, 华为手机, 小米手机, 三星手机, oppo, vivo, 荣耀手机]
+    terms: [手机, iphone, 苹果, 华为, 小米, 三星, oppo, vivo, 荣耀, 红米, 手机壳]
+  - id: computer
+    canonical: 电脑
+    aliases: [台式机, 台式, 笔记本, 主机, 显示器, 一体机]
+    terms: [电脑, 台式, 笔记本, 主机, 显示器, 一体机]
+  - id: toy
+    canonical: 玩具
+    aliases: [玩偶, 公仔, 模型, 积木, 乐高, 毛绒]
+    terms: [玩具, 玩偶, 公仔, 积木, 乐高, 模型, 毛绒]
+  - id: instrument
+    canonical: 乐器
+    aliases: [吉他, 尤克里里, 电子琴, 钢琴, 电吉他, 民谣吉他]
+    terms: [乐器, 吉他, 尤克里里, 电子琴, 钢琴, 电吉他, 民谣]
+  - id: appliance
+    canonical: 家电
+    aliases: [电器, 小家电]
+    terms: [家电, 电器, 小家电]
+  - id: apparel
+    canonical: 服饰
+    aliases: [衣服, 鞋子, 童装]
+    terms: [服饰, 衣服, 鞋子, 童装, 儿童]
+  - id: beauty
+    canonical: 美妆
+    aliases: [护肤, 化妆品]
+    terms: [美妆, 护肤, 化妆品]

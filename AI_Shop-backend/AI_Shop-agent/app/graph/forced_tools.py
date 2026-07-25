@@ -1,0 +1,172 @@
+"""模型漏调工具时的确定性兜底。
+
+ReAct 的前提是模型会在需要事实时自己调工具。实际上它会漏：明明在问订单，
+却直接凭上下文编一段话。这类回答看起来通顺但可能完全错，比报错更糟。
+
+所以第 0 轮结束后，如果意图明确需要工具而模型没调，就由代码直接调一次，
+把结果并进这一轮的输出并直接进 finalize——不再给模型第二次机会，
+因为再来一轮它大概率还是不调，只是多花一次 token。
+
+四个分支都在做同一件事：调一个工具，然后把结果拼成"可以收尾"的状态增量。
+原先它们内联在 ``agent_loop_node`` 里，各写一遍近似的 dict，
+漏一个键就是卡片渲染不出来。这里收敛成一个 ``_finalize_with_tool``。
+"""
+
+from __future__ import annotations
+
+import structlog
+from langchain_core.messages import ToolMessage
+
+from app.domain.intent.types import IntentKind
+from app.domain.intent.write_args import required_tool_for_intent
+from app.services.mcp_tool_router import mcp_tool_router
+from app.services.tool_invoke_result import ToolInvokeResult
+
+logger = structlog.get_logger()
+
+# 工具名 → 前端业务卡片类型。只在工具本身没给 biz_type 时兜底。
+_BIZ_TYPE_BY_TOOL = {
+    "QUERY_ORDERS": "query_order",
+    "QUERY_LOGISTICS": "query_logistics",
+    "QUERY_COMMENT": "query_comment",
+    "QUERY_USER_COUPONS": "query_coupon",
+}
+
+_CANCEL_ORDER_GUIDE = "客服侧暂不支持直接取消订单，请到「我的订单」页面自行取消。"
+
+
+def _biz_type_for(result: ToolInvokeResult, tool_name: str) -> str | None:
+    if result.biz_type:
+        return result.biz_type
+    if tool_name.startswith("PROPOSE_"):
+        return "action_confirm"
+    return _BIZ_TYPE_BY_TOOL.get(tool_name)
+
+
+def _finalize_with_tool(
+    *,
+    messages: list,
+    tool_name: str,
+    result: ToolInvokeResult,
+    chunks: list[str],
+    search_hint: str | None = None,
+) -> dict:
+    """把一次强制工具调用的结果拼成直接收尾的状态增量。"""
+    return {
+        "llm_messages": messages,
+        "tools_called": [tool_name],
+        "tool_biz": result.to_biz_dict() or None,
+        "biz_type": _biz_type_for(result, tool_name),
+        "biz_data": result.biz_data,
+        "assistant_cards": result.assistant_cards,
+        "search_tool_hint": search_hint,
+        "search_fallback_done": True,
+        "chunks": chunks,
+        "pending_tool_calls": [],
+        "route": "finalize",
+    }
+
+
+def _has_cards(result: ToolInvokeResult) -> bool:
+    return bool(result.assistant_cards and result.assistant_cards.strip() not in ("", "[]"))
+
+
+async def forced_product_search(
+    *,
+    messages: list,
+    user_id: str,
+    keyword: str,
+    llm_body: str,
+    exclude_product_id: str | None,
+    log_event: str,
+) -> dict:
+    """模型该搜商品却没搜时，直接搜一次。
+
+    ``llm_body`` 是模型这一轮已经说出来的话，保留它，否则用户会看到回答凭空消失。
+    """
+    args: dict = {"keyword": keyword}
+    if exclude_product_id:
+        args["excludeProductId"] = str(exclude_product_id)
+    result = await mcp_tool_router.invoke("SEARCH_PRODUCTS", args, user_id)
+    logger.info(
+        log_event,
+        user_id=user_id,
+        keyword=keyword,
+        exclude_product_id=exclude_product_id,
+        has_cards=bool(result.assistant_cards),
+    )
+    return _finalize_with_tool(
+        messages=messages,
+        tool_name="SEARCH_PRODUCTS",
+        result=result,
+        chunks=[llm_body] if llm_body else [],
+        search_hint=result.to_tool_message(),
+    )
+
+
+async def forced_tool_for_intent(
+    *,
+    messages: list,
+    user_id: str,
+    intent: str | None,
+    intent_data: str | None,
+    user_text: str,
+) -> dict | None:
+    """意图要求工具但模型没调时，替它调。参数不全则返回 None 交回模型追问。"""
+    forced = await required_tool_for_intent(intent, intent_data, user_text, user_id)
+    if not forced:
+        return None
+    tool_name, tool_args = forced
+    result = await mcp_tool_router.invoke(tool_name, tool_args, user_id)
+    tool_text = result.to_tool_message() or ""
+    messages.append(ToolMessage(content=tool_text or "未查询到相关记录。", tool_call_id="forced_mcp"))
+    logger.warning(
+        "forced_mcp_after_llm_skip",
+        user_id=user_id,
+        intent=intent,
+        tool=tool_name,
+        has_cards=bool(result.assistant_cards),
+        has_act_token="act_" in tool_text.lower(),
+    )
+
+    # 有卡片时不再输出文本，避免卡片和纯文本重复描述同一批数据。
+    chunks = [] if _has_cards(result) else [tool_text or "未查询到相关记录。"]
+    if intent == IntentKind.CANCEL_ORDER.value:
+        chunks = [_CANCEL_ORDER_GUIDE + "\n" + chunks[0]] if chunks else [_CANCEL_ORDER_GUIDE]
+
+    return _finalize_with_tool(
+        messages=messages,
+        tool_name=tool_name,
+        result=result,
+        chunks=chunks,
+        search_hint=tool_text if tool_name == "SEARCH_PRODUCTS" else None,
+    )
+
+
+async def forced_order_list(
+    *,
+    messages: list,
+    user_id: str,
+    intent: str | None,
+    order_id: str | None,
+) -> dict:
+    """用户明确在要订单列表时强制查一次，保证前端拿到卡片而不是表格文本。"""
+    result = await mcp_tool_router.invoke(
+        "QUERY_ORDERS", {"orderId": order_id} if order_id else {}, user_id
+    )
+    tool_text = result.to_tool_message() or ""
+    messages.append(
+        ToolMessage(content=tool_text or "未查询到相关订单。", tool_call_id="forced_orders_ui")
+    )
+    logger.warning(
+        "forced_query_orders_for_cards",
+        user_id=user_id,
+        intent=intent,
+        has_cards=bool(result.assistant_cards),
+    )
+    return _finalize_with_tool(
+        messages=messages,
+        tool_name="QUERY_ORDERS",
+        result=result,
+        chunks=[],
+    )

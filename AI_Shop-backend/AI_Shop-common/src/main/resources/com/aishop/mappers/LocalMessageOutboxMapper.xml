@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aishop.mappers.LocalMessageOutboxMapper">
+
+    <resultMap id="base_result_map" type="com.aishop.entity.po.LocalMessageOutbox">
+        <id column="id" property="id"/>
+        <result column="idempotency_key" property="idempotencyKey"/>
+        <result column="exchange_name" property="exchangeName"/>
+        <result column="routing_key" property="routingKey"/>
+        <result column="payload_json" property="payloadJson"/>
+        <result column="reliability_level" property="reliabilityLevel"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="lease_owner" property="leaseOwner"/>
+        <result column="lease_until" property="leaseUntil"/>
+        <result column="next_retry_time" property="nextRetryTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="sent_time" property="sentTime"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        insert into local_message_outbox
+        (idempotency_key, exchange_name, routing_key, payload_json, reliability_level,
+         status, retry_count, create_time, update_time)
+        values
+        (#{idempotencyKey}, #{exchangeName}, #{routingKey}, #{payloadJson}, #{reliabilityLevel},
+         #{status}, #{retryCount}, #{createTime}, #{updateTime})
+    </insert>
+
+    <select id="selectById" resultMap="base_result_map">
+        select * from local_message_outbox where id = #{id}
+    </select>
+
+    <select id="selectByIdempotencyKey" resultMap="base_result_map">
+        select * from local_message_outbox where idempotency_key = #{idempotencyKey}
+    </select>
+
+    <update id="claimForDispatch">
+        update local_message_outbox
+        set status = #{sendingStatus},
+            update_time = now(),
+            lease_owner = #{leaseOwner},
+            lease_until = #{leaseUntil},
+            error_message = null
+        where id = #{id}
+          and (
+            (
+              status in (#{pendingStatus}, #{failedStatus})
+              and (next_retry_time is null or next_retry_time &lt;= #{now})
+            )
+            or
+            (
+              status = #{sendingStatus}
+              and (lease_until is null or lease_until &lt;= #{now})
+            )
+          )
+    </update>
+
+    <update id="markSent">
+        update local_message_outbox
+        set status = #{sentStatus},
+            update_time = now(),
+            sent_time = #{sentTime},
+            lease_owner = null,
+            lease_until = null,
+            next_retry_time = null,
+            error_message = null
+        where id = #{id}
+          and status = #{sendingStatus}
+          and lease_owner = #{leaseOwner}
+    </update>
+
+    <update id="markFailed">
+        update local_message_outbox
+        set status = #{failedStatus},
+            update_time = now(),
+            retry_count = ifnull(retry_count, 0) + 1,
+            error_message = #{errorMessage},
+            next_retry_time = #{nextRetryTime},
+            lease_owner = null,
+            lease_until = null
+        where id = #{id}
+          and status = #{sendingStatus}
+          and lease_owner = #{leaseOwner}
+    </update>
+
+    <select id="selectDispatchBatch" resultMap="base_result_map">
+        select * from local_message_outbox
+        where create_time &lt;= #{beforeTime}
+          and (
+            (
+              status in (#{pendingStatus}, #{failedStatus})
+              and (next_retry_time is null or next_retry_time &lt;= #{now})
+            )
+            or
+            (
+              status = #{sendingStatus}
+              and (lease_until is null or lease_until &lt;= #{now})
+            )
+          )
+        order by id asc
+        limit #{limit}
+    </select>
+</mapper>

@@ -1,4 +1,4 @@
-# Simlect 本地中间件一键启动（Windows PowerShell）
+# AI_Shop 本地中间件一键启动（Windows PowerShell）
 $ErrorActionPreference = "Stop"
 $ComposeFile = Join-Path $PSScriptRoot "docker-compose.middleware.yml"
 
@@ -11,7 +11,7 @@ Write-Host "==> 确保 MySQL 先起来（便于初始化 nacos/seata 库）"
 docker compose -f $ComposeFile up -d mysql
 $ok = $false
 for ($i = 0; $i -lt 60; $i++) {
-  $st = docker inspect -f "{{.State.Health.Status}}" simlect-mysql 2>$null
+  $st = docker inspect -f "{{.State.Health.Status}}" aishop-mysql 2>$null
   if ($st -eq "healthy") { $ok = $true; break }
   Start-Sleep -Seconds 2
 }
@@ -20,7 +20,7 @@ if (-not $ok) { throw "MySQL 未在超时内 healthy" }
 Write-Host "==> 初始化 nacos / seata / undo_log（可重复执行）"
 & (Join-Path $PSScriptRoot "init-mysql-meta.ps1")
 
-Write-Host "==> 启动全部中间件（同网络 simlect-net，含 Seata）"
+Write-Host "==> 启动全部中间件（同网络 aishop-net，含 Seata）"
 docker compose -f $ComposeFile up -d
 
 Write-Host ""

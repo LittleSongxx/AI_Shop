@@ -1,4 +1,4 @@
-# Simlect 上线清单（Go-Live）
+# AI_Shop 上线清单（Go-Live）
 
 ## 结论口径
 
@@ -10,26 +10,26 @@
 
 ```bash
 export JAVA_HOME=...   # JDK 17
-cd Simlect/Simlect-backend
+cd AI_Shop/AI_Shop-backend
 mvn -q package -DskipTests
 # 确认各模块 target/*-1.0.0.jar 存在
 ```
 
-## 1. 数据库（按序）
+## 1. 数据库引导
 
 ```text
 00_create_databases.sql
 00b_nacos_seata_databases.sql   # 首次：nacos / seata 库
 14_nacos.sql / 15_seata.sql / 16_seata_undo_log.sql
-01_user.sql … 10_admin.sql
-13_mq_infra_per_service.sql   # user/product/search Outbox + mq_compensation_log
 ```
 
-表归属见 `sql/TABLE_OWNERSHIP.md`。
+业务表由各 Java 服务唯一的
+`src/main/resources/db/migration/R__current_schema.sql` 自动初始化并兼容升级；
+Python Agent 使用 Alembic。表归属见 `sql/TABLE_OWNERSHIP.md`。
 
 ## 2. 基础设施
 
-- MySQL 8（各 simlect_* 库）
+- MySQL 8（各 aishop_* 库）
 - Redis
 - RabbitMQ（建议磁盘持久化）
 - Nacos 2.x（8848）
@@ -40,8 +40,8 @@ mvn -q package -DskipTests
 
 复制 `deploy/env.production.example`，至少改掉：
 
-- `SIMLECT_PRODUCTION_READY=true`
-- `SIMLECT_INTERNAL_TOKEN`
+- `AISHOP_PRODUCTION_READY=true`
+- `AISHOP_INTERNAL_TOKEN`
 - `MYSQL_PASSWORD` / `RABBIT_PASSWORD`
 - `ADMIN_PASSWORD`
 - `PROJECT_FOLDER` / `PROJECT_DOMAIN`
@@ -54,10 +54,10 @@ mvn -q package -DskipTests
 3. Python MCP Server:7060（`start-mcp.bat` / `python -m app.mcp_server`；**无热重载，发版或改工具后须重启**）
 4. Python agent API:7050（`JAVA_WEB_URL` 与 `MCP_SERVER_URL` 指向 Gateway / MCP）
 5. Python agent worker（`python -m app.worker`，必须与 API 使用同一 `.env`）
-6. Nginx 反代（见 `deploy/nginx.simlect.conf.example`）
+6. Nginx 反代（见 `deploy/nginx.aishop.conf.example`）
 7. 前端 production 构建，相对路径 `/api`、`/admin-api`
 
-> Java 根包与 Maven `groupId` 均为 `com.simlect`。ES 商品索引 `simlect-index`，向量索引默认 `simlect_vectorstore`（`VECTOR_INDEX` / Agent `ES_INDEX`）。密钥仅环境变量 / `.env`，勿写入 IDE Run Configuration。
+> Java 根包与 Maven `groupId` 均为 `com.aishop`。ES 商品索引 `aishop-index`，向量索引默认 `aishop_vectorstore`（`VECTOR_INDEX` / Agent `ES_INDEX`）。密钥仅环境变量 / `.env`，勿写入 IDE Run Configuration。
 
 ## 5. Smoke Test
 
@@ -68,12 +68,14 @@ mvn -q package -DskipTests
 - 订单超时关单 / Outbox 有 SENT 记录  
 - 管理端登录与订单列表  
 - 管理端首页今日数据 / 库存预警（依赖 order、user、product、stock 均 UP）  
-- Agent HTTP/WS 经 Gateway；Agent `/health` 返回 `worker=true`；MCP `tools/list` 可用（`:7060/mcp`）
+- Agent HTTP/WS 经 Gateway；`/health/live` 存活，`/health/ready` 对
+  MySQL、Redis、RabbitMQ、Worker、ES mapping、MCP 与 Gateway actuator
+  全部返回就绪；外部模型状态查看 `/health/dependencies`
 - 对话：订单卡 / 商品卡正常；搜索未命中文案为<暂未找到>而非误报<找到 N 个>
 
 ## 6. 安全确认
 
 - 业务端口（8084–8111、7050）不对公网  
-- 未使用 `-Ddev` / `SIMLECT_DEV_LOGIN_BYPASS=true`  
+- 未使用 `-Ddev` / `AISHOP_DEV_LOGIN_BYPASS=true`  
 - Nginx 未反代 `/actuator`  
 - 各服务启动日志出现"生产就绪校验通过"

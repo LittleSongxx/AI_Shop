@@ -1,4 +1,4 @@
-# Simlect 完整版启动（中间件全开 + 微服务全开）
+# AI_Shop 完整版启动（中间件全开 + 微服务全开）
 
 ## 机器要求（务必看）
 
@@ -39,7 +39,7 @@ docker compose -f docker-compose.middleware.yml ps
 
 ## 二、Java 微服务（全部 `*Application`，按顺序）
 
-**不要启动** `*/api`、`Simlect-common`。
+**不要启动** `*/api`、`AI_Shop-common`。
 
 IDE 运行时在 VM options 加对应 `-Xms/-Xmx`；或 PowerShell：
 
@@ -50,23 +50,23 @@ $env:JAVA_TOOL_OPTIONS="-XX:+UseG1GC -XX:MaxGCPauseMillis=50 ..."
 
 | 顺序  | 入口类                  | 模块                    | 端口   | 建议 JVM（16G 机）       |
 | --- | -------------------- | --------------------- | ---- | ------------------- |
-| 1   | `GatewayApplication` | `Simlect-gateway`     | 8080 | `-Xms128m -Xmx256m` |
-| 2   | `UserApplication`    | `Simlect-user/app`    | 8105 | `-Xms128m -Xmx320m` |
-| 3   | `ProductApplication` | `Simlect-product/app` | 8099 | `-Xms128m -Xmx320m` |
-| 4   | `StockApplication`   | `Simlect-stock/app`   | 8102 | `-Xms128m -Xmx256m` |
-| 5   | `CartApplication`    | `Simlect-cart/app`    | 8084 | `-Xms128m -Xmx256m` |
-| 6   | `CouponApplication`  | `Simlect-coupon/app`  | 8087 | `-Xms128m -Xmx256m` |
-| 7   | `OrderApplication`   | `Simlect-order/app`   | 8093 | `-Xms128m -Xmx384m` |
-| 8   | `PayApplication`     | `Simlect-pay/app`     | 8096 | `-Xms128m -Xmx256m` |
-| 9   | `SearchApplication`  | `Simlect-search`      | 8108 | `-Xms128m -Xmx384m` |
-| 10  | `AdminApplication`   | `Simlect-admin`       | 8111 | `-Xms128m -Xmx256m` |
+| 1   | `GatewayApplication` | `AI_Shop-gateway`     | 8080 | `-Xms128m -Xmx256m` |
+| 2   | `UserApplication`    | `AI_Shop-user/app`    | 8105 | `-Xms128m -Xmx320m` |
+| 3   | `ProductApplication` | `AI_Shop-product/app` | 8099 | `-Xms128m -Xmx320m` |
+| 4   | `StockApplication`   | `AI_Shop-stock/app`   | 8102 | `-Xms128m -Xmx256m` |
+| 5   | `CartApplication`    | `AI_Shop-cart/app`    | 8084 | `-Xms128m -Xmx256m` |
+| 6   | `CouponApplication`  | `AI_Shop-coupon/app`  | 8087 | `-Xms128m -Xmx256m` |
+| 7   | `OrderApplication`   | `AI_Shop-order/app`   | 8093 | `-Xms128m -Xmx384m` |
+| 8   | `PayApplication`     | `AI_Shop-pay/app`     | 8096 | `-Xms128m -Xmx256m` |
+| 9   | `SearchApplication`  | `AI_Shop-search`      | 8108 | `-Xms128m -Xmx384m` |
+| 10  | `AdminApplication`   | `AI_Shop-admin`       | 8111 | `-Xms128m -Xmx256m` |
 
 
 命令行示例（购物车）：
 
 ```powershell
 $env:JAVA_TOOL_OPTIONS="-Xms128m -Xmx256m"
-cd .\Simlect-backend\Simlect-cart\app
+cd .\AI_Shop-backend\AI_Shop-cart\app
 mvn -q spring-boot:run
 ```
 
@@ -77,7 +77,7 @@ mvn -q spring-boot:run
 ## 三、前端
 
 ```powershell
-cd .\Simlect-front\Simlect-web
+cd .\AI_Shop-front\AI_Shop-web
 npm run dev
 ```
 
@@ -99,7 +99,7 @@ RABBIT_USER=guest
 RABBIT_PASSWORD=guest
 NACOS_ADDR=127.0.0.1:8848
 ES_URIS=http://127.0.0.1:9200
-VECTOR_INDEX=simlect_vectorstore
+VECTOR_INDEX=aishop_vectorstore
 SENTINEL_DASHBOARD=127.0.0.1:8858
 SEATA_ENABLED=true
 ```
@@ -107,7 +107,7 @@ SEATA_ENABLED=true
 Agent / MCP（另开终端）：
 
 ```powershell
-cd Simlect-backend\Simlect-agent
+cd AI_Shop-backend\AI_Shop-agent
 .\start-mcp.bat
 .\start.bat
 ```
@@ -121,7 +121,7 @@ cd Simlect-backend\Simlect-agent
 - `docker compose ps` 六个中间件 Up（ES/Nacos healthy）
 - Nacos：[http://localhost:8848/nacos](http://localhost:8848/nacos) 能看到各服务实例
 - 网关 `8080` 通；前端能登录/浏览/加购
-- 搜索走 ES（索引 `simlect-index` / `simlect_vectorstore`）；下单走 order/pay/coupon
+- 搜索走 ES（索引 `aishop-index` / `aishop_vectorstore`）；下单走 order/pay/coupon
 - Agent + MCP 工具可对话查单 / 搜商品
   - 查<我的订单>应出**订单卡片**（非仅表格）
   - 搜不存在品类应提示**暂未找到**并另荐，而非<搜索结果找到 N 个>无关品

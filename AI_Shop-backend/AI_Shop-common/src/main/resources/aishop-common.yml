@@ -1,0 +1,88 @@
+spring:
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    locations: classpath:db/migration
+
+amap:
+  key: ${AMAP_KEY:}
+
+project:
+  folder: ${PROJECT_FOLDER:./data/aishop/upload/}
+  domain: ${PROJECT_DOMAIN:}
+  auto-checkpay: ${PROJECT_AUTO_CHECKPAY:false}
+  ai-chat-limit: ${PROJECT_AI_CHAT_LIMIT:0}
+
+admin:
+  account: ${ADMIN_ACCOUNT:admin}
+  password: ${ADMIN_PASSWORD:admin123456}
+  emails: ${ADMIN_EMAILS:}
+
+alipay:
+  appid: ${ALIPAY_APPID:}
+  sellerId: ${ALIPAY_SELLER_ID:}
+  appPrivateKey: ${ALIPAY_APP_PRIVATE_KEY:}
+  appCertPath: ${ALIPAY_APP_CERT_PATH:}
+  alipayPublicCertPath: ${ALIPAY_PUBLIC_CERT_PATH:}
+  alipayRootCertPath: ${ALIPAY_ROOT_CERT_PATH:}
+  serverUrl: ${ALIPAY_SERVER_URL:https://openapi.alipay.com/gateway.do}
+
+order:
+  expire:
+    minute: ${ORDER_EXPIRE_MINUTE:15}
+    ms: ${ORDER_EXPIRE_MS:900000}
+  confirm:
+    minute: ${ORDER_CONFIRM_MINUTE:10080}
+    ms: ${ORDER_CONFIRM_MS:604800000}
+
+rush:
+  prepare:
+    expire-second: ${RUSH_PREPARE_EXPIRE_SECOND:900}
+
+baidu:
+  aip:
+    enabled: ${BAIDU_AIP_ENABLED:false}
+    api-key: ${BAIDU_AIP_API_KEY:}
+    secret-key: ${BAIDU_AIP_SECRET_KEY:}
+
+aishop:
+  production-ready: ${AISHOP_PRODUCTION_READY:false}
+  dev-login-bypass: ${AISHOP_DEV_LOGIN_BYPASS:false}
+  internal:
+    token: ${AISHOP_INTERNAL_TOKEN:your-token}
+    auth-enabled: ${AISHOP_INTERNAL_AUTH_ENABLED:true}
+  feign:
+    connect-timeout-ms: ${AISHOP_FEIGN_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${AISHOP_FEIGN_READ_TIMEOUT_MS:10000}
+  sentinel:
+    feign-rules-enabled: ${AISHOP_SENTINEL_FEIGN_RULES:true}
+
+seata:
+  enabled: ${SEATA_ENABLED:true}
+  application-id: ${spring.application.name:aishop}
+  tx-service-group: ${SEATA_TX_GROUP:aishop_tx_group}
+  enable-auto-data-source-proxy: true
+  data-source-proxy-mode: AT
+  service:
+    vgroup-mapping:
+      aishop_tx_group: default
+      default_tx_group: default
+    grouplist:
+      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
+  registry:
+    type: file
+  config:
+    type: file
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
