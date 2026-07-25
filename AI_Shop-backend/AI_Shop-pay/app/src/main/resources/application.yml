@@ -78,6 +78,15 @@ management:
     web:
       exposure:
         include: health,info
+
+app:
+  # 显式写 false 而不是留空：本服务没有自己的定时任务，打开这个开关只会让
+  # MqCompensationAutoReplayTask 跟着注册（它的开关是 matchIfMissing = true），
+  # 而 mq_compensation_log 表不在 pay 库里，任务每分钟会查一张不存在的表并打 error。
+  # 写出来是为了让"关"是个决定，而不是像之前那样看起来只是漏了。
+  common-scheduling:
+    enabled: false
+
 aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}

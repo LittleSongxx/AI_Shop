@@ -78,6 +78,12 @@ management:
     web:
       exposure:
         include: health,info
+
+app:
+  # 本服务没有定时任务，库里也没有 mq_compensation_log，打开只会让重放任务空转报错。
+  common-scheduling:
+    enabled: false
+
 aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}

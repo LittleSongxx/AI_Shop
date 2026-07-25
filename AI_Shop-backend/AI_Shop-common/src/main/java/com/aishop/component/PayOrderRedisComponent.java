@@ -3,6 +3,7 @@ package com.aishop.component;
 import com.aishop.constants.Constants;
 import com.aishop.exception.BusinessException;
 import com.aishop.exception.PayOrderLifecycleBusyException;
+import com.aishop.redis.LuaScriptLoader;
 import com.aishop.redis.RedisUtils;
 import com.aishop.support.PayOrderLifecycleLockHolder;
 import com.aishop.utils.StringTools;
@@ -70,13 +71,9 @@ public class PayOrderRedisComponent {
 	}
 
 	// 只有持锁者能删自己的锁：token 不匹配就不删，避免删掉别人续期后的锁
-	private static final String PAY_ORDER_LIFECYCLE_UNLOCK_LUA =
-			"if redis.call('get', KEYS[1]) == ARGV[1] then "
-					+ "return redis.call('del', KEYS[1]) "
-					+ "else return 0 end";
-
+	// 脚本见 resources/lua/pay_order_lifecycle_unlock_v1.lua
 	private static final DefaultRedisScript<Long> PAY_ORDER_LIFECYCLE_UNLOCK_SCRIPT =
-			new DefaultRedisScript<>(PAY_ORDER_LIFECYCLE_UNLOCK_LUA, Long.class);
+			LuaScriptLoader.load("pay_order_lifecycle_unlock_v1.lua", Long.class);
 
 	public void runWithPayOrderLifecycleLock(String payOrderId, Runnable action) {
 		runWithPayOrderLifecycleLock(payOrderId, () -> {

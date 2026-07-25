@@ -140,6 +140,13 @@ public class Constants {
 
     public static final String REDIS_KEY_COUPON_DETAIL = REDIS_KEY_PREFIX + "coupon:detail:";
 
+    /**
+     * 秒杀库存对账任务的分布式锁。多实例部署时只让一个实例跑，重复跑不会算错
+     * （对账是幂等的）但会白占 Redis 和数据库。
+     */
+    public static final String REDIS_KEY_COUPON_RUSH_RECONCILE_LOCK =
+            REDIS_KEY_PREFIX + "lock:coupon:rush:reconcile";
+
     public static final String REDIS_KEY_COUPON_REBUILD_LOCK = REDIS_KEY_PREFIX + "coupon:rebuild:lock:";
 
     public static final String REDIS_COUPON_NULL_PLACEHOLDER = "@COUPON_NULL@";

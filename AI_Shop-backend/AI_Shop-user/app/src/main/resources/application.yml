@@ -86,6 +86,27 @@ aliyun:
     account-name: ${ALIYUN_DM_ACCOUNT_NAME:aishop@aishop.com}
     reply-to-address: ${ALIYUN_DM_REPLY_TO_ADDRESS:false}
 
+app:
+  # 之前没声明这个键，SignReconcileTask 就一直没注册过：它的开关是 havingValue = "true"
+  # 且没有 matchIfMissing，键缺失等于关闭。签到写 Redis 位图失败时没有任何补偿，
+  # 这个每小时一次的对账是唯一的兜底，本该是开着的。
+  common-scheduling:
+    enabled: true
+  sign:
+    # SignDailyInitTask 单独关掉，不跟着上面一起开：它在零点把整张 user_sign_record
+    # 无 LIMIT 地读进内存（selectList 只在 simplePage 非空时才拼 limit），
+    # 而写进去的是全 0 位图——getBit 读不存在的键本来就返回 0，这些键存不存在不改变任何行为。
+    # 代价是全表扫描，收益是零。要开之前先把那个查询改成分页。
+    daily-init-enabled: false
+
+mq:
+  compensation:
+    # 必须显式关掉：MqCompensationAutoReplayTask 的开关是 matchIfMissing = true，
+    # 上面的 common-scheduling 一开它就会一起注册。而 mq_compensation_log 表只在
+    # order/admin/product/search 库里有，user 库这 10 张表里没有，任务每分钟会查一张
+    # 不存在的表并打 error。
+    auto-replay-enabled: false
+
 aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}

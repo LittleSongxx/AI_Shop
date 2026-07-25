@@ -2,6 +2,7 @@ package com.aishop.component;
 
 import com.aishop.constants.Constants;
 import com.aishop.exception.BusinessException;
+import com.aishop.redis.LuaScriptLoader;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -15,17 +16,13 @@ import java.util.Collections;
 @Slf4j
 public class CouponRushRateLimitService {
 
-    private static final String RATE_LIMIT_LUA =
-            "local current = redis.call('INCR', KEYS[1]); "
-                    + "if current == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end "
-                    + "if current > tonumber(ARGV[2]) then return 0 else return 1 end;";
-
     /**
-     * 脚本实例复用：{@link DefaultRedisScript} 的 sha1 是加锁懒加载的，多线程共享一个实例安全。
+     * 固定窗口计数限流，脚本见 {@code resources/lua/rate_limit_v1.lua}。
+     * <p>脚本实例复用：{@link DefaultRedisScript} 的 sha1 是加锁懒加载的，多线程共享一个实例安全。
      * 限流是每次抢购请求都要走的路径，每次新建实例等于每次重算 sha1、退回 EVAL 传全量脚本文本。
      */
     private static final DefaultRedisScript<Long> RATE_LIMIT_SCRIPT =
-            new DefaultRedisScript<>(RATE_LIMIT_LUA, Long.class);
+            LuaScriptLoader.load("rate_limit_v1.lua", Long.class);
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;

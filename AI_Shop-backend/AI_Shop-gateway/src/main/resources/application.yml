@@ -244,8 +244,24 @@ aishop:
       default-qps: 200
       auth-qps: 30
 
+app:
+  # 网关没有定时任务，也不依赖 AI_Shop-common（那些 @Scheduled 类根本不在 classpath 上）。
+  # 写出来只是为了让"每个服务都对这个开关表过态"这条约束成立，参见
+  # SchedulingFlagConsistencyTest。
+  common-scheduling:
+    enabled: false
+
+# 网关不依赖 AI_Shop-common，上面的 optional:classpath:aishop-common.yml 导入不生效，
+# 所以 management 这段要在本地重复一次
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name:aishop-gateway}
+  prometheus:
+    metrics:
+      export:
+        enabled: true

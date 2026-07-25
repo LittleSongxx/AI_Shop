@@ -78,6 +78,16 @@ management:
     web:
       exposure:
         include: health,info
+
+app:
+  # 本服务没有自己的定时任务，且库里没有 mq_compensation_log，打开只会让
+  # MqCompensationAutoReplayTask 空转报错（它的开关是 matchIfMissing = true）。
+  # 注：RefundStockListener 消费失败时会尝试写补偿记录，本库没这张表所以写不进去
+  # （recorder 会 catch 并打 error，Redis 副本也一起跳过）。那是建表脚本的缺口，
+  # 不是这个开关能解决的，改开关只会把问题换成另一种报错。
+  common-scheduling:
+    enabled: false
+
 aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}

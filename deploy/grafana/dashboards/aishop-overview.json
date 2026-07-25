@@ -1,0 +1,319 @@
+{
+  "title": "AI_Shop Overview",
+  "uid": "aishop-overview",
+  "tags": ["aishop"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "服务",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+        "query": "label_values(http_server_requests_seconds_count, application)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Java 服务（Spring Boot / Micrometer）",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "请求速率（按服务）",
+      "description": "http_server_requests_seconds_count 由 Micrometer 自动埋点，无需业务代码改动",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$service\"}[5m]))",
+          "legendFormat": "{{application}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "错误率（5xx / 全部）",
+      "description": "outcome 标签由 Micrometer 按响应状态自动打，SERVER_ERROR 即 5xx",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (rate(http_server_requests_seconds_count{application=~\"$service\",outcome=\"SERVER_ERROR\"}[5m]))\n/ clamp_min(sum by (application) (rate(http_server_requests_seconds_count{application=~\"$service\"}[5m])), 0.001)",
+          "legendFormat": "{{application}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "响应延迟 p95（按服务）",
+      "description": "需要 histogram bucket；若曲线为空，检查是否开启了 percentiles-histogram",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, application) (rate(http_server_requests_seconds_bucket{application=~\"$service\"}[5m])))",
+          "legendFormat": "{{application}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "最慢接口 p95（Top 10）",
+      "description": "按 uri 下钻，定位具体慢接口",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, application, uri) (rate(http_server_requests_seconds_bucket{application=~\"$service\"}[5m]))))",
+          "legendFormat": "{{application}} {{uri}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM 堆内存使用",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (jvm_memory_used_bytes{application=~\"$service\",area=\"heap\"})",
+          "legendFormat": "{{application}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM 存活线程数",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (application) (jvm_threads_live_threads{application=~\"$service\"})",
+          "legendFormat": "{{application}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "抓取目标存活情况",
+      "description": "up 为 0 说明该实例挂了或指标端点没暴露；排查顺序：进程是否在、端口是否对、include 是否含 prometheus",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "short", "max": 1, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"aishop-.*\"}",
+          "legendFormat": "{{job}} {{service}} {{instance}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "AI Agent（Python / prometheus_client）",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "意图识别速率（按意图）",
+      "description": "source 标签区分识别来源（规则 / 模型），可用于观察规则命中占比",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (intent, source) (rate(agent_intent_total[5m]))",
+          "legendFormat": "{{intent}} / {{source}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "工具调用速率（按工具与状态）",
+      "description": "status 非 ok 的曲线抬头，通常是下游 MCP 工具或后端接口出问题",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tool, status) (rate(agent_tool_call_total[5m]))",
+          "legendFormat": "{{tool}} / {{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM 调用延迟 p95 / p50",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(agent_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RAG 检索延迟 p95 / 平均",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_rag_latency_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(agent_rag_latency_seconds_sum[5m]) / clamp_min(rate(agent_rag_latency_seconds_count[5m]), 0.001)",
+          "legendFormat": "平均"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "RAG 命中率",
+      "description": "result 标签为 hit 的占比；持续偏低说明知识库覆盖不足或检索阈值过严",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 42 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(agent_rag_search_total{result=\"hit\"}[30m])) / clamp_min(sum(rate(agent_rag_search_total[30m])), 0.001)",
+          "legendFormat": "命中率"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "熔断器状态",
+      "description": "0=closed 1=open 2=half_open；非 0 表示对应下游已被熔断",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 42 },
+      "fieldConfig": { "defaults": { "unit": "short", "max": 2, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "agent_circuit_state",
+          "legendFormat": "{{breaker}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "异步任务队列：处理中 / 积压",
+      "description": "积压持续上涨说明消费能力跟不上，需要扩 worker 或查慢任务",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 42 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (queue) (agent_task_inflight)",
+          "legendFormat": "处理中 {{queue}}"
+        },
+        {
+          "refId": "B",
+          "expr": "agent_task_backlog",
+          "legendFormat": "数据库积压"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "异步任务结果速率",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 48 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (queue, result) (rate(agent_task_total[5m]))",
+          "legendFormat": "{{queue}} / {{result}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "流式输出 token 速率",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 48 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agent_stream_tokens_total[5m])",
+          "legendFormat": "tokens/s"
+        }
+      ]
+    }
+  ]
+}

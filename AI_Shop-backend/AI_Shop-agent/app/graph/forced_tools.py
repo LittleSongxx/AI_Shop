@@ -19,28 +19,18 @@ from langchain_core.messages import ToolMessage
 
 from app.domain.intent.types import IntentKind
 from app.domain.intent.write_args import required_tool_for_intent
+from app.domain.tool_policy import fallback_biz_type
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.tool_invoke_result import ToolInvokeResult
 
 logger = structlog.get_logger()
 
-# 工具名 → 前端业务卡片类型。只在工具本身没给 biz_type 时兜底。
-_BIZ_TYPE_BY_TOOL = {
-    "QUERY_ORDERS": "query_order",
-    "QUERY_LOGISTICS": "query_logistics",
-    "QUERY_COMMENT": "query_comment",
-    "QUERY_USER_COUPONS": "query_coupon",
-}
-
 _CANCEL_ORDER_GUIDE = "客服侧暂不支持直接取消订单，请到「我的订单」页面自行取消。"
 
 
 def _biz_type_for(result: ToolInvokeResult, tool_name: str) -> str | None:
-    if result.biz_type:
-        return result.biz_type
-    if tool_name.startswith("PROPOSE_"):
-        return "action_confirm"
-    return _BIZ_TYPE_BY_TOOL.get(tool_name)
+    # 工具自己给了就用工具的；否则查策略表兜底（PROPOSE_* 一律 action_confirm）。
+    return result.biz_type or fallback_biz_type(tool_name)
 
 
 def _finalize_with_tool(

@@ -79,6 +79,19 @@ management:
       exposure:
         include: health,info
 
+app:
+  # 打开后 CouponRushReconcileTask 才注册；多实例部署时任务本身有 Redis 锁，
+  # 不需要只在单个实例上开。
+  common-scheduling:
+    enabled: true
+
+mq:
+  compensation:
+    # 必须显式关掉：MqCompensationAutoReplayTask 的开关是 matchIfMissing = true，
+    # 只要上面的 common-scheduling 打开它就会一起注册。而 mq_compensation_log 表只在
+    # order/admin/product/search 库里有，本库没有，任务每分钟会查一张不存在的表并打 error。
+    auto-replay-enabled: false
+
 aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}

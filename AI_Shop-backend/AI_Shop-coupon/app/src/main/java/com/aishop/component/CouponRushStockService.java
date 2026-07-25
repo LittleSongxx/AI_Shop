@@ -277,6 +277,71 @@ public class CouponRushStockService {
         return results;
     }
 
+    /**
+     * 库存对账 + 参与者 SET 清理，供定时任务调用。
+     * <p>两件事都做是因为它们的成因是同一个：预占之后的收尾动作没跑到。库存那侧
+     * {@link #reconcileOne} 以 DB 为准改回来；SET 那侧没有 TTL，只能显式摘掉过期成员。
+     * <p>单张券失败不影响其余券：对账是兜底手段，一张券的数据异常不该让整轮停在半路。
+     *
+     * @return 本轮修正过库存的券数量与清理掉的 SET 成员数
+     */
+    public CouponRushReconcileSummary reconcileAndSweepAllRushing() {
+        DiscountCouponQuery query = new DiscountCouponQuery();
+        query.setRushingstatus(RushingCouponStatusEnum.YES.getStatus());
+        List<DiscountCoupon> list = discountCouponMapper.selectList(query);
+        CouponRushReconcileSummary summary = new CouponRushReconcileSummary();
+        if (list == null || list.isEmpty()) {
+            return summary;
+        }
+        for (DiscountCoupon coupon : list) {
+            if (coupon == null || StringTools.isEmpty(coupon.getCouponId())) {
+                continue;
+            }
+            String couponId = coupon.getCouponId();
+            summary.scanned++;
+            try {
+                CouponRushStockReconcileDTO dto = reconcileOne(couponId);
+                if (dto.isAdjusted()) {
+                    summary.adjusted++;
+                }
+                summary.sweptMembers += couponRushRedisComponent.sweepDanglingRushParticipants(couponId);
+            } catch (Exception e) {
+                summary.failed++;
+                log.error("秒杀库存对账单张失败 couponId={}", couponId, e);
+            }
+        }
+        log.info("秒杀库存对账完成 scanned={}, adjusted={}, sweptMembers={}, failed={}",
+                summary.scanned, summary.adjusted, summary.sweptMembers, summary.failed);
+        return summary;
+    }
+
+    /**
+     * 一轮对账的结果计数。定时任务只需要这几个数写日志，不需要每张券的明细
+     * （明细走管理端的 {@link #reconcileAllRushing()}）。
+     */
+    public static class CouponRushReconcileSummary {
+        private int scanned;
+        private int adjusted;
+        private long sweptMembers;
+        private int failed;
+
+        public int getScanned() {
+            return scanned;
+        }
+
+        public int getAdjusted() {
+            return adjusted;
+        }
+
+        public long getSweptMembers() {
+            return sweptMembers;
+        }
+
+        public int getFailed() {
+            return failed;
+        }
+    }
+
     public int warmupAllRushingFromDb() {
         DiscountCouponQuery query = new DiscountCouponQuery();
         query.setRushingstatus(RushingCouponStatusEnum.YES.getStatus());

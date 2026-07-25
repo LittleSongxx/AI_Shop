@@ -1,0 +1,63 @@
+# AI_Shop 指标抓取配置
+#
+# 前置条件（缺一个就抓不到数据）：
+#   1. Java 侧已引 micrometer-registry-prometheus（AI_Shop-common / AI_Shop-gateway 的 pom）
+#   2. management.endpoints.web.exposure.include 含 prometheus（aishop-common.yml）
+#   3. Python agent 已 mount /metrics（AI_Shop-agent/app/main.py）
+#
+# 安全边界：/actuator/prometheus 和 /metrics 都无鉴权，会暴露 URI 模板、SQL、线程池等内部细节。
+# 这份配置假定 Prometheus 与被抓服务同处内网，且 Nginx / 网关不对外反代 /actuator 与 /metrics
+# （见 deploy/nginx.aishop.conf.example、deploy/GO_LIVE.md）。若要跨网段抓取，先加鉴权或 mTLS。
+#
+# 目标地址默认走 host.docker.internal，即 Prometheus 跑在容器里、服务跑在宿主机（本地开发的常见形态）。
+# 若服务也在 compose 网络里，把 host.docker.internal 换成对应的服务名。
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    project: aishop
+
+scrape_configs:
+  # ---- 网关：唯一对外入口，QPS 和限流指标看这里 ----
+  - job_name: aishop-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          tier: gateway
+
+  # ---- 业务服务：端口与各模块 application.yml 的 server.port 一一对应 ----
+  - job_name: aishop-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8084"]
+        labels: { service: aishop-cart, tier: business }
+      - targets: ["host.docker.internal:8087"]
+        labels: { service: aishop-coupon, tier: business }
+      - targets: ["host.docker.internal:8093"]
+        labels: { service: aishop-order, tier: business }
+      - targets: ["host.docker.internal:8096"]
+        labels: { service: aishop-pay, tier: business }
+      - targets: ["host.docker.internal:8099"]
+        labels: { service: aishop-product, tier: business }
+      - targets: ["host.docker.internal:8102"]
+        labels: { service: aishop-stock, tier: business }
+      - targets: ["host.docker.internal:8105"]
+        labels: { service: aishop-user, tier: business }
+      - targets: ["host.docker.internal:8108"]
+        labels: { service: aishop-search, tier: business }
+      - targets: ["host.docker.internal:8111"]
+        labels: { service: aishop-admin, tier: business }
+
+  # ---- Python Agent：prometheus_client 直接挂在 /metrics，不是 actuator 那套路径 ----
+  - job_name: aishop-agent
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:7050"]
+        labels: { service: aishop-agent, tier: ai }
+
+  # ---- Prometheus 自监控：抓取失败、样本堆积先从这里看 ----
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

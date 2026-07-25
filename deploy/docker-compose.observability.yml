@@ -1,0 +1,52 @@
+# Prometheus + Grafana，只做指标采集与展示，不含任何业务组件。
+# 中间件（MySQL/Redis/RabbitMQ/ES/Nacos/Seata）见 docker-compose.middleware.yml。
+#
+#   docker compose -f docker-compose.observability.yml up -d
+#   Grafana  http://localhost:3000   (admin / 见 GF_SECURITY_ADMIN_PASSWORD)
+#   Prometheus http://localhost:9090
+#
+# 默认抓取目标写的是 host.docker.internal，即服务跑在宿主机、这两个容器跑在 Docker 里。
+# 端口只绑 127.0.0.1：两个面板都无鉴权保护指标内容，不要直接暴露到公网。
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: aishop-prometheus
+    restart: unless-stopped
+    extra_hosts:
+      # Linux 上没有内置的 host.docker.internal，这里显式映射到宿主网关
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: aishop-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      # 密码从环境变量注入，不要把明文写进仓库
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?请先设置 GRAFANA_ADMIN_PASSWORD}
+      # 关掉匿名访问和注册，面板里能看到 URI、SQL 等内部信息
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  prometheus-data:
+  grafana-data:

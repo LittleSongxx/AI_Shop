@@ -113,6 +113,14 @@ management:
     web:
       exposure:
         include: health,info
+
+app:
+  # 与 product 同因：本库有 mq_compensation_log 且 RAG 相关的消费/发送失败会往里写，
+  # 但重放任务从未注册，记录只堆不消。打开前先确认 PENDING 积压里没有不该重放的旧消息
+  # （重放会把当时的 RAG 处理再触发一遍）。
+  common-scheduling:
+    enabled: false
+
 aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}

@@ -1,0 +1,2 @@
+# Grafana 启动时会扫描 provisioning 下的 plugins/ 与 alerting/ 目录，
+# 目录不存在就会打 level=error 日志。这里放个空占位文件，避免每次启动都刷无意义的报错。

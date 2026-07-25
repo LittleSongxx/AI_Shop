@@ -1,0 +1,572 @@
+{
+  "datasetVersion": "aishop_convo_v1",
+  "datasetSha256": "f5859ed69e6e9edd762789f89c5b083cd1c20c2f5a0c93c7ba421bc9a0b6578e",
+  "runnerVersion": "aishop_convo_eval_runner_v1",
+  "frozenPolicy": {
+    "resampling": "forbidden",
+    "relabeling": "forbidden",
+    "note": "期望值按正确的客服行为写；跑出来错的留在集合里并记入 KNOWN_LIMITATIONS.md"
+  },
+  "baseline": {
+    "cases": 112,
+    "passed": 90,
+    "passRate": 0.803571,
+    "bySplit": {
+      "dev": {
+        "cases": 68,
+        "passed": 57,
+        "passRate": 0.838235
+      },
+      "test": {
+        "cases": 44,
+        "passed": 33,
+        "passRate": 0.75
+      }
+    },
+    "bySubset": {
+      "aftersales": {
+        "cases": 10,
+        "passed": 8,
+        "passRate": 0.8
+      },
+      "cancel_order": {
+        "cases": 5,
+        "passed": 1,
+        "passRate": 0.2
+      },
+      "chat_howto": {
+        "cases": 6,
+        "passed": 5,
+        "passRate": 0.833333
+      },
+      "confirm_receipt": {
+        "cases": 5,
+        "passed": 3,
+        "passRate": 0.6
+      },
+      "coupon": {
+        "cases": 6,
+        "passed": 5,
+        "passRate": 0.833333
+      },
+      "handoff": {
+        "cases": 5,
+        "passed": 5,
+        "passRate": 1.0
+      },
+      "identity": {
+        "cases": 5,
+        "passed": 5,
+        "passRate": 1.0
+      },
+      "injection": {
+        "cases": 14,
+        "passed": 14,
+        "passRate": 1.0
+      },
+      "logistics": {
+        "cases": 7,
+        "passed": 6,
+        "passRate": 0.857143
+      },
+      "order_query": {
+        "cases": 10,
+        "passed": 7,
+        "passRate": 0.7
+      },
+      "product_consult": {
+        "cases": 7,
+        "passed": 6,
+        "passRate": 0.857143
+      },
+      "product_search": {
+        "cases": 10,
+        "passed": 8,
+        "passRate": 0.8
+      },
+      "refund": {
+        "cases": 8,
+        "passed": 5,
+        "passRate": 0.625
+      },
+      "review": {
+        "cases": 8,
+        "passed": 6,
+        "passRate": 0.75
+      },
+      "tool_policy": {
+        "cases": 6,
+        "passed": 6,
+        "passRate": 1.0
+      }
+    },
+    "byDimension": {
+      "allowed": {
+        "graded": 6,
+        "passed": 6,
+        "passRate": 1.0
+      },
+      "argsUserId": {
+        "graded": 5,
+        "passed": 5,
+        "passRate": 1.0
+      },
+      "blocked": {
+        "graded": 14,
+        "passed": 14,
+        "passRate": 1.0
+      },
+      "handoffReason": {
+        "graded": 7,
+        "passed": 4,
+        "passRate": 0.571429
+      },
+      "intent": {
+        "graded": 86,
+        "passed": 69,
+        "passRate": 0.802326
+      },
+      "mismatchFlagged": {
+        "graded": 5,
+        "passed": 5,
+        "passRate": 1.0
+      },
+      "nextAction": {
+        "graded": 77,
+        "passed": 59,
+        "passRate": 0.766234
+      },
+      "noSnakeCaseLeak": {
+        "graded": 5,
+        "passed": 5,
+        "passRate": 1.0
+      },
+      "tool": {
+        "graded": 87,
+        "passed": 79,
+        "passRate": 0.908046
+      },
+      "toolArgs": {
+        "graded": 33,
+        "passed": 26,
+        "passRate": 0.787879
+      },
+      "write": {
+        "graded": 6,
+        "passed": 6,
+        "passRate": 1.0
+      }
+    }
+  },
+  "knownFailures": {
+    "order-006": {
+      "subset": "order_query",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "问状态也是查订单",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "order-007": {
+      "subset": "order_query",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "上次买的=订单历史，不能当成物流查询而漏掉订单卡片",
+      "actual": {
+        "intent": "PRODUCT_SEARCH",
+        "source": "rule",
+        "nextAction": "TOOL",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "order-009": {
+      "subset": "order_query",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "复购要先摆订单让用户挑，不能直接当新的商品搜索",
+      "actual": {
+        "intent": "PRODUCT_SEARCH",
+        "source": "rule",
+        "nextAction": "TOOL",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "logi-006": {
+      "subset": "logistics",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction"
+      ],
+      "note": "抱怨式物流问题，仍是物流意图但缺单号",
+      "actual": {
+        "intent": "CHAT",
+        "source": "rule",
+        "nextAction": "ANSWER",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "refund-005": {
+      "subset": "refund",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "nextAction",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "口语化退货",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "refund-006": {
+      "subset": "refund",
+      "split": "dev",
+      "dimensions": [
+        "nextAction"
+      ],
+      "note": "问规则不是发起退款，不能直接生成退款提案",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "refund-007": {
+      "subset": "refund",
+      "split": "test",
+      "dimensions": [
+        "intent"
+      ],
+      "note": "问到账时间是退款进度类，不该发起新退款",
+      "actual": {
+        "intent": "REFUND",
+        "source": "rule",
+        "nextAction": "TOOL",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "cancel-001": {
+      "subset": "cancel_order",
+      "split": "dev",
+      "dimensions": [
+        "nextAction"
+      ],
+      "note": "客服不代客取消，查到订单后引导用户自己操作",
+      "actual": {
+        "intent": "CANCEL_ORDER",
+        "source": "rule",
+        "nextAction": "ANSWER",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": "QUERY_ORDERS",
+        "toolArgs": {
+          "orderId": "17223344556677AABBCCDD"
+        }
+      }
+    },
+    "cancel-002": {
+      "subset": "cancel_order",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "口语化取消",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "cancel-003": {
+      "subset": "cancel_order",
+      "split": "test",
+      "dimensions": [
+        "nextAction"
+      ],
+      "note": "没单号无法定位",
+      "actual": {
+        "intent": "CANCEL_ORDER",
+        "source": "rule",
+        "nextAction": "ANSWER",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "cancel-005": {
+      "subset": "cancel_order",
+      "split": "dev",
+      "dimensions": [
+        "handoffReason",
+        "intent",
+        "nextAction"
+      ],
+      "note": "含扣款是资金争议，必须转人工而不是自己解释",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "receipt-004": {
+      "subset": "confirm_receipt",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "nextAction"
+      ],
+      "note": "问操作位置，不能替用户确认收货",
+      "actual": {
+        "intent": "CONFIRM_RECEIPT",
+        "source": "rule",
+        "nextAction": "TOOL",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "receipt-005": {
+      "subset": "confirm_receipt",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction",
+        "tool"
+      ],
+      "note": "同上但带了单号：判成确认收货就会真的产出一张确认卡，比不带单号那条更严重",
+      "actual": {
+        "intent": "CONFIRM_RECEIPT",
+        "source": "rule",
+        "nextAction": "TOOL",
+        "handoffReason": null,
+        "confidence": 0.9,
+        "tool": "PROPOSE_CONFIRM_RECEIPT",
+        "toolArgs": {
+          "orderId": "17223344556677AABBCCDD"
+        }
+      }
+    },
+    "review-003": {
+      "subset": "review",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "nextAction",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "打分写法",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "review-004": {
+      "subset": "review",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction"
+      ],
+      "note": "缺单号缺正文，不能凭空造一条评价",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "coupon-005": {
+      "subset": "coupon",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction",
+        "tool",
+        "toolArgs"
+      ],
+      "note": "排查用不了要先看用户手上的券，不能凭空解释门槛",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "search-009": {
+      "subset": "product_search",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "nextAction"
+      ],
+      "note": "品类词不在硬编码 hints 表里，考的是规则表覆盖面而不是列举能力",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "search-010": {
+      "subset": "product_search",
+      "split": "dev",
+      "dimensions": [
+        "intent",
+        "nextAction"
+      ],
+      "note": "同上，表外品类",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "consult-007": {
+      "subset": "product_consult",
+      "split": "test",
+      "dimensions": [
+        "intent",
+        "nextAction"
+      ],
+      "note": "从商品页进来，没有卡也算咨询",
+      "actual": {
+        "intent": "CHAT",
+        "source": "default",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "handoffReason": "LOW_CONFIDENCE",
+        "confidence": 0.4,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "after-004": {
+      "subset": "aftersales",
+      "split": "dev",
+      "dimensions": [
+        "handoffReason",
+        "nextAction"
+      ],
+      "note": "扣款争议必须转人工",
+      "actual": {
+        "intent": "PAYMENT_ISSUE",
+        "source": "rule_priority",
+        "nextAction": "ANSWER",
+        "handoffReason": null,
+        "confidence": 0.96,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "after-005": {
+      "subset": "aftersales",
+      "split": "test",
+      "dimensions": [
+        "handoffReason",
+        "nextAction"
+      ],
+      "note": "重复支付",
+      "actual": {
+        "intent": "PAYMENT_ISSUE",
+        "source": "rule_priority",
+        "nextAction": "ANSWER",
+        "handoffReason": null,
+        "confidence": 0.96,
+        "tool": null,
+        "toolArgs": null
+      }
+    },
+    "chat-005": {
+      "subset": "chat_howto",
+      "split": "test",
+      "dimensions": [
+        "intent"
+      ],
+      "note": "howto 优先于发票关键词",
+      "actual": {
+        "intent": "INVOICE",
+        "source": "rule_priority",
+        "nextAction": "ANSWER",
+        "handoffReason": null,
+        "confidence": 0.96,
+        "tool": null,
+        "toolArgs": null
+      }
+    }
+  }
+}

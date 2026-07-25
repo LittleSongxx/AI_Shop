@@ -1,0 +1,81 @@
+# 指标监控（Prometheus + Grafana）
+
+## 启动
+
+```bash
+cd deploy
+export GRAFANA_ADMIN_PASSWORD='换成你自己的密码'
+docker compose -f docker-compose.observability.yml up -d
+```
+
+- Grafana `http://localhost:3000`（账号 `admin`，密码取上面的环境变量）
+- Prometheus `http://localhost:9090`
+- 面板：Dashboards → AI_Shop → **AI_Shop Overview**
+
+不设 `GRAFANA_ADMIN_PASSWORD` 会直接启动失败，这是故意的，避免默认口令进生产。
+
+## 安全边界
+
+`/actuator/prometheus` 和 Agent 的 `/metrics` 都**没有鉴权**，返回内容包含 URI 模板、SQL 语句、
+线程池与连接池状态。当前的隔离方式是不对外暴露，而不是靠鉴权：
+
+- Nginx 不反代 `/actuator`（见 `nginx.aishop.conf.example`、`GO_LIVE.md`）
+- 网关路由全部带前缀（`/api/**`、`/admin-api/**`、`/internal/**`、`/ws/**`），没有通配路由会把
+  `/actuator/**` 透传到后端
+- compose 里 Prometheus 和 Grafana 都只绑 `127.0.0.1`
+
+要跨网段抓取（比如独立监控机），先加鉴权或 mTLS 再改 `prometheus.yml` 的 targets。
+
+## 抓取目标
+
+`prometheus/prometheus.yml` 里的端口和各模块 `application.yml` 的 `server.port` 一一对应：
+
+| 目标 | 端口 | 路径 |
+| --- | --- | --- |
+| aishop-gateway | 8080 | `/actuator/prometheus` |
+| aishop-cart | 8084 | `/actuator/prometheus` |
+| aishop-coupon | 8087 | `/actuator/prometheus` |
+| aishop-order | 8093 | `/actuator/prometheus` |
+| aishop-pay | 8096 | `/actuator/prometheus` |
+| aishop-product | 8099 | `/actuator/prometheus` |
+| aishop-stock | 8102 | `/actuator/prometheus` |
+| aishop-user | 8105 | `/actuator/prometheus` |
+| aishop-search | 8108 | `/actuator/prometheus` |
+| aishop-admin | 8111 | `/actuator/prometheus` |
+| aishop-agent | 7050 | `/metrics` |
+
+默认地址是 `host.docker.internal`，即服务在宿主机、Prometheus 在容器里。若服务也在 compose
+网络内，把它换成对应服务名。
+
+## 指标来源
+
+Java 侧靠 `micrometer-registry-prometheus`（在 `AI_Shop-common` 与 `AI_Shop-gateway` 的 pom 里），
+配置在 `aishop-common.yml`：`management.endpoints.web.exposure.include` 含 `prometheus`，
+并统一打上 `application` 标签供面板下钻。网关不依赖 `AI_Shop-common`，所以这两处它都单独配了一份。
+
+**不要把 actuator 挪到独立的 `management.server.port`**：`spring.cloud.loadbalancer` 的
+health-check 探的是注册在 Nacos 上的业务端口 `/actuator/health`，挪走会让所有实例被判定下线。
+
+Agent 侧是 `prometheus_client`，指标定义在 `app/harness/metrics/runtime_sensors.py`，
+`app/main.py` 把它挂在 `/metrics`。
+
+## 面板为空时的排查顺序
+
+1. Prometheus → Status → Targets，看 `up` 是不是 0
+2. `up` 为 0：进程没起，或端口不对，或 `include` 里没加 `prometheus`
+   ```bash
+   curl -s localhost:8093/actuator/prometheus | head    # 404 就是没暴露
+   curl -s localhost:7050/metrics | head
+   ```
+3. `up` 为 1 但曲线空：指标名或标签对不上。延迟分位数面板依赖 histogram bucket，
+   若只有 `_count`/`_sum` 没有 `_bucket`，需要给对应指标开启 percentiles-histogram
+4. 只有 Agent 有数据、Java 全空：大概率漏了 `micrometer-registry-prometheus` 依赖
+
+## 面板与指标的对应关系
+
+面板里的 PromQL 只用已确认存在的指标名，改动前先确认新名字真实存在。相关回归测试：
+
+- `AI_Shop-common/src/test/java/com/aishop/observability/PrometheusEndpointExposureTest.java`
+  真实抓取一次，确认注册表装配、输出为 Prometheus 文本格式、JVM 指标齐全
+- `AI_Shop-common/src/test/java/com/aishop/observability/MetricNamingProbeTest.java`
+  钉住 `http.server.requests` → `http_server_requests_seconds_*` 这层命名转换

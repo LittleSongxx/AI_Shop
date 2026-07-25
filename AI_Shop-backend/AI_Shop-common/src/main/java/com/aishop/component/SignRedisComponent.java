@@ -2,6 +2,7 @@ package com.aishop.component;
 
 import com.aishop.constants.Constants;
 import com.aishop.exception.BusinessException;
+import com.aishop.redis.LuaScriptLoader;
 import com.aishop.redis.RedisUtils;
 import com.aishop.utils.DateUtil;
 import com.aishop.utils.StringTools;
@@ -198,30 +199,10 @@ public class SignRedisComponent {
 		return Integer.parseInt(usedStr);
 	}
 
-	// 签到bitMap
-	private static final String SIGN_LUA =
-
-			"local todayKey = KEYS[1]; " +
-					"local yesterdayKey = KEYS[2]; " +
-					"local hashKey = KEYS[3]; " +
-					"local todayOffset = tonumber(ARGV[1]); " +
-					"local yesterdayOffset = tonumber(ARGV[2]); " +
-					"if redis.call('getbit', todayKey, todayOffset) == 1 then return {-1, 0, 0} end; " +
-					"redis.call('setbit', todayKey, todayOffset, 1); " +
-					"local yesterdaySigned = redis.call('getbit', yesterdayKey, yesterdayOffset); " +
-					"local continuousDays = 1; " +
-					"if yesterdaySigned == 1 then " +
-					"    local current = redis.call('hget', hashKey, 'continuousDays'); " +
-					"    if current then continuousDays = tonumber(current) + 1 end; " +
-					"end; " +
-					"redis.call('hset', hashKey, 'continuousDays', continuousDays); " +
-					"local totalDays = redis.call('hincrby', hashKey, 'totalSignDays', 1); " +
-					"redis.call('del', ARGV[3]); " +
-					"return {1, continuousDays, totalDays};";
-
+	// 签到 bitMap，脚本见 resources/lua/sign_v1.lua
 	// 脚本对象持有惰性计算的 SHA1，复用同一实例才能走 EVALSHA 而不是每次重传脚本全文
 	private static final DefaultRedisScript<List> SIGN_SCRIPT =
-			new DefaultRedisScript<>(SIGN_LUA, List.class);
+			LuaScriptLoader.load("sign_v1.lua", List.class);
 
 	public void sign(String userId) {
 		LocalDate now = LocalDate.now();
@@ -258,27 +239,9 @@ public class SignRedisComponent {
 				Constants.REDIS_KEY_SIGN_USERID + userId, dayOfMonth - 1);
 	}
 
-	private static final String SUPPLEMENT_LUA =
-
-			"local bitmapKey = KEYS[1]; " +
-					"local hashKey = KEYS[2]; " +
-					"local targetOffset = tonumber(ARGV[1]); " +
-					"if redis.call('getbit', bitmapKey, targetOffset) == 1 then " +
-					"    return -1; " +
-					"end; " +
-					"local totalDays = tonumber(redis.call('hget', hashKey, 'totalSignDays') or '0'); " +
-					"local usedCount = tonumber(redis.call('hget', hashKey, 'usedCount') or '0'); " +
-					"if usedCount >= math.floor(totalDays / 30) then " +
-					"    return -2; " +
-					"end; " +
-					"redis.call('setbit', bitmapKey, targetOffset, 1); " +
-					"redis.call('hincrby', hashKey, 'usedCount', 1); " +
-					"redis.call('hincrby', hashKey, 'totalSignDays', 1); " +
-					"redis.call('del', ARGV[2]); " +
-					"return 1;";
-
+	// 补签，脚本见 resources/lua/sign_supplement_v1.lua
 	private static final DefaultRedisScript<Long> SUPPLEMENT_SCRIPT =
-			new DefaultRedisScript<>(SUPPLEMENT_LUA, Long.class);
+			LuaScriptLoader.load("sign_supplement_v1.lua", Long.class);
 
 	public void supplementSign(String userId, String yyyyMM, int dayOfMonth) {
 		// 1. Lua 原子补签

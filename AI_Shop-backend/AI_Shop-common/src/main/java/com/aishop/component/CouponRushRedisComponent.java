@@ -2,15 +2,20 @@ package com.aishop.component;
 
 import com.aishop.constants.Constants;
 import com.aishop.entity.config.AppConfig;
+import com.aishop.redis.LuaScriptLoader;
 import com.aishop.redis.RedisUtils;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * 优惠券抢购的 Redis 预占。
@@ -35,67 +40,29 @@ public class CouponRushRedisComponent {
 		redisUtils.set(Constants.REDIS_KEY_RUSHING_STOCK + couponId, stock);
 	}
 
-	// 抢购相关操作：查询是否有购买资格、扣减库存、记录用户预占信息
-	// lua
-	private static final String RUSHING_LUA =
-			"local couponId = ARGV[1]; " +
-					"local userId = ARGV[2]; " +
-					"local userCouponId = ARGV[3]; " +
-					"local stockKey = 'mall:rushing:stock:' .. couponId; " +
-					"local couponKey = 'mall:rushing:coupon:' .. couponId; " +
-					"local userCouponKey = 'mall:rushing:userId:' .. userId .. ':coupon:' .. couponId; " +
-					"local stock = redis.call('get', stockKey); " + // 查库存
-					"if not stock then return 1 end; " +
-					"local stockNum = tonumber(stock); " +
-					"if stockNum ~= -1 and stockNum <= 0 then return 1 end; " +
-					"if redis.call('sismember', couponKey, userId) == 1 then " +
-					"  if redis.call('exists', userCouponKey) == 1 then return 2 end; " + // 有效预占才防重复
-					"  redis.call('srem', couponKey, userId); " + // 预占 hash 已过期则清理脏 SET 成员
-					"end; " +
-					"if stockNum ~= -1 then redis.call('decr', stockKey); end; " + // 限量券扣库存
-					"redis.call('sadd', couponKey, userId); " + // 记录用户
-					"redis.call('hset', userCouponKey, 'couponId', couponId); " +
-					"redis.call('hset', userCouponKey, 'userCouponId', userCouponId); " +
-					"redis.call('hset', userCouponKey, 'time', redis.call('time')[1]); " +
-					"redis.call('expire', userCouponKey, tonumber(ARGV[4])); " +
-					"return 0;";
-
 	/**
-	 * 脚本实例复用：{@link DefaultRedisScript} 内部对 sha1 做了加锁的懒加载，多线程共享一个实例是安全的。
+	 * 抢购预占：查询是否有购买资格、扣减库存、记录用户预占信息。脚本见 {@code resources/lua/coupon_rush_reserve_v1.lua}。
+	 * <p>脚本实例复用：{@link DefaultRedisScript} 内部对 sha1 做了加锁的懒加载，多线程共享一个实例是安全的。
 	 * 每次调用新建实例会重算 sha1、退回 EVAL 传全量脚本文本，抢购这种高频路径没必要。
-	 * 预占过期时间用 ARGV 传入而不是 String.format，脚本文本恒定才能一直命中同一个 EVALSHA。
+	 * 预占过期时间用 ARGV 传入而不是拼进脚本文本，脚本恒定才能一直命中同一个 EVALSHA。
 	 */
-	private static final DefaultRedisScript<Long> RUSHING_SCRIPT = new DefaultRedisScript<>(RUSHING_LUA, Long.class);
-
-	private static final String RUSH_ROLLBACK_REDIS_ONLY_LUA =
-			"local couponId = ARGV[1]; " +
-					"local userId = ARGV[2]; " +
-					"local stockKey = 'mall:rushing:stock:' .. couponId; " +
-					"local couponKey = 'mall:rushing:coupon:' .. couponId; " +
-					"local userCouponKey = 'mall:rushing:userId:' .. userId .. ':coupon:' .. couponId; " +
-					"local stock = redis.call('get', stockKey); " +
-					"if stock and tonumber(stock) ~= -1 then redis.call('incr', stockKey); end; " +
-					"redis.call('srem', couponKey, userId); " +
-					"redis.call('del', userCouponKey); " +
-					"return 0;";
-
-	private static final String RUSH_RELEASE_ALIGN_LUA =
-			"local couponId = ARGV[1]; " +
-					"local userId = ARGV[2]; " +
-					"local dbRemain = tonumber(ARGV[3]); " +
-					"local stockKey = 'mall:rushing:stock:' .. couponId; " +
-					"local couponKey = 'mall:rushing:coupon:' .. couponId; " +
-					"local userCouponKey = 'mall:rushing:userId:' .. userId .. ':coupon:' .. couponId; " +
-					"redis.call('set', stockKey, dbRemain); " +
-					"redis.call('srem', couponKey, userId); " +
-					"redis.call('del', userCouponKey); " +
-					"return 0;";
+	private static final DefaultRedisScript<Long> RUSHING_SCRIPT =
+			LuaScriptLoader.load("coupon_rush_reserve_v1.lua", Long.class);
 
 	private static final DefaultRedisScript<Long> RUSH_ROLLBACK_REDIS_ONLY_SCRIPT =
-			new DefaultRedisScript<>(RUSH_ROLLBACK_REDIS_ONLY_LUA, Long.class);
+			LuaScriptLoader.load("coupon_rush_rollback_v1.lua", Long.class);
 
 	private static final DefaultRedisScript<Long> RUSH_RELEASE_ALIGN_SCRIPT =
-			new DefaultRedisScript<>(RUSH_RELEASE_ALIGN_LUA, Long.class);
+			LuaScriptLoader.load("coupon_rush_release_align_v1.lua", Long.class);
+
+	private static final DefaultRedisScript<Long> RUSH_SWEEP_DANGLING_SCRIPT =
+			LuaScriptLoader.load("coupon_rush_sweep_dangling_v1.lua", Long.class);
+
+	/**
+	 * 参与者 SET 的单批清理批量。一次脚本执行是原子的、会独占 Redis，批越大阻塞越久，
+	 * 所以按批切开而不是把整个 SET 丢进去。
+	 */
+	private static final int SWEEP_BATCH_SIZE = 200;
 
 	public void rollbackRushRedisReserve(String couponId, String userId) {
 		if (StringTools.isEmpty(couponId) || StringTools.isEmpty(userId)) {
@@ -144,6 +111,55 @@ public class CouponRushRedisComponent {
 			return false;
 		}
 		return hasRushPrepare(userId, couponId);
+	}
+
+	/**
+	 * 摘掉参与者 SET 里预占已过期的僵尸成员。脚本见 {@code resources/lua/coupon_rush_sweep_dangling_v1.lua}。
+	 * <p>SET 没有 TTL，正常路径靠回滚或用户下次抢购时的懒清理收敛；两者都没发生时成员会永久残留，
+	 * SET 只增不减。判定条件与预占脚本里的懒清理一致，所以这里只是提前做掉，不改变业务判定。
+	 * <p>用 SSCAN 遍历而不是 SMEMBERS：热门券的 SET 可能很大，一次性取回会打爆网络和内存。
+	 *
+	 * @return 摘掉的成员数
+	 */
+	public long sweepDanglingRushParticipants(String couponId) {
+		if (StringTools.isEmpty(couponId)) {
+			return 0L;
+		}
+		String couponKey = Constants.REDIS_KEY_RUSHING_COUPON + couponId;
+		long removed = 0L;
+		List<String> batch = new ArrayList<>(SWEEP_BATCH_SIZE);
+		ScanOptions options = ScanOptions.scanOptions().count(SWEEP_BATCH_SIZE).build();
+		try (Cursor<String> cursor = stringRedisTemplate.opsForSet().scan(couponKey, options)) {
+			while (cursor.hasNext()) {
+				String member = cursor.next();
+				if (StringTools.isEmpty(member)) {
+					continue;
+				}
+				batch.add(member);
+				if (batch.size() >= SWEEP_BATCH_SIZE) {
+					removed += sweepBatch(couponId, batch);
+					batch.clear();
+				}
+			}
+		}
+		if (!batch.isEmpty()) {
+			removed += sweepBatch(couponId, batch);
+		}
+		if (removed > 0) {
+			log.info("抢购参与者 SET 已清理僵尸成员 couponId={}, removed={}", couponId, removed);
+		}
+		return removed;
+	}
+
+	private long sweepBatch(String couponId, List<String> userIds) {
+		String[] argv = new String[userIds.size() + 1];
+		argv[0] = couponId;
+		for (int i = 0; i < userIds.size(); i++) {
+			argv[i + 1] = userIds.get(i);
+		}
+		Long removed = stringRedisTemplate.execute(
+				RUSH_SWEEP_DANGLING_SCRIPT, Collections.emptyList(), (Object[]) argv);
+		return removed == null ? 0L : removed;
 	}
 
 	/**

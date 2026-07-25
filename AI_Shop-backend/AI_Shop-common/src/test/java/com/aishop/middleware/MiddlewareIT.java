@@ -1,5 +1,7 @@
 package com.aishop.middleware;
 
+import com.aishop.constants.Constants;
+import com.aishop.redis.LuaScriptLoader;
 import com.rabbitmq.client.ConnectionFactory;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
@@ -260,6 +262,53 @@ class MiddlewareIT {
                     "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
                     "1", key, "owner-a"));
             assertEquals("(nil)", redis.command("GET", key));
+        }
+    }
+
+    /**
+     * 抢购参与者 SET 清理脚本的真实语义。单测只能验"分了几批"，判定本身要真 Redis：
+     * 摘错人的代价是用户白抢一次却拿不到券，而且没有任何报错。
+     * <p>脚本文本从 classpath 读，验的是打进包的那份文件，不是测试里另抄一遍的副本。
+     */
+    @Test
+    void redisSweepRemovesOnlyMembersWhoseRushPrepareExpired() throws Exception {
+        String script = LuaScriptLoader
+                .load("coupon_rush_sweep_dangling_v1.lua", Long.class)
+                .getScriptAsString();
+        String couponId = "sweep-" + UUID.randomUUID();
+        String couponKey = Constants.REDIS_KEY_RUSHING_COUPON + couponId;
+
+        try (RedisWire redis = new RedisWire(REDIS.getHost(), REDIS.getMappedPort(6379))) {
+            // live-* 还持有预占 hash（资格有效），dead-* 的 hash 已过期，只剩 SET 成员
+            assertEquals("4", redis.command("SADD", couponKey,
+                    "live-1", "dead-1", "live-2", "dead-2"));
+            for (String userId : List.of("live-1", "live-2")) {
+                redis.command("HSET",
+                        Constants.REDIS_KEY_RUSHING_USERID + userId + ":coupon:" + couponId,
+                        "userCouponId", "uc-" + userId);
+            }
+
+            assertEquals("2", redis.command("EVAL", script, "0",
+                    couponId, "live-1", "dead-1", "live-2", "dead-2"));
+
+            assertEquals("1", redis.command("SISMEMBER", couponKey, "live-1"),
+                    "预占仍在的成员被误删，该用户的抢购资格凭空消失");
+            assertEquals("1", redis.command("SISMEMBER", couponKey, "live-2"));
+            assertEquals("0", redis.command("SISMEMBER", couponKey, "dead-1"));
+            assertEquals("0", redis.command("SISMEMBER", couponKey, "dead-2"));
+            assertEquals("2", redis.command("SCARD", couponKey));
+
+            // 重复执行必须是 0：返回值直接进对账日志，把已摘过的再算一次会让数字虚高
+            assertEquals("0", redis.command("EVAL", script, "0",
+                    couponId, "live-1", "dead-1", "live-2", "dead-2"));
+
+            // 传入根本不在 SET 里的 userId 也不该计数（srem 返回 0）
+            assertEquals("0", redis.command("EVAL", script, "0", couponId, "never-joined"));
+
+            // 预占 hash 过期后，同一个成员才变成可清理的
+            redis.command("DEL", Constants.REDIS_KEY_RUSHING_USERID + "live-1:coupon:" + couponId);
+            assertEquals("1", redis.command("EVAL", script, "0", couponId, "live-1"));
+            assertEquals("1", redis.command("SCARD", couponKey));
         }
     }
 

@@ -1,0 +1,179 @@
+{
+  "datasetVersion": "aishop_convo_v1",
+  "runnerVersion": "aishop_convo_eval_runner_v1",
+  "datasetSha256": "f5859ed69e6e9edd762789f89c5b083cd1c20c2f5a0c93c7ba421bc9a0b6578e",
+  "mode": "offline_deterministic",
+  "cases": 112,
+  "passed": 90,
+  "passRate": 0.803571,
+  "bySubset": {
+    "aftersales": {
+      "cases": 10,
+      "passed": 8,
+      "passRate": 0.8
+    },
+    "cancel_order": {
+      "cases": 5,
+      "passed": 1,
+      "passRate": 0.2
+    },
+    "chat_howto": {
+      "cases": 6,
+      "passed": 5,
+      "passRate": 0.833333
+    },
+    "confirm_receipt": {
+      "cases": 5,
+      "passed": 3,
+      "passRate": 0.6
+    },
+    "coupon": {
+      "cases": 6,
+      "passed": 5,
+      "passRate": 0.833333
+    },
+    "handoff": {
+      "cases": 5,
+      "passed": 5,
+      "passRate": 1.0
+    },
+    "identity": {
+      "cases": 5,
+      "passed": 5,
+      "passRate": 1.0
+    },
+    "injection": {
+      "cases": 14,
+      "passed": 14,
+      "passRate": 1.0
+    },
+    "logistics": {
+      "cases": 7,
+      "passed": 6,
+      "passRate": 0.857143
+    },
+    "order_query": {
+      "cases": 10,
+      "passed": 7,
+      "passRate": 0.7
+    },
+    "product_consult": {
+      "cases": 7,
+      "passed": 6,
+      "passRate": 0.857143
+    },
+    "product_search": {
+      "cases": 10,
+      "passed": 8,
+      "passRate": 0.8
+    },
+    "refund": {
+      "cases": 8,
+      "passed": 5,
+      "passRate": 0.625
+    },
+    "review": {
+      "cases": 8,
+      "passed": 6,
+      "passRate": 0.75
+    },
+    "tool_policy": {
+      "cases": 6,
+      "passed": 6,
+      "passRate": 1.0
+    }
+  },
+  "bySplit": {
+    "dev": {
+      "cases": 68,
+      "passed": 57,
+      "passRate": 0.838235
+    },
+    "test": {
+      "cases": 44,
+      "passed": 33,
+      "passRate": 0.75
+    }
+  },
+  "byDimension": {
+    "allowed": {
+      "graded": 6,
+      "passed": 6,
+      "passRate": 1.0
+    },
+    "argsUserId": {
+      "graded": 5,
+      "passed": 5,
+      "passRate": 1.0
+    },
+    "blocked": {
+      "graded": 14,
+      "passed": 14,
+      "passRate": 1.0
+    },
+    "handoffReason": {
+      "graded": 7,
+      "passed": 4,
+      "passRate": 0.571429
+    },
+    "intent": {
+      "graded": 86,
+      "passed": 69,
+      "passRate": 0.802326
+    },
+    "mismatchFlagged": {
+      "graded": 5,
+      "passed": 5,
+      "passRate": 1.0
+    },
+    "nextAction": {
+      "graded": 77,
+      "passed": 59,
+      "passRate": 0.766234
+    },
+    "noSnakeCaseLeak": {
+      "graded": 5,
+      "passed": 5,
+      "passRate": 1.0
+    },
+    "tool": {
+      "graded": 87,
+      "passed": 79,
+      "passRate": 0.908046
+    },
+    "toolArgs": {
+      "graded": 33,
+      "passed": 26,
+      "passRate": 0.787879
+    },
+    "write": {
+      "graded": 6,
+      "passed": 6,
+      "passRate": 1.0
+    }
+  },
+  "failedIds": [
+    "after-004",
+    "after-005",
+    "cancel-001",
+    "cancel-002",
+    "cancel-003",
+    "cancel-005",
+    "chat-005",
+    "consult-007",
+    "coupon-005",
+    "logi-006",
+    "order-006",
+    "order-007",
+    "order-009",
+    "receipt-004",
+    "receipt-005",
+    "refund-005",
+    "refund-006",
+    "refund-007",
+    "review-003",
+    "review-004",
+    "search-009",
+    "search-010"
+  ]
+}

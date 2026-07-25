@@ -1,0 +1,2 @@
+# 同 plugins/.gitkeep：占位用，Grafana 找不到该目录会打 level=error。
+# 后续要配告警规则，直接把 yaml 放进这个目录即可被自动加载。
