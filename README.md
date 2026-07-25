@@ -1,6 +1,6 @@
 # AI_Shop — AI 驱动的微服务电商平台
 
-基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，集成 AI 购物导购、智能客服与 RAG 知识库。不追求完整生产级，但工程化基础扎实：分布式事务、消息可靠投递、分布式锁、安全过滤均有具体实现。
+基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，集成 AI 购物导购、智能客服与 RAG 知识库。工程化基础扎实：分布式事务、消息可靠投递、分布式锁、安全过滤均有具体实现。
 
 ---
 
