@@ -166,16 +166,6 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ---
 
-## 工程化亮点
-
-- **Lua 脚本实例复用**：`DefaultRedisScript` 全局静态实例，高频路径走 `EVALSHA` 而非每次传全量脚本
-- **Redis 组件域拆分**：按业务域（签到 / 支付生命周期 / 抢购预占）拆为独立 Bean，键结构联动修改不会漏改
-- **God 类消除**：`OrderInfoServiceImpl` 将秒杀集群拆出为独立 `CouponRushOrderService`；`RedisComponent` 1080→530 行
-- **输入防护分层**：关键词表只做纵深防御，真正边界是 Spotlighting + Propose→Java 执行 + 工具白名单三层
-- **测试体系**：Java 各模块单元测试 + Python 183 用例，覆盖 ReAct 强制工具回退、防注入、双弱信号升级等核心分支
-
----
-
 ## 许可证
 
 见 [LICENSE.md](LICENSE.md)
