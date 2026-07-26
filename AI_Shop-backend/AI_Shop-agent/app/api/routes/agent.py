@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.api.deps import TokenUserInfo, get_request_token, require_login
 from app.config.settings import get_settings
@@ -18,12 +16,10 @@ from app.services.support_service import support_service
 router = APIRouter(prefix="/agent", tags=["agent"])
 tracer = get_tracer()
 
-limiter = Limiter(key_func=get_remote_address)
-
-def _user_key(request: Request) -> str:
-
-    token = get_request_token(request)
-    return token or get_remote_address(request)
+# 限流统一走 rate_limit_service（Redis 固定窗口，跨进程共享配额）。
+# 这里曾经叠了一层 slowapi @limiter.limit：它默认存在进程内存里，多 uvicorn worker
+# 时每个进程各算一份配额，"1/second" 实际是 "N/second"；而且下面四个接口本来就各有
+# 一次等价的 Redis 校验，留着它只是让人误以为已经限流了。
 
 def _form_bool(value: str | bool | None) -> bool:
 
@@ -69,9 +65,7 @@ async def load_history_message(
     return success(data)
 
 @router.post("/sendMessage")
-@limiter.limit("1/second", key_func=_user_key)
 async def send_message(
-    request: Request,
     message: str = Form(...),
     fromProduct: str | None = Form(None),
     consultProductId: str | None = Form(None),
@@ -95,9 +89,7 @@ async def send_message(
         return error(600, str(e))
 
 @router.post("/cancelMessage")
-@limiter.limit("1/second", key_func=_user_key)
 async def cancel_message(
-    request: Request,
     messageId: int = Form(...),
     assistantMessage: str | None = Form(None),
     user: TokenUserInfo = Depends(require_login),
@@ -172,7 +164,6 @@ async def message_feedback(
         return error(600, str(exc))
 
 @router.post("/confirmAction")
-@limiter.limit("3/second", key_func=_user_key)
 async def confirm_action(
     request: Request,
     actionToken: str = Form(...),
@@ -209,9 +200,7 @@ async def confirm_action(
         })
 
 @router.post("/cancelAction")
-@limiter.limit("3/second", key_func=_user_key)
 async def cancel_action(
-    request: Request,
     actionToken: str = Form(...),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:

@@ -31,7 +31,7 @@
 | 工具调用 | MCP（Model Context Protocol）双向通信 |
 | 会话记忆 | Redis 短期 + MySQL 长期持久化 |
 | 可观测 | OpenTelemetry（OTLP）+ Prometheus 指标 |
-| 测试 | pytest（183 用例覆盖核心路径） |
+| 测试 | pytest（209 用例覆盖核心路径） |
 
 ### 前端
 

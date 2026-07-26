@@ -160,6 +160,39 @@ class RedisService:
             owner,
         )
 
+    async def allow_fixed_window(
+        self,
+        key: str,
+        window_seconds: int,
+        max_count: int,
+    ) -> bool:
+        """固定窗口限流，计数与设置过期在一次 EVAL 里完成。
+
+        与 Java 侧 ``lua/rate_limit_v1.lua`` 同语义：只在计数从 0 变 1 时设置过期，
+        避免每次请求都续期导致窗口永不结束。
+
+        必须是原子的：先 INCR 再 EXPIRE 的写法一旦在两次往返之间断开（进程被杀、
+        连接抖动），这个 key 就永久没有 TTL，该用户对该动作会被永久锁死。
+        第二个分支是给这种历史脏 key 兜底的——老版本可能已经留下无 TTL 的 key，
+        下次请求时顺手补上过期时间，让它自己恢复。
+        """
+        result = await self.client.eval(
+            """
+            local current = redis.call('INCR', KEYS[1]);
+            if current == 1 then
+                redis.call('EXPIRE', KEYS[1], ARGV[1]);
+            elseif redis.call('TTL', KEYS[1]) < 0 then
+                redis.call('EXPIRE', KEYS[1], ARGV[1]);
+            end
+            if current > tonumber(ARGV[2]) then return 0 else return 1 end;
+            """,
+            1,
+            key,
+            max(1, int(window_seconds)),
+            max(1, int(max_count)),
+        )
+        return result == 1
+
     async def set_worker_heartbeat(self, worker_id: str, ttl_seconds: int) -> None:
         await self.client.setex(
             REDIS_AGENT_WORKER_HEARTBEAT,

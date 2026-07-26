@@ -5,10 +5,6 @@ import structlog
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket
 from prometheus_client import make_asgi_app
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
 from app.api.exception_handlers import business_exception_handler
 from app.api.routes import agent
@@ -116,10 +112,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="EShop Agent Python", lifespan=lifespan)
 configure_telemetry(app)
 
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_middleware(SlowAPIMiddleware)
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# 接口限流有两层，都不在这里：
+#   1. 网关 Sentinel 按路由做 QPS 流控（agent-http / agent-ws），是对外的第一道；
+#   2. 应用内按「用户 + 动作」的配额走 rate_limit_service（Redis 固定窗口）。
+# 原先这里挂的 slowapi 中间件绑的是本模块的 Limiter，而路由装饰器注册在
+# app/api/routes/agent.py 自己的 Limiter 上，两个实例互不可见，中间件实际是空转。
 app.add_exception_handler(BusinessException, business_exception_handler)
 
 app.include_router(agent.router, prefix="/api")
