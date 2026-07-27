@@ -83,6 +83,7 @@ _TOOL_INTENTS = frozenset(
         IntentKind.RECOMMENT,
         IntentKind.QUERY_COMMENT,
         IntentKind.REFUND_STATUS,
+        IntentKind.CANCEL_ORDER,  # 查到订单后引导用户自行取消；需要工具结果才能响应
     }
 )
 
@@ -136,13 +137,10 @@ def classify_intent_by_rules(
         return IntentKind.PAYMENT_ISSUE
     if any(k in text for k in ("破损", "损坏", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
         return IntentKind.DAMAGED_OR_WRONG_ITEM
-    if any(k in text for k in ("开发票", "发票", "抬头", "税号")):
-        return IntentKind.INVOICE
-    if any(k in text for k in ("修改地址", "改地址", "收货地址错", "地址填错", "换地址")):
-        return IntentKind.ADDRESS_CHANGE
-    if "投诉" in text or any(k in text for k in _VERY_NEGATIVE_HINTS):
-        return IntentKind.COMPLAINT
 
+    # 操作方法/如何/怎么类 → CHAT（必须在 INVOICE/ADDRESS_CHANGE 等专项分支之前执行，
+    # 否则「发票怎么申请」「确认收货在哪里点」会被专项分支抢走，导致错误路由或触发
+    # PROPOSE_CONFIRM_RECEIPT 等副作用）。
     howto = any(
         k in text
         for k in (
@@ -160,6 +158,7 @@ def classify_intent_by_rules(
             "如何使用",
             "在哪使用",
             "在哪里用",
+            "在哪里",  # 覆盖「确认收货在哪里点」「在哪里取消」等格式
             "在哪看",
             "哪里看",
         )
@@ -174,6 +173,7 @@ def classify_intent_by_rules(
             "退款",
             "退货",
             "评价",
+            "追评",   # 「追评怎么写」
             "收货",
             "物流",
             "快递",
@@ -183,6 +183,13 @@ def classify_intent_by_rules(
         )
     ):
         return IntentKind.CHAT
+
+    if any(k in text for k in ("开发票", "发票", "抬头", "税号")):
+        return IntentKind.INVOICE
+    if any(k in text for k in ("修改地址", "改地址", "收货地址错", "地址填错", "换地址")):
+        return IntentKind.ADDRESS_CHANGE
+    if "投诉" in text or any(k in text for k in _VERY_NEGATIVE_HINTS):
+        return IntentKind.COMPLAINT
 
     if any(k in text for k in ("追评", "再评", "二次评价")):
         return IntentKind.RECOMMENT
@@ -200,10 +207,14 @@ def classify_intent_by_rules(
         k in text for k in ("订单", "给", "写", "提交")
     ):
         return IntentKind.PRODUCT_REVIEW
-    if any(k in text for k in ("我的优惠券", "查优惠券", "有哪些券", "还有几张券", "可用券", "未使用券")):
+    if any(k in text for k in ("我的优惠券", "查优惠券", "有哪些券", "还有几张券", "可用券", "未使用券", "这张券", "那张券")):
         return IntentKind.QUERY_COUPON
-    if any(k in text for k in ("优惠券", "优惠卷")) and any(
-        k in text for k in ("查", "看看", "有没有", "还有", "几张", "列表")
+    # 含「订单」的复合句（如「帮我看看订单，顺便查一下优惠券」）主意图是 QUERY_ORDER，
+    # 不应被「优惠券 + 看看」触发的宽泛规则抢走。
+    if (
+        any(k in text for k in ("优惠券", "优惠卷"))
+        and any(k in text for k in ("查", "看看", "有没有", "还有", "几张", "列表"))
+        and "订单" not in text
     ):
         return IntentKind.QUERY_COUPON
     if "取消" not in text and any(

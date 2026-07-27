@@ -3,17 +3,23 @@ import random
 import time
 
 import redis.asyncio as aioredis
+import structlog
 
 from app.config.settings import get_settings
 from app.constants import (
     CANCEL_FLAG_TTL,
     CONSULT_ACTIVE_TTL,
     CONSULT_PRODUCT_TTL,
+    IMPRESSION_LOG_MAX_ENTRIES,
+    IMPRESSION_LOG_MAX_PRODUCTS,
+    IMPRESSION_LOG_TTL,
     PENDING_ACTION_TTL,
     PENDING_MSG_TTL,
+    REDIS_AGENT_CLICK_LOG,
     REDIS_AGENT_CONSULT_ACTIVE,
     REDIS_AGENT_CONSULT_PRODUCT,
     REDIS_AGENT_HISTORY_CONDENSED,
+    REDIS_AGENT_IMPRESSION_LOG,
     REDIS_AGENT_PENDING_ACTION,
     REDIS_AGENT_PENDING_MSG,
     REDIS_AGENT_SHOPPING_PROFILE,
@@ -27,6 +33,8 @@ from app.constants import (
     SHOPPING_PROFILE_TTL,
     WS_MESSAGE_TOPIC_AGENT,
 )
+
+logger = structlog.get_logger()
 
 
 class RedisService:
@@ -115,6 +123,109 @@ class RedisService:
     async def get_shopping_profile(self, user_id: str) -> dict | None:
         value = await self.get_json(f"{REDIS_AGENT_SHOPPING_PROFILE}{user_id}")
         return value if isinstance(value, dict) else None
+
+    async def log_impression(
+        self,
+        user_id: str,
+        product_ids: list[str],
+        *,
+        query: str = "",
+        source: str = "",
+        request_id: str = "",
+    ) -> None:
+        """Record which products were shown, so clicks later have a denominator.
+
+        This is the missing half of every CTR metric: without the shown-set there
+        is no rate to compute and no negative samples to train on. Capped list
+        with a TTL rather than an append-only table, because an MVP needs the
+        signal, not a warehouse. Never raises - losing a log line must not fail
+        a search.
+        """
+        shown = [str(pid) for pid in product_ids if pid][:IMPRESSION_LOG_MAX_PRODUCTS]
+        if not user_id or not shown:
+            return
+        entry = {
+            "ts": int(time.time() * 1000),
+            "query": (query or "")[:120],
+            "source": source or "",
+            "requestId": request_id or "",
+            "productIds": shown,
+        }
+        await self._push_capped(
+            f"{REDIS_AGENT_IMPRESSION_LOG}{user_id}",
+            entry,
+            event="impression",
+            user_id=user_id,
+        )
+
+    async def log_click(
+        self,
+        user_id: str,
+        product_id: str,
+        *,
+        source: str = "",
+        position: int | None = None,
+    ) -> None:
+        """Record a product click as the positive counterpart to an impression."""
+        if not user_id or not product_id:
+            return
+        entry = {
+            "ts": int(time.time() * 1000),
+            "productId": str(product_id),
+            "source": source or "",
+            "position": position,
+        }
+        await self._push_capped(
+            f"{REDIS_AGENT_CLICK_LOG}{user_id}",
+            entry,
+            event="click",
+            user_id=user_id,
+        )
+
+    async def _push_capped(
+        self,
+        key: str,
+        entry: dict,
+        *,
+        event: str,
+        user_id: str,
+    ) -> None:
+        try:
+            pipe = self.client.pipeline(transaction=False)
+            pipe.lpush(key, json.dumps(entry, ensure_ascii=False))
+            pipe.ltrim(key, 0, IMPRESSION_LOG_MAX_ENTRIES - 1)
+            pipe.expire(key, IMPRESSION_LOG_TTL)
+            await pipe.execute()
+        except Exception as exc:
+            logger.warning(
+                "rec_event_log_failed",
+                event=event,
+                user_id=user_id,
+                error=str(exc),
+            )
+
+    async def read_impressions(self, user_id: str, limit: int = 50) -> list[dict]:
+        """Read back a user's impression log, newest first. Offline analysis only."""
+        return await self._read_events(f"{REDIS_AGENT_IMPRESSION_LOG}{user_id}", limit)
+
+    async def read_clicks(self, user_id: str, limit: int = 50) -> list[dict]:
+        """Read back a user's click log, newest first. Offline analysis only."""
+        return await self._read_events(f"{REDIS_AGENT_CLICK_LOG}{user_id}", limit)
+
+    async def _read_events(self, key: str, limit: int) -> list[dict]:
+        try:
+            raw = await self.client.lrange(key, 0, max(1, int(limit)) - 1)
+        except Exception:
+            return []
+        events: list[dict] = []
+        for item in raw or []:
+            try:
+                value = json.loads(item)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(value, dict):
+                events.append(value)
+        return events
 
     async def pause_consult(self, user_id: str) -> None:
 

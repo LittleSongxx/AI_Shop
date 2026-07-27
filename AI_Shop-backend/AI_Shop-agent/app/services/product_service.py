@@ -2,7 +2,12 @@ import re
 
 import structlog
 
-from app.constants import PRODUCT_CANDIDATE_SIZE, PRODUCT_RESULT_SIZE, PRODUCT_STATUS_ON_SALE
+from app.constants import (
+    PRODUCT_CANDIDATE_SIZE,
+    PRODUCT_RESULT_SIZE,
+    PRODUCT_STATUS_ON_SALE,
+    SIMILAR_PRODUCT_SIZE,
+)
 from app.domain.intent.rules import looks_like_browse_recommend
 from app.rag.retriever import rag_retriever
 from app.rag.rrf import rrf_merge
@@ -11,6 +16,7 @@ from app.services.product_search_query import (
     filter_products_by_query_relevance,
     normalize_product_search_query,
 )
+from app.services.redis_service import redis_service
 from app.services.search_recommend_service import search_recommend_service
 from app.services.shopping_profile_service import shopping_profile_service
 from app.utils.biz_payload import build_product_payload, first_cover
@@ -163,14 +169,16 @@ class ProductService:
                 source = "none"
 
         if not products and consult_product and is_vague_search_keyword(keyword or user_text):
-            category_id = consult_product.get("categoryId") or consult_product.get("category_id")
-            if category_id:
-                logger.info("category_fallback", category_id=category_id)
-                products = await search_recommend_service.load_by_category(str(category_id), 8)
-                if exclude_product_id:
-                    products = [p for p in products if str(p.get("product_id")) != str(exclude_product_id)]
-                if products:
-                    source = "category"
+            # Embedding i2i first: "有没有类似的" deserves content-similar items, not
+            # just anything sharing the shelf. Falls back to category internally.
+            similar, similar_source = await self.load_similar_products(
+                consult_product,
+                SIMILAR_PRODUCT_SIZE,
+                exclude_product_id or None,
+            )
+            if similar:
+                products = similar
+                source = similar_source
 
         if not products and looks_like_browse_recommend(user_text):
             products = await search_recommend_service.load_recommend_products(user_id, 8)
@@ -216,6 +224,12 @@ class ProductService:
             )
 
         assistant, biz_data = build_product_payload(products)
+        await redis_service.log_impression(
+            user_id,
+            [str(product.get("product_id") or "") for product in products],
+            query=query,
+            source=source,
+        )
         return assistant, biz_data, biz_type, products, source
 
     async def get_product_detail_text(self, product_id: str) -> str:
@@ -301,6 +315,78 @@ class ProductService:
                 ordered.append(id_map[pid])
         return ordered
 
+    async def load_similar_products(
+        self,
+        anchor: dict | None,
+        limit: int = SIMILAR_PRODUCT_SIZE,
+        exclude_product_id: str | None = None,
+    ) -> tuple[list[dict], str]:
+        """Item-to-item recall using the product embeddings already in the index.
+
+        This is the one collaborative-filtering-shaped feature that needs no
+        interaction history at all: content similarity comes from the vectors the
+        search service already writes. Returns (products, source) so the caller
+        can tell embedding recall apart from the category fallback.
+        """
+        if not anchor:
+            return [], "none"
+        anchor_id = str(anchor.get("productId") or anchor.get("product_id") or "")
+        exclude = str(exclude_product_id or anchor_id or "")
+        name = str(anchor.get("productName") or anchor.get("product_name") or "").strip()
+        category_id = str(anchor.get("categoryId") or anchor.get("category_id") or "")
+        size = max(1, min(int(limit), 20))
+
+        if name:
+            # Over-fetch: the anchor itself and off-category hits get dropped below.
+            candidate_ids = await rag_retriever.search_product_vector_ids(
+                name,
+                max(size * 3, PRODUCT_CANDIDATE_SIZE),
+            )
+            candidate_ids = [pid for pid in candidate_ids if str(pid) != exclude]
+            if candidate_ids:
+                products = await self._load_products_by_ids(candidate_ids)
+                products = [
+                    product
+                    for product in products
+                    if str(product.get("product_id") or "") != exclude
+                ]
+                if category_id:
+                    same_category = [
+                        product
+                        for product in products
+                        if str(product.get("category_id") or "") == category_id
+                    ]
+                    # Only tighten to the anchor's shelf when it still fills the row;
+                    # a near-empty same-category list is worse than a mixed one.
+                    if len(same_category) >= min(size, 3):
+                        products = same_category
+                products = filter_known_available_products(products)[:size]
+                if products:
+                    logger.info(
+                        "similar_i2i_embedding_hit",
+                        anchor_id=anchor_id,
+                        category_id=category_id,
+                        returned=len(products),
+                    )
+                    return products, "similar_i2i"
+
+        if category_id:
+            products = await search_recommend_service.load_by_category(category_id, size)
+            products = [
+                product
+                for product in products
+                if str(product.get("product_id") or "") != exclude
+            ]
+            if products:
+                logger.info(
+                    "similar_i2i_category_fallback",
+                    anchor_id=anchor_id,
+                    category_id=category_id,
+                    returned=len(products),
+                )
+                return products[:size], "category"
+        return [], "none"
+
 product_service = ProductService()
 
 def _similar_intent(keyword: str | None, consult: dict | None) -> bool:
@@ -362,9 +448,16 @@ def format_search_tool_message(
         )
     if similar_intent and source == "category":
         return f"【同品类推荐】找到 {len(products)} 个同品类商品（请查看下方卡片）。"
+    if source == "similar_i2i":
+        return (
+            f"【类似商品】根据「{consult_name}」为你找到 {len(products)} 个相似商品"
+            "（请查看下方卡片）。"
+        )
 
     # Even if source claims hybrid, never brand irrelevant titles as「找到」.
-    if products and kw and source not in ("category",):
+    # category/similar_i2i are excluded: both are recalled by shelf or embedding
+    # rather than by the keyword, so keyword-term matching would wrongly reject them.
+    if products and kw and source not in ("category", "similar_i2i"):
         relevant = filter_products_by_query_relevance(products, kw)
         intentional_alt = looks_like_hot_sale_recommend(kw) or looks_like_browse_recommend(kw)
         if not relevant and not intentional_alt:

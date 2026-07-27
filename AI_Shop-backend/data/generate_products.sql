@@ -56,6 +56,10 @@ INSERT INTO temp_property_options VALUES
 ('尺寸', '小号,中号,大号,定制'),
 ('款式', '简约,复古,现代,欧式'),
 ('功率', '500W,1000W,1500W,2000W'),
+-- 品牌取自 Agent 侧 _BRAND_ALIASES 的规范名，不是随手编的：
+-- 用户说「只看华为」时，能匹配上的就只有这批词。若走 '其他' 兜底，
+-- 品牌值会变成「标准型」，品牌偏好过滤永远筛不出东西。
+('品牌', '苹果,华为,小米,红米,荣耀,三星,OPPO,vivo,联想,戴尔,惠普,耐克,阿迪达斯'),
 ('其他', '标准型,升级型,优选型');
 
 DELIMITER //
@@ -123,19 +127,23 @@ BEGIN
     WHERE category_id = p_category_id;
     
     -- 如果没有定义属性，生成一个默认SKU
+    -- 注意：库存不在 product_sku 里，已迁至 aishop_stock.sku_stock（见两库的
+    -- R__current_schema.sql）。这里必须跨库写，否则 Unknown column 'stock'。
     IF v_prop_count = 0 THEN
         INSERT INTO product_sku (
             product_id, property_value_id_hash, property_value_ids,
-            price, stock, sort
+            price, sort
         ) VALUES (
             p_product_id,
             'd41d8cd98f00b204e9800998ecf8427e',
             '',
             ROUND(10 + RAND() * 1990, 2),
-            FLOOR(RAND() * 301),
             0
         );
-        
+
+        INSERT IGNORE INTO aishop_stock.sku_stock (product_id, property_value_id_hash, stock)
+        VALUES (p_product_id, 'd41d8cd98f00b204e9800998ecf8427e', FLOOR(RAND() * 301));
+
         UPDATE product_info 
         SET min_price = (SELECT price FROM product_sku WHERE product_id = p_product_id LIMIT 1),
             max_price = (SELECT price FROM product_sku WHERE product_id = p_product_id LIMIT 1)
@@ -207,12 +215,16 @@ BEGIN
                 
                 INSERT INTO product_sku (
                     product_id, property_value_id_hash, property_value_ids,
-                    price, stock, sort
+                    price, sort
                 ) VALUES (
                     p_product_id, v_pv_hash, COALESCE(v_pv_ids, ''),
-                    v_price, v_stock, v_sku_idx
+                    v_price, v_sku_idx
                 );
-                
+
+                INSERT IGNORE INTO aishop_stock.sku_stock
+                    (product_id, property_value_id_hash, stock)
+                VALUES (p_product_id, v_pv_hash, v_stock);
+
                 IF v_price < v_min_price THEN SET v_min_price = v_price; END IF;
                 IF v_price > v_max_price THEN SET v_max_price = v_price; END IF;
             END IF;
@@ -316,41 +328,47 @@ FROM (
 -- ============================================================
 -- 为没有属性定义的商品生成默认SKU
 -- ============================================================
-INSERT INTO product_sku (product_id, property_value_id_hash, property_value_ids, price, stock, sort)
-SELECT 
+INSERT INTO product_sku (product_id, property_value_id_hash, property_value_ids, price, sort)
+SELECT
     product_id,
     'd41d8cd98f00b204e9800998ecf8427e',
     '',
     ROUND(10 + RAND() * 1990, 2),
-    FLOOR(RAND() * 301),
     0
 FROM product_info p
 WHERE NOT EXISTS (
-    SELECT 1 FROM product_property_value pv 
+    SELECT 1 FROM product_property_value pv
     WHERE pv.product_id = p.product_id
 );
 
 -- ============================================================
 -- 为有属性的商品生成SKU（简化版本，每个商品2-3个SKU）
 -- ============================================================
-INSERT INTO product_sku (product_id, property_value_id_hash, property_value_ids, price, stock, sort)
-SELECT 
+INSERT INTO product_sku (product_id, property_value_id_hash, property_value_ids, price, sort)
+SELECT
     p.product_id,
     MD5(GROUP_CONCAT(ppv.property_value_id ORDER BY ppv.property_id)) as hash,
     GROUP_CONCAT(ppv.property_value_id ORDER BY ppv.property_id) as pv_ids,
     ROUND(10 + RAND() * 1990, 2) as price,
-    FLOOR(RAND() * 301) as stock,
     0 as sort
 FROM product_info p
 INNER JOIN product_property_value ppv ON p.product_id = ppv.product_id
 WHERE EXISTS (
-    SELECT 1 FROM product_property_value pv2 
+    SELECT 1 FROM product_property_value pv2
     WHERE pv2.product_id = p.product_id
 )
 GROUP BY p.product_id
-ON DUPLICATE KEY UPDATE 
-    price = VALUES(price),
-    stock = VALUES(stock);
+ON DUPLICATE KEY UPDATE
+    price = VALUES(price);
+
+-- ============================================================
+-- 库存：product_sku.stock 已迁到 aishop_stock.sku_stock（见 AI_Shop-stock
+-- 的 R__current_schema.sql）。跨库补齐上面两批 SKU 的库存，一条不落。
+-- ============================================================
+INSERT INTO aishop_stock.sku_stock (product_id, property_value_id_hash, stock)
+SELECT s.product_id, s.property_value_id_hash, FLOOR(RAND() * 301)
+FROM product_sku s
+ON DUPLICATE KEY UPDATE stock = VALUES(stock);
 
 -- ============================================================
 -- 更新商品的最低和最高价格

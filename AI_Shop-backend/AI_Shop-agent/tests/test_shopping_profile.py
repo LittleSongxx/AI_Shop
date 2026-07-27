@@ -1,3 +1,4 @@
+from app.constants import CLARIFY_MAX_TEXT_LENGTH
 from app.services.shopping_profile_service import (
     ShoppingProfileService,
     empty_profile,
@@ -54,8 +55,56 @@ def test_generic_request_requires_clarification_without_profile():
     profile = empty_profile()
 
     assert service.should_clarify("推荐几个商品", "推荐几个商品", profile, None)
-    assert not service.should_clarify("推荐手机", "推荐手机", profile, None)
+    # A considered purchase with only a category is worth one clarifying turn:
+    # "手机" alone cannot rank a shelf, budget and scenario can.
+    assert service.should_clarify("推荐手机", "推荐手机", profile, None)
+    # Low-consideration categories stay direct — no budget interview for snacks.
     assert not service.should_clarify("我要吃零食", "零食", profile, None)
+
+
+def test_narrowing_signal_suppresses_clarification():
+    service = ShoppingProfileService()
+    empty = empty_profile()
+
+    # Budget, brand, scenario or feature in the request itself is enough to rank on.
+    assert not service.should_clarify("3000以内的手机", "手机", empty, None)
+    assert not service.should_clarify("推荐华为手机", "华为手机", empty, None)
+    assert not service.should_clarify("办公用的笔记本", "笔记本", empty, None)
+    assert not service.should_clarify("轻薄的笔记本", "笔记本", empty, None)
+
+    # A remembered budget also suppresses it, so we never ask the same thing twice.
+    remembered = extract_profile("预算3000以内")
+    assert not service.should_clarify("推荐手机", "推荐手机", remembered, None)
+
+    # A remembered category alone must NOT suppress it — that was the old bug.
+    category_only = extract_profile("买个手机")
+    assert service.should_clarify("推荐手机", "推荐手机", category_only, None)
+
+
+def test_long_request_skips_clarification():
+    service = ShoppingProfileService()
+    profile = empty_profile()
+
+    # Past the length gate the user has spelled out their own intent.
+    long_request = (
+        "我最近想换一台手机不过还没决定好到底要选哪个品牌和什么价位"
+        "你先随便给我看看有哪些款式我再慢慢挑吧"
+    )
+    assert len(long_request) > CLARIFY_MAX_TEXT_LENGTH
+    assert not service.should_clarify(long_request, "手机", profile, None)
+
+
+def test_consult_context_skips_clarification():
+    service = ShoppingProfileService()
+    profile = empty_profile()
+
+    # Looking at a product already supplies the context a question would ask for.
+    assert not service.should_clarify(
+        "推荐手机",
+        "推荐手机",
+        profile,
+        {"productId": "1", "productName": "某品牌手机"},
+    )
 
 
 def test_filter_products_applies_budget_and_brand_constraints():

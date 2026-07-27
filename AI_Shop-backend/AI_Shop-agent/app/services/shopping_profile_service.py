@@ -5,7 +5,7 @@ from typing import Any
 
 import structlog
 
-from app.constants import PRODUCT_STATUS_ON_SALE
+from app.constants import CLARIFY_MAX_TEXT_LENGTH, PRODUCT_STATUS_ON_SALE
 from app.services.redis_service import redis_service
 
 logger = structlog.get_logger()
@@ -77,6 +77,11 @@ _FEATURE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 _NEGATIVE_BRAND_WORDS = ("不要", "不想要", "排除", "不考虑", "不选", "别买", "避开")
 _GENERIC_RECOMMEND_WORDS = ("推荐", "买什么", "选什么", "挑什么", "有什么好物", "找点")
+
+# Low-consideration categories: the bare category is already a good enough query,
+# so a budget/scenario question costs a turn and buys almost no ranking quality.
+# Considered purchases (phone, laptop, camera, appliance...) are the opposite.
+_CLARIFY_EXEMPT_CATEGORIES = ("零食",)
 _ACCEPT_SUBSTITUTE_HINTS = (
     "可以替代",
     "接受替代",
@@ -207,6 +212,23 @@ def _has_signal(profile: dict[str, Any]) -> bool:
     )
 
 
+def _has_narrowing_signal(profile: dict[str, Any]) -> bool:
+    """Signals that actually narrow a result set, so clarification adds nothing.
+
+    A bare category is deliberately excluded: "买个笔记本" tells us the shelf but
+    not the budget, scenario or brand, which is exactly the case where one
+    clarifying question buys the most ranking quality.
+    """
+    return bool(
+        profile.get("budgetMin") is not None
+        or profile.get("budgetMax") is not None
+        or profile.get("brands")
+        or profile.get("excludedBrands")
+        or profile.get("scenarios")
+        or profile.get("features")
+    )
+
+
 def _merge_unique(existing: list[str], incoming: list[str]) -> list[str]:
     result = list(existing or [])
     for item in incoming:
@@ -289,13 +311,30 @@ class ShoppingProfileService:
         profile: dict[str, Any] | None,
         consult_product: dict | None,
     ) -> bool:
-        if consult_product or _has_signal(profile or {}):
+        """Decide whether one clarifying question beats guessing at the ranking.
+
+        Widened from the original "no signal at all and <=24 chars" rule: a
+        category-only request now qualifies, because category alone cannot rank
+        a 10k-SKU shelf. Anything carrying a budget, brand, scenario or feature
+        is left alone, as is any long request where the user has clearly already
+        spelled out what they want.
+        """
+        if consult_product:
+            return False
+        # Remembered budget/brand/scenario already narrows the shelf, so asking again is noise.
+        if _has_narrowing_signal(profile or {}):
             return False
         value = (text or keyword or "").strip()
-        if not value or len(value) > 24:
+        if not value or len(value) > CLARIFY_MAX_TEXT_LENGTH:
             return False
-        if _has_signal(extract_profile(value)):
+        extracted = extract_profile(value)
+        if _has_narrowing_signal(extracted):
             return False
+        # Category without any narrowing signal: the highest-value place to ask,
+        # except where the category alone already pins the shelf well enough.
+        category = str(extracted.get("category") or "")
+        if category:
+            return category not in _CLARIFY_EXEMPT_CATEGORIES
         if any(word in value for word in _GENERIC_RECOMMEND_WORDS):
             return True
         return value in {"商品", "东西", "好物", "产品", "随便看看"}
@@ -478,7 +517,11 @@ class ShoppingProfileService:
         if profile.get("features"):
             reasons.append(f"关注{profile['features'][0]}")
         if not reasons:
-            return "结合当前浏览与搜索结果推荐" if source == "browse" else "根据搜索结果推荐"
+            if source == "browse":
+                return "结合当前浏览与搜索结果推荐"
+            if source == "similar_i2i":
+                return "与你正在看的商品相似"
+            return "根据搜索结果推荐"
         return "、".join(reasons)
 
 

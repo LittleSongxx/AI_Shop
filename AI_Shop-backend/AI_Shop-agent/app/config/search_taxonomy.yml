@@ -1,5 +1,31 @@
 contract: current
+# fillers are joined into one regex alternation, so order is significant:
+# alternatives are tried left to right at each position and the first match
+# wins. Compound forms must precede the bare verb they contain, otherwise
+# "买个空气炸锅" strips "买" and leaks the measure word as "个空气炸锅".
 fillers:
+  - 我想买一个
+  - 我想买个
+  - 我要买个
+  - 想买一个
+  - 买一个
+  - 买一台
+  - 买一套
+  - 来一个
+  - 想买个
+  - 买个
+  - 买台
+  - 买套
+  - 来个
+  - 一款
+  - 一个
+  - 一台
+  - 一套
+  - 一双
+  - 一部
+  - 一只
+  - 一瓶
+  - 一盒
   - 我想要
   - 我要
   - 想要
@@ -27,6 +53,12 @@ fillers:
   - 买
   - 要
   - 吃
+  # Polite closings, otherwise "电磁炉，谢谢" becomes the keyword "电磁炉谢谢",
+  # which matches no product title at all.
+  - 谢谢
+  - 谢啦
+  - 多谢
+  - 麻烦了
 punctuation: "的了吗呢啊哦呀呗嘛～~，。！？、；：\"'"
 topics:
   - id: snack
@@ -42,6 +74,25 @@ topics:
     canonical: 电脑
     aliases: [台式机, 台式, 笔记本, 主机, 显示器, 一体机]
     terms: [电脑, 台式, 笔记本, 主机, 显示器, 一体机]
+  - id: earphone
+    canonical: 耳机
+    aliases: [无线耳机, 蓝牙耳机, 降噪耳机, 头戴式耳机, 入耳式耳机, tws耳机, airpods]
+    terms:
+      [耳机, 无线耳机, 蓝牙耳机, 降噪耳机, 头戴式, 入耳式, 半入耳, tws, airpods, 耳塞, 耳麦, 真无线]
+  - id: tablet
+    canonical: 平板
+    aliases: [平板电脑, ipad, 学习平板]
+    terms: [平板, 平板电脑, ipad, 学习机]
+  - id: camera
+    canonical: 相机
+    aliases: [单反, 微单, 数码相机, 运动相机, 摄像机]
+    terms: [相机, 单反, 微单, 数码相机, 运动相机, 摄像机, 镜头, 云台, 三脚架]
+  # canonical must be a word that actually appears in product titles, because it
+  # becomes the ES query string. "智能穿戴" is a shelf name and matches nothing.
+  - id: wearable
+    canonical: 手表
+    aliases: [智能手表, 运动手表]
+    terms: [手表, 智能手表, 运动手表, 手环, 智能手环, 智能穿戴]
   - id: toy
     canonical: 玩具
     aliases: [玩偶, 公仔, 模型, 积木, 乐高, 毛绒]
@@ -52,8 +103,42 @@ topics:
     terms: [乐器, 吉他, 尤克里里, 电子琴, 钢琴, 电吉他, 民谣]
   - id: appliance
     canonical: 家电
-    aliases: [电器, 小家电]
-    terms: [家电, 电器, 小家电]
+    aliases: [电器, 小家电, 厨房电器, 厨电, 大家电]
+    terms:
+      [
+        家电,
+        电器,
+        小家电,
+        厨电,
+        空气炸锅,
+        电饭煲,
+        微波炉,
+        电烤箱,
+        烤箱,
+        破壁机,
+        豆浆机,
+        料理机,
+        榨汁机,
+        电水壶,
+        养生壶,
+        咖啡机,
+        电磁炉,
+        洗碗机,
+        冰箱,
+        洗衣机,
+        空调,
+        风扇,
+        电风扇,
+        取暖器,
+        加湿器,
+        空气净化器,
+        扫地机器人,
+        吸尘器,
+        电吹风,
+        吹风机,
+        剃须刀,
+        电动牙刷,
+      ]
   - id: apparel
     canonical: 服饰
     aliases: [衣服, 鞋子, 童装]

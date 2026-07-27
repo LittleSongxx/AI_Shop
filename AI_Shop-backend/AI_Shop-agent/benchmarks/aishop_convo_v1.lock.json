@@ -9,18 +9,18 @@
   },
   "baseline": {
     "cases": 112,
-    "passed": 90,
-    "passRate": 0.803571,
+    "passed": 96,
+    "passRate": 0.857143,
     "bySplit": {
       "dev": {
         "cases": 68,
-        "passed": 57,
-        "passRate": 0.838235
+        "passed": 60,
+        "passRate": 0.882353
       },
       "test": {
         "cases": 44,
-        "passed": 33,
-        "passRate": 0.75
+        "passed": 36,
+        "passRate": 0.818182
       }
     },
     "bySubset": {
@@ -31,23 +31,23 @@
       },
       "cancel_order": {
         "cases": 5,
-        "passed": 1,
-        "passRate": 0.2
-      },
-      "chat_howto": {
-        "cases": 6,
-        "passed": 5,
-        "passRate": 0.833333
-      },
-      "confirm_receipt": {
-        "cases": 5,
         "passed": 3,
         "passRate": 0.6
       },
+      "chat_howto": {
+        "cases": 6,
+        "passed": 6,
+        "passRate": 1.0
+      },
+      "confirm_receipt": {
+        "cases": 5,
+        "passed": 5,
+        "passRate": 1.0
+      },
       "coupon": {
         "cases": 6,
-        "passed": 5,
-        "passRate": 0.833333
+        "passed": 6,
+        "passRate": 1.0
       },
       "handoff": {
         "cases": 5,
@@ -123,8 +123,8 @@
       },
       "intent": {
         "graded": 86,
-        "passed": 69,
-        "passRate": 0.802326
+        "passed": 73,
+        "passRate": 0.848837
       },
       "mismatchFlagged": {
         "graded": 5,
@@ -133,8 +133,8 @@
       },
       "nextAction": {
         "graded": 77,
-        "passed": 59,
-        "passRate": 0.766234
+        "passed": 64,
+        "passRate": 0.831169
       },
       "noSnakeCaseLeak": {
         "graded": 5,
@@ -143,13 +143,13 @@
       },
       "tool": {
         "graded": 87,
-        "passed": 79,
-        "passRate": 0.908046
+        "passed": 81,
+        "passRate": 0.931034
       },
       "toolArgs": {
         "graded": 33,
-        "passed": 26,
-        "passRate": 0.787879
+        "passed": 27,
+        "passRate": 0.818182
       },
       "write": {
         "graded": 6,
@@ -289,25 +289,6 @@
         "toolArgs": null
       }
     },
-    "cancel-001": {
-      "subset": "cancel_order",
-      "split": "dev",
-      "dimensions": [
-        "nextAction"
-      ],
-      "note": "客服不代客取消，查到订单后引导用户自己操作",
-      "actual": {
-        "intent": "CANCEL_ORDER",
-        "source": "rule",
-        "nextAction": "ANSWER",
-        "handoffReason": null,
-        "confidence": 0.9,
-        "tool": "QUERY_ORDERS",
-        "toolArgs": {
-          "orderId": "17223344556677AABBCCDD"
-        }
-      }
-    },
     "cancel-002": {
       "subset": "cancel_order",
       "split": "dev",
@@ -324,23 +305,6 @@
         "nextAction": "HANDOFF_SUGGESTED",
         "handoffReason": "LOW_CONFIDENCE",
         "confidence": 0.4,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
-    "cancel-003": {
-      "subset": "cancel_order",
-      "split": "test",
-      "dimensions": [
-        "nextAction"
-      ],
-      "note": "没单号无法定位",
-      "actual": {
-        "intent": "CANCEL_ORDER",
-        "source": "rule",
-        "nextAction": "ANSWER",
-        "handoffReason": null,
-        "confidence": 0.9,
         "tool": null,
         "toolArgs": null
       }
@@ -362,45 +326,6 @@
         "confidence": 0.4,
         "tool": null,
         "toolArgs": null
-      }
-    },
-    "receipt-004": {
-      "subset": "confirm_receipt",
-      "split": "test",
-      "dimensions": [
-        "intent",
-        "nextAction"
-      ],
-      "note": "问操作位置，不能替用户确认收货",
-      "actual": {
-        "intent": "CONFIRM_RECEIPT",
-        "source": "rule",
-        "nextAction": "TOOL",
-        "handoffReason": null,
-        "confidence": 0.9,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
-    "receipt-005": {
-      "subset": "confirm_receipt",
-      "split": "dev",
-      "dimensions": [
-        "intent",
-        "nextAction",
-        "tool"
-      ],
-      "note": "同上但带了单号：判成确认收货就会真的产出一张确认卡，比不带单号那条更严重",
-      "actual": {
-        "intent": "CONFIRM_RECEIPT",
-        "source": "rule",
-        "nextAction": "TOOL",
-        "handoffReason": null,
-        "confidence": 0.9,
-        "tool": "PROPOSE_CONFIRM_RECEIPT",
-        "toolArgs": {
-          "orderId": "17223344556677AABBCCDD"
-        }
       }
     },
     "review-003": {
@@ -431,26 +356,6 @@
         "nextAction"
       ],
       "note": "缺单号缺正文，不能凭空造一条评价",
-      "actual": {
-        "intent": "CHAT",
-        "source": "default",
-        "nextAction": "HANDOFF_SUGGESTED",
-        "handoffReason": "LOW_CONFIDENCE",
-        "confidence": 0.4,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
-    "coupon-005": {
-      "subset": "coupon",
-      "split": "dev",
-      "dimensions": [
-        "intent",
-        "nextAction",
-        "tool",
-        "toolArgs"
-      ],
-      "note": "排查用不了要先看用户手上的券，不能凭空解释门槛",
       "actual": {
         "intent": "CHAT",
         "source": "default",
@@ -543,23 +448,6 @@
       "note": "重复支付",
       "actual": {
         "intent": "PAYMENT_ISSUE",
-        "source": "rule_priority",
-        "nextAction": "ANSWER",
-        "handoffReason": null,
-        "confidence": 0.96,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
-    "chat-005": {
-      "subset": "chat_howto",
-      "split": "test",
-      "dimensions": [
-        "intent"
-      ],
-      "note": "howto 优先于发票关键词",
-      "actual": {
-        "intent": "INVOICE",
         "source": "rule_priority",
         "nextAction": "ANSWER",
         "handoffReason": null,

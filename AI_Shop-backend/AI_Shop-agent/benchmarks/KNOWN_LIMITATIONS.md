@@ -1,9 +1,13 @@
 # Known Limitations — aishop_convo_v1
 
-基线：112 条 case，通过 90（0.803571）。dev 0.838235 / test 0.75。
+基线：112 条 case，通过 96（0.857143）。dev 0.882353 / test 0.818182。
 数据集 SHA-256 `f5859ed69e6e9edd762789f89c5b083cd1c20c2f5a0c93c7ba421bc9a0b6578e`。
 
-下面 22 条是**一次成型跑出来的失败，原样留着**。期望值是按"正确的客服行为应该是什么"写的，
+> 基线从 90（0.803571）升到 96：意图路由的修复让 `cancel-001`、`cancel-003`、`chat-005`、
+> `coupon-005`、`receipt-004`、`receipt-005` 六条转为通过，已按 lock 的双向对齐规则移出下面的清单。
+> 题面一个字没动（SHA-256 不变），所以升的是实现而不是标准。
+
+下面 16 条是**一次成型跑出来的失败，原样留着**。期望值是按"正确的客服行为应该是什么"写的，
 不是按当前实现的输出写的；跑出来不对的没有改成实际输出，也没有重跑取好成绩。
 把 label 对齐到实现，任何实现都能得 100 分，那样这个集合就一点用都没有了。
 
@@ -17,9 +21,8 @@
 
 <!-- KNOWN_FAILURE_IDS:BEGIN -->
 ```
-after-004 after-005 cancel-001 cancel-002 cancel-003 cancel-005
-chat-005 consult-007 coupon-005 logi-006 order-006 order-007
-order-009 receipt-004 receipt-005 refund-005 refund-006 refund-007
+after-004 after-005 cancel-002 cancel-005 consult-007 logi-006
+order-006 order-007 order-009 refund-005 refund-006 refund-007
 review-003 review-004 search-009 search-010
 ```
 <!-- KNOWN_FAILURE_IDS:END -->
@@ -30,8 +33,8 @@ review-003 review-004 search-009 search-010
 
 1. **不是端到端质量。** 评的是 `resolve_intent(..., allow_llm=False)` 这条确定性路径，
    LLM 那一层完全没评到。线上大部分轮次是 LLM 给意图，规则只在 LLM 之前（structural /
-   rule_priority）和之后（rule fallback）起作用。所以这里的 0.803571 **不能**读成
-   "线上意图准确率 80%"。
+   rule_priority）和之后（rule fallback）起作用。所以这里的 0.857143 **不能**读成
+   "线上意图准确率 86%"。
 2. **没有真实检索和真实工具结果。** MCP 出网、Java 微服务、Redis 全是桩，
    退款那条链路的订单项数据由题面的 `fixture` 字段喂。所以"参数拼对了"不等于
    "线上这次调用会成功"。
@@ -58,7 +61,6 @@ review-003 review-004 search-009 search-010
 | `cancel-002` | 这个订单不要了，取消 …CCDD | CANCEL_ORDER + QUERY_ORDERS | CHAT / HANDOFF_SUGGESTED |
 | `review-003` | 给这个订单打3分 一般吧 …CCDD | PRODUCT_REVIEW + star=3 | CHAT / HANDOFF_SUGGESTED |
 | `review-004` | 我要评价 | PRODUCT_REVIEW（再追问单号） | CHAT / HANDOFF_SUGGESTED |
-| `coupon-005` | 这张券为什么用不了 | QUERY_COUPON + 查券 | CHAT / HANDOFF_SUGGESTED |
 | `search-009` | 帮我搜一下无线耳机 | PRODUCT_SEARCH | CHAT / HANDOFF_SUGGESTED |
 | `search-010` | 有便宜点的空气炸锅吗 | PRODUCT_SEARCH | CHAT / HANDOFF_SUGGESTED |
 | `refund-006` | 七天无理由怎么退 | CHAT + ANSWER | CHAT 但 HANDOFF_SUGGESTED |
@@ -74,9 +76,6 @@ review-003 review-004 search-009 search-010
   "打3分"中间夹了数字，`打分` 匹配不上。判定和取参数两处对同一种写法的支持度不一致。
 - **`review-004`**：只说"我要评价"没给单号。理想行为是认出评价意图再追问是哪一单；
   现在是直接落到 CHAT 并建议转人工。
-- **`coupon-005`**：这条是这组里业务影响最大的。用户说券用不了，正确做法是先把他手上的券查出来
-  再对着门槛解释；现在既不查券也不答，直接建议转人工。原因是分支要求出现完整的
-  `优惠券`/`优惠卷`，而用户说的是"这张券"。
 - **`search-009` / `search-010`**：品类词靠 `rules.py` 里几张硬编码 hints 表列举
   （`_PHONE_HINTS`、`_SNACK_HINTS`…），"无线耳机""空气炸锅"不在表里。
   这不是"再加两个词"能解决的——枚举品类这条路本身有上限。
@@ -93,18 +92,12 @@ review-003 review-004 search-009 search-010
 | case | 输入 | 期望 | 实际 | 成因 |
 |---|---|---|---|---|
 | `refund-007` | 退款要多久到账 | REFUND_STATUS | REFUND | 进度关键词表里只有 `退款到账`，"要多久到账"没命中，被后面的 `退款` 泛匹配抢走 |
-| `chat-005` | 发票怎么申请 | CHAT | INVOICE | `发票` 分支在 howto 分支之前，问方法被当成要开票 |
-| `receipt-004` | 确认收货在哪里点 | CHAT | CONFIRM_RECEIPT | howto 关键词表有 `在哪用/在哪看`，没有 `在哪里点` |
-| `receipt-005` | 确认收货在哪里点 …CCDD | CHAT | CONFIRM_RECEIPT + **PROPOSE_CONFIRM_RECEIPT** | 同上，但带了单号 |
 | `logi-006` | 物流一直不动怎么办 | QUERY_LOGISTICS | CHAT | `怎么` + `物流` 命中 howto，在物流分支之前返回 |
 
-`receipt-005` 是这一组里唯一会产生副作用的：已验证在带单号时
-`required_tool_for_intent` 会真的返回 `('PROPOSE_CONFIRM_RECEIPT', {'orderId': ...})`，
-也就是用户问"在哪里点"会收到一张确认收货的确认卡。
-
-被 `PROPOSE_*` + 用户点确认这一层挡住了，不会直接落库（这也是
-`app/domain/tool_policy.py` 里"所有写操作都是提案"这个设计在起作用），
-但用户仍然会看到一张他没要的确认卡。
+同一组里 `chat-005`、`receipt-004`、`receipt-005` 已经修好（见文末"已修复"）。
+`receipt-005` 当时是全集唯一会产生副作用的一条：用户问"在哪里点"会收到一张
+他没要的确认收货卡。它没有直接落库，是因为 `app/domain/tool_policy.py` 里
+"所有写操作都是提案"这个设计挡住了——顺序判错时，那一层是最后一道防线。
 
 注意 `cancel-004`（怎么取消订单）是**通过**的：那条 howto 覆盖到了。
 同一类问法在取消上答对、在发票和确认收货上答错——说明这不是"要不要做 howto 识别"的
@@ -151,28 +144,11 @@ review-003 review-004 search-009 search-010
 `LOW_CONFIDENCE` 才勉强转了人工——转是转了，但 urgency 是 HIGH 而不是
 资金争议该有的 CRITICAL，`handoff_reason` 也是错的，客服侧看不出这是笔资金问题。
 
-这一组是 22 条里唯一涉及钱的，优先级应当高于其余各条。
+这一组是 16 条里唯一涉及钱的，优先级应当高于其余各条。
 
 ---
 
-## 六、留着的失败：意图与 next_action 的定义不一致
-
-| case | 输入 | 期望 | 实际 |
-|---|---|---|---|
-| `cancel-001` | 帮我取消订单 …CCDD | nextAction TOOL | ANSWER（但 tool 确实是 QUERY_ORDERS） |
-| `cancel-003` | 取消订单 | nextAction TOOL | ANSWER |
-
-`CANCEL_ORDER` 不在 `classifier._TOOL_INTENTS` 里，所以 `next_action` 是 `ANSWER`；
-但 `write_args.required_tool_for_intent` 里 `CANCEL_ORDER` 明确映射到 `QUERY_ORDERS`。
-一处说不用工具，另一处强制调工具。
-
-`cancel-001` 的实际输出里 `tool` 是对的（`QUERY_ORDERS` + 正确单号），只有 `nextAction`
-不对，所以线上表现大概率是正常的——但任何依据 `next_action` 做分流的下游
-（`agent_queue_service.queue_for_decision`）看到的是"这轮不需要工具"。
-
----
-
-## 七、`consult-007`：商品页进来但没有咨询卡
+## 六、`consult-007`：商品页进来但没有咨询卡
 
 | case | 输入 | 期望 | 实际 |
 |---|---|---|---|
@@ -195,7 +171,7 @@ review-003 review-004 search-009 search-010
 
 ---
 
-## 八、明确不接受"已知失败"的维度
+## 七、明确不接受"已知失败"的维度
 
 `tests/test_convo_eval_frozen.py::test_security_dimensions_have_no_known_failures`
 把这四维钉在 100%，一旦有失败就直接红，不允许写进 `knownFailures`：
@@ -213,6 +189,27 @@ review-003 review-004 search-009 search-010
 问券的限制、解除账号限制、忘记密码、粘贴含 `System:` 的商品参数……），
 要求判定为不拦截。只测"能拦住攻击"的防护会一路收紧到把正常对话也拦掉，
 所以这两个方向必须一起测。
+
+---
+
+## 八、已修复（曾经的已知失败）
+
+这六条已从 `knownFailures` 移出，题面未改（SHA-256 不变）。留在这里是因为
+"修好了"和"标签被改成实现的输出"在 diff 上很像，需要有地方说清是哪一种。
+
+| case | 输入 | 曾经的错法 | 成因 |
+|---|---|---|---|
+| `cancel-001` | 帮我取消订单 …CCDD | nextAction ANSWER，应为 TOOL | `CANCEL_ORDER` 不在 `_TOOL_INTENTS` 里，但 `required_tool_for_intent` 又强制映射到 `QUERY_ORDERS`——一处说不用工具，另一处说必须调 |
+| `cancel-003` | 取消订单 | 同上 | 同上 |
+| `chat-005` | 发票怎么申请 | 判成 INVOICE | `发票` 分支排在 howto 分支之前，问方法被当成要开票 |
+| `receipt-004` | 确认收货在哪里点 | 判成 CONFIRM_RECEIPT | howto 关键词表有 `在哪用/在哪看`，没有 `在哪里点` |
+| `receipt-005` | 确认收货在哪里点 …CCDD | CONFIRM_RECEIPT + 真的产出确认卡 | 同上，但带了单号，于是走到 `PROPOSE_CONFIRM_RECEIPT` |
+| `coupon-005` | 这张券为什么用不了 | CHAT / HANDOFF_SUGGESTED | 分支要求完整的 `优惠券`/`优惠卷`，用户说的是"这张券" |
+
+共同点是同一个形态：**两处规则对同一种问法的说法不一致**，而不是某一条关键词漏了。
+`cancel-001`/`cancel-003` 是意图表和工具表不一致，`chat-005`/`receipt-004`/`receipt-005`
+是分支顺序和 howto 覆盖面不一致。剩下 16 条里 `refund-007`、`logi-006`、`order-007`、
+`order-009`、`after-004` 都还是这个形态，值得一起收。
 
 ---
 

@@ -15,6 +15,8 @@ REDIS_PROMPT = f"{REDIS_PREFIX}prompt:"
 REDIS_AGENT_CONSULT_PRODUCT = f"{REDIS_PREFIX}agent:consult:product:userId:"
 REDIS_AGENT_CONSULT_ACTIVE = f"{REDIS_PREFIX}agent:consult:active:"
 REDIS_AGENT_SHOPPING_PROFILE = f"{REDIS_PREFIX}agent:shopping:profile:userId:"
+REDIS_AGENT_IMPRESSION_LOG = f"{REDIS_PREFIX}agent:rec:impression:userId:"
+REDIS_AGENT_CLICK_LOG = f"{REDIS_PREFIX}agent:rec:click:userId:"
 REDIS_AGENT_PENDING_ACTION = f"{REDIS_PREFIX}agent:pending:action:"
 REDIS_AGENT_PENDING_MSG = f"{REDIS_PREFIX}agent:pending:msg:userId:"
 REDIS_AGENT_SESSION = f"{REDIS_PREFIX}agent:session:"
@@ -49,6 +51,17 @@ ERROR = 2
 RRF_K = 60
 PRODUCT_RESULT_SIZE = 12
 PRODUCT_CANDIDATE_SIZE = 24
+SIMILAR_PRODUCT_SIZE = 8
+
+# Requests longer than this have usually spelled out their own intent, so a
+# clarifying question would just get in the way.
+CLARIFY_MAX_TEXT_LENGTH = 40
+
+# Impression log: capped per-user list, short TTL. Sized for offline CTR
+# analysis on an MVP, not for a warehouse.
+IMPRESSION_LOG_TTL = 7 * 24 * 60 * 60
+IMPRESSION_LOG_MAX_ENTRIES = 200
+IMPRESSION_LOG_MAX_PRODUCTS = 20
 
 PENDING_ACTION_TTL = 30 * 60
 CANCEL_FLAG_TTL = 5 * 60
