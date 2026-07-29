@@ -1,7 +1,26 @@
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, BeforeValidator, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _blank_to_none(value: object) -> object:
+    """把 `.env` 里的空值读成"未配置"。
+
+    dotenv 表达"这一项没配"的方式是留空（`MEMORY_LLM_TIMEOUT=`），不是删掉整行——
+    删掉就看不出还有这个可选项了。但 pydantic 无法把 `""` 强转成 int，于是
+    `cp .env.example .env` 之后 Settings() 直接抛 ValidationError，应用、评测 runner、
+    以及所有 import 了模块级单例的测试全部起不来。
+
+    只给可选数值字段用。字符串字段本来就接受空值，不需要绕这一圈。
+    """
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
+OptionalInt = Annotated[int | None, BeforeValidator(_blank_to_none)]
 
 
 class Settings(BaseSettings):
@@ -53,7 +72,8 @@ class Settings(BaseSettings):
     memory_llm_base_url: str = ""
     memory_llm_model: str = ""
 
-    memory_llm_timeout: int | None = None
+    # 留空 = 回落 llm_timeout，见 _blank_to_none。
+    memory_llm_timeout: OptionalInt = None
 
     embedding_api_key: str = ""
     embedding_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
