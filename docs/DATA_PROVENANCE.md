@@ -32,7 +32,7 @@
 | 指标 | 为什么是空的 | 解除条件 |
 |------|------------|---------|
 | NDCG / MRR / Recall@K | 没有任何 `relevantProductIds` 标注，runner 直接返回 `{"skipped": true}` | `--emit-template` 出模板，人工标注约 200 对 query→商品 |
-| CTR / 曝光点击比 | `redis_service.log_click` 只有函数定义，全仓库没有调用方，分子恒为 0 | 前端商品卡点击时上报 `(session_id, product_id)` |
+| CTR / 曝光点击比 | `redis_service.log_click` 只有函数定义，没有调用方，分子恒为 0。已查过 Python（`app/` `scripts/` `tests/`）、前端（`.ts/.vue/.js`）、Java（`*.java`）三侧，均无调用 | 前端商品卡点击时上报 `(session_id, product_id)` |
 | 曝光日志 | `log_impression` 已接在 `search_products` 里，但商品表为空 → 搜索无结果 → 写入路径实际没被走到 | 先装真实商品数据（见第三节） |
 | 向量索引质量（kNN 召回率） | `aishop_vectorstore` 为空 | 装数据 + 跑 `scripts/vector_index.py` |
 

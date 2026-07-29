@@ -49,9 +49,14 @@ docker compose -f docker-compose.middleware.yml ps
 | **Seata** | TC `8092` / 控制台 `7092` | 控制台 seata / seata；注册到 Nacos `SEATA_GROUP`；镜像自建（驱动在 `/seata-server/libs`） |
 
 > Redis / RabbitMQ / Seata 的宿主机端口刻意 **+1** 偏移，避免与本机已装的同类服务抢端口；
-> 容器内端口不变，所以容器互通用默认端口即可。宿主机上的 Java 服务必须显式传
-> `REDIS_PORT=6380`、`RABBIT_PORT=5673`、`SEATA_SERVER_ADDR=127.0.0.1:8092`
-> （根目录 `start.sh` 已内置），否则会落到 `application.yml` 里 6379/5672/8091 的默认值而连不上。
+> 容器内端口不变，所以容器互通用默认端口即可。
+>
+> `application.yml` 和 Agent 的 `settings.py` 里的**默认值已经是偏移后的端口**
+> （6380 / 5673 / 8092，RabbitMQ 账号 `aishop/aishop`），所以不传环境变量也能连上。
+> 这不只是图方便：本机常有装在 6379 / 5672 的 Redis 和 RabbitMQ，默认值要是留在标准端口，
+> 服务会**静默连上本机那一个**——连得通、但读写的是错的实例，比连不上更难查。
+>
+> 唯一还必须自己给的是 `MYSQL_PASSWORD`（默认值是占位符 `your-password`，故意不填真值）。
 
 容器互通主机名：`mysql`、`redis`、`rabbitmq`、`nacos`、`elasticsearch`、`sentinel`、`seata-server`。  
 宿主机上的 Java 微服务仍连 `127.0.0.1`（Seata TC 已映射 `8092`）。

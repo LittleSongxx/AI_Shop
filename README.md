@@ -127,8 +127,8 @@ docker compose -f docker-compose.middleware.yml up -d
 等待 Nacos（8848）、MySQL（3306）、Redis（**6380**）、RabbitMQ（**5673**）、ES（9200）全部就绪。
 
 > Redis / RabbitMQ / Seata 的宿主机端口是 +1 偏移（6380 / 5673 / 8092），避免和本机已装的同类服务冲突。
-> 手工起 Java 服务时要显式传 `REDIS_PORT=6380 RABBIT_PORT=5673 SEATA_SERVER_ADDR=127.0.0.1:8092`，
-> 否则会用 `application.yml` 里的默认值 6379/5672/8091 连不上。详见 [deploy/MIDDLEWARE_DOCKER.md](deploy/MIDDLEWARE_DOCKER.md)。
+> 配置里的默认值已经是偏移后的端口，所以不传环境变量也能连上；手工起服务时唯一必须给的是
+> `MYSQL_PASSWORD`。详见 [deploy/MIDDLEWARE_DOCKER.md](deploy/MIDDLEWARE_DOCKER.md)。
 
 ### 2. 初始化数据库
 

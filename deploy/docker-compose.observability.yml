@@ -1,3 +1,10 @@
+# name 固定成 shop，和 docker-compose.middleware.yml 一致，这样两个文件属于同一个
+# Compose project，`docker compose -p shop ps` 能一次看全，卷名也稳定为 shop_*。
+# 注意它跟网络无关：本文件不声明任何 network，Prometheus 是走 host.docker.internal
+# 抓宿主机上的服务，从来就没有加入过 middleware 的 aishop-net。
+#
+# 卷前缀同理跟着 name 走，现在是 shop_prometheus-data / shop_grafana-data。
+# 加 name 之前起过的话，历史指标留在 deploy_* 那套卷里，没被删，按需手动迁移。
 name: shop
 
 # Prometheus + Grafana，只做指标采集与展示，不含任何业务组件。

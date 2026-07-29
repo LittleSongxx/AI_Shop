@@ -1,4 +1,13 @@
 
+# name 固定成 shop（observability 那份也一样），否则 Compose 按目录名生成 project，
+# 两份文件会分属 deploy / 各自的 project，`docker compose ps` 看不全。
+#
+# ⚠️ 卷的完整名是 <project>_<卷名>，所以 name 决定卷前缀：现在是 shop_aishop_mysql。
+# 如果你在加 name 之前起过这套栈，那批卷叫 deploy_aishop_*（按目录名生成），
+# 加上 name 之后等于换了一套空卷：MySQL 变空库、Nacos 配置没了、ES 索引没了，
+# 正好踩回"库里没数据 → 搜推空转"那条链。老数据不会被删，`docker volume ls | grep aishop`
+# 能看到；要接着用就先 down，再把 deploy_* 的内容拷进 shop_*（或临时把 name 改回原样）。
+# 本机当前只有 shop_* 一套（已确认无 deploy_* 残留），所以没有这个问题。
 name: shop
 
 networks:

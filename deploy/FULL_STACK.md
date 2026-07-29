@@ -105,8 +105,9 @@ SEATA_ENABLED=true
 SEATA_SERVER_ADDR=127.0.0.1:8092
 ```
 
-> Redis / RabbitMQ / Seata 走 **+1 偏移端口**（见 `MIDDLEWARE_DOCKER.md`）。
-> 根目录 `./start.sh` 已经导出这几个变量，手工起服务时别忘了带上。
+> 上面这些除 `MYSQL_PASSWORD` 之外**都已经是配置里的默认值**，列出来只是说明口径，
+> 不传也能起（Redis / RabbitMQ / Seata 走 +1 偏移端口，见 `MIDDLEWARE_DOCKER.md`）。
+> 根目录 `./start.sh` 仍然显式导出它们——重复但无害，写出来是为了让端口来源一眼可见。
 
 Agent / MCP（另开终端）：
 
