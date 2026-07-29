@@ -50,12 +50,12 @@ spring:
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT:6380}
   rabbitmq:
     host: ${RABBIT_HOST:127.0.0.1}
-    port: ${RABBIT_PORT:5672}
-    username: ${RABBIT_USER:guest}
-    password: ${RABBIT_PASSWORD:guest}
+    port: ${RABBIT_PORT:5673}
+    username: ${RABBIT_USER:aishop}
+    password: ${RABBIT_PASSWORD:aishop}
     virtual-host: ${RABBIT_VHOST:/}
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -105,7 +105,7 @@ seata:
       aishop_tx_group: default
       default_tx_group: default
     grouplist:
-      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
+      default: ${SEATA_SERVER_ADDR:127.0.0.1:8092}
   registry:
     type: file
   config:

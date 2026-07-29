@@ -98,7 +98,9 @@ class Settings(BaseSettings):
     agent_auto_migrate: bool = True
 
     redis_host: str = "127.0.0.1"
-    redis_port: int = 6379
+    # 6380 而不是 6379：compose 把宿主机端口偏移了一位，避开本机已装的 Redis。
+    # 默认值必须指向项目的容器，否则会静默连上本机那个 Redis（连得通但是错的库）。
+    redis_port: int = 6380
     redis_db: int = 0
 
     es_hosts: str = "http://localhost:9200"
@@ -109,7 +111,8 @@ class Settings(BaseSettings):
     )
     es_vector_dimensions: int = 1024
 
-    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    # 账号和端口都跟 compose 对齐：aishop/aishop + 5673。
+    rabbitmq_url: str = "amqp://aishop:aishop@localhost:5673/"
     agent_queue_exchange: str = "agent.tasks"
     agent_worker_high_concurrency: int = 4
     agent_worker_fast_concurrency: int = 4

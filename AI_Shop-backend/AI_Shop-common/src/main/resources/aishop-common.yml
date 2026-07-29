@@ -70,7 +70,7 @@ seata:
       aishop_tx_group: default
       default_tx_group: default
     grouplist:
-      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
+      default: ${SEATA_SERVER_ADDR:127.0.0.1:8092}
   registry:
     type: file
   config:
