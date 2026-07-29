@@ -46,6 +46,7 @@ desktop.ini
 # Logs & local data
 *.log
 logs/
+run/
 **/tmp/
 **/.cache/
 coverage/

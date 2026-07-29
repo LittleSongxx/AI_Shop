@@ -104,6 +104,19 @@ AI_Shop/
 - Python 3.11–3.12
 - Docker & Docker Compose
 
+### 0. 一键起停（推荐）
+
+```bash
+./start.sh --build          # 首次：Maven 打包 + 中间件 + Java 微服务 + Agent
+./start.sh                  # 后续：跳过构建
+./start.sh --middleware-only  # 只起 Docker 中间件
+./stop.sh                   # 停 Java + Agent（中间件保留）
+./stop.sh --middleware      # 一并停中间件
+```
+
+`start.sh` 会等待 MySQL / Nacos / Seata 就绪再拉起 Java 服务，PID 和日志落在 `run/`。
+Agent 走 conda 环境 `shop`。下面 1–5 步是拆开的手工流程，排查问题时用。
+
 ### 1. 启动中间件
 
 ```bash
@@ -111,7 +124,11 @@ cd deploy
 docker compose -f docker-compose.middleware.yml up -d
 ```
 
-等待 Nacos（8848）、MySQL（3306）、Redis（6379）、RabbitMQ（5672）、ES（9200）全部就绪。
+等待 Nacos（8848）、MySQL（3306）、Redis（**6380**）、RabbitMQ（**5673**）、ES（9200）全部就绪。
+
+> Redis / RabbitMQ / Seata 的宿主机端口是 +1 偏移（6380 / 5673 / 8092），避免和本机已装的同类服务冲突。
+> 手工起 Java 服务时要显式传 `REDIS_PORT=6380 RABBIT_PORT=5673 SEATA_SERVER_ADDR=127.0.0.1:8092`，
+> 否则会用 `application.yml` 里的默认值 6379/5672/8091 连不上。详见 [deploy/MIDDLEWARE_DOCKER.md](deploy/MIDDLEWARE_DOCKER.md)。
 
 ### 2. 初始化数据库
 
