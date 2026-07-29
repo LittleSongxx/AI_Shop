@@ -38,6 +38,22 @@ from app.utils.prompt_boundary import isolate_knowledge_text
 logger = structlog.get_logger()
 output_guard = OutputGuardrail()
 
+# Intent kinds for which the original intent is preserved even when a
+# category-switch or new-product-search is detected.  Defined at module
+# level so the frozenset is constructed once rather than on every call to
+# build_context_node.
+_KEEP_INTENT: frozenset = frozenset({
+    IntentKind.QUERY_ORDER,
+    IntentKind.QUERY_LOGISTICS,
+    IntentKind.QUERY_COMMENT,
+    IntentKind.QUERY_COUPON,
+    IntentKind.PRODUCT_REVIEW,
+    IntentKind.RECOMMENT,
+    IntentKind.REFUND,
+    IntentKind.CONFIRM_RECEIPT,
+    IntentKind.CANCEL_ORDER,
+})
+
 async def entry_guard(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
     message_id = state["message_id"]
@@ -113,18 +129,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
     intent_source = decision.source
     intent_data = decision.data
 
-    _keep_intent = {
-        IntentKind.QUERY_ORDER,
-        IntentKind.QUERY_LOGISTICS,
-        IntentKind.QUERY_COMMENT,
-        IntentKind.QUERY_COUPON,
-        IntentKind.PRODUCT_REVIEW,
-        IntentKind.RECOMMENT,
-        IntentKind.REFUND,
-        IntentKind.CONFIRM_RECEIPT,
-        IntentKind.CANCEL_ORDER,
-    }
-    if (switching_away or category_switch_search) and intent not in _keep_intent:
+    if (switching_away or category_switch_search) and intent not in _KEEP_INTENT:
         intent = IntentKind.PRODUCT_SEARCH
         intent_source = "category_switch"
         decision = decision.model_copy(

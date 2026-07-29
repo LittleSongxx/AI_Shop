@@ -105,9 +105,13 @@ seata:
     vgroup-mapping:
       aishop_tx_group: default
       default_tx_group: default
-    grouplist:
-      default: ${SEATA_SERVER_ADDR:127.0.0.1:8092}
   registry:
-    type: file
+    type: nacos
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:}
+      group: SEATA_GROUP
+      application: seata-server
+      cluster: default
   config:
     type: file

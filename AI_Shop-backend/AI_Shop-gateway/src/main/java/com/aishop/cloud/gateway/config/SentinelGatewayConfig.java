@@ -9,6 +9,9 @@ import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
 import com.alibaba.csp.sentinel.adapter.gateway.sc.callback.BlockRequestHandler;
 import com.alibaba.csp.sentinel.adapter.gateway.sc.callback.GatewayCallbackManager;
+import com.alibaba.csp.sentinel.slots.block.RuleConstant;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRule;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRuleManager;
 import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -16,8 +19,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.server.ServerWebExchange;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,11 +38,45 @@ public class SentinelGatewayConfig {
     @PostConstruct
     public void init() {
         initBlockHandler();
+        // 降级规则：Agent 直连路由没有 lb:// 保护，需要在网关层单独声明熔断，
+        // 避免 Agent 服务慢/异常时持续占用网关连接池。
+        initDegradeRules();
         if (!rateLimitProperties.isEnabled()) {
             return;
         }
         initCustomApis();
         initGatewayRules();
+    }
+
+    /**
+     * 为 Python Agent 路由（agent-http、agent-ws）注册 Sentinel 降级规则。
+     *
+     * <p>其他 Java 服务路由经 {@code lb://} 通过 OpenFeign + Sentinel 保护；
+     * Agent 直连 HTTP/WS，不经过 Nacos 负载均衡，因此需要在此处单独声明熔断规则，
+     * 防止 Agent 出现慢响应或异常时持续占用网关连接池，引发级联失败。
+     *
+     * <p>策略：异常比例 &ge; 50%（至少 5 个请求）时触发熔断，休眠 10&nbsp;s 后进入半开探测。
+     */
+    private void initDegradeRules() {
+        List<DegradeRule> rules = new ArrayList<>();
+
+        // agent-http（REST 对话接口）
+        rules.add(new DegradeRule("agent-http")
+                .setGrade(RuleConstant.DEGRADE_GRADE_EXCEPTION_RATIO)
+                .setCount(0.5)
+                .setMinRequestAmount(5)
+                .setTimeWindow(10)
+                .setStatIntervalMs(10_000));
+
+        // agent-ws（WebSocket 流式接口，与 agent-http 独立统计）
+        rules.add(new DegradeRule("agent-ws")
+                .setGrade(RuleConstant.DEGRADE_GRADE_EXCEPTION_RATIO)
+                .setCount(0.5)
+                .setMinRequestAmount(5)
+                .setTimeWindow(10)
+                .setStatIntervalMs(10_000));
+
+        DegradeRuleManager.loadRules(rules);
     }
 
     private void initCustomApis() {

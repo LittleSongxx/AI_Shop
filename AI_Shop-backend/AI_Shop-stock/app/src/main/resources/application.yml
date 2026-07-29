@@ -80,13 +80,11 @@ management:
         include: health,info
 
 app:
-  # 本服务没有自己的定时任务，且库里没有 mq_compensation_log，打开只会让
-  # MqCompensationAutoReplayTask 空转报错（它的开关是 matchIfMissing = true）。
-  # 注：RefundStockListener 消费失败时会尝试写补偿记录，本库没这张表所以写不进去
-  # （recorder 会 catch 并打 error，Redis 副本也一起跳过）。那是建表脚本的缺口，
-  # 不是这个开关能解决的，改开关只会把问题换成另一种报错。
+  # mq_compensation_log 已在本库建表（R__current_schema.sql），MqCompensationAutoReplayTask
+  # 可以正常运行：退款库存恢复的 MQ 消息消费失败时，RemoteCompensateRecorder 落库的补偿记录
+  # 将被此任务周期重放，确保库存最终恢复正确。
   common-scheduling:
-    enabled: false
+    enabled: true
 
 aishop:
   internal:
@@ -106,9 +104,15 @@ seata:
     vgroup-mapping:
       aishop_tx_group: default
       default_tx_group: default
-    grouplist:
-      default: ${SEATA_SERVER_ADDR:127.0.0.1:8092}
+  # Seata Server 已经向 Nacos 注册（deploy/seata/application.yml registry.type=nacos），
+  # 客户端同样走 Nacos 发现，不再硬编码 SEATA_SERVER_ADDR。
   registry:
-    type: file
+    type: nacos
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:}
+      group: SEATA_GROUP
+      application: seata-server
+      cluster: default
   config:
     type: file

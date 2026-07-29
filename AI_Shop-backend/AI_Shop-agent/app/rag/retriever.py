@@ -695,6 +695,9 @@ class RagRetriever:
             pass
 
     def _normalize_question(self, query: str) -> str:
+        # str.isalnum() is Unicode-aware: Chinese characters (CJK Unified Ideographs)
+        # are classified as Letter+Other (Lo) and return True, so this filter strips
+        # only whitespace and punctuation while preserving Chinese query strings intact.
         return "".join(ch for ch in (query or "").lower() if ch.isalnum())
 
 
