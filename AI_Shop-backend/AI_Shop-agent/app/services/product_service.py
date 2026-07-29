@@ -123,7 +123,9 @@ class ProductService:
 
             keyword_ids = await rag_retriever.search_product_keyword_ids(query, PRODUCT_CANDIDATE_SIZE)
             vector_ids = await rag_retriever.search_product_vector_ids(query, PRODUCT_CANDIDATE_SIZE)
-            product_ids = rrf_merge(keyword_ids, vector_ids, PRODUCT_RESULT_SIZE)
+            # Over-fetch to CANDIDATE_SIZE so term-filtering + reranking have
+            # enough headroom; we slice to RESULT_SIZE after reranking.
+            product_ids = rrf_merge(keyword_ids, vector_ids, PRODUCT_CANDIDATE_SIZE)
             logger.info(
                 "hybrid_search",
                 query=query,
@@ -152,6 +154,13 @@ class ProductService:
                         after=len(relevant),
                     )
                     products = relevant
+                # Cross-encoder rerank before slicing to RESULT_SIZE.  The
+                # circuit breaker inside rerank_products guarantees silent
+                # fallback to original RRF order when the API is unavailable.
+                if products:
+                    products = await rag_retriever.rerank_products(
+                        query, products, PRODUCT_RESULT_SIZE
+                    )
         else:
             products = []
 
