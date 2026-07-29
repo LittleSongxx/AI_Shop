@@ -27,6 +27,29 @@ KNOWLEDGE_RELEASE_TOPIC = "knowledge.release"
 # Elasticsearch rejects a kNN search whose num_candidates exceeds this.
 ES_MAX_NUM_CANDIDATES = 10_000
 
+# RRF 的排名平滑常数。60 是 Cormack 等人原始论文的取值，也是 ES 自己 rrf retriever
+# 的默认值；改它会让所有 RRF 阈值失去意义，所以定在这里供换算复用，不做成配置。
+RRF_RANK_CONSTANT = 60
+
+
+def cosine_to_es_score(cosine: float) -> float:
+    """把 cosine 相似度换算成 ES 的 ``_score``。
+
+    ES 对 ``cosineSimilarity`` 的打分是 ``(1 + cos) / 2``，把 [-1, 1] 映射到 [0, 1]。
+    这层换算是 ES 的实现细节，不该泄漏到配置里让人心算——写 ``cos >= 0.3`` 是能复核的，
+    写 ``_score >= 0.65`` 只能靠注释解释。
+    """
+    return (1.0 + max(-1.0, min(1.0, float(cosine)))) / 2.0
+
+
+def rrf_score_at_rank(rank: int) -> float:
+    """名次 ``rank``（从 1 起）在单一路召回里贡献的 RRF 分。
+
+    用来把"至少进了某一路的前 N 名"这个可读的条件，翻译成 ``_has_enough_evidence``
+    能比较的分数。
+    """
+    return 1.0 / (RRF_RANK_CONSTANT + max(int(rank), 1))
+
 
 def knn_num_candidates(k: int, settings) -> int:
     """Per-shard candidate pool for an approximate kNN search.
@@ -131,7 +154,12 @@ class RagRetriever:
         }
 
     async def search_product_vector_ids(self, query: str, limit: int) -> list[str]:
-        docs = await self._vector_search(query, "product", limit, threshold=0.4)
+        docs = await self._vector_search(
+            query,
+            "product",
+            limit,
+            min_cosine=get_settings().rag_product_vector_min_cosine,
+        )
         ids = []
         for d in docs:
             meta = d.get("metadata") or {}
@@ -150,7 +178,19 @@ class RagRetriever:
                 "query": {
                     "bool": {
                         "should": [
-                            {"match": {"productName": {"query": query, "boost": 2}}},
+                            # Multi-field BM25: productName carries the most signal,
+                            # productDesc and brand widen recall for queries like
+                            # "华为手机" where brand is stored separately.
+                            # Unknown fields are silently ignored by ES.
+                            {
+                                "multi_match": {
+                                    "query": query,
+                                    "fields": ["productName^3", "productDesc^1", "brand^2"],
+                                    "type": "best_fields",
+                                }
+                            },
+                            # Wildcard on the keyword sub-field keeps exact-substring
+                            # matches that tokenisation would otherwise miss.
                             {"wildcard": {"productName.keyword": f"*{query}*"}},
                         ]
                     }
@@ -233,11 +273,20 @@ class RagRetriever:
         query: str,
         data_type: str | tuple[str, ...],
         top_k: int | None = None,
-        threshold: float | None = None,
+        min_cosine: float | None = None,
     ) -> list[dict]:
+        """kNN 召回。``min_cosine`` 是 cosine 相似度下限，不是 ES 的 ``_score``。
+
+        参数原先叫 ``threshold`` 并直接和 ``_score`` 比。调用方传 0.4 看着像"要求四成
+        相似"，实际是 ``cos >= -0.2``——比正交还低，等于没有过滤。改成显式的 cosine 语义
+        以后，取值和名字对得上了。
+        """
         settings = get_settings()
         k = top_k or settings.rag_top_k
-        th = threshold if threshold is not None else settings.rag_score_threshold
+        cosine_floor = (
+            min_cosine if min_cosine is not None else settings.rag_vector_min_cosine
+        )
+        th = cosine_to_es_score(cosine_floor)
         breaker = circuit_registry.get_or_create("es")
         if not breaker.allow_request():
             return []
@@ -339,6 +388,59 @@ class RagRetriever:
             breaker.record_failure()
             logger.warning("rerank_failed_fallback_rrf", error=str(exc))
             return docs[:limit]
+
+    async def rerank_products(
+        self,
+        query: str,
+        products: list[dict],
+        limit: int,
+    ) -> list[dict]:
+        """Rerank a candidate product list with the cross-encoder API.
+
+        Wraps each product as a lightweight document (name + first 200 chars of
+        description) so the existing ``_rerank()`` infrastructure can be reused
+        without any new HTTP client or circuit-breaker wiring.  Falls back to
+        the original order if the API is unavailable or unconfigured.
+
+        This is intentionally a thin shim: the heavy lifting (circuit breaker,
+        silent fallback, response parsing) is already handled by ``_rerank()``.
+        """
+        if not products or len(products) <= limit:
+            return products[:limit]
+        docs = []
+        for product in products:
+            name = str(
+                product.get("product_name") or product.get("productName") or ""
+            ).strip()
+            desc = str(
+                product.get("product_desc") or product.get("productDesc") or ""
+            )[:200].strip()
+            content = f"{name}。{desc}" if desc else name
+            docs.append({
+                "id": str(product.get("product_id") or product.get("productId") or ""),
+                "content": content,
+                "score": 0.0,
+                "source": "product_candidate",
+            })
+        reranked_docs = await self._rerank(query, docs, limit)
+        id_to_product: dict[str, dict] = {
+            str(p.get("product_id") or p.get("productId") or ""): p
+            for p in products
+        }
+        result: list[dict] = []
+        seen: set[str] = set()
+        for doc in reranked_docs:
+            pid = str(doc.get("id") or "")
+            if pid and pid not in seen and pid in id_to_product:
+                seen.add(pid)
+                result.append(id_to_product[pid])
+        # Guard against unexpected gaps in the reranker response (shouldn't
+        # happen because _rerank already falls back to the original order).
+        for p in products:
+            pid = str(p.get("product_id") or p.get("productId") or "")
+            if pid and pid not in seen:
+                result.append(p)
+        return result[:limit]
 
     async def _exact_faq(self, query: str, version: int) -> dict | None:
         cached = await self._get_faq_exact_cache(version, query)
@@ -457,6 +559,18 @@ class RagRetriever:
             return []
 
     def _rrf_docs(self, ranked_groups: list[list[dict]], limit: int) -> list[dict]:
+        """Reciprocal Rank Fusion：只用名次，不用各路的原始分。
+
+        ``score`` 融合后就是 RRF 分。原先这里写 ``max(原始分, RRF分)``，而 BM25 的
+        ``_score`` 是 1~20、RRF 分最大 ~0.033，于是 max 永远取原始分——融合结果被自己
+        覆盖掉了。列表顺序还是对的（排序用的是局部 ``scores``），但两件事因此坏了：
+
+        1. ``_has_enough_evidence`` 拿 0.5 去比一个混着 BM25 分和 cosine 分的值，
+           BM25 命中恒过、向量命中也已在上游筛过，那道闸门实际是空的；
+        2. trace 里的 ``topScore`` 跨查询不可比——8.7 是好是坏取决于它来自哪一路。
+
+        原始分留在 ``engineScore`` 里，排查单路召回质量时还需要它。
+        """
         scores: dict[str, float] = {}
         by_id: dict[str, dict] = {}
         for group in ranked_groups:
@@ -464,13 +578,14 @@ class RagRetriever:
                 doc_id = str(doc.get("id") or "")
                 if not doc_id:
                     continue
-                scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (60 + index + 1)
+                scores[doc_id] = scores.get(doc_id, 0.0) + rrf_score_at_rank(index + 1)
                 by_id.setdefault(doc_id, doc)
         sorted_ids = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
         merged = []
         for doc_id, score in sorted_ids[:limit]:
             doc = dict(by_id[doc_id])
-            doc["score"] = max(float(doc.get("score") or 0), score)
+            doc["engineScore"] = float(doc.get("score") or 0)
+            doc["score"] = score
             doc["source"] = "rrf"
             merged.append(doc)
         return merged
@@ -525,9 +640,26 @@ class RagRetriever:
         return str(doc.get("content") or doc.get("text") or "").strip()
 
     def _has_enough_evidence(self, docs: list[dict]) -> bool:
+        """证据够不够写进 prompt。
+
+        按分数的来源分流，因为 rerank 之后和只做完 RRF 的分数量纲不同：
+        rerank 给的是 0~1 归一相关性，可以直接和一个绝对阈值比；RRF 分是名次的倒数和，
+        只能表达"至少在某一路里进了前 N 名"。用一个常量同时比这两种，其中一种必然失真。
+
+        rerank 未配置或熔断时会静默回落到 RRF（见 ``_rerank``），所以这条兜底路径不是
+        边缘情况——恰恰是没有 rerank key 的部署里的常态。
+        """
         if not docs:
             return False
-        return max(float(doc.get("score") or 0) for doc in docs) >= get_settings().rag_score_threshold
+        settings = get_settings()
+        top = max(docs, key=lambda doc: float(doc.get("score") or 0))
+        top_score = float(top.get("score") or 0)
+        if top.get("source") == "rerank":
+            return top_score >= settings.rag_evidence_min_relevance
+        if top.get("source") == "rrf":
+            return top_score >= rrf_score_at_rank(settings.rag_evidence_min_rrf_rank)
+        # 精确 FAQ 命中（score=1.0）等不经过融合的路径。
+        return top_score >= settings.rag_evidence_min_relevance
 
     def _rewrite_query(self, query: str) -> str:
         text = (query or "").strip()

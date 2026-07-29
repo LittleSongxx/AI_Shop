@@ -125,7 +125,34 @@ class Settings(BaseSettings):
 
     ai_chat_limit: int = 200
     rag_top_k: int = 15
-    rag_score_threshold: float = 0.5
+
+    # ---- 检索阈值：三个阶段的分数量纲互不相同，不能共用一个常量 ----
+    #
+    # 原先只有一个 rag_score_threshold=0.5，被同时用在下面三处。这不是"取值调得
+    # 不够好"，而是 0.5 在三处的含义根本不同：
+    #   _vector_search      ES cosine 打分是 (1+cos)/2，0.5 ⇔ cos>=0，只排除负相关；
+    #   商品向量召回        原先在 retriever.py 里写死 0.4 ⇔ cos>=-0.2，比中性点还低，等于不过滤；
+    #   _has_enough_evidence 拿到的是 BM25 原始分（1~20，恒过）或 rerank 归一分（0~1，合理）。
+    # 所以那道"证据是否充分"的闸门实际几乎恒为真，而两道向量阈值几乎不筛东西。
+    #
+    # 现在按语义拆开，并且向量阈值直接用 cosine 表达——(1+cos)/2 这层换算属于 ES 的
+    # 实现细节，配置项不该让人心算。换算在 retriever.cosine_to_es_score() 里。
+    #
+    # 取值依据与验证方法：DashScope text-embedding-v4 在中文短查询上，相关文档的
+    # cosine 多在 0.4~0.8，无关文档在 0.1~0.3。0.30 取在两个分布之间偏保守的位置——
+    # 宁可放进来交给 rerank 筛，也不要在召回阶段就把边缘相关的丢掉（召回阶段的漏召
+    # 无法在后续任何阶段补回）。这两个数需要用 benchmarks/search_relevance_v1.jsonl
+    # 在真实 ES 上标定，当前取值是保守默认而不是实测最优。
+    rag_vector_min_cosine: float = 0.30
+    # 商品召回比知识库召回更容忍噪声：搜出来的商品会再过一遍 rerank 和 MMR，
+    # 而且用户能直接看出哪个不相关；知识库召回的噪声会被写进 prompt 当证据。
+    rag_product_vector_min_cosine: float = 0.20
+    # rerank 之后的归一化相关性（0~1）。这一道才是原来 0.5 唯一说得通的地方。
+    rag_evidence_min_relevance: float = 0.5
+    # 无 rerank 时的兜底闸门，单位是 RRF 融合分而不是任何引擎的原始分。
+    # RRF 的全部意义就是丢掉不可比的原始分只留排名，所以这道闸门只能用排名表达：
+    # "至少在某一路里进了前 N 名"。1/(60+N) 是 RRF 的定义式，N 越大越宽松。
+    rag_evidence_min_rrf_rank: int = 10
     # ES requires num_candidates >= k. Raising it trades latency for recall, so
     # keep a floor rather than deriving it from k alone: at k=15 a bare 2x gives
     # the HNSW search very little room to escape a local minimum.
