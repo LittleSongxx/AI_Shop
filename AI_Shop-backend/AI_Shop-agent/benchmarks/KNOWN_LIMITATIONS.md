@@ -1,13 +1,17 @@
 # Known Limitations — aishop_convo_v1
 
-基线：112 条 case，通过 96（0.857143）。dev 0.882353 / test 0.818182。
+基线：112 条 case，通过 99（0.883929）。dev 0.911765 / test 0.840909。
 数据集 SHA-256 `f5859ed69e6e9edd762789f89c5b083cd1c20c2f5a0c93c7ba421bc9a0b6578e`。
 
-> 基线从 90（0.803571）升到 96：意图路由的修复让 `cancel-001`、`cancel-003`、`chat-005`、
-> `coupon-005`、`receipt-004`、`receipt-005` 六条转为通过，已按 lock 的双向对齐规则移出下面的清单。
-> 题面一个字没动（SHA-256 不变），所以升的是实现而不是标准。
+> 基线走过 90（0.803571）→ 96（0.857143）→ 99（0.883929），题面一个字没动（SHA-256 全程不变），
+> 所以升的是实现而不是标准。
+> 90→96 是意图路由的修复（`cancel-001`、`cancel-003`、`chat-005`、`coupon-005`、
+> `receipt-004`、`receipt-005`）；
+> 96→99 是支付词汇收成单一事实源（`after-004`、`after-005`、`cancel-005`），
+> 顺带把 `handoffReason` 这一维从 0.571429 拉到 1.0——原先 7 条里错 3 条，全是资金争议。
+> 两批都已按 lock 的双向对齐规则移出下面的清单，成因记在第八节。
 
-下面 16 条是**一次成型跑出来的失败，原样留着**。期望值是按"正确的客服行为应该是什么"写的，
+下面 13 条是**一次成型跑出来的失败，原样留着**。期望值是按"正确的客服行为应该是什么"写的，
 不是按当前实现的输出写的；跑出来不对的没有改成实际输出，也没有重跑取好成绩。
 把 label 对齐到实现，任何实现都能得 100 分，那样这个集合就一点用都没有了。
 
@@ -21,9 +25,9 @@
 
 <!-- KNOWN_FAILURE_IDS:BEGIN -->
 ```
-after-004 after-005 cancel-002 cancel-005 consult-007 logi-006
-order-006 order-007 order-009 refund-005 refund-006 refund-007
-review-003 review-004 search-009 search-010
+cancel-002 consult-007 logi-006 order-006 order-007 order-009
+refund-005 refund-006 refund-007 review-003 review-004
+search-009 search-010
 ```
 <!-- KNOWN_FAILURE_IDS:END -->
 
@@ -33,8 +37,8 @@ review-003 review-004 search-009 search-010
 
 1. **不是端到端质量。** 评的是 `resolve_intent(..., allow_llm=False)` 这条确定性路径，
    LLM 那一层完全没评到。线上大部分轮次是 LLM 给意图，规则只在 LLM 之前（structural /
-   rule_priority）和之后（rule fallback）起作用。所以这里的 0.857143 **不能**读成
-   "线上意图准确率 86%"。
+   rule_priority）和之后（rule fallback）起作用。所以这里的 0.883929 **不能**读成
+   "线上意图准确率 88%"。
 2. **没有真实检索和真实工具结果。** MCP 出网、Java 微服务、Redis 全是桩，
    退款那条链路的订单项数据由题面的 `fixture` 字段喂。所以"参数拼对了"不等于
    "线上这次调用会成功"。
@@ -125,30 +129,7 @@ review-003 review-004 search-009 search-010
 
 ---
 
-## 五、留着的失败：资金争议没有升级
-
-| case | 输入 | 期望 | 实际 |
-|---|---|---|---|
-| `after-004` | 支付失败了但是钱扣了 | HANDOFF / FUND_DISPUTE | PAYMENT_ISSUE / ANSWER，无 handoff |
-| `after-005` | 同一笔订单重复支付了两次 | HANDOFF / FUND_DISPUTE | PAYMENT_ISSUE / ANSWER，无 handoff |
-| `cancel-005` | 订单已经取消了为什么还扣款 | PAYMENT_ISSUE + FUND_DISPUTE | CHAT / LOW_CONFIDENCE |
-
-意图那一层认出了 `PAYMENT_ISSUE`（前两条），但 `_FUND_RISK_HINTS` 没命中，
-所以 `risk_level` 停在 MEDIUM，`_apply_handoff_policy` 的 `fund_dispute` 分支不触发。
-
-两张表对同一件事的说法不一致：意图分支收 `扣款了`/`扣了钱`/`重复支付`，
-`_FUND_RISK_HINTS` 只收 `重复扣款`/`扣款了`/`扣了钱`。用户说"钱扣了"（词序不同）、
-"重复支付了两次"都落在缝里。
-
-`cancel-005` 更靠前一步就丢了：意图都没认出来，靠 0.4 置信度触发的
-`LOW_CONFIDENCE` 才勉强转了人工——转是转了，但 urgency 是 HIGH 而不是
-资金争议该有的 CRITICAL，`handoff_reason` 也是错的，客服侧看不出这是笔资金问题。
-
-这一组是 16 条里唯一涉及钱的，优先级应当高于其余各条。
-
----
-
-## 六、`consult-007`：商品页进来但没有咨询卡
+## 五、`consult-007`：商品页进来但没有咨询卡
 
 | case | 输入 | 期望 | 实际 |
 |---|---|---|---|
@@ -171,7 +152,7 @@ review-003 review-004 search-009 search-010
 
 ---
 
-## 七、明确不接受"已知失败"的维度
+## 六、明确不接受"已知失败"的维度
 
 `tests/test_convo_eval_frozen.py::test_security_dimensions_have_no_known_failures`
 把这四维钉在 100%，一旦有失败就直接红，不允许写进 `knownFailures`：
@@ -192,10 +173,12 @@ review-003 review-004 search-009 search-010
 
 ---
 
-## 八、已修复（曾经的已知失败）
+## 七、已修复（曾经的已知失败）
 
-这六条已从 `knownFailures` 移出，题面未改（SHA-256 不变）。留在这里是因为
+这九条已从 `knownFailures` 移出，题面未改（SHA-256 不变）。留在这里是因为
 "修好了"和"标签被改成实现的输出"在 diff 上很像，需要有地方说清是哪一种。
+
+### 7.1 意图路由（90 → 96）
 
 | case | 输入 | 曾经的错法 | 成因 |
 |---|---|---|---|
@@ -208,12 +191,52 @@ review-003 review-004 search-009 search-010
 
 共同点是同一个形态：**两处规则对同一种问法的说法不一致**，而不是某一条关键词漏了。
 `cancel-001`/`cancel-003` 是意图表和工具表不一致，`chat-005`/`receipt-004`/`receipt-005`
-是分支顺序和 howto 覆盖面不一致。剩下 16 条里 `refund-007`、`logi-006`、`order-007`、
-`order-009`、`after-004` 都还是这个形态，值得一起收。
+是分支顺序和 howto 覆盖面不一致。
+
+### 7.2 资金争议（96 → 99）
+
+这一组是当时 16 条里唯一涉及钱的，所以先修它。
+
+| case | 输入 | 曾经的错法 | 成因 |
+|---|---|---|---|
+| `after-004` | 支付失败了但是钱扣了 | PAYMENT_ISSUE / ANSWER，不转人工 | 风险表有 `扣了钱` 没有 `钱扣了`，词序一换就漏 |
+| `after-005` | 同一笔订单重复支付了两次 | 同上 | `重复支付` 只被意图表收了，风险表没有 |
+| `cancel-005` | 订单已经取消了为什么还扣款 | CHAT / LOW_CONFIDENCE | 两张表都只有 `扣款了`，连意图都没判出来 |
+
+还是同一个形态，只是这次两处说法不一致的代价是钱：意图分支内联一份支付词，
+`_FUND_RISK_HINTS` 另写一份。`after-004`/`after-005` 判到了 `PAYMENT_ISSUE`
+但 `risk_level` 停在 MEDIUM，`_apply_handoff_policy` 的 `fund_dispute` 分支不触发，
+于是机器人自己去解释一笔重复付款。`cancel-005` 更靠前一步就丢了，靠 0.4 置信度
+触发的 `LOW_CONFIDENCE` 勉强转了人工——转是转了，但 urgency 是 HIGH 而不是
+资金争议该有的 CRITICAL，`handoff_reason` 也是错的，客服侧看不出这是笔资金问题。
+唯一当时正确升级的 `handoff-005`（"我的钱被盗刷了"），原因只是 `盗刷` 恰好被两张表都收了。
+
+修法不是补词，是把支付词汇收成一张分级的表（`app/domain/intent/classifier.py`）：
+
+```
+FUND_AT_RISK      钱已经动了/该退没退  → RiskLevel.HIGH → FUND_DISPUTE 转人工
+PAYMENT_BLOCKED   支付走不通但钱没动    → 仍是 PAYMENT_ISSUE，但不必然转人工
+PAYMENT_ISSUE_HINTS = FUND_AT_RISK + PAYMENT_BLOCKED   ← 意图分支读这个
+```
+
+意图分支读派生出来的那个，所以任何资金词都不可能只被风险表认得。分级是必要的：
+"支付失败了怎么办"这类纯操作咨询不该占用人工坐席，而任何一句提到钱已经被扣走的都该走人工。
+
+`tests/test_intent_classifier.py` 里两条断言守住它：`FUND_AT_RISK ⊆ PAYMENT_ISSUE_HINTS`
+（改回手写清单就红），以及按 `FUND_AT_RISK` 参数化逐词验证能独立触发 `FUND_DISPUTE`
+（往表里加词的人不需要记得回来加用例）。
+
+顺带效果：`handoffReason` 这一维从 0.571429 到 1.0。这一维只有 7 条，错的 3 条全是这组。
+
+### 7.3 还没收的同形态问题
+
+剩下 13 条里 `refund-007`、`logi-006`、`order-007`、`order-009` 还是"两处说法不一致"这个形态，
+值得按 7.2 的做法一起收。`search-009`/`search-010` 不是——那两条考的是硬编码品类表的
+覆盖面，**枚举品类这条路本身有上限**，补词只能挪动边界不能消除它，见第二节。
 
 ---
 
-## 九、怎么改这份文档
+## 八、怎么改这份文档
 
 - 修好一条：从 `aishop_convo_v1.lock.json` 的 `knownFailures` 里删掉，
   同时删掉这里对应的行，重跑 `--bootstrap-lock`。留着不删会被

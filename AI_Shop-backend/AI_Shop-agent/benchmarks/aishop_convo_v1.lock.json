@@ -9,30 +9,30 @@
   },
   "baseline": {
     "cases": 112,
-    "passed": 96,
-    "passRate": 0.857143,
+    "passed": 99,
+    "passRate": 0.883929,
     "bySplit": {
       "dev": {
         "cases": 68,
-        "passed": 60,
-        "passRate": 0.882353
+        "passed": 62,
+        "passRate": 0.911765
       },
       "test": {
         "cases": 44,
-        "passed": 36,
-        "passRate": 0.818182
+        "passed": 37,
+        "passRate": 0.840909
       }
     },
     "bySubset": {
       "aftersales": {
         "cases": 10,
-        "passed": 8,
-        "passRate": 0.8
+        "passed": 10,
+        "passRate": 1.0
       },
       "cancel_order": {
         "cases": 5,
-        "passed": 3,
-        "passRate": 0.6
+        "passed": 4,
+        "passRate": 0.8
       },
       "chat_howto": {
         "cases": 6,
@@ -118,13 +118,13 @@
       },
       "handoffReason": {
         "graded": 7,
-        "passed": 4,
-        "passRate": 0.571429
+        "passed": 7,
+        "passRate": 1.0
       },
       "intent": {
         "graded": 86,
-        "passed": 73,
-        "passRate": 0.848837
+        "passed": 74,
+        "passRate": 0.860465
       },
       "mismatchFlagged": {
         "graded": 5,
@@ -133,8 +133,8 @@
       },
       "nextAction": {
         "graded": 77,
-        "passed": 64,
-        "passRate": 0.831169
+        "passed": 67,
+        "passRate": 0.87013
       },
       "noSnakeCaseLeak": {
         "graded": 5,
@@ -309,25 +309,6 @@
         "toolArgs": null
       }
     },
-    "cancel-005": {
-      "subset": "cancel_order",
-      "split": "dev",
-      "dimensions": [
-        "handoffReason",
-        "intent",
-        "nextAction"
-      ],
-      "note": "含扣款是资金争议，必须转人工而不是自己解释",
-      "actual": {
-        "intent": "CHAT",
-        "source": "default",
-        "nextAction": "HANDOFF_SUGGESTED",
-        "handoffReason": "LOW_CONFIDENCE",
-        "confidence": 0.4,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
     "review-003": {
       "subset": "review",
       "split": "test",
@@ -416,42 +397,6 @@
         "nextAction": "HANDOFF_SUGGESTED",
         "handoffReason": "LOW_CONFIDENCE",
         "confidence": 0.4,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
-    "after-004": {
-      "subset": "aftersales",
-      "split": "dev",
-      "dimensions": [
-        "handoffReason",
-        "nextAction"
-      ],
-      "note": "扣款争议必须转人工",
-      "actual": {
-        "intent": "PAYMENT_ISSUE",
-        "source": "rule_priority",
-        "nextAction": "ANSWER",
-        "handoffReason": null,
-        "confidence": 0.96,
-        "tool": null,
-        "toolArgs": null
-      }
-    },
-    "after-005": {
-      "subset": "aftersales",
-      "split": "test",
-      "dimensions": [
-        "handoffReason",
-        "nextAction"
-      ],
-      "note": "重复支付",
-      "actual": {
-        "intent": "PAYMENT_ISSUE",
-        "source": "rule_priority",
-        "nextAction": "ANSWER",
-        "handoffReason": null,
-        "confidence": 0.96,
         "tool": null,
         "toolArgs": null
       }

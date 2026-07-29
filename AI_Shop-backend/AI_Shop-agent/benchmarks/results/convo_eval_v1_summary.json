@@ -4,33 +4,33 @@
   "datasetSha256": "f5859ed69e6e9edd762789f89c5b083cd1c20c2f5a0c93c7ba421bc9a0b6578e",
   "mode": "offline_deterministic",
   "cases": 112,
-  "passed": 90,
-  "passRate": 0.803571,
+  "passed": 99,
+  "passRate": 0.883929,
   "bySubset": {
     "aftersales": {
       "cases": 10,
-      "passed": 8,
-      "passRate": 0.8
+      "passed": 10,
+      "passRate": 1.0
     },
     "cancel_order": {
       "cases": 5,
-      "passed": 1,
-      "passRate": 0.2
+      "passed": 4,
+      "passRate": 0.8
     },
     "chat_howto": {
       "cases": 6,
-      "passed": 5,
-      "passRate": 0.833333
+      "passed": 6,
+      "passRate": 1.0
     },
     "confirm_receipt": {
       "cases": 5,
-      "passed": 3,
-      "passRate": 0.6
+      "passed": 5,
+      "passRate": 1.0
     },
     "coupon": {
       "cases": 6,
-      "passed": 5,
-      "passRate": 0.833333
+      "passed": 6,
+      "passRate": 1.0
     },
     "handoff": {
       "cases": 5,
@@ -86,13 +86,13 @@
   "bySplit": {
     "dev": {
       "cases": 68,
-      "passed": 57,
-      "passRate": 0.838235
+      "passed": 62,
+      "passRate": 0.911765
     },
     "test": {
       "cases": 44,
-      "passed": 33,
-      "passRate": 0.75
+      "passed": 37,
+      "passRate": 0.840909
     }
   },
   "byDimension": {
@@ -113,13 +113,13 @@
     },
     "handoffReason": {
       "graded": 7,
-      "passed": 4,
-      "passRate": 0.571429
+      "passed": 7,
+      "passRate": 1.0
     },
     "intent": {
       "graded": 86,
-      "passed": 69,
-      "passRate": 0.802326
+      "passed": 74,
+      "passRate": 0.860465
     },
     "mismatchFlagged": {
       "graded": 5,
@@ -128,8 +128,8 @@
     },
     "nextAction": {
       "graded": 77,
-      "passed": 59,
-      "passRate": 0.766234
+      "passed": 67,
+      "passRate": 0.87013
     },
     "noSnakeCaseLeak": {
       "graded": 5,
@@ -138,13 +138,13 @@
     },
     "tool": {
       "graded": 87,
-      "passed": 79,
-      "passRate": 0.908046
+      "passed": 81,
+      "passRate": 0.931034
     },
     "toolArgs": {
       "graded": 33,
-      "passed": 26,
-      "passRate": 0.787879
+      "passed": 27,
+      "passRate": 0.818182
     },
     "write": {
       "graded": 6,
@@ -153,21 +153,12 @@
     }
   },
   "failedIds": [
-    "after-004",
-    "after-005",
-    "cancel-001",
     "cancel-002",
-    "cancel-003",
-    "cancel-005",
-    "chat-005",
     "consult-007",
-    "coupon-005",
     "logi-006",
     "order-006",
     "order-007",
     "order-009",
-    "receipt-004",
-    "receipt-005",
     "refund-005",
     "refund-006",
     "refund-007",
