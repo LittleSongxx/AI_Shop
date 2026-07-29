@@ -1,4 +1,6 @@
 
+name: shop
+
 networks:
   aishop-net:
     name: aishop-net
@@ -35,7 +37,7 @@ services:
     container_name: aishop-redis
     networks: [aishop-net]
     ports:
-      - "6379:6379"
+      - "6380:6379"
     command:
       - redis-server
       - --appendonly
@@ -59,8 +61,8 @@ services:
     container_name: aishop-rabbitmq
     networks: [aishop-net]
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5673:5672"
+      - "15673:15672"
     environment:
       RABBITMQ_DEFAULT_USER: aishop
       RABBITMQ_DEFAULT_PASS: aishop
@@ -161,8 +163,8 @@ services:
     container_name: aishop-seata
     networks: [aishop-net]
     ports:
-      - "8091:8091"
-      - "7091:7091"
+      - "8092:8091"
+      - "7092:7091"
     depends_on:
       mysql:
         condition: service_healthy
@@ -170,7 +172,7 @@ services:
         condition: service_healthy
     environment:
       SEATA_IP: host.docker.internal
-      SEATA_PORT: 8091
+      SEATA_PORT: 8092
       STORE_MODE: db
       TZ: Asia/Shanghai
       JVM_XMX: 1024m

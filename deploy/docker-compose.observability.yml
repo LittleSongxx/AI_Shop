@@ -1,3 +1,5 @@
+name: shop
+
 # Prometheus + Grafana，只做指标采集与展示，不含任何业务组件。
 # 中间件（MySQL/Redis/RabbitMQ/ES/Nacos/Seata）见 docker-compose.middleware.yml。
 #
