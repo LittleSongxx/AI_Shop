@@ -29,8 +29,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/internal/order/agent")
@@ -187,6 +190,53 @@ public class OrderAgentInternalController extends ABaseController {
         map.put("commentBizReply", c.getCommentBizReply());
         map.put("recommentContent", c.getRecommentContent());
         return getSuccessResponseVO(map);
+    }
+
+    @PostMapping("/coPurchaseProductIds")
+    public ResponseVO<List<String>> coPurchaseProductIds(@RequestBody Map<String, Object> body) {
+        String productId = str(body, "productId");
+        if (StringTools.isEmpty(productId)) {
+            return getSuccessResponseVO(Collections.emptyList());
+        }
+        int limit = Math.min(Math.max(intVal(body.get("limit"), 5), 1), 20);
+
+        // Step 1: find order IDs that contain the seed product (cap at 30 orders).
+        OrderItemQuery seedQuery = new OrderItemQuery();
+        seedQuery.setProductId(productId);
+        seedQuery.setSimplePage(new SimplePage(0, 30));
+        List<OrderItem> seedItems = orderItemService.findListByParam(seedQuery);
+        if (seedItems == null || seedItems.isEmpty()) {
+            return getSuccessResponseVO(Collections.emptyList());
+        }
+        Set<String> orderIds = new LinkedHashSet<>();
+        for (OrderItem item : seedItems) {
+            orderIds.add(item.getOrderId());
+        }
+
+        // Step 2: across those orders, count how often each other product appears.
+        Map<String, Integer> freq = new LinkedHashMap<>();
+        for (String orderId : orderIds) {
+            OrderItemQuery oiq = new OrderItemQuery();
+            oiq.setOrderId(orderId);
+            List<OrderItem> items = orderItemService.findListByParam(oiq);
+            if (items == null) continue;
+            for (OrderItem item : items) {
+                String pid = item.getProductId();
+                if (StringTools.isEmpty(pid) || productId.equals(pid)) continue;
+                freq.merge(pid, 1, Integer::sum);
+            }
+        }
+        if (freq.isEmpty()) {
+            return getSuccessResponseVO(Collections.emptyList());
+        }
+
+        // Step 3: sort by co-purchase frequency descending, return top limit.
+        List<String> result = freq.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            .limit(limit)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+        return getSuccessResponseVO(result);
     }
 
     private Map<String, Object> toOrderMap(OrderInfo o, boolean withItems) {

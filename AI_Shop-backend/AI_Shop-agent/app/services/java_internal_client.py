@@ -171,6 +171,83 @@ class JavaInternalClient:
             return str(pid) if pid else None
         return str(data)
 
+    async def browse_history_ids(self, user_id: str, limit: int = 5) -> list[str]:
+        """Return the most-recently browsed product IDs for the user.
+
+        POST /internal/user/agent/browseHistoryIds
+        Body: {"userId": "...", "limit": N}
+        Data: list of productId strings (newest first, deduplicated by Java side)
+        """
+        try:
+            data = await self.post_json(
+                "/internal/user/agent/browseHistoryIds",
+                {"userId": user_id, "limit": max(1, limit)},
+            )
+            if not data or not isinstance(data, list):
+                return []
+            ids: list[str] = []
+            for item in data:
+                if isinstance(item, dict):
+                    pid = item.get("productId") or item.get("product_id")
+                    if pid:
+                        ids.append(str(pid))
+                elif item:
+                    ids.append(str(item))
+            return ids
+        except Exception:
+            return []
+
+    async def purchase_history_product_ids(self, user_id: str, limit: int = 3) -> list[str]:
+        """Return product IDs from the user's recent completed orders.
+
+        Filters to "product received" statuses — COMPLETED (3), WAIT_COMMENT (8),
+        PARTIALLY_REFUNDED (7) — so cancelled / unpaid orders are excluded.
+        Reuses the existing listOrders endpoint; no new Java endpoint required.
+        """
+        from app.constants import (
+            ORDER_STATUS_COMPLETED,
+            ORDER_STATUS_PARTIALLY_REFUNDED,
+            ORDER_STATUS_WAIT_COMMENT,
+        )
+
+        received = {ORDER_STATUS_COMPLETED, ORDER_STATUS_WAIT_COMMENT, ORDER_STATUS_PARTIALLY_REFUNDED}
+        try:
+            # Over-fetch orders to get enough completed ones.
+            orders = await self.list_orders(user_id, limit=max(1, limit) * 3)
+            ids: list[str] = []
+            for order in orders:
+                if order.get("order_status") not in received:
+                    continue
+                for item in order.get("items") or []:
+                    pid = str(item.get("product_id") or "").strip()
+                    if pid and pid not in ids:
+                        ids.append(pid)
+                        if len(ids) >= limit:
+                            return ids
+            return ids
+        except Exception:
+            return []
+
+    async def co_purchase_product_ids(self, product_id: str, limit: int = 5) -> list[str]:
+        """Return product IDs most frequently co-purchased with the given product.
+
+        POST /internal/order/agent/coPurchaseProductIds
+        Body: {"productId": "...", "limit": N}
+        Data: list of productId strings sorted by co-purchase frequency desc.
+        """
+        if not product_id:
+            return []
+        try:
+            data = await self.post_json(
+                "/internal/order/agent/coPurchaseProductIds",
+                {"productId": product_id, "limit": max(1, min(limit, 20))},
+            )
+            if not data or not isinstance(data, list):
+                return []
+            return [str(item) for item in data if item]
+        except Exception:
+            return []
+
     async def knowledge_version(self) -> int:
         data = await self.post_json("/internal/search/knowledge/version", {})
         try:
