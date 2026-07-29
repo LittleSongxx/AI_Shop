@@ -183,6 +183,14 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ---
 
+## 数据与指标口径
+
+仓库里的数字分三类：实测的、框架就绪但没数据的、合成或手工编写的。引用任何指标前先看
+[docs/DATA_PROVENANCE.md](docs/DATA_PROVENANCE.md)，评测集的已知失败见
+[benchmarks/KNOWN_LIMITATIONS.md](AI_Shop-backend/AI_Shop-agent/benchmarks/KNOWN_LIMITATIONS.md)。
+
+---
+
 ## 许可证
 
 见 [LICENSE.md](LICENSE.md)
