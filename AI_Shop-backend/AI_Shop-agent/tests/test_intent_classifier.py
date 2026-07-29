@@ -1,11 +1,13 @@
 import pytest
 
 from app.domain.intent.classifier import (
+    FUND_AT_RISK,
+    PAYMENT_ISSUE_HINTS,
     _parse_intent_json,
     classify_intent_by_rules,
     resolve_intent,
 )
-from app.domain.intent.types import IntentKind, NextAction, SentimentKind
+from app.domain.intent.types import IntentKind, NextAction, RiskLevel, SentimentKind
 
 
 def test_parse_intent_json():
@@ -67,3 +69,46 @@ async def test_negative_fund_dispute_is_handoff():
     )
     assert decision.next_action == NextAction.HANDOFF
     assert decision.sentiment in {SentimentKind.NEGATIVE, SentimentKind.VERY_NEGATIVE}
+
+
+def test_fund_terms_are_a_subset_of_payment_intent_terms():
+    """资金词必须同时是支付意图词。
+
+    这条断言就是"单一事实源"本身。原先意图分支内联一份支付词、风险判定用另一份，
+    结果「重复支付」只被意图表收了（判成 PAYMENT_ISSUE 但不转人工），
+    「订单已经取消了为什么还扣款」两张表都不认（落到 CHAT/0.4）。
+    只要 PAYMENT_ISSUE_HINTS 仍从 FUND_AT_RISK 派生，这条就恒成立；
+    哪天有人把它改回手写清单，这里立刻红。
+    """
+    missing = [term for term in FUND_AT_RISK if term not in PAYMENT_ISSUE_HINTS]
+    assert not missing, (
+        f"这些资金词不在支付意图词表里：{missing}。"
+        "它们会被风险判定认出但意图分支认不出，导致连 PAYMENT_ISSUE 都判不到。"
+    )
+
+
+@pytest.mark.parametrize("term", FUND_AT_RISK)
+@pytest.mark.asyncio
+async def test_every_fund_term_escalates_to_fund_dispute(term):
+    """逐个资金词都要能独立触发 FUND_DISPUTE，不依赖上下文里其他词凑出来。
+
+    参数化而不是挑几个代表：往 FUND_AT_RISK 里加词的人不需要记得回来加用例，
+    加进去就自动被覆盖。
+    """
+    decision = await resolve_intent("u1", f"我的订单{term}了", allow_llm=False)
+    assert decision.risk_level == RiskLevel.HIGH
+    assert decision.next_action == NextAction.HANDOFF
+    assert decision.handoff_reason == "FUND_DISPUTE"
+
+
+@pytest.mark.asyncio
+async def test_payment_blocked_without_fund_loss_is_not_fund_dispute():
+    """支付走不通但钱没动，不该占用人工坐席。
+
+    分级的意义全在这条：如果只要判成 PAYMENT_ISSUE 就一律转人工，这类纯操作咨询
+    会把资金争议队列冲淡。
+    """
+    decision = await resolve_intent("u1", "支付异常是什么原因", allow_llm=False)
+    assert decision.intent == IntentKind.PAYMENT_ISSUE
+    assert decision.risk_level != RiskLevel.HIGH
+    assert decision.handoff_reason != "FUND_DISPUTE"

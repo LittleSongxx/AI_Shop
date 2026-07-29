@@ -59,16 +59,46 @@ _NEGATIVE_HINTS = (
     "烦",
 )
 _POSITIVE_HINTS = ("谢谢", "满意", "很好", "不错", "喜欢", "解决了")
-_FUND_RISK_HINTS = (
-    "重复扣款",
-    "扣款了",
+
+# ---------------------------------------------------------------------------
+# 支付类词汇：单一事实源
+#
+# 这里原先是两张表：意图分支内联一份支付词，风险判定用另一份 _FUND_RISK_HINTS。
+# 两份各自增删，于是漏成了这样——
+#   「同一笔订单重复支付了两次」意图表收了「重复支付」，风险表没收 → 判成 PAYMENT_ISSUE
+#     但 risk=MEDIUM，不转人工，机器人自己去解释一笔重复付款；
+#   「支付失败了但是钱扣了」风险表有「扣了钱」但没有「钱扣了」，词序一换就漏；
+#   「订单已经取消了为什么还扣款」两张表都只有「扣款了」，连意图都没判出来，落到 CHAT/0.4。
+# 而「我的钱被盗刷了」是唯一正确转人工的，原因只是「盗刷」恰好被两张表都收了。
+#
+# 所以问题不是"漏了几个词"，是同一件事有两处说法。改成分级派生：
+#   FUND_AT_RISK    钱已经动了/该退没退 → RiskLevel.HIGH → FUND_DISPUTE 转人工
+#   PAYMENT_BLOCKED 支付走不通但钱没动 → 仍是 PAYMENT_ISSUE，但不必然转人工
+# 意图分支读派生出的 PAYMENT_ISSUE_HINTS，因此任何资金词都不可能只被风险表认得。
+# 分级的作用：「支付失败了怎么办」这类纯操作咨询不该占用人工坐席，而任何一句提到钱
+# 已经被扣走的都该走人工——这两件事必须能分开表达。
+#
+# 取舍：「扣款」按裸词收，不写死「重复扣款」「扣款了」这些具体说法。代价是
+# 「什么时候扣款」这类售前咨询也会升级；收益是任何"钱被扣了"的说法都不会漏。
+# 资金问题上多转一次人工的成本远低于漏转一次。
+# ---------------------------------------------------------------------------
+FUND_AT_RISK = (
+    "扣款",
     "扣了钱",
+    "钱扣了",
+    "重复支付",
     "钱没退",
     "退款没到账",
     "支付成功没订单",
     "资金",
     "盗刷",
 )
+PAYMENT_BLOCKED = (
+    "支付失败",
+    "付款失败",
+    "支付异常",
+)
+PAYMENT_ISSUE_HINTS = FUND_AT_RISK + PAYMENT_BLOCKED
 _UNRESOLVED_HINTS = ("还是没解决", "没有解决", "又不行", "还是不行", "说了没用", "重复问")
 
 _TOOL_INTENTS = frozenset(
@@ -133,7 +163,7 @@ def classify_intent_by_rules(
         return IntentKind.HUMAN_REQUEST
     if any(k in text for k in ("退款进度", "退款到哪", "退款到账", "退款什么时候", "退款状态")):
         return IntentKind.REFUND_STATUS
-    if any(k in text for k in ("支付失败", "付款失败", "重复支付", "重复扣款", "扣款了", "扣了钱", "支付异常", "盗刷")):
+    if any(k in text for k in PAYMENT_ISSUE_HINTS):
         return IntentKind.PAYMENT_ISSUE
     if any(k in text for k in ("破损", "损坏", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
         return IntentKind.DAMAGED_OR_WRONG_ITEM
@@ -524,7 +554,7 @@ def _build_decision(
     next_action: NextAction | None = None,
 ) -> IntentDecision:
     sentiment = analyze_sentiment(user_text)
-    risk = RiskLevel.HIGH if any(k in user_text for k in _FUND_RISK_HINTS) else RiskLevel.LOW
+    risk = RiskLevel.HIGH if any(k in user_text for k in FUND_AT_RISK) else RiskLevel.LOW
     if risk == RiskLevel.LOW and intent in {
         IntentKind.PAYMENT_ISSUE,
         IntentKind.COMPLAINT,
