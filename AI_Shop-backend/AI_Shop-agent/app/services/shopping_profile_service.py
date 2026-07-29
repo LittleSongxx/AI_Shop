@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
 import structlog
 
 from app.constants import CLARIFY_MAX_TEXT_LENGTH, PRODUCT_STATUS_ON_SALE
+from app.db.pool import acquire
 from app.services.redis_service import redis_service
 
 logger = structlog.get_logger()
@@ -270,28 +272,187 @@ def merge_profiles(current: dict[str, Any] | None, incoming: dict[str, Any]) -> 
 class ShoppingProfileService:
 
     async def get_profile(self, user_id: str) -> dict[str, Any]:
+        """Read the profile from Redis, falling back to the durable MySQL row.
+
+        Redis is only a cache here: its TTL is finite and it can be restarted,
+        so a miss must not silently reset a user's remembered budget/brand
+        constraints. MySQL is the source of truth and a hit backfills Redis.
+        """
         if not user_id:
             return empty_profile()
         try:
-            value = await redis_service.get_shopping_profile(user_id)
-            return merge_profiles(value, empty_profile()) if value else empty_profile()
+            cached = await redis_service.get_shopping_profile(user_id)
+            if cached:
+                return merge_profiles(cached, empty_profile())
         except Exception as exc:
-            logger.warning("shopping_profile_read_failed", user_id=user_id, error=str(exc))
+            logger.warning("shopping_profile_redis_read_failed", user_id=user_id, error=str(exc))
+
+        stored = await self._load_from_db(user_id)
+        if not stored:
             return empty_profile()
+        merged = merge_profiles(stored, empty_profile())
+        await self._save_redis(user_id, merged)
+        return merged
 
     async def update_profile(self, user_id: str, text: str | None) -> dict[str, Any]:
         incoming = extract_profile(text)
         if not user_id or not _has_signal(incoming):
             return await self.get_profile(user_id)
+        current = await self.get_profile(user_id)
+        merged = merge_profiles(current, incoming)
+        # Neither store may break an ordinary chat turn, so both writes are
+        # best-effort and the merged value is returned regardless.
+        await self._save_redis(user_id, merged)
+        await self._save_db(user_id, merged)
+        return merged
+
+    async def async_enrich_profile(self, user_id: str, text: str | None) -> None:
+        """Background LLM-based profile enrichment.
+
+        Intended to be launched via ``asyncio.create_task()`` — never awaited
+        directly on the hot path.  Fires only when the text is long enough to
+        carry signals that regex reliably misses (complex natural language,
+        contextual hints, negations embedded in sentences).
+
+        On success, the LLM result is merged on top of the current profile
+        (regex already ran; LLM fills the gaps it could not capture) and
+        persisted to both Redis and MySQL.  Any failure is silent so a bad LLM
+        call can never disrupt the main conversation.
+        """
+        if not user_id or not text:
+            return
+        stripped = text.strip()
+        # Regex handles short, keyword-style inputs well.  Only spend an LLM
+        # call on texts that are long enough to contain sentence-level context.
+        if len(stripped) < 15:
+            return
         try:
-            current = await redis_service.get_shopping_profile(user_id)
-            merged = merge_profiles(current, incoming)
-            await redis_service.save_shopping_profile(user_id, merged)
-            return merged
+            enriched = await self._llm_extract_profile(stripped)
+            if not enriched or not _has_signal(enriched):
+                return
+            current = await self.get_profile(user_id)
+            # LLM result is the "incoming" layer — it may override regex fields
+            # only when it carries explicit signal (merge_profiles respects None).
+            merged = merge_profiles(current, enriched)
+            await self._save_redis(user_id, merged)
+            await self._save_db(user_id, merged)
+            logger.info(
+                "profile_llm_enriched",
+                user_id=user_id,
+                category=enriched.get("category"),
+                budget_max=enriched.get("budgetMax"),
+                brands=enriched.get("brands"),
+            )
         except Exception as exc:
-            # A Redis outage must never make an ordinary chat message fail.
-            logger.warning("shopping_profile_write_failed", user_id=user_id, error=str(exc))
-            return merge_profiles(None, incoming)
+            logger.warning("profile_llm_enrich_failed", user_id=user_id, error=str(exc))
+
+    async def _llm_extract_profile(self, text: str) -> dict[str, Any] | None:
+        """Call the LLM to extract a structured shopping profile from natural language.
+
+        Uses the memory LLM (non-streaming, may be a cheaper/faster model) with
+        an 8-second hard timeout so a slow call never blocks the background task
+        queue for long.
+        """
+        import asyncio as _asyncio
+
+        from langchain_core.messages import HumanMessage
+
+        from app.services.llm_factory import create_memory_llm
+
+        prompt = (
+            "你是电商购物意图分析助手。从用户文本提取购物偏好，仅返回JSON，不含任何其他文字。\n\n"
+            f"用户文本：{text[:500]}\n\n"
+            "提取字段（无明确信号保持 null 或空列表）：\n"
+            "  category      — 商品类别，如手机、笔记本电脑、耳机\n"
+            "  budgetMin     — 最低预算（纯数字，单位元，无则 null）\n"
+            "  budgetMax     — 最高预算（纯数字，单位元，无则 null）\n"
+            "  brands        — 偏好品牌列表，如 [\"苹果\",\"华为\"]\n"
+            "  excludedBrands— 排除品牌列表\n"
+            "  scenarios     — 使用场景列表，如 [\"办公\",\"游戏\",\"送礼\"]\n"
+            "  features      — 功能偏好列表，如 [\"便携\",\"续航\",\"性价比\"]\n"
+            "  acceptSubstitute — 是否接受替代品牌：true/false/null\n\n"
+            "示例输出：\n"
+            '{"category":"手机","budgetMin":null,"budgetMax":3000,"brands":["苹果"],'
+            '"excludedBrands":[],"scenarios":["学生"],"features":["性价比"],'
+            '"acceptSubstitute":true}'
+        )
+        try:
+            llm = create_memory_llm()
+            response = await _asyncio.wait_for(
+                llm.ainvoke([HumanMessage(content=prompt)]),
+                timeout=8.0,
+            )
+            raw = (response.content or "").strip()
+            # Strip optional markdown code fences.
+            if raw.startswith("```"):
+                parts = raw.split("```")
+                raw = parts[1] if len(parts) > 1 else raw
+                if raw.startswith("json"):
+                    raw = raw[4:].lstrip()
+            parsed = json.loads(raw)
+            if not isinstance(parsed, dict):
+                return None
+            result = empty_profile()
+            cat = parsed.get("category")
+            result["category"] = str(cat).strip() if cat else None
+            for key in ("budgetMin", "budgetMax"):
+                val = parsed.get(key)
+                try:
+                    result[key] = float(val) if val is not None else None
+                except (TypeError, ValueError):
+                    result[key] = None
+            for key in ("brands", "excludedBrands", "scenarios", "features"):
+                raw_list = parsed.get(key) or []
+                result[key] = [str(x).strip() for x in raw_list if x][:10]
+            sub = parsed.get("acceptSubstitute")
+            if isinstance(sub, bool):
+                result["acceptSubstitute"] = sub
+            return result
+        except Exception as exc:
+            logger.warning("profile_llm_extract_failed", error=str(exc))
+            return None
+
+    async def _save_redis(self, user_id: str, profile: dict[str, Any]) -> None:
+        try:
+            await redis_service.save_shopping_profile(user_id, profile)
+        except Exception as exc:
+            logger.warning("shopping_profile_redis_write_failed", user_id=user_id, error=str(exc))
+
+    async def _save_db(self, user_id: str, profile: dict[str, Any]) -> None:
+        try:
+            async with acquire() as cur:
+                await cur.execute(
+                    """INSERT INTO agent_shopping_profile (user_id, profile_json, updated_at)
+                       VALUES (%s, %s, NOW())
+                       ON DUPLICATE KEY UPDATE
+                         profile_json=VALUES(profile_json),
+                         updated_at=VALUES(updated_at)""",
+                    (user_id, json.dumps(profile, ensure_ascii=False)),
+                )
+        except Exception as exc:
+            logger.warning("shopping_profile_db_write_failed", user_id=user_id, error=str(exc))
+
+    async def _load_from_db(self, user_id: str) -> dict[str, Any] | None:
+        try:
+            async with acquire() as cur:
+                await cur.execute(
+                    "SELECT profile_json FROM agent_shopping_profile WHERE user_id=%s",
+                    (user_id,),
+                )
+                row = await cur.fetchone()
+        except Exception as exc:
+            logger.warning("shopping_profile_db_read_failed", user_id=user_id, error=str(exc))
+            return None
+        if not row:
+            return None
+        stored = row.get("profile_json")
+        if isinstance(stored, str):
+            try:
+                stored = json.loads(stored)
+            except json.JSONDecodeError:
+                logger.warning("shopping_profile_db_corrupt", user_id=user_id)
+                return None
+        return stored if isinstance(stored, dict) else None
 
     @staticmethod
     def has_hard_constraints(profile: dict[str, Any] | None) -> bool:

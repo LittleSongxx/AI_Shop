@@ -1,3 +1,8 @@
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from app.constants import CLARIFY_MAX_TEXT_LENGTH
 from app.services.shopping_profile_service import (
     ShoppingProfileService,
@@ -5,6 +10,16 @@ from app.services.shopping_profile_service import (
     extract_profile,
     merge_profiles,
 )
+
+
+def _db_cursor(fetchone_result=None):
+    """构造一个可注入的 acquire() 上下文，返回 DictCursor 形状的行。"""
+    cur = AsyncMock()
+    cur.fetchone = AsyncMock(return_value=fetchone_result)
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=cur)
+    cm.__aexit__ = AsyncMock(return_value=None)
+    return cur, cm
 
 
 def test_extract_profile_parses_budget_brand_category_and_preferences():
@@ -153,3 +168,275 @@ def test_constraint_summary_is_user_readable():
     profile = extract_profile("预算3000以内的华为手机，办公")
 
     assert ShoppingProfileService.summary(profile) == "预算不超过3000元、偏好华为、类别手机、场景办公"
+
+
+# --------------------------------------------------------------------------- #
+# Redis 缓存 + MySQL 事实源                                                    #
+#                                                                             #
+# Redis 有 TTL 也会重启，所以它不能是唯一存储：缓存一没，用户之前说过的预算和品牌      #
+# 约束就凭空消失了，而用户不会知道要再说一遍。这一组测的就是"缓存失效不等于偏好丢失"。 #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_profile_falls_back_to_db_when_cache_misses(monkeypatch):
+    stored = {**empty_profile(), "category": "手机", "budgetMax": 3000.0}
+    _, cm = _db_cursor({"profile_json": json.dumps(stored, ensure_ascii=False)})
+    service = ShoppingProfileService()
+
+    saved: dict = {}
+
+    async def fake_save(user_id, profile):
+        saved[user_id] = profile
+
+    monkeypatch.setattr(
+        "app.services.shopping_profile_service.redis_service.get_shopping_profile",
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(service, "_save_redis", fake_save)
+
+    with patch("app.services.shopping_profile_service.acquire", return_value=cm):
+        profile = await service.get_profile("u1")
+
+    assert profile["category"] == "手机"
+    assert profile["budgetMax"] == 3000.0
+    # 命中 DB 之后要回填缓存，否则每一轮对话都要多打一次 MySQL。
+    assert saved["u1"]["category"] == "手机"
+
+
+@pytest.mark.asyncio
+async def test_profile_falls_back_to_db_when_redis_raises(monkeypatch):
+    """Redis 整个挂掉（不是未命中）时也要走 DB，不能直接返回空档案。"""
+    stored = {**empty_profile(), "category": "耳机"}
+    _, cm = _db_cursor({"profile_json": stored})  # 驱动也可能已经反序列化好
+    service = ShoppingProfileService()
+
+    monkeypatch.setattr(
+        "app.services.shopping_profile_service.redis_service.get_shopping_profile",
+        AsyncMock(side_effect=RuntimeError("redis down")),
+    )
+    monkeypatch.setattr(service, "_save_redis", AsyncMock())
+
+    with patch("app.services.shopping_profile_service.acquire", return_value=cm):
+        profile = await service.get_profile("u1")
+
+    assert profile["category"] == "耳机"
+
+
+@pytest.mark.asyncio
+async def test_corrupt_db_json_degrades_to_empty_profile(monkeypatch):
+    """DB 里存的 JSON 坏了要当作没有档案，而不是把异常抛到对话链路上。"""
+    _, cm = _db_cursor({"profile_json": "{not json"})
+    service = ShoppingProfileService()
+
+    monkeypatch.setattr(
+        "app.services.shopping_profile_service.redis_service.get_shopping_profile",
+        AsyncMock(return_value=None),
+    )
+
+    with patch("app.services.shopping_profile_service.acquire", return_value=cm):
+        profile = await service.get_profile("u1")
+
+    assert profile == empty_profile()
+
+
+@pytest.mark.asyncio
+async def test_db_outage_does_not_break_an_ordinary_chat_turn(monkeypatch):
+    """MySQL 挂了，取档案要返回空档案让对话继续，不能抛。"""
+    service = ShoppingProfileService()
+    monkeypatch.setattr(
+        "app.services.shopping_profile_service.redis_service.get_shopping_profile",
+        AsyncMock(return_value=None),
+    )
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("mysql down")
+
+    with patch("app.services.shopping_profile_service.acquire", side_effect=boom):
+        profile = await service.get_profile("u1")
+
+    assert profile == empty_profile()
+
+
+@pytest.mark.asyncio
+async def test_update_writes_through_to_both_stores(monkeypatch):
+    """更新要同时落缓存和 DB。只落 Redis 的话重启就丢，只落 DB 则每轮都要查库。"""
+    service = ShoppingProfileService()
+    calls: list[str] = []
+
+    monkeypatch.setattr(service, "get_profile", AsyncMock(return_value=empty_profile()))
+
+    async def note_redis(user_id, profile):
+        calls.append("redis")
+
+    async def note_db(user_id, profile):
+        calls.append("db")
+
+    monkeypatch.setattr(service, "_save_redis", note_redis)
+    monkeypatch.setattr(service, "_save_db", note_db)
+
+    merged = await service.update_profile("u1", "想买3000以内的华为手机")
+
+    assert merged["budgetMax"] == 3000
+    assert sorted(calls) == ["db", "redis"]
+
+
+# --------------------------------------------------------------------------- #
+# 后台 LLM 富化                                                                #
+#                                                                             #
+# 这条路径是 asyncio.create_task 起的，异常不会有人看——所以"失败必须静默且不影响       #
+# 主链路"本身就是要被测的行为，而不是可以省略的边界情况。                             #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_short_text_does_not_spend_an_llm_call(monkeypatch):
+    """短文本正则就能处理，不值得花一次 LLM 调用。"""
+    service = ShoppingProfileService()
+    called = False
+
+    async def fake_extract(text):
+        nonlocal called
+        called = True
+        return None
+
+    monkeypatch.setattr(service, "_llm_extract_profile", fake_extract)
+
+    await service.async_enrich_profile("u1", "买手机")
+
+    assert not called
+
+
+@pytest.mark.asyncio
+async def test_enrichment_merges_on_top_of_the_existing_profile(monkeypatch):
+    """LLM 结果是"增量层"：它补正则拿不到的字段，不该抹掉已有约束。"""
+    service = ShoppingProfileService()
+    current = {**empty_profile(), "budgetMax": 3000.0}
+    enriched = {**empty_profile(), "category": "笔记本电脑", "scenarios": ["办公"]}
+    saved: dict = {}
+
+    monkeypatch.setattr(service, "_llm_extract_profile", AsyncMock(return_value=enriched))
+    monkeypatch.setattr(service, "get_profile", AsyncMock(return_value=current))
+
+    async def capture(user_id, profile):
+        saved.update(profile)
+
+    monkeypatch.setattr(service, "_save_redis", capture)
+    monkeypatch.setattr(service, "_save_db", capture)
+
+    await service.async_enrich_profile("u1", "我想找一台适合日常办公用的机器，轻薄一点")
+
+    assert saved["category"] == "笔记本电脑"
+    assert saved["budgetMax"] == 3000.0, "LLM 富化把正则已经拿到的预算抹掉了"
+
+
+@pytest.mark.asyncio
+async def test_enrichment_failure_is_silent(monkeypatch):
+    """LLM 抛异常不能让后台任务把异常冒到事件循环里。"""
+    service = ShoppingProfileService()
+    monkeypatch.setattr(
+        service, "_llm_extract_profile", AsyncMock(side_effect=RuntimeError("llm down")),
+    )
+    monkeypatch.setattr(service, "_save_redis", AsyncMock())
+    monkeypatch.setattr(service, "_save_db", AsyncMock())
+
+    await service.async_enrich_profile("u1", "我想找一台适合日常办公用的机器，轻薄一点")
+
+
+@pytest.mark.asyncio
+async def test_signal_free_llm_result_is_not_persisted(monkeypatch):
+    """LLM 什么都没提取到时不该写库——空档案覆盖会清掉用户已有的偏好。"""
+    service = ShoppingProfileService()
+    monkeypatch.setattr(
+        service, "_llm_extract_profile", AsyncMock(return_value=empty_profile()),
+    )
+    written = False
+
+    async def note(user_id, profile):
+        nonlocal written
+        written = True
+
+    monkeypatch.setattr(service, "_save_redis", note)
+    monkeypatch.setattr(service, "_save_db", note)
+
+    await service.async_enrich_profile("u1", "今天天气不错，随便看看有什么新鲜玩意儿")
+
+    assert not written
+
+
+@pytest.mark.asyncio
+async def test_llm_json_is_parsed_through_markdown_fences(monkeypatch):
+    """模型爱把 JSON 包在 ```json 里，这是最常见的一种解析失败。"""
+    service = ShoppingProfileService()
+    payload = {
+        "category": "手机",
+        "budgetMin": None,
+        "budgetMax": 3000,
+        "brands": ["苹果"],
+        "excludedBrands": [],
+        "scenarios": ["学生"],
+        "features": ["性价比"],
+        "acceptSubstitute": True,
+    }
+    fenced = "```json\n" + json.dumps(payload, ensure_ascii=False) + "\n```"
+
+    llm = MagicMock()
+    llm.ainvoke = AsyncMock(return_value=MagicMock(content=fenced))
+    monkeypatch.setattr(
+        "app.services.llm_factory.create_memory_llm", MagicMock(return_value=llm)
+    )
+
+    result = await service._llm_extract_profile("我是学生，想买台三千以内的苹果手机")
+
+    assert result["category"] == "手机"
+    assert result["budgetMax"] == 3000.0
+    assert result["brands"] == ["苹果"]
+    assert result["acceptSubstitute"] is True
+
+
+@pytest.mark.asyncio
+async def test_llm_garbage_values_are_coerced_not_propagated(monkeypatch):
+    """模型可能把预算写成 "三千"、把列表写成 null。这些都要被归一化掉。
+
+    不做归一化的话，脏值会一路写进 Redis 和 MySQL，之后每一轮对话都带着它。
+    """
+    service = ShoppingProfileService()
+    payload = {
+        "category": "  手机  ",
+        "budgetMin": "不限",
+        "budgetMax": "三千",
+        "brands": None,
+        "excludedBrands": ["", "小米"],
+        "scenarios": None,
+        "features": [f"f{i}" for i in range(20)],
+        "acceptSubstitute": "yes",
+    }
+    llm = MagicMock()
+    llm.ainvoke = AsyncMock(return_value=MagicMock(content=json.dumps(payload, ensure_ascii=False)))
+    monkeypatch.setattr(
+        "app.services.llm_factory.create_memory_llm", MagicMock(return_value=llm)
+    )
+
+    result = await service._llm_extract_profile("随便说点什么凑够十五个字的长度")
+
+    assert result["category"] == "手机"
+    assert result["budgetMin"] is None
+    assert result["budgetMax"] is None
+    assert result["brands"] == []
+    assert result["excludedBrands"] == ["小米"]
+    assert len(result["features"]) == 10, "列表没有截断，脏数据会一直留在档案里"
+    # "yes" 是真值但不是布尔。当成 True 会让"是否接受替代品牌"这种影响推荐结果的
+    # 字段被字符串的真值性决定，所以只认真正的 bool。
+    assert result["acceptSubstitute"] is None
+
+
+@pytest.mark.asyncio
+async def test_non_json_llm_response_returns_none(monkeypatch):
+    service = ShoppingProfileService()
+    llm = MagicMock()
+    llm.ainvoke = AsyncMock(return_value=MagicMock(content="抱歉，我无法完成这个请求。"))
+    monkeypatch.setattr(
+        "app.services.llm_factory.create_memory_llm", MagicMock(return_value=llm)
+    )
+
+    assert await service._llm_extract_profile("随便说点什么凑够十五个字的长度") is None

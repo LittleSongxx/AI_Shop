@@ -54,6 +54,18 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        CREATE TABLE IF NOT EXISTS agent_shopping_profile
+        (
+            user_id varchar(32) NOT NULL PRIMARY KEY,
+            profile_json json NULL,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
+                ON UPDATE CURRENT_TIMESTAMP
+        ) COMMENT 'durable shopping preferences (budget/brand/scenario)'
+          CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS agent_pending_action
         (
             action_token varchar(80) NOT NULL PRIMARY KEY,
@@ -288,6 +300,7 @@ def downgrade() -> None:
         "support_message",
         "support_session",
         "agent_pending_action",
+        "agent_shopping_profile",
         "agent_session_memory",
         "agent_message",
     ):

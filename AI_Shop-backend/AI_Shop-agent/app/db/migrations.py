@@ -35,6 +35,11 @@ _REQUIRED_COLUMNS = {
         "turn_count",
         "updated_at",
     },
+    "agent_shopping_profile": {
+        "user_id",
+        "profile_json",
+        "updated_at",
+    },
     "agent_pending_action": {
         "action_token",
         "user_id",
