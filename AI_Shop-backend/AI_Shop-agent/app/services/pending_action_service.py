@@ -81,8 +81,6 @@ class PendingActionService:
             status = pending.get("status")
             if status == self.STATUS_EXPIRED:
                 raise PendingActionExpired("操作已过期")
-            if status == self.STATUS_EXECUTING:
-                raise ValueError("操作处理中，请勿重复点击")
             if status in (self.STATUS_CONFIRMED, self.STATUS_FAILED, self.STATUS_CANCELLED):
                 return (
                     pending.get("actionType"),
@@ -91,6 +89,8 @@ class PendingActionService:
                     or pending.get("errorMessage")
                     or "该操作已处理",
                 )
+            # not claimed → 另一请求正持有 EXECUTING slot，幂等拒绝
+            # claimed=True → claim() 已将 status 写为 EXECUTING，正常向下执行
             if not claimed:
                 raise ValueError("操作处理中，请勿重复点击")
 

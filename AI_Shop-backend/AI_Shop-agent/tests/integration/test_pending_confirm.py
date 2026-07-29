@@ -15,12 +15,13 @@ def service():
 
 @pytest.mark.asyncio
 async def test_confirm_success_persists_result(service):
+    # claim() 在 DB 侧已将 status 写为 EXECUTING(3)，返回 post-UPDATE 行
     pending = {
         "token": "act_test",
         "userId": "u1",
         "actionType": "CONFIRM_RECEIPT",
         "paramsJson": json.dumps({"orderId": "o1"}),
-        "status": 0,
+        "status": 3,
     }
 
     async def executor(p):
@@ -44,12 +45,13 @@ async def test_confirm_success_persists_result(service):
 
 @pytest.mark.asyncio
 async def test_confirm_failure_persists_error(service):
+    # claim() 在 DB 侧已将 status 写为 EXECUTING(3)，返回 post-UPDATE 行
     pending = {
         "token": "act_fail",
         "userId": "u1",
         "actionType": "REFUND",
         "paramsJson": "{}",
-        "status": 0,
+        "status": 3,
     }
 
     async def executor(_):
@@ -101,11 +103,12 @@ async def test_confirm_idempotent_on_processed(service):
 
 @pytest.mark.asyncio
 async def test_confirm_returns_saved_result_when_completion_lookup_is_needed(service):
+    # claim() 在 DB 侧已将 status 写为 EXECUTING(3)，返回 post-UPDATE 行
     pending = {
         "token": "act_race",
         "userId": "u1",
         "actionType": "CONFIRM_RECEIPT",
-        "status": 0,
+        "status": 3,
     }
     saved = {
         **pending,

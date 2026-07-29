@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 import structlog
@@ -8,6 +9,7 @@ from app.config.settings import get_settings
 from app.constants import AGENT_QUEUE_LOW
 from app.domain.intent.classifier import resolve_intent
 from app.harness.guardrails.input_guard import InputGuardrail
+from app.memory.session_memory_service import session_memory_service
 from app.rag.retriever import rag_retriever
 from app.services.agent_queue_service import agent_queue_service
 from app.services.message_service import agent_message_service
@@ -70,8 +72,12 @@ class AgentOrchestrator:
             await redis_service.set_consult_active(user_id)
 
         await shopping_profile_service.update_profile(user_id, original_user_text)
+        # LLM enrichment runs in the background — never blocks this turn.
+        asyncio.create_task(
+            shopping_profile_service.async_enrich_profile(user_id, original_user_text)
+        )
         previous_unresolved = await agent_message_service.get_unresolved_count(user_id)
-        consult_card = await redis_service.get_consult_product(user_id)
+        consult_card = await self._resolve_consult_card_for_routing(user_id)
         decision = await resolve_intent(
             user_id,
             original_user_text,
@@ -199,6 +205,24 @@ class AgentOrchestrator:
             )
             agent_msg["deliveryState"] = "PENDING_RECOVERY"
         return agent_msg
+
+    async def _resolve_consult_card_for_routing(self, user_id: str) -> dict | None:
+        """Resolve the active consult card for pre-classification.
+
+        The graph's ``build_context_node`` already falls back to the durable
+        session-memory state when the Redis consult key has expired.  This
+        routing pass must use the same fallback, otherwise the persisted intent
+        and the queue it selects can disagree with what the graph later sees.
+        """
+        cached = await redis_service.get_consult_product(user_id)
+        if cached:
+            return cached
+        try:
+            memory = await session_memory_service.load(user_id, redis_service.client)
+        except Exception as exc:
+            logger.warning("consult_card_memory_fallback_failed", user_id=user_id, error=str(exc))
+            return None
+        return memory.state.get("consultProduct")
 
     async def _transfer_to_support(
         self,

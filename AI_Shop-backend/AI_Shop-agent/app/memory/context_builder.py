@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
@@ -8,6 +10,7 @@ from app.memory.models import SessionMemory
 from app.memory.token_estimator import estimate_text_tokens
 from app.services.message_service import agent_message_service
 from app.services.prompt_service import build_agent_system_prompt
+from app.services.shopping_profile_service import _has_signal, shopping_profile_service
 from app.utils.prompt_boundary import isolate_user_message
 
 
@@ -71,7 +74,7 @@ def select_working_turns(
     oldest_id = int(selected[0]["message_id"]) if selected else None
     return selected, oldest_id
 
-def build_context_block(memory: SessionMemory) -> str:
+def build_context_block(memory: SessionMemory, shopping_profile: dict | None = None) -> str:
 
     summary = memory.summary
     facts = summary.get("facts") or {}
@@ -88,16 +91,28 @@ def build_context_block(memory: SessionMemory) -> str:
     meta_parts = []
     if goal:
         meta_parts.append(f"目标: {goal}")
-    if budget:
-        meta_parts.append(f"预算: {budget}")
-    if preferences:
-
-        meta_parts.append(f"偏好: {', '.join(map(str, preferences))}")
+    # Structured profile is the authoritative source for budget/brand constraints.
+    # Only fall back to LLM-compressed summary facts when the profile has no signal —
+    # the LLM can hallucinate or forget exact numbers during summarisation.
+    profile_has_signal = _has_signal(shopping_profile or {})
+    if not profile_has_signal:
+        if budget:
+            meta_parts.append(f"预算: {budget}")
+        if preferences:
+            meta_parts.append(f"偏好: {', '.join(map(str, preferences))}")
     if decisions:
-
         meta_parts.append(f"已决策: {', '.join(map(str, decisions[-8:]))}")
     if meta_parts:
         lines.append(" | ".join(meta_parts))
+
+    # Shopping profile — structured, durable, regex-extracted constraints.
+    # Shown only when the profile has accumulated signal; absent on first contact
+    # or pure customer-service sessions that never touch product browsing/buying.
+    if profile_has_signal:
+        profile_summary = shopping_profile_service.summary(shopping_profile)
+        if profile_summary:
+            lines.append("\n## 购物偏好")
+            lines.append(profile_summary)
 
     lines.append("\n## 当前状态")
     consult = state.get("consultProduct")
@@ -138,15 +153,20 @@ class ContextBuilder:
     ) -> tuple[list, list[dict], int | None]:
 
         settings = get_settings()
-        system_prompt = await build_agent_system_prompt(
-            intent,
-            user_id,
-            user_text,
-            product_snapshot=product_snapshot,
-            faq_text=faq_text,
-            knowledge_text=knowledge_text,
+        # Build system prompt and load shopping profile concurrently —
+        # the profile is a fast Redis hit in the common case, so this is free.
+        system_prompt, shopping_profile = await asyncio.gather(
+            build_agent_system_prompt(
+                intent,
+                user_id,
+                user_text,
+                product_snapshot=product_snapshot,
+                faq_text=faq_text,
+                knowledge_text=knowledge_text,
+            ),
+            shopping_profile_service.get_profile(user_id),
         )
-        context_block = build_context_block(memory)
+        context_block = build_context_block(memory, shopping_profile)
 
         turns = await agent_message_service.load_turns_for_memory(user_id)
         working_turns, working_oldest_id = select_working_turns(
@@ -176,10 +196,11 @@ class ContextBuilder:
         working_turns: list[dict],
         user_text: str,
         system_prompt: str,
+        shopping_profile: dict | None = None,
     ) -> int:
 
         total = estimate_text_tokens(system_prompt)
-        total += estimate_text_tokens(build_context_block(memory))
+        total += estimate_text_tokens(build_context_block(memory, shopping_profile))
         for turn in working_turns:
             if not is_complete_turn_for_context(turn):
                 continue

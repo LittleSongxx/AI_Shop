@@ -97,6 +97,54 @@ def test_build_context_block():
     assert "旺旺雪饼" in block
     assert "买礼物" in block
 
+def test_build_context_block_renders_shopping_profile_section():
+    """Profile with signal → ## 购物偏好 section appears in the block."""
+    mem = SessionMemory(user_id="u1")
+    mem.summary["narrative"] = "用户想买笔记本"
+    profile = {
+        "version": 1,
+        "category": "笔记本电脑",
+        "budgetMin": None,
+        "budgetMax": 8000.0,
+        "brands": ["苹果"],
+        "excludedBrands": [],
+        "scenarios": ["办公"],
+        "features": [],
+        "acceptSubstitute": None,
+    }
+    block = build_context_block(mem, shopping_profile=profile)
+    assert "购物偏好" in block
+    assert "苹果" in block
+    assert "8000" in block
+
+
+def test_build_context_block_profile_supersedes_summary_budget():
+    """When profile has signal, LLM-compressed budget/preferences are suppressed
+    to avoid conflicting or stale values reaching the model.
+    """
+    mem = SessionMemory(user_id="u1")
+    mem.summary["facts"]["budget"] = "预算3000元"
+    mem.summary["facts"]["preferences"] = ["小米"]
+    profile = {
+        "version": 1,
+        "category": None,
+        "budgetMin": None,
+        "budgetMax": 5000.0,
+        "brands": ["华为"],
+        "excludedBrands": [],
+        "scenarios": [],
+        "features": [],
+        "acceptSubstitute": None,
+    }
+    block = build_context_block(mem, shopping_profile=profile)
+    # Structured profile values appear.
+    assert "5000" in block
+    assert "华为" in block
+    # Stale LLM-compressed values are NOT rendered alongside the profile.
+    assert "3000" not in block
+    assert "小米" not in block
+
+
 def test_build_context_block_hides_last_search_names():
     mem = SessionMemory(user_id="u1")
     mem.state["lastToolResults"] = {
