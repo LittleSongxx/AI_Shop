@@ -50,6 +50,11 @@ class CouponArgs(BaseModel):
     status: int | None = Field(None, description="0未使用 1已使用 2已过期")
 
 
+class SearchKnowledgeArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    query: str = Field(description="检索关键词（独立、完整，不依赖上下文即可理解）")
+
+
 async def _call(name: str, **kwargs) -> str:
     args = {k: v for k, v in kwargs.items() if v is not None}
     return (await mcp_streamable_client.call_tool(name, args)).to_tool_message()
@@ -107,6 +112,19 @@ def build_mcp_tools() -> list[StructuredTool]:
             name="QUERY_USER_COUPONS",
             description="[READ] 查询用户优惠券",
             args_schema=CouponArgs,
+        ),
+        # P3-1 Agentic RAG: in-process tool; route goes through mcp_tool_router,
+        # not through the MCP Streamable HTTP server.
+        StructuredTool.from_function(
+            coroutine=lambda userId, query: _call(
+                "SEARCH_KNOWLEDGE", userId=userId, query=query
+            ),
+            name="SEARCH_KNOWLEDGE",
+            description=(
+                "[READ] 检索知识库/FAQ；商品政策、售后规则、使用方法等知识类问题，"
+                "先调本工具获取依据再回答；系统已注入 RAG 上下文时，对不确定的问题可迭代调用"
+            ),
+            args_schema=SearchKnowledgeArgs,
         ),
         StructuredTool.from_function(
             coroutine=lambda userId, orderId: _call(

@@ -22,6 +22,8 @@ from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
 from app.memory.context_builder import context_builder
 from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
+from app.rag.ab_test import get_bucket, get_rag_overrides
+from app.rag.query_rewriter import rewrite_for_rag
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
 from app.services.llm_factory import has_fallback_chat_llm
@@ -60,7 +62,9 @@ async def entry_guard(state: AgentGraphState) -> dict:
     if await rt.is_cancelled(user_id, message_id):
         return {"cancelled": True, "finished": True, "route": "end"}
     card, user_text = rt.parse_agent_message(state["agent_msg"])
-    return {"card": card, "message_card": card, "user_text": user_text, "cancelled": False}
+    # P3-2: optional image URL forwarded by the frontend alongside the text message.
+    image_url: str | None = state["agent_msg"].get("imageUrl") or None
+    return {"card": card, "message_card": card, "user_text": user_text, "image_url": image_url, "cancelled": False}
 
 async def build_context_node(state: AgentGraphState) -> dict:
     if state.get("cancelled"):
@@ -139,12 +143,38 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 "next_action": NextAction.TOOL,
             }
         )
+    # P2-3: stable A/B bucket for this user; empty dict when testing is off.
+    ab_bucket = get_bucket(user_id)
+    _ab_overrides = get_rag_overrides(ab_bucket)
+
+    # P3-2: describe the user's image (if any) before the retrieval step so
+    # the description enriches both the RAG query and the LLM context window.
+    image_url = state.get("image_url")
+    image_desc: str | None = None
+    if image_url:
+        from app.rag.image_describer import describe_image
+        image_desc = await describe_image(image_url)
+        if image_desc:
+            logger.debug("user_image_described", user_id=user_id, length=len(image_desc))
+
     faq_text = ""
     knowledge_text = ""
     rag_source_refs: list[dict] = []
     rag_trace: dict | None = None
-    if intent in (IntentKind.PRODUCT_CONSULT, IntentKind.CHAT):
-        rag_result = await rag_retriever.search_faq_with_trace(user_text)
+    # P3-1: when agentic_rag=True the LLM calls SEARCH_KNOWLEDGE itself;
+    # skip the fixed prefetch so the context window stays clean.
+    if not get_settings().agentic_rag and intent in (IntentKind.PRODUCT_CONSULT, IntentKind.CHAT):
+        rag_query = await rewrite_for_rag(user_text, memory)
+        # P3-2: prepend image description to retrieval query when available.
+        if image_desc:
+            rag_query = f"{image_desc} {rag_query}".strip()
+        _cat_map = get_settings().rag_intent_category_map
+        category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
+        rag_result = await rag_retriever.search_faq_with_trace(
+            rag_query,
+            top_k=_ab_overrides.get("rag_top_k"),
+            category_filter=category_filter,
+        )
         faq_text = str(rag_result.get("text") or "")
         rag_source_refs = list(rag_result.get("source_refs") or [])
         rag_trace = rag_result.get("trace")
@@ -168,7 +198,19 @@ async def build_context_node(state: AgentGraphState) -> dict:
         intent=intent.value,
         source=intent_source,
         intent_data=intent_data or None,
+        ab_bucket=ab_bucket,
     )
+
+    # P3-2: inject VLM image description so the LLM understands visual context.
+    if image_desc:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "## 用户发送了图片\n"
+                    f"图片描述（内部参考，勿直接引用原文）：{image_desc}"
+                )
+            )
+        )
 
     if card and card.get("productId") and snapshot and intent != IntentKind.PRODUCT_CONSULT:
         messages.append(

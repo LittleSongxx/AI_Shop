@@ -9,15 +9,25 @@ import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.Resource;
+import org.apache.tika.extractor.EmbeddedDocumentExtractor;
+import org.xml.sax.ContentHandler;
+import org.xml.sax.SAXException;
+
 @Component
 public class KnowledgeDocumentParser {
+
+    @Resource
+    private ImageVlmDescriber imageVlmDescriber;
 
     public static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
     private static final int MAX_CHUNK_CHARS = 1200;
@@ -43,17 +53,31 @@ public class KnowledgeDocumentParser {
             AutoDetectParser parser = new AutoDetectParser();
             BodyContentHandler handler = new BodyContentHandler(-1);
             Metadata metadata = new Metadata();
-            parser.parse(inputStream, handler, metadata, new ParseContext());
+            // P3-2: collect embedded images for VLM description when enabled.
+            ParseContext context = new ParseContext();
+            EmbeddedImageCollector imageCollector = new EmbeddedImageCollector();
+            if (imageVlmDescriber.isEnabled()) {
+                context.set(EmbeddedDocumentExtractor.class, imageCollector);
+            }
+            parser.parse(inputStream, handler, metadata, context);
             String normalized = normalize(handler.toString());
             if (normalized.isBlank()) {
                 throw new BusinessException("文档未解析出可用文本，不支持扫描件或空文档");
+            }
+            // P3-2: append VLM image-description chunks after the text chunks.
+            List<Chunk> chunks = new ArrayList<>(chunk(normalized));
+            List<String> imageDescs = imageVlmDescriber.describeAll(imageCollector.getImages());
+            int idx = chunks.size();
+            for (String desc : imageDescs) {
+                String content = "[图片描述] " + desc;
+                chunks.add(new Chunk(idx++, "[图片]", content, estimateTokens(content)));
             }
             return new ParsedDocument(
                     sourceName,
                     fileType,
                     normalized,
                     metadata.get(Metadata.CONTENT_TYPE),
-                    chunk(normalized)
+                    chunks
             );
         } catch (EncryptedDocumentException e) {
             throw new BusinessException("不支持加密文档，请解除密码后重新上传", e);
@@ -194,6 +218,33 @@ public class KnowledgeDocumentParser {
             return "";
         }
         return name.substring(index + 1).toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * P3-2: Tika {@link EmbeddedDocumentExtractor} that collects raw image bytes
+     * from compound documents (PDF, DOCX) for later VLM description.
+     * Non-image embedded objects (e.g. embedded spreadsheets) are skipped.
+     */
+    private static class EmbeddedImageCollector implements EmbeddedDocumentExtractor {
+
+        private final List<byte[]> images = new ArrayList<>();
+
+        @Override
+        public boolean shouldParseEmbedded(Metadata metadata) {
+            String ct = metadata.get(Metadata.CONTENT_TYPE);
+            return ct != null && ct.startsWith("image/");
+        }
+
+        @Override
+        public void parseEmbedded(InputStream stream, ContentHandler handler,
+                                  Metadata metadata, boolean outputHtml)
+                throws SAXException, IOException {
+            images.add(stream.readAllBytes());
+        }
+
+        public List<byte[]> getImages() {
+            return Collections.unmodifiableList(images);
+        }
     }
 
     private record Section(String heading, String content) {

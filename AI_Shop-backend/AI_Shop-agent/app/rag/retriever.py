@@ -13,6 +13,7 @@ from app.harness.metrics.runtime_sensors import (
 from app.infra.http_client import get_client
 from app.observability.telemetry import get_tracer
 from app.rag.embedding import embed_text
+from app.rag.query_expander import expand_query
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.java_internal_client import java_internal_client
 from app.services.redis_service import redis_service
@@ -85,14 +86,15 @@ class RagRetriever:
         except Exception as exc:
             logger.warning("faq_cache_warmup_skipped", error=str(exc))
 
-    async def search_faq(self, query: str, top_k: int | None = None) -> str:
-        result = await self.search_faq_with_trace(query, top_k)
+    async def search_faq(self, query: str, top_k: int | None = None, category_filter: list[str] | None = None) -> str:
+        result = await self.search_faq_with_trace(query, top_k, category_filter=category_filter)
         return str(result.get("text") or "")
 
     async def search_faq_with_trace(
         self,
         query: str,
         top_k: int | None = None,
+        category_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Search FAQ/knowledge and retain bounded evidence for observability."""
         started = time.perf_counter()
@@ -114,7 +116,12 @@ class RagRetriever:
             self._observe_search(started, True, "cache")
             return self._trace_result(cleaned, version, "cache", True, cached, started)
 
-        docs = await self._search_knowledge_docs(cleaned, top_k or get_settings().rag_top_k)
+        extra_filters: list[dict] | None = (
+            [{"terms": {"metadata.category": category_filter}}] if category_filter else None
+        )
+        docs = await self._search_knowledge_docs(
+            cleaned, top_k or get_settings().rag_top_k, extra_filters=extra_filters
+        )
         if not self._has_enough_evidence(docs):
             self._observe_search(started, False, "hybrid")
             return self._trace_result(cleaned, version, "hybrid", False, docs, started)
@@ -211,16 +218,29 @@ class RagRetriever:
             logger.error("es_keyword_search_failed", error=str(e))
             return await self._product_search_fallback(query, limit)
 
-    async def _search_knowledge_docs(self, query: str, limit: int) -> list[dict]:
+    async def _search_knowledge_docs(self, query: str, limit: int, extra_filters: list[dict] | None = None) -> list[dict]:
         with tracer.start_as_current_span("rag.hybrid_search") as span:
             span.set_attribute("rag.query_length", len(query))
             span.set_attribute("rag.limit", limit)
-            keyword_task = self._keyword_search_docs(query, ("faq", "knowledge"), limit)
-            vector_task = self._vector_search(query, ("faq", "knowledge"), limit)
-            keyword_docs, vector_docs = await asyncio.gather(keyword_task, vector_task)
-            span.set_attribute("rag.keyword_hits", len(keyword_docs))
-            span.set_attribute("rag.vector_hits", len(vector_docs))
-            rrf_docs = self._rrf_docs([keyword_docs, vector_docs], limit=max(limit, 1))
+
+            # P2-1 Query Expansion: obtain synonym / alias variants, run a full
+            # hybrid search (BM25 + kNN → per-variant RRF) for each, then fuse
+            # all ranked lists with a final RRF pass.  Falls back to the original
+            # single-query path automatically when the expander returns one entry.
+            queries = await expand_query(query)
+            span.set_attribute("rag.query_variants", len(queries))
+
+            async def _hybrid_one(q: str) -> list[dict]:
+                kw, vec = await asyncio.gather(
+                    self._keyword_search_docs(q, ("faq", "knowledge"), limit, extra_filters),
+                    self._vector_search(q, ("faq", "knowledge"), limit, extra_filters=extra_filters),
+                )
+                return self._rrf_docs([kw, vec], limit=max(limit, 1))
+
+            ranked_groups = await asyncio.gather(*[_hybrid_one(q) for q in queries])
+            rrf_docs = self._rrf_docs(list(ranked_groups), limit=max(limit, 1))
+            rrf_docs = self._filter_expired(rrf_docs)
+            span.set_attribute("rag.active_hits", len(rrf_docs))
             result = await self._rerank(query, rrf_docs, min(get_settings().rerank_top_n, limit))
             span.set_attribute("rag.result_count", len(result))
             return result
@@ -230,6 +250,7 @@ class RagRetriever:
         query: str,
         data_types: tuple[str, ...],
         limit: int,
+        extra_filters: list[dict] | None = None,
     ) -> list[dict]:
         breaker = circuit_registry.get_or_create("es", failure_threshold=3, recovery_timeout=30)
         if not breaker.allow_request() or not query.strip():
@@ -241,6 +262,7 @@ class RagRetriever:
                     "bool": {
                         "filter": [
                             {"terms": {"metadata.dataType": list(data_types)}},
+                            *(extra_filters or []),
                         ],
                         "should": [
                             {"match": {"content": {"query": query, "boost": 2}}},
@@ -274,6 +296,7 @@ class RagRetriever:
         data_type: str | tuple[str, ...],
         top_k: int | None = None,
         min_cosine: float | None = None,
+        extra_filters: list[dict] | None = None,
     ) -> list[dict]:
         """kNN 召回。``min_cosine`` 是 cosine 相似度下限，不是 ES 的 ``_score``。
 
@@ -307,7 +330,10 @@ class RagRetriever:
                     "num_candidates": knn_num_candidates(k, settings),
                     "filter": {
                         "bool": {
-                            "must": [{"terms": {"metadata.dataType": data_types}}]
+                            "must": [
+                                {"terms": {"metadata.dataType": data_types}},
+                                *(extra_filters or []),
+                            ]
                         }
                     },
                 },
@@ -660,6 +686,29 @@ class RagRetriever:
             return top_score >= rrf_score_at_rank(settings.rag_evidence_min_rrf_rank)
         # 精确 FAQ 命中（score=1.0）等不经过融合的路径。
         return top_score >= settings.rag_evidence_min_relevance
+
+    def _filter_expired(self, docs: list[dict]) -> list[dict]:
+        """过滤 FAQ 时效窗口之外的文档。
+
+        只有 ``dataType == "faq"`` 的文档携带时效约束；knowledge / product chunk
+        原样透传。时间戳由 Java 侧入库时写入（epoch ms，B-1 fix）。缺少某个边界视为
+        永久有效（两端都不填 = 常驻，只填 effectiveStart = 生效后永远有效，以此类推）。
+        """
+        now_ms = int(time.time() * 1000)
+        result = []
+        for doc in docs:
+            metadata = doc.get("metadata") or {}
+            if metadata.get("dataType") == "faq":
+                eff_end = metadata.get("effectiveEnd")
+                if eff_end is not None and int(eff_end) < now_ms:
+                    logger.debug("faq_doc_expired_filtered", doc_id=doc.get("id"))
+                    continue
+                eff_start = metadata.get("effectiveStart")
+                if eff_start is not None and int(eff_start) > now_ms:
+                    logger.debug("faq_doc_not_yet_active_filtered", doc_id=doc.get("id"))
+                    continue
+            result.append(doc)
+        return result
 
     def _rewrite_query(self, query: str) -> str:
         text = (query or "").strip()

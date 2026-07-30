@@ -13,7 +13,11 @@ tool_guard = ToolGuardrail()
 
 
 class McpToolRouter:
-    """Dispatches tools via Streamable HTTP MCP server (not in-process)."""
+    """Dispatches tools via Streamable HTTP MCP server (not in-process).
+
+    Exception: SEARCH_KNOWLEDGE is handled in-process (P3-1 Agentic RAG) and
+    is never forwarded to the MCP Streamable HTTP server.
+    """
 
     async def invoke(self, tool_name: str, args: dict, user_id: str) -> ToolInvokeResult:
 
@@ -53,6 +57,11 @@ class McpToolRouter:
                 user_id=user_id,
             )
 
+        # P3-1: in-process tools are handled locally, never forwarded to the
+        # MCP Streamable HTTP server.
+        if tool_name == "SEARCH_KNOWLEDGE":
+            return await self._search_knowledge(raw.get("query") or "", user_id)
+
         try:
             mcp_args = self._to_mcp_args(tool_name, raw)
             result = await mcp_streamable_client.call_tool(tool_name, mcp_args)
@@ -66,6 +75,39 @@ class McpToolRouter:
             logger.exception("mcp_tool_failed", tool=tool_name, error=str(e))
             TOOL_CALL_TOTAL.labels(tool=tool_name, status="error").inc()
             return ToolInvokeResult(content="【操作失败】系统处理异常，请稍后重试")
+
+    # ------------------------------------------------------------------
+    # In-process tool handlers
+    # ------------------------------------------------------------------
+
+    async def _search_knowledge(self, query: str, user_id: str) -> ToolInvokeResult:
+        """P3-1 Agentic RAG: in-process knowledge/FAQ retrieval.
+
+        Uses the same rag_retriever pipeline (query expansion + hybrid search
+        + rerank) as the fixed build_context_node RAG path, so result quality
+        is identical.  Import is deferred to avoid a circular-import cycle at
+        module load time.
+        """
+        from app.rag.retriever import rag_retriever  # deferred: avoids circular import
+
+        if not query:
+            TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="bad_args").inc()
+            return ToolInvokeResult(content="【知识检索失败】请提供检索关键词")
+        try:
+            result = await rag_retriever.search_faq_with_trace(query)
+            text = str(result.get("text") or "")
+            TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="success").inc()
+            if not text:
+                return ToolInvokeResult(content="【知识检索】未找到相关内容")
+            return ToolInvokeResult(content=text)
+        except Exception as e:
+            logger.exception("search_knowledge_failed", query=query[:80], error=str(e))
+            TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="error").inc()
+            return ToolInvokeResult(content="【知识检索失败】系统处理异常，请稍后重试")
+
+    # ------------------------------------------------------------------
+    # Argument normalisation (MCP server tools only)
+    # ------------------------------------------------------------------
 
     def _to_mcp_args(self, tool_name: str, args: dict) -> dict:
         """Normalize to camelCase keys expected by MCP tool schemas."""

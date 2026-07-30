@@ -73,6 +73,8 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
         _policy("QUERY_LOGISTICS", _READ, "query_logistics"),
         _policy("QUERY_COMMENT", _READ, "query_comment"),
         _policy("QUERY_USER_COUPONS", _READ, "query_coupon"),
+        # P3-1 Agentic RAG: in-process knowledge/FAQ retrieval tool.
+        _policy("SEARCH_KNOWLEDGE", _READ),
         # 写操作一律渲染确认卡片，用户点了才落库。
         _policy("PROPOSE_REFUND", _PROPOSE, "action_confirm"),
         _policy("PROPOSE_CONFIRM_RECEIPT", _PROPOSE, "action_confirm"),

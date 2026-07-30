@@ -137,6 +137,13 @@ public class RabbitMQRagListenerComponent {
         metaData.put("version", ragQuestion.getVersion());
         metaData.put("source", ragQuestion.getSource());
         metaData.put("owner", ragQuestion.getOwner());
+        // 时效性字段（epoch ms），供检索侧过滤过期 FAQ，与精确 SQL 路径行为保持一致
+        if (ragQuestion.getEffectiveStart() != null) {
+            metaData.put("effectiveStart", ragQuestion.getEffectiveStart().getTime());
+        }
+        if (ragQuestion.getEffectiveEnd() != null) {
+            metaData.put("effectiveEnd", ragQuestion.getEffectiveEnd().getTime());
+        }
         // 如果有相似问题则填充
         if(!StringUtils.isEmpty(ragQuestion.getSimilarQuestion())){
             metaData.put("similarQuestion", ragQuestion.getSimilarQuestion());

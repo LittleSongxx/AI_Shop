@@ -125,6 +125,16 @@ aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}
     auth-enabled: true
+  # P3-2 Multimodal RAG: VLM image description during document ingestion.
+  # Set vlm.enabled=true and provide an api-key to activate.
+  # Falls back to DASHSCOPE_API_KEY when VLM_API_KEY is absent.
+  vlm:
+    enabled: ${VLM_ENABLED:false}
+    api-key: ${VLM_API_KEY:${DASHSCOPE_API_KEY:}}
+    base-url: ${VLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    model: ${VLM_MODEL:qwen-vl-plus}
+    max-tokens: ${VLM_MAX_TOKENS:150}
+    timeout-seconds: ${VLM_TIMEOUT_SECONDS:15}
   feign:
     connect-timeout-ms: 3000
     read-timeout-ms: 10000

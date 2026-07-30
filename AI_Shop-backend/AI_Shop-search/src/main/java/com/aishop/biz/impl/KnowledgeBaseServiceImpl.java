@@ -3,6 +3,7 @@ package com.aishop.biz.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.aishop.biz.KnowledgeBaseService;
+import com.aishop.component.ContextPrefixEnricher;
 import com.aishop.component.KnowledgeDocumentParser;
 import com.aishop.component.KnowledgeDocumentParser.Chunk;
 import com.aishop.component.KnowledgeDocumentParser.ParsedDocument;
@@ -60,6 +61,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private ReliableMessageSender reliableMessageSender;
+    @Resource
+    private ContextPrefixEnricher contextPrefixEnricher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -117,6 +120,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
         long jobId = insertJob(documentId, "RUNNING", "INDEX", 85);
         try {
+            List<Document> toEnrich = new ArrayList<>();
             List<Document> batch = new ArrayList<>();
             for (Map<String, Object> chunk : chunks) {
                 Map<String, Object> metadata = new LinkedHashMap<>();
@@ -127,10 +131,12 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 metadata.put("source", document.get("source_name"));
                 metadata.put("version", version);
                 metadata.put("status", "PUBLISHED");
-                batch.add(new Document(
+                Document doc = new Document(
                         String.valueOf(chunk.get("chunk_id")),
                         String.valueOf(chunk.get("content")),
-                        metadata));
+                        metadata);
+                batch.add(doc);
+                toEnrich.add(doc);
                 if (batch.size() == 10) {
                     vectorStore.add(batch);
                     batch = new ArrayList<>();
@@ -138,6 +144,14 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             }
             if (!batch.isEmpty()) {
                 vectorStore.add(batch);
+            }
+            // P1-1 Contextual Retrieval: fire background prefix generation after all
+            // chunks are indexed and immediately searchable.  enrichAsync swallows its
+            // own errors so the publish transaction is unaffected.
+            String title = String.valueOf(document.get("title"));
+            for (Document doc : toEnrich) {
+                contextPrefixEnricher.enrichAsync(
+                        doc.getId(), title, doc.getText(), doc.getMetadata());
             }
             jdbcTemplate.update(
                     """

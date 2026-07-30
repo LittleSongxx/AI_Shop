@@ -92,22 +92,17 @@ MYSQL_HOST=127.0.0.1
 MYSQL_USER=root
 MYSQL_PASSWORD=123456
 REDIS_HOST=127.0.0.1
-REDIS_PORT=6380
+REDIS_PORT=6379
 RABBIT_HOST=127.0.0.1
-RABBIT_PORT=5673
-RABBIT_USER=aishop
-RABBIT_PASSWORD=aishop
+RABBIT_PORT=5672
+RABBIT_USER=guest
+RABBIT_PASSWORD=guest
 NACOS_ADDR=127.0.0.1:8848
 ES_URIS=http://127.0.0.1:9200
 VECTOR_INDEX=aishop_vectorstore
 SENTINEL_DASHBOARD=127.0.0.1:8858
 SEATA_ENABLED=true
-SEATA_SERVER_ADDR=127.0.0.1:8092
 ```
-
-> 上面这些除 `MYSQL_PASSWORD` 之外**都已经是配置里的默认值**，列出来只是说明口径，
-> 不传也能起（Redis / RabbitMQ / Seata 走 +1 偏移端口，见 `MIDDLEWARE_DOCKER.md`）。
-> 根目录 `./start.sh` 仍然显式导出它们——重复但无害，写出来是为了让端口来源一眼可见。
 
 Agent / MCP（另开终端）：
 

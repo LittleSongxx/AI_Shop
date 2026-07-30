@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     rerank_model: str = "gte-rerank-v2"
     rerank_timeout: int = 20
     rerank_top_n: int = 6
+    # P1-2：为 True 时 validate_runtime() 将缺失 rerank key 视为致命错误。
+    # _rerank() 缺失时静默降级为 RRF；该标志让降级在生产环境变得显式可见。
+    rerank_required: bool = False
 
     mysql_host: str = "localhost"
     mysql_port: int = 3306
@@ -155,7 +158,38 @@ class Settings(BaseSettings):
     # 无 rerank 时的兜底闸门，单位是 RRF 融合分而不是任何引擎的原始分。
     # RRF 的全部意义就是丢掉不可比的原始分只留排名，所以这道闸门只能用排名表达：
     # "至少在某一路里进了前 N 名"。1/(60+N) 是 RRF 的定义式，N 越大越宽松。
-    rag_evidence_min_rrf_rank: int = 10
+    # 旧值 N=10：阈值 ≈ 0.0143，最高分 ≈ 0.0164（rank 1），相当于"进前10都通过"
+    # ——几乎不过滤任何内容。新值 N=3：阈值 ≈ 0.0159，要求至少一路进前 3 才算有证据。
+    rag_evidence_min_rrf_rank: int = 3
+    # P1-3 意图→FAQ 类别过滤映射（键为 IntentKind.value 字符串）。
+    # 配置后，对应意图的 RAG 检索仅召回指定类别的 FAQ，减少跨类别干扰。
+    # 示例（.env 里设为 JSON 字符串）：
+    #   RAG_INTENT_CATEGORY_MAP='{"REFUND":["退换货","售后"],"QUERY_LOGISTICS":["物流"]}'
+    # 空字典（默认）= 不启用类别过滤。
+    rag_intent_category_map: dict[str, list[str]] = {}
+    # P2-3 A/B testing for RAG retrieval strategies.
+    # ab_test_buckets: 0 or 1 = disabled; 2 = A/B; 3 = A/B/C …
+    # Bucket "A" is always the unmodified baseline.
+    # Per-bucket param overrides are specified as a JSON dict:
+    #   AB_TEST_CONFIG='{"B":{"rag_top_k":20,"rerank_top_n":10}}'
+    ab_test_buckets: int = 0
+    ab_test_config: dict[str, dict] = {}
+    # P3-1 Agentic RAG: when True, build_context_node skips the fixed RAG call
+    # and the LLM must invoke SEARCH_KNOWLEDGE explicitly.  Keep False until the
+    # system prompt has been tuned and LLM reliability validated in staging.
+    agentic_rag: bool = False
+    # P3-2 Multimodal RAG: VLM for image description.
+    # vlm_api_key falls back to DASHSCOPE_API_KEY so DashScope users need no new secret.
+    # Leave empty (default) to disable — images are silently ignored.
+    # Recommended model: qwen-vl-plus (DashScope) or any OpenAI-compatible vision endpoint.
+    vlm_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("DASHSCOPE_API_KEY", "VLM_API_KEY", "vlm_api_key"),
+    )
+    vlm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    vlm_model: str = "qwen-vl-plus"
+    vlm_image_max_tokens: int = 150
+    vlm_timeout: int = 15
     # ES requires num_candidates >= k. Raising it trades latency for recall, so
     # keep a floor rather than deriving it from k alone: at k=15 a bare 2x gives
     # the HNSW search very little room to escape a local minimum.
@@ -217,6 +251,8 @@ class Settings(BaseSettings):
             errors.append("LLM_API_KEY must be configured")
         if not self.embedding_api_key.strip():
             errors.append("EMBEDDING_API_KEY must be configured")
+        if self.rerank_required and not self.rerank_api_key.strip():
+            errors.append("RERANK_API_KEY must be configured (RERANK_REQUIRED=true)")
         if self.allow_development_auth_bypass:
             errors.append("ALLOW_DEVELOPMENT_AUTH_BYPASS must be false")
         if errors:
