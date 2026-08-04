@@ -124,12 +124,47 @@ export const couponApi = {
     request.postForm('/discountCoupon/getDiscountCouponDetail', { couponId })
 };
 
+const reportAgentProductClick = (
+  productId: string,
+  requestId: string,
+  position: number
+): Promise<void> => {
+  const payload = new FormData();
+  payload.append('productId', productId);
+  payload.append('requestId', requestId);
+  payload.append('position', String(position));
+
+  // Analytics must neither surface the shared HTTP client's error toast nor be
+  // cancelled by a hard navigation. sendBeacon includes same-origin cookies;
+  // keepalive fetch covers browsers that cannot queue this particular payload.
+  if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    try {
+      if (navigator.sendBeacon('/api/agent/reportClick', payload)) {
+        return Promise.resolve();
+      }
+    } catch {
+      // Fall through to keepalive fetch.
+    }
+  }
+  return fetch('/api/agent/reportClick', {
+    method: 'POST',
+    body: payload,
+    credentials: 'include',
+    keepalive: true
+  }).then((response) => {
+    if (!response.ok) {
+      throw new Error(`Click attribution failed with HTTP ${response.status}`);
+    }
+  });
+};
+
 export const agentApi = {
   loadHistoryMessage: (params: Record<string, unknown>) => request.postForm('/agent/loadHistoryMessage', params),
   sendMessage: (message: string, fromProduct?: boolean, consultProductId?: string) =>
     request.postForm('/agent/sendMessage', { message, fromProduct, consultProductId }),
   cancelMessage: (messageId: number, assistantMessage?: string) =>
     request.postForm('/agent/cancelMessage', { messageId, assistantMessage }),
+  reportClick: reportAgentProductClick,
   clearProductConsult: () => request.postForm('/agent/clearProductConsult', {}),
   pauseProductConsult: () => request.postForm('/agent/pauseProductConsult', {}),
   getProductConsultContext: () =>

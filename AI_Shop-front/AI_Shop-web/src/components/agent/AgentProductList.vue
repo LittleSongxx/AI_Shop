@@ -5,7 +5,7 @@
       :key="item.productId || `p-${index}`"
       :to="`/product/${item.productId}`"
       class="product-link"
-      @click="onProductClick(item)"
+      @click="onProductClick(item, index)"
     >
       <ProductImage :product="item" :width="52" :height="52" />
       <p class="name">{{ item.productName }}</p>
@@ -27,12 +27,13 @@ import { RouterLink } from 'vue-router';
 import ProductImage from '@/components/common/ProductImage.vue';
 import { saveAgentConsultProduct } from '@/utils/agentProductConsult';
 import { useAuthStore } from '@/stores/auth';
+import { agentApi } from '@/api/modules';
 
 defineProps<{ list: Record<string, any>[] }>();
 
 const authStore = useAuthStore();
 
-const onProductClick = (item: Record<string, any>) => {
+const onProductClick = (item: Record<string, any>, position = 0) => {
   if (!item?.productId || !item?.productName) return;
   saveAgentConsultProduct(
     {
@@ -43,6 +44,17 @@ const onProductClick = (item: Record<string, any>) => {
     },
     authStore.userInfo?.userId as string | undefined
   );
+  // P0-7 推荐归因：requestId 是 serving 时随卡片下发的归因 token，
+  // 点击原样回传（fire-and-forget，失败不影响跳转）。
+  const requestId = item.requestId ? String(item.requestId) : '';
+  if (!requestId) return;
+  agentApi
+    .reportClick(
+      String(item.productId),
+      requestId,
+      position + 1
+    )
+    .catch(() => {});
 };
 
 const formatPrice = (val: unknown) => Number(val ?? 0).toFixed(2);
