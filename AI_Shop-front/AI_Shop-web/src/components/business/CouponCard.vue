@@ -95,7 +95,7 @@ const rushRangeText = computed(() =>
 .discount-card {
   display: flex;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 8px;
   margin-bottom: 12px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);

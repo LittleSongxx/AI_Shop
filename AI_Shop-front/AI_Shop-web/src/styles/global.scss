@@ -32,13 +32,13 @@
   --glass-blur-sm: saturate(160%) blur(14px);
   --glass-page-bg: var(--ios-page-bg);
 
-  --m-radius: 20px;
-  --m-radius-sm: 14px;
-  --m-gold: #D4A24E;
-  --m-gold-soft: rgba(212, 162, 78, 0.18);
-  --m-ink: #333333;
-  --m-ink-2: #666666;
-  --m-ink-3: #999999;
+  --m-radius: 8px;
+  --m-radius-sm: 6px;
+  --m-gold: #2563EB;
+  --m-gold-soft: rgba(37, 99, 235, 0.14);
+  --m-ink: #17202A;
+  --m-ink-2: #4B5B63;
+  --m-ink-3: #73848C;
 }
 
 .home-search-header.ignore,
@@ -249,7 +249,7 @@ body {
   font-family: $font-family;
   font-size: 14px;
   line-height: 1.5;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   -webkit-tap-highlight-color: transparent;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -344,7 +344,7 @@ select {
 
   &.lg {
     font-size: 26px;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
   }
 
   &.md {
@@ -625,7 +625,7 @@ select {
     font-size: 14px;
     font-weight: 500;
     line-height: 1.45;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     padding-right: 2px;
   }
 }
@@ -715,7 +715,7 @@ select {
   .home-page.ignore .shortcut-icon {
     width: 48px;
     height: 48px;
-    border-radius: 12px;
+    border-radius: 8px;
     color: var(--m-ink);
   }
 
@@ -733,7 +733,7 @@ select {
     padding: 16px;
   }
   .auth-page.ignore .auth-brand {
-    background: var(--ios-hero-bg, linear-gradient(165deg, #3a3a3c 0%, #1d1d1f 100%));
+    background: var(--ios-hero-bg, #0f766e);
     padding: 24px 20px;
   }
 

@@ -11,21 +11,22 @@ const publicDir = path.resolve(__dirname, '../public');
 const LOGO = {
   cx: 16,
   cy: 16,
-  width: 20,
-  height: 22
+  width: 32,
+  height: 32
 };
 
 const LOGO_PATHS = `
-  <path fill="none" stroke="#1d1d1f" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" d="M20.5 8.5c-3.2 0-5.2 1.8-5.2 4.6 0 3.4 5.2 3.2 5.2 7.2 0 2.6-2.2 4.4-5.4 4.4-2.2 0-4-.8-5.1-2.1"/>
-  <path fill="none" stroke="#1d1d1f" stroke-width="1.85" stroke-linecap="round" d="M11.5 8.5v14.6"/>
+  <rect x="2" y="2" width="28" height="28" rx="7" fill="#0f766e"/>
+  <path fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" d="m8.8 16.2 4.7 4.7 9.7-10.1"/>
+  <path fill="none" stroke="#bfdbfe" stroke-width="1.8" stroke-linecap="round" d="M9.4 7.1v4.2M7.3 9.2h4.2"/>
 `;
 
 
-const logoMarkSvg = (size, logoScale = 0.62) => {
+const logoMarkSvg = (size, logoScale = 0.72) => {
   const scale = (size * logoScale) / LOGO.width;
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" fill="#ffffff"/>
+  <rect width="${size}" height="${size}" fill="#f4f7f8"/>
   <g transform="translate(${size / 2} ${size / 2}) scale(${scale}) translate(${-LOGO.cx} ${-LOGO.cy})">
     ${LOGO_PATHS}
   </g>
@@ -34,18 +35,27 @@ const logoMarkSvg = (size, logoScale = 0.62) => {
 
 
 const splashSvg = (width, height) => {
-  const logoSize = Math.round(Math.min(width, height) * 0.22);
+  const logoSize = Math.round(Math.min(width, height) * 0.18);
   const scale = (logoSize / LOGO.width).toFixed(4);
   const cx = width / 2;
   const cy = height * 0.46;
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="${width}" height="${height}" fill="#ffffff"/>
+  <rect width="${width}" height="${height}" fill="#f4f7f8"/>
   <g transform="translate(${cx} ${cy}) scale(${scale}) translate(${-LOGO.cx} ${-LOGO.cy})">
     ${LOGO_PATHS}
   </g>
 </svg>`;
 };
+
+const referenceWordmarkSvg = () => `
+<svg xmlns="http://www.w3.org/2000/svg" width="188" height="95" viewBox="0 0 188 95">
+  <g transform="translate(10 22) scale(1.55)">
+    ${LOGO_PATHS}
+  </g>
+  <text x="68" y="45" fill="#17202a" font-size="25" font-weight="700" font-family="Noto Sans CJK SC, PingFang SC, Microsoft YaHei, sans-serif">智选</text>
+  <text x="68" y="65" fill="#0f766e" font-size="12" font-weight="600" font-family="Arial, sans-serif">SmartSelect</text>
+</svg>`;
 
 const SPLASH_SIZES = [
   { name: 'iphone-se', width: 750, height: 1334 },
@@ -99,7 +109,7 @@ async function writePngFromSvg(file, svg, width, height) {
 
 async function writeIconPng(name, width, height) {
   const master = 1024;
-  const masterSvg = logoMarkSvg(master, 0.62);
+  const masterSvg = logoMarkSvg(master, 0.72);
   const file = path.join(outDir, name);
   await sharp(Buffer.from(masterSvg), { density: 300 })
     .resize(width, height, { kernel: sharp.kernel.lanczos3 })
@@ -122,6 +132,13 @@ async function main() {
     path.join(publicDir, 'apple-touch-icon.png')
   );
   console.log('wrote', path.join(publicDir, 'apple-touch-icon.png'));
+
+  await writePngFromSvg(
+    path.join(publicDir, 'simlect-origin/images/simlect-logo.png'),
+    referenceWordmarkSvg(),
+    188,
+    95
+  );
 
   for (const item of SPLASH_SIZES) {
     await writePngFromSvg(

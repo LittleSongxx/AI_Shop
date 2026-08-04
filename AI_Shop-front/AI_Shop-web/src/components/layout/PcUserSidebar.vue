@@ -1,7 +1,7 @@
 <template>
-  <aside class="pc-user-sidebar ignore" aria-label="我的简选导航">
+  <aside class="pc-user-sidebar ignore" aria-label="我的智选导航">
     <div class="sidebar-head">
-      <RouterLink to="/account" class="sidebar-brand">我的简选</RouterLink>
+      <RouterLink to="/account" class="sidebar-brand">我的智选</RouterLink>
     </div>
     <nav v-for="group in PC_USER_NAV_GROUPS" :key="group.title" class="sidebar-group">
       <h4 class="group-title">{{ group.title }}</h4>

@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
-echo [Simlect MCP] Streamable HTTP server...
+echo [SmartSelect MCP] Streamable HTTP server...
 
 if not exist ".env" (
     if exist ".env.example" (
@@ -19,7 +19,7 @@ if not exist ".venv\Scripts\python.exe" (
 
 ".venv\Scripts\python.exe" -c "import mcp" 1>nul 2>nul
 if errorlevel 1 (
-    echo [Simlect MCP] installing mcp deps...
+    echo [SmartSelect MCP] installing mcp deps...
     call ".venv\Scripts\pip.exe" install -r requirements.lock -q
     if errorlevel 1 (
         echo [error] pip install failed
@@ -28,8 +28,8 @@ if errorlevel 1 (
     )
 )
 
-echo [Simlect MCP] http://0.0.0.0:7060/mcp
-echo [Simlect MCP] Ctrl+C to stop
+echo [SmartSelect MCP] http://0.0.0.0:7060/mcp
+echo [SmartSelect MCP] Ctrl+C to stop
 echo.
 
 ".venv\Scripts\python.exe" -m app.mcp_server

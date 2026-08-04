@@ -236,7 +236,7 @@ onUnmounted(() => window.removeEventListener('resize', handleResize));
   padding: 0 14px;
   background: $color-bg-subtle;
   border: none;
-  border-radius: 17px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
 

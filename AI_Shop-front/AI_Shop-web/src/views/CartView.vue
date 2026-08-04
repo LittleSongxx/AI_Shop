@@ -499,13 +499,13 @@ usePageRefresh(load);
   width: 25%;
   max-width: 76px;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 
   :deep(.product-image) {
     width: 100% !important;
     height: 100% !important;
-    border-radius: 12px;
+    border-radius: 8px;
   }
 }
 
@@ -694,7 +694,7 @@ usePageRefresh(load);
   .recommend-title {
     font-size: 16px;
     font-weight: 700;
-    letter-spacing: $letter-spacing-heading;
+    letter-spacing: 0;
     color: $color-text-title;
   }
 
@@ -717,7 +717,7 @@ usePageRefresh(load);
   bottom: calc(var(--mobile-tab-stack-height, #{$mobile-tab-height + 12px}) + 6px);
   z-index: 1000;
   border: none;
-  border-radius: 22px;
+  border-radius: 8px;
   overflow: hidden;
   box-shadow:
     0 6px 6px rgba(0, 0, 0, 0.16),

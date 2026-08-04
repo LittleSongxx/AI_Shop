@@ -31,7 +31,7 @@
 
             <div class="ios-notification-copy">
               <div class="ios-notification-meta">
-                <span class="ios-app-name">简选</span>
+                <span class="ios-app-name">智选</span>
                 <span class="ios-meta-sep" aria-hidden="true">·</span>
                 <span class="ios-meta-time">{{ formatTime(notification.createTime) }}</span>
               </div>
@@ -315,7 +315,7 @@ defineExpose({ show });
 
 .ios-notification-banner {
   width: 100%;
-  border-radius: 22px;
+  border-radius: 8px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   box-shadow:
@@ -340,7 +340,7 @@ defineExpose({ show });
   flex-shrink: 0;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -349,7 +349,7 @@ defineExpose({ show });
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
 
   &--app {
-    background: linear-gradient(160deg, #3a3a3c 0%, #1c1c1e 55%, #2c2c2e 100%);
+    background: #ecfdf5;
   }
 
   &--logistics {
@@ -403,7 +403,7 @@ defineExpose({ show });
   font-size: 13px;
   line-height: 1.2;
   color: rgba(60, 60, 67, 0.6);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .ios-app-name {
@@ -425,8 +425,8 @@ defineExpose({ show });
   font-size: 15px;
   font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.02em;
-  color: #1d1d1f;
+  letter-spacing: 0;
+  color: #17202a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -438,7 +438,7 @@ defineExpose({ show });
   font-size: 15px;
   font-weight: 400;
   line-height: 1.32;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: rgba(60, 60, 67, 0.88);
   overflow: hidden;
   text-overflow: ellipsis;

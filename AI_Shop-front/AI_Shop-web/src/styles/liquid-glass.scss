@@ -1,13 +1,13 @@
 
 
 :root {
-  --m-radius: 16px;
-  --m-radius-sm: 12px;
-  --m-gold: #c9a962;
-  --m-gold-soft: rgba(201, 169, 98, 0.16);
-  --m-ink: #333333;
-  --m-ink-2: #4b4b4f;
-  --m-ink-3: #8a8a8f;
+  --m-radius: 8px;
+  --m-radius-sm: 6px;
+  --m-gold: #2563eb;
+  --m-gold-soft: rgba(37, 99, 235, 0.14);
+  --m-ink: #17202a;
+  --m-ink-2: #4b5b63;
+  --m-ink-3: #73848c;
 
   --glass-bg: rgba(255, 255, 255, 0.62);
   --glass-bg-strong: rgba(255, 255, 255, 0.78);
@@ -20,10 +20,7 @@
   --glass-blur: saturate(180%) blur(20px);
   --glass-blur-sm: saturate(160%) blur(12px);
 
-  --glass-page-bg:
-    radial-gradient(120% 80% at 12% -10%, rgba(201, 169, 98, 0.18), transparent 60%),
-    radial-gradient(120% 90% at 100% 0%, rgba(0, 113, 227, 0.12), transparent 55%),
-    linear-gradient(180deg, #eef0f5 0%, #e7e9f0 100%);
+  --glass-page-bg: #f4f7f8;
 }
 
 .glass-card {

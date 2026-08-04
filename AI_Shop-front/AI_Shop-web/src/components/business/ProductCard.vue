@@ -209,7 +209,7 @@ const displayPrice = computed(() => {
       font-size: 18px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       line-height: 1.2;
 
       .symbol {
@@ -402,7 +402,7 @@ const displayPrice = computed(() => {
     font-weight: 700;
     line-height: 1.2;
     color: $color-primary;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     white-space: nowrap;
     transition: color 0.2s ease;
   }

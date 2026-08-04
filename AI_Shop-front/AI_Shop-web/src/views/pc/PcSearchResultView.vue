@@ -378,7 +378,7 @@ onUnmounted(() => observer?.disconnect());
   font-size: 15px;
   font-weight: 600;
   color: $color-text-primary;
-  letter-spacing: $letter-spacing-body;
+  letter-spacing: 0;
 }
 
 .pc-result-grid {

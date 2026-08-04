@@ -36,7 +36,7 @@
         }
 
         &.active {
-          color: var(--m-gold, #d4a24e);
+          color: var(--m-gold, #2563eb);
         }
       }
     }
@@ -126,7 +126,7 @@
 
       .member-summary-card {
         margin: 12px $app-page-gutter 0;
-        border-radius: 12px;
+        border-radius: 8px;
       }
 
       .order-card,
@@ -193,7 +193,7 @@
       .filter-bar,
       .sub-category-bar,
       .card {
-        border-radius: 12px;
+        border-radius: 8px;
         margin-bottom: 10px;
       }
     }
@@ -214,13 +214,13 @@
       .cart-bar {
         .btn-checkout {
           background: $color-primary;
-          border-radius: 20px;
+          border-radius: 8px;
         }
       }
 
       .cart-empty {
         background: #fff;
-        border-radius: 12px;
+        border-radius: 8px;
         margin-top: 20px;
       }
     }
@@ -259,7 +259,7 @@
 
     .simlect-waterfall .product-card:not(.ignore) {
       .cover-wrap {
-        border-radius: var(--ios-surface-radius-sm, 12px) var(--ios-surface-radius-sm, 12px) 0 0;
+        border-radius: var(--ios-surface-radius-sm, 6px) var(--ios-surface-radius-sm, 6px) 0 0;
       }
 
       .cart-float {
@@ -308,7 +308,7 @@
         flex: 1;
 
         .el-input__wrapper {
-          border-radius: 17px !important;
+          border-radius: 8px !important;
           background: $color-bg-subtle !important;
           box-shadow: none !important;
         }
@@ -319,7 +319,7 @@
         height: 34px;
         padding: 0 16px;
         border: none;
-        border-radius: 17px;
+        border-radius: 8px;
         background: $color-primary;
         color: #fff;
         font-size: 14px;
@@ -341,7 +341,7 @@
 
     .simlect-search-portal .section {
       padding: 14px;
-      border-radius: 12px;
+      border-radius: 8px;
       background: #fff;
     }
 
@@ -357,7 +357,7 @@
 
     .search-result-page .search-bar,
     .search-result-page .filter-bar {
-      border-radius: 12px;
+      border-radius: 8px;
       background: #fff;
     }
 
@@ -423,7 +423,7 @@
 
       .block {
         margin: 10px $app-page-gutter 0;
-        border-radius: 12px;
+        border-radius: 8px;
         padding: 14px;
         background: #fff;
         border: none;
@@ -450,12 +450,12 @@
 
     .auth-page.ignore {
       .auth-card {
-        border-radius: 12px;
+        border-radius: 8px;
         overflow: hidden;
       }
 
       .auth-brand {
-        background: linear-gradient(135deg, #3D3D3D 0%, #2A2A2A 55%, #4A4A4A 100%);
+        background: $color-primary;
       }
 
       .submit-btn {
@@ -466,7 +466,7 @@
     .sign-page {
       .sign-card,
       .calendar-wrap {
-        border-radius: 12px;
+        border-radius: 8px;
       }
 
       .signed-day {
@@ -477,7 +477,7 @@
 
     .coupons-page .coupon-card,
     .my-coupons-page .coupon-card {
-      border-radius: 12px;
+      border-radius: 8px;
     }
 
   }

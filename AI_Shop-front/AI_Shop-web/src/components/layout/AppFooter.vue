@@ -4,7 +4,7 @@
       <p class="copyright-line">
         <a class="beian-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">闽ICP备2026020850号</a>
       </p>
-      <p class="copyright-text">© 2026 简选 Simlect 版权所有</p>
+      <p class="copyright-text">© 2026 智选 SmartSelect 版权所有</p>
     </div>
   </footer>
 </template>

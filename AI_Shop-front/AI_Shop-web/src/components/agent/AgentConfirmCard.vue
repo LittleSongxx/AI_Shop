@@ -245,7 +245,7 @@ const onCancel = async () => {
   min-width: 240px;
   max-width: 100%;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid rgba($color-primary, 0.28);
   background: #fff;
   box-sizing: border-box;

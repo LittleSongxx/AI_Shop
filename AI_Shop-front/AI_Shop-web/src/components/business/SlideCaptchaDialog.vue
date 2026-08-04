@@ -372,7 +372,7 @@ defineExpose({ open });
 .slide-captcha-panel {
   position: relative;
   width: min(92vw, 380px);
-  border-radius: 22px;
+  border-radius: 8px;
   background: linear-gradient(165deg, #fff 0%, #fafafa 100%);
   border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow:
@@ -382,11 +382,7 @@ defineExpose({ open });
 }
 
 .panel-glow {
-  position: absolute;
-  inset: -40% -20% auto;
-  height: 180px;
-  background: radial-gradient(ellipse at 50% 0%, rgba($color-gold, 0.18), transparent 70%);
-  pointer-events: none;
+  display: none;
 }
 
 .panel-header {
@@ -403,7 +399,7 @@ defineExpose({ open });
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius: 8px;
   color: $color-gold;
   background: linear-gradient(145deg, $color-gold-soft, #fff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -423,7 +419,7 @@ defineExpose({ open });
     font-size: 17px;
     font-weight: 600;
     color: $color-text-title;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
   }
 
   p {
@@ -438,7 +434,7 @@ defineExpose({ open });
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: $color-text-muted;
   cursor: pointer;
@@ -464,7 +460,7 @@ defineExpose({ open });
   position: relative;
   width: 100%;
   aspect-ratio: 310 / 155;
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
   background: #1a1a1e;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -551,7 +547,7 @@ defineExpose({ open });
   width: 34px;
   height: 34px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
   cursor: pointer;
@@ -607,7 +603,7 @@ defineExpose({ open });
 .slider-track {
   position: absolute;
   inset: 0;
-  border-radius: 23px;
+  border-radius: 8px;
   background: $color-bg-subtle;
   border: 1px solid $color-border-light;
   overflow: hidden;

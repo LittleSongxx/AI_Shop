@@ -96,7 +96,7 @@ const lvStyle = computed(() => {
   padding: 14px 16px;
   text-decoration: none;
   color: inherit;
-  border-radius: var(--ios-surface-radius, 16px);
+  border-radius: var(--ios-surface-radius, 8px);
   -webkit-tap-highlight-color: transparent;
   position: relative;
   z-index: 1;

@@ -16,7 +16,7 @@
         历史消息加载失败，点击重试
       </button>
       <p v-else-if="!messageList.length && !loadingHistory" class="welcome">
-        您好，我是简选智能客服，可以帮您查商品、查订单、推荐精选。
+        您好，我是智选智能客服小智，可以帮您查商品、查订单、推荐精选。
       </p>
       <p
         v-if="messageList.length && pageNo >= pageTotal && !loadingHistory"

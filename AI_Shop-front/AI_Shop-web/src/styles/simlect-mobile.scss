@@ -76,7 +76,7 @@
       -webkit-backdrop-filter: var(--glass-blur);
       backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
-      border-radius: var(--m-radius, 16px);
+      border-radius: var(--m-radius, 8px);
       box-shadow: var(--glass-shadow);
       overflow: hidden;
       margin-bottom: 10px;
@@ -97,12 +97,12 @@
       -webkit-backdrop-filter: var(--glass-blur);
       backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
-      border-radius: 12px;
+      border-radius: 8px;
       box-shadow: var(--glass-shadow);
       overflow: hidden;
 
       .cart-float {
-        background: var(--m-gold, #c9a962);
+        background: var(--m-gold, #2563eb);
         color: #fff;
         border: none;
         box-shadow: var(--glass-shadow-sm);
@@ -125,7 +125,7 @@
       .shortcut-icon {
         width: 48px;
         height: 48px;
-        border-radius: 14px;
+        border-radius: 8px;
         color: var(--m-ink, #333333);
         background: rgba(255, 255, 255, 0.55);
         -webkit-backdrop-filter: var(--glass-blur-sm);
@@ -198,7 +198,7 @@
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
         border: 1px solid var(--glass-border);
-        border-radius: var(--m-radius, 16px);
+        border-radius: var(--m-radius, 8px);
         box-shadow: var(--glass-shadow);
         overflow: hidden;
 
@@ -213,15 +213,15 @@
       }
 
       .auth-brand {
-        background: var(--m-gold, #c9a962);
+        background: var(--m-gold, #2563eb);
         padding: 24px 20px;
       }
     }
 
     .mobile-menu {
       .el-menu-item.is-active {
-        color: var(--m-gold, #c9a962);
-        background: var(--m-gold-soft, rgba(201, 169, 98, 0.16));
+        color: var(--m-gold, #2563eb);
+        background: var(--m-gold-soft, rgba(37, 99, 235, 0.14));
       }
     }
 

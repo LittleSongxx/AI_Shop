@@ -55,7 +55,7 @@ watch(
   height: 44px;
   padding: 0;
   border: 1px solid $color-border-light;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   background: linear-gradient(145deg, #fff, $color-bg-subtle);

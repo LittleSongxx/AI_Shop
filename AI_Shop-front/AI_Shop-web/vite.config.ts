@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: [
           'favicon.svg',
+          'smartselect-favicon.svg',
           'icons.svg',
           'apple-touch-icon.png',
           'pwa/apple-touch-icon.png',
@@ -31,11 +32,11 @@ export default defineConfig(({ mode }) => {
           'pwa/splash-iphone-16-pro-max.png'
         ],
         manifest: {
-          name: '简选 Simlect',
-          short_name: '简选',
-          description: '简选 - 精选好物，品质生活',
-          theme_color: '#1d1d1f',
-          background_color: '#ffffff',
+          name: '智选 SmartSelect',
+          short_name: '智选',
+          description: '智选 - 让选择更聪明',
+          theme_color: '#0f766e',
+          background_color: '#f4f7f8',
           display: 'standalone',
           start_url: '/',
           icons: [

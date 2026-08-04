@@ -312,7 +312,7 @@ defineExpose({ open });
   width: min(94vw, 400px);
   padding: 16px 16px 14px;
   background: #fff;
-  border-radius: 20px;
+  border-radius: 8px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
 
@@ -321,13 +321,13 @@ defineExpose({ open });
   gap: 8px;
   padding: 4px;
   background: #f2f2f7;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .tab-btn {
   flex: 1;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 8px 0;
   font-size: 14px;
   font-weight: 500;
@@ -337,7 +337,7 @@ defineExpose({ open });
 
   &.active {
     background: #fff;
-    color: #1d1d1f;
+    color: #17202a;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   }
 }
@@ -345,7 +345,7 @@ defineExpose({ open });
 .cropper-viewport.rect {
   width: 100%;
   height: min(52vw, 300px);
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
   background: #1a1a1a;
 }
@@ -374,7 +374,7 @@ defineExpose({ open });
   align-items: center;
   justify-content: center;
   background: #1a1a1a;
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -405,7 +405,7 @@ defineExpose({ open });
   padding: 0;
 
   &.active {
-    border-color: #1d1d1f;
+    border-color: #17202a;
     transform: scale(1.08);
   }
 }

@@ -106,7 +106,7 @@ const goBack = () => {
 
   &:hover {
     background: rgba(255, 255, 255, 0.78);
-    color: var(--m-gold, #c9a962);
+    color: var(--m-gold, #2563eb);
   }
 
   &:active {
@@ -120,7 +120,7 @@ const goBack = () => {
   padding: 0 8px;
   font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.3;
   color: $color-text-title;
   text-align: center;

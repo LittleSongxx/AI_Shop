@@ -3,7 +3,7 @@
     <header class="pc-auth-header">
       <RouterLink to="/" class="brand">
         <BrandMark class="brand-icon" />
-        <span class="brand-text">简选</span>
+        <span class="brand-text">智选</span>
       </RouterLink>
       <nav class="auth-links">
         <RouterLink to="/">网站首页</RouterLink>
@@ -15,7 +15,7 @@
       <slot />
     </main>
     <footer class="pc-auth-footer">
-      <span>© 简选</span>
+      <span>© 智选 SmartSelect</span>
     </footer>
   </div>
 </template>
@@ -64,7 +64,7 @@ const isLoginPage = computed(() => route.path === '/login');
       font-size: 21px;
       font-weight: 600;
       color: $color-primary;
-      letter-spacing: 0.12em;
+      letter-spacing: 0;
     }
   }
 

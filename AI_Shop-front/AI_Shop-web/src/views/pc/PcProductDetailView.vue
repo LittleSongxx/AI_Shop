@@ -668,14 +668,14 @@ const openReport = (payload: { orderId: string; commentContent?: string }) => {
     font-size: 16px;
     font-weight: 600;
     border-radius: $radius-xs;
-    --el-button-bg-color: #1D1D1F;
+    --el-button-bg-color: #0F766E;
     --el-button-text-color: #fff;
-    --el-button-border-color: #1D1D1F;
-    --el-button-hover-bg-color: #333;
+    --el-button-border-color: #0F766E;
+    --el-button-hover-bg-color: #0B665F;
     --el-button-hover-text-color: #fff;
-    --el-button-hover-border-color: #333;
-    --el-button-active-bg-color: #000;
-    --el-button-active-border-color: #000;
+    --el-button-hover-border-color: #0B665F;
+    --el-button-active-bg-color: #095A54;
+    --el-button-active-border-color: #095A54;
   }
 }
 

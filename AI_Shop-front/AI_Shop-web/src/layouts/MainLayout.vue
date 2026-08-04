@@ -42,7 +42,7 @@
       <div class="header-inner">
         <RouterLink class="brand" to="/">
           <BrandMark class="brand-icon" />
-          <span class="brand-text">简选</span>
+          <span class="brand-text">智选</span>
         </RouterLink>
 
         <div class="mobile-tools">
@@ -73,7 +73,7 @@
             v-model="keyword"
             class="search-input"
             type="search"
-            placeholder="搜索简选"
+            placeholder="搜索智选"
             @keyup.enter="goSearch"
           />
           <button type="button" class="search-submit" @click="goSearch">
@@ -467,7 +467,7 @@ onMounted(() => {
     font-size: 20px;
     font-weight: 600;
     color: $color-text-title;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     white-space: nowrap;
     line-height: 1;
   }
@@ -615,7 +615,7 @@ onMounted(() => {
     gap: 6px;
     padding: 4px 10px 4px 4px;
     border: none;
-    border-radius: 20px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
     cursor: pointer;

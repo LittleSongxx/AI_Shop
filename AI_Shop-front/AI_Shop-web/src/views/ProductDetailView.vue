@@ -45,7 +45,7 @@
 
     <section class="block quality-badges-row">
       <span class="quality-badge gold">
-        <BrandMark class="badge-icon" />简选自营
+        <BrandMark class="badge-icon" />智选自营
       </span>
       <span class="quality-badge">
         <i class="badge-dot"></i>正品保证
@@ -117,7 +117,7 @@
         <BrandMark class="store-logo" />
         <div class="store-info">
           <div class="store-name">
-            {{ productInfo.storeName || '简选自营' }}
+            {{ productInfo.storeName || '智选自营' }}
             <span v-if="!productInfo.storeName" class="store-badge">自营</span>
           </div>
         </div>
@@ -448,7 +448,7 @@ const openReport = (payload: { orderId: string; commentContent?: string }) => {
   font-size: 12px;
   color: #fff;
   background: rgba(0, 0, 0, 0.45);
-  border-radius: 12px;
+  border-radius: 8px;
   z-index: 2;
 }
 

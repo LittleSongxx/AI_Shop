@@ -303,7 +303,7 @@ usePageRefresh(loadSignCalendar);
   max-width: 360px;
   background: linear-gradient(135deg, #fef7e6, #fef0d5);
   border: 1px solid #f5e2b5;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 12px;
   color: #8b6f3a;
   line-height: 1.5;
@@ -446,7 +446,7 @@ usePageRefresh(loadSignCalendar);
 
 <style lang="scss">
 .sign-reward-alert {
-  border-radius: 20px !important;
+  border-radius: 8px !important;
   background: rgba(255, 255, 255, 0.88) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
@@ -490,7 +490,7 @@ usePageRefresh(loadSignCalendar);
     justify-content: center !important;
 
     .el-button {
-      border-radius: 20px !important;
+      border-radius: 8px !important;
       padding: 8px 32px !important;
       min-width: 120px !important;
     }

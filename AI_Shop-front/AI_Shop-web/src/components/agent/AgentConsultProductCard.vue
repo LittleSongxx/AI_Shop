@@ -64,7 +64,7 @@ const onClick = () => {
 
   &.is-composer {
     padding: 10px 12px;
-    border-radius: 12px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.75);
     background: var(--glass-bg-light, rgba(255, 255, 255, 0.75));
     -webkit-backdrop-filter: blur(12px) saturate(160%);

@@ -85,7 +85,7 @@ watch(
   display: flex;
   flex-direction: column;
   background: $color-card;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 12px 40px rgba(16, 24, 40, 0.18);
   overflow: hidden;
   border: 1px solid $color-border-gray;

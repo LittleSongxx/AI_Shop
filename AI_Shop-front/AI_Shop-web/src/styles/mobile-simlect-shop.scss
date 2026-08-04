@@ -50,7 +50,7 @@
       .shortcut-icon {
         width: 44px;
         height: 44px;
-        border-radius: 12px;
+        border-radius: 8px;
         background: $color-bg-subtle;
         border: none;
       }
@@ -326,13 +326,13 @@
         box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
 
         .btn-buy {
-          border-radius: 20px;
+          border-radius: 8px;
           background: linear-gradient(90deg, $color-primary-hover, $color-primary);
           border: none;
         }
 
         .btn-cart {
-          border-radius: 20px;
+          border-radius: 8px;
         }
       }
     }
@@ -370,8 +370,8 @@
       .profile-card {
         margin: 0;
         padding: calc(16px + env(safe-area-inset-top, 0)) 16px 28px;
-        background: linear-gradient(160deg, $color-primary 0%, #3D3D3D 100%);
-        border-radius: 0 0 18px 18px;
+        background: linear-gradient(160deg, $color-primary 0%, $color-gold 100%);
+        border-radius: 0 0 8px 8px;
         box-shadow: $shadow-card;
 
         .nick,
@@ -423,7 +423,7 @@
 
     .mobile-menu {
       .menu-btn {
-        border-radius: 20px;
+        border-radius: 8px;
       }
 
       .el-menu {

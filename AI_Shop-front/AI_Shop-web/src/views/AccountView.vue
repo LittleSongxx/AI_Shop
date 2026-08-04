@@ -20,7 +20,7 @@
         <UserAvatar :avatar="user?.avatar" :size="56" />
         <div class="profile-info">
           <div class="nick-row">
-            <h2 class="nick">{{ user?.nickName || '简选用户' }}</h2>
+            <h2 class="nick">{{ user?.nickName || '智选用户' }}</h2>
             <RouterLink v-if="memberProfile" to="/member-center" class="level-tag" :class="levelTagClass" @click.stop>
               {{ memberProfile.levelName || '普通会员' }}
             </RouterLink>

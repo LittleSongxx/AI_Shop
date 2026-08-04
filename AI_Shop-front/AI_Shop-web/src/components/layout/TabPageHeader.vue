@@ -71,7 +71,7 @@ defineProps<{
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   color: $color-text-title;
   white-space: nowrap;
 }

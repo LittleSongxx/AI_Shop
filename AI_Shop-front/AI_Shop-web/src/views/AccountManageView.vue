@@ -3,7 +3,7 @@
     <section class="user-brief card">
       <UserAvatar :avatar="user.avatar" :size="56" />
       <div class="brief-text">
-        <p class="nick">{{ user.nickName || '简选用户' }}</p>
+        <p class="nick">{{ user.nickName || '智选用户' }}</p>
         <p class="account">{{ user.email || '未绑定账号' }}</p>
       </div>
     </section>

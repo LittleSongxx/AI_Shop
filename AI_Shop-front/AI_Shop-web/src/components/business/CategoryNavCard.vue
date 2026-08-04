@@ -91,7 +91,7 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   cursor: pointer;
   border-radius: 8px;
   transition: background $transition-fast, color $transition-fast;

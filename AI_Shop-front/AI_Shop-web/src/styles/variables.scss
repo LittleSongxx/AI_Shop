@@ -1,67 +1,67 @@
 
-$color-primary: #1D1D1F;
-$color-primary-hover: #2D2D2D;
-$color-primary-active: #3D3D3D;
-$color-primary-soft: #F5F5F7;
-$color-primary-muted: rgba(29, 29, 31, 0.06);
+$color-primary: #0F766E;
+$color-primary-hover: #0B665F;
+$color-primary-active: #095A54;
+$color-primary-soft: #ECFDF5;
+$color-primary-muted: rgba(15, 118, 110, 0.10);
 
-$color-gold: #D4A24E;
-$color-gold-soft: #FDF6EC;
-$color-gold-muted: rgba(212, 162, 78, 0.18);
-$color-silver: #A8A8AD;
-$color-silver-soft: #F8F8F8;
-$color-accent-gradient: linear-gradient(135deg, #1D1D1F 0%, #3D3D3D 100%);
-$color-accent-gradient-gold: linear-gradient(to right, #E0B86C 0%, #D4A24E 100%);
+$color-gold: #2563EB;
+$color-gold-soft: #EFF6FF;
+$color-gold-muted: rgba(37, 99, 235, 0.14);
+$color-silver: #64748B;
+$color-silver-soft: #F1F5F9;
+$color-accent-gradient: linear-gradient(135deg, #0F766E 0%, #2563EB 100%);
+$color-accent-gradient-gold: linear-gradient(to right, #2563EB 0%, #3B82F6 100%);
 
-$color-emphasis: #1D1D1F;
-$color-price: #D4A24E;
-$color-price-soft: #FDF6EC;
+$color-emphasis: #17202A;
+$color-price: #E85D3F;
+$color-price-soft: #FFF3F0;
 
-$color-success: #52C41A;
-$color-success-soft: #F6FFED;
-$color-success-border: rgba(82, 196, 26, 0.28);
+$color-success: #16A34A;
+$color-success-soft: #F0FDF4;
+$color-success-border: rgba(22, 163, 74, 0.24);
 
-$color-error: #FF4D4F;
-$color-error-soft: #FFF1F0;
-$color-error-border: rgba(255, 77, 79, 0.25);
+$color-error: #DC2626;
+$color-error-soft: #FEF2F2;
+$color-error-border: rgba(220, 38, 38, 0.22);
 
-$color-warning: #FAAD14;
-$color-warning-soft: #FFFBE6;
-$color-warning-border: rgba(250, 173, 20, 0.28);
+$color-warning: #D97706;
+$color-warning-soft: #FFFBEB;
+$color-warning-border: rgba(217, 119, 6, 0.24);
 
-$color-info: #8E8E93;
-$color-info-soft: #F5F5F7;
-$color-info-border: rgba(142, 142, 147, 0.22);
+$color-info: #2563EB;
+$color-info-soft: #EFF6FF;
+$color-info-border: rgba(37, 99, 235, 0.20);
 
-$color-bg: #F5F5F5;
-$color-bg-pink: #FDF6EC;
-$color-bg-subtle: #F5F5F5;
-$color-cat-hover-bg: #F5F5F7;
-$color-border-gray: #DDDDDD;
-$color-text-primary: #333333;
-$color-primary-hover-bright: #D4A24E;
-$color-topbar-start: #FAFAFA;
-$color-topbar-end: #FAFAFA;
+$color-bg: #F4F7F8;
+$color-bg-pink: #FFF3F0;
+$color-bg-subtle: #F4F7F8;
+$color-cat-hover-bg: #ECFDF5;
+$color-border-gray: #D7E0E3;
+$color-text-primary: #17202A;
+$color-primary-hover-bright: #2563EB;
+$color-topbar-start: #F8FAFB;
+$color-topbar-end: #F4F7F8;
 $color-card: #FFFFFF;
 $color-elevated: #FFFFFF;
-$color-surface-inset: #F5F5F5;
+$color-surface-inset: #EEF3F5;
 
-$color-text-title: #333333;
-$color-text-body: #666666;
-$color-text-muted: #999999;
+$color-text-title: #17202A;
+$color-text-body: #4B5B63;
+$color-text-muted: #73848C;
 $color-text-secondary: $color-text-muted;
-$color-text-disabled: #CCCCCC;
-$color-border: #EEEEEE;
-$color-border-light: #F5F5F5;
-$color-footer-bg: #F5F5F5;
-$color-tab-inactive: #999999;
+$color-text-disabled: #A8B4BA;
+$color-border: #DDE5E8;
+$color-border-light: #EDF2F3;
+$color-footer-bg: #EEF3F5;
+$color-tab-inactive: #73848C;
 
-$radius-xs: 10px;
-$radius-sm: 12px;
-$radius-card: 16px;
-$radius-btn: 12px;
-$radius-tag: 10px;
-$radius-search: 12px;
+$radius-xs: 4px;
+$radius-sm: 6px;
+$radius-card: 8px;
+$radius-btn: 6px;
+$radius-tag: 6px;
+$radius-search: 8px;
 $radius-pill: 999px;
 $radius-app-shell: 0;
 
@@ -112,10 +112,10 @@ $z-index-agent-composer: 1200;
 $font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC',
   'Helvetica Neue', 'Microsoft YaHei', system-ui, sans-serif;
 
-$letter-spacing-display: -0.02em;
-$letter-spacing-heading: -0.01em;
-$letter-spacing-body: 0.01em;
-$letter-spacing-label: 0.04em;
+$letter-spacing-display: 0;
+$letter-spacing-heading: 0;
+$letter-spacing-body: 0;
+$letter-spacing-label: 0;
 
 $transition-fast: 0.2s ease;
 $transition-normal: 0.3s ease;
@@ -125,5 +125,5 @@ $breakpoint-tablet: 1199px;
 $breakpoint-mobile: 768px;
 
 $app-page-gutter: 12px;
-$mobile-page-bg: #F5F5F5;
-$mobile-section-radius: 16px;
+$mobile-page-bg: #F4F7F8;
+$mobile-section-radius: 8px;

@@ -5,8 +5,8 @@
         <BrandMark variant="light" class="brand-mark" />
         <div class="auth-brand-text">
           <h2>创建新账号</h2>
-          <p class="brand-name">简选 · Simlect</p>
-          <p class="brand-tip">注册简选，开启品质购物之旅</p>
+          <p class="brand-name">智选 · SmartSelect</p>
+          <p class="brand-tip">注册智选，开启更聪明的购物</p>
         </div>
       </div>
 
@@ -200,10 +200,7 @@ const submit = async () => {
   justify-content: center;
   align-items: flex-start;
   padding: 24px 16px 48px;
-  background:
-    radial-gradient(ellipse 80% 50% at 20% 0%, rgba($color-primary, 0.1), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 90% 100%, rgba($color-primary, 0.06), transparent 50%),
-    $color-bg;
+  background: $color-bg;
 }
 
 .auth-card {
@@ -267,7 +264,7 @@ const submit = async () => {
     margin: 6px 0 2px;
     font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     color: $color-gold;
   }
 
@@ -354,7 +351,7 @@ const submit = async () => {
   width: 100%;
   margin-top: 4px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 0;
 }
 
 .error-tip {

@@ -30,8 +30,8 @@
       <div class="search-row-inner">
         <RouterLink class="brand" to="/">
           <BrandMark class="brand-icon" />
-          <span class="brand-text">简选</span>
-          <span class="brand-en">Simlect</span>
+          <span class="brand-text">智选</span>
+          <span class="brand-en">SmartSelect</span>
         </RouterLink>
 
         <div class="search-block">
@@ -55,7 +55,7 @@
               v-model="keyword"
               class="search-input"
               type="search"
-              placeholder="搜索简选"
+              placeholder="搜索智选"
               @focus="openRecentPanel"
               @blur="onSearchBlur"
               @keyup.enter="goSearch"
@@ -391,14 +391,14 @@ onMounted(async () => {
       font-size: 21px;
       font-weight: 600;
       color: $color-primary;
-      letter-spacing: 0.12em;
+      letter-spacing: 0;
     }
 
     .brand-en {
       font-size: 11px;
       font-weight: 500;
       color: $color-text-muted;
-      letter-spacing: 0.14em;
+      letter-spacing: 0;
       text-transform: uppercase;
       margin-left: -4px;
     }
@@ -628,7 +628,7 @@ onMounted(async () => {
       gap: 6px;
       padding: 4px 8px 4px 4px;
       border: 1px solid $color-border-gray;
-      border-radius: 20px;
+      border-radius: 8px;
       background: $color-card;
       cursor: pointer;
       transition: border-color $transition-fast, box-shadow $transition-fast;

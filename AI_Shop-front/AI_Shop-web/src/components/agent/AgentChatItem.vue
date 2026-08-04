@@ -343,7 +343,7 @@ const submitFeedback = async (rating: 1 | -1) => {
   padding: 9px 12px;
   font-size: 13px;
   line-height: 1.45;
-  border-radius: 12px;
+  border-radius: 8px;
   word-break: break-word;
   flex: 0 1 auto;
   min-width: 0;

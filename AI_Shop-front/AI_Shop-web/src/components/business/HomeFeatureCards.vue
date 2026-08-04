@@ -42,7 +42,7 @@ const iconColor = computed(() => {
   if (level >= 2) {
     return '#757575';
   }
-  return '#1D1D1F';
+  return '#0F766E';
 });
 
 const handleClick = (item: { path: string; isAnchor: boolean }) => {
@@ -80,7 +80,7 @@ const handleClick = (item: { path: string; isAnchor: boolean }) => {
   gap: 10px;
   padding: 16px 14px;
   border: 1px solid var(--ios-surface-border, rgba(0, 0, 0, 0.045));
-  border-radius: var(--ios-surface-radius, 16px);
+  border-radius: var(--ios-surface-radius, 8px);
   background: var(--ios-surface-bg, #fff);
   box-shadow: var(--ios-surface-shadow);
   cursor: pointer;

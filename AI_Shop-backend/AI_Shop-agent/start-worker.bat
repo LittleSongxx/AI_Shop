@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
-echo [Simlect Agent Worker] starting...
+echo [SmartSelect Agent Worker] starting...
 
 if not exist ".env" (
     if exist ".env.example" (
@@ -23,7 +23,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 if not exist ".venv\Scripts\ai-shop-agent-worker.exe" (
-    echo [Simlect Agent Worker] installing project...
+    echo [SmartSelect Agent Worker] installing project...
     call ".venv\Scripts\pip.exe" install -r requirements.lock -q
     call ".venv\Scripts\pip.exe" install --no-deps --editable . -q
     if errorlevel 1 (
@@ -33,8 +33,8 @@ if not exist ".venv\Scripts\ai-shop-agent-worker.exe" (
     )
 )
 
-echo [Simlect Agent Worker] heartbeat key: mall:agent:worker:heartbeat
-echo [Simlect Agent Worker] Ctrl+C to stop
+echo [SmartSelect Agent Worker] heartbeat key: mall:agent:worker:heartbeat
+echo [SmartSelect Agent Worker] Ctrl+C to stop
 echo.
 
 ".venv\Scripts\ai-shop-agent-worker.exe"

@@ -169,7 +169,7 @@ defineExpose({ open });
   width: min(92vw, 360px);
   padding: 24px 20px 20px;
   background: #fff;
-  border-radius: 20px;
+  border-radius: 8px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
 
@@ -177,13 +177,13 @@ defineExpose({ open });
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1d1d1f;
+  color: #17202a;
 }
 
 .cropper-viewport {
   width: 280px;
   height: 280px;
-  border-radius: 16px;
+  border-radius: 8px;
   overflow: hidden;
   background: #1a1a1a;
 }

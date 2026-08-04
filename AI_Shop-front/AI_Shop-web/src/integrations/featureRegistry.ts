@@ -326,7 +326,7 @@ export const FEATURE_REGISTRY: FeatureMeta[] = [
   },
   {
     id: 'pc_simlect_home',
-    label: 'PC Simlect 首页',
+    label: 'PC 智选首页',
     simlectRef: 'simlect-origin/index.html',
     supported: true,
     eshopApi: '同首页商品/分类接口'

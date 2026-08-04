@@ -131,7 +131,7 @@ const menuIconStyle = computed(() => {
   if (level >= 2) {
     return { color: '#757575' };
   }
-  return { color: '#1D1D1F' };
+  return { color: '#0F766E' };
 });
 
 const feedSentinel = ref<HTMLElement | null>(null);
@@ -376,7 +376,7 @@ usePageRefresh(() => {
 .simlect-sort {
   margin: 10px $app-page-gutter 0;
   padding: 16px 12px;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .simlect-sort-scroll {
@@ -522,7 +522,7 @@ usePageRefresh(() => {
   color: $color-gold;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .editor-meta {

@@ -53,7 +53,7 @@
         </button>
         <div v-else class="sl-banner-placeholder">
           <BrandMark class="sl-banner-logo" />
-          <p>简选 Simlect</p>
+          <p>智选 SmartSelect</p>
         </div>
         <div v-if="bannerList.length > 1" class="sl-banner-dots">
           <button
@@ -69,8 +69,8 @@
 
       <div class="sl-hot-strip">
         <div class="sl-hot-head">
-          <span class="sl-hot-badge">简选</span>
-          <span class="sl-hot-title">简选好物</span>
+          <span class="sl-hot-badge">智选</span>
+          <span class="sl-hot-title">智选好物</span>
         </div>
         <div class="sl-hot-grid">
           <button
@@ -93,7 +93,7 @@
           <el-avatar :size="54" :src="avatarUrl">{{ avatarLetter }}</el-avatar>
         </div>
         <div class="sl-member-info">
-          {{ authStore.isLoggedIn ? `Hi，${authStore.userInfo?.nickName || '用户'}` : 'Hi! 欢迎来到简选' }}
+          {{ authStore.isLoggedIn ? `Hi，${authStore.userInfo?.nickName || '用户'}` : 'Hi! 欢迎来到智选' }}
         </div>
         <div class="sl-login-and-reg">
           <template v-if="!authStore.isLoggedIn">

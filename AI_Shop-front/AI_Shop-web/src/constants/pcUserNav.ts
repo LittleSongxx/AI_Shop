@@ -2,7 +2,7 @@ export type PcLayoutMode = 'auth' | 'user' | 'plain';
 
 export const PC_USER_NAV_GROUPS = [
   {
-    title: '我的简选',
+    title: '我的智选',
     items: [
       { label: '个人中心', path: '/account' },
       { label: '会员中心', path: '/member-center' },

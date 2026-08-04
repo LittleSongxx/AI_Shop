@@ -100,7 +100,7 @@ const goAgent = () => openAgent();
   height: 42px;
   padding: 0 16px;
   border: 1px solid rgba(120, 120, 128, 0.12);
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   text-align: left;
@@ -143,7 +143,7 @@ const goAgent = () => openAgent();
   display: grid;
   place-items: center;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: 8px;
   transition: background 0.2s ease, transform 0.15s ease;
 
   &:active {

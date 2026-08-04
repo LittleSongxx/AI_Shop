@@ -13,6 +13,6 @@ test.beforeEach(async ({ page }) => {
 test('login screen renders on the configured viewport', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByText('欢迎回来')).toBeVisible();
-  await expect(page.getByText('简选 · Simlect')).toBeVisible();
+  await expect(page.getByText('智选 · SmartSelect')).toBeVisible();
   expect(await page.locator('body').evaluate((node) => node.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

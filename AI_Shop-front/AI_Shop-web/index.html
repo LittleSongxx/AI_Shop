@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <style>html,body{background:#fff}</style>
+    <style>html,body{background:#f4f7f8}</style>
     <script>
       (function () {
         if (
@@ -16,7 +16,8 @@
     <link rel="preload" href="/apple-touch-icon.png" as="image" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/smartselect-favicon.svg" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/smartselect-favicon.svg" />
     <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/pwa/splash-iphone-se.png" />
     <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/splash-iphone-12-13-14.png" />
     <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/pwa/splash-iphone-14-pro.png" />
@@ -27,7 +28,7 @@
     <style>
       html.pwa-standalone,
       html.pwa-standalone body {
-        background: #fff;
+        background: #f4f7f8;
       }
       #pwa-boot-splash { display: none !important; }
       html.pwa-standalone #pwa-boot-splash {
@@ -37,7 +38,7 @@
         display: flex !important;
         align-items: center;
         justify-content: center;
-        background: #fff;
+        background: #f4f7f8;
         padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
           env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
       }
@@ -63,28 +64,28 @@
         margin: 0;
         font-size: 26px;
         font-weight: 600;
-        letter-spacing: 0.06em;
-        color: #1d1d1f;
+        letter-spacing: 0;
+        color: #17202a;
         font-family: 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
       }
       #pwa-boot-splash.is-hidden { pointer-events: none; }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="简选 Simlect" />
+    <meta name="apple-mobile-web-app-title" content="智选 SmartSelect" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
-    <meta name="theme-color" content="#1d1d1f" />
-    <meta name="msapplication-TileColor" content="#1d1d1f" />
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="msapplication-TileColor" content="#0f766e" />
     <meta name="color-scheme" content="light" />
-    <title>简选 Simlect</title>
+    <title>智选 SmartSelect</title>
   </head>
   <body>
     <div id="pwa-boot-splash" hidden style="display:none" aria-hidden="true">
       <div class="boot-content">
         <img class="boot-mark" src="/apple-touch-icon.png" width="88" height="88" alt="" />
-        <p class="boot-title">简选 Simlect</p>
+        <p class="boot-title">智选 SmartSelect</p>
       </div>
     </div>
     <script>

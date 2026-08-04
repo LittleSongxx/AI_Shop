@@ -60,7 +60,7 @@ body,
 
 .el-button {
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   border-radius: #{$radius-btn};
   transition: background $transition-fast, border-color $transition-fast, opacity $transition-fast, transform 0.15s ease, box-shadow $transition-fast, filter $transition-fast;
 
@@ -130,7 +130,7 @@ body,
 
   .el-empty__description p {
     font-size: 13px;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
   }
 }
 

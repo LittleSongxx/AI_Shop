@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
-echo [Simlect Agent] preparing...
+echo [SmartSelect Agent] preparing...
 
 if not exist ".env" (
     if exist ".env.example" (
@@ -17,7 +17,7 @@ if not exist ".env" (
 )
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [Simlect Agent] creating venv...
+    echo [SmartSelect Agent] creating venv...
     python -m venv .venv
     if errorlevel 1 (
         echo [error] venv failed - need Python 3.11+
@@ -27,7 +27,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 if not exist ".venv\Scripts\uvicorn.exe" (
-    echo [Simlect Agent] installing deps first time, may be slow...
+    echo [SmartSelect Agent] installing deps first time, may be slow...
     call ".venv\Scripts\pip.exe" install -r requirements.lock -q
     if errorlevel 1 (
         echo [error] pip install failed
@@ -36,9 +36,9 @@ if not exist ".venv\Scripts\uvicorn.exe" (
     )
 )
 
-echo [Simlect Agent] http://0.0.0.0:7050
-echo [Simlect Agent] health http://localhost:7050/health
-echo [Simlect Agent] Ctrl+C to stop
+echo [SmartSelect Agent] http://0.0.0.0:7050
+echo [SmartSelect Agent] health http://localhost:7050/health
+echo [SmartSelect Agent] Ctrl+C to stop
 echo.
 
 ".venv\Scripts\uvicorn.exe" app.main:app --host 0.0.0.0 --port 7050 --reload

@@ -3,7 +3,7 @@
     <section class="profile-hero">
       <UserAvatar :avatar="user.avatar" :size="72" />
       <div class="profile-hero__text">
-        <h2 class="nick">{{ user.nickName || '简选用户' }}</h2>
+        <h2 class="nick">{{ user.nickName || '智选用户' }}</h2>
         <p class="sub">{{ user.email || '未绑定账号' }}</p>
       </div>
     </section>

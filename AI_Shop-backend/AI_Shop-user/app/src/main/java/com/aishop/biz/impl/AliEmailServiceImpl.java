@@ -62,7 +62,7 @@ public class AliEmailServiceImpl implements EmailService {
         String verificationCode = StringTools.getRandomNumber(6);
 
         // 第2步：设置邮件内容（这里使用简单的纯文本格式）
-        String emailSubject = "【简选AI_Shop】邮箱验证码"; // 邮件主题
+        String emailSubject = "【智选 SmartSelect】邮箱验证码"; // 邮件主题
         String emailBody = "您的验证码是：" + verificationCode + "，有效期5分钟。请勿泄露给他人。"; // 邮件正文，包含验证码
 
         // 第3步：构建并发送API请求
