@@ -21,19 +21,19 @@ services:
     container_name: aishop-mysql
     networks: [aishop-net]
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_general_ci
       - --default-authentication-plugin=caching_sha2_password
-      - --innodb_buffer_pool_size=1G
-      - --max_connections=300
+      - --innodb_buffer_pool_size=${MYSQL_INNODB_BUFFER_POOL_SIZE:-128M}
+      - --max_connections=${MYSQL_MAX_CONNECTIONS:-150}
     volumes:
       - aishop_mysql:/var/lib/mysql
-    mem_limit: 2g
+    mem_limit: ${MYSQL_MEMORY_LIMIT:-640m}
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
       interval: 10s
@@ -46,18 +46,18 @@ services:
     container_name: aishop-redis
     networks: [aishop-net]
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
     command:
       - redis-server
       - --appendonly
       - "yes"
       - --maxmemory
-      - 512mb
+      - ${REDIS_MAXMEMORY:-256mb}
       - --maxmemory-policy
       - allkeys-lru
     volumes:
       - aishop_redis:/data
-    mem_limit: 640m
+    mem_limit: ${REDIS_MEMORY_LIMIT:-384m}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -70,16 +70,16 @@ services:
     container_name: aishop-rabbitmq
     networks: [aishop-net]
     ports:
-      - "5673:5672"
-      - "15673:15672"
+      - "${RABBIT_PORT:-5673}:5672"
+      - "${RABBIT_MANAGEMENT_PORT:-15673}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: aishop
       RABBITMQ_DEFAULT_PASS: aishop
       RABBITMQ_DEFAULT_VHOST: /
-      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-memory 1024M"
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-memory ${RABBITMQ_MEMORY_WATERMARK:-512M}"
     volumes:
       - aishop_rabbit:/var/lib/rabbitmq
-    mem_limit: 1536m
+    mem_limit: ${RABBITMQ_MEMORY_LIMIT:-768m}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -92,16 +92,17 @@ services:
     container_name: aishop-nacos
     networks: [aishop-net]
     ports:
-      - "8848:8848"
-      - "9848:9848"
+      - "${NACOS_PORT:-8848}:8848"
+      - "${NACOS_GRPC_PORT:-9848}:9848"
     depends_on:
       mysql:
         condition: service_healthy
     environment:
       MODE: standalone
       PREFER_HOST_MODE: hostname
-      JVM_XMS: 512m
-      JVM_XMX: 1024m
+      JVM_XMS: ${NACOS_JVM_XMS:-192m}
+      JVM_XMX: ${NACOS_JVM_XMX:-384m}
+      JVM_XMN: ${NACOS_JVM_XMN:-96m}
       NACOS_AUTH_ENABLE: "false"
       SPRING_DATASOURCE_PLATFORM: mysql
       MYSQL_SERVICE_HOST: mysql
@@ -110,7 +111,7 @@ services:
       MYSQL_SERVICE_USER: root
       MYSQL_SERVICE_PASSWORD: root
       MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=10000&socketTimeout=30000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
-    mem_limit: 1536m
+    mem_limit: ${NACOS_MEMORY_LIMIT:-768m}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8848/nacos/"]
       interval: 15s
@@ -127,17 +128,17 @@ services:
     container_name: aishop-es
     networks: [aishop-net]
     ports:
-      - "9200:9200"
+      - "${ES_PORT:-9200}:9200"
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
       xpack.security.http.ssl.enabled: "false"
-      ES_JAVA_OPTS: -Xms1g -Xmx2g
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms256m -Xmx512m}
       cluster.name: aishop-es
       bootstrap.memory_lock: "false"
     volumes:
       - aishop_es:/usr/share/elasticsearch/data
-    mem_limit: 3g
+    mem_limit: ${ES_MEMORY_LIMIT:-1024m}
     ulimits:
       memlock:
         soft: -1
@@ -158,10 +159,10 @@ services:
     container_name: aishop-sentinel
     networks: [aishop-net]
     ports:
-      - "8858:8858"
+      - "${SENTINEL_PORT:-8858}:8858"
     environment:
-      JAVA_OPT_EXT: "-Xms256m -Xmx512m -Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858"
-    mem_limit: 768m
+      JAVA_OPT_EXT: "-Xms${SENTINEL_JVM_XMS:-128m} -Xmx${SENTINEL_JVM_XMX:-256m} -Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858"
+    mem_limit: ${SENTINEL_MEMORY_LIMIT:-384m}
     restart: unless-stopped
 
   seata-server:
@@ -172,24 +173,25 @@ services:
     container_name: aishop-seata
     networks: [aishop-net]
     ports:
-      - "8092:8091"
-      - "7092:7091"
+      - "${SEATA_PORT:-8092}:${SEATA_PORT:-8092}"
+      - "${SEATA_CONSOLE_PORT:-7092}:7091"
     depends_on:
       mysql:
         condition: service_healthy
       nacos:
         condition: service_healthy
     environment:
-      SEATA_IP: host.docker.internal
-      SEATA_PORT: 8092
+      # start.sh sets this to the WSL host's reachable non-loopback address.
+      SEATA_IP: ${SEATA_IP:-host.docker.internal}
+      SEATA_PORT: ${SEATA_PORT:-8092}
       STORE_MODE: db
       TZ: Asia/Shanghai
-      JVM_XMX: 1024m
-      JVM_XMS: 512m
-      JVM_MaxDirectMemorySize: 512m
+      JVM_XMX: ${SEATA_JVM_XMX:-384m}
+      JVM_XMS: ${SEATA_JVM_XMS:-192m}
+      JVM_MaxDirectMemorySize: ${SEATA_JVM_DIRECT_MEMORY:-128m}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 2g
+    mem_limit: ${SEATA_MEMORY_LIMIT:-640m}
     restart: unless-stopped
 
 volumes:

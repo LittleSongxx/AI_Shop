@@ -1,9 +1,15 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const devPort = Number(env.VITE_ADMIN_DEV_PORT || env.VITE_DEV_PORT) || 6002
+  const apiTarget = env.VITE_ADMIN_API_PROXY_TARGET || 'http://localhost:8080'
+  const wsTarget = env.VITE_ADMIN_WS_PROXY_TARGET || apiTarget.replace(/^http/, 'ws')
+
+  return {
   base: '/admin/',
   plugins: [
     vue(),
@@ -17,20 +23,21 @@ export default defineConfig({
     historyApiFallback: true,
     hmr: true,
     host: '0.0.0.0',
-    port: 6002,
+    port: devPort,
+    strictPort: true,
     proxy: {
       // 开发态 /api → Gateway /admin-api（与生产 baseURL 对齐）
       "/admin-api": {
-        target: "http://localhost:8080",
+        target: apiTarget,
         changeOrigin: true,
       },
       "/api": {
-        target: "http://localhost:8080",
+        target: apiTarget,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/admin-api'),
       },
       "/ws": {
-        target: "ws://localhost:8080",
+        target: wsTarget,
         changeOrigin: true,
         ws: true,
       }
@@ -72,5 +79,6 @@ export default defineConfig({
         },
       },
     }
+  }
   }
 })

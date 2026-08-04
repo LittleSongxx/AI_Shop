@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   shutdown: graceful
 
 spring:
@@ -24,6 +24,12 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         prefer-ip-address: true
+        # The gateway starts before the business services during local cold starts.
+        # Subscribe to Nacos updates and load the initial naming cache so a service
+        # registered a few seconds later is not permanently treated as unavailable.
+        watch:
+          enabled: true
+        naming-load-cache-at-start: true
         heart-beat-interval: 5
         heart-beat-timeout: 15
         ip-delete-timeout: 30

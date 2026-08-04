@@ -28,8 +28,16 @@ seata:
       cluster: default
       username: ""
       password: ""
+  server:
+    # Seata publishes this address through Nacos, so its container listener
+    # and the Compose host mapping must use the same dynamic port.
+    service-port: ${SEATA_PORT:8091}
   store:
     mode: db
+    session:
+      mode: db
+    lock:
+      mode: db
     db:
       datasource: druid
       db-type: mysql
@@ -43,6 +51,7 @@ seata:
       branch-table: branch_table
       lock-table: lock_table
       distributed-lock-table: distributed_lock
+      vgroup-table: vgroup_table
   security:
     secretKey: SeataSecretKey0c382ef121d778043159209298fd40bf3850a017
     tokenValidityInMilliseconds: 1800000

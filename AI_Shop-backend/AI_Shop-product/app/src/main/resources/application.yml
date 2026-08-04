@@ -1,5 +1,5 @@
 server:
-  port: 8099
+  port: ${SERVER_PORT:8099}
   shutdown: graceful
 
 spring:
@@ -43,7 +43,7 @@ spring:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
       eager: true
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:3306/aishop_product?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&allowMultiQueries=true&useSSL=false
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/aishop_product?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&allowMultiQueries=true&useSSL=false
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:your-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
