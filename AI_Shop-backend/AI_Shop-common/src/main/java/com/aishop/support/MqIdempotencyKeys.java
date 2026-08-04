@@ -39,6 +39,10 @@ public final class MqIdempotencyKeys {
         return "refund:result:" + require(refundRequestId);
     }
 
+    public static String orderGrowth(String orderId) {
+        return "order:growth:" + require(orderId);
+    }
+
     public static String browseRecord(String userId, String productId) {
         return "browse:" + require(userId) + ":" + require(productId);
     }

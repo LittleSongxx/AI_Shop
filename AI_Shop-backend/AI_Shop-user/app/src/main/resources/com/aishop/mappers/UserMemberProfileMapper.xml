@@ -191,4 +191,29 @@
 		 where user_id=#{userId}
 	</update>
 
+    <insert id="incrementGrowth">
+        INSERT INTO user_member_profile
+            (user_id, level_code, growth_value, level_name, update_time)
+        VALUES
+            (#{userId},
+             CASE WHEN #{points} &gt;= 5000 THEN 3 WHEN #{points} &gt;= 1000 THEN 2 ELSE 1 END,
+             #{points},
+             CASE WHEN #{points} &gt;= 5000 THEN '金卡会员'
+                  WHEN #{points} &gt;= 1000 THEN '银卡会员' ELSE '普通会员' END,
+             #{updateTime})
+        ON DUPLICATE KEY UPDATE
+            level_code = CASE
+                WHEN growth_value + #{points} &gt;= 5000 THEN 3
+                WHEN growth_value + #{points} &gt;= 1000 THEN 2
+                ELSE 1
+            END,
+            level_name = CASE
+                WHEN growth_value + #{points} &gt;= 5000 THEN '金卡会员'
+                WHEN growth_value + #{points} &gt;= 1000 THEN '银卡会员'
+                ELSE '普通会员'
+            END,
+            growth_value = growth_value + #{points},
+            update_time = #{updateTime}
+    </insert>
+
 </mapper>

@@ -1240,9 +1240,6 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	@Override
 	public void onOrderConfirmed(String userId, String orderId) {
 		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
-		if (orderInfo != null && orderInfo.getAmount() != null) {
-			userFeignSupport.addGrowthOnPay(userId, orderInfo.getAmount());
-		}
 		if (orderInfo != null && OrderCommentStatusEnum.EVALUATED.getStatus().equals(orderInfo.getCommentStatus())) {
 			userFeignSupport.sendNotifyAsync(userId, "追评提醒",
 					"订单已完成，欢迎追加评价分享购物体验", "comment_re", orderId);
@@ -1280,8 +1277,27 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		if (rows == null || rows == 0) {
 			return false;
 		}
+		enqueueOrderGrowth(existing);
 		increaseProductSalesForOrder(orderId);
 		return true;
+	}
+
+	private void enqueueOrderGrowth(OrderInfo orderInfo) {
+		if (orderInfo == null
+				|| StringTools.isEmpty(orderInfo.getOrderId())
+				|| StringTools.isEmpty(orderInfo.getUserId())
+				|| orderInfo.getAmount() == null
+				|| orderInfo.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		OrderGrowthEventDTO event = new OrderGrowthEventDTO(
+				orderInfo.getOrderId(), orderInfo.getUserId(), orderInfo.getAmount());
+		transactionalMqSender.sendAfterCommit(
+				RabbitMQConfig.USER_GROWTH_EXCHANGE,
+				RabbitMQConfig.USER_GROWTH_KEY,
+				event,
+				MqIdempotencyKeys.orderGrowth(orderInfo.getOrderId()),
+				MessageReliabilityLevelEnum.STANDARD);
 	}
 
 	@Override

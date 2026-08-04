@@ -35,6 +35,39 @@ create table if not exists user_member_profile
     update_time  datetime          null
 ) comment '会员成长' collate = utf8mb4_general_ci row_format = DYNAMIC;
 
+create table if not exists user_order_growth
+(
+    order_id     varchar(32)                         not null primary key,
+    user_id      varchar(15)                         not null,
+    pay_amount   decimal(10, 2)                      not null,
+    growth_value int                                 not null,
+    create_time  datetime default current_timestamp  not null,
+    key idx_user_order_growth_user (user_id, create_time)
+) comment '订单完成成长值幂等账本' collate = utf8mb4_general_ci row_format = DYNAMIC;
+
+-- 公共 MQ 消费失败审查组件使用用户库数据源；确保最终死信仍可落库审计。
+create table if not exists mq_compensation_log
+(
+    log_id            int auto_increment comment '日志ID' primary key,
+    idempotency_key   varchar(128)               not null comment '幂等键',
+    exchange          varchar(64)                not null comment '交换机',
+    routing_key       varchar(64)                not null comment '路由键',
+    biz_scene         varchar(32)                null comment '业务场景',
+    payload_json      mediumtext                 null comment '消息体 JSON',
+    reliability_level varchar(16) default 'HIGH' not null comment '发送级别',
+    error_message     varchar(512)               null comment '失败原因',
+    retry_count       int         default 0      not null comment '重放次数',
+    status            int         default 0      not null comment '0待处理 1处理中 2已重放成功 3重放失败 4已忽略',
+    create_time       datetime                   not null comment '创建时间',
+    update_time       datetime                   null comment '更新时间',
+    handle_time       datetime                   null comment '运维处理时间',
+    handle_remark     varchar(512)               null comment '处理备注',
+    constraint uk_mq_compensation_idempotency unique (idempotency_key),
+    key idx_mq_compensation_status (status),
+    key idx_mq_compensation_scene (biz_scene),
+    key idx_mq_compensation_create (create_time)
+) comment 'MQ消费失败审查日志（用户库）' charset = utf8mb4;
+
 create table if not exists user_sign_record
 (
     user_id         varchar(15)   not null primary key,

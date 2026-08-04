@@ -1,28 +1,33 @@
 package com.aishop.biz.impl;
 
 import com.aishop.api.dto.UserCouponCreateDTO;
+import com.aishop.api.dto.OrderGrowthEventDTO;
 import com.aishop.api.support.CouponFeignSupport;
 import com.aishop.api.vo.DiscountCouponVO;
 import com.aishop.component.RedisComponent;
 import com.aishop.entity.enums.ResponseCodeEnum;
 import com.aishop.api.enums.UserCouponStatusEnum;
 import com.aishop.entity.po.UserMemberProfile;
+import com.aishop.entity.po.UserOrderGrowth;
 import com.aishop.entity.vo.MemberCenterVO;
 import com.aishop.api.vo.MemberLevelRewardVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.mappers.UserMemberProfileMapper;
+import com.aishop.mappers.UserOrderGrowthMapper;
 import com.aishop.biz.MemberLevelRewardConfigService;
 import com.aishop.biz.UserMemberProfileService;
 import com.aishop.biz.UserNotificationService;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Service("userMemberProfileService")
@@ -43,6 +48,8 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
     private CouponFeignSupport couponFeignSupport;
     @Resource
     private UserMemberProfileMapper<UserMemberProfile, com.aishop.entity.query.UserMemberProfileQuery> userMemberProfileMapper;
+    @Resource
+    private UserOrderGrowthMapper userOrderGrowthMapper;
 
     @Override
     public UserMemberProfile getOrInitProfile(String userId) {
@@ -169,11 +176,37 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
         if (payAmount == null || payAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        int add = payAmount.intValue() / 100;
-        if (add < 1) {
-            add = 1;
+        addGrowth(userId, growthForPay(payAmount));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean applyOrderGrowth(OrderGrowthEventDTO event) {
+        if (event == null
+                || StringTools.isEmpty(event.getOrderId())
+                || StringTools.isEmpty(event.getUserId())
+                || event.getPayAmount() == null
+                || event.getPayAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("订单成长值事件参数不完整");
         }
-        addGrowth(userId, add);
+        int points = growthForPay(event.getPayAmount());
+        UserOrderGrowth ledger = new UserOrderGrowth();
+        ledger.setOrderId(event.getOrderId());
+        ledger.setUserId(event.getUserId());
+        ledger.setPayAmount(event.getPayAmount());
+        ledger.setGrowthValue(points);
+        ledger.setCreateTime(new Date());
+        try {
+            userOrderGrowthMapper.insert(ledger);
+        } catch (DuplicateKeyException duplicate) {
+            UserOrderGrowth existing = userOrderGrowthMapper.selectByOrderId(event.getOrderId());
+            if (sameOrderGrowth(existing, event, points)) {
+                return false;
+            }
+            throw new BusinessException("订单成长值事件业务键冲突");
+        }
+        addGrowth(event.getUserId(), points);
+        return true;
     }
 
     @Override
@@ -182,11 +215,27 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
         if (points <= 0) {
             return;
         }
-        UserMemberProfile profile = getOrInitProfile(userId);
-        profile.setGrowthValue((profile.getGrowthValue() == null ? 0 : profile.getGrowthValue()) + points);
-        refreshLevel(profile);
-        profile.setUpdateTime(new Date());
-        userMemberProfileMapper.updateByUserId(profile, userId);
+        if (StringTools.isEmpty(userId)) {
+            throw new BusinessException("用户ID为空");
+        }
+        Integer rows = userMemberProfileMapper.incrementGrowth(userId, points, new Date());
+        if (rows == null || rows == 0) {
+            throw new IllegalStateException("成长值更新失败");
+        }
+    }
+
+    private static int growthForPay(BigDecimal payAmount) {
+        return Math.max(1, payAmount.intValue() / 100);
+    }
+
+    private static boolean sameOrderGrowth(
+            UserOrderGrowth existing, OrderGrowthEventDTO event, int points) {
+        return existing != null
+                && Objects.equals(existing.getOrderId(), event.getOrderId())
+                && Objects.equals(existing.getUserId(), event.getUserId())
+                && existing.getPayAmount() != null
+                && existing.getPayAmount().compareTo(event.getPayAmount()) == 0
+                && Objects.equals(existing.getGrowthValue(), points);
     }
 
     private void refreshLevel(UserMemberProfile profile) {

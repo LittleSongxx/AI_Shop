@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aishop.mappers.UserOrderGrowthMapper">
+
+    <resultMap id="base_result_map" type="com.aishop.entity.po.UserOrderGrowth">
+        <id column="order_id" property="orderId"/>
+        <result column="user_id" property="userId"/>
+        <result column="pay_amount" property="payAmount"/>
+        <result column="growth_value" property="growthValue"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.aishop.entity.po.UserOrderGrowth">
+        INSERT INTO user_order_growth
+            (order_id, user_id, pay_amount, growth_value, create_time)
+        VALUES
+            (#{bean.orderId}, #{bean.userId}, #{bean.payAmount},
+             #{bean.growthValue}, #{bean.createTime})
+    </insert>
+
+    <select id="selectByOrderId" resultMap="base_result_map">
+        SELECT order_id, user_id, pay_amount, growth_value, create_time
+        FROM user_order_growth
+        WHERE order_id = #{orderId}
+    </select>
+</mapper>

@@ -101,11 +101,9 @@ app:
 
 mq:
   compensation:
-    # 必须显式关掉：MqCompensationAutoReplayTask 的开关是 matchIfMissing = true，
-    # 上面的 common-scheduling 一开它就会一起注册。而 mq_compensation_log 表只在
-    # order/admin/product/search 库里有，user 库这 10 张表里没有，任务每分钟会查一张
-    # 不存在的表并打 error。
-    auto-replay-enabled: false
+    # 用户库现在持有公共补偿审查表，允许自动恢复发送失败；消费失败仍保留人工审查，
+    # MqCompensationLogService 的自动任务会刻意跳过 mq.consume 记录。
+    auto-replay-enabled: true
 
 aishop:
   internal:

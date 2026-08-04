@@ -43,6 +43,7 @@ public class RabbitMQConfig {
     // 通知交换机
     public static final String NOTIFY_EXCHANGE = "notify.exchange";
     public static final String REFUND_EXCHANGE = "refund.exchange";
+    public static final String USER_GROWTH_EXCHANGE = "user.growth.exchange";
 
     // 队列
     public static final String RUSHING_ORDER_QUEUE = "rushing.order.queue";
@@ -55,6 +56,8 @@ public class RabbitMQConfig {
     public static final String REFUND_STOCK_DEAD_QUEUE = "refund.stock.dead.queue";
     public static final String REFUND_RESULT_QUEUE = "refund.result.queue";
     public static final String REFUND_RESULT_DEAD_QUEUE = "refund.result.dead.queue";
+    public static final String USER_GROWTH_QUEUE = "user.growth.queue";
+    public static final String USER_GROWTH_DEAD_QUEUE = "user.growth.dead.queue";
 
     // 死信队列（超时未支付释放库存）
     public static final String RUSHING_DELAY_QUEUE = "rushing.delay.queue";
@@ -89,6 +92,8 @@ public class RabbitMQConfig {
     public static final String REFUND_STOCK_DEAD_KEY = "refund.stock.dead";
     public static final String REFUND_RESULT_KEY = "refund.result";
     public static final String REFUND_RESULT_DEAD_KEY = "refund.result.dead";
+    public static final String USER_GROWTH_KEY = "user.growth";
+    public static final String USER_GROWTH_DEAD_KEY = "user.growth.dead";
 
     // 通知队列
     public static final String NOTIFY_QUEUE = "notify.queue";
@@ -301,6 +306,37 @@ public class RabbitMQConfig {
     public Binding refundResultDeadBinding() {
         return BindingBuilder.bind(refundResultDeadQueue())
                 .to(refundExchange()).with(REFUND_RESULT_DEAD_KEY);
+    }
+
+    // ========== 订单完成后会员成长值 ==========
+    @Bean
+    public DirectExchange userGrowthExchange() {
+        return new DirectExchange(USER_GROWTH_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue userGrowthQueue() {
+        return QueueBuilder.durable(USER_GROWTH_QUEUE)
+                .withArgument("x-dead-letter-exchange", USER_GROWTH_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", USER_GROWTH_DEAD_KEY)
+                .build();
+    }
+
+    @Bean
+    public Queue userGrowthDeadQueue() {
+        return QueueBuilder.durable(USER_GROWTH_DEAD_QUEUE).build();
+    }
+
+    @Bean
+    public Binding userGrowthBinding() {
+        return BindingBuilder.bind(userGrowthQueue())
+                .to(userGrowthExchange()).with(USER_GROWTH_KEY);
+    }
+
+    @Bean
+    public Binding userGrowthDeadBinding() {
+        return BindingBuilder.bind(userGrowthDeadQueue())
+                .to(userGrowthExchange()).with(USER_GROWTH_DEAD_KEY);
     }
 
     // ========== 浏览足迹异步落库 ==========
