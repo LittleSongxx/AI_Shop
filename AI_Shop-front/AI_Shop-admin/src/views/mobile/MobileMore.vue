@@ -21,7 +21,7 @@
         <span class="iconfont icon-account acc-icon"></span>
         <div class="acc-info">
           <span class="acc-name">管理员</span>
-          <span class="acc-sub">简选运营后台 · 移动端</span>
+          <span class="acc-sub">智选运营后台 · 移动端</span>
         </div>
       </div>
       <button type="button" class="acc-logout" @click="logout">退出登录</button>
@@ -125,7 +125,7 @@ const logout = () => {
   gap: 6px;
   padding: 10px 4px;
   border: none;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   transition: transform 0.15s, background 0.2s;
@@ -162,7 +162,7 @@ const logout = () => {
       height: 46px;
       display: grid;
       place-items: center;
-      border-radius: 14px;
+      border-radius: 8px;
       background: var(--m-gold-soft);
       color: var(--m-ink);
       font-size: 24px;
@@ -188,7 +188,7 @@ const logout = () => {
   .acc-logout {
     width: 100%;
     height: 42px;
-    border-radius: 13px;
+    border-radius: 8px;
     font-size: 14px;
     cursor: pointer;
     transition: transform 0.15s;

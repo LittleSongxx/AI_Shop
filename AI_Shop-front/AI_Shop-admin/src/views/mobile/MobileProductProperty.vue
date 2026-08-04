@@ -117,7 +117,7 @@ onMounted(loadCategory)
   gap: 4px;
   padding: 6px 10px;
   border: 1px solid rgba(120, 120, 128, 0.24);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.55);
   font-size: 13px;
   color: var(--m-ink-2);

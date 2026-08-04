@@ -220,7 +220,7 @@ watch(
 
   &.is-mobile {
     height: 300px;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
   }
 }

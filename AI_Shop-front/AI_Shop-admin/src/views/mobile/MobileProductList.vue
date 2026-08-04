@@ -253,7 +253,7 @@ const del = (row) => {
   gap: 8px;
   height: 44px;
   padding: 0 12px;
-  border-radius: 16px;
+  border-radius: 8px;
 
   .search-icon {
     font-size: 16px;
@@ -278,7 +278,7 @@ const del = (row) => {
     flex-shrink: 0;
     border: none;
     background: rgba(255, 255, 255, 0.5);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 4px 6px;
     font-size: 13px;
     color: var(--m-ink-2);
@@ -293,7 +293,7 @@ const del = (row) => {
   gap: 6px;
   height: 42px;
   border: none;
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--m-ink);
   color: #fff;
   font-size: 14px;
@@ -381,7 +381,7 @@ const del = (row) => {
     min-width: 56px;
     height: 32px;
     border: 1px solid rgba(120, 120, 128, 0.24);
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.5);
     color: var(--m-ink-2);
     font-size: 12px;
@@ -429,7 +429,7 @@ const del = (row) => {
 
   &.gold {
     background: var(--m-gold-soft);
-    color: #927535;
+    color: #1d4ed8;
   }
 }
 

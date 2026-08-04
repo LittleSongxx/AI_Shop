@@ -153,7 +153,7 @@ onUnmounted(() => {
   gap: 8px;
   height: 44px;
   padding: 0 12px;
-  border-radius: 16px;
+  border-radius: 8px;
 
   .search-input {
     flex: 1;
@@ -172,7 +172,7 @@ onUnmounted(() => {
   .search-select {
     flex-shrink: 0;
     border: 1px solid rgba(120, 120, 128, 0.24);
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.5);
     height: 30px;
     padding: 0 6px;
@@ -258,7 +258,7 @@ onUnmounted(() => {
   .rpt-remark {
     margin: 8px 0 0;
     padding: 8px 10px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(120, 120, 128, 0.08);
     font-size: 13px;
     color: var(--m-ink-2);
@@ -269,7 +269,7 @@ onUnmounted(() => {
       padding: 0 6px;
       border-radius: 6px;
       background: var(--m-gold-soft);
-      color: #927535;
+      color: #1d4ed8;
       font-size: 11px;
     }
   }
@@ -283,7 +283,7 @@ onUnmounted(() => {
       flex: 1;
       height: 32px;
       border: 1px solid rgba(120, 120, 128, 0.24);
-      border-radius: 10px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.5);
       color: var(--m-ink-2);
       font-size: 12px;

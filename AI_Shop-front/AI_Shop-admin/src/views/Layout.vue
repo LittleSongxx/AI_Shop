@@ -6,8 +6,8 @@
           <div class="logo-row">
             <BrandMark class="logo-mark" />
             <div class="logo-copy">
-              <span class="logo-text">简选</span>
-              <span class="logo-sub">Simlect Admin</span>
+              <span class="logo-text">智选</span>
+              <span class="logo-sub">SmartSelect Admin</span>
             </div>
           </div>
         </div>
@@ -223,13 +223,7 @@ const switchToMobile = () => {
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08);
 
     .sidebar-glow {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 120px;
-      height: 120px;
-      background: radial-gradient(circle, rgba(201, 117, 79, 0.18) 0%, transparent 70%);
-      pointer-events: none;
+      display: none;
     }
 
     .left-side-content {
@@ -263,7 +257,7 @@ const switchToMobile = () => {
         .logo-text {
           font-size: 17px;
           font-weight: 600;
-          letter-spacing: 0.06em;
+          letter-spacing: 0;
           color: var(--sidebar-text-active);
         }
 
@@ -271,7 +265,7 @@ const switchToMobile = () => {
           font-size: 11px;
           font-weight: 500;
           color: var(--sidebar-text-muted);
-          letter-spacing: 0.04em;
+          letter-spacing: 0;
         }
       }
 
@@ -281,7 +275,7 @@ const switchToMobile = () => {
         height: 44px;
         margin: 3px 12px;
         padding: 0 12px;
-        border-radius: 12px;
+        border-radius: 8px;
         font-size: 14px;
         color: var(--sidebar-text);
         cursor: pointer;
@@ -328,7 +322,7 @@ const switchToMobile = () => {
         height: 38px;
         margin: 2px 14px 2px 22px;
         padding: 0 12px;
-        border-radius: 10px;
+        border-radius: 8px;
         font-size: 13px;
         color: var(--sidebar-text-muted);
         cursor: pointer;
@@ -404,7 +398,7 @@ const switchToMobile = () => {
           font-size: 18px;
           font-weight: 600;
           color: var(--text);
-          letter-spacing: 0.01em;
+          letter-spacing: 0;
         }
 
         .breadcrumb {
@@ -452,7 +446,7 @@ const switchToMobile = () => {
 
         &:hover {
           color: var(--text);
-          border-color: rgba(42, 36, 32, 0.14);
+          border-color: rgba(23, 32, 42, 0.14);
           box-shadow: var(--shadow-sm);
         }
 
@@ -475,7 +469,7 @@ const switchToMobile = () => {
           width: 28px;
           height: 28px;
           border-radius: 50%;
-          background: linear-gradient(135deg, var(--accent) 0%, #a86542 100%);
+          background: linear-gradient(135deg, var(--accent) 0%, #1d4ed8 100%);
           color: #fff;
           font-size: 12px;
           font-weight: 600;

@@ -66,7 +66,7 @@ const back = () => router.replace('/m/product')
   height: 44px;
   margin-bottom: 10px;
   border: none;
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--m-ink);
   color: #fff;
   font-size: 15px;
@@ -78,7 +78,7 @@ const back = () => router.replace('/m/product')
   width: 100%;
   height: 42px;
   border: 1px solid rgba(120, 120, 128, 0.24);
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.5);
   color: var(--m-ink-2);
   font-size: 14px;

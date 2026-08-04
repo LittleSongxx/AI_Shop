@@ -122,7 +122,7 @@ onMounted(loadCategory)
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.45);
 
   .sub-name {

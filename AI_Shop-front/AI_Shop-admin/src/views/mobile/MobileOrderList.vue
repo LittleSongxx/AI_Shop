@@ -242,7 +242,7 @@ onUnmounted(() => {
     flex-shrink: 0;
     padding: 7px 14px;
     border: none;
-    border-radius: 12px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.55);
     color: var(--m-ink-2);
     font-size: 13px;
@@ -262,7 +262,7 @@ onUnmounted(() => {
   gap: 8px;
   height: 42px;
   padding: 0 12px;
-  border-radius: 14px;
+  border-radius: 8px;
 
   .search-icon {
     font-size: 16px;
@@ -428,7 +428,7 @@ onUnmounted(() => {
       height: 32px;
       padding: 0 14px;
       border: 1px solid rgba(120, 120, 128, 0.24);
-      border-radius: 10px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.5);
       color: var(--m-ink-2);
       font-size: 12px;

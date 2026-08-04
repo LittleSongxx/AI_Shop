@@ -74,14 +74,14 @@ const asideStats = computed(() => {
 const getChartOption = () => {
   const isSale = activeTab.value === 'sale'
   const data = isSale ? saleData.value : refundData.value
-  const accent = isSale ? '#c9754f' : '#ff6b5a'
-  const accentSoft = isSale ? 'rgba(201, 117, 79, 0.14)' : 'rgba(255, 107, 90, 0.12)'
+  const accent = isSale ? '#0f766e' : '#e85d3f'
+  const accentSoft = isSale ? 'rgba(15, 118, 110, 0.14)' : 'rgba(232, 93, 63, 0.12)'
 
   return {
     animationDuration: 600,
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(42, 36, 32, 0.92)',
+      backgroundColor: 'rgba(23, 32, 42, 0.92)',
       borderWidth: 0,
       textStyle: { color: '#fff', fontSize: 12 },
       formatter(params) {
@@ -97,7 +97,7 @@ const getChartOption = () => {
       top: 0,
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { color: '#8a8278', fontSize: 11 },
+      textStyle: { color: '#73848c', fontSize: 11 },
     },
     grid: { left: 4, right: 4, bottom: 0, top: 28, containLabel: true },
     xAxis: {
@@ -148,8 +148,8 @@ const getChartOption = () => {
         barMaxWidth: 14,
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(42, 36, 32, 0.55)' },
-            { offset: 1, color: 'rgba(42, 36, 32, 0.12)' },
+            { offset: 0, color: 'rgba(37, 99, 235, 0.55)' },
+            { offset: 1, color: 'rgba(37, 99, 235, 0.12)' },
           ]),
           borderRadius: [4, 4, 0, 0],
         },

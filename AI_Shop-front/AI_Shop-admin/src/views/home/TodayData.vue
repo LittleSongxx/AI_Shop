@@ -68,7 +68,7 @@ const todayDataField = ref([
     name: '今日销售额',
     icon: 'sale-amount',
     color: '#fff',
-    bg: 'linear-gradient(135deg, #c9754f 0%, #a86542 100%)',
+    bg: 'linear-gradient(135deg, #0f766e 0%, #2563eb 100%)',
     key: 'orderAmount',
     amount: true,
     dataValue: {},
@@ -76,8 +76,8 @@ const todayDataField = ref([
   {
     name: '今日订单',
     icon: 'order-count',
-    color: '#2a2420',
-    bg: 'rgba(42, 36, 32, 0.08)',
+    color: '#17202a',
+    bg: 'rgba(23, 32, 42, 0.08)',
     key: 'orderCount',
     dataValue: {},
   },
@@ -158,7 +158,7 @@ onMounted(() => {
   flex-direction: column;
   min-height: 0;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--header-border);
   box-shadow: var(--shadow-card);
@@ -170,7 +170,7 @@ onMounted(() => {
 
   &--orderAmount {
     grid-area: hero;
-    background: linear-gradient(145deg, #2a2420 0%, #1f1b19 100%);
+    background: linear-gradient(145deg, #0f766e 0%, #0b665f 100%);
     border-color: rgba(255, 255, 255, 0.08);
 
     .metric-label,
@@ -268,7 +268,7 @@ onMounted(() => {
   font-weight: 700;
   line-height: 1.2;
   color: var(--text);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .metric-yesterday {

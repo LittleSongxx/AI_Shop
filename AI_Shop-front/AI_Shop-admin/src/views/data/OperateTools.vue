@@ -95,7 +95,7 @@ const runApi = (apiKey, params, confirmMsg) => {
 }
 
 .tool-card {
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .tool-grid {

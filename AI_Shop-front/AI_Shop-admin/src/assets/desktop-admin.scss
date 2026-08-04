@@ -1,41 +1,41 @@
 
 
 [data-admin-platform='desktop'] {
-  --accent: #c9754f;
-  --accent-hover: #b86844;
-  --accent-soft: rgba(201, 117, 79, 0.12);
-  --accent-muted: rgba(201, 117, 79, 0.22);
-  --primary: #2a2420;
-  --primary-hover: #3d3530;
-  --primary-soft: #f7f4f1;
-  --primary-muted: rgba(42, 36, 32, 0.06);
-  --page-bg: #eceae6;
-  --page-bg-end: #e4e1dc;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.10);
+  --accent-muted: rgba(37, 99, 235, 0.20);
+  --primary: #0f766e;
+  --primary-hover: #0b665f;
+  --primary-soft: #ecfdf5;
+  --primary-muted: rgba(15, 118, 110, 0.08);
+  --page-bg: #f4f7f8;
+  --page-bg-end: #eef3f5;
   --surface: #ffffff;
   --surface-elevated: rgba(255, 255, 255, 0.88);
   --header-bg: rgba(255, 255, 255, 0.72);
-  --header-border: rgba(42, 36, 32, 0.08);
-  --sidebar-bg: #1c1917;
-  --sidebar-bg-end: #12100e;
+  --header-border: rgba(23, 32, 42, 0.08);
+  --sidebar-bg: #17202a;
+  --sidebar-bg-end: #0f3f3b;
   --sidebar-text: rgba(255, 255, 255, 0.68);
   --sidebar-text-muted: rgba(255, 255, 255, 0.42);
   --sidebar-text-active: #ffffff;
   --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-active-bg: rgba(201, 117, 79, 0.14);
-  --card-radius: 14px;
-  --shadow-sm: 0 1px 2px rgba(42, 36, 32, 0.04);
-  --shadow-card: 0 4px 24px rgba(42, 36, 32, 0.06);
-  --shadow-float: 0 12px 40px rgba(42, 36, 32, 0.1);
-  --gold: #c9754f;
+  --sidebar-active-bg: rgba(37, 99, 235, 0.20);
+  --card-radius: 8px;
+  --shadow-sm: 0 1px 2px rgba(23, 32, 42, 0.04);
+  --shadow-card: 0 4px 24px rgba(23, 32, 42, 0.06);
+  --shadow-float: 0 12px 40px rgba(23, 32, 42, 0.10);
+  --gold: #2563eb;
 
   body {
     background: linear-gradient(165deg, var(--page-bg) 0%, var(--page-bg-end) 100%);
   }
 
   .el-button {
-    border-radius: 10px;
+    border-radius: 6px;
     font-weight: 500;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   }
 
@@ -48,34 +48,34 @@
     --el-button-border-color: var(--primary);
     --el-button-hover-bg-color: var(--primary-hover);
     --el-button-hover-border-color: var(--primary-hover);
-    box-shadow: 0 2px 8px rgba(42, 36, 32, 0.12);
+    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.18);
   }
 
   .el-button--success {
-    --el-button-bg-color: #3d7a5c;
-    --el-button-border-color: #3d7a5c;
-    --el-button-hover-bg-color: #356b50;
-    --el-button-hover-border-color: #356b50;
+    --el-button-bg-color: #16a34a;
+    --el-button-border-color: #16a34a;
+    --el-button-hover-bg-color: #15803d;
+    --el-button-hover-border-color: #15803d;
   }
 
   .el-button--default {
     --el-button-bg-color: var(--surface);
     --el-button-border-color: var(--header-border);
     --el-button-hover-bg-color: var(--primary-soft);
-    --el-button-hover-border-color: rgba(42, 36, 32, 0.14);
+    --el-button-hover-border-color: rgba(23, 32, 42, 0.14);
     --el-button-text-color: var(--text);
   }
 
   .el-input__wrapper,
   .el-select__wrapper {
-    border-radius: 10px !important;
+    border-radius: 6px !important;
     box-shadow: 0 0 0 1px var(--header-border) inset !important;
     transition: box-shadow 0.2s ease;
   }
 
   .el-input__wrapper:hover,
   .el-select__wrapper:hover {
-    box-shadow: 0 0 0 1px rgba(42, 36, 32, 0.16) inset !important;
+    box-shadow: 0 0 0 1px rgba(23, 32, 42, 0.16) inset !important;
   }
 
   .el-input__wrapper.is-focus,
@@ -100,9 +100,9 @@
   }
 
   .el-table {
-    --el-table-border-color: rgba(42, 36, 32, 0.06);
-    --el-table-header-bg-color: #faf9f7;
-    --el-table-row-hover-bg-color: rgba(201, 117, 79, 0.06);
+    --el-table-border-color: rgba(23, 32, 42, 0.06);
+    --el-table-header-bg-color: #f8fafb;
+    --el-table-row-hover-bg-color: rgba(37, 99, 235, 0.06);
     font-size: 13px;
   }
 
@@ -110,15 +110,15 @@
     font-weight: 600;
     color: var(--text2);
     font-size: 12px;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
   }
 
   .el-table__body tr.current-row > td.el-table__cell {
-    background-color: rgba(201, 117, 79, 0.08) !important;
+    background-color: rgba(37, 99, 235, 0.08) !important;
   }
 
   .el-table__body tr:hover > td.el-table__cell {
-    background-color: rgba(201, 117, 79, 0.06) !important;
+    background-color: rgba(37, 99, 235, 0.06) !important;
   }
 
   .el-pagination.is-background .el-pager li.is-active {
@@ -132,7 +132,7 @@
   }
 
   .el-dialog {
-    border-radius: 16px !important;
+    border-radius: 8px !important;
     box-shadow: var(--shadow-float) !important;
   }
 
@@ -145,8 +145,8 @@
   .list-op-panel .btn-panel--icon {
     width: 32px;
     height: 32px;
-    border-radius: 10px;
-    border-color: rgba(42, 36, 32, 0.1);
+    border-radius: 8px;
+    border-color: rgba(23, 32, 42, 0.1);
     background: var(--primary-muted);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 

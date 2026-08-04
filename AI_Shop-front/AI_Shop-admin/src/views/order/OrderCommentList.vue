@@ -149,7 +149,7 @@ const showAllProducts = (row) => {
     html += `<div style="display:flex;gap:12px;padding:10px 0;${idx > 0 ? 'border-top:1px solid #eee;' : ''}">
       ${cover}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:500;margin-bottom:4px;color:#1d1d1f;">${item.productName || ''}</div>
+        <div style="font-size:14px;font-weight:500;margin-bottom:4px;color:#17202a;">${item.productName || ''}</div>
         <div style="font-size:12px;color:#86868b;">${item.propertyInfo || ''}</div>
         <div style="font-size:12px;color:#86868b;margin-top:2px;">￥${item.itemAmount || 0} × ${item.buyCount || 0}</div>
       </div>

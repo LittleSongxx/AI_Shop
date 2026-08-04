@@ -11,13 +11,13 @@
     display: flex;
     gap: 6px;
     padding: 6px;
-    border-radius: 18px;
+    border-radius: 8px;
 
     .step {
       flex: 1;
       height: 40px;
       border: none;
-      border-radius: 14px;
+      border-radius: 6px;
       background: transparent;
       color: var(--m-ink-2);
       font-size: 14px;
@@ -49,7 +49,7 @@
       font-size: 15px;
       font-weight: 600;
       color: var(--m-ink);
-      letter-spacing: 0.01em;
+      letter-spacing: 0;
     }
 
     .section-hint {
@@ -64,7 +64,7 @@
       padding: 3px 8px;
       border-radius: 8px;
       background: var(--m-gold-soft);
-      color: #927535;
+      color: #1d4ed8;
       font-size: 11px;
       font-weight: 600;
     }
@@ -146,7 +146,7 @@
       width: 32px;
       height: 32px;
       border: 1px solid rgba(120, 120, 128, 0.2);
-      border-radius: 10px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.55);
       color: var(--m-ink-2);
       display: inline-flex;
@@ -164,7 +164,7 @@
     .dim-value-card {
       padding: 12px;
       margin-bottom: 8px;
-      border-radius: 14px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.45);
       border: 1px solid rgba(120, 120, 128, 0.14);
 
@@ -233,7 +233,7 @@
     display: flex;
     gap: 10px;
     padding: 10px 12px;
-    border-radius: 18px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.82);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
@@ -246,7 +246,7 @@
       height: 44px;
       padding: 0 16px;
       border: 1px solid rgba(120, 120, 128, 0.22);
-      border-radius: 14px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.6);
       color: var(--m-ink-2);
       font-size: 14px;
@@ -258,14 +258,14 @@
       flex: 1;
       height: 44px;
       border: none;
-      border-radius: 14px;
-      background: linear-gradient(135deg, #2a2420 0%, #1d1d1f 100%);
+      border-radius: 6px;
+      background: #0f766e;
       color: #fff;
       font-size: 15px;
       font-weight: 600;
-      letter-spacing: 0.02em;
+      letter-spacing: 0;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(29, 29, 31, 0.25);
+      box-shadow: 0 4px 16px rgba(15, 118, 110, 0.22);
     }
   }
 
@@ -290,10 +290,10 @@
     .add-dim-tag {
       height: 32px;
       padding: 0 12px;
-      border: 1px solid rgba(201, 169, 98, 0.35);
+      border: 1px solid rgba(37, 99, 235, 0.30);
       border-radius: 999px;
       background: var(--m-gold-soft);
-      color: #7a6530;
+      color: #1d4ed8;
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
@@ -308,7 +308,7 @@
     .el-select__wrapper,
     .el-cascader .el-input__wrapper {
       min-height: 42px;
-      border-radius: 12px !important;
+      border-radius: 6px !important;
       box-shadow: 0 0 0 1px rgba(120, 120, 128, 0.18) inset !important;
       background: rgba(255, 255, 255, 0.65) !important;
     }

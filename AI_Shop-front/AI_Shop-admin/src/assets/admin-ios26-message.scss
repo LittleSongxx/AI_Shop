@@ -1,11 +1,11 @@
 
 :root {
   --ios26-alert-bg: rgba(255, 255, 255, 0.88);
-  --ios26-alert-radius: 36px;
-  --ios26-alert-title: #1d1d1f;
+  --ios26-alert-radius: 8px;
+  --ios26-alert-title: #17202a;
   --ios26-alert-body: #3c3c43;
-  --ios26-alert-blue: #0071e3;
-  --ios26-alert-blue-hover: #0077ed;
+  --ios26-alert-blue: #0f766e;
+  --ios26-alert-blue-hover: #0b665f;
 }
 
 .el-overlay.is-message-box {
@@ -34,7 +34,7 @@
       justify-content: center;
       font-size: 17px;
       font-weight: 600;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       color: var(--ios26-alert-title);
       line-height: 1.3;
     }
@@ -68,7 +68,7 @@
         font-size: 14px;
         line-height: 1.5;
         color: var(--ios26-alert-body);
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
       }
     }
   }
@@ -90,10 +90,10 @@
       margin: 0 !important;
       height: 36px;
       padding: 0 20px;
-      border-radius: 14px;
+      border-radius: 6px;
       font-size: 14px;
       font-weight: 500;
-      letter-spacing: -0.01em;
+      letter-spacing: 0;
       box-shadow: none;
     }
 

@@ -32,7 +32,7 @@ describe('admin workflow helpers', () => {
 
   it('renders the brand marker as an accessible image', () => {
     const { getByRole } = render(BrandMark, { props: { variant: 'light' } })
-    expect(getByRole('img', { name: '简选 Simlect' })).toBeTruthy()
+    expect(getByRole('img', { name: '智选 SmartSelect' })).toBeTruthy()
   })
 
   it('validates knowledge document type and size before upload', () => {

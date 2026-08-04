@@ -78,7 +78,7 @@ const tabs = [
 ]
 
 const tabPaths = tabs.map((t) => t.path)
-const title = computed(() => route.meta?.title || '简选运营')
+const title = computed(() => route.meta?.title || '智选运营')
 const showBack = computed(() => !tabPaths.includes(route.path) && !!route.meta?.showBack)
 
 const isTabActive = (tab) => {
@@ -148,7 +148,7 @@ const switchToDesktop = () => {
   height: 52px;
   margin: 8px 10px 0;
   padding: 0 8px;
-  border-radius: 18px;
+  border-radius: 8px;
 
   .m-top-title {
     flex: 1;
@@ -158,7 +158,7 @@ const switchToDesktop = () => {
     .m-title-text {
       font-size: 17px;
       font-weight: 600;
-      letter-spacing: 0.02em;
+      letter-spacing: 0;
       color: var(--m-ink);
     }
   }
@@ -170,7 +170,7 @@ const switchToDesktop = () => {
     display: grid;
     place-items: center;
     border: none;
-    border-radius: 12px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.5);
     color: var(--m-ink);
     cursor: pointer;

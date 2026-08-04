@@ -552,7 +552,7 @@ const delRow = (row) => {
 
 .support-msg {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #f6f7fb;
 
   &.admin {

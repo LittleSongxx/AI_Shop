@@ -10,7 +10,7 @@
 
 ::-webkit-scrollbar-thumb {
     background: #c7c7cc;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -22,28 +22,28 @@
 }
 
 :root {
-    --text: #1d1d1f;
-    --text2: #6e6e73;
-    --text3: #86868b;
-    --pink: #f5f5f7;
-    --red: #ff3b30;
-    --primary: #1d1d1f;
-    --primary-hover: #424245;
-    --primary-soft: #f5f5f7;
-    --primary-muted: rgba(29, 29, 31, 0.08);
-    --link: #0071e3;
-    --link2: #005bb5;
-    --green: #34c759;
-    --gold: #c9a962;
-    --gold-soft: #f7f3ea;
-    --gold-muted: rgba(201, 169, 98, 0.18);
-    --card-radius: 12px;
-    --page-bg: #f5f5f7;
+    --text: #17202a;
+    --text2: #4b5b63;
+    --text3: #73848c;
+    --pink: #fff3f0;
+    --red: #dc2626;
+    --primary: #0f766e;
+    --primary-hover: #0b665f;
+    --primary-soft: #ecfdf5;
+    --primary-muted: rgba(15, 118, 110, 0.1);
+    --link: #2563eb;
+    --link2: #1d4ed8;
+    --green: #16a34a;
+    --gold: #2563eb;
+    --gold-soft: #eff6ff;
+    --gold-muted: rgba(37, 99, 235, 0.14);
+    --card-radius: 8px;
+    --page-bg: #f4f7f8;
     --surface: #ffffff;
     --header-bg: #ffffff;
-    --header-border: #e8e8ed;
-    --sidebar-bg: #1d1d1f;
-    --sidebar-bg-end: #000000;
+    --header-border: #dde5e8;
+    --sidebar-bg: #17202a;
+    --sidebar-bg-end: #0f3f3b;
     --sidebar-text: rgba(255, 255, 255, 0.72);
     --sidebar-text-muted: rgba(255, 255, 255, 0.45);
     --sidebar-text-active: #ffffff;

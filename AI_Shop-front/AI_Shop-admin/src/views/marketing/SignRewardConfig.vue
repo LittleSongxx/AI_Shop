@@ -293,7 +293,7 @@ onMounted(async () => {
 }
 
 .config-card {
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .config-form {

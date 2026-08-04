@@ -127,7 +127,7 @@ onUnmounted(() => {
   gap: 8px;
   height: 44px;
   padding: 0 12px;
-  border-radius: 16px;
+  border-radius: 8px;
 
   .search-icon {
     font-size: 16px;
@@ -218,7 +218,7 @@ onUnmounted(() => {
 
   &.gold {
     background: var(--m-gold-soft);
-    color: #927535;
+    color: #1d4ed8;
   }
 
   &.muted {

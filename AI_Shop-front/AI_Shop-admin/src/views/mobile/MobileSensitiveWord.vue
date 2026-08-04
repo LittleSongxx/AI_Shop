@@ -131,7 +131,7 @@ onMounted(loadList)
   height: 40px;
   padding: 0 12px;
   border: 1px solid rgba(120, 120, 128, 0.24);
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.6);
   font-size: 14px;
   color: var(--m-ink);
@@ -167,7 +167,7 @@ onMounted(loadList)
   flex: 1;
   height: 38px;
   border: 1px solid rgba(120, 120, 128, 0.24);
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.6);
   color: var(--m-ink-2);
   font-size: 13px;
@@ -182,7 +182,7 @@ onMounted(loadList)
   &.warning {
     background: rgba(255, 149, 0, 0.16);
     border-color: rgba(255, 149, 0, 0.32);
-    color: #c75b00;
+    color: #b45309;
   }
 }
 

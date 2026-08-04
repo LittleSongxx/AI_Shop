@@ -79,7 +79,7 @@ const runTool = (apiKey, label, params = {}) => {
 .tool-btn {
   height: 44px;
   border: 1px solid rgba(120, 120, 128, 0.24);
-  border-radius: 13px;
+  border-radius: 8px;
   background: var(--m-ink);
   color: #fff;
   font-size: 14px;

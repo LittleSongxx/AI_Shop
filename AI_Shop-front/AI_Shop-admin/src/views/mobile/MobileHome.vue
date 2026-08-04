@@ -198,7 +198,7 @@ onMounted(() => {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: 13px;
+    border-radius: 8px;
     font-size: 21px;
     background: var(--m-gold-soft);
     color: var(--m-ink);
@@ -274,7 +274,7 @@ onMounted(() => {
   gap: 6px;
   padding: 10px 4px;
   border: none;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   transition: transform 0.15s, background 0.2s;

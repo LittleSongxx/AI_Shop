@@ -111,7 +111,7 @@ const showAllProducts = (row) => {
     html += `<div style="display:flex;gap:12px;padding:10px 0;${idx > 0 ? 'border-top:1px solid #eee;' : ''}">
       ${cover}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:500;margin-bottom:4px;color:#1d1d1f;">${item.productName || ''}</div>
+        <div style="font-size:14px;font-weight:500;margin-bottom:4px;color:#17202a;">${item.productName || ''}</div>
         <div style="font-size:12px;color:#86868b;">${item.propertyInfo || ''}</div>
         <div style="font-size:12px;color:#86868b;margin-top:2px;">￥${item.itemAmount || 0} × ${item.buyCount || 0}</div>
       </div>
@@ -179,7 +179,7 @@ onUnmounted(() => {
   gap: 8px;
   height: 44px;
   padding: 0 12px;
-  border-radius: 16px;
+  border-radius: 8px;
 
   .search-input {
     flex: 1;
@@ -247,7 +247,7 @@ onUnmounted(() => {
       padding: 1px 6px;
       border-radius: 4px;
       background: var(--m-gold-soft);
-      color: #927535;
+      color: #1d4ed8;
       font-size: 10px;
       cursor: pointer;
       white-space: nowrap;
@@ -281,7 +281,7 @@ onUnmounted(() => {
       padding: 0 6px;
       border-radius: 6px;
       background: var(--m-gold-soft);
-      color: #927535;
+      color: #1d4ed8;
       font-size: 11px;
     }
   }
@@ -289,7 +289,7 @@ onUnmounted(() => {
   .cmt-reply {
     padding: 8px 10px;
     margin-top: 8px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(120, 120, 128, 0.08);
   }
 
@@ -302,7 +302,7 @@ onUnmounted(() => {
       flex: 1;
       height: 32px;
       border: 1px solid rgba(120, 120, 128, 0.24);
-      border-radius: 10px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.5);
       color: var(--m-ink-2);
       font-size: 12px;

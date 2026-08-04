@@ -191,7 +191,7 @@ onUnmounted(() => {
     width: 100%;
     max-height: 200px;
     object-fit: contain;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #f5f5f7;
     margin-bottom: 8px;
   }
@@ -214,14 +214,14 @@ onUnmounted(() => {
   .op-btn {
     flex: 1;
     height: 34px;
-    border-radius: 10px;
+    border-radius: 8px;
     border: 1px solid rgba(120, 120, 128, 0.24);
     background: rgba(255, 255, 255, 0.5);
     font-size: 13px;
 
     &.primary {
       color: var(--m-gold);
-      border-color: rgba(201, 169, 98, 0.4);
+      border-color: rgba(37, 99, 235, 0.32);
     }
   }
 }

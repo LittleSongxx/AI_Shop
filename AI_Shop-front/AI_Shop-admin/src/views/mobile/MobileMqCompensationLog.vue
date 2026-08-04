@@ -201,7 +201,7 @@ onUnmounted(() => {
 .search-select {
   width: 100%;
   height: 40px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(120, 120, 128, 0.2);
   padding: 0 12px;
   font-size: 14px;
@@ -274,7 +274,7 @@ onUnmounted(() => {
   width: 100%;
   max-height: 85vh;
   overflow: auto;
-  border-radius: 16px 16px 0 0;
+  border-radius: 8px 8px 0 0;
   padding: 16px;
 }
 
@@ -309,7 +309,7 @@ onUnmounted(() => {
 .op-btn {
   flex: 1;
   height: 42px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(120, 120, 128, 0.25);
   background: #fff;
   font-size: 14px;

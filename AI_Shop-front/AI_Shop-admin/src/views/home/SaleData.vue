@@ -36,7 +36,7 @@ import ShippedOrder from './ShippedOrder.vue'
   background: var(--surface);
   border: 1px solid var(--header-border);
   box-shadow: var(--shadow-card);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .ops-section {

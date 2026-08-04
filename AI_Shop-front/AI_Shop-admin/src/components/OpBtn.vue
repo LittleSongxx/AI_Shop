@@ -59,7 +59,7 @@ const tooltipText = computed(() => (props.disabled && props.disabledTips ? props
 const TYPE_MAP = {
   primary: 'var(--primary)',
   success: 'var(--green)',
-  warning: '#d4a24e',
+  warning: '#d97706',
   danger: '#e56b5b',
   info: '#8b95a8',
 }
@@ -85,11 +85,11 @@ const handleClick = (event) => {
     width: 30px;
     height: 30px;
     background: var(--primary-muted);
-    border: 1px solid rgba(201, 117, 79, 0.22);
+    border: 1px solid rgba(37, 99, 235, 0.20);
 
     &:hover {
       background: var(--primary-soft);
-      border-color: rgba(201, 117, 79, 0.35);
+      border-color: rgba(37, 99, 235, 0.32);
     }
 
     .iconfont {
@@ -103,7 +103,7 @@ const handleClick = (event) => {
     height: 30px;
     padding: 0 10px;
     background: var(--primary-muted);
-    border: 1px solid rgba(201, 117, 79, 0.22);
+    border: 1px solid rgba(37, 99, 235, 0.20);
 
     &:hover {
       background: var(--primary-soft);
@@ -161,6 +161,6 @@ const handleClick = (event) => {
 }
 
 .btn-panel--warning .btn-text {
-  color: #d4a24e;
+  color: #d97706;
 }
 </style>

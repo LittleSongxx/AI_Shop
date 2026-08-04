@@ -5,8 +5,8 @@
         <div class="brand-glow" />
         <div class="brand-content">
           <BrandMark variant="light" class="brand-mark" />
-          <h1 class="brand-name">简选</h1>
-          <p class="brand-tagline">Simlect · 运营后台</p>
+          <h1 class="brand-name">智选</h1>
+          <p class="brand-tagline">SmartSelect · 运营后台</p>
           <p class="brand-desc">
             统一管理商品、订单、营销与数据，为日常运营提供清晰高效的工作台。
           </p>
@@ -156,14 +156,14 @@ const doSubmit = () => {
 
 <style lang="scss" scoped>
 .login-page {
-  --accent: #d4845f;
-  --accent-hover: #c9754f;
-  --accent-soft: #f3e6de;
-  --brand-ink: #4a3f3a;
-  --brand-muted: #7a6a62;
-  --ink: #2c2c34;
-  --muted: #6b7280;
-  --line: #e8eaed;
+  --accent: #0f766e;
+  --accent-hover: #0b665f;
+  --accent-soft: #ecfdf5;
+  --brand-ink: #ffffff;
+  --brand-muted: rgba(255, 255, 255, 0.78);
+  --ink: #17202a;
+  --muted: #4b5b63;
+  --line: #dde5e8;
   --panel: #ffffff;
 
   box-sizing: border-box;
@@ -174,10 +174,7 @@ const doSubmit = () => {
   align-items: center;
   justify-content: center;
   padding: 32px 24px;
-  background-color: #f0ebe6;
-  background-image:
-    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(212, 132, 95, 0.18), transparent 50%),
-    radial-gradient(ellipse 90% 70% at 100% 100%, rgba(255, 255, 255, 0.5), transparent 45%);
+  background-color: #f4f7f8;
 }
 
 .login-panel {
@@ -186,7 +183,7 @@ const doSubmit = () => {
   grid-template-columns: minmax(280px, 1fr) 400px;
   width: min(920px, 100%);
   min-height: 520px;
-  border-radius: 16px;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.65);
@@ -198,17 +195,12 @@ const doSubmit = () => {
 .panel-brand {
   position: relative;
   padding: 48px 40px;
-  background: linear-gradient(165deg, #f2e0d6 0%, #e8cfc2 48%, #dfc4b5 100%);
+  background: #0f766e;
   color: var(--brand-ink);
   overflow: hidden;
 
   .brand-glow {
-    position: absolute;
-    inset: -20% -10% auto auto;
-    width: 70%;
-    aspect-ratio: 1;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, transparent 68%);
-    pointer-events: none;
+    display: none;
   }
 
   .brand-content {
@@ -221,14 +213,14 @@ const doSubmit = () => {
     width: 48px;
     height: 48px;
     margin-bottom: 24px;
-    box-shadow: 0 4px 14px rgba(92, 74, 66, 0.08);
+    box-shadow: none;
   }
 
   .brand-name {
     margin: 0 0 6px;
     font-size: 28px;
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: 0;
     color: var(--brand-ink);
   }
 
@@ -236,7 +228,7 @@ const doSubmit = () => {
     margin: 0 0 20px;
     font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.2em;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: var(--brand-muted);
   }
@@ -291,7 +283,7 @@ const doSubmit = () => {
     font-size: 22px;
     font-weight: 600;
     color: var(--ink);
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
   }
 
   p {
@@ -380,7 +372,7 @@ const doSubmit = () => {
   border-radius: 8px;
   font-size: 15px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   border: none;
   --el-button-bg-color: var(--accent);
   --el-button-border-color: var(--accent);

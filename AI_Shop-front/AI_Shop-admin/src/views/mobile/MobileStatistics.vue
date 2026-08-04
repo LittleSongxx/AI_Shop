@@ -118,7 +118,7 @@ onUnmounted(() => {
   gap: 8px;
   height: 44px;
   padding: 0 12px;
-  border-radius: 16px;
+  border-radius: 8px;
 
   .search-input {
     flex: 1;
@@ -138,7 +138,7 @@ onUnmounted(() => {
     flex-shrink: 0;
     border: none;
     background: rgba(255, 255, 255, 0.5);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 4px 6px;
     font-size: 13px;
     color: var(--m-ink-2);
@@ -148,8 +148,8 @@ onUnmounted(() => {
 
 .m-wide-btn {
   height: 40px;
-  border: 1px solid rgba(201, 169, 98, 0.4);
-  border-radius: 13px;
+  border: 1px solid rgba(37, 99, 235, 0.32);
+  border-radius: 8px;
   background: var(--m-gold-soft);
   color: #8a6d2c;
   font-size: 14px;
