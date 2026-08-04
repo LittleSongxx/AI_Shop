@@ -40,5 +40,6 @@ public interface LocalMessageOutboxMapper {
                                                  @Param("sendingStatus") Integer sendingStatus,
                                                  @Param("beforeTime") Date beforeTime,
                                                  @Param("now") Date now,
+                                                 @Param("maxRetries") int maxRetries,
                                                  @Param("limit") int limit);
 }

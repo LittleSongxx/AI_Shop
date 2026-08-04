@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Date;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -65,5 +66,29 @@ class OutboxMessageServiceImplTest {
         verify(mapper).markSent(
                 eq(7L), eq(OutboxMessageStatusEnum.SENDING.getStatus()),
                 eq(OutboxMessageStatusEnum.SENT.getStatus()), anyString(), any(Date.class));
+    }
+
+    @Test
+    void dispatchBatchPassesRetryCapToDatabaseQuery() {
+        when(mapper.selectDispatchBatch(
+                eq(OutboxMessageStatusEnum.PENDING.getStatus()),
+                eq(OutboxMessageStatusEnum.FAILED.getStatus()),
+                eq(OutboxMessageStatusEnum.SENDING.getStatus()),
+                any(Date.class),
+                any(Date.class),
+                eq(10),
+                eq(20)))
+                .thenReturn(List.of());
+
+        service.dispatchPendingBatch(20, 10);
+
+        verify(mapper).selectDispatchBatch(
+                eq(OutboxMessageStatusEnum.PENDING.getStatus()),
+                eq(OutboxMessageStatusEnum.FAILED.getStatus()),
+                eq(OutboxMessageStatusEnum.SENDING.getStatus()),
+                any(Date.class),
+                any(Date.class),
+                eq(10),
+                eq(20));
     }
 }

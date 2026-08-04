@@ -141,6 +141,7 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
                 OutboxMessageStatusEnum.SENDING.getStatus(),
                 before,
                 now,
+                maxRetries,
                 batchSize);
         if (list == null || list.isEmpty()) {
             return 0;

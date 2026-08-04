@@ -90,6 +90,7 @@
     <select id="selectDispatchBatch" resultMap="base_result_map">
         select * from local_message_outbox
         where create_time &lt;= #{beforeTime}
+          and ifnull(retry_count, 0) &lt; #{maxRetries}
           and (
             (
               status in (#{pendingStatus}, #{failedStatus})
