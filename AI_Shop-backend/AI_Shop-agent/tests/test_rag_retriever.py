@@ -6,12 +6,16 @@ import pytest
 from app.config.settings import Settings, get_settings
 from app.rag.retriever import (
     ES_MAX_NUM_CANDIDATES,
+    KNOWLEDGE_CATALOG_LKG_CACHE_KEY,
+    KNOWLEDGE_VERSION_CACHE_KEY,
     RRF_RANK_CONSTANT,
+    KnowledgeCatalogUnavailable,
     RagRetriever,
     cosine_to_es_score,
     knn_num_candidates,
     rrf_score_at_rank,
 )
+from app.services.java_internal_client import java_internal_client
 
 
 @pytest.mark.asyncio
@@ -263,3 +267,211 @@ def test_rag_thresholds_are_independently_configurable():
     assert settings.rag_product_vector_min_cosine == 0.15
     assert settings.rag_evidence_min_relevance == 0.8
     assert settings.rag_evidence_min_rrf_rank == 3
+
+
+@pytest.mark.asyncio
+async def test_java_catalog_is_saved_as_agent_owned_last_known_good(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(None, True)))
+    monkeypatch.setattr(retriever, "_read_last_known_good_catalog", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        java_internal_client,
+        "knowledge_catalog",
+        AsyncMock(return_value={"version": 7, "active_document_ids": ["11", "11", "12"]}),
+    )
+    save = AsyncMock()
+    monkeypatch.setattr(retriever, "_save_last_known_good_catalog", save)
+
+    catalog = await retriever._knowledge_catalog()
+
+    assert catalog == {"version": 7, "active_document_ids": ["11", "12"]}
+    save.assert_awaited_once_with(catalog)
+    assert KNOWLEDGE_VERSION_CACHE_KEY != KNOWLEDGE_CATALOG_LKG_CACHE_KEY
+
+
+@pytest.mark.asyncio
+async def test_java_catalog_refreshes_even_when_lkg_matches_release_hint(monkeypatch):
+    retriever = RagRetriever()
+    lkg = {"version": 7, "active_document_ids": ["11"]}
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(7, True)))
+    monkeypatch.setattr(retriever, "_read_last_known_good_catalog", AsyncMock(return_value=lkg))
+    java_catalog = AsyncMock(
+        return_value={"version": 8, "active_document_ids": ["12"]}
+    )
+    monkeypatch.setattr(java_internal_client, "knowledge_catalog", java_catalog)
+    save = AsyncMock()
+    monkeypatch.setattr(retriever, "_save_last_known_good_catalog", save)
+
+    catalog = await retriever._knowledge_catalog()
+
+    assert catalog == {"version": 8, "active_document_ids": ["12"]}
+    java_catalog.assert_awaited_once()
+    save.assert_awaited_once_with(catalog)
+
+
+@pytest.mark.asyncio
+async def test_java_failure_uses_lkg_when_hint_does_not_prove_it_stale(monkeypatch):
+    retriever = RagRetriever()
+    lkg = {"version": 7, "active_document_ids": ["11"]}
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(6, True)))
+    monkeypatch.setattr(retriever, "_read_last_known_good_catalog", AsyncMock(return_value=lkg))
+    monkeypatch.setattr(
+        java_internal_client,
+        "knowledge_catalog",
+        AsyncMock(side_effect=OSError("java unavailable")),
+    )
+
+    assert await retriever._knowledge_catalog() == lkg
+
+
+@pytest.mark.asyncio
+async def test_newer_release_hint_fails_closed_when_java_and_lkg_are_stale(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(8, True)))
+    monkeypatch.setattr(
+        retriever,
+        "_read_last_known_good_catalog",
+        AsyncMock(return_value={"version": 7, "active_document_ids": ["11"]}),
+    )
+    monkeypatch.setattr(
+        java_internal_client,
+        "knowledge_catalog",
+        AsyncMock(side_effect=OSError("java unavailable")),
+    )
+
+    assert await retriever._knowledge_catalog() is None
+
+
+@pytest.mark.asyncio
+async def test_no_java_or_lkg_does_not_fabricate_version_one(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(None, True)))
+    monkeypatch.setattr(retriever, "_read_last_known_good_catalog", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        java_internal_client,
+        "knowledge_version",
+        AsyncMock(side_effect=OSError("java unavailable")),
+    )
+
+    with pytest.raises(KnowledgeCatalogUnavailable):
+        await retriever._knowledge_version()
+
+
+@pytest.mark.asyncio
+async def test_faq_cache_version_uses_java_when_redis_release_hint_is_stale(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(7, True)))
+    monkeypatch.setattr(
+        retriever,
+        "_read_last_known_good_catalog",
+        AsyncMock(return_value={"version": 7, "active_document_ids": ["11"]}),
+    )
+    java_version = AsyncMock(return_value=8)
+    monkeypatch.setattr(java_internal_client, "knowledge_version", java_version)
+
+    assert await retriever._knowledge_version() == 8
+    java_version.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_faq_cache_version_does_not_reuse_hint_when_java_is_unavailable(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(retriever, "_read_release_hint", AsyncMock(return_value=(7, True)))
+    monkeypatch.setattr(
+        retriever,
+        "_read_last_known_good_catalog",
+        AsyncMock(return_value={"version": 7, "active_document_ids": ["11"]}),
+    )
+    monkeypatch.setattr(
+        java_internal_client,
+        "knowledge_version",
+        AsyncMock(side_effect=OSError("java unavailable")),
+    )
+
+    with pytest.raises(KnowledgeCatalogUnavailable):
+        await retriever._knowledge_version()
+
+
+@pytest.mark.asyncio
+async def test_exact_faq_bypasses_cache_when_release_version_is_unavailable(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(
+        retriever,
+        "_knowledge_version",
+        AsyncMock(side_effect=KnowledgeCatalogUnavailable("version unavailable")),
+    )
+    cache_get = AsyncMock()
+    cache_set = AsyncMock()
+    monkeypatch.setattr(retriever, "_get_faq_exact_cache", cache_get)
+    monkeypatch.setattr(retriever, "_set_faq_exact_cache", cache_set)
+    exact = AsyncMock(
+        return_value={
+            "question": "如何开发票",
+            "answer": "请在订单详情申请。",
+            "question_id": 9,
+        }
+    )
+    monkeypatch.setattr(java_internal_client, "exact_faq", exact)
+
+    result = await retriever.exact_faq_answer("如何开发票")
+
+    assert result is not None
+    assert result["answer"] == "请在订单详情申请。"
+    assert result["version"] == 0
+    exact.assert_awaited_once_with("如何开发票")
+    cache_get.assert_not_awaited()
+    cache_set.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_exact_faq_timeout_budget_includes_version_resolution(monkeypatch):
+    monkeypatch.setenv("FAQ_FAST_PATH_TIMEOUT_SECONDS", "0.01")
+    get_settings.cache_clear()
+    retriever = RagRetriever()
+
+    async def slow_version():
+        await asyncio.sleep(0.1)
+        return 8
+
+    monkeypatch.setattr(retriever, "_knowledge_version", slow_version)
+    exact = AsyncMock(return_value={"answer": "不应返回"})
+    monkeypatch.setattr(retriever, "_exact_faq", exact)
+    try:
+        assert await retriever.exact_faq_answer("配送范围是什么") is None
+        exact.assert_not_awaited()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_active_document_ids_are_sent_to_both_es_recall_paths(monkeypatch):
+    retriever = RagRetriever()
+    captured: list[list[dict]] = []
+
+    async def fake_expand(_query):
+        return ["配送"]
+
+    async def fake_keyword(_query, _types, _limit, filters=None):
+        captured.append(filters or [])
+        return []
+
+    async def fake_vector(_query, _types, _limit, extra_filters=None):
+        captured.append(extra_filters or [])
+        return []
+
+    monkeypatch.setattr("app.rag.retriever.expand_query", fake_expand)
+    monkeypatch.setattr(retriever, "_keyword_search_docs", fake_keyword)
+    monkeypatch.setattr(retriever, "_vector_search", fake_vector)
+
+    await retriever._search_knowledge_docs(
+        "配送",
+        3,
+        version_filter=7,
+        active_document_ids=["11", "12"],
+    )
+
+    assert len(captured) == 2
+    serialized = str(captured)
+    assert "metadata.documentId" in serialized
+    assert "11" in serialized and "12" in serialized
+    assert "'lte': 7" in serialized

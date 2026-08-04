@@ -16,6 +16,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -35,18 +36,22 @@ public class SearchToolInternalController extends ABaseController {
     private ReliableMessageSender reliableMessageSender;
 
     @PostMapping("/productData")
-    public ResponseVO<Void> productData() {
+    public ResponseVO<Void> productData(
+            @RequestParam(name = "includeVector", defaultValue = "true") boolean includeVector) {
         List<String> productIds = productFeignSupport.listOnSaleProductIds();
         for (String productId : productIds) {
             esSearchComponent.saveIndex(productId);
-            RagDataDTO ragDataDTO = new RagDataDTO(productId, RagDataTypeEnum.PRODUCT.getType());
-            reliableMessageSender.sendMessage(
-                    RabbitMQConfig.RAG_EXCHANGE,
-                    RabbitMQConfig.RAG_QUEUE_KEY,
-                    ragDataDTO,
-                    MqIdempotencyKeys.ragProduct(productId, ragDataDTO.getVersion()),
-                    MessageReliabilityLevelEnum.HIGH);
+            if (includeVector) {
+                RagDataDTO ragDataDTO = new RagDataDTO(productId, RagDataTypeEnum.PRODUCT.getType());
+                reliableMessageSender.sendMessage(
+                        RabbitMQConfig.RAG_EXCHANGE,
+                        RabbitMQConfig.RAG_QUEUE_KEY,
+                        ragDataDTO,
+                        MqIdempotencyKeys.ragProduct(productId, ragDataDTO.getVersion()),
+                        MessageReliabilityLevelEnum.HIGH);
+            }
         }
+        log.info("product_index_rebuild_completed count={} includeVector={}", productIds.size(), includeVector);
         return getSuccessResponseVO(null);
     }
 

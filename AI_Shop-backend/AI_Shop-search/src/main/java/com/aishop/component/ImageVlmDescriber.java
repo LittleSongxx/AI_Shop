@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -58,6 +59,9 @@ public class ImageVlmDescriber {
     @Value("${aishop.vlm.timeout-seconds:15}")
     private int timeoutSeconds;
 
+    @Value("${aishop.vlm.connect-timeout-seconds:5}")
+    private int connectTimeoutSeconds;
+
     private final ObjectMapper objectMapper;
 
     public ImageVlmDescriber(ObjectMapper objectMapper) {
@@ -80,6 +84,10 @@ public class ImageVlmDescriber {
         if (!isEnabled() || images == null || images.isEmpty()) {
             return List.of();
         }
+        // 一个文档共享一份 client 配置，避免为每张图重复构建客户端。
+        // SimpleClientHttpRequestFactory 不承诺连接池复用，因此这里不依赖该语义。
+        RestClient client = buildClient();
+
         List<String> descriptions = new ArrayList<>();
         int limit = Math.min(images.size(), MAX_IMAGES_PER_DOC);
         for (int i = 0; i < limit; i++) {
@@ -88,7 +96,7 @@ public class ImageVlmDescriber {
                 continue;
             }
             try {
-                String desc = callVlm(bytes);
+                String desc = callVlm(bytes, client);
                 if (desc != null && !desc.isBlank()) {
                     descriptions.add(desc);
                     log.debug("vlm_image_described index={} length={}", i, desc.length());
@@ -100,14 +108,37 @@ public class ImageVlmDescriber {
         return descriptions;
     }
 
-    private String callVlm(byte[] imageBytes) throws Exception {
-        String dataUri = "data:image/png;base64,"
-                + Base64.getEncoder().encodeToString(imageBytes);
-
-        RestClient client = RestClient.builder()
+    private RestClient buildClient() {
+        SimpleClientHttpRequestFactory factory = createRequestFactory(
+                connectTimeoutSeconds, timeoutSeconds);
+        return RestClient.builder()
                 .baseUrl(baseUrl.stripTrailing().replaceAll("/+$", ""))
                 .defaultHeader("Authorization", "Bearer " + apiKey)
+                .requestFactory(factory)
                 .build();
+    }
+
+    /**
+     * Build the JDK request factory with independent, bounded timeouts.
+     * Connection setup is kept short; the read timeout honours the configured
+     * VLM latency budget (the old implementation incorrectly capped both at 5s).
+     */
+    static SimpleClientHttpRequestFactory createRequestFactory(
+            int connectTimeoutSeconds, int readTimeoutSeconds) {
+        int safeConnectSeconds = Math.min(Math.max(connectTimeoutSeconds, 1), 5);
+        int safeReadSeconds = Math.min(Math.max(readTimeoutSeconds, 1), 60);
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout((int) Duration.ofSeconds(safeConnectSeconds).toMillis());
+        factory.setReadTimeout((int) Duration.ofSeconds(safeReadSeconds).toMillis());
+        return factory;
+    }
+
+    private String callVlm(byte[] imageBytes, RestClient client) throws Exception {
+        // 按魔数探测真实图片格式，不再写死 image/png：
+        // PNG 之外常见的 jpg/gif/webp/bmp 在旧实现下会被 VLM 拒收或描述失真。
+        String mime = detectImageMime(imageBytes);
+        String dataUri = "data:" + mime + ";base64,"
+                + Base64.getEncoder().encodeToString(imageBytes);
 
         Map<String, Object> body = Map.of(
                 "model", model,
@@ -144,5 +175,41 @@ public class ImageVlmDescriber {
         }
         String text = choices.get(0).path("message").path("content").asText("").strip();
         return text.isBlank() ? null : text;
+    }
+
+    /** 按文件头魔数探测常见图片 MIME；认不出的回落到 octet-stream。 */
+    static String detectImageMime(byte[] bytes) {
+        if (bytes == null || bytes.length < 3) {
+            return "application/octet-stream";
+        }
+        int b0 = bytes[0] & 0xFF;
+        int b1 = bytes[1] & 0xFF;
+        if (bytes.length >= 8
+                && b0 == 0x89 && b1 == 0x50
+                && bytes[2] == 0x4E && bytes[3] == 0x47
+                && bytes[4] == 0x0D && bytes[5] == 0x0A
+                && bytes[6] == 0x1A && bytes[7] == 0x0A) {
+            return "image/png";
+        }
+        if (b0 == 0xFF && b1 == 0xD8 && (bytes[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        if (bytes.length >= 6
+                && b0 == 'G' && b1 == 'I' && bytes[2] == 'F'
+                && ((bytes[3] == '8' && bytes[4] == '7' && bytes[5] == 'a')
+                    || (bytes[3] == '8' && bytes[4] == '9' && bytes[5] == 'a'))) {
+            return "image/gif";
+        }
+        if (b0 == 'R' && b1 == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes.length >= 12
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') {
+            // RIFF 家族还有 AVI 等其他容器：只查 RIFF+'F' 会把它们误判成
+            // image/webp，VLM 会拒收或解析失败（P1 审查：WEBP 魔数不完整）。
+            return "image/webp";
+        }
+        if (b0 == 0x42 && b1 == 0x4D) {
+            return "image/bmp";
+        }
+        return "application/octet-stream";
     }
 }

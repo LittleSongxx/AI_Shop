@@ -24,7 +24,6 @@ from app.memory.session_memory_service import session_memory_service
 from app.observability.telemetry import configure_telemetry, shutdown_telemetry
 from app.rag.retriever import (
     KNOWLEDGE_RELEASE_TOPIC,
-    KNOWLEDGE_VERSION_CACHE_KEY,
     rag_retriever,
 )
 from app.services.agent_queue_service import agent_queue_service
@@ -57,8 +56,10 @@ async def _knowledge_release_listener() -> None:
         async for message in pubsub.listen():
             if message.get("type") != "message":
                 continue
-            await redis_service.client.delete(KNOWLEDGE_VERSION_CACHE_KEY)
-            logger.info("knowledge_version_cache_invalidated")
+            # Java owns mall:knowledge:version as a durable release hint. The
+            # Agent only observes the pub/sub event; deleting or expiring that
+            # key here would erase the authority during a Java outage.
+            logger.info("knowledge_release_observed", version=message.get("data"))
     except asyncio.CancelledError:
         raise
     finally:

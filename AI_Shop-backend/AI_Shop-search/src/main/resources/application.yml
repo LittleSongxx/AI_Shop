@@ -134,6 +134,7 @@ aishop:
     base-url: ${VLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
     model: ${VLM_MODEL:qwen-vl-plus}
     max-tokens: ${VLM_MAX_TOKENS:150}
+    connect-timeout-seconds: ${VLM_CONNECT_TIMEOUT_SECONDS:5}
     timeout-seconds: ${VLM_TIMEOUT_SECONDS:15}
   feign:
     connect-timeout-ms: 3000

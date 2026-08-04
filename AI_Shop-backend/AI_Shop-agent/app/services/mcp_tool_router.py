@@ -88,13 +88,17 @@ class McpToolRouter:
         is identical.  Import is deferred to avoid a circular-import cycle at
         module load time.
         """
+        from app.rag.ab_test import get_bucket
         from app.rag.retriever import rag_retriever  # deferred: avoids circular import
 
         if not query:
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="bad_args").inc()
             return ToolInvokeResult(content="【知识检索失败】请提供检索关键词")
         try:
-            result = await rag_retriever.search_faq_with_trace(query)
+            # Agentic RAG 路径同样带上用户的 A/B 分桶，保证缓存键与预取路径一致。
+            result = await rag_retriever.search_faq_with_trace(
+                query, bucket=get_bucket(user_id)
+            )
             text = str(result.get("text") or "")
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="success").inc()
             if not text:

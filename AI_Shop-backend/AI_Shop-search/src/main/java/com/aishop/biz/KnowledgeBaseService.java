@@ -34,6 +34,8 @@ public interface KnowledgeBaseService {
 
     long releaseVersion();
 
+    Map<String, Object> releaseCatalog();
+
     long invalidateCaches();
 
     List<Map<String, Object>> topFaq(int limit);

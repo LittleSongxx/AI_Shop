@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import time
 from typing import Any
 
@@ -12,6 +13,7 @@ from app.harness.metrics.runtime_sensors import (
 )
 from app.infra.http_client import get_client
 from app.observability.telemetry import get_tracer
+from app.rag.ab_test import get_rag_overrides
 from app.rag.embedding import embed_text
 from app.rag.query_expander import expand_query
 from app.resilience.circuit_breaker import circuit_registry
@@ -22,7 +24,13 @@ logger = structlog.get_logger()
 tracer = get_tracer()
 
 PRODUCT_INDEX = "aishop-index"
+# Java owns this key. The Agent may read it, but must never refresh or expire it.
 KNOWLEDGE_VERSION_CACHE_KEY = "mall:knowledge:version"
+# A separate, bounded fallback containing the last catalog that Java returned
+# successfully. Keeping it separate prevents an Agent outage from changing the
+# authoritative release counter.
+KNOWLEDGE_CATALOG_LKG_CACHE_KEY = "mall:agent:knowledge:catalog:last_known_good"
+KNOWLEDGE_CATALOG_LKG_TTL_SECONDS = 24 * 60 * 60
 KNOWLEDGE_RELEASE_TOPIC = "knowledge.release"
 
 # Elasticsearch rejects a kNN search whose num_candidates exceeds this.
@@ -31,6 +39,15 @@ ES_MAX_NUM_CANDIDATES = 10_000
 # RRF 的排名平滑常数。60 是 Cormack 等人原始论文的取值，也是 ES 自己 rrf retriever
 # 的默认值；改它会让所有 RRF 阈值失去意义，所以定在这里供换算复用，不做成配置。
 RRF_RANK_CONSTANT = 60
+
+# ES 熔断器参数。registry.get_or_create 是"先到先得"：参数只在首次创建时生效，
+# 之后传什么都被忽略。原来 BM25/向量/商品关键词三处各传各的（3/30 vs 默认 5/60），
+# 并发下谁先创建谁的阈值就生效，熔断行为不确定。收敛成一份参数。
+ES_BREAKER_ARGS = {"failure_threshold": 3, "recovery_timeout": 30}
+
+
+class KnowledgeCatalogUnavailable(RuntimeError):
+    """The active knowledge catalog could not be established safely."""
 
 
 def cosine_to_es_score(cosine: float) -> float:
@@ -95,39 +112,160 @@ class RagRetriever:
         query: str,
         top_k: int | None = None,
         category_filter: list[str] | None = None,
+        bucket: str = "A",
     ) -> dict[str, Any]:
-        """Search FAQ/knowledge and retain bounded evidence for observability."""
+        """Search FAQ/knowledge and retain bounded evidence for observability.
+
+        ``bucket`` 是 A/B 分桶（默认 "A" = 基线）。A/B 覆盖参数（rag_top_k /
+        rerank_top_n）在这里统一生效，并写进语义缓存键——不同策略的检索结果
+        绝不能互相污染（P0-4：旧缓存键只有版本+查询哈希，filter/top_k/分桶/
+        rerank 配置变了也会命中旧结果）。
+        """
         started = time.perf_counter()
+        settings = get_settings()
+        overrides = get_rag_overrides(bucket)
+        effective_top_k = int(overrides.get("rag_top_k") or top_k or settings.rag_top_k)
+        rerank_top_n = int(overrides.get("rerank_top_n") or settings.rerank_top_n)
+
         cleaned = self._rewrite_query(query)
         if not cleaned:
             self._observe_search(started, False, "empty")
-            return self._trace_result(cleaned, 1, "empty", False, [], started)
+            return self._trace_result(cleaned, 0, "empty", False, [], started)
 
-        version = await self._knowledge_version()
+        catalog = await self._knowledge_catalog()
+        try:
+            version = int(catalog["version"]) if catalog else await self._knowledge_version()
+        except KnowledgeCatalogUnavailable:
+            # Exact FAQ is independently authoritative. A zero sentinel is
+            # observable in trace and is never used to authorize knowledge ES
+            # documents.
+            version = 0
         exact = await self._exact_faq(cleaned, version)
         if exact:
             docs = [self._faq_row_to_doc(exact, score=1.0)]
             self._observe_search(started, True, "exact")
-            return self._trace_result(cleaned, version, "exact", True, docs, started)
+            return self._trace_result(cleaned, version, "exact", True, docs, started, bucket=bucket)
 
-        cache_key = f"mall:rag:semantic:v{version}:{_sha256(cleaned)}"
+        cache_key = self._semantic_cache_key(
+            cleaned, version, effective_top_k, category_filter, bucket, settings, rerank_top_n
+        )
         cached = await self._get_cache(cache_key)
         if cached:
-            self._observe_search(started, True, "cache")
-            return self._trace_result(cleaned, version, "cache", True, cached, started)
+            # 缓存里的 FAQ 可能已过期（发布后新版本号才会换 key），读出来再滤一遍。
+            cached = self._filter_catalog(self._filter_expired(cached), catalog)
+            if not cached:
+                # 缓存条目全部已过生效窗口（effectiveEnd 已过）——这是"假命中"：
+                # 不能返回空证据、也不能把 hit=True 记进命中率/盲评样本（P1 审查），
+                # 回源混合检索重新出结果。
+                logger.warning("rag_cache_hit_all_expired", query=cleaned[:80])
+            else:
+                # B2：按比例抽样命中记录进盲评队列——语义缓存的失败是静默的，
+                # 不抽样盲评就发现不了误报（行业建议按周评审误报率）。
+                await self._sample_cache_hit(cleaned, cached)
+                self._observe_search(started, True, "cache")
+                return self._trace_result(cleaned, version, "cache", True, cached, started, bucket=bucket)
 
         extra_filters: list[dict] | None = (
             [{"terms": {"metadata.category": category_filter}}] if category_filter else None
         )
+        # P0-5：knowledge 文档按"已发布版本"过滤（version <= 当前版本，见
+        # _search_knowledge_docs 的 range 条件），版本号即发布提交点。
+        # Java 发布端先写"下一版本盖章"的切片、成功后才 bump 版本号——
+        # 未 bump 前新切片（v=当前+1）对检索端不可见，中途失败=从未发布；
+        # FAQ 不受版本控制（生命周期由 rag_question 表 + 生效时间管理），永远可见。
+        # 目录版本和活跃文档集合由 Java 端权威目录门控；缓存命中也必须再次经过
+        # 当前目录过滤，避免旧版本结果在发布或归档后继续返回。
+        # 如果 Java 与 last-known-good 目录都不可用，只允许 FAQ 分支继续，
+        # 绝不能用固定版本或无目录检索可能已经归档的知识切片。
         docs = await self._search_knowledge_docs(
-            cleaned, top_k or get_settings().rag_top_k, extra_filters=extra_filters
+            cleaned,
+            effective_top_k,
+            extra_filters=extra_filters,
+            rerank_top_n=rerank_top_n,
+            version_filter=version if catalog else None,
+            active_document_ids=(catalog or {}).get("active_document_ids") if catalog else None,
+            knowledge_enabled=bool(catalog),
         )
         if not self._has_enough_evidence(docs):
             self._observe_search(started, False, "hybrid")
-            return self._trace_result(cleaned, version, "hybrid", False, docs, started)
-        await self._set_cache(cache_key, docs, get_settings().rag_cache_ttl_seconds)
+            return self._trace_result(cleaned, version, "hybrid", False, docs, started, bucket=bucket)
+        await self._set_cache(cache_key, docs, settings.rag_cache_ttl_seconds)
         self._observe_search(started, True, "hybrid")
-        return self._trace_result(cleaned, version, "hybrid", True, docs, started)
+        return self._trace_result(cleaned, version, "hybrid", True, docs, started, bucket=bucket)
+
+    def _semantic_cache_key(
+        self,
+        cleaned: str,
+        version: int,
+        top_k: int,
+        category_filter: list[str] | None,
+        bucket: str,
+        settings,
+        rerank_top_n: int,
+    ) -> str:
+        """语义缓存的键 = 所有会改变检索结果的配置维度的指纹。
+
+        旧实现只有 ``v{version}:sha256(cleaned)``——换 top_k、加类别过滤、
+        换 A/B 分桶或 rerank 配置都会命中上一次策略的结果，把错误证据写进回答。
+        这里把影响检索的参数全部折叠进 key；rerank 只折叠"是否启用+模型+地址"
+        （地址变更本来就该换缓存），不折叠 API key。
+        """
+        payload = {
+            "q": cleaned,
+            "top_k": top_k,
+            "filters": category_filter or [],
+            "bucket": bucket,
+            "rerank_top_n": rerank_top_n,
+            "rerank_model": settings.rerank_model,
+            "rerank_url": settings.rerank_base_url,
+            "rerank_enabled": bool(settings.rerank_api_key.strip()),
+            "min_cosine": settings.rag_vector_min_cosine,
+            "knn_factor": settings.knn_num_candidates_factor,
+            "knn_min": settings.knn_num_candidates_min,
+            # 证据闸门阈值也折进 key：运营收紧 rag_evidence_min_relevance /
+            # rag_evidence_min_rrf_rank 后，旧标准写入的缓存条目不应继续按
+            # 命中输出（P1 审查：阈值调整最长滞后一个 TTL）。
+            "min_relevance": settings.rag_evidence_min_relevance,
+            "min_rrf_rank": settings.rag_evidence_min_rrf_rank,
+        }
+        canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        return f"mall:rag:semantic:v{version}:{_sha256(canonical)}"
+
+    async def _sample_cache_hit(self, cleaned: str, cached: list[dict]) -> None:
+        """按 RAG_CACHE_SAMPLE_RATE 抽样缓存命中，供离线盲评误报率。"""
+        import random
+
+        if not cached:
+            # 空证据绝不进盲评队列——假命中样本会污染误报率统计（P1 审查）。
+            return
+        settings = get_settings()
+        if settings.rag_cache_sample_rate <= 0 or random.random() > settings.rag_cache_sample_rate:
+            return
+        try:
+            sample = {
+                "ts": int(time.time() * 1000),
+                "query": cleaned[:120],
+                "hitDocs": [
+                    {
+                        "id": doc.get("id"),
+                        "source": str((doc.get("metadata") or {}).get("source") or ""),
+                        "score": round(float(doc.get("score") or 0), 4),
+                    }
+                    for doc in cached[:5]
+                ],
+            }
+            # 按天分 key：全局共享一个 cap 200 的队列，日命中量大时早间样本
+            # 会被全部冲掉，"按周评审"只剩最近几小时（P1 审查）。按天分 key
+            # 后每天的样本独立留存。
+            day_key = time.strftime("%Y%m%d")
+            await redis_service._push_capped(
+                f"mall:rag:cache:sample:v1:{day_key}",
+                sample,
+                event="cache_hit_sample",
+                user_id="",
+            )
+        except Exception as exc:
+            logger.debug("rag_cache_sample_failed", error=str(exc))
 
     async def exact_faq_answer(self, query: str) -> dict | None:
         """Return a curated FAQ answer without invoking the LLM."""
@@ -136,12 +274,23 @@ class RagRetriever:
         if not cleaned:
             self._observe_search(started, False, "exact_fast_path")
             return None
-        version = await self._knowledge_version()
+        settings = get_settings()
         try:
-            row = await asyncio.wait_for(
-                self._exact_faq(cleaned, version),
-                timeout=get_settings().faq_fast_path_timeout_seconds,
-            )
+            # The latency budget covers both authoritative version resolution and
+            # the FAQ lookup. Otherwise a slow version endpoint could block the
+            # supposedly-fast path for the Java client's full HTTP timeout before
+            # the old wait_for() even started.
+            async with asyncio.timeout(settings.faq_fast_path_timeout_seconds):
+                try:
+                    version = await self._knowledge_version()
+                except KnowledgeCatalogUnavailable as exc:
+                    # The release version only partitions Redis cache entries. It
+                    # must not make the Java-owned exact FAQ endpoint unavailable.
+                    # Version 0 bypasses cache reads/writes, so a stale Redis hint
+                    # can never authorize an old exact answer during an outage.
+                    version = 0
+                    logger.warning("faq_fast_path_version_unavailable", error=str(exc))
+                row = await self._exact_faq(cleaned, version)
         except TimeoutError:
             logger.warning("faq_fast_path_timeout", query_hash=_sha256(cleaned))
             self._observe_search(started, False, "exact_fast_path_timeout")
@@ -176,7 +325,7 @@ class RagRetriever:
         return ids
 
     async def search_product_keyword_ids(self, query: str, limit: int) -> list[str]:
-        breaker = circuit_registry.get_or_create("es", failure_threshold=3, recovery_timeout=30)
+        breaker = circuit_registry.get_or_create("es", **ES_BREAKER_ARGS)
         if not breaker.allow_request() or not query.strip():
             return []
         try:
@@ -218,7 +367,16 @@ class RagRetriever:
             logger.error("es_keyword_search_failed", error=str(e))
             return await self._product_search_fallback(query, limit)
 
-    async def _search_knowledge_docs(self, query: str, limit: int, extra_filters: list[dict] | None = None) -> list[dict]:
+    async def _search_knowledge_docs(
+        self,
+        query: str,
+        limit: int,
+        extra_filters: list[dict] | None = None,
+        rerank_top_n: int | None = None,
+        version_filter: int | None = None,
+        active_document_ids: list[str] | None = None,
+        knowledge_enabled: bool = True,
+    ) -> list[dict]:
         with tracer.start_as_current_span("rag.hybrid_search") as span:
             span.set_attribute("rag.query_length", len(query))
             span.set_attribute("rag.limit", limit)
@@ -230,18 +388,71 @@ class RagRetriever:
             queries = await expand_query(query)
             span.set_attribute("rag.query_variants", len(queries))
 
-            async def _hybrid_one(q: str) -> list[dict]:
-                kw, vec = await asyncio.gather(
-                    self._keyword_search_docs(q, ("faq", "knowledge"), limit, extra_filters),
-                    self._vector_search(q, ("faq", "knowledge"), limit, extra_filters=extra_filters),
+            # P0-5 版本过滤：knowledge 必须「已发布」（version <= 当前版本），
+            # FAQ 不受版本约束。注意是 range(lte) 而不是 term(==)：
+            # Java 发布端每次发布给新切片盖「全局下一版本」章（releaseVersion()+1），
+            # 若用精确匹配，发布文档 B 后文档 A（盖章 v2 < 当前 v3）会立即从
+            # 检索里消失——版本号是全局单调的，精确匹配只留得下「最近一次 bump
+            # 的文档」。lte 下：在途未 bump 的切片（v=当前+1）天然不可见，
+            # bump 后新旧切片共存；归档靠「删切片 + bump 后状态变更」保证不可见。
+            # metadata.version 是数值类型（ES 动态映射），range 用数值直配。
+            effective_filters = list(extra_filters or [])
+            if knowledge_enabled and version_filter is not None:
+                active_ids = [str(value) for value in (active_document_ids or []) if str(value)]
+                # An empty active set is a valid catalog state, but using an
+                # impossible sentinel avoids relying on ES-specific handling of
+                # an empty `terms` array.
+                document_filter = {
+                    "terms": {
+                        "metadata.documentId": active_ids or ["__no_active_document__"]
+                    }
+                }
+                effective_filters.append(
+                    {
+                        "bool": {
+                            "should": [
+                                {"term": {"metadata.dataType": "faq"}},
+                                {
+                                    "bool": {
+                                        "must": [
+                                            {"term": {"metadata.dataType": "knowledge"}},
+                                            {
+                                                "range": {
+                                                    "metadata.version": {
+                                                        "lte": int(version_filter)
+                                                    }
+                                                }
+                                            },
+                                            document_filter,
+                                        ]
+                                    }
+                                },
+                            ],
+                            "minimum_should_match": 1,
+                        }
+                    }
                 )
-                return self._rrf_docs([kw, vec], limit=max(limit, 1))
+
+            async def _hybrid_one(q: str) -> list[dict]:
+                data_types = ("faq", "knowledge") if knowledge_enabled else ("faq",)
+                kw, vec = await asyncio.gather(
+                    self._keyword_search_docs(
+                        q, data_types, limit, effective_filters
+                    ),
+                    self._vector_search(
+                        q, data_types, limit, extra_filters=effective_filters
+                    ),
+                )
+                merged = self._rrf_docs([kw, vec], limit=max(limit, 1))
+                # 过期 FAQ 在并进最终融合之前就滤掉：先限量再过滤会让过期项
+                # 白白占住 top-k 名额，把有效文档挤出候选池。
+                return self._filter_expired(merged)
 
             ranked_groups = await asyncio.gather(*[_hybrid_one(q) for q in queries])
             rrf_docs = self._rrf_docs(list(ranked_groups), limit=max(limit, 1))
             rrf_docs = self._filter_expired(rrf_docs)
             span.set_attribute("rag.active_hits", len(rrf_docs))
-            result = await self._rerank(query, rrf_docs, min(get_settings().rerank_top_n, limit))
+            result = await self._rerank(query, rrf_docs, min(rerank_top_n or get_settings().rerank_top_n, limit))
             span.set_attribute("rag.result_count", len(result))
             return result
 
@@ -252,7 +463,7 @@ class RagRetriever:
         limit: int,
         extra_filters: list[dict] | None = None,
     ) -> list[dict]:
-        breaker = circuit_registry.get_or_create("es", failure_threshold=3, recovery_timeout=30)
+        breaker = circuit_registry.get_or_create("es", **ES_BREAKER_ARGS)
         if not breaker.allow_request() or not query.strip():
             return []
         try:
@@ -310,7 +521,9 @@ class RagRetriever:
             min_cosine if min_cosine is not None else settings.rag_vector_min_cosine
         )
         th = cosine_to_es_score(cosine_floor)
-        breaker = circuit_registry.get_or_create("es")
+        # 熔断参数与 _keyword_search_docs/_hybrid_one 收敛到同一份（P1 审查：
+        # 此前此处仍是默认 5/60，asyncio.gather 并发下先到先得，参数不唯一）。
+        breaker = circuit_registry.get_or_create("es", **ES_BREAKER_ARGS)
         if not breaker.allow_request():
             return []
         vector = await embed_text(query)
@@ -469,34 +682,196 @@ class RagRetriever:
         return result[:limit]
 
     async def _exact_faq(self, query: str, version: int) -> dict | None:
-        cached = await self._get_faq_exact_cache(version, query)
-        if cached:
-            return cached
+        if version > 0:
+            cached = await self._get_faq_exact_cache(version, query)
+            if cached:
+                return cached
         try:
             row = await java_internal_client.exact_faq(query)
-            if row:
+            if row and version > 0:
                 await self._set_faq_exact_cache(version, query, row)
             return row
         except Exception as exc:
             logger.warning("faq_exact_failed", error=str(exc))
             return None
 
-    async def _knowledge_version(self) -> int:
+    async def _read_release_hint(self) -> tuple[int | None, bool]:
+        """Read Java's release hint without ever writing it.
+
+        The boolean distinguishes an absent key from a Redis failure/invalid
+        value. During a Java outage an LKG catalog is only safe when we know the
+        hint read succeeded; otherwise a newer release could be hidden.
+        """
         try:
             cached = await redis_service.client.get(KNOWLEDGE_VERSION_CACHE_KEY)
-            if cached:
-                return int(cached)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("knowledge_release_hint_unavailable", error=str(exc))
+            return None, False
+        if cached is None or str(cached).strip() == "":
+            return None, True
+        try:
+            version = int(cached)
+        except (TypeError, ValueError):
+            logger.error("knowledge_release_hint_invalid", value=str(cached)[:64])
+            return None, False
+        if version < 1:
+            logger.error("knowledge_release_hint_invalid", value=version)
+            return None, False
+        return version, True
+
+    async def _read_last_known_good_catalog(self) -> dict[str, Any] | None:
+        try:
+            raw = await redis_service.client.get(KNOWLEDGE_CATALOG_LKG_CACHE_KEY)
+        except Exception as exc:
+            logger.warning("knowledge_catalog_lkg_unavailable", error=str(exc))
+            return None
+        if not raw:
+            return None
+        try:
+            payload = json.loads(raw) if isinstance(raw, str) else raw
+            if not isinstance(payload, dict):
+                raise ValueError("catalog is not an object")
+            version = int(payload.get("version"))
+            active_ids = payload.get("active_document_ids")
+            if active_ids is None:
+                active_ids = payload.get("activeDocumentIds")
+            if not isinstance(active_ids, list) or version < 1:
+                raise ValueError("catalog fields are invalid")
+            normalized_ids: list[str] = []
+            for value in active_ids:
+                item = str(value).strip() if value is not None else ""
+                if not item:
+                    raise ValueError("catalog contains an empty document id")
+                if item not in normalized_ids:
+                    normalized_ids.append(item)
+            return {"version": version, "active_document_ids": normalized_ids}
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            logger.error("knowledge_catalog_lkg_invalid", error=str(exc))
+            return None
+
+    async def _save_last_known_good_catalog(self, catalog: dict[str, Any]) -> None:
+        payload = json.dumps(catalog, ensure_ascii=False, sort_keys=True)
+        try:
+            # Only the Agent-owned key receives a TTL.
+            await redis_service.client.setex(
+                KNOWLEDGE_CATALOG_LKG_CACHE_KEY,
+                KNOWLEDGE_CATALOG_LKG_TTL_SECONDS,
+                payload,
+            )
+        except Exception as exc:
+            logger.warning("knowledge_catalog_lkg_save_failed", error=str(exc))
+
+    async def _knowledge_catalog(self) -> dict[str, Any] | None:
+        """Resolve a safe release snapshot for knowledge retrieval.
+
+        Java is authoritative and is queried on every resolution. The Redis hint
+        is not a freshness proof because its after-commit broadcast is explicitly
+        best-effort; returning an equal-version LKG without consulting Java could
+        keep an archived document visible for the whole LKG TTL. If Java is
+        unavailable, an LKG is accepted only when the successfully-read hint does
+        not prove it stale. ``None`` means the knowledge branch must be disabled.
+        """
+        hint, hint_ok = await self._read_release_hint()
+        lkg = await self._read_last_known_good_catalog()
+
+        try:
+            raw_catalog = await java_internal_client.knowledge_catalog()
+            if not isinstance(raw_catalog, dict):
+                raise ValueError("Java knowledge catalog is not an object")
+            version = int(raw_catalog["version"])
+            raw_ids = raw_catalog.get("active_document_ids")
+            if raw_ids is None:
+                raw_ids = raw_catalog.get("activeDocumentIds")
+            if not isinstance(raw_ids, list):
+                raise ValueError("Java knowledge catalog document IDs are invalid")
+            active_ids: list[str] = []
+            for value in raw_ids:
+                item = str(value).strip() if value is not None else ""
+                if not item:
+                    raise ValueError("Java knowledge catalog contains an empty document id")
+                if item not in active_ids:
+                    active_ids.append(item)
+            catalog = {"version": version, "active_document_ids": active_ids}
+            if hint is not None and version < hint:
+                raise ValueError(
+                    f"Java knowledge catalog regressed below release hint: {version} < {hint}"
+                )
+            await self._save_last_known_good_catalog(catalog)
+            return catalog
+        except Exception as exc:
+            if hint_ok and lkg and (hint is None or int(lkg["version"]) >= hint):
+                logger.warning(
+                    "knowledge_catalog_using_lkg",
+                    version=lkg["version"],
+                    hint=hint,
+                    error=str(exc),
+                )
+                return lkg
+            logger.error(
+                "knowledge_catalog_unavailable_fail_closed",
+                hint=hint,
+                hint_read_ok=hint_ok,
+                error=str(exc),
+            )
+            return None
+
+    async def _knowledge_version(self) -> int:
+        """Resolve the authoritative version used to partition FAQ caches.
+
+        The Redis release key is only a best-effort notification written after
+        the database transaction commits. It can therefore lag behind Java and
+        must not select an exact-FAQ cache namespace: doing so could serve an old
+        answer for the full six-hour cache TTL after a failed broadcast.
+        """
+        hint, _hint_ok = await self._read_release_hint()
+        lkg = await self._read_last_known_good_catalog()
         try:
             version = await java_internal_client.knowledge_version()
-        except Exception:
-            version = 1
-        try:
-            await redis_service.client.setex(KNOWLEDGE_VERSION_CACHE_KEY, 300, str(version))
-        except Exception:
-            pass
+        except Exception as exc:
+            raise KnowledgeCatalogUnavailable(
+                "knowledge release version unavailable"
+            ) from exc
+        known_versions = [
+            value
+            for value in (
+                hint,
+                int(lkg["version"]) if lkg else None,
+            )
+            if value is not None
+        ]
+        if known_versions and version < max(known_versions):
+            raise KnowledgeCatalogUnavailable(
+                "knowledge release version regressed below a previously observed version"
+            )
         return version
+
+    def _filter_catalog(
+        self,
+        docs: list[dict],
+        catalog: dict[str, Any] | None,
+    ) -> list[dict]:
+        """Apply the same release/catalog gate to semantic-cache hits."""
+        active_ids = set(str(value) for value in (catalog or {}).get("active_document_ids", []))
+        version = int((catalog or {}).get("version") or 0)
+        filtered: list[dict] = []
+        for doc in docs:
+            metadata = doc.get("metadata") or {}
+            data_type = str(metadata.get("dataType") or "").lower()
+            if data_type == "faq":
+                filtered.append(doc)
+                continue
+            if catalog is None:
+                # Unknown/missing data types are treated as knowledge and are
+                # removed while the authoritative catalog is unavailable.
+                continue
+            document_id = str(metadata.get("documentId") or "")
+            try:
+                document_version = int(metadata.get("version"))
+            except (TypeError, ValueError):
+                continue
+            if document_id in active_ids and document_version <= version:
+                filtered.append(doc)
+        return filtered
 
     def _observe_search(self, started: float, hit: bool, mode: str) -> None:
         RAG_SEARCH_TOTAL.labels(result="hit" if hit else "miss", mode=mode).inc()
@@ -510,6 +885,7 @@ class RagRetriever:
         hit: bool,
         docs: list[dict],
         started: float,
+        bucket: str = "A",
     ) -> dict[str, Any]:
         refs = self._source_refs(docs, version)
         elapsed_ms = round(max(0.0, time.perf_counter() - started) * 1000, 2)
@@ -521,6 +897,7 @@ class RagRetriever:
                 "mode": mode,
                 "hit": hit,
                 "knowledgeVersion": version,
+                "bucket": bucket,
                 "sourceCount": len(refs),
                 "topScore": max(
                     (float(doc.get("score") or 0) for doc in docs),
@@ -531,9 +908,13 @@ class RagRetriever:
         }
 
     def _source_refs(self, docs: list[dict], version: int) -> list[dict]:
+        # 传入的 docs 就是最终注入 prompt 的证据集合（已按 effective
+        # rerank_top_n / limit 截断）。此前这里再按 settings.rerank_top_n
+        # 切片，A/B 桶覆盖了 rerank_top_n 时溯源/盲评数据与真实注入不一致
+        # （P1 审查：_source_refs 观测失真）。
         refs: list[dict] = []
         seen: set[str] = set()
-        for doc in docs[: get_settings().rerank_top_n]:
+        for doc in docs:
             metadata = doc.get("metadata") or {}
             doc_id = str(
                 doc.get("id")
