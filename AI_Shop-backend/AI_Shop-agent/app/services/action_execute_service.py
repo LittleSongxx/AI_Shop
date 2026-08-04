@@ -1,6 +1,7 @@
 import structlog
 
 from app.config.settings import get_settings
+from app.exceptions import RemoteActionOutcomeUnknown, RemoteActionRejected
 from app.infra.http_client import get_client
 from app.observability.telemetry import get_tracer
 
@@ -33,8 +34,29 @@ class JavaBridge:
                 headers=headers,
                 cookies={"token": token},
             )
-            resp.raise_for_status()
-            return resp.json()
+            try:
+                result = resp.json()
+            except ValueError as exc:
+                resp.raise_for_status()
+                # A successful HTTP status with a truncated/non-JSON body does
+                # not prove that the write failed. Keep the local action in
+                # EXECUTING so the idempotency ledger/domain state can reconcile
+                # it instead of authorizing the user to submit a second write.
+                raise RemoteActionOutcomeUnknown("Java 返回了无效响应") from exc
+            if not isinstance(result, dict):
+                resp.raise_for_status()
+                raise RemoteActionOutcomeUnknown("Java 返回了无效响应")
+            if result.get("status") != "success":
+                raise RemoteActionRejected(
+                    result.get("info") or "远端业务操作被拒绝",
+                    status_code=resp.status_code,
+                )
+            if resp.is_error:
+                raise RemoteActionRejected(
+                    result.get("info") or "远端业务操作被拒绝",
+                    status_code=resp.status_code,
+                )
+            return result
 
     async def refund_order(self, token: str, order_item_id: str, idempotency_key: str) -> str:
 

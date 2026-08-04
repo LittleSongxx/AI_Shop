@@ -157,7 +157,7 @@ class AgentMessageService:
                            source_refs=%s,
                            latency_ms=COALESCE(%s, TIMESTAMPDIFF(MICROSECOND, send_time, NOW()) DIV 1000),
                            status=%s
-                       WHERE message_id=%s""",
+                       WHERE message_id=%s AND status=%s""",
                     (
                         trimmed,
                         biz_type,
@@ -166,16 +166,19 @@ class AgentMessageService:
                         latency_ms,
                         MSG_STATUS_COMPLETE,
                         message_id,
+                        MSG_STATUS_COMPLETE,
                     ),
                 )
 
-    async def cancel_message(self, user_id: str, message_id: int) -> None:
+    async def cancel_message(self, user_id: str, message_id: int) -> bool:
 
         async with acquire() as cur:
             await cur.execute(
-                "UPDATE agent_message SET status=%s WHERE user_id=%s AND message_id=%s",
-                (MSG_STATUS_CANCEL, user_id, message_id),
+                """UPDATE agent_message SET status=%s
+                   WHERE user_id=%s AND message_id=%s AND status=%s""",
+                (MSG_STATUS_CANCEL, user_id, message_id, MSG_STATUS_NORMAL),
             )
+            return cur.rowcount == 1
 
     async def interrupt_message(
         self,
@@ -183,18 +186,31 @@ class AgentMessageService:
         message_id: int,
         partial_message: str,
         biz_type: str | None = None,
-    ) -> None:
+    ) -> bool:
 
         trimmed = trim_assistant(partial_message)
         if not trimmed:
-            await self.cancel_message(user_id, message_id)
-            return
+            return await self.cancel_message(user_id, message_id)
         async with acquire() as cur:
             await cur.execute(
                 """UPDATE agent_message SET assistant_message=%s, biz_type=%s, status=%s
                    WHERE message_id=%s AND user_id=%s AND status=%s""",
                 (trimmed, biz_type, MSG_STATUS_INTERRUPTED, message_id, user_id, MSG_STATUS_NORMAL),
             )
+            return cur.rowcount == 1
+
+    async def is_execution_cancelled(self, user_id: str, message_id: int) -> bool:
+        """Check durable state before a Worker starts or times out a task."""
+        async with acquire() as cur:
+            await cur.execute(
+                "SELECT status FROM agent_message WHERE user_id=%s AND message_id=%s",
+                (user_id, message_id),
+            )
+            row = await cur.fetchone()
+        return bool(
+            row
+            and row.get("status") in (MSG_STATUS_CANCEL, MSG_STATUS_INTERRUPTED)
+        )
 
     async def load_history(
         self,
@@ -297,6 +313,30 @@ class AgentMessageService:
     def should_include_in_working_memory(assistant_message: str | None) -> bool:
 
         return _should_include_assistant_in_history(assistant_message)
+
+    async def get_recent_intents(self, user_id: str, limit: int = 4) -> list[str]:
+        """最近 N 轮已完成的意图（新→旧），限 24 小时内的轮次。
+
+        A2/A3 的输入：会话级意图延续（取最近一轮）与死循环检测
+        （连续同意图计数）都从这里拿事实，而不是让每个调用方自己查一遍表。
+        时间窗把"会话级"延续钉死为"最近一天"，昨天的旧话题不会隔夜续上
+        （跨会话误延续会让用户今天的话沿用昨天的意图）。
+        """
+        safe = max(1, min(int(limit), 10))
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT intent FROM agent_message
+                WHERE user_id=%s
+                  AND status IN (%s, %s)
+                  AND intent IS NOT NULL
+                  AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)
+                ORDER BY message_id DESC LIMIT %s
+                """,
+                (user_id, MSG_STATUS_COMPLETE, MSG_STATUS_INTERRUPTED, safe),
+            )
+            rows = list(await cur.fetchall())
+        return [str(r["intent"]) for r in rows if r.get("intent")]
 
     async def count_user_messages(self, user_id: str) -> int:
 

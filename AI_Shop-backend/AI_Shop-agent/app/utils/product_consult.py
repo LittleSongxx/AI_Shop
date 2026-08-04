@@ -46,8 +46,10 @@ def is_product_consult_turn(
 ) -> bool:
 
     from app.domain.intent.rules import (
+        HUMAN_HINTS,
         looks_like_category_switch,
         looks_like_consult_followup,
+        looks_like_consult_question,
         looks_like_new_product_search,
     )
     from app.services.product_service import is_similar_or_recommend_request
@@ -58,6 +60,10 @@ def is_product_consult_turn(
         consult = normalize_consult_card(consult_card)
         consult_name = (consult or {}).get("productName")
 
+    if any(h in (user_text or "") for h in HUMAN_HINTS):
+        # 转人工永远优先于商品咨询：用户在咨询中要求转人工，
+        # 不能被 PRODUCT_CONSULT 分支吃掉。
+        return False
     if is_similar_or_recommend_request(user_text):
         return False
     if looks_like_category_switch(user_text, consult_name):
@@ -73,6 +79,13 @@ def is_product_consult_turn(
     if consult:
 
         return looks_like_consult_followup(user_text)
+    if from_product is True:
+        # consult-007：客户端从商品页进来但快照缺失（只传了 fromProduct
+        # 没传商品 ID / 快照过期）时，规格追问仍按咨询处理——否则每一句
+        # 都落到 CHAT 并建议转人工。类别切换/新搜索在上面已被排除。
+        # 无卡时没有商品上下文，只认带明确咨询/规格标记的问法
+        # （"谢谢""嗯"这类寒暄不进咨询分支）。
+        return looks_like_consult_question(user_text)
     return False
 
 async def resolve_consult_card(

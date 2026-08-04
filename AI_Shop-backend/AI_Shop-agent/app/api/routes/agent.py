@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request
 
 from app.api.deps import TokenUserInfo, get_request_token, require_login
 from app.config.settings import get_settings
+from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
 from app.exceptions import PendingActionExpired
 from app.models.response import ResponseVO, error, success
 from app.observability.telemetry import get_tracer
@@ -96,6 +97,40 @@ async def cancel_message(
 ) -> ResponseVO:
     await agent_orchestrator.cancel_message(user.user_id, messageId, assistantMessage)
     return success(None)
+
+@router.post("/reportClick")
+async def report_click(
+    productId: str = Form(...),
+    requestId: str = Form(...),
+    position: int = Form(...),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    """P0-7：前端商品卡片点击上报（fire-and-forget）。
+
+    requestId 是 serving 时随卡片下发的归因 token；点击日志与曝光日志
+    靠它关联，离线分析才能算 CTR/转化而不是只有展示。
+    """
+    product_id = productId.strip()
+    request_id = requestId.strip()
+    if (
+        not product_id
+        or len(product_id) > 64
+        or not request_id
+        or len(request_id) > 128
+        or position < 1
+        or position > IMPRESSION_LOG_MAX_PRODUCTS
+    ):
+        return error(600, "点击归因参数无效")
+    attribution = await redis_service.log_attributed_click(
+        user.user_id,
+        request_id,
+        product_id,
+        position,
+    )
+    if attribution is None:
+        return error(600, "点击归因无效或已过期")
+    return success(None)
+
 
 @router.post("/clearProductConsult")
 async def clear_product_consult(user: TokenUserInfo = Depends(require_login)) -> ResponseVO:
@@ -313,9 +348,10 @@ async def admin_support_claim(
 ) -> ResponseVO:
     body = await _read_admin_body(request)
     try:
-        data = await support_service.claim(
-            _required_text(body, "sessionId"), _required_text(body, "adminId")
-        )
+        admin_id = _required_text(body, "adminId")
+        session_id = _required_text(body, "sessionId")
+        data = await support_service.claim(session_id, admin_id)
+        _audit_admin_action("claim", admin_id, session_id)
         return success(support_service.public_session(data))
     except ValueError as exc:
         return error(600, str(exc))
@@ -343,11 +379,11 @@ async def admin_support_reply(
 ) -> ResponseVO:
     body = await _read_admin_body(request)
     try:
-        data = await support_service.reply(
-            _required_text(body, "sessionId"),
-            _required_text(body, "adminId"),
-            _required_text(body, "content"),
-        )
+        admin_id = _required_text(body, "adminId")
+        session_id = _required_text(body, "sessionId")
+        content = _required_text(body, "content")
+        data = await support_service.reply(session_id, admin_id, content)
+        _audit_admin_action("reply", admin_id, session_id, {"contentLength": len(content)})
         return success(support_service.public_session(data))
     except ValueError as exc:
         return error(600, str(exc))
@@ -442,3 +478,21 @@ def _required_text(body: dict, key: str) -> str:
     if not value:
         raise ValueError(f"{key} 不能为空")
     return value
+
+
+def _audit_admin_action(action: str, admin_id: str, session_id: str | None, extra: dict | None = None) -> None:
+    """管理端写操作的结构化审计日志（P0-6 残留）。
+
+    管理身份本身已由 Java 侧认证会话派生（/admin/agentMessage/* 的 currentAdmin），
+    Python 只接收派生结果；这里把"谁在什么时间对哪个会话做了什么"落成审计线索，
+    出问题时要能回答"哪条回复是谁发的"。
+    """
+    import structlog as _structlog
+
+    _structlog.get_logger().info(
+        "admin_support_action",
+        action=action,
+        admin_id=admin_id,
+        session_id=session_id,
+        extra=extra or {},
+    )

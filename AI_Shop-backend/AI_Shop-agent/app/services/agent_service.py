@@ -77,6 +77,9 @@ class AgentOrchestrator:
             shopping_profile_service.async_enrich_profile(user_id, original_user_text)
         )
         previous_unresolved = await agent_message_service.get_unresolved_count(user_id)
+        # A2/A3：会话级意图延续 + 死循环检测的输入。一次查询同时给两处用。
+        recent_intents = await agent_message_service.get_recent_intents(user_id)
+        session_intent = recent_intents[0] if recent_intents else None
         consult_card = await self._resolve_consult_card_for_routing(user_id)
         decision = await resolve_intent(
             user_id,
@@ -86,6 +89,8 @@ class AgentOrchestrator:
             message_card=card,
             unresolved_count=previous_unresolved,
             allow_llm=False,
+            session_intent=session_intent,
+            recent_intents=recent_intents,
         )
 
         if card:
@@ -193,6 +198,12 @@ class AgentOrchestrator:
             return agent_msg
 
         try:
+            # 先原子预占 DISPATCHING，再 publish。Consumer 允许直接认领
+            # DISPATCHING，因此 publish confirm 与 QUEUED 落库之间不存在丢消息窗口；
+            # 若进程在 publish 前崩溃，恢复扫描只会在预占超时后重发一次。
+            if not await agent_task_service.mark_dispatching(agent_msg["messageId"]):
+                agent_msg["deliveryState"] = "DUPLICATE"
+                return agent_msg
             await agent_queue_service.publish(queue_name, agent_msg)
             await agent_task_service.mark_queued(agent_msg["messageId"])
             agent_msg["deliveryState"] = "QUEUED"
@@ -313,11 +324,13 @@ class AgentOrchestrator:
 
         await redis_service.set_cancel_flag(user_id, message_id)
         if partial_assistant_message:
-            await agent_message_service.interrupt_message(
+            changed = await agent_message_service.interrupt_message(
                 user_id, message_id, partial_assistant_message
             )
         else:
-            await agent_message_service.cancel_message(user_id, message_id)
+            changed = await agent_message_service.cancel_message(user_id, message_id)
+        if changed:
+            await agent_task_service.cancel(message_id, user_id)
 
     async def get_consult_context(self, user_id: str) -> dict | None:
         snapshot = await redis_service.get_consult_product(user_id)

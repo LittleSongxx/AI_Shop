@@ -134,6 +134,23 @@ class PendingActionStore:
             row = await cur.fetchone()
         return self._to_public(row) if row else None
 
+    async def list_stale_executing(self, stale_seconds: int = 600) -> list[dict]:
+        """EXECUTING 超过阈值未收到终态的悬挂动作（B1 reconciler 的输入）。
+
+        正常执行在秒级完成；超过阈值说明执行方在写终态前崩了。
+        """
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT * FROM agent_pending_action
+                WHERE status=%s
+                  AND updated_at < DATE_SUB(NOW(), INTERVAL %s SECOND)
+                ORDER BY updated_at ASC LIMIT 100
+                """,
+                (self.EXECUTING, max(int(stale_seconds), 30)),
+            )
+            return [self._to_public(row) for row in await cur.fetchall()]
+
     async def cancel(self, user_id: str, token: str) -> dict | None:
         async with acquire() as cur:
             await cur.execute(

@@ -35,3 +35,46 @@ def test_prompt_write_ops_no_query_orders_fallback():
     text = _load_prompt()
     for phrase in ("确认收货", "退款", "追评"):
         assert phrase in text
+
+def test_system_prompt_static_prefix_stable_across_calls(monkeypatch):
+    """B3 静态前置契约：跨意图、跨用户文本，system prompt 的静态前缀必须字节级一致。
+
+    prefix cache 的命中原则就是"前缀字节级稳定"——任何动态内容混进前缀
+    （时间戳/用户ID/请求ID）都会让每次调用都 miss。这里把契约钉死：
+    两个不同的意图与文本构造出的 prompt，在首个动态标记
+    （=== 当前意图）之前的部分必须完全相等。
+    """
+    import asyncio
+
+    from app.domain.intent.types import IntentKind
+    from app.services import prompt_service
+    from app.services.prompt_service import build_agent_system_prompt
+
+    class _StubRedis:
+        class _Client:
+            async def get(self, _key: str):
+                return None
+
+        client = _Client()
+
+    monkeypatch.setattr(prompt_service, "redis_service", _StubRedis())
+
+    async def build(intent: IntentKind, user_text: str) -> str:
+        return await build_agent_system_prompt(
+            intent,
+            "user-001",
+            user_text,
+            product_snapshot=None,
+            faq_text=None,
+            knowledge_text=None,
+        )
+
+    a = asyncio.run(build(IntentKind.QUERY_ORDER, "查一下我的订单"))
+    b = asyncio.run(build(IntentKind.PRODUCT_SEARCH, "帮我搜耳机"))
+    marker = "=== 当前意图："
+    prefix_a = a.split(marker)[0] if marker in a else a
+    prefix_b = b.split(marker)[0] if marker in b else b
+    assert prefix_a == prefix_b, "system prompt 静态前缀不稳定，prefix cache 会失效"
+    assert marker in a and marker in b
+    assert "user-001" not in prefix_a
+    assert "查一下我的订单" not in prefix_a and "帮我搜耳机" not in prefix_a

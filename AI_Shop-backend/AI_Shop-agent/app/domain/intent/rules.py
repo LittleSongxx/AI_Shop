@@ -1,13 +1,24 @@
 import re
 
+# 转人工的显式请求。放在 rules 层是因为 classifier 和 product_consult 都要先于
+# 商品咨询分支拦截它：用户在咨询一款商品时要求转人工，不能被 PRODUCT_CONSULT 吃掉。
+HUMAN_HINTS = ("转人工", "人工客服", "找客服", "真人客服", "人工处理", "人工介入", "找你们主管")
+
 _PHONE_HINTS = ("手机", "iphone", "苹果", "三星", "华为", "小米", "oppo", "vivo", "荣耀")
 _SNACK_HINTS = ("零食", "小吃", "坚果", "糖果", "饼干")
 _COMPUTER_HINTS = ("电脑", "台式", "台式机", "笔记本", "平板", "主机", "显示器")
 _TOY_HINTS = ("玩具", "玩偶", "模型", "积木", "乐高")
 _MUSIC_HINTS = ("吉他", "乐器", "钢琴", "尤克里里", "电子琴")
 _OTHER_PRODUCT_HINTS = ("家电", "服饰", "衣服", "鞋子", "美妆", "护肤", "儿童")
+# 高频数码小家电/外设品类词。枚举品类这条路有上限（KNOWN_LIMITATIONS 第 2 节），
+# 这里只是把最高频的几种补进去，不追求穷尽——LLM 兜底仍然存在。
+_DIGITAL_LIFESTYLE_HINTS = (
+    "耳机", "音箱", "键盘", "鼠标", "手表", "充电宝",
+    "空气炸锅", "电饭煲", "扫地机器人", "空调", "冰箱", "洗衣机", "风扇",
+)
 _ALL_PRODUCT_HINTS = (
-    _PHONE_HINTS + _SNACK_HINTS + _COMPUTER_HINTS + _TOY_HINTS + _MUSIC_HINTS + _OTHER_PRODUCT_HINTS
+    _PHONE_HINTS + _SNACK_HINTS + _COMPUTER_HINTS + _TOY_HINTS + _MUSIC_HINTS
+    + _OTHER_PRODUCT_HINTS + _DIGITAL_LIFESTYLE_HINTS
 )
 _SWITCH_HINTS = ("转", "切换", "换品类", "换个", "不要这款", "不要这个", "看看别的", "别的品类", "跨品类")
 _SEARCH_VERBS = ("搜索", "找", "推荐", "买", "想要", "需要", "看看", "有没有")
@@ -22,9 +33,26 @@ _CONSULT_FOLLOWUP_HINTS = (
     "价格",
     "库存",
     "颜色",
+    # 无商品快照时（from_product=True 但卡丢失）仍要认的咨询问法：
+    # 带明确的规格/疑问标记才路由进咨询分支，"谢谢""嗯"这类寒暄不算。
+    # （"可以"已移除：它是纯应答词，无卡时一句"可以"不该被路由进咨询分支，
+    # 与 docstring 的"寒暄不进咨询"声明矛盾——P1 审查）
+    "支持",
+    "几个",
+    "多少",
+    "哪个",
+    "哪些",
+    "能不能",
+    "多大",
+    "怎么用",
     "怎么样",
-    "介绍",
+    "参数",
+    "型号",
     "配置",
+    "发货",
+    "售后",
+    "保修",
+    "介绍",
     "单主机",
     "显示器",
     "版本",
@@ -116,7 +144,9 @@ def looks_like_direct_product_keyword(user_text: str) -> bool:
     t = (user_text or "").strip()
     if not t or len(t) > 16:
         return False
-    # Order-history phrases contain 「买」 but are not product search
+    # Order-history phrases contain 「买」 but are not product search.
+    # 与 _ORDER_LIST_UI_HINTS 对齐（order-007/009：漏了「上次买/再买一次/复购」
+    # 会让订单历史问法被当成商品搜索）。
     if any(
         k in t
         for k in (
@@ -127,6 +157,9 @@ def looks_like_direct_product_keyword(user_text: str) -> bool:
             "我的订单",
             "最近的订单",
             "最近订单",
+            "上次买",
+            "再买一次",
+            "复购",
         )
     ):
         return False
@@ -157,6 +190,9 @@ def looks_like_new_product_search(user_text: str) -> bool:
             "最近的订单",
             "最近订单",
             "查订单",
+            "上次买",
+            "再买一次",
+            "复购",
         )
     ):
         return False
@@ -187,6 +223,78 @@ def looks_like_consult_followup(user_text: str) -> bool:
     if len(t) <= 20 and not any(v in t for v in _SEARCH_VERBS):
         return True
     return False
+
+
+def looks_like_consult_question(user_text: str) -> bool:
+    """无商品快照时判断是否仍像咨询问法（只认明确的咨询/规格标记）。
+
+    与 looks_like_consult_followup 的区别：不含"短文本即算追问"的宽分支。
+    没有商品上下文时，"谢谢""嗯"这类寒暄不能被路由进 PRODUCT_CONSULT，
+    否则每句客套话都会被当成商品规格追问（P2 审查：from_product 误路由）。
+    """
+    t = _text_lower(user_text or "")
+    return bool(t) and any(h in t for h in _CONSULT_FOLLOWUP_HINTS)
+
+# 延续性问法的标记词：单独出现、不带任何新意图线索、很短时，
+# 应该沿用上一轮意图而不是重新落到 CHAT（会话级意图保持，行业共识
+# "意图不每轮重猜"——首轮完整识别，后续轮用轻量判断延续/切换）。
+_CONTINUATION_MARKERS = ("那", "然后", "再", "还", "呢", "啊", "咋样", "怎么样了", "详情", "具体", "之后")
+
+# 纯问候/应答：带语气词与标点变体也认（"你好啊""好的呢""还在吗"）。
+# 这类句子绝不能触发意图延续——否则一句"你好啊"会复活 24 小时内的旧意图
+# （P1 审查：A2 延续判定吞问候语）。
+_GREETINGS = ("你好", "您好", "哈喽", "hello", "hi", "嗨", "在吗", "在不在", "在么")
+_ACK_WORDS = frozenset({
+    "好", "好的", "嗯", "嗯嗯", "嗯呢", "哦", "行", "行吧", "好嘞", "收到",
+    "明白", "知道了", "是的", "对", "对的", "没问题", "可以", "谢谢", "感谢",
+    "再见", "拜拜", "没事", "没事了", "没了", "没了呢", "好哒",
+})
+
+def looks_like_ack_or_greeting(user_text: str | None) -> bool:
+    """是否只是问候/应答/在场确认（可带语气词和标点）。
+
+    用于两类防护：意图延续判定前排除（防止"你好啊"续上旧意图），以及
+    A3 死循环检测前排除（防止 1 句真诉求 + 2 句应答凑满 3 连）。
+    """
+    t = (user_text or "").strip()
+    if not t:
+        return False
+    if any(g in t for g in _GREETINGS):
+        return True
+    # 剥掉尾部语气词/标点后对纯应答词集合（"好的呢" → "好的"）。
+    stripped = _strip_trailing_particles(t)
+    return stripped in _ACK_WORDS
+
+def _strip_trailing_particles(text: str) -> str:
+    return re.sub(r"[的了吗呢啊呀哦呗哈吧啦~～!！?？。，,\s、，]+$", "", text)
+
+def looks_like_intent_continuation(user_text: str, session_intent: str | None) -> bool:
+    """文本是"上一轮话题的延续"时返回 True。
+
+    保守判定，宁可漏判也不要抢走新意图：
+    - 文本必须很短（≤10 字）——长文本大概率带了新信息；
+    - 必须含延续标记词；
+    - 不含任何强新意图词（转人工/退款/取消/订单号/品类词等）；
+    - 不是纯问候/应答（"你好啊""好的呢"绝不延续旧意图）。
+    """
+    if not session_intent:
+        return False
+    t = (user_text or "").strip()
+    if not t or len(t) > 10:
+        return False
+    if looks_like_ack_or_greeting(t):
+        return False
+    if not any(m in t for m in _CONTINUATION_MARKERS):
+        return False
+    if any(k in t for k in HUMAN_HINTS + _SWITCH_HINTS):
+        return False
+    if any(k in t for k in ("退款", "退货", "取消", "评价", "收货", "物流", "快递",
+                            "优惠券", "优惠卷", "发票", "地址", "投诉", "人工")):
+        return False
+    if _mentions_any(t, _ALL_PRODUCT_HINTS):
+        return False
+    return True
+
 
 _ORDER_LIST_UI_HINTS = (
     "我的订单",

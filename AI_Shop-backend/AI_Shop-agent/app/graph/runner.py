@@ -36,7 +36,14 @@ async def _should_resume(user_id: str, message_id: int, thread_id: str) -> bool:
 
     return (await checkpointer.aget_tuple(config)) is not None
 
-async def run_agent_graph(agent_msg: dict) -> None:
+async def run_agent_graph(agent_msg: dict) -> str:
+    """跑完一轮图，返回用户实际看到的结果类型。
+
+    返回值是 outcome 字段：``ok`` / ``cancelled`` / ``llm_error`` / ``graph_error``。
+    Worker 只把 ``ok`` 记成 COMPLETED——llm_error / graph_error 意味着用户收到的是
+    错误文案，绝不应当进成功率（P0-1）。图内异常已经被节点消化成用户可见错误，
+    这里不重抛，避免 Worker 把"用户已收到错误"再当一次可重试的普通异常。
+    """
 
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
@@ -48,18 +55,17 @@ async def run_agent_graph(agent_msg: dict) -> None:
     try:
         if await _should_resume(user_id, message_id, thread_id):
             logger.info("graph_resume", thread_id=thread_id, message_id=message_id)
-
-            await graph.ainvoke(None, config)
-            return
+            result = await graph.ainvoke(None, config)
+            return str(result.get("outcome") or "ok")
 
         await checkpointer.adelete_thread(thread_id)
         card, user_text = parse_agent_message(agent_msg)
         state = initial_state(agent_msg, card, user_text)
         logger.info("graph_invoke", thread_id=thread_id, message_id=message_id)
 
-        await graph.ainvoke(state, config)
+        result = await graph.ainvoke(state, config)
+        return str(result.get("outcome") or "ok")
     finally:
-
         try:
             await checkpointer.adelete_thread(thread_id)
         except Exception as e:

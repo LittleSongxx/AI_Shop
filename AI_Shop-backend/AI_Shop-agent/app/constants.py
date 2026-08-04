@@ -17,6 +17,7 @@ REDIS_AGENT_CONSULT_ACTIVE = f"{REDIS_PREFIX}agent:consult:active:"
 REDIS_AGENT_SHOPPING_PROFILE = f"{REDIS_PREFIX}agent:shopping:profile:userId:"
 REDIS_AGENT_IMPRESSION_LOG = f"{REDIS_PREFIX}agent:rec:impression:userId:"
 REDIS_AGENT_CLICK_LOG = f"{REDIS_PREFIX}agent:rec:click:userId:"
+REDIS_AGENT_IMPRESSION_REQUEST = f"{REDIS_PREFIX}agent:rec:impression:request:"
 REDIS_AGENT_PENDING_ACTION = f"{REDIS_PREFIX}agent:pending:action:"
 REDIS_AGENT_PENDING_MSG = f"{REDIS_PREFIX}agent:pending:msg:userId:"
 REDIS_AGENT_SESSION = f"{REDIS_PREFIX}agent:session:"
@@ -60,6 +61,7 @@ CLARIFY_MAX_TEXT_LENGTH = 40
 # Impression log: capped per-user list, short TTL. Sized for offline CTR
 # analysis on an MVP, not for a warehouse.
 IMPRESSION_LOG_TTL = 7 * 24 * 60 * 60
+IMPRESSION_ATTRIBUTION_TTL = 7 * 24 * 60 * 60
 IMPRESSION_LOG_MAX_ENTRIES = 200
 IMPRESSION_LOG_MAX_PRODUCTS = 20
 

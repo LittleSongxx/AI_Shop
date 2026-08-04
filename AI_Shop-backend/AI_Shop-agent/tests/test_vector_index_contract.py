@@ -59,3 +59,21 @@ def test_mapping_body_uses_configured_field():
 def test_context_threshold_must_be_below_budget():
     with pytest.raises(ValueError):
         Settings(working_token_budget=1000, compress_token_threshold=1000)
+
+
+@pytest.mark.parametrize("sample_rate", [-0.01, 1.01])
+def test_rag_cache_sample_rate_must_be_a_probability(sample_rate):
+    with pytest.raises(ValueError, match="RAG_CACHE_SAMPLE_RATE"):
+        Settings(rag_cache_sample_rate=sample_rate)
+
+
+@pytest.mark.parametrize("worker_port", [0, 65_536, 7050])
+def test_worker_metrics_port_must_be_valid_and_separate(worker_port):
+    with pytest.raises(ValueError, match="WORKER_METRICS_PORT"):
+        Settings(worker_metrics_port=worker_port)
+
+
+@pytest.mark.parametrize("ttl", [0, 1, 4])
+def test_worker_heartbeat_ttl_matches_runtime_minimum(ttl):
+    with pytest.raises(ValueError, match="AGENT_WORKER_HEARTBEAT_TTL_SECONDS"):
+        Settings(agent_worker_heartbeat_ttl_seconds=ttl)

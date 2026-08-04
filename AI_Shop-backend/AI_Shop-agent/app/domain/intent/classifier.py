@@ -7,6 +7,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
+from app.domain.intent.rules import HUMAN_HINTS as _HUMAN_HINTS
 from app.domain.intent.types import (
     IntentDecision,
     IntentKind,
@@ -15,7 +16,8 @@ from app.domain.intent.types import (
     SentimentKind,
     UrgencyKind,
 )
-from app.harness.metrics.runtime_sensors import INTENT_TOTAL
+from app.harness.metrics.runtime_sensors import HANDOFF_TOTAL, INTENT_TOTAL
+from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.llm_factory import create_memory_llm
 from app.services.prompt_service import load_user_intent_classifier_prompt
 from app.utils.order_ids import extract_order_id, extract_order_item_id
@@ -23,15 +25,18 @@ from app.utils.product_consult import is_product_consult_turn, normalize_consult
 
 logger = structlog.get_logger()
 
-_HUMAN_HINTS = (
-    "转人工",
-    "人工客服",
-    "找客服",
-    "真人客服",
-    "人工处理",
-    "人工介入",
-    "找你们主管",
-)
+# A5：转人工原因 label 的合法取值集合（策略分支写死的常量 + 业务侧兜底）。
+# LLM 自由文本 reason 一律归一化为 OTHER，防止 Prometheus 基数膨胀。
+_BOUNDED_HANDOFF_REASONS = frozenset({
+    "USER_REQUEST",
+    "FUND_DISPUTE",
+    "SEVERE_NEGATIVE_SENTIMENT",
+    "REPEATED_UNRESOLVED",
+    "REPEATED_INTENT",
+    "LOW_CONFIDENCE",
+    "AI_HANDOFF",
+})
+
 _VERY_NEGATIVE_HINTS = (
     "诈骗",
     "骗子",
@@ -138,9 +143,11 @@ def classify_intent_by_rules(
     from_product: bool = False,
     consult_card: dict | None = None,
     message_card: dict | None = None,
+    session_intent: str | None = None,
 ) -> IntentKind | None:
     from app.domain.intent.rules import (
         looks_like_category_switch,
+        looks_like_intent_continuation,
         looks_like_new_product_search,
     )
     from app.services.product_service import is_similar_or_recommend_request
@@ -161,12 +168,26 @@ def classify_intent_by_rules(
 
     if any(hint in text for hint in _HUMAN_HINTS):
         return IntentKind.HUMAN_REQUEST
-    if any(k in text for k in ("退款进度", "退款到哪", "退款到账", "退款什么时候", "退款状态")):
+    # refund-007：进度问法只写死了「退款到账」，补上带时间词的问法——
+    # 「退款要多久到账」之前被后面的「退款」泛匹配抢走判成 REFUND。
+    if any(k in text for k in (
+        "退款进度", "退款到哪", "退款到账", "退款什么时候", "退款状态",
+        "多久到账", "几天到账", "何时到账", "什么时候到账", "多久退", "几天退",
+    )):
         return IntentKind.REFUND_STATUS
     if any(k in text for k in PAYMENT_ISSUE_HINTS):
         return IntentKind.PAYMENT_ISSUE
     if any(k in text for k in ("破损", "损坏", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
         return IntentKind.DAMAGED_OR_WRONG_ITEM
+
+    # logi-006：物流异常问法（「物流一直不动怎么办」）要的是轨迹而不是操作说明，
+    # 必须抢在 howto 分支之前——否则「怎么」+「物流」会先命中 howto 判成 CHAT。
+    if any(k in text for k in ("物流", "快递", "包裹", "运单")) and any(
+        k in text
+        for k in ("不动", "没动", "没动静", "卡住", "停滞", "不更新", "一直不",
+                  "怎么还不", "异常", "没派送", "没到", "丢件", "丢失", "不见了")
+    ):
+        return IntentKind.QUERY_LOGISTICS
 
     # 操作方法/如何/怎么类 → CHAT（必须在 INVOICE/ADDRESS_CHANGE 等专项分支之前执行，
     # 否则「发票怎么申请」「确认收货在哪里点」会被专项分支抢走，导致错误路由或触发
@@ -202,6 +223,7 @@ def classify_intent_by_rules(
             "用券",
             "退款",
             "退货",
+            "退",     # refund-006：「七天无理由怎么退」只含单字「退」
             "评价",
             "追评",   # 「追评怎么写」
             "收货",
@@ -223,17 +245,53 @@ def classify_intent_by_rules(
 
     if any(k in text for k in ("追评", "再评", "二次评价")):
         return IntentKind.RECOMMENT
-    if any(k in text for k in ("退款", "退货", "退钱")):
+    # refund-005：「这东西我不想要了，退了吧」之前匹配不到「退款/退货/退钱」。
+    # refund-008 过宽修复：「要退」「想退」是子串匹配，政策/疑问问法（"要不要退
+    # 差价""要退运费吗""想退就退"）会被误判成退款动作；排除疑问/假设式后只认
+    # 明确的退款意向。
+    if any(k in text for k in ("退款", "退货", "退钱", "退了吧", "退掉", "退一下", "给我退", "帮我退", "申请退")) or (
+        any(k in text for k in ("想退", "要退"))
+        # 排除假设/疑问式政策问法（"要不要退差价""想退就退""能退吗"），
+        # 以及句首无主语的"要退运费吗"；带主语的"我想退，可以吗"仍算退款。
+        and not any(k in text for k in ("要不要", "想退就", "能退", "可以退", "给退"))
+        and not re.match(r"^要退", text)
+    ):
         return IntentKind.REFUND
     if any(k in text for k in ("确认收货", "已收到", "收货确认")):
         return IntentKind.CONFIRM_RECEIPT
-    if any(k in text for k in ("取消这个订单", "不要这个订单", "帮我取消", "给我取消", "取消订单")):
+    # cancel-002：「这个订单不要了，取消」——「取消」和「订单」都在但原表里的
+    # 固定短语一个都匹配不上，补一条组合判断（howto 分支在前，政策问法不受影响）。
+    # 过宽修复（P1 审查）：组合判断不区分语态，会把查询型问法（"我的订单被取消了
+    # 吗""取消的订单去哪了"）误判成取消动作并触发强制取消引导文案；排除被动/
+    # 过去式/疑问式后只认"主动取消"语义。
+    if any(k in text for k in (
+        "取消这个订单", "不要这个订单", "帮我取消", "给我取消", "取消订单",
+        "取消掉", "取消吧", "取消一下", "想取消", "要取消", "申请取消",
+    )) or (
+        "取消" in text
+        and "订单" in text
+        and not any(k in text for k in (
+            "被取消", "已取消", "取消了", "取消的", "是不是", "为什么", "为何",
+            "什么原因", "怎么回事",
+        ))
+    ):
         return IntentKind.CANCEL_ORDER
     if any(k in text for k in ("物流", "快递", "到哪了", "运单", "包裹")):
         return IntentKind.QUERY_LOGISTICS
     if any(k in text for k in ("查看评价", "评价内容", "写了什么评价", "我的评价")):
         return IntentKind.QUERY_COMMENT
-    if any(k in text for k in ("评价", "好评", "差评", "打分", "评星", "星级")) and any(
+    # review-004：只说「我要评价」也要认出评价意图，再由工具层追问单号，
+    # 不能落成 CHAT + 建议转人工。
+    if any(k in text for k in (
+        "我要评价", "我想评价", "想评价", "去评价", "来评价", "评价一下",
+        "想写评价", "写个评价", "给我评价",
+    )):
+        return IntentKind.PRODUCT_REVIEW
+    # review-003：「打3分」中间夹数字，原表里「打分」匹配不上；补正则。
+    if (
+        any(k in text for k in ("评价", "好评", "差评", "打分", "评星", "星级"))
+        or re.search(r"打\s*\d+\s*分", text)
+    ) and any(
         k in text for k in ("订单", "给", "写", "提交")
     ):
         return IntentKind.PRODUCT_REVIEW
@@ -258,6 +316,9 @@ def classify_intent_by_rules(
             "最近购买",
             "最近订单",
             "订单列表",
+            "上次买",
+            "再买一次",
+            "复购",
         )
     ):
         return IntentKind.QUERY_ORDER
@@ -274,6 +335,14 @@ def classify_intent_by_rules(
         return IntentKind.PRODUCT_SEARCH
     if any(k in text for k in ("售后", "退换", "商品有问题", "订单有问题")):
         return IntentKind.AFTERSALES_UNKNOWN
+    # A2 会话级意图延续：所有显式分支都没命中、文本又短又像"上一轮话题的延续"时，
+    # 沿用上一轮意图而不是落到 default CHAT（行业共识：意图不每轮重猜）。
+    # 放最后是因为它只负责"延续"，绝不能抢走任何带新信息的问法。
+    if looks_like_intent_continuation(text, session_intent):
+        try:
+            return IntentKind(session_intent)
+        except ValueError:
+            return None
     if lower in {"你好", "您好", "hello", "hi", "在吗", "谢谢"}:
         return IntentKind.CHAT
     return None
@@ -284,13 +353,15 @@ def classify_high_confidence_order_intent(user_text: str) -> IntentKind | None:
     return intent
 
 
-def classify_high_confidence_intent(user_text: str) -> tuple[IntentKind | None, str]:
+def classify_high_confidence_intent(
+    user_text: str, session_intent: str | None = None
+) -> tuple[IntentKind | None, str]:
     text = (user_text or "").strip()
     if not text:
         return None, ""
     order_id = extract_order_id(text) or ""
 
-    ruled = classify_intent_by_rules(text)
+    ruled = classify_intent_by_rules(text, session_intent=session_intent)
     if ruled in {
         IntentKind.HUMAN_REQUEST,
         IntentKind.COMPLAINT,
@@ -305,6 +376,15 @@ def classify_high_confidence_intent(user_text: str) -> tuple[IntentKind | None, 
         k in text for k in ("到哪里", "到哪了", "物流", "快递", "运单", "包裹", "轨迹")
     ):
         return IntentKind.QUERY_LOGISTICS, order_id
+    # order-006：带单号问「现在什么状态/进展到哪了」是订单查询的常见问法。
+    if order_id and any(
+        k in text for k in ("状态", "进展", "情况", "怎么样了", "什么情况", "到哪一步")
+    ):
+        # 修复（P1 审查）：带退款词的单号（"退款单号XXX现在什么情况"）问的是
+        # 退款进度，应归 REFUND_STATUS 而不是 QUERY_ORDER。
+        if any(k in text for k in ("退款", "退货", "退钱", "退款单", "退货单")):
+            return IntentKind.REFUND_STATUS, order_id
+        return IntentKind.QUERY_ORDER, order_id
     if any(
         k in text
         for k in (
@@ -318,6 +398,9 @@ def classify_high_confidence_intent(user_text: str) -> tuple[IntentKind | None, 
             "最近买了",
             "最近买的",
             "最近购买",
+            "上次买",
+            "再买一次",
+            "复购",
         )
     ):
         return IntentKind.QUERY_ORDER, order_id
@@ -421,7 +504,8 @@ async def classify_intent_by_llm(
     prompt = f"{base}\n\n{context}"
     try:
         llm = create_memory_llm()
-        response = await llm.ainvoke(
+        response = await invoke_llm_with_metrics(
+            llm,
             [
                 SystemMessage(
                     content=(
@@ -431,7 +515,7 @@ async def classify_intent_by_llm(
                     )
                 ),
                 HumanMessage(content=prompt),
-            ]
+            ],
         )
         content = (
             response.content
@@ -484,6 +568,9 @@ async def resolve_intent(
     message_card: dict | None = None,
     unresolved_count: int = 0,
     allow_llm: bool = True,
+    session_intent: str | None = None,
+    recent_intents: list[str] | None = None,
+    record_metrics: bool = True,
 ) -> IntentDecision:
     structural = _structural_intent(
         user_text,
@@ -495,9 +582,17 @@ async def resolve_intent(
         decision = _build_decision(
             structural, user_text, confidence=0.99, source="structural"
         )
-        return _record_and_apply(decision, user_text, unresolved_count)
+        return _record_and_apply(
+            decision,
+            user_text,
+            unresolved_count,
+            recent_intents=recent_intents,
+            record_metrics=record_metrics,
+        )
 
-    high_intent, high_data = classify_high_confidence_intent(user_text)
+    high_intent, high_data = classify_high_confidence_intent(
+        user_text, session_intent=session_intent
+    )
     if high_intent is not None:
         decision = _build_decision(
             high_intent,
@@ -506,7 +601,13 @@ async def resolve_intent(
             source="rule_priority",
             data=high_data,
         )
-        return _record_and_apply(decision, user_text, unresolved_count)
+        return _record_and_apply(
+            decision,
+            user_text,
+            unresolved_count,
+            recent_intents=recent_intents,
+            record_metrics=record_metrics,
+        )
 
     settings = get_settings()
     if allow_llm and settings.intent_use_llm:
@@ -518,7 +619,13 @@ async def resolve_intent(
             message_card=message_card,
         )
         if llm_decision is not None:
-            return _record_and_apply(llm_decision, user_text, unresolved_count)
+            return _record_and_apply(
+                llm_decision,
+                user_text,
+                unresolved_count,
+                recent_intents=recent_intents,
+                record_metrics=record_metrics,
+            )
 
     if settings.intent_rule_fallback:
         ruled = classify_intent_by_rules(
@@ -526,13 +633,20 @@ async def resolve_intent(
             from_product=from_product,
             consult_card=consult_card,
             message_card=message_card,
+            session_intent=session_intent,
         )
         if ruled is not None:
             confidence = 0.9 if ruled != IntentKind.AFTERSALES_UNKNOWN else 0.65
             decision = _build_decision(
                 ruled, user_text, confidence=confidence, source="rule"
             )
-            return _record_and_apply(decision, user_text, unresolved_count)
+            return _record_and_apply(
+                decision,
+                user_text,
+                unresolved_count,
+                recent_intents=recent_intents,
+                record_metrics=record_metrics,
+            )
 
     decision = _build_decision(
         IntentKind.CHAT,
@@ -541,7 +655,13 @@ async def resolve_intent(
         source="default",
         next_action=NextAction.ASK_CLARIFICATION,
     )
-    return _record_and_apply(decision, user_text, unresolved_count)
+    return _record_and_apply(
+        decision,
+        user_text,
+        unresolved_count,
+        recent_intents=recent_intents,
+        record_metrics=record_metrics,
+    )
 
 
 def _build_decision(
@@ -589,8 +709,31 @@ def _build_decision(
     )
 
 
+def record_intent_metrics(decision: IntentDecision) -> None:
+    """记录意图/转人工指标。
+
+    与 _record_and_apply 分离：send 路径与 worker refine 路径各自决定何时
+    计数。worker 重算决策（allow_llm=True）时不能再次经过 _record_and_apply
+    的计数逻辑，否则同一消息的 INTENT_TOTAL/HANDOFF_TOTAL 被计两次，
+    转人工率虚高（P1 审查）。
+    """
+    INTENT_TOTAL.labels(intent=decision.intent.value, source=decision.source).inc()
+    # A5：转人工原因分布必须可查询（误转/漏转都比"少转"难发现）。
+    # reason 归一化到固定集合：策略分支写的是集合内常量，但 LLM 决策的
+    # handoffReason 是自由文本，直接进 label 会让 Prometheus 基数无限膨胀。
+    if decision.next_action in (NextAction.HANDOFF, NextAction.HANDOFF_SUGGESTED) and decision.handoff_reason:
+        reason = decision.handoff_reason
+        if reason not in _BOUNDED_HANDOFF_REASONS:
+            reason = "OTHER"
+        HANDOFF_TOTAL.labels(reason=reason).inc()
+
+
 def _record_and_apply(
-    decision: IntentDecision, user_text: str, unresolved_count: int
+    decision: IntentDecision,
+    user_text: str,
+    unresolved_count: int,
+    recent_intents: list[str] | None = None,
+    record_metrics: bool = True,
 ) -> IntentDecision:
     entities = {
         **extract_entities(user_text, decision.data),
@@ -611,13 +754,19 @@ def _record_and_apply(
         entities["orderId"] = decision.data
     if entities != decision.entities:
         decision = decision.model_copy(update={"entities": entities})
-    decision = _apply_handoff_policy(decision, user_text, unresolved_count)
-    INTENT_TOTAL.labels(intent=decision.intent.value, source=decision.source).inc()
+    decision = _apply_handoff_policy(
+        decision, user_text, unresolved_count, recent_intents=recent_intents
+    )
+    if record_metrics:
+        record_intent_metrics(decision)
     return decision
 
 
 def _apply_handoff_policy(
-    decision: IntentDecision, user_text: str, unresolved_count: int
+    decision: IntentDecision,
+    user_text: str,
+    unresolved_count: int,
+    recent_intents: list[str] | None = None,
 ) -> IntentDecision:
     explicit_human = decision.intent == IntentKind.HUMAN_REQUEST or any(
         hint in user_text for hint in _HUMAN_HINTS
@@ -667,6 +816,34 @@ def _apply_handoff_policy(
             update={
                 "next_action": NextAction.HANDOFF,
                 "handoff_reason": "REPEATED_UNRESOLVED",
+                "urgency": UrgencyKind.HIGH,
+            }
+        )
+    # A3 死循环检测：同一意图连续 3 轮且这轮仍需要工具/在硬答，说明用户
+    # 一直在重复同一诉求而 AI 没帮上忙——主动建议转人工而不是继续车轱辘话
+    # （315 翻车案例的根因：循环复读直到用户崩溃）。
+    # 误报防护（P1 审查）：当前轮本身是延续/应答（"然后呢""好的呢"）时
+    # 不算"重复诉求"——否则 1 句真诉求 + 2 句应答就能凑满 3 连触发建议。
+    from app.domain.intent.rules import (
+        looks_like_ack_or_greeting,
+        looks_like_intent_continuation,
+    )
+
+    # recent_intents 只包含已经落库的历史轮次，不包含当前 decision。因此
+    # “当前轮 + 最近两轮”才是连续 3 轮；要求三条历史会拖到第 4 轮才触发。
+    repeated_intent = (
+        recent_intents
+        and len(recent_intents) >= 2
+        and all(i == decision.intent.value for i in recent_intents[:2])
+        and decision.next_action == NextAction.TOOL
+        and not looks_like_intent_continuation(user_text, decision.intent.value)
+        and not looks_like_ack_or_greeting(user_text)
+    )
+    if repeated_intent:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF_SUGGESTED,
+                "handoff_reason": "REPEATED_INTENT",
                 "urgency": UrgencyKind.HIGH,
             }
         )

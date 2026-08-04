@@ -34,6 +34,16 @@ class AgentQueueService:
     async def publish(self, queue_name: str, payload: dict[str, Any]) -> None:
         await self.connect()
         assert self._channel is not None
+        headers = {"x-message-id": str(payload.get("messageId") or "")}
+        # P0-3: W3C traceparent 随消息传播，Worker 消费时据此续接父 span。
+        # OTel 未启用时当前 span 不 recording，inject 是空操作。
+        from opentelemetry import trace
+        from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+        if trace.get_current_span().is_recording():
+            carrier: dict[str, str] = {}
+            TraceContextTextMapPropagator().inject(carrier)
+            headers.update(carrier)
         exchange = await self._channel.get_exchange(get_settings().agent_queue_exchange)
         await exchange.publish(
             Message(
@@ -41,7 +51,7 @@ class AgentQueueService:
                 content_type="application/json",
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 message_id=str(payload.get("messageId") or ""),
-                headers={"x-message-id": str(payload.get("messageId") or "")},
+                headers=headers,
             ),
             routing_key=queue_name,
         )

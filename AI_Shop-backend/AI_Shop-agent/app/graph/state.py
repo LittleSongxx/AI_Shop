@@ -22,6 +22,10 @@ class AgentGraphState(TypedDict, total=False):
     finished: bool
     route: RouteKind
 
+    # 用户最终看到什么。Worker 以此决定任务终态：只有 ok 才进 COMPLETED，
+    # llm_error / graph_error 说明用户收到的是错误文案，绝不应当成成功任务。
+    outcome: str | None
+
     llm_messages: list[BaseMessage]
     working_turns: list[dict]
     working_oldest_id: int | None
@@ -59,6 +63,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "cancelled": False,
         "finished": False,
         "route": "agent_loop",
+        "outcome": None,
         "llm_messages": [],
         "working_turns": [],
         "working_oldest_id": None,

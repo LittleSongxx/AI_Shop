@@ -112,3 +112,31 @@ async def test_payment_blocked_without_fund_loss_is_not_fund_dispute():
     assert decision.intent == IntentKind.PAYMENT_ISSUE
     assert decision.risk_level != RiskLevel.HIGH
     assert decision.handoff_reason != "FUND_DISPUTE"
+
+
+@pytest.mark.asyncio
+async def test_repeated_intent_handoff_triggers_on_current_third_turn():
+    decision = await resolve_intent(
+        "u1",
+        "物流到哪了",
+        allow_llm=False,
+        recent_intents=["QUERY_LOGISTICS", "QUERY_LOGISTICS"],
+    )
+
+    assert decision.intent == IntentKind.QUERY_LOGISTICS
+    assert decision.next_action == NextAction.HANDOFF_SUGGESTED
+    assert decision.handoff_reason == "REPEATED_INTENT"
+
+
+@pytest.mark.asyncio
+async def test_repeated_intent_handoff_does_not_trigger_on_second_turn():
+    decision = await resolve_intent(
+        "u1",
+        "物流到哪了",
+        allow_llm=False,
+        recent_intents=["QUERY_LOGISTICS"],
+    )
+
+    assert decision.intent == IntentKind.QUERY_LOGISTICS
+    assert decision.next_action == NextAction.TOOL
+    assert decision.handoff_reason is None

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import random
 import time
@@ -10,6 +11,7 @@ from app.constants import (
     CANCEL_FLAG_TTL,
     CONSULT_ACTIVE_TTL,
     CONSULT_PRODUCT_TTL,
+    IMPRESSION_ATTRIBUTION_TTL,
     IMPRESSION_LOG_MAX_ENTRIES,
     IMPRESSION_LOG_MAX_PRODUCTS,
     IMPRESSION_LOG_TTL,
@@ -20,6 +22,7 @@ from app.constants import (
     REDIS_AGENT_CONSULT_PRODUCT,
     REDIS_AGENT_HISTORY_CONDENSED,
     REDIS_AGENT_IMPRESSION_LOG,
+    REDIS_AGENT_IMPRESSION_REQUEST,
     REDIS_AGENT_PENDING_ACTION,
     REDIS_AGENT_PENDING_MSG,
     REDIS_AGENT_SHOPPING_PROFILE,
@@ -35,6 +38,39 @@ from app.constants import (
 )
 
 logger = structlog.get_logger()
+
+_RECORD_ATTRIBUTED_CLICK_LUA = """
+local raw = redis.call('GET', KEYS[1])
+if not raw then return {} end
+
+local decoded, snapshot = pcall(cjson.decode, raw)
+if not decoded or type(snapshot) ~= 'table' then return {} end
+if tostring(snapshot.userId or '') ~= ARGV[1] then return {} end
+
+local position = tonumber(ARGV[4])
+local product_ids = snapshot.productIds
+if not position or position < 1 or position ~= math.floor(position) then return {} end
+if type(product_ids) ~= 'table' or product_ids[position] == nil then return {} end
+if tostring(product_ids[position]) ~= ARGV[2] then return {} end
+
+local source = string.sub(tostring(snapshot.source or ''), 1, 40)
+if redis.call('EXISTS', KEYS[3]) == 1 then
+    return {'DUPLICATE', source, tostring(position)}
+end
+
+local event = cjson.encode({
+    ts = tonumber(ARGV[5]),
+    productId = ARGV[2],
+    source = source,
+    position = position,
+    requestId = ARGV[3]
+})
+redis.call('LPUSH', KEYS[2], event)
+redis.call('LTRIM', KEYS[2], 0, tonumber(ARGV[6]) - 1)
+redis.call('EXPIRE', KEYS[2], tonumber(ARGV[7]))
+redis.call('SET', KEYS[3], '1', 'EX', tonumber(ARGV[8]))
+return {'RECORDED', source, tostring(position)}
+"""
 
 
 class RedisService:
@@ -151,12 +187,167 @@ class RedisService:
             "requestId": request_id or "",
             "productIds": shown,
         }
+        if request_id:
+            await self._push_attributed_impression(
+                user_id,
+                request_id,
+                shown,
+                entry,
+                query=query,
+                source=source,
+            )
+            return
         await self._push_capped(
             f"{REDIS_AGENT_IMPRESSION_LOG}{user_id}",
             entry,
             event="impression",
             user_id=user_id,
         )
+
+    async def _push_attributed_impression(
+        self,
+        user_id: str,
+        request_id: str,
+        product_ids: list[str],
+        entry: dict,
+        *,
+        query: str,
+        source: str,
+    ) -> None:
+        snapshot = {
+            "ts": int(time.time() * 1000),
+            "userId": user_id,
+            "requestId": request_id,
+            "query": (query or "")[:120],
+            "source": (source or "")[:40],
+            "productIds": product_ids,
+        }
+        try:
+            pipe = self.client.pipeline(transaction=True)
+            pipe.setex(
+                self._impression_request_key(request_id),
+                IMPRESSION_ATTRIBUTION_TTL,
+                json.dumps(snapshot, ensure_ascii=False),
+            )
+            log_key = f"{REDIS_AGENT_IMPRESSION_LOG}{user_id}"
+            pipe.lpush(log_key, json.dumps(entry, ensure_ascii=False))
+            pipe.ltrim(log_key, 0, IMPRESSION_LOG_MAX_ENTRIES - 1)
+            pipe.expire(log_key, IMPRESSION_LOG_TTL)
+            await pipe.execute()
+        except Exception as exc:
+            logger.warning(
+                "attributed_impression_log_failed",
+                user_id=user_id,
+                error=str(exc),
+            )
+
+    async def validate_click_attribution(
+        self,
+        user_id: str,
+        request_id: str,
+        product_id: str,
+        position: int,
+    ) -> dict | None:
+        """Resolve a click against the immutable serving snapshot.
+
+        Position is 1-based, matching analytics conventions and the UI payload.
+        The returned source is server-owned; callers must not trust a client
+        supplied source label.
+        """
+        if not user_id or not request_id or not product_id or position < 1:
+            return None
+        try:
+            raw = await self.client.get(self._impression_request_key(request_id))
+        except Exception as exc:
+            logger.warning(
+                "click_attribution_lookup_failed",
+                user_id=user_id,
+                error=str(exc),
+            )
+            return None
+        if not raw:
+            return None
+        try:
+            snapshot = json.loads(raw)
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(snapshot, dict) or str(snapshot.get("userId") or "") != user_id:
+            return None
+        product_ids = snapshot.get("productIds")
+        if not isinstance(product_ids, list) or position > len(product_ids):
+            return None
+        expected_product_id = str(product_ids[position - 1])
+        if expected_product_id != product_id:
+            return None
+        return {
+            "source": str(snapshot.get("source") or "")[:40],
+            "position": position,
+            "requestId": request_id,
+            "productId": product_id,
+        }
+
+    async def log_attributed_click(
+        self,
+        user_id: str,
+        request_id: str,
+        product_id: str,
+        position: int,
+    ) -> dict | None:
+        """Atomically validate, deduplicate and record a served-product click."""
+        if not user_id or not request_id or not product_id or position < 1:
+            return None
+        snapshot_key = self._impression_request_key(request_id)
+        click_key = f"{REDIS_AGENT_CLICK_LOG}{user_id}"
+        dedup_material = f"{user_id}\0{product_id}\0{position}".encode("utf-8")
+        dedup_key = (
+            f"{snapshot_key}:click:{hashlib.sha256(dedup_material).hexdigest()}"
+        )
+        try:
+            result = await self.client.eval(
+                _RECORD_ATTRIBUTED_CLICK_LUA,
+                3,
+                snapshot_key,
+                click_key,
+                dedup_key,
+                user_id,
+                product_id,
+                request_id,
+                int(position),
+                int(time.time() * 1000),
+                IMPRESSION_LOG_MAX_ENTRIES,
+                IMPRESSION_LOG_TTL,
+                IMPRESSION_ATTRIBUTION_TTL,
+            )
+        except Exception as exc:
+            logger.warning(
+                "attributed_click_log_failed",
+                user_id=user_id,
+                error=str(exc),
+            )
+            return None
+        if not isinstance(result, (list, tuple)) or len(result) < 3:
+            return None
+        status = self._redis_text(result[0])
+        if status not in {"RECORDED", "DUPLICATE"}:
+            return None
+        return {
+            "source": self._redis_text(result[1])[:40],
+            "position": int(self._redis_text(result[2])),
+            "requestId": request_id,
+            "productId": product_id,
+            "duplicate": status == "DUPLICATE",
+        }
+
+    @staticmethod
+    def _impression_request_key(request_id: str) -> str:
+        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        return f"{REDIS_AGENT_IMPRESSION_REQUEST}{digest}"
+
+    @staticmethod
+    def _redis_text(value: object) -> str:
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return str(value)
 
     async def log_click(
         self,
@@ -165,6 +356,7 @@ class RedisService:
         *,
         source: str = "",
         position: int | None = None,
+        request_id: str = "",
     ) -> None:
         """Record a product click as the positive counterpart to an impression."""
         if not user_id or not product_id:
@@ -174,6 +366,7 @@ class RedisService:
             "productId": str(product_id),
             "source": source or "",
             "position": position,
+            "requestId": request_id or "",
         }
         await self._push_capped(
             f"{REDIS_AGENT_CLICK_LOG}{user_id}",
@@ -191,7 +384,7 @@ class RedisService:
         user_id: str,
     ) -> None:
         try:
-            pipe = self.client.pipeline(transaction=False)
+            pipe = self.client.pipeline(transaction=True)
             pipe.lpush(key, json.dumps(entry, ensure_ascii=False))
             pipe.ltrim(key, 0, IMPRESSION_LOG_MAX_ENTRIES - 1)
             pipe.expire(key, IMPRESSION_LOG_TTL)
@@ -257,6 +450,28 @@ class RedisService:
             ex=max(1, int(ttl_seconds)),
         )
         return bool(ok)
+
+    async def renew_agent_user_lock(
+        self, user_id: str, owner: str, ttl_seconds: int
+    ) -> bool:
+        """仅当锁仍归 owner 时续期；锁已被别人拿走则返回 False。
+
+        Worker 长任务处理期间调用（worker._renew_lease_loop），否则锁
+        TTL(180s) 比任务租约(240s) 短，>180s 的任务会把同用户新消息放进来。
+        """
+        result = await self.client.eval(
+            """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('expire', KEYS[1], ARGV[2])
+            end
+            return 0
+            """,
+            1,
+            f"{REDIS_AGENT_USER_LOCK}{user_id}",
+            owner,
+            max(1, int(ttl_seconds)),
+        )
+        return bool(result)
 
     async def release_agent_user_lock(self, user_id: str, owner: str) -> None:
         await self.client.eval(

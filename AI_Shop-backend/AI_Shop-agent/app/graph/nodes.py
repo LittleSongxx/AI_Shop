@@ -22,7 +22,8 @@ from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
 from app.memory.context_builder import context_builder
 from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
-from app.rag.ab_test import get_bucket, get_rag_overrides
+from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.rag.ab_test import get_bucket
 from app.rag.query_rewriter import rewrite_for_rag
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
@@ -38,6 +39,10 @@ from app.utils.product_consult import is_product_consult_turn
 from app.utils.prompt_boundary import isolate_knowledge_text
 
 logger = structlog.get_logger()
+
+# A3：HANDOFF_SUGGESTED（REPEATED_INTENT / 低置信）时追加在回答末尾的
+# 建议转人工文案。只是建议，不强制；用户可继续提问或直接说"转人工"。
+_HANDOFF_SUGGEST_TEXT = "\n\n如仍未解决，可以回复“转人工”，由人工客服继续协助。"
 output_guard = OutputGuardrail()
 
 # Intent kinds for which the original intent is preserved even when a
@@ -60,7 +65,7 @@ async def entry_guard(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
     message_id = state["message_id"]
     if await rt.is_cancelled(user_id, message_id):
-        return {"cancelled": True, "finished": True, "route": "end"}
+        return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
     card, user_text = rt.parse_agent_message(state["agent_msg"])
     # P3-2: optional image URL forwarded by the frontend alongside the text message.
     image_url: str | None = state["agent_msg"].get("imageUrl") or None
@@ -121,6 +126,9 @@ async def build_context_node(state: AgentGraphState) -> dict:
     except (TypeError, ValueError):
         decision = None
     if decision is None:
+        # A2/A3：会话级意图延续与死循环检测的输入（send_message 已算过决策的
+        # 情况下走不到这里；只有 agent_msg 没带 intentDecision 时才补查）。
+        recent_intents = await agent_message_service.get_recent_intents(user_id)
         decision = await resolve_intent(
             user_id,
             user_text,
@@ -128,6 +136,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
             consult_card=consult_card,
             message_card=card,
             unresolved_count=int(state["agent_msg"].get("unresolvedCount") or 0),
+            session_intent=recent_intents[0] if recent_intents else None,
+            recent_intents=recent_intents,
         )
     intent = decision.intent
     intent_source = decision.source
@@ -143,9 +153,10 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 "next_action": NextAction.TOOL,
             }
         )
-    # P2-3: stable A/B bucket for this user; empty dict when testing is off.
+    # P2-3: stable A/B bucket for this user. Overrides (rag_top_k / rerank_top_n)
+    # are applied inside rag_retriever (single source), which also folds the
+    # bucket into the semantic cache key so strategies never share cached results.
     ab_bucket = get_bucket(user_id)
-    _ab_overrides = get_rag_overrides(ab_bucket)
 
     # P3-2: describe the user's image (if any) before the retrieval step so
     # the description enriches both the RAG query and the LLM context window.
@@ -172,8 +183,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
         category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
         rag_result = await rag_retriever.search_faq_with_trace(
             rag_query,
-            top_k=_ab_overrides.get("rag_top_k"),
             category_filter=category_filter,
+            bucket=ab_bucket,
         )
         faq_text = str(rag_result.get("text") or "")
         rag_source_refs = list(rag_result.get("source_refs") or [])
@@ -307,7 +318,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         if partial:
             await agent_message_service.interrupt_message(user_id, message_id, partial, "agent")
         await redis_service.clear_bound_message_id(user_id)
-        return {"cancelled": True, "finished": True, "route": "end"}
+        return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
 
     llm = rt.bind_agent_llm()
     consult = state.get("card")
@@ -345,7 +356,9 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
     non_stream_turn = similar_first_turn or category_switch_first_turn or tool_required_first_turn
     try:
         if non_stream_turn:
-            response = await llm.ainvoke(messages)
+            response = await invoke_llm_with_metrics(
+                llm, messages, model=settings.llm_model
+            )
         else:
             response = await rt.stream_llm_turn(
                 llm,
@@ -354,10 +367,16 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                 message_id,
                 agent_msg.get("userMessage"),
                 turn_chunks,
+                model=settings.llm_model,
             )
     except Exception as primary_error:
         response = None
         can_retry = not turn_chunks and has_fallback_chat_llm()
+        # A4：失败的调用也计入 LLM_CALL_TOTAL（成功/失败都要可观测，
+        # 只看成功数算不出失败率）。已部分流式输出的不算 fallback 机会，
+        # 但那次调用本身已经失败，照记。
+        if not non_stream_turn:
+            rt.record_llm_failure(settings.llm_model, fallback=False)
         logger.warning(
             "llm_turn_failed",
             error=str(primary_error),
@@ -368,7 +387,12 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             try:
                 fallback_llm = rt.bind_agent_llm(fallback=True)
                 if non_stream_turn:
-                    response = await fallback_llm.ainvoke(messages)
+                    response = await invoke_llm_with_metrics(
+                        fallback_llm,
+                        messages,
+                        fallback=True,
+                        model=settings.llm_fallback_model,
+                    )
                 else:
                     response = await rt.stream_llm_turn(
                         fallback_llm,
@@ -377,12 +401,18 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                         message_id,
                         agent_msg.get("userMessage"),
                         turn_chunks,
+                        fallback=True,
+                        model=settings.llm_fallback_model,
                     )
                 logger.info(
                     "llm_fallback_succeeded",
                     fallback_model=settings.llm_fallback_model,
                 )
             except Exception as fallback_error:
+                if not non_stream_turn:
+                    rt.record_llm_failure(
+                        settings.llm_fallback_model, fallback=True
+                    )
                 logger.warning(
                     "llm_fallback_failed",
                     error=str(fallback_error),
@@ -392,14 +422,14 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             partial = "".join((state.get("chunks") or []) + turn_chunks)
             await rt.push_chat_error(agent_msg, "agent", partial)
             await redis_service.clear_bound_message_id(user_id)
-            return {"finished": True, "route": "end"}
+            return {"finished": True, "route": "end", "outcome": "llm_error"}
 
     if response is None:
         partial = "".join((state.get("chunks") or []) + turn_chunks)
         if partial:
             await agent_message_service.interrupt_message(user_id, message_id, partial, "agent")
         await redis_service.clear_bound_message_id(user_id)
-        return {"cancelled": True, "finished": True, "route": "end"}
+        return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
 
     tool_calls = getattr(response, "tool_calls", None) or []
     if tool_calls:
@@ -482,7 +512,7 @@ async def tools_node(state: AgentGraphState) -> dict:
 
     for tc in state.get("pending_tool_calls") or []:
         if await rt.is_cancelled(user_id, message_id):
-            return {"cancelled": True, "finished": True, "route": "end"}
+            return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
         if tc["name"] == "SEARCH_PRODUCTS" and is_product_consult_turn(
             state.get("user_text"),
             state.get("message_card"),
@@ -566,7 +596,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
 
     try:
         if state.get("cancelled"):
-            return {"finished": True, "route": "end"}
+            return {"finished": True, "route": "end", "outcome": "cancelled"}
 
         chunks = list(state.get("chunks") or [])
         messages = list(state.get("llm_messages") or [])
@@ -576,6 +606,20 @@ async def finalize_node(state: AgentGraphState) -> dict:
         if guarded != full_text:
             chunks = [guarded]
             full_text = guarded
+
+        # A3：HANDOFF_SUGGESTED（REPEATED_INTENT / 低置信）此前只被计数、
+        # 用户看不到任何提示。这里在回答末尾补一句可见的建议转人工文案——
+        # 只是建议，不强制（强制转人工是 HANDOFF 的职责）。
+        decision = agent_msg.get("intentDecision") or {}
+        # 键名兼容：IntentDecision.model_dump 输出 snake_case 的 next_action
+        # （死代码修复：旧写法只查 nextAction，全链路从不产生该键，A3 文案
+        # 从未生效——P1 审查）。
+        if (
+            decision.get("next_action") == "HANDOFF_SUGGESTED"
+            or decision.get("nextAction") == "HANDOFF_SUGGESTED"
+        ):
+            chunks = list(chunks) + [_HANDOFF_SUGGEST_TEXT]
+            full_text = "".join(chunks)
 
         await rt.finalize_agent_response(
             agent_msg,
@@ -602,10 +646,11 @@ async def finalize_node(state: AgentGraphState) -> dict:
     except Exception as e:
         logger.exception("graph_finalize_failed", error=str(e))
         await rt.push_chat_error(agent_msg, "agent", "".join(state.get("chunks") or []))
+        return {"finished": True, "route": "end", "outcome": "graph_error"}
     finally:
         await redis_service.clear_bound_message_id(user_id)
 
-    return {"finished": True, "route": "post_turn"}
+    return {"finished": True, "route": "post_turn", "outcome": "ok"}
 
 async def post_turn_node(state: AgentGraphState) -> dict:
     if state.get("cancelled"):

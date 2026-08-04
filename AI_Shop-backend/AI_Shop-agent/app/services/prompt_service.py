@@ -29,7 +29,7 @@ PROMPT_FILE_MAP: dict[str, str] = {
 }
 
 _REACT_SUPPLEMENT = """
-=== ReAct 执行说明（优先级高于上文冲突条目）===
+=== ReAct 执行说明（优先级高于上文「当前意图」段内的冲突条目）===
 你是自主规划的工具 Agent：自己判断下一步是追问、直接回答，还是调用哪个 MCP 工具。
 - 政策/如何操作/能力边界类问题（含优惠券怎么用、如何取消订单）：直接回答，不要为了「走流程」强行查单或查券。
 - 需要真实业务数据时再调工具：搜商品 SEARCH_PRODUCTS；查订单 QUERY_ORDERS；物流 QUERY_LOGISTICS；查评价 QUERY_COMMENT；查券列表 QUERY_USER_COUPONS；写评价 PROPOSE_PRODUCT_REVIEW；追评 PROPOSE_RECOMMENT；退款 PROPOSE_REFUND；确认收货 PROPOSE_CONFIRM_RECEIPT。
@@ -135,18 +135,25 @@ async def build_agent_system_prompt(
         knowledge_text=knowledge_text,
     )
 
-    parts: list[str] = []
-    if global_part:
-        parts.append(global_part)
-    if intent_part:
-        parts.append(f"=== 当前意图：{intent.value} ===\n{intent_part}")
-    if intent in _REACT_ADAPTED_INTENTS or intent == IntentKind.PRODUCT_CONSULT:
-        parts.append(_REACT_SUPPLEMENT)
+    # B3 静态前置（prefix-cache 契约）：字节级稳定的段（全局规则、不可信
+    # 输入边界）放在最前，动态的意图段放最后——跨请求的 system prompt 有
+    # 最长稳定前缀，任何支持 prefix caching 的 provider 都能命中。
+    # ReAct 补充说明放在意图段之后：它声明"优先级高于上文「当前意图」段内
+    # 的冲突条目"，按 LLM 常见的"后文覆盖前文"行为，必须位于它要压制的
+    # 意图段之后才成立；放前面会让声明落空（旧实现恰好是这个错误）。
+    # 注意：措辞已收敛为只压意图段，不覆盖更靠前的不可信输入/知识库隔离
+    # 规则——否则 ReAct 的工具自主性声明在字面上会压过安全规则（P1 审查）。
+    body = global_part or (await load_prompt("agent")).strip()
+    body = append_untrusted_rule(body)
 
-    body = "\n\n".join(parts).strip()
-    if not body:
-        body = (await load_prompt("agent")).strip()
-    return append_untrusted_rule(body)
+    dynamic_parts: list[str] = []
+    if intent_part:
+        dynamic_parts.append(f"=== 当前意图：{intent.value} ===\n{intent_part}")
+    if intent in _REACT_ADAPTED_INTENTS or intent == IntentKind.PRODUCT_CONSULT:
+        dynamic_parts.append(_REACT_SUPPLEMENT)
+    if dynamic_parts:
+        body = f"{body}\n\n" + "\n\n".join(dynamic_parts)
+    return body
 
 async def load_agent_prompt(
     intent: IntentKind | None = None,

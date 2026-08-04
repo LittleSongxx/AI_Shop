@@ -153,7 +153,8 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
     fresh = f"agent_migration_fresh_{suffix}"
     original = f"agent_migration_original_{suffix}"
     incomplete = f"agent_migration_incomplete_{suffix}"
-    databases = (fresh, original, incomplete)
+    duplicates = f"agent_migration_duplicates_{suffix}"
+    databases = (fresh, original, incomplete, duplicates)
 
     try:
         for database in databases:
@@ -196,6 +197,79 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
                 "SELECT user_message, biz_data FROM agent_message WHERE user_id='u2'"
             )
             assert cursor.fetchone() == ("still here", '{"kept":true}')
+
+        # 模拟旧版本允许同一用户存在多个活跃人工会话的数据库。升级必须保留
+        # 两条会话记录，并把重复会话的消息迁入最早创建的主会话；直接 DELETE
+        # 会话会让 support_message 留下孤儿记录。
+        _migrate(duplicates)
+        with _database_connection(duplicates) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "ALTER TABLE support_session DROP INDEX uk_support_active_user"
+            )
+            cursor.execute(
+                """
+                INSERT INTO support_session
+                    (session_id, user_id, status, summary, assigned_admin,
+                     created_at, updated_at)
+                VALUES
+                    ('session-old', 'merge-user', 'QUEUED', '旧排队会话', NULL,
+                     '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+                    ('session-new', 'merge-user', 'ACTIVE', '正在服务的主会话', 'admin-1',
+                     '2026-01-02 00:00:00', '2026-01-02 00:00:00')
+                """
+            )
+            cursor.execute(
+                """
+                INSERT INTO support_message (session_id, sender_type, content)
+                VALUES ('session-old', 'USER', 'old-message'),
+                       ('session-new', 'USER', 'new-message')
+                """
+            )
+            cursor.execute(
+                """
+                INSERT INTO agent_message
+                    (session_id, user_id, user_message, status, send_time)
+                VALUES ('session-old', 'merge-user', 'linked-agent-message', 2, NOW())
+                """
+            )
+
+        _migrate(duplicates)
+        _migrate(duplicates)
+        _assert_current_schema(duplicates)
+        with _database_connection(duplicates) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT session_id, status, summary
+                FROM support_session
+                WHERE user_id='merge-user'
+                ORDER BY created_at, session_id
+                """
+            )
+            sessions = cursor.fetchall()
+            assert len(sessions) == 2
+            assert sessions[0][0:2] == ("session-old", "CANCELLED")
+            assert "session-new" in sessions[0][2]
+            assert sessions[1] == ("session-new", "ACTIVE", "正在服务的主会话")
+
+            cursor.execute(
+                """
+                SELECT session_id, content
+                FROM support_message
+                WHERE content IN ('old-message', 'new-message')
+                ORDER BY support_message_id
+                """
+            )
+            assert cursor.fetchall() == (
+                ("session-new", "old-message"),
+                ("session-new", "new-message"),
+            )
+            cursor.execute(
+                """
+                SELECT session_id FROM agent_message
+                WHERE user_message='linked-agent-message'
+                """
+            )
+            assert cursor.fetchone() == ("session-new",)
     finally:
         get_settings.cache_clear()
         for database in databases:

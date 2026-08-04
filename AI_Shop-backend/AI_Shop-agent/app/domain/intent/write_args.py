@@ -113,7 +113,10 @@ async def _refund_tool_call(
     # 多个可退项时先把订单摆给用户看，让用户挑，不替用户选。
     if len(refundable) > 1:
         return "QUERY_ORDERS", {"orderId": order_id}
-    return "PROPOSE_REFUND", {"orderItemId": raw_id}
+    # A1（Verified-Action）：ID 既解析不到订单项、订单也没有可退项时，
+    # 不能拿原始 ID 硬发退款提案——那是在对不可验证的业务状态做出承诺。
+    # 正确行为是返回 None，把"确认这是哪一单/哪一项"交回给模型追问用户。
+    return None
 
 
 async def required_tool_for_intent(

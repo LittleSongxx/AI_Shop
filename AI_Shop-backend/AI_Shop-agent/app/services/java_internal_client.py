@@ -120,6 +120,24 @@ class JavaInternalClient:
         )
         return normalize_keys(data) if data else None
 
+    async def get_agent_action_status(
+        self,
+        user_id: str,
+        action_type: str,
+        idempotency_key: str,
+        params: dict,
+    ) -> dict:
+        data = await self.post_json(
+            "/internal/order/agent/actionStatus",
+            {
+                "userId": user_id,
+                "actionType": action_type,
+                "idempotencyKey": idempotency_key,
+                "params": params,
+            },
+        )
+        return normalize_keys(data) if isinstance(data, dict) else {}
+
     async def snapshot_batch(self, product_ids: list[str]) -> dict | None:
         data = await self.post_json(
             "/internal/product/snapshotBatch",
@@ -251,9 +269,41 @@ class JavaInternalClient:
     async def knowledge_version(self) -> int:
         data = await self.post_json("/internal/search/knowledge/version", {})
         try:
-            return int(data)
+            version = int(data)
         except (TypeError, ValueError):
-            return 1
+            raise ValueError("invalid knowledge release version response") from None
+        if version < 1:
+            raise ValueError("knowledge release version must be positive")
+        return version
+
+    async def knowledge_catalog(self) -> dict[str, Any]:
+        """Return the Java release snapshot used to gate knowledge retrieval.
+
+        The catalog is intentionally validated at the boundary. A partial or
+        malformed response must never be treated as an empty catalog, because
+        that would make a failed Java request look like a successful archive.
+        """
+        data = await self.post_json("/internal/search/knowledge/catalog", {})
+        if not isinstance(data, dict):
+            raise ValueError("invalid knowledge catalog response")
+        normalized = normalize_keys(data)
+        try:
+            version = int(normalized.get("version"))
+        except (TypeError, ValueError):
+            raise ValueError("knowledge catalog version is invalid") from None
+        if version < 1:
+            raise ValueError("knowledge catalog version must be positive")
+        document_ids = normalized.get("active_document_ids")
+        if not isinstance(document_ids, list):
+            raise ValueError("knowledge catalog activeDocumentIds is invalid")
+        active_ids: list[str] = []
+        for document_id in document_ids:
+            value = str(document_id).strip() if document_id is not None else ""
+            if not value:
+                raise ValueError("knowledge catalog contains an empty document id")
+            if value not in active_ids:
+                active_ids.append(value)
+        return {"version": version, "active_document_ids": active_ids}
 
     async def exact_faq(
         self,

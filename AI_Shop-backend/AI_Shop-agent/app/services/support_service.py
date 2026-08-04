@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime
 
 import structlog
+from aiomysql import IntegrityError
 
 from app.config.settings import get_settings
 from app.constants import (
@@ -51,34 +52,55 @@ class SupportService:
         if active:
             return active
         session_id = str(uuid.uuid4())
-        async with acquire() as cur:
-            await cur.execute(
-                """
-                INSERT INTO support_session
-                    (session_id, user_id, status, trigger_reason, summary, intent, sentiment,
-                     urgency, risk_level, source_message_id, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                """,
-                (
-                    session_id,
-                    user_id,
-                    SUPPORT_STATUS_QUEUED,
-                    reason,
-                    summary,
-                    decision.get("intent"),
-                    decision.get("sentiment"),
-                    decision.get("urgency"),
-                    decision.get("risk_level"),
-                    source_message_id,
-                ),
-            )
-            await cur.execute(
-                """
-                INSERT INTO support_message
-                    (session_id, sender_type, sender_id, content, source_message_id, created_at)
-                VALUES (%s, 'SYSTEM', 'agent', %s, %s, NOW())
-                """,
-                (session_id, "已为您登记人工客服请求，客服接入后会在此对话回复。", source_message_id),
+        try:
+            async with acquire() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO support_session
+                        (session_id, user_id, status, trigger_reason, summary, intent, sentiment,
+                         urgency, risk_level, source_message_id, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    """,
+                    (
+                        session_id,
+                        user_id,
+                        SUPPORT_STATUS_QUEUED,
+                        reason,
+                        summary,
+                        decision.get("intent"),
+                        decision.get("sentiment"),
+                        decision.get("urgency"),
+                        decision.get("risk_level"),
+                        source_message_id,
+                    ),
+                )
+        except IntegrityError as exc:
+            # P0-6：两个并发请求都过了上面的 get_active；数据库唯一约束
+            # uk_support_active_user（active_user 生成列）只放行一个，
+            # 抢输的一方读回赢家的会话，而不是自己再插一条重复的。
+            # 必须同时核对 MySQL 错误码和索引名；IntegrityError 还包含非空、
+            # 外键等约束错误，不能把那些错误误装成并发赢家。
+            if not _is_active_session_duplicate(exc):
+                raise
+            winner = await self.get_active(user_id)
+            if winner:
+                return winner
+            raise
+        try:
+            async with acquire() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO support_message
+                        (session_id, sender_type, sender_id, content, source_message_id, created_at)
+                    VALUES (%s, 'SYSTEM', 'agent', %s, %s, NOW())
+                    """,
+                    (session_id, "已为您登记人工客服请求，客服接入后会在此对话回复。", source_message_id),
+                )
+        except Exception:
+            # 欢迎消息写失败不致命：会话已建立、管理端仍会收到会话通知，
+            # 不能把用户请求整体判失败。记日志，会话照常返回。
+            logger.warning(
+                "support_welcome_message_failed", session_id=session_id
             )
         session = await self.get_by_id(session_id)
         await self.publish_admin(
@@ -147,33 +169,59 @@ class SupportService:
         return session
 
     async def reply(self, session_id: str, admin_id: str, content: str) -> dict | None:
-        session = await self.get_by_id(session_id)
-        if not session or session["status"] not in (
-            SUPPORT_STATUS_ASSIGNED,
-            SUPPORT_STATUS_ACTIVE,
-        ):
-            raise ValueError("会话尚未认领或已结束")
-        if session.get("assigned_admin") not in (None, admin_id):
-            raise ValueError("会话已被其他客服认领")
-        await self.activate(session_id, admin_id)
         async with acquire() as cur:
-            await cur.execute(
-                """
-                INSERT INTO support_message
-                    (session_id, sender_type, sender_id, content, created_at)
-                VALUES (%s, 'ADMIN', %s, %s, NOW())
-                """,
-                (session_id, admin_id, content),
-            )
-            await cur.execute(
-                """
-                INSERT INTO agent_message
-                    (session_id, user_id, assistant_message, status, biz_type, send_time, queue_name)
-                VALUES (%s, %s, %s, 2, 'human_support', NOW(), 'human')
-                """,
-                (session_id, session["user_id"], content),
-            )
-            message_id = cur.lastrowid
+            # The pool uses autocommit for ordinary one-statement operations. A
+            # reply needs a real transaction: lock the session so resolve/cancel
+            # cannot close it between the ownership check and the two message
+            # inserts, then commit the state transition and messages together.
+            await cur.execute("START TRANSACTION")
+            try:
+                await cur.execute(
+                    "SELECT * FROM support_session WHERE session_id=%s FOR UPDATE",
+                    (session_id,),
+                )
+                session = await cur.fetchone()
+                if not session or session["status"] not in (
+                    SUPPORT_STATUS_ASSIGNED,
+                    SUPPORT_STATUS_ACTIVE,
+                ):
+                    raise ValueError("会话尚未认领或已结束")
+                if session.get("assigned_admin") not in (None, admin_id):
+                    raise ValueError("会话已被其他客服认领")
+                await cur.execute(
+                    """
+                    UPDATE support_session
+                    SET status='ACTIVE', assigned_admin=%s,
+                        assigned_at=COALESCE(assigned_at, NOW()), updated_at=NOW()
+                    WHERE session_id=%s
+                      AND status IN ('ASSIGNED', 'ACTIVE')
+                      AND (assigned_admin IS NULL OR assigned_admin=%s)
+                    """,
+                    (admin_id, session_id, admin_id),
+                )
+                if cur.rowcount != 1:
+                    raise ValueError("会话已被其他客服认领或已经结束")
+                await cur.execute(
+                    """
+                    INSERT INTO support_message
+                        (session_id, sender_type, sender_id, content, created_at)
+                    VALUES (%s, 'ADMIN', %s, %s, NOW())
+                    """,
+                    (session_id, admin_id, content),
+                )
+                await cur.execute(
+                    """
+                    INSERT INTO agent_message
+                        (session_id, user_id, assistant_message, status, biz_type, send_time, queue_name)
+                    VALUES (%s, %s, %s, 2, 'human_support', NOW(), 'human')
+                    """,
+                    (session_id, session["user_id"], content),
+                )
+                message_id = cur.lastrowid
+                await cur.execute("COMMIT")
+            except BaseException:
+                await cur.execute("ROLLBACK")
+                raise
         await redis_service.publish_ws(
             {
                 "messageType": WS_MESSAGE_TYPE_SUPPORT,
@@ -198,13 +246,6 @@ class SupportService:
         return await self.get_by_id(session_id)
 
     async def resolve(self, session_id: str, admin_id: str, remark: str | None = None) -> dict | None:
-        session = await self.get_by_id(session_id)
-        if (
-            not session
-            or session.get("assigned_admin") not in (None, admin_id)
-            or session.get("status") not in _ACTIVE_STATUSES
-        ):
-            raise ValueError("会话不存在、已结束或不属于当前客服")
         async with acquire() as cur:
             await cur.execute(
                 """
@@ -213,21 +254,17 @@ class SupportService:
                     summary=CASE WHEN %s IS NULL OR %s='' THEN summary
                                 ELSE CONCAT(COALESCE(summary, ''), '\n处理备注：', %s) END
                 WHERE session_id=%s AND status IN ('QUEUED', 'ASSIGNED', 'ACTIVE')
+                  AND (assigned_admin IS NULL OR assigned_admin=%s)
                 """,
-                (remark, remark, remark, session_id),
+                (remark, remark, remark, session_id, admin_id),
             )
+            if cur.rowcount != 1:
+                raise ValueError("会话不存在、已结束或不属于当前客服")
         session = await self.get_by_id(session_id)
         await self.publish_both(session, {"event": "support.resolved"})
         return session
 
     async def return_to_ai(self, session_id: str, admin_id: str) -> dict | None:
-        session = await self.get_by_id(session_id)
-        if (
-            not session
-            or session.get("assigned_admin") not in (None, admin_id)
-            or session.get("status") not in _ACTIVE_STATUSES
-        ):
-            raise ValueError("会话不存在、已结束或不属于当前客服")
         async with acquire() as cur:
             await cur.execute(
                 """
@@ -235,9 +272,12 @@ class SupportService:
                 SET status='CANCELLED', resolved_at=NOW(), updated_at=NOW(),
                     summary=CONCAT(COALESCE(summary, ''), '\n已转回AI客服')
                 WHERE session_id=%s AND status IN ('QUEUED', 'ASSIGNED', 'ACTIVE')
+                  AND (assigned_admin IS NULL OR assigned_admin=%s)
                 """,
-                (session_id,),
+                (session_id, admin_id),
             )
+            if cur.rowcount != 1:
+                raise ValueError("会话不存在、已结束或不属于当前客服")
         session = await self.get_by_id(session_id)
         await self.publish_both(session, {"event": "support.returned_to_ai"})
         return session
@@ -254,6 +294,8 @@ class SupportService:
                 """,
                 (session_id, user_id),
             )
+            if cur.rowcount != 1:
+                return None
         session = await self.get_by_id(session_id)
         await self.publish_both(session, {"event": "support.cancelled"})
         return session
@@ -710,6 +752,11 @@ def _eligible_faq_candidate(row: dict | None) -> bool:
 
 
 support_service = SupportService()
+
+
+def _is_active_session_duplicate(exc: IntegrityError) -> bool:
+    code = exc.args[0] if exc.args else None
+    return code == 1062 and "uk_support_active_user" in str(exc)
 
 
 def build_sla_stats(

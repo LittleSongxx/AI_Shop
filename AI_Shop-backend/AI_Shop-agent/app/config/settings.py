@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     app_host: str = "0.0.0.0"
     app_port: int = 7050
+    # Worker 是独立进程，任务指标在 Worker 内更新；Prometheus 抓这个端口
+    # （deploy/prometheus/prometheus.yml 已加 aishop-agent-worker job）。
+    worker_metrics_port: int = 7051
     app_env: str = "development"
     # Autoreload respawns the server on file changes and is a local-dev tool
     # only; leaving it on elsewhere costs a watcher process and restarts.
@@ -122,8 +125,17 @@ class Settings(BaseSettings):
     agent_worker_low_concurrency: int = 2
     agent_task_max_retries: int = 5
     agent_task_deadline_seconds: int = 120
+    # 任务租约时长：必须大于 deadline（deadline + 余量），正常跑的任务不会被误接管。
+    # Worker 处理期间每 lease/3 秒续租一次；Worker 崩溃后租约到期，其他 Worker 才能接管。
+    agent_task_lease_seconds: int = 240
+    # MQ 发布前的 DISPATCHING 预占超时。只有该状态超时才允许恢复重发；
+    # 已由 RabbitMQ confirm 的 QUEUED 任务不会被周期复制。
+    agent_task_dispatch_timeout_seconds: int = 30
     agent_task_recovery_interval_seconds: int = 5
     agent_user_lock_ttl_seconds: int = 180
+    # B1：悬挂在 EXECUTING 的待确认动作补终态（执行方崩溃后不再永久"处理中"）。
+    pending_action_stale_seconds: int = 600
+    pending_action_reconcile_interval_seconds: int = 300
     agent_support_summary_limit: int = 12
     agent_worker_heartbeat_ttl_seconds: int = 30
     support_first_response_sla_seconds: int = 300
@@ -196,6 +208,9 @@ class Settings(BaseSettings):
     knn_num_candidates_factor: int = 3
     knn_num_candidates_min: int = 100
     rag_cache_ttl_seconds: int = 30 * 60
+    # B2：语义缓存命中按此比例抽样进盲评队列（1% 命中会被记录，
+    # 离线抽样看误报率——行业建议"命中率突降按事故处理，误报率按周评审"）。
+    rag_cache_sample_rate: float = 0.01
     faq_exact_cache_ttl_seconds: int = 6 * 60 * 60
     faq_fast_path_timeout_seconds: float = 1.5
     history_message_limit: int = 15
@@ -238,6 +253,29 @@ class Settings(BaseSettings):
             )
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
+        if not 1 <= self.worker_metrics_port <= 65_535:
+            raise ValueError("WORKER_METRICS_PORT must be between 1 and 65535")
+        if self.worker_metrics_port == self.app_port:
+            raise ValueError("WORKER_METRICS_PORT must differ from APP_PORT")
+        if not 0 <= self.rag_cache_sample_rate <= 1:
+            raise ValueError("RAG_CACHE_SAMPLE_RATE must be between 0 and 1")
+        if self.agent_task_lease_seconds <= self.agent_task_deadline_seconds:
+            raise ValueError(
+                "AGENT_TASK_LEASE_SECONDS must be greater than "
+                "AGENT_TASK_DEADLINE_SECONDS"
+            )
+        if self.agent_task_dispatch_timeout_seconds < 5:
+            raise ValueError("AGENT_TASK_DISPATCH_TIMEOUT_SECONDS must be at least 5")
+        if self.agent_task_recovery_interval_seconds < 1:
+            raise ValueError("AGENT_TASK_RECOVERY_INTERVAL_SECONDS must be positive")
+        if self.agent_user_lock_ttl_seconds < 1:
+            raise ValueError("AGENT_USER_LOCK_TTL_SECONDS must be positive")
+        if self.pending_action_stale_seconds < 1:
+            raise ValueError("PENDING_ACTION_STALE_SECONDS must be positive")
+        if self.pending_action_reconcile_interval_seconds < 1:
+            raise ValueError("PENDING_ACTION_RECONCILE_INTERVAL_SECONDS must be positive")
+        if self.agent_worker_heartbeat_ttl_seconds < 5:
+            raise ValueError("AGENT_WORKER_HEARTBEAT_TTL_SECONDS must be at least 5")
         return self
 
     def validate_runtime(self) -> None:

@@ -18,8 +18,13 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from app.config.settings import get_settings
+from app.harness.metrics.runtime_sensors import CHECKPOINT_PERSIST_FAILURES
 
 logger = structlog.get_logger()
+
+
+class CheckpointPersistenceError(RuntimeError):
+    """A checkpoint mutation could not be persisted to the shared Redis store."""
 
 
 class RedisCheckpointSaver(BaseCheckpointSaver[str]):
@@ -31,6 +36,24 @@ class RedisCheckpointSaver(BaseCheckpointSaver[str]):
         self._prefix = key_prefix.rstrip(":")
         self._ttl = ttl_seconds
         self._memory = InMemorySaver(serde=self._serde)
+        # P0-2c：进程内累计的持久化失败次数。写不进 Redis 的 checkpoint
+        # 意味着这次运行无法恢复——进程内 saver 只在当前进程生效，重启即失。
+        # runner 用"运行前后差值"判断本轮是否可恢复，并打 ERROR 日志。
+        self._persist_failures = 0
+
+    @property
+    def persist_failures(self) -> int:
+        return self._persist_failures
+
+    def _record_persist_failure(self, thread_id: str, operation: str, error: str) -> None:
+        self._persist_failures += 1
+        CHECKPOINT_PERSIST_FAILURES.inc()
+        logger.error(
+            "graph_checkpoint_persist_failed",
+            thread_id=thread_id,
+            operation=operation,
+            error=error,
+        )
 
     def _redis_key(self, thread_id: str) -> str:
         return f"{self._prefix}:{thread_id}"
@@ -170,7 +193,10 @@ class RedisCheckpointSaver(BaseCheckpointSaver[str]):
         try:
             await self._persist_thread(thread_id)
         except Exception as e:
-            logger.warning("graph_checkpoint_persist_failed", thread_id=thread_id, error=str(e))
+            self._record_persist_failure(thread_id, "put", str(e))
+            raise CheckpointPersistenceError(
+                f"checkpoint put failed for {thread_id}"
+            ) from e
         return result
 
     async def aput_writes(
@@ -185,14 +211,20 @@ class RedisCheckpointSaver(BaseCheckpointSaver[str]):
         try:
             await self._persist_thread(thread_id)
         except Exception as e:
-            logger.warning("graph_checkpoint_writes_persist_failed", thread_id=thread_id, error=str(e))
+            self._record_persist_failure(thread_id, "put_writes", str(e))
+            raise CheckpointPersistenceError(
+                f"checkpoint writes failed for {thread_id}"
+            ) from e
 
     async def adelete_thread(self, thread_id: str) -> None:
         self.delete_thread(thread_id)
         try:
             await self._redis.delete(self._redis_key(thread_id))
         except Exception as e:
-            logger.warning("graph_checkpoint_delete_failed", thread_id=thread_id, error=str(e))
+            self._record_persist_failure(thread_id, "delete", str(e))
+            raise CheckpointPersistenceError(
+                f"checkpoint delete failed for {thread_id}"
+            ) from e
 
 _checkpointer: RedisCheckpointSaver | None = None
 

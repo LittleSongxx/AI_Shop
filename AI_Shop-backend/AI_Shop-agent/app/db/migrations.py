@@ -51,7 +51,17 @@ _REQUIRED_COLUMNS = {
         "created_at",
         "updated_at",
     },
-    "support_session": {"session_id", "user_id", "status", "created_at", "updated_at"},
+    "support_session": {
+        "session_id",
+        "user_id",
+        "status",
+        "created_at",
+        "updated_at",
+        # P0-6：active_user 生成列（QUEUED/ASSIGNED/ACTIVE 时 = user_id）。
+        # 清单与 alembic 迁移定义对齐，否则只缺这一列的环境会被判为
+        # schema_is_current、跳过 alembic 补列（P1 审查）。
+        "active_user",
+    },
     "support_message": {
         "support_message_id",
         "session_id",
@@ -69,6 +79,9 @@ _REQUIRED_COLUMNS = {
         "payload_json",
         "created_at",
         "updated_at",
+        "lease_owner",
+        "lease_until",
+        "next_retry_at",
     },
     "agent_message_feedback": {
         "feedback_id",
@@ -93,6 +106,7 @@ _REQUIRED_INDEXES = {
     ("agent_message", "idx_agent_message_session"),
     ("agent_pending_action", "idx_agent_pending_user"),
     ("support_session", "idx_support_queue"),
+    ("support_session", "uk_support_active_user"),
     ("support_message", "idx_support_message_session"),
     ("agent_task", "uk_agent_task_message"),
     ("agent_message_feedback", "uk_agent_feedback"),

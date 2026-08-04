@@ -108,11 +108,154 @@ def upgrade() -> None:
             resolved_at datetime NULL,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
                 ON UPDATE CURRENT_TIMESTAMP,
+            -- P0-6: 每用户同时只允许一个活跃会话，由数据库保证而不是应用层先查再插。
+            -- 生成列：QUEUED/ASSIGNED/ACTIVE 时为 user_id，其余状态为 NULL；
+            -- NULL 不参与唯一索引，所以已解决/已取消的会话不占坑。
+            active_user varchar(15) GENERATED ALWAYS AS (
+                CASE WHEN status IN ('QUEUED','ASSIGNED','ACTIVE') THEN user_id ELSE NULL END
+            ) STORED,
             KEY idx_support_queue (status, urgency, created_at),
-            KEY idx_support_user (user_id, status, updated_at)
+            KEY idx_support_user (user_id, status, updated_at),
+            UNIQUE KEY uk_support_active_user (active_user)
         ) COMMENT 'human support session' CHARSET = utf8mb4
         """
     )
+    # P0-6 对已存在的库补列与唯一索引（CREATE TABLE IF NOT EXISTS 不会动老表）。
+    # 全程用 Python 层 information_schema 判断做幂等，不用 SET/PREPARE 多语句
+    # （pymysql 默认不开 MULTI_STATEMENTS，多语句会直接报错）。
+    bind = op.get_bind()
+    from sqlalchemy import text
+
+    has_active_col = bind.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'support_session'
+              AND column_name = 'active_user'
+            """
+        )
+    ).scalar()
+    if not has_active_col:
+        op.execute(
+            """
+            ALTER TABLE support_session
+                ADD COLUMN active_user varchar(15) GENERATED ALWAYS AS (
+                    CASE WHEN status IN ('QUEUED','ASSIGNED','ACTIVE') THEN user_id ELSE NULL END
+                ) STORED
+            """
+        )
+    # 历史数据里可能已有同一用户的多个活跃会话。优先保留已经 ACTIVE、
+    # 其次 ASSIGNED、最后 QUEUED；同状态才取最早创建的一条。只按创建时间
+    # 会取消正在由客服处理的新会话，反而保留无人认领的旧排队会话。
+    # 把其余会话的消息和 Agent 记录合并到主会话，再置为 CANCELLED。
+    # 绝不能 DELETE 会话：support_message 没有级联外键，直接删除会留下孤儿记录。
+    op.execute("DROP TEMPORARY TABLE IF EXISTS tmp_support_session_merge")
+    op.execute(
+        """
+        CREATE TEMPORARY TABLE tmp_support_session_merge AS
+        SELECT user_id,
+               SUBSTRING_INDEX(
+                   GROUP_CONCAT(
+                       session_id
+                       ORDER BY FIELD(status, 'ACTIVE', 'ASSIGNED', 'QUEUED'),
+                                created_at, session_id
+                       SEPARATOR ','
+                   ),
+                   ',', 1
+               ) AS canonical_session_id
+        FROM support_session
+        WHERE status IN ('QUEUED','ASSIGNED','ACTIVE')
+        GROUP BY user_id
+        HAVING COUNT(*) > 1
+        """
+    )
+    has_support_message = bind.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_schema = DATABASE()
+              AND table_name = 'support_message'
+            """
+        )
+    ).scalar()
+    if has_support_message:
+        op.execute(
+            """
+            UPDATE support_message m
+            JOIN support_session duplicate_session
+              ON duplicate_session.session_id COLLATE utf8mb4_general_ci
+                 = m.session_id COLLATE utf8mb4_general_ci
+            JOIN tmp_support_session_merge merge_plan
+              ON merge_plan.user_id COLLATE utf8mb4_general_ci
+                 = duplicate_session.user_id COLLATE utf8mb4_general_ci
+            SET m.session_id = merge_plan.canonical_session_id
+            WHERE duplicate_session.status IN ('QUEUED','ASSIGNED','ACTIVE')
+              AND duplicate_session.session_id COLLATE utf8mb4_general_ci
+                  <> merge_plan.canonical_session_id COLLATE utf8mb4_general_ci
+            """
+        )
+    has_agent_message_session = bind.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'agent_message'
+              AND column_name = 'session_id'
+            """
+        )
+    ).scalar()
+    if has_agent_message_session:
+        op.execute(
+            """
+            UPDATE agent_message m
+            JOIN support_session duplicate_session
+              ON duplicate_session.session_id COLLATE utf8mb4_general_ci
+                 = m.session_id COLLATE utf8mb4_general_ci
+            JOIN tmp_support_session_merge merge_plan
+              ON merge_plan.user_id COLLATE utf8mb4_general_ci
+                 = duplicate_session.user_id COLLATE utf8mb4_general_ci
+            SET m.session_id = merge_plan.canonical_session_id
+            WHERE duplicate_session.status IN ('QUEUED','ASSIGNED','ACTIVE')
+              AND duplicate_session.session_id COLLATE utf8mb4_general_ci
+                  <> merge_plan.canonical_session_id COLLATE utf8mb4_general_ci
+            """
+        )
+    op.execute(
+        """
+        UPDATE support_session duplicate_session
+        JOIN tmp_support_session_merge merge_plan
+          ON merge_plan.user_id COLLATE utf8mb4_general_ci
+             = duplicate_session.user_id COLLATE utf8mb4_general_ci
+        SET duplicate_session.status = 'CANCELLED',
+            duplicate_session.summary = CONCAT_WS(
+                '；', NULLIF(duplicate_session.summary, ''),
+                CONCAT('迁移时合并至会话 ', merge_plan.canonical_session_id)
+            ),
+            duplicate_session.updated_at = NOW()
+        WHERE duplicate_session.status IN ('QUEUED','ASSIGNED','ACTIVE')
+          AND duplicate_session.session_id COLLATE utf8mb4_general_ci
+              <> merge_plan.canonical_session_id COLLATE utf8mb4_general_ci
+        """
+    )
+    op.execute("DROP TEMPORARY TABLE IF EXISTS tmp_support_session_merge")
+    has_active_idx = bind.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+              AND table_name = 'support_session'
+              AND index_name = 'uk_support_active_user'
+            """
+        )
+    ).scalar()
+    if not has_active_idx:
+        op.execute(
+            """
+            ALTER TABLE support_session
+                ADD UNIQUE KEY uk_support_active_user (active_user)
+            """
+        )
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS support_message
@@ -143,6 +286,12 @@ def upgrade() -> None:
             deadline_at datetime NULL,
             payload_json json NOT NULL,
             error_message varchar(512) NULL,
+            -- P0-2b：任务租约。lease_owner 持有期内其他 Worker 不得接管，
+            -- 防止 MQ 重投/Worker 卡顿导致的双执行；租约过期才允许接管。
+            lease_owner varchar(64) NULL,
+            lease_until datetime NULL,
+            -- P0-2a：退避重试。失败后不立即重发，next_retry_at 到了才被恢复扫描拉起。
+            next_retry_at datetime NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
                 ON UPDATE CURRENT_TIMESTAMP,
@@ -153,6 +302,28 @@ def upgrade() -> None:
         ) COMMENT 'durable Agent task ledger' CHARSET = utf8mb4
         """
     )
+    # P0-2 对已存在的库补租约/退避列（幂等，见 support_session 的同样处理）。
+    bind = op.get_bind()
+    from sqlalchemy import text
+
+    for column, ddl in (
+        ("lease_owner", "ALTER TABLE agent_task ADD COLUMN lease_owner varchar(64) NULL"),
+        ("lease_until", "ALTER TABLE agent_task ADD COLUMN lease_until datetime NULL"),
+        ("next_retry_at", "ALTER TABLE agent_task ADD COLUMN next_retry_at datetime NULL"),
+    ):
+        has_col = bind.execute(
+            text(
+                """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'agent_task'
+                  AND column_name = :col
+                """
+            ),
+            {"col": column},
+        ).scalar()
+        if not has_col:
+            op.execute(ddl)
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS agent_message_feedback
