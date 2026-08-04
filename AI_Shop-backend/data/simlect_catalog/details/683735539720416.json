@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20033",
+    "commendType": 1,
+    "cover": "2026-06/0UdI1Gf76QNlvPtPdBCuGqxUSHUanl.jpg,2026-06/gUo0T1GFbNL5RPIOayiX7SzJfhqOHC.jpg,2026-06/wwyzDtJ2mKiwnOPeH5fE64lKj0ZAB9.jpg,2026-06/bJlP1L9B1ywcdrUzMChxx7FuT5vcrJ.jpg,2026-06/xEz1ADpCauhvhygL9ykWw9jGYy6uKg.jpg",
+    "createTime": "2026-06-20 15:42:02",
+    "maxPrice": 99.0,
+    "minPrice": 99.0,
+    "pCategoryId": "10007",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/xhnVBk6lzd9fJCTEDvtYJaGO5EmqwC.png)\n![](/api/file/getResource?sourceName=2026-06/2GZgP8DPaHmuw3PLWpYxsQRtcMf1Ct.png)\n![](/api/file/getResource?sourceName=2026-06/azyabYTeffJwWVIYSYcKYu2iZkVabd.png)\n![](/api/file/getResource?sourceName=2026-06/Y67epwKoyCAfexRjf5UiNld7VPiEf2.png)\n",
+    "productId": "683735539720416",
+    "productName": "CUKTECH酷态科10号超级车充自带伸缩线车载充电器可充大疆无人机多口100W/单口90W超级快充适用苹果17小米",
+    "status": 1,
+    "totalSale": 98
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "4326836416",
+      "propertyName": "颜色",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/gD5z48ljL0wCjchx0BlruTTiihK6fC.jpg",
+          "propertyRemark": "",
+          "propertyValue": "钛灰",
+          "propertyValueId": "17819412684683"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 99.0,
+      "productId": "683735539720416",
+      "propertyValueIdHash": "c49ad658a5132756218c4978816fb754",
+      "propertyValueIds": "17819412684683",
+      "sort": 0,
+      "stock": 99901
+    }
+  ]
+}

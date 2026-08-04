@@ -245,31 +245,14 @@ DELIMITER ;
 -- 生成10000条商品记录
 -- ============================================================
 
--- 创建辅助函数获取随机分类
-DROP FUNCTION IF EXISTS get_random_category//
-
-CREATE FUNCTION get_random_category()
-RETURNS VARCHAR(10)
-DETERMINISTIC
-BEGIN
-    DECLARE cat_id VARCHAR(10);
-    DECLARE cat_count INT;
-    
-    SELECT COUNT(*) INTO cat_count FROM temp_categories;
-    SELECT category_id INTO cat_id FROM temp_categories LIMIT 1 OFFSET FLOOR(RAND() * cat_count);
-    
-    RETURN cat_id;
-END//
-
-DELIMITER ;
-
 -- ============================================================
 -- 执行生成：调用存储过程生成10000条商品
 -- ============================================================
--- 注意：由于MySQL存储过程调用有性能限制，建议分批执行
--- 以下脚本使用简单的INSERT SELECT方式批量生成商品数据
+-- 数据写入保持在同一事务中；mysql 客户端遇错断开时会自动回滚。
+START TRANSACTION;
+SET @category_count := (SELECT COUNT(*) FROM temp_categories);
 
--- 生成商品数据（每批1000条，执行10次）
+-- 生成 10000 条商品数据，并把分类按序均匀分布到全部二级类目。
 INSERT INTO product_info (
     product_id, product_name, product_desc, cover, create_time,
     category_id, p_category_id, status, min_price, max_price,
@@ -293,37 +276,19 @@ SELECT
     FLOOR(RAND() * 3001) as total_sale,
     CASE WHEN RAND() < 0.1 THEN 1 ELSE 0 END as commend_type
 FROM (
-    SELECT 
-        @row := @row + 1 as seq_num,
-        category_id,
-        p_category_id
-    FROM 
-        temp_categories c,
-        (SELECT @row := 0) r
-    CROSS JOIN (
-        SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION
-        SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION
-        SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION
-        SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION SELECT 20 UNION
-        SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25 UNION
-        SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29 UNION SELECT 30 UNION
-        SELECT 31 UNION SELECT 32 UNION SELECT 33 UNION SELECT 34 UNION SELECT 35 UNION
-        SELECT 36 UNION SELECT 37 UNION SELECT 38 UNION SELECT 39 UNION SELECT 40 UNION
-        SELECT 41 UNION SELECT 42 UNION SELECT 43 UNION SELECT 44 UNION SELECT 45 UNION
-        SELECT 46 UNION SELECT 47 UNION SELECT 48 UNION SELECT 49 UNION SELECT 50 UNION
-        SELECT 51 UNION SELECT 52 UNION SELECT 53 UNION SELECT 54 UNION SELECT 55 UNION
-        SELECT 56 UNION SELECT 57 UNION SELECT 58 UNION SELECT 59 UNION SELECT 60 UNION
-        SELECT 61 UNION SELECT 62 UNION SELECT 63 UNION SELECT 64 UNION SELECT 65 UNION
-        SELECT 66 UNION SELECT 67 UNION SELECT 68 UNION SELECT 69 UNION SELECT 70 UNION
-        SELECT 71 UNION SELECT 72 UNION SELECT 73 UNION SELECT 74 UNION SELECT 75 UNION
-        SELECT 76 UNION SELECT 77 UNION SELECT 78 UNION SELECT 79 UNION SELECT 80 UNION
-        SELECT 81 UNION SELECT 82 UNION SELECT 83 UNION SELECT 84 UNION SELECT 85 UNION
-        SELECT 86 UNION SELECT 87 UNION SELECT 88 UNION SELECT 89 UNION SELECT 90 UNION
-        SELECT 91 UNION SELECT 92 UNION SELECT 93 UNION SELECT 94 UNION SELECT 95 UNION
-        SELECT 96 UNION SELECT 97 UNION SELECT 98 UNION SELECT 99 UNION SELECT 100
-    ) numbers
-    WHERE @row < 10000
-) data;
+    SELECT
+        d0.digit + d1.digit * 10 + d2.digit * 100 + d3.digit * 1000 + 1 AS seq_num
+    FROM (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+          UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) d0
+    CROSS JOIN (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) d1
+    CROSS JOIN (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) d2
+    CROSS JOIN (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) d3
+) numbers
+INNER JOIN temp_categories c
+    ON c.seq = MOD(numbers.seq_num - 1, @category_count) + 1;
 
 -- ============================================================
 -- 为没有属性定义的商品生成默认SKU
@@ -381,12 +346,15 @@ INNER JOIN (
 ) sku ON p.product_id = sku.product_id
 SET p.min_price = sku.min_p, p.max_price = sku.max_p;
 
+COMMIT;
+
 -- ============================================================
 -- 清理临时表
 -- ============================================================
 DROP TEMPORARY TABLE IF EXISTS temp_categories;
 DROP TEMPORARY TABLE IF EXISTS temp_property_options;
 DROP FUNCTION IF EXISTS get_random_category;
+DROP PROCEDURE IF EXISTS generate_single_product;
 
 -- 启用外键检查
 SET FOREIGN_KEY_CHECKS = 1;

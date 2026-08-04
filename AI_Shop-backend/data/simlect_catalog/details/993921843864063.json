@@ -1,0 +1,126 @@
+{
+  "productInfo": {
+    "categoryId": "20009",
+    "commendType": 0,
+    "cover": "2026-06/hrrJiXJ7CFp8cXaGlAvsdVdsNeOumD.jpg,2026-06/EjIPM5KCOC0lIq2IjJhgiGeF5K01DB.jpg,2026-06/v717wwY198FFBN16aIEFAxH8vdAhr6.jpg,2026-06/EHGD2qgBq6AEZSGQYFvJqBns2lzKI1.jpg,2026-06/GHkfElgxnF2veJSQE9ml7Prw1yuiUj.jpg",
+    "createTime": "2026-06-20 14:16:26",
+    "maxPrice": 1800.0,
+    "minPrice": 1800.0,
+    "pCategoryId": "10002",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/yzqnrkQAzWbnOCOMthqqK8hZRWCwtd.png)\n![](/api/file/getResource?sourceName=2026-06/OsCLX6mN0ZPEPD1YMjOiJMcDGrrdOI.png)\n![](/api/file/getResource?sourceName=2026-06/ve5qHFcDmYHyWNvzlp2aOgNHyNovSu.png)\n![](/api/file/getResource?sourceName=2026-06/shUptK58fOmS4vKRtqViF4Rr1Xa31K.png)\n",
+    "productId": "993921843864063",
+    "productName": "KAILAS凯乐石M8软壳衣男女户外登山耐磨弹力透气轻量防风连帽外套春秋 ",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1025",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/jKSnEdaxfyXF6MD919uT8CwlAGfIPE.jpg",
+          "propertyRemark": "",
+          "propertyValue": "玄青黑",
+          "propertyValueId": "17819360956630"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1026",
+      "propertyName": "尺码",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "XS",
+          "propertyValueId": "17819360956631"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "S",
+          "propertyValueId": "1781936132226"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "M",
+          "propertyValueId": "1781936133632"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "L",
+          "propertyValueId": "1781936138489"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "XL",
+          "propertyValueId": "1781936140458"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "2XL",
+          "propertyValueId": "1781936146495"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 1800.0,
+      "productId": "993921843864063",
+      "propertyValueIdHash": "3638d3373fe1c1414f783941d1f65c8c",
+      "propertyValueIds": "17819360956630-17819360956631",
+      "sort": 0,
+      "stock": 999
+    },
+    {
+      "price": 1800.0,
+      "productId": "993921843864063",
+      "propertyValueIdHash": "e30baa9d4076c5db9d4681f27145f935",
+      "propertyValueIds": "17819360956630-1781936132226",
+      "sort": 1,
+      "stock": 999
+    },
+    {
+      "price": 1800.0,
+      "productId": "993921843864063",
+      "propertyValueIdHash": "dcdcbee756b8ec82d5a97de622aedc7a",
+      "propertyValueIds": "17819360956630-1781936133632",
+      "sort": 2,
+      "stock": 999
+    },
+    {
+      "price": 1800.0,
+      "productId": "993921843864063",
+      "propertyValueIdHash": "6cb28db8e2c687c0de912a3bf6899443",
+      "propertyValueIds": "17819360956630-1781936138489",
+      "sort": 3,
+      "stock": 999
+    },
+    {
+      "price": 1800.0,
+      "productId": "993921843864063",
+      "propertyValueIdHash": "c4544af110eefa5477ac2ff8790464bc",
+      "propertyValueIds": "17819360956630-1781936140458",
+      "sort": 4,
+      "stock": 999
+    },
+    {
+      "price": 1800.0,
+      "productId": "993921843864063",
+      "propertyValueIdHash": "2b0ae2d1bd6a1fd488227492b9c38440",
+      "propertyValueIds": "17819360956630-1781936146495",
+      "sort": 5,
+      "stock": 999
+    }
+  ]
+}

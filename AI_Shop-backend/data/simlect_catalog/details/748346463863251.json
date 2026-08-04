@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20019",
+    "commendType": 1,
+    "cover": "2026-06/uBhA4dgu65Lo61y15ZzqviWSbrdMwg.jpg,2026-06/6LkkgX8alWypzIYu1YqxeMhUtCAjUf.jpg,2026-06/F9KTWJES2yLcpLBDaXWRCFuc5C7r5n.jpg,2026-06/wamXguPEGh1JPY00qXhrfuGCkzLn6b.jpg,2026-06/LZbFHBlg6KTG97E1bJG4iaUYR63dS4.jpg",
+    "createTime": "2026-06-20 14:48:19",
+    "maxPrice": 109.0,
+    "minPrice": 109.0,
+    "pCategoryId": "10004",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/b1mQCAIpt7Sz6NVXNH0L5wzAWYGdgG.png)\n![](/api/file/getResource?sourceName=2026-06/CSMBxWVlwvulT7TE4CMlxs7E6dO5PG.png)\n![](/api/file/getResource?sourceName=2026-06/sYdt7gn5gFydkWpStX3XjEkv2ctDmj.png)\n![](/api/file/getResource?sourceName=2026-06/z5oOQ8kBrevds1cuYQyB9sT5eNWEeP.png)\n",
+    "productId": "748346463863251",
+    "productName": "杞乐招财猫乔迁礼物入户玄关摆件客厅钥匙收纳置物架搬家新居礼品装饰 铃铛猫+置物架+相框+小摆件",
+    "status": 1,
+    "totalSale": 99
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "4524936256",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "铃铛大嘴猫收纳摆件",
+          "propertyValueId": "17819380469562"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "3557329908",
+      "propertyName": "颜色",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/t1J5PNxXS8gJNhngmZERbYk8WnK8B5.jpg",
+          "propertyRemark": "",
+          "propertyValue": "铃铛猫+置物架+相框+小摆件",
+          "propertyValueId": "17819380469563"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 109.0,
+      "productId": "748346463863251",
+      "propertyValueIdHash": "19f7a81c88810a2166719d2278d276a6",
+      "propertyValueIds": "17819380469562-17819380469563",
+      "sort": 0,
+      "stock": 9900
+    }
+  ]
+}

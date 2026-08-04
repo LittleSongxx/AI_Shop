@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20003",
+    "commendType": 0,
+    "cover": "2026-06/RvRxT1qh1p3bwMCogWawxAEADpzlfP.jpg,2026-06/KS5gt4MvZw5rD3lQcsyyZKa0jCii9g.jpg,2026-06/xHcZwfXRbUD6cIfPtxlDTPDHkEQgU1.jpg,2026-06/kILYFJJVlUnuR7RBwWOgM5zGIt9Opu.jpg,2026-06/G4dMEpMl2BvSb6RtJRnCZZvyubsAne.jpg",
+    "createTime": "2026-06-20 01:39:42",
+    "maxPrice": 3999.0,
+    "minPrice": 3999.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/FxUcw7IXr6DylCVfJiBtSA590yqb55.png)\n![](/api/file/getResource?sourceName=2026-06/cCPHevK7vyIXPKYA8bowB9rAuHoMNh.png)\n![](/api/file/getResource?sourceName=2026-06/JcNBEfqt7E0TGBb3DBI6QaJ5uyUj94.png)\n![](/api/file/getResource?sourceName=2026-06/8nihzRcaU0lTsyrb15kn75u7VQl6wo.png)\n![](/api/file/getResource?sourceName=2026-06/HQrYKJQzCk82AZmIiqDoIotmQyda2V.png)\n",
+    "productId": "231335860060520",
+    "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1007",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "铂金银",
+          "propertyValueId": "17818907013950"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "3742160298",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "【超旗舰降噪】WH-1000XM6",
+          "propertyValueId": "17818907013953"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 3999.0,
+      "productId": "231335860060520",
+      "propertyValueIdHash": "1999572e6313cccae580033af1efda51",
+      "propertyValueIds": "17818907013950-17818907013953",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20045",
+    "commendType": 0,
+    "cover": "2026-06/JoDqEkpKc2jrUSoybe6SgsTJ5j3wOA.jpg,2026-06/ghbGi6meGEf2eW60jyZI9oRZXxpgz4.jpg,2026-06/AdRdTlo1NslsamlVy1Ns4uynaMhHmH.jpg,2026-06/rGz6EjK2SIyxSzZZjN3FivHvfkJIpw.jpg,2026-06/DK0p4iEe5q7HqDLppyuacY15BlU1xo.jpg",
+    "createTime": "2026-06-20 15:46:17",
+    "maxPrice": 890.0,
+    "minPrice": 890.0,
+    "pCategoryId": "10011",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/vJnRcfGE1Syle3SS4z4EuilZl4AZZC.png)\n![](/api/file/getResource?sourceName=2026-06/pMU6h4NE6n28M88CJH8cIdktu7xdTX.png)\n",
+    "productId": "857498255651316",
+    "productName": "SW SolidWorks软件安装包正版激活码服务 2025高级许可证企业商用序列 2024激活订阅正版授权 激活服务 2025版本【一年有效】",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1133",
+      "propertyName": "版本",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "2025版本【一年有效】",
+          "propertyValueId": "17819415083130"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 890.0,
+      "productId": "857498255651316",
+      "propertyValueIdHash": "cacdf38c13ba9519755b6a0e9bbf15db",
+      "propertyValueIds": "17819415083130",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

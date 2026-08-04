@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20021",
+    "commendType": 0,
+    "cover": "202601/i2xGLZRmg1pKVPCJr9jp26J6gscnyV_thumbnail.png,202601/IS7tYU2NlK0LFrG810ZGv99J5xL6Ja_thumbnail.png,202601/nvUsWQENwKmcoboPMZqIbQeenQMNUj_thumbnail.png,202601/FIGbBuGwy3ut39zc85oTcqCsDFxqzi_thumbnail.png,202601/XstrXft7fmQOXVIT73Y7TB9NppfgGw_thumbnail.png",
+    "createTime": "2026-01-10 21:52:03",
+    "maxPrice": 89.9,
+    "minPrice": 39.9,
+    "pCategoryId": "10005",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/3HbMHvk4s58Amos0hT0Kua9lWSh6hN.png)\n![](/api/file/getResource?sourceName=202601/Cih3uo5GvquqCQc9FaoWXsHnJUZVSp.png)\n![](/api/file/getResource?sourceName=202601/oKxGPjW97YLCXaO226JAVn48IxTC0M.png)\n",
+    "productId": "438316828084252",
+    "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃",
+    "status": 1,
+    "totalSale": 3
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1061",
+      "propertyName": "口味",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/T61o37DdrUL3JbocBDDNKMa7eniOdi_thumbnail.png",
+          "propertyRemark": "买5送5",
+          "propertyValue": "整箱10包",
+          "propertyValueId": "1768052963764"
+        },
+        {
+          "propertyCover": "202601/jq28F1PGLFvgzY7ZxUdmfDtmJIvjUE_thumbnail.png",
+          "propertyRemark": "买15送15",
+          "propertyValue": "整箱30包",
+          "propertyValueId": "1768053085531"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 39.9,
+      "productId": "438316828084252",
+      "propertyValueIdHash": "f4fc7960f18634140bb3c39919aeddb9",
+      "propertyValueIds": "1768052963764",
+      "sort": 0,
+      "stock": 97
+    },
+    {
+      "price": 89.9,
+      "productId": "438316828084252",
+      "propertyValueIdHash": "1e0045d66effc7214b82dd4c4b9cf773",
+      "propertyValueIds": "1768053085531",
+      "sort": 1,
+      "stock": 100
+    }
+  ]
+}

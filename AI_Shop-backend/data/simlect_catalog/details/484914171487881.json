@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20027",
+    "commendType": 0,
+    "cover": "2026-06/apedrrYicI8pyh4un1XUHRTIdnQCtC.jpg,2026-06/aQcP4FpBCxplbJsNj13a8YURBdsBvo.jpg,2026-06/4BRLTNkx4aV3i1iWvlPpjatVF5hJBj.jpg,2026-06/KCj8KMHAcvy21qNGIbd2ki6pub9iQ2.jpg,2026-06/3ucYUeIwOprUl6YFAAnS1CIG5pLSMV.jpg",
+    "createTime": "2026-06-20 15:13:29",
+    "maxPrice": 79.9,
+    "minPrice": 79.9,
+    "pCategoryId": "10006",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/CPuEai9UJKiichn8seydNvgsmBevFc.png)\n![](/api/file/getResource?sourceName=2026-06/xVH9osA9J18P1eR1BMyJvY3qcqLkJa.png)\n![](/api/file/getResource?sourceName=2026-06/ZrCise4Wdykh12pM6WLGxCbDz1Yxbf.png)\n![](/api/file/getResource?sourceName=2026-06/Clq4APnBNtI2y1dJX50KBjY2dwN9kz.png)\n",
+    "productId": "484914171487881",
+    "productName": "匹克（PEAK）筋膜枪按摩器肩颈腰背按摩仪肌颈膜枪专业级迷你便携式健身肌肉放松父母亲节春节情人七夕礼物男女",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "2021517804",
+      "propertyName": "颜色",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/BdIcENbf1Hsj6apY8rA3tM23NCBDYE.jpg",
+          "propertyRemark": "",
+          "propertyValue": "行业【第一】1800mAh+变速压感灯",
+          "propertyValueId": "17819395475063"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 79.9,
+      "productId": "484914171487881",
+      "propertyValueIdHash": "64b36a8c943fadcc17a93abe5134c570",
+      "propertyValueIds": "17819395475063",
+      "sort": 0,
+      "stock": 999999
+    }
+  ]
+}

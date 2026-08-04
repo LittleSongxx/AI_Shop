@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20015",
+    "commendType": 1,
+    "cover": "2026-06/4MsbQS6FxvnI5LypKWnY9gwTqbc5zC.jpg,2026-06/1M3AGAqxv6kkazaIbfcYU9xqGSIFWA.jpg,2026-06/hbJGMVCZEmtTwBH8JFaj6DfZuh23uS.jpg,2026-06/oiO0KuDn8zC9MWI7usek3IrhUx82kq.jpg,2026-06/BbIvxr0Hj5alYyN8e8Vwi4ors3VDMW.jpg",
+    "createTime": "2026-06-20 14:33:45",
+    "maxPrice": 1430.0,
+    "minPrice": 1430.0,
+    "pCategoryId": "10003",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/hUjGk4myNkSfjcVeBrogCkvDTnNpsA.png)\n![](/api/file/getResource?sourceName=2026-06/gtxNLGBBAgc2JeEzULGXEhp8eUam9y.png)\n![](/api/file/getResource?sourceName=2026-06/41A2ayE6TVzi1Q3QW2LKgsV8eCdQUy.png)\n",
+    "productId": "100766326868880",
+    "productName": "CHANEL【官方正品】香奈儿邂逅系列套组 香水礼盒套装 女士 生日礼物 邂逅柔情淡香水50ml+双效持色唇釉174号",
+    "status": 1,
+    "totalSale": 99
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "4568665114",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "邂逅系列礼盒",
+          "propertyValueId": "17819371910993"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "7595050195",
+      "propertyName": "产品",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/zt55jGCPZPzL0RF7i00dwwYGduAzvO.jpg",
+          "propertyRemark": "",
+          "propertyValue": "邂逅柔情淡香水50ml+双效持色唇釉174号",
+          "propertyValueId": "17819371910994"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 1430.0,
+      "productId": "100766326868880",
+      "propertyValueIdHash": "ecaa832f282d17232a50d909fe6c37d2",
+      "propertyValueIds": "17819371910993-17819371910994",
+      "sort": 0,
+      "stock": 900
+    }
+  ]
+}

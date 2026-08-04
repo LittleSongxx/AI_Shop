@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "88409",
+    "commendType": 0,
+    "cover": "202601/SBTrI5RGlJdu4uv7kxygOIK2Kc8iHn_thumbnail.png,202601/a4xh1CACo85Ia6bq2blVDP42xHNJg8_thumbnail.png,202601/YUrbWvpvLnjT91VDRI86PVSnlNiQ9B_thumbnail.png,202601/hGo4ytAgDvAsbXRv85voO0lPTfPvY6_thumbnail.png,202601/ya8PqJD2tGx9ZueV9Dtc2Io60eQj5E_thumbnail.png",
+    "createTime": "2026-01-11 17:59:21",
+    "maxPrice": 25.9,
+    "minPrice": 19.9,
+    "pCategoryId": "64617",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/IIcM83JFgrYvMNbG4SDsyDjylH3xFs.png)\n![](/api/file/getResource?sourceName=202601/dHjWneG9qknhrfEDbtfvPxWNSm5Wia.png)\n![](/api/file/getResource?sourceName=202601/ZLTEsg8SiCffX03gaDAgcZPjKTcKSp.png)\n![](/api/file/getResource?sourceName=202601/mq5KqE0w7H2vsS1FUGCJceqZHKqsTT.png)\n![](/api/file/getResource?sourceName=202601/SBwVwYTe20X8Wpj4q3arTFg3I5HUR7.png)\n",
+    "productId": "917186661226040",
+    "productName": "卡皮巴拉软握按动中性笔高颜值胖胖笔熊猫笔减负速干欧包笔 0.5黑色水笔大容量刷题笔st笔头考试专用开学文具",
+    "status": 1,
+    "totalSale": 100
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "44065",
+      "propertyName": "颜色分类",
+      "propertySort": null,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/0vNcqiRrMPNzWBFPZjxIV2DogbkO0r_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "【五款大合集】20支装 (超高价值)",
+          "propertyValueId": "1768125478450"
+        },
+        {
+          "propertyCover": "202601/3R5zRwRJBpqerghogeBRI933ahVeIg_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": " 豚豚店员-4支装 (升级新款)",
+          "propertyValueId": "1768125501664"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 25.9,
+      "productId": "917186661226040",
+      "propertyValueIdHash": "444ac3778c4754b97944f5f3a0e23fbc",
+      "propertyValueIds": "1768125478450",
+      "sort": 0,
+      "stock": 199
+    },
+    {
+      "price": 19.9,
+      "productId": "917186661226040",
+      "propertyValueIdHash": "ec54a3c0108ce143bf0b6542e29ec750",
+      "propertyValueIds": "1768125501664",
+      "sort": 1,
+      "stock": 99
+    }
+  ]
+}

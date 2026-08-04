@@ -1,0 +1,158 @@
+{
+  "productInfo": {
+    "categoryId": "20008",
+    "commendType": 0,
+    "cover": "202601/pCs23yyJQRaW6Auyj3GYh8UsPM7EuL_thumbnail.jpg,202601/iefsqE9hoZuWkfMddNVcuf6f1mYnik_thumbnail.jpg,202601/7dbQc1kXd0TESCQBH1MwPu8jgBNaci_thumbnail.jpg,202601/mFMN0k8jOfm142zOcX8t7DtLSiHzDt_thumbnail.jpg,202601/1GHEodQXxSC2GGaWkqHeQ5YejviJ63_thumbnail.jpg",
+    "createTime": "2026-01-10 20:46:26",
+    "maxPrice": 189.9,
+    "minPrice": 189.9,
+    "pCategoryId": "10002",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/F3V11hIPVAnLRtryd7LNiZ2clmfOx0.png)\n![](/api/file/getResource?sourceName=202601/nLBuzMqEC7lzrmVmNIRdRhNqfaB5GN.png)\n![](/api/file/getResource?sourceName=202601/YNs9LB3HzMgeRFXpkjfelun49EL6Bs.png)\n",
+    "productId": "864824304719236",
+    "productName": "假两件格纹翻领棉服外套男冬季新款宽松加绒加厚大码男生夹克",
+    "status": 1,
+    "totalSale": 1
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1022",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/mX4mH55w82TrfH6N4oKGzHJZDxokS2_thumbnail.jpg",
+          "propertyRemark": "升级加绒款",
+          "propertyValue": "棕色",
+          "propertyValueId": "1768049124430"
+        },
+        {
+          "propertyCover": "202601/phDNO58hqftcZJOVaRTwVzfShk1cwo_thumbnail.jpg",
+          "propertyRemark": "加绒款",
+          "propertyValue": "黑色",
+          "propertyValueId": "1768049128413"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1023",
+      "propertyName": "尺码",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "M",
+          "propertyValueId": "1768049124431"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "L",
+          "propertyValueId": "1768049160885"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "XL",
+          "propertyValueId": "1768049161189"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "2XL",
+          "propertyValueId": "1768049161605"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "3XL",
+          "propertyValueId": "1768049168829"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "a926fe64ddd163da5d555efdca51d15f",
+      "propertyValueIds": "1768049124430-1768049124431",
+      "sort": 0,
+      "stock": 299
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "8b7da0343b63087230e07e7ca97f6ab6",
+      "propertyValueIds": "1768049124430-1768049160885",
+      "sort": 1,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "bd8d2ef6ebada96a9b80e7e678c73084",
+      "propertyValueIds": "1768049124430-1768049161189",
+      "sort": 2,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "c9164bf5e48a5624fb24a786dfbc053d",
+      "propertyValueIds": "1768049124430-1768049161605",
+      "sort": 3,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "9562078f6a22e5d45021e777611279b4",
+      "propertyValueIds": "1768049124430-1768049168829",
+      "sort": 4,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "d132f2253a2b8fde3a441d8d502d4c86",
+      "propertyValueIds": "1768049128413-1768049124431",
+      "sort": 5,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "9f34d88dc6b855752ccbe23c4709b74a",
+      "propertyValueIds": "1768049128413-1768049160885",
+      "sort": 6,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "19cc0f65d89b5789d661b787400958b8",
+      "propertyValueIds": "1768049128413-1768049161189",
+      "sort": 7,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "ec0f39fc0fa9dff67dd5c8c1d94ef8b8",
+      "propertyValueIds": "1768049128413-1768049161605",
+      "sort": 8,
+      "stock": 300
+    },
+    {
+      "price": 189.9,
+      "productId": "864824304719236",
+      "propertyValueIdHash": "f8c58ccab5cee51284aec41a73576a3f",
+      "propertyValueIds": "1768049128413-1768049168829",
+      "sort": 9,
+      "stock": 300
+    }
+  ]
+}

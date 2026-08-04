@@ -1,0 +1,250 @@
+{
+  "productInfo": {
+    "categoryId": "20007",
+    "commendType": 1,
+    "cover": "202601/Es2Me5UbE9voEk0LJ5hv2cgbPXgB0l_thumbnail.jpg,202601/Uj6JdSIBYdZ2XKnp3mZDChMQHY7Kb9_thumbnail.jpg,202601/X5dQaMUMQ2p4b86LViJBdvkrjuZ0a5_thumbnail.jpg,202601/KfF11QY8Fnr1J54e2I3bYH4clRB7XP_thumbnail.jpg,202601/2szKpOb1ZSA7vcVX69pcj6ehALqh0o_thumbnail.jpg",
+    "createTime": "2026-01-10 20:39:53",
+    "maxPrice": 39.9,
+    "minPrice": 39.9,
+    "pCategoryId": "10002",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/EfulgSPGV0kypYNyuXODBmqEkX382I.png)\n![](/api/file/getResource?sourceName=202601/ROgFjsCpV5E5FWdhNjJmLBYtEhLC49.png)\n![](/api/file/getResource?sourceName=202601/kXvCaAarYbEe1SVuVdlTDrtOWEjRB4.png)\n![](/api/file/getResource?sourceName=202601/hYKwzNvYqLlhTSzDZt93aeSQnW5Pb4.png)\n![](/api/file/getResource?sourceName=202601/xl3wv9oQysCHyzFSTpGfolkNnQ70tQ.png)\n",
+    "productId": "422543322296606",
+    "productName": "女大童加绒加厚毛衣女秋冬15岁18初高中学生水貂绒翻领针织打底衫",
+    "status": 1,
+    "totalSale": 99
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1019",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/jO123JRYUau2unIfG8qBZxCZqf4AW4_thumbnail.jpg",
+          "propertyRemark": "",
+          "propertyValue": "蓝色",
+          "propertyValueId": "1768048722327"
+        },
+        {
+          "propertyCover": "202601/eJMAlt87MNyt3HnUDfVsUMafyteS3J_thumbnail.jpg",
+          "propertyRemark": "",
+          "propertyValue": "绿色",
+          "propertyValueId": "1768048730485"
+        },
+        {
+          "propertyCover": "202601/vQUUGtI45BhStNv2DlzHsTAJyoFfHZ_thumbnail.jpg",
+          "propertyRemark": "",
+          "propertyValue": "粉色",
+          "propertyValueId": "1768048730829"
+        },
+        {
+          "propertyCover": "202601/aN9Xn92lFdL8oLVbiEbkUm1QGRcuHO_thumbnail.jpg",
+          "propertyRemark": "",
+          "propertyValue": "白色",
+          "propertyValueId": "1768048731301"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1020",
+      "propertyName": "尺码",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "S",
+          "propertyValueId": "1768048722328"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "M",
+          "propertyValueId": "1768048758373"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "L",
+          "propertyValueId": "1768048758813"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "XL",
+          "propertyValueId": "1768048759629"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "2XL",
+          "propertyValueId": "1768048766773"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "d71d43a3fe1aa0ef4a03c1c3ba879b59",
+      "propertyValueIds": "1768048722327-1768048722328",
+      "sort": 0,
+      "stock": 101
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "edcaf2d83902a1e0589127bde46fcbe0",
+      "propertyValueIds": "1768048722327-1768048758373",
+      "sort": 1,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "4a3ae15a0392d395fc8049f3ce7ddbf2",
+      "propertyValueIds": "1768048722327-1768048758813",
+      "sort": 2,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "845344c667ca34de3f6dbc66daff3534",
+      "propertyValueIds": "1768048722327-1768048759629",
+      "sort": 3,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "d86a5c6f8a30d4272c7fa582176c8d43",
+      "propertyValueIds": "1768048722327-1768048766773",
+      "sort": 4,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "f59ff174ba4aec568e033f616fe0fb8f",
+      "propertyValueIds": "1768048730485-1768048722328",
+      "sort": 5,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "1145b6fbf50921920f393b8fa6e54d7f",
+      "propertyValueIds": "1768048730485-1768048758373",
+      "sort": 6,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "8779278d8f9b476c59838306819193ea",
+      "propertyValueIds": "1768048730485-1768048758813",
+      "sort": 7,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "9ec3af9caf9d2507f15d60764bbdd2c0",
+      "propertyValueIds": "1768048730485-1768048759629",
+      "sort": 8,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "35a1d95a52bfc1c651b31fc35687e2eb",
+      "propertyValueIds": "1768048730485-1768048766773",
+      "sort": 9,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "25ad09e5d79424e316290ab6a2b3071c",
+      "propertyValueIds": "1768048730829-1768048722328",
+      "sort": 10,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "5de06d8271580ee7000ad26053da42b0",
+      "propertyValueIds": "1768048730829-1768048758373",
+      "sort": 11,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "0372cce34c5f7db36532c7278801bd1f",
+      "propertyValueIds": "1768048730829-1768048758813",
+      "sort": 12,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "0c823fef545a90d294ef0ce1b8faf88a",
+      "propertyValueIds": "1768048730829-1768048759629",
+      "sort": 13,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "63a2ff53f186ecdad3a0c95e56b310d1",
+      "propertyValueIds": "1768048730829-1768048766773",
+      "sort": 14,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "194cf1f1ff07e42231bd5a06e076ebf5",
+      "propertyValueIds": "1768048731301-1768048722328",
+      "sort": 15,
+      "stock": 200
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "1374c0528345d0108cf5b2b9110ecd0e",
+      "propertyValueIds": "1768048731301-1768048758373",
+      "sort": 16,
+      "stock": 1111
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "3941978129ab6f892a75020e68ed848f",
+      "propertyValueIds": "1768048731301-1768048758813",
+      "sort": 17,
+      "stock": 213
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "dcc79cedee9b5f35358a6b2fbfe5bd47",
+      "propertyValueIds": "1768048731301-1768048759629",
+      "sort": 18,
+      "stock": 1000
+    },
+    {
+      "price": 39.9,
+      "productId": "422543322296606",
+      "propertyValueIdHash": "0423c9cf30525dc15042df72c640606c",
+      "propertyValueIds": "1768048731301-1768048766773",
+      "sort": 19,
+      "stock": 550
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "productInfo": {
+    "categoryId": "20012",
+    "commendType": 0,
+    "cover": "202601/pUwyKfd2B813LuFGKyp0xAqHKPkWfY_thumbnail.png,202601/aD81Jp6lpqOp3loRPTqS9ehyzt7DaW_thumbnail.png,202601/pjL2kmku4CPjIUNE258Hf26mljBg35_thumbnail.png,202601/BpLcgDRa2eryX5wzdlRf4lqGlUHcEP_thumbnail.png,202601/knNGleTyvNiFblgUYOYMK5YJRoRrtz_thumbnail.png",
+    "createTime": "2026-01-10 21:42:19",
+    "maxPrice": 19.9,
+    "minPrice": 19.9,
+    "pCategoryId": "10003",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/wCh9PVfO7lQJBm08H8mWBK5xzIKimC.png)\n![](/api/file/getResource?sourceName=202601/l4MG9BJNr3FNfZEGyeoWzo6NnyPC9y.png)\n![](/api/file/getResource?sourceName=202601/Bk1L6LZht90LowRMTI4MNCJWY8QqpO.png)\n![](/api/file/getResource?sourceName=202601/KGs4M5UHbVa1CmOzEGqcdN5uh8hY7P.png)\n![](/api/file/getResource?sourceName=202601/wBm32ZONkBD6Ufy8s681ohdkjVnI2C.png)\n",
+    "productId": "843304724668395",
+    "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1034",
+      "propertyName": "色号",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/2t29eNMx9D8QNBUmlISivOP2hT4YUG_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "不累的工",
+          "propertyValueId": "1768052450716"
+        },
+        {
+          "propertyCover": "202601/VAx20TgrYMsDZus2zE4EXJWAozfUkb_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "舒服的假",
+          "propertyValueId": "1768052488467"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1035",
+      "propertyName": "容量",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "10克",
+          "propertyValueId": "1768052450717"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 19.9,
+      "productId": "843304724668395",
+      "propertyValueIdHash": "1ee624ffb7730f00d8db3417d310ec3d",
+      "propertyValueIds": "1768052450716-1768052450717",
+      "sort": 0,
+      "stock": 999
+    },
+    {
+      "price": 19.9,
+      "productId": "843304724668395",
+      "propertyValueIdHash": "4494ac8930bde6ac73125e19a1bd1910",
+      "propertyValueIds": "1768052488467-1768052450717",
+      "sort": 1,
+      "stock": 1000
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "productInfo": {
+    "categoryId": "20016",
+    "commendType": 0,
+    "cover": "202601/DP7ki0XqcnDviCofMkIiHlZ6rqfYaE_thumbnail.png,202601/jPT9c0pMqhtLHnT6kRayfoFZq6RbGl_thumbnail.png,202601/S3x7LxccJottSWDo61MStIsNDmSUDN_thumbnail.png,2026-06/F73JfxPY5JLJqNWHmb1X3Yop9D1U3Q.png,202601/p0Z7y8i5tlrYISJHmdEWI3jkhTF2AO_thumbnail.png",
+    "createTime": "2026-01-11 12:42:52",
+    "maxPrice": 899.0,
+    "minPrice": 499.0,
+    "pCategoryId": "10004",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/KLk9YkdbC9djpSV53AEvwUMyKYIgAg.png)\n![](/api/file/getResource?sourceName=202601/bPZfba5lqqYMOE93kPQf29jC8XDbBV.png)\n![](/api/file/getResource?sourceName=202601/PfbKq6irL7Mc8HIpowCkDM89xsdbkH.png)\n![](/api/file/getResource?sourceName=202601/KIh0lhu59NYMWVQR4ds4dFW9QYKrwL.png)\n",
+    "productId": "378919755916188",
+    "productName": "席梦思床垫家用卧室硬椰棕1.5米20cm厚乳胶软垫独立弹簧",
+    "status": 1,
+    "totalSale": 22
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1046",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/BGzotDpsENEbXn5XJ4kaK2BRMuUrKL_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "硬核支撑?静音独立弹簧线径加粗 20cm适中",
+          "propertyValueId": "1768106374323"
+        },
+        {
+          "propertyCover": "202601/T4O7OtGTA32C4Y4LGJM9t4szyWAxLY_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "实惠首选白碳钢加固弹簧+3E棕 均衡承托 22cm偏硬",
+          "propertyValueId": "1768106510018"
+        },
+        {
+          "propertyCover": "202601/0adGwg1hQSkuaUjcbzL0PPOsflw8P1_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "尊享环保抑菌竹炭分区静音布袋弹簧+3E棕 22cm厚偏硬",
+          "propertyValueId": "1768106511697"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "1048",
+      "propertyName": "尺寸",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "120x190CM",
+          "propertyValueId": "1768106374324"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "120x200CM",
+          "propertyValueId": "1768106553530"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 499.0,
+      "productId": "378919755916188",
+      "propertyValueIdHash": "b021f01e05424e0bc12f17f06eb9ebcf",
+      "propertyValueIds": "1768106374323-1768106374324",
+      "sort": 0,
+      "stock": 187
+    },
+    {
+      "price": 499.0,
+      "productId": "378919755916188",
+      "propertyValueIdHash": "7b534fe4f948575522666a7c31945752",
+      "propertyValueIds": "1768106374323-1768106553530",
+      "sort": 1,
+      "stock": 200
+    },
+    {
+      "price": 499.0,
+      "productId": "378919755916188",
+      "propertyValueIdHash": "19b67904c8d6319a7ea2451e75a15cfc",
+      "propertyValueIds": "1768106510018-1768106374324",
+      "sort": 2,
+      "stock": 195
+    },
+    {
+      "price": 899.0,
+      "productId": "378919755916188",
+      "propertyValueIdHash": "7328104c0c7f9a3dd670b6685718f9da",
+      "propertyValueIds": "1768106510018-1768106553530",
+      "sort": 3,
+      "stock": 100
+    },
+    {
+      "price": 899.0,
+      "productId": "378919755916188",
+      "propertyValueIdHash": "304dc9239c6d6d996df4abc3b8c6bdcb",
+      "propertyValueIds": "1768106511697-1768106374324",
+      "sort": 4,
+      "stock": 100
+    },
+    {
+      "price": 899.0,
+      "productId": "378919755916188",
+      "propertyValueIdHash": "e1d2d1d27d211c77fe047bd9a4889153",
+      "propertyValueIds": "1768106511697-1768106553530",
+      "sort": 5,
+      "stock": 96
+    }
+  ]
+}

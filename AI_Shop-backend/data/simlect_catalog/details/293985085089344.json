@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20029",
+    "commendType": 0,
+    "cover": "2026-06/Vg6XutdF4eeJ3WaWIDTnyfpKVN5LV4.jpg,2026-06/mLVZMUh7N9mag1Y3kN2sDCm1YMo4Nj.jpg,2026-06/l51I6aIEBg1fISPijjlO761cSBkdR7.jpg,2026-06/fSoPI3vKGAegmJAdGWOnNIbZBSYSqt.jpg,2026-06/LTPBDy8HPUO34bj7WaakgWaUY86sqC.jpg",
+    "createTime": "2026-06-20 15:10:27",
+    "maxPrice": 13999.0,
+    "minPrice": 13999.0,
+    "pCategoryId": "10006",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/8UTMGjDkvJ6VVEQNrnT9xaW4Xmcwgs.png)\n![](/api/file/getResource?sourceName=2026-06/mjYJTXZK8agEYfHjdjAJCaFC1VJPho.png)\n![](/api/file/getResource?sourceName=2026-06/KU30L6ThqIKeABK564f4v3vrrsO2J9.png)\n![](/api/file/getResource?sourceName=2026-06/tc2Kgg03wxBaKsPe08HE7JlR8y38EM.png)\n",
+    "productId": "293985085089344",
+    "productName": "ANKER安克立体纹理百万色全彩打印喷绘印刷eufyMake UV浮雕打印自清洁3D打印安克UV打印机E1",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "8022543115",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "立体纹理打印机",
+          "propertyValueId": "17819393652823"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "6891354445",
+      "propertyName": "颜色",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/xgiFFJhJyuYDJexGSQaCV2ss4hlDs3.jpg",
+          "propertyRemark": "",
+          "propertyValue": "灰黑色",
+          "propertyValueId": "17819393652824"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 13999.0,
+      "productId": "293985085089344",
+      "propertyValueIdHash": "f1bfcbd886dbd0e958cbcf488b9c29a0",
+      "propertyValueIds": "17819393652823-17819393652824",
+      "sort": 0,
+      "stock": 9999
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20012",
+    "commendType": 0,
+    "cover": "202601/KuI5GGeCeiYuqv9rZTtn9QWjoH7Q7S_thumbnail.png,202601/pHjG0mfliw7iPUABq3rhu9rbc8Jtmn_thumbnail.png,202601/2tVy0lAP8EbGX4me6f5c6q57yf4l5p_thumbnail.png,202601/Kn9YUT5pwuUmB6iSvPHBr9HrfI4ve6_thumbnail.png,202601/LAiipAPzyFzNCbFvWsKDaD1w68MdJd_thumbnail.png",
+    "createTime": "2026-01-11 18:11:16",
+    "maxPrice": 9.9,
+    "minPrice": 9.9,
+    "pCategoryId": "10003",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/saJTSrqNKuYy0ptwTpj2Kq0nrd5bGP.png)\n![](/api/file/getResource?sourceName=202601/camqKb4YZp3L3KzLMtMNcwt1JxjPVi.png)\n![](/api/file/getResource?sourceName=202601/bODm5UdWo46bMS9SnJIklGtQyMny3l.png)\n",
+    "productId": "298286497857602",
+    "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1034",
+      "propertyName": "颜色分类",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/V8IR8T6MrSknir649JaGXIi7pLusIM_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "#01乌木甜茶 ⭐【HOT】豆蔻粉红棕",
+          "propertyValueId": "1768126212913"
+        },
+        {
+          "propertyCover": "202601/PUTcY19SeV0x7qbXACNRZ4gsRTGMwe_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "#03冷杉红栗 ⭐【NEW】冰透红茶冻",
+          "propertyValueId": "1768126259416"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 9.9,
+      "productId": "298286497857602",
+      "propertyValueIdHash": "ee6f3d95fc7a1ac431e4e7c9b0a9a8ac",
+      "propertyValueIds": "1768126212913",
+      "sort": 0,
+      "stock": 200
+    },
+    {
+      "price": 9.9,
+      "productId": "298286497857602",
+      "propertyValueIdHash": "71a51ff8020ea17f1b7bd9c7cecf2afb",
+      "propertyValueIds": "1768126259416",
+      "sort": 1,
+      "stock": 200
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20032",
+    "commendType": 0,
+    "cover": "2026-06/MGzI6tMytQZly4G8OEg4bCM3PiIqP2.jpg,2026-06/Od9XFMtdEXSqFqNtfKzDTDaftw8RIz.jpg,2026-06/tgLxu1Lvh45meA9QakzbUqKdvNNGps.jpg,2026-06/XvE7mWdD6DCqHrvfui58O42beA7HvB.jpg,2026-06/Tiq4Vqiaz81UfRDjwqHCHxtmPbEkr5.jpg",
+    "createTime": "2026-06-20 15:27:32",
+    "maxPrice": 488.0,
+    "minPrice": 488.0,
+    "pCategoryId": "10007",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/Sb39h19vTxmNjvFPYHVNGWJaSeAuMg.png)\n![](/api/file/getResource?sourceName=2026-06/CFZCd9VK5wW53fmNNMPkCIFrPUUges.png)\n![](/api/file/getResource?sourceName=2026-06/5WGjH64a1v8an0myvzwe06Jzdp9JiR.png)\n![](/api/file/getResource?sourceName=2026-06/bGwkIFZS7ty3D4fhwtEk7KzMHDw5xW.png)\n",
+    "productId": "088573992437392",
+    "productName": "君高 器材维修工具箱铝合金工具箱维修保养工具箱 军械员工具箱(京仓发货) 铝合金 25新型",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "5172604775",
+      "propertyName": "颜色",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/aBpTOKHSF2JQJq45Hc3OLdZEuNVgKZ.jpg",
+          "propertyRemark": "",
+          "propertyValue": "军械员工具箱 铝合金(京仓发货)",
+          "propertyValueId": "17819404064233"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 488.0,
+      "productId": "088573992437392",
+      "propertyValueIdHash": "2b128a73fbcc1f31046fce5291d6d008",
+      "propertyValueIds": "17819404064233",
+      "sort": 0,
+      "stock": 99999
+    }
+  ]
+}

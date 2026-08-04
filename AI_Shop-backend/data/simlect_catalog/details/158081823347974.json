@@ -1,0 +1,76 @@
+{
+  "productInfo": {
+    "categoryId": "20003",
+    "commendType": 0,
+    "cover": "2026-06/kAZzdAvwuvXbuMOUTR87aqeL4jRbSQ.jpg,2026-06/M3zSAPhae2K1mklqQE6uT75MQSWd1d.jpg,2026-06/7gaLdadRU0zqQkQ8cGtQ0nfKPPawbV.jpg,2026-06/vqKTAmVos08bioI5NYvg4efuQCaUQn.jpg,2026-06/GNncFaWhxok8Sso0PiK6m0Nr7473UV.jpg",
+    "createTime": "2026-06-20 01:35:09",
+    "maxPrice": 3998.0,
+    "minPrice": 2054.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/zaQ6BFImG59tXNu6b0v03TSCDp4VBv.png)\n![](/api/file/getResource?sourceName=2026-06/GjnMQ3YVH0S3qNzcnVH3BQfvP1ydjy.png)\n![](/api/file/getResource?sourceName=2026-06/TAsHu4qQ4bdYZ5M2ZikZIjqqGKo5gI.png)\n![](/api/file/getResource?sourceName=2026-06/isMz2OSg9VauQPyZGJ5dqKNRmVbU0U.png)\n![](/api/file/getResource?sourceName=2026-06/BEd6JRM7CjWkJCaLInaICzHAtyeoTl.png)\n",
+    "productId": "158081823347974",
+    "productName": "哈曼卡顿AURA STUDIO 5琉璃5代琉璃4升级版蓝牙音箱 环绕立体声 下沉式低音炮 居家桌面音响 氛围感音响",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1007",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "琉璃5代",
+          "propertyValueId": "17818903385550"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "琉璃4 黑色经典版",
+          "propertyValueId": "1781890352414"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "3742160298",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "哈曼卡顿水晶5",
+          "propertyValueId": "17818902988793"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "哈曼卡顿琉璃4/5",
+          "propertyValueId": "1781890411193"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 3998.0,
+      "productId": "158081823347974",
+      "propertyValueIdHash": "64d609dd19f3095ca2008f6b3d604b59",
+      "propertyValueIds": "17818903385550-1781890411193",
+      "sort": 0,
+      "stock": 0
+    },
+    {
+      "price": 2054.0,
+      "productId": "158081823347974",
+      "propertyValueIdHash": "78df941091c50dea66e162da30c40eff",
+      "propertyValueIds": "1781890352414-1781890411193",
+      "sort": 1,
+      "stock": 0
+    }
+  ]
+}

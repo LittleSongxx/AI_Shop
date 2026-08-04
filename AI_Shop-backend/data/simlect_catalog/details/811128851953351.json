@@ -1,0 +1,70 @@
+{
+  "productInfo": {
+    "categoryId": "20013",
+    "commendType": 0,
+    "cover": "2026-06/X3bLTxb0pDOWtc7BKGudlWR4pXW5co.jpg,2026-06/TRC8jIAgNSclIhpMWHnWOW5yDquqKv.jpg,2026-06/rMlrwga4GaMNYiE7ZoIZYSzQaMBfDs.jpg,2026-06/6Pirf1EtWcnffInZfh8gOvUXCvfwyX.jpg,2026-06/rrhiGGWAFNNaRaEaDU68dBZV4xp7N6.jpg",
+    "createTime": "2026-06-20 14:25:36",
+    "maxPrice": 259.0,
+    "minPrice": 259.0,
+    "pCategoryId": "10003",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/twdbnXciR2NFB41RmwybT0tCSUuETG.png)\n![](/api/file/getResource?sourceName=2026-06/cTYIMJsLbIKCcHsNhlN4jnKOSsgaA4.png)\n![](/api/file/getResource?sourceName=2026-06/8HdAd2t1v45kdHaN5T3ewiXGhJfp5A.png)\n![](/api/file/getResource?sourceName=2026-06/fnia9PkmEQX3FTO6FS05LuQVJ7YHMj.png)\n",
+    "productId": "811128851953351",
+    "productName": "欧莱雅第四代小蜜罐胶原面霜滋润紧致抗皱抗老补水保湿护肤品送妈妈礼物 第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml 女士优选",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "2031902811",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "面霜",
+          "propertyValueId": "17819366864733"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "0303189060",
+      "propertyName": "产品",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/3guNWVKOPIa2Kycaq5Qw5SjLAU39jH.jpg",
+          "propertyRemark": "",
+          "propertyValue": "第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml",
+          "propertyValueId": "17819366864734"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "7992149822",
+      "propertyName": "其他信息",
+      "propertySort": 6,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "女士优选",
+          "propertyValueId": "17819366864735"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 259.0,
+      "productId": "811128851953351",
+      "propertyValueIdHash": "97e63eb29644e87c88b402b2c827a734",
+      "propertyValueIds": "17819366864733-17819366864734-17819366864735",
+      "sort": 0,
+      "stock": 9999
+    }
+  ]
+}

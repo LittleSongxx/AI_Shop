@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "88409",
+    "commendType": 1,
+    "cover": "2026-06/Djyjtfe0oRVYaDeIZvCm7M5x71PPsG.jpg,2026-06/gHa9pTnGRS5YEKwEbOMQjvnnRRHRcb.jpg,2026-06/UDSkzqkg8gMyCrpXWyNg8ISeUXssFm.jpg,2026-06/V4jjrgW9PAA9UC52WpB09z3n4xA6JO.jpg,2026-06/rC91IbjxcjqYm3myljjghgbYBKAr3f.jpg",
+    "createTime": "2026-06-20 15:56:05",
+    "maxPrice": 33.9,
+    "minPrice": 33.9,
+    "pCategoryId": "64617",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/fv0DVHjUIuyNyU4XbSiucXY7NgEVQm.png)\n![](/api/file/getResource?sourceName=2026-06/Cq3KT3VH9g1hhAI2ENZqp1faltQT1l.png)\n![](/api/file/getResource?sourceName=2026-06/TYRam2CY5My9lKDUJS3UdhsinW2M9T.png)\n![](/api/file/getResource?sourceName=2026-06/KPyVFX5D4UIR6jm9JLGoOa9DSFFizd.png)\n![](/api/file/getResource?sourceName=2026-06/q5Sdd2TxAS4QliIax6vOoqeGiQOeWN.png)\n",
+    "productId": "622491960431656",
+    "productName": "名创优品（MINISO）小猪B-BO弹力超柔趴姿公仔毛绒玩偶儿童玩具抱枕靠枕生日礼物女",
+    "status": 1,
+    "totalSale": 88
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "3353076910",
+      "propertyName": "规格",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/imX1gB363DcY5YBkPodvorfSiizsIo.jpg",
+          "propertyRemark": "",
+          "propertyValue": "【弹力超软系列】趴姿小猪B-BO",
+          "propertyValueId": "17819421246570"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 33.9,
+      "productId": "622491960431656",
+      "propertyValueIdHash": "d9fb7afdb6be101f9809cefb0d3a95ad",
+      "propertyValueIds": "17819421246570",
+      "sort": 0,
+      "stock": 999909
+    }
+  ]
+}

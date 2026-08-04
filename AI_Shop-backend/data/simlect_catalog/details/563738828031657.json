@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20004",
+    "commendType": 0,
+    "cover": "2026-06/YWjvYOeY0nyxcbdHpfIs032s5GvVAw.jpg,2026-06/URDFN1V1XwxYAcSA2Gp4D1YxQpg1mA.jpg,2026-06/o2vbTGnjAlvaJDsiBdHWK29NM4iULJ.jpg,2026-06/1uNO2I89Tumgzt0cvRloIo1S8VlMRZ.jpg,2026-06/Sbkk0tHjTLhpQUh2vojX0uk5OYkGNg.jpg",
+    "createTime": "2026-06-20 14:11:58",
+    "maxPrice": 12890.0,
+    "minPrice": 12890.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/JPL9cx7CN7gS2DjWyTLx7w1LFHZLWY.png)\n![](/api/file/getResource?sourceName=2026-06/8Xr1KEJJ9VJtwh7ScaWiq8zXQ5sWvf.png)\n![](/api/file/getResource?sourceName=2026-06/oxR4gUjTz8NfCwqlGGcD68sEqOjUFY.png)\n![](/api/file/getResource?sourceName=2026-06/HiQZf7N5yzgVsBjAv4Zk9940uIPySr.png)\n",
+    "productId": "563738828031657",
+    "productName": "西门子（SIEMENS）71升德国原装进口蒸烤一体机蒸烤炸搪瓷内胆4D热风立体环绕烤精控探针空气炸多重自清洁HS756G3B1W 黑色",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1010",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "黑色",
+          "propertyValueId": "17819358563970"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 12890.0,
+      "productId": "563738828031657",
+      "propertyValueIdHash": "7340264b46cb61351cde5c53e004ca3d",
+      "propertyValueIds": "17819358563970",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

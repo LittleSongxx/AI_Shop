@@ -1,0 +1,168 @@
+{
+  "productInfo": {
+    "categoryId": "20047",
+    "commendType": 0,
+    "cover": "2026-06/9UvGBHxeT3qfETLbpnOoRcYN9f74Kq.jpg,2026-06/PhKw9FHMsYak1liKh85SJn3EPECSH3.jpg,2026-06/JJvjTIOMeIDEYNLmodbBX1gAb551OU.jpg,2026-06/6oNs29GBhn56YWSObcGUTFYjE11sVj.jpg,2026-06/RJWhUAfvLCy9T3jWAER0MkycSL7aqy.jpg",
+    "createTime": "2026-06-20 15:52:36",
+    "maxPrice": 960.0,
+    "minPrice": 96.0,
+    "pCategoryId": "10011",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/YGSP2o7Qp5DnVsFhql13Tm9lv9Fubd.png)\n",
+    "productId": "519183041848998",
+    "productName": "任天堂港服NS充值卡香港Switch点卡100 200 300 400 500港区eshop预付卡",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1141",
+      "propertyName": "版本",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC1",
+          "propertyValueId": "17819418332082"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC2",
+          "propertyValueId": "1781941860337"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC3",
+          "propertyValueId": "1781941862513"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC4",
+          "propertyValueId": "1781941864822"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC5",
+          "propertyValueId": "1781941869103"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC6",
+          "propertyValueId": "1781941871760"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC7",
+          "propertyValueId": "1781941874615"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC8",
+          "propertyValueId": "1781941877552"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC9",
+          "propertyValueId": "1781941880065"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "DLC10",
+          "propertyValueId": "1781941882589"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 96.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "f91203dffdfa6f4a17f8cd1fa548c733",
+      "propertyValueIds": "17819418332082",
+      "sort": 0,
+      "stock": 999
+    },
+    {
+      "price": 192.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "b3c878b8b067e0acc5a873d792d0b2d0",
+      "propertyValueIds": "1781941860337",
+      "sort": 1,
+      "stock": 999
+    },
+    {
+      "price": 288.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "c000244cb72db2ad78af2df9a350d6a5",
+      "propertyValueIds": "1781941862513",
+      "sort": 2,
+      "stock": 999
+    },
+    {
+      "price": 384.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "42b3cf082eb383b009489b77b7ecddcb",
+      "propertyValueIds": "1781941864822",
+      "sort": 3,
+      "stock": 999
+    },
+    {
+      "price": 480.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "d09df7a3b96d5ecd5da7f43fcf4cae8c",
+      "propertyValueIds": "1781941869103",
+      "sort": 4,
+      "stock": 999
+    },
+    {
+      "price": 576.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "e30f4759b40fe34f0f06e0ed3bc1e7f1",
+      "propertyValueIds": "1781941871760",
+      "sort": 5,
+      "stock": 999
+    },
+    {
+      "price": 672.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "5e7a4ae3fd2796a6cca8e5374533b154",
+      "propertyValueIds": "1781941874615",
+      "sort": 6,
+      "stock": 999
+    },
+    {
+      "price": 768.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "2d2d5b3be4beca648daad5861c089ef3",
+      "propertyValueIds": "1781941877552",
+      "sort": 7,
+      "stock": 999
+    },
+    {
+      "price": 864.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "b884d4be304663f8d6e966efc32715d4",
+      "propertyValueIds": "1781941880065",
+      "sort": 8,
+      "stock": 999
+    },
+    {
+      "price": 960.0,
+      "productId": "519183041848998",
+      "propertyValueIdHash": "787a6b509b318a457f194c08fa3dc784",
+      "propertyValueIds": "1781941882589",
+      "sort": 9,
+      "stock": 999
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "productInfo": {
+    "categoryId": "20002",
+    "commendType": 1,
+    "cover": "2026-06/hz2G9r5DxdUEKQKEHiIHM4M9aObj1v.jpg,2026-06/rl6OoPvXEG0q4cyQYOhNismh53JZv8.jpg,2026-06/28UfukHzdqr6MaHHDihKNmqaH8h9We.jpg,2026-06/6mwPYeiO7ugtMUH6UO02uWyNY30Y4R.jpg,2026-06/d2B9laCZ8kq2TmNDn3HEXxGuY2oFbp.jpg",
+    "createTime": "2026-06-20 01:27:56",
+    "maxPrice": 5099.0,
+    "minPrice": 4399.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/I0lhqGildiPbaRqc8pr88G4kKFlHg9.png)\n![](/api/file/getResource?sourceName=2026-06/l20HT46bntuHlXro56HRj4ZLcnx4aI.png)\n![](/api/file/getResource?sourceName=2026-06/5a5O6sXDMphPWbl2Jr97nz7TyLf8dj.png)\n![](/api/file/getResource?sourceName=2026-06/ccnAL8iOZKVu2HfoBspYnKzqeSNfnF.png)\n![](/api/file/getResource?sourceName=2026-06/h5dxdk7tQ6LWMe77ftinv18A7RUexN.png)\n",
+    "productId": "650980987345712",
+    "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260",
+    "status": 1,
+    "totalSale": 9
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "5553712174",
+      "propertyName": "规格",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/ve6FdM4wTFMijCylrCaiqP5MUnCsCg.jpg",
+          "propertyRemark": "",
+          "propertyValue": "超值单主机",
+          "propertyValueId": "17818899129391"
+        },
+        {
+          "propertyCover": "2026-06/eED8y4CdUjG7xnAEjXFYkYEJL3yyCT.jpg",
+          "propertyRemark": "",
+          "propertyValue": "主机+27英寸显示器",
+          "propertyValueId": "1781889979475"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "6887378688",
+      "propertyName": "版本",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "【16核旗舰】i9-12900HX 16G 1T",
+          "propertyValueId": "17818899129392"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 4399.0,
+      "productId": "650980987345712",
+      "propertyValueIdHash": "dbe48cff4b49e7632d8e386f7d58e628",
+      "propertyValueIds": "17818899129391-17818899129392",
+      "sort": 0,
+      "stock": 990
+    },
+    {
+      "price": 5099.0,
+      "productId": "650980987345712",
+      "propertyValueIdHash": "7a2efcb015278ff3533df978517d2a7a",
+      "propertyValueIds": "1781889979475-17818899129392",
+      "sort": 1,
+      "stock": 999
+    }
+  ]
+}

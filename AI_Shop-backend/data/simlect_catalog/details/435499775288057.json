@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20031",
+    "commendType": 0,
+    "cover": "2026-06/ivrBW0gIKWLUmHTvRi0zVPLP5JOLyE.jpg,2026-06/vDHfBXY7MvCDB9efOWoBzNoSdf2TqV.jpg,2026-06/lBUH3kuh49XyCuMMWPp3eiFdWQzwRv.jpg,2026-06/efIoXwvMn849QvEADbVVfNuhyrOwr8.jpg,2026-06/UzEiypG9aK51t6LkGTfaViAdNGlKMF.jpg",
+    "createTime": "2026-06-20 15:23:07",
+    "maxPrice": 109.0,
+    "minPrice": 109.0,
+    "pCategoryId": "10007",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/zcSH1ysWn2zdkzPUC7CM6chXvkIGGO.png)\n![](/api/file/getResource?sourceName=2026-06/AYP44bZCyYXdehWrBAPR5zfs07ftwm.png)\n![](/api/file/getResource?sourceName=2026-06/aZ3IGmFbPMTLgn7Vk1DeZw2LJNIHPK.png)\n![](/api/file/getResource?sourceName=2026-06/H1Y1W5LrZFAeVgPu52YPtizR7PzDF9.png)\n",
+    "productId": "435499775288057",
+    "productName": "点氛车载香薰固体香膏男士专用持久留香汽车香水车内香氛古刹檀香",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1093",
+      "propertyName": "款式",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "210g",
+          "propertyValueId": "17819401667070"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "2138007062",
+      "propertyName": "香型",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/91DuS0sj3IkDGPm40ftDjj8uNEekLE.jpg",
+          "propertyRemark": "",
+          "propertyValue": "古刹檀香丨进口香料丨全车飘香",
+          "propertyValueId": "17819401443463"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 109.0,
+      "productId": "435499775288057",
+      "propertyValueIdHash": "abd34d84ec59e4ff5625bf2a63aecd44",
+      "propertyValueIds": "17819401667070-17819401443463",
+      "sort": 0,
+      "stock": 99999
+    }
+  ]
+}

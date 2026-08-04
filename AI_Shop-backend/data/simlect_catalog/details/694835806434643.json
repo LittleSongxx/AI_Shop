@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20018",
+    "commendType": 0,
+    "cover": "2026-06/bXQsj5Etgp6XPCDbWJOO4psOloE55o.jpg,2026-06/tCULa6UAkz0q99OoJyM6W0t07bs6TI.jpg,2026-06/c6anMRV9cJFlE1oRGJ55607kGDSE6C.jpg,2026-06/2tRiyb0PWDU1zAo3JUHRw645d0b5P9.jpg,2026-06/YnMXWYyZclnB2bgiycZfYk8HJuHbSb.jpg",
+    "createTime": "2026-06-20 14:37:53",
+    "maxPrice": 379.0,
+    "minPrice": 379.0,
+    "pCategoryId": "10004",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/SsPQXhjnaSffRQggYuo8K9PoAeLAXJ.png)\n![](/api/file/getResource?sourceName=2026-06/4M8npsFiW3UFqWoPjugAARxSZfqhtU.png)\n![](/api/file/getResource?sourceName=2026-06/675dgk7yA7pYpkQ0n3tPpy8llaT7mN.png)\n![](/api/file/getResource?sourceName=2026-06/poMtgFIm0r5JP2VDxRvFRsMosWHnLY.png)\n\n",
+    "productId": "694835806434643",
+    "productName": "以辰景德镇68头餐具整套碗具碗碟套装家用碗筷碗盘洗碗机可用送礼物",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "9457941046",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "金枝玉叶系列",
+          "propertyValueId": "17819374367903"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "4274999756",
+      "propertyName": "款式",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/F2HKGK7wI8387FlX2AceWbShRDWO2N.jpg",
+          "propertyRemark": "",
+          "propertyValue": "【店铺主推】金枝玉叶68头",
+          "propertyValueId": "17819374367904"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 379.0,
+      "productId": "694835806434643",
+      "propertyValueIdHash": "b3534182b1ca18f4967fdae885256791",
+      "propertyValueIds": "17819374367903-17819374367904",
+      "sort": 0,
+      "stock": 9999
+    }
+  ]
+}

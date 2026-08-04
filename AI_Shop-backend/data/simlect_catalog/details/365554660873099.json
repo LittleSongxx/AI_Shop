@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20046",
+    "commendType": 0,
+    "cover": "2026-06/DUGaqEsCZI4EHhVBXDPpYVfZKJ9nFY.jpg,2026-06/uEv3fDLxnEXzJDYl800cbdyKX5v3pr.jpg,2026-06/hjQpsOvMbjuxw5mplLoXkQ5ST72rG2.jpg,2026-06/3FYzZRim3m3nzIWwKgnqEQ0KepJoj2.jpg,2026-06/Utb0sY7ZfjRbppgeUqQ6EhDfzT8XJS.jpg",
+    "createTime": "2026-06-20 15:49:19",
+    "maxPrice": 158.0,
+    "minPrice": 158.0,
+    "pCategoryId": "10011",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/JUUyy5T2OI6AtumgKhd1iPckz4A3Qt.png)\n![](/api/file/getResource?sourceName=2026-06/rrbs89t2jsFGPAeLzHA7bv9PBtVOw0.png)\n![](/api/file/getResource?sourceName=2026-06/AWOLigOdQKHA45u7YhODV6LSSLdPfH.png)\n![](/api/file/getResource?sourceName=2026-06/q6nHyh6Ki0Fm8d5mEV09a8GKnzCaWC.png)\n![](/api/file/getResource?sourceName=2026-06/CgcWUpsC05LVmtZ1d5mV1gFM9J5RDS.png)\n",
+    "productId": "365554660873099",
+    "productName": "WPS Office【学生专享】超级会员2年卡744天论文排版外文翻译PPT模 直充到账",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1136",
+      "propertyName": "时长",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "744天",
+          "propertyValueId": "17819417099250"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1137",
+      "propertyName": "等级",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "超级会员2年卡",
+          "propertyValueId": "17819417099251"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 158.0,
+      "productId": "365554660873099",
+      "propertyValueIdHash": "587af7809d9e840e3e7bbcc093fd81c5",
+      "propertyValueIds": "17819417099250-17819417099251",
+      "sort": 0,
+      "stock": 99999
+    }
+  ]
+}

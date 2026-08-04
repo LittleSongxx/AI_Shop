@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20024",
+    "commendType": 0,
+    "cover": "2026-06/5RiYRCS0mzs735otaxv5IV37xd05Ls.jpg,2026-06/wPzGrHUgmSamqdpFKVS2bEtMNkzyXy.jpg,2026-06/ikpD5IAN312sxpT1uS86URnhrsdgOf.jpg,2026-06/vaeim5UhVkt3T8ixeP3pwDY4Iza3To.jpg,2026-06/ko9ZRRohTOE4xLuJ5fPfvcMBexjIRj.jpg",
+    "createTime": "2026-06-20 15:00:11",
+    "maxPrice": 19.4,
+    "minPrice": 19.4,
+    "pCategoryId": "10005",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/gTXaksGdmqtjnjlCFl9uiugPlBP4Ge.png)\n![](/api/file/getResource?sourceName=2026-06/n3BwkrNtycEjhBJR1ldbbfLxuuhjOn.png)\n![](/api/file/getResource?sourceName=2026-06/HdMrD4pn7kUoAT6YwhHv59p2D3taMf.png)\n![](/api/file/getResource?sourceName=2026-06/RABLSyq6KmASicOATW4xY74w6W9xkK.png)\n",
+    "productId": "327158568449097",
+    "productName": "海天厨房调料组合套装油盐酱醋组合装家庭宿舍调料大全调味料做饭礼盒 【性价比Plus】常用调料12件套",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "0636252148",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "爆款调料套装",
+          "propertyValueId": "17819387631393"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "3019891428",
+      "propertyName": "规格",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/msGa8pdmDMTcRSjh8bPq8ivTmbA92F.jpg",
+          "propertyRemark": "",
+          "propertyValue": "【性价比Plus】常用调料12件套",
+          "propertyValueId": "17819387631394"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 19.4,
+      "productId": "327158568449097",
+      "propertyValueIdHash": "126870c30e7170e4e3df0eb1eb74958b",
+      "propertyValueIds": "17819387631393-17819387631394",
+      "sort": 0,
+      "stock": 999999
+    }
+  ]
+}

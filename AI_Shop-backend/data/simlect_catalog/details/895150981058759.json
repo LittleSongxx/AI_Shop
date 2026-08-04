@@ -1,0 +1,174 @@
+{
+  "productInfo": {
+    "categoryId": "20001",
+    "commendType": 1,
+    "cover": "2026-06/SxUHBfpEffG8Hx89vvqFCIMr9yc0cF.png,2026-06/mtONSbOc6ycgs0B2ARrudokbsJlI40.png,2026-06/v8EO2h1gyn8la9NOwR4M5MVsk0wdiY.png,2026-06/gCKWJf4UCHbwy1jAvrVvqpw8hTZF3m.png,2026-06/NsFktoGyDE2mHdQrQ17qSUp7hnoTOS.png",
+    "createTime": "2026-06-04 14:38:33",
+    "maxPrice": 16999.0,
+    "minPrice": 8999.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/j8eJxjwWmp89mYFWPVQ38gsiwkZY19.png)\n![](/api/file/getResource?sourceName=2026-06/BRUYtoVgDgvprDR9pJqU2hHeRCCSjt.png)\n![](/api/file/getResource?sourceName=2026-06/yQFkSrCnkzpV4s7LBHZOjX9dQbvM7V.png)\n![](/api/file/getResource?sourceName=2026-06/KHC0g2S3qn9LUYXplrkFBFMwthQ0IS.png)\n",
+    "productId": "895150981058759",
+    "productName": "Apple/苹果 iPhone 17 Pro Max 移动联通电信5G 双卡双待手机",
+    "status": 1,
+    "totalSale": 33
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1001",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/a61Br9M7Fu2ixHGaaXl3tFTYut83cl.png",
+          "propertyRemark": "",
+          "propertyValue": "银色",
+          "propertyValueId": "1780554968348"
+        },
+        {
+          "propertyCover": "2026-06/ddUoDxTCuI9NvI1l1y7J46D3fmguYg.png",
+          "propertyRemark": "",
+          "propertyValue": "星宇橙色",
+          "propertyValueId": "1780554977545"
+        },
+        {
+          "propertyCover": "2026-06/G6lFGeOgZjcYZlyiqE5e8Qotx4e0TO.png",
+          "propertyRemark": "",
+          "propertyValue": "深蓝色",
+          "propertyValueId": "1780554988020"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "1098012240",
+      "propertyName": "存储容量",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "256GB",
+          "propertyValueId": "1780554968349"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "512GB",
+          "propertyValueId": "1780555030813"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "1TB",
+          "propertyValueId": "1780555035131"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "2TB",
+          "propertyValueId": "1780555037839"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 8999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "137e14ea51a28c111aef8b2258c3691f",
+      "propertyValueIds": "1780554968348-1780554968349",
+      "sort": 0,
+      "stock": 564
+    },
+    {
+      "price": 10999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "9129ecfe4b2943141fa12842448699c8",
+      "propertyValueIds": "1780554968348-1780555030813",
+      "sort": 1,
+      "stock": 456
+    },
+    {
+      "price": 12999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "6a12dbb984205c4e9790311800993f4e",
+      "propertyValueIds": "1780554968348-1780555035131",
+      "sort": 2,
+      "stock": 345
+    },
+    {
+      "price": 16999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "72f6706244b6b80b05e895bc8fdfb057",
+      "propertyValueIds": "1780554968348-1780555037839",
+      "sort": 3,
+      "stock": 213
+    },
+    {
+      "price": 8999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "fdb2ee5a10e3e316bce4e73859197301",
+      "propertyValueIds": "1780554977545-1780554968349",
+      "sort": 4,
+      "stock": 567
+    },
+    {
+      "price": 10999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "c9e7f407727160be400151fa3a4af30e",
+      "propertyValueIds": "1780554977545-1780555030813",
+      "sort": 5,
+      "stock": 456
+    },
+    {
+      "price": 12999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "f47eb3f4c1fe24b6d2905730871c9f8d",
+      "propertyValueIds": "1780554977545-1780555035131",
+      "sort": 6,
+      "stock": 345
+    },
+    {
+      "price": 16999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "a1b1b5f8da9d4331a04e95b0b9a80e32",
+      "propertyValueIds": "1780554977545-1780555037839",
+      "sort": 7,
+      "stock": 230
+    },
+    {
+      "price": 8999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "ba48496c7143d320ed24a9e58d814108",
+      "propertyValueIds": "1780554988020-1780554968349",
+      "sort": 8,
+      "stock": 567
+    },
+    {
+      "price": 10999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "9f171963ae755f29f3940e3570e85f1c",
+      "propertyValueIds": "1780554988020-1780555030813",
+      "sort": 9,
+      "stock": 456
+    },
+    {
+      "price": 12999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "0ed148a98c17d0e93d19324f110e9db6",
+      "propertyValueIds": "1780554988020-1780555035131",
+      "sort": 10,
+      "stock": 345
+    },
+    {
+      "price": 16999.0,
+      "productId": "895150981058759",
+      "propertyValueIdHash": "a46f9533ec714e91424152b025dcb4ed",
+      "propertyValueIds": "1780554988020-1780555037839",
+      "sort": 11,
+      "stock": 229
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "productInfo": {
+    "categoryId": "20014",
+    "commendType": 0,
+    "cover": "2026-06/URkRvHeRcSICJ82g80DmDZaf1CPRNT.jpg,2026-06/CD4ZHxP8GE1T32cbIcNsVsZJx9DI1K.jpg,2026-06/GvWqOftciMx4FDpgYbDwa411O3KMbw.jpg,2026-06/FSbJjxBfM80ht7rp4Qouj8RZSyGrg7.jpg,2026-06/K0SWJmaV6g3oE8rKYE1gCyfpoQTlTv.jpg",
+    "createTime": "2026-06-20 14:30:33",
+    "maxPrice": 179.0,
+    "minPrice": 179.0,
+    "pCategoryId": "10003",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/lEgdqgE8OJOH9HVeMoomvFwpAeepo8.png)\n![](/api/file/getResource?sourceName=2026-06/GAjOn7oJNybx9ny8nkO8vMwum8x8u1.png)\n![](/api/file/getResource?sourceName=2026-06/eT9yiXaxQFPycTwIp2du3RSbJNR4T0.png)\n![](/api/file/getResource?sourceName=2026-06/gfuas0FKEOpWZK0xGOuRb3evd4qVRy.png)\n",
+    "productId": "467794132963439",
+    "productName": "babycare新生儿见面礼盒衣服婴儿礼物周岁初生宝宝用品大全 淡焦黄 66cm",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1040",
+      "propertyName": "尺码",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "66cm",
+          "propertyValueId": "17819369574510"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "0588847267",
+      "propertyName": "系列品",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "轻柔天使限定礼盒",
+          "propertyValueId": "17819369574511"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "3096733438",
+      "propertyName": "颜色",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/21Tat79bobg66gee5ohluaGiTLvXTK.jpg",
+          "propertyRemark": "",
+          "propertyValue": "淡焦黄",
+          "propertyValueId": "17819369574512"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 179.0,
+      "productId": "467794132963439",
+      "propertyValueIdHash": "29cf1d6ace513f31b75d90484b99d653",
+      "propertyValueIds": "17819369574510-17819369574511-17819369574512",
+      "sort": 0,
+      "stock": 9999
+    }
+  ]
+}

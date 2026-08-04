@@ -1,0 +1,128 @@
+{
+  "productInfo": {
+    "categoryId": "20002",
+    "commendType": 1,
+    "cover": "2026-06/hVXgqn3HrlBSaheySBdd8PGmYw9C0Y.png,2026-06/UK3ol2dXWXyXmSUWWpzbvd1pdVWxGb.png,2026-06/1406spDx5BARn79fMvDEjsAMdZUoZT.png,2026-06/VYeNx3qexRPSNEXlrqnIZFVRjcJWTu.png,2026-06/6mT3DHcMK85AuArxMU62usPoRqC87M.png",
+    "createTime": "2026-06-03 20:38:14",
+    "maxPrice": 42299.0,
+    "minPrice": 9199.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/g84EZGoWW0Wqv5mBaSEz8jexpXNtOt.png)\n![](/api/file/getResource?sourceName=2026-06/nYi8sNYoAVQJ92CsrVrS53lJIi2tjl.png)\n![](/api/file/getResource?sourceName=2026-06/eKanZpcPWoYH8aLOC8skCEAo20nJ9d.png)\n![](/api/file/getResource?sourceName=2026-06/ALRtl2tfbVPmcFAR7c3ruIffBkNXRU.png)\n![](/api/file/getResource?sourceName=2026-06/Ly1EUiwfxUXXvOcvZfKJifPlCiv6pd.png)\n",
+    "productId": "995230446006541",
+    "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制",
+    "status": 1,
+    "totalSale": 40
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1004",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/0o3NRTTeCWTZAW7cPafSXh0hk9HQhI.png",
+          "propertyRemark": "",
+          "propertyValue": "白色",
+          "propertyValueId": "1780489902527"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "5553712174",
+      "propertyName": "规格",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/uqrguM3daFYeQK5CCXBvSyfG5KUSOd.png",
+          "propertyRemark": "",
+          "propertyValue": "Ultra7-256K 16G内存 512G固态",
+          "propertyValueId": "1780489902528"
+        },
+        {
+          "propertyCover": "2026-06/LulkY1uaNAZdRd9YFKlaYoL5MKAjJF.png",
+          "propertyRemark": "",
+          "propertyValue": "Ultra7-265K 64G 2TB固态",
+          "propertyValueId": "1780490103014"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "6887378688",
+      "propertyName": "版本",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "集成显卡 定制",
+          "propertyValueId": "1780489902529"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "RTX4090D-24G独显 定制",
+          "propertyValueId": "1780490130659"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "RTX5060Ti-8G独显 定制",
+          "propertyValueId": "1780490149740"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 9199.0,
+      "productId": "995230446006541",
+      "propertyValueIdHash": "ac875b9c0877277ebc7eaa7f3a08cd91",
+      "propertyValueIds": "1780489902527-1780489902528-1780489902529",
+      "sort": 0,
+      "stock": 60
+    },
+    {
+      "price": 33199.0,
+      "productId": "995230446006541",
+      "propertyValueIdHash": "f5241fc2889c42c6819ea22cc11cab49",
+      "propertyValueIds": "1780489902527-1780489902528-1780490130659",
+      "sort": 1,
+      "stock": 100
+    },
+    {
+      "price": 13799.0,
+      "productId": "995230446006541",
+      "propertyValueIdHash": "45fdc11e52a8a69e6008cd1c9eaa7cbc",
+      "propertyValueIds": "1780489902527-1780489902528-1780490149740",
+      "sort": 2,
+      "stock": 100
+    },
+    {
+      "price": 22899.0,
+      "productId": "995230446006541",
+      "propertyValueIdHash": "628f16574693489f683c2070efdab95d",
+      "propertyValueIds": "1780489902527-1780490103014-1780489902529",
+      "sort": 3,
+      "stock": 100
+    },
+    {
+      "price": 42299.0,
+      "productId": "995230446006541",
+      "propertyValueIdHash": "ff462af4a16fa19829228d30beb3438d",
+      "propertyValueIds": "1780489902527-1780490103014-1780490130659",
+      "sort": 4,
+      "stock": 10
+    },
+    {
+      "price": 22899.0,
+      "productId": "995230446006541",
+      "propertyValueIdHash": "790c0d41ba555dd623ad6db9b9383b94",
+      "propertyValueIds": "1780489902527-1780490103014-1780490149740",
+      "sort": 5,
+      "stock": 60
+    }
+  ]
+}

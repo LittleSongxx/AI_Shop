@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20004",
+    "commendType": 0,
+    "cover": "2026-06/mhqT81mtrtTqpJUguljdlBB4eoj4kB.jpg,2026-06/RFEe9jqrI8rU9BrGdidmUEnJLSYgCC.jpg,2026-06/R1e4UAs1RYkrX91d7Qs3Nq9oE7WBGr.jpg,2026-06/f5uBnRzlxZIZNHkyuGB5lDqvxgDUi4.jpg,2026-06/EH7Ufiey5JdTcdTMPIh1G6d7cFW2Wc.jpg",
+    "createTime": "2026-06-20 01:52:10",
+    "maxPrice": 7087.0,
+    "minPrice": 7087.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/Ux0WjmEGRnGt0SX2QBknu2vTEGqhcx.png)\n![](/api/file/getResource?sourceName=2026-06/I9IAz9al9t1x2UvX9RxcQIPFEkGB4a.png)\n![](/api/file/getResource?sourceName=2026-06/tjHDVBCmG7f9XtEUjEKbswKyf5d48l.png)\n![](/api/file/getResource?sourceName=2026-06/YdmxIx0Vs9byYho0MAKTG4W7XsuFBO.png)\n\n",
+    "productId": "547755968243478",
+    "productName": "352空气净化器除甲醛除花粉除菌猫毛宠物TVOC异味 除过敏认证新房家用塔式双风机Z90",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1012",
+      "propertyName": "型号",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "全效系列Z90",
+          "propertyValueId": "17818913299662"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 7087.0,
+      "productId": "547755968243478",
+      "propertyValueIdHash": "37cab855bb458dbc29802d55a9327da0",
+      "propertyValueIds": "17818913299662",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20044",
+    "commendType": 0,
+    "cover": "2026-06/r9L058UAchM4M4kSx75wmdEI1sgoK8.jpg,2026-06/kU1kLxHMo5Deo2jN4owA3oPVqs5NLK.jpg,2026-06/w5OQJkMfcfVGymCODCzTWdM3BjNzou.jpg,2026-06/3anKatZl8ZcugPzvkK4kLdmpHu4BGv.jpg,2026-06/iNgLH1JBOMXJzfSn0kdsD77NUhb1wF.jpg",
+    "createTime": "2026-06-20 15:44:13",
+    "maxPrice": 4880.0,
+    "minPrice": 4880.0,
+    "pCategoryId": "10011",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/lYUiK3UkJDP5uP1E5xA0YQNz8VqyKA.png)\n",
+    "productId": "116420922896782",
+    "productName": "小猫爱学绘喵教育手绘商业插画板绘教程好课在线教学全套课程 日韩系统班",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "7428529912",
+      "propertyName": "班型",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/SpoIBilr7HlX1gdouDxcxemerRk3YA.jpg",
+          "propertyRemark": "",
+          "propertyValue": "日韩系统班",
+          "propertyValueId": "17819414067073"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 4880.0,
+      "productId": "116420922896782",
+      "propertyValueIdHash": "47b7881cf505d457bce7f2d02054f33e",
+      "propertyValueIds": "17819414067073",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20023",
+    "commendType": 1,
+    "cover": "2026-06/eFgRv8uZ7RMGS9F2eLfZh9M7cnH9YR.jpg,2026-06/GfFtpUUWjBJ4vupGyuBCSMek7jLj7G.jpg,2026-06/3zBh5fHqi7uDlXzAwHPpeJWblJFhaM.jpg,2026-06/AR6rwOWNQFbDH45cZ5qBrBvPOebykj.jpg,2026-06/5Ar3WtU80tPlgovmGPj3Td5s26xADk.jpg",
+    "createTime": "2026-06-20 14:57:17",
+    "maxPrice": 49.9,
+    "minPrice": 49.9,
+    "pCategoryId": "10005",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/rZpXj0o7QLCCOYFwcxQmjiRv2w7JwF.png)\n![](/api/file/getResource?sourceName=2026-06/Irtgktz6VAcQdAzLPxikcAiEkhIOmX.png)\n![](/api/file/getResource?sourceName=2026-06/tocsT5f41fq7Wd4j9ZzPJ6LYrOfWq6.png)\n![](/api/file/getResource?sourceName=2026-06/0FchIA6e20i6wCA2JRDPkjVGznqLbA.png)\n",
+    "productId": "303019597302892",
+    "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐",
+    "status": 1,
+    "totalSale": 99
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "0863193473",
+      "propertyName": "规格",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/BKlw2MchBz3uuNd00sRiuliq7vMsmf.jpg",
+          "propertyRemark": "",
+          "propertyValue": "可乐*12+雪碧*8+芬达*4 330ml*24",
+          "propertyValueId": "17819385819633"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 49.9,
+      "productId": "303019597302892",
+      "propertyValueIdHash": "657584f99c87292613bd4b1c61304395",
+      "propertyValueIds": "17819385819633",
+      "sort": 0,
+      "stock": 99900
+    }
+  ]
+}

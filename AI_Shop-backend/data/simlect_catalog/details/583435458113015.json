@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20026",
+    "commendType": 0,
+    "cover": "2026-06/zj6WcId2vYSJDLwPWHcMDJhGQnaCWQ.jpg,2026-06/V2o62jQi1gdvr3SUC6l0BoMgCctU0W.jpg,2026-06/ubuJuDahSB4nApfsTPyyPgf4hi0unZ.jpg,2026-06/LFCLUItoEOS8VPzmXJGRD71a5S9u4N.jpg,2026-06/TH9zWA7lKMO8AxwHB3nFBAj8Y0tTyN.jpg",
+    "createTime": "2026-06-20 15:07:26",
+    "maxPrice": 34.4,
+    "minPrice": 34.4,
+    "pCategoryId": "10006",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/HtMNlCU94HpURwhVSjXLtIiGAL5OwB.png)\n![](/api/file/getResource?sourceName=2026-06/Bbt2I7e2uVK0CB0im2CXhE34jTSSP3.png)\n![](/api/file/getResource?sourceName=2026-06/voRGAqgdA2rtpM62cScBAG8fkPCict.png)\n![](/api/file/getResource?sourceName=2026-06/FOVxOnGpVmVBXsbSbZYbvsyLm4pINL.png)\n\n",
+    "productId": "583435458113015",
+    "productName": "红楼梦 我国古典小说的巅峰之作（1书+1MP3）",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "7011105661",
+      "propertyName": "颜色",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/gHAGv5f3wBfIcBUsqOUzthCKM9NnfQ.jpg",
+          "propertyRemark": "",
+          "propertyValue": "红楼梦",
+          "propertyValueId": "17819391724073"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 34.4,
+      "productId": "583435458113015",
+      "propertyValueIdHash": "0a988e535ff53df1adec93c2476b3393",
+      "propertyValueIds": "17819391724073",
+      "sort": 0,
+      "stock": 99999
+    }
+  ]
+}

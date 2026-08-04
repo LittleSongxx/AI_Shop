@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20028",
+    "commendType": 1,
+    "cover": "2026-06/OiLb7On6jv1SrU3Fr84FdXm9mo2PlA.jpg,2026-06/zoNjw8Kbi9CgoREdYVEI0QyxNxD78l.jpg,2026-06/lxGCFdzFGQaepxsEEqx0BEefLt49Fy.jpg,2026-06/PY2ibWr1NLN6X5VOaOsQegyUNUbDZL.jpg,2026-06/Qy8hAqKZ3q8a3rhrcT3xMremIi4jMR.jpg",
+    "createTime": "2026-06-20 15:17:15",
+    "maxPrice": 1749.0,
+    "minPrice": 1749.0,
+    "pCategoryId": "10006",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/Rqh0y75ZpEdm7fJTN9RfhnmJBA4gIz.png)\n![](/api/file/getResource?sourceName=2026-06/awoaF7t96sv2R5HsUj7UvO1KDcaKN9.png)\n![](/api/file/getResource?sourceName=2026-06/ujHqdtlrfFZASO1By18gFTSEwwXQNQ.png)\n![](/api/file/getResource?sourceName=2026-06/pprPrlMbxhz6i6Nep2cD8KJ7xNcZfw.png)\n",
+    "productId": "549376645121601",
+    "productName": "雅马哈（YAMAHA）吉他FG800初学者单板民谣FS800男女学生指弹原声弹唱电箱入门吉它 FG800 沙暴渐变-41英寸原声款",
+    "status": 1,
+    "totalSale": 56
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "6580827088",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "FG800经典入门单板",
+          "propertyValueId": "17819397993283"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "4177694945",
+      "propertyName": "规格",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/MzGrCV0zq4bLwNkvnVwIusSWwbhs2z.jpg",
+          "propertyRemark": "",
+          "propertyValue": "FG800 沙暴渐变-41英寸原声款",
+          "propertyValueId": "17819397993284"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 1749.0,
+      "productId": "549376645121601",
+      "propertyValueIdHash": "0f8d1dd037d0641dd52f2c9f9d722da1",
+      "propertyValueIds": "17819397993283-17819397993284",
+      "sort": 0,
+      "stock": 9943
+    }
+  ]
+}

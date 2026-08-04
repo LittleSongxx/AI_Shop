@@ -1,0 +1,70 @@
+{
+  "productInfo": {
+    "categoryId": "20011",
+    "commendType": 1,
+    "cover": "202601/naOr2dwJaca3qfUperfNmWdfvWBjjl_thumbnail.png,202601/BVOXVyFntp0EkLGScXNO4JrsZpbz9S_thumbnail.png,202601/GBhkut2AotCbpfRdatkvuM8cNdt7kX_thumbnail.png,202601/ygLSnu2nTpw6jlMWEBBAxkMd6r7NCD_thumbnail.png,202601/mATTdbHRVwMZgX8TwM2H5r3G55mAH8_thumbnail.png",
+    "createTime": "2026-01-10 21:08:12",
+    "maxPrice": 35.9,
+    "minPrice": 19.9,
+    "pCategoryId": "10002",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/E9VP2PnlLVJJKTVyAtvZKDMMZXQaS6.png)\n![](/api/file/getResource?sourceName=202601/Ifm5fnM3oCTtc3pqQ3GHIQZuZuNm8u.png)\n![](/api/file/getResource?sourceName=202601/o7ZkMBqMWjL8yD6YFdRtfozHRYefN1.png)\n![](/api/file/getResource?sourceName=202601/S272XFDnJQiQk0dgVA3v27TbsihrIz.png)\n![](/api/file/getResource?sourceName=202601/NaBUf64TBqfslXsZZlJPCcABeUpNl0.png)\n![](/api/file/getResource?sourceName=202601/mlJrXPixw2lv4zv5ORJfheICqNdg3M.png)\n",
+    "productId": "763086281772264",
+    "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女",
+    "status": 1,
+    "totalSale": 102
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1031",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/7yB3uvvq0SutEBoFA2er2zHCtIuEua_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "星星糖项链",
+          "propertyValueId": "1768050383077"
+        },
+        {
+          "propertyCover": "202601/3BhSu5XC8i9HxANRPzm5Los6AqpJp1_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "月亮糖项链",
+          "propertyValueId": "1768050429180"
+        },
+        {
+          "propertyCover": "202601/rraXYFPem4YdEiRQgRHmCLKPxfpuy7_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": "【星星+月亮】闺蜜两条装",
+          "propertyValueId": "1768050433492"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 19.9,
+      "productId": "763086281772264",
+      "propertyValueIdHash": "75efb5191c7da469fcc570aba1e21041",
+      "propertyValueIds": "1768050383077",
+      "sort": 0,
+      "stock": 101
+    },
+    {
+      "price": 19.9,
+      "productId": "763086281772264",
+      "propertyValueIdHash": "2675cb5d7172c3c5ff07c8c9811f71c7",
+      "propertyValueIds": "1768050429180",
+      "sort": 1,
+      "stock": 199
+    },
+    {
+      "price": 35.9,
+      "productId": "763086281772264",
+      "propertyValueIdHash": "4408ece52af09cc10aa035676bc4f668",
+      "propertyValueIds": "1768050433492",
+      "sort": 2,
+      "stock": 200
+    }
+  ]
+}

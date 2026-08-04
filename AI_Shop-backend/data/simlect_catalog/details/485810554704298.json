@@ -1,0 +1,56 @@
+{
+  "productInfo": {
+    "categoryId": "20025",
+    "commendType": 0,
+    "cover": "2026-06/3jx48XPa26oh67pmEWJqHlMrzFBgLd.jpg,2026-06/CF3jlJfL9w4v3XlLZ9LoZRwih3BjnB.jpg,2026-06/yfnZ77r1KF1bgWUr3bo4S07JohiOUh.jpg,2026-06/gGjFPdDRl61X6Y6lSHQ7TKHcayBj9Z.jpg,2026-06/IJkcCSUacyftSdPE99At3shPUfk3EL.jpg",
+    "createTime": "2026-06-20 15:03:32",
+    "maxPrice": 289.8,
+    "minPrice": 289.8,
+    "pCategoryId": "10005",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/0L4yX18qfGhZGt5nAtSqQLOR8EN5jn.png)\n![](/api/file/getResource?sourceName=2026-06/FfQgwEOVlgNN3mMvOkCwyryCqvjHhi.png)\n![](/api/file/getResource?sourceName=2026-06/dAphAsdzpqTyCdaBrb0bQ6xnbRiP57.png)\n![](/api/file/getResource?sourceName=2026-06/TsevP8jzgCuHXIS7Xqb0BdLLT2jaBd.png)\n",
+    "productId": "485810554704298",
+    "productName": "同仁堂品牌 北京同仁堂正宗西洋参片礼盒250g花旗参送父母长辈补品礼品",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 0,
+      "propertyId": "1627217349",
+      "propertyName": "系列品",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "爆款礼遇系列",
+          "propertyValueId": "17819389587753"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "3419014094",
+      "propertyName": "规格",
+      "propertySort": 5,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/M9Qwz0yauTisSavb6JU1gollCMHEwI.jpg",
+          "propertyRemark": "",
+          "propertyValue": "致长辈-福罐礼盒显心意 250g*1盒",
+          "propertyValueId": "17819389587754"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 289.8,
+      "productId": "485810554704298",
+      "propertyValueIdHash": "e8829f3d7b3aecd082e02c275da97e63",
+      "propertyValueIds": "17819389587753-17819389587754",
+      "sort": 0,
+      "stock": 999999
+    }
+  ]
+}

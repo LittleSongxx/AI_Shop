@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20020",
+    "commendType": 0,
+    "cover": "2026-06/U7LZN7XdQJXUuWtHB51RT7FHQpadPR.jpg,2026-06/ufoX9mSzvWdOYoOqWPRafRwQ0QNwy2.jpg,2026-06/9pWtjoV3AGZIH69Ys2eJBxdU1Xlchh.jpg,2026-06/eHEuuMe2ltJ5lRReZKJgU16ufUoBe3.jpg,2026-06/pCPH71CBKtwQdb6Z2K64IadFUEWsOG.jpg",
+    "createTime": "2026-06-20 14:51:38",
+    "maxPrice": 319.6,
+    "minPrice": 319.6,
+    "pCategoryId": "10004",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/FlT9BHptAfSXiFXJyjuNhJsmac5eZd.png)\n![](/api/file/getResource?sourceName=2026-06/RuXayEzbALTkcd2a8CNW5VdJScQknh.png)\n![](/api/file/getResource?sourceName=2026-06/iONemXSmqs4JCfvvzlybdE7SodAdlu.png)\n![](/api/file/getResource?sourceName=2026-06/9Q6lULvoEj3QeWpSU2mVO73NSnQXMP.png)\n",
+    "productId": "578084699484498",
+    "productName": "拖把置物架架不锈钢扫把架拖布架沥水架学校工厂落地式清洁工具收纳架 卡夹款5卡6钩",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "0345311493",
+      "propertyName": "规格",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/CicRy2BKGQER6aTSnXwSOiepkKAJdo.jpg",
+          "propertyRemark": "",
+          "propertyValue": "卡夹款5卡6钩",
+          "propertyValueId": "17819382380913"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 319.6,
+      "productId": "578084699484498",
+      "propertyValueIdHash": "3994b5987f56a764b2cb696f5725342b",
+      "propertyValueIds": "17819382380913",
+      "sort": 0,
+      "stock": 9999
+    }
+  ]
+}

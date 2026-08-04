@@ -1,0 +1,128 @@
+{
+  "productInfo": {
+    "categoryId": "20002",
+    "commendType": 1,
+    "cover": "2026-06/E4YrHMEHPuTwPpN3MLtAuinOclQfZf.png,2026-06/CQeVAQJHAF0WlzbOrf46euanKjajJN.png,2026-06/zR0yzLKpgBoNFkRN6tsWHTooOtFdCO.png,2026-06/wlPoGtcwSLaV9cwgPV9BsBTVtZCnNU.png,2026-06/WWApUWZUAafHrLBaooeYhCWtqW8YeC.png",
+    "createTime": "2026-06-03 20:54:59",
+    "maxPrice": 25399.0,
+    "minPrice": 12699.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/i8rl7FK2z5QCCbilny3uwkyaoRj4dk.png)\n![](/api/file/getResource?sourceName=2026-06/YCLGm2L5iCyYyRgXHnjUeQO5w9ZOLE.png)\n![](/api/file/getResource?sourceName=2026-06/amIJ9T2Mr6GSRRGYeltjRqc6lHMREe.png)\n![](/api/file/getResource?sourceName=2026-06/mateOoQzaKSR0GgnaG5lUvNzfOuKEU.png)\n![](/api/file/getResource?sourceName=2026-06/mCzGovA5fGovtK8BtHlBxZWfYZ6zth.png)\n",
+    "productId": "869004898763662",
+    "productName": "Apple/苹果AI笔记本/MacBookPro14英寸M5(10+10核)16G 1T银色笔记本电脑MDE54CH/A",
+    "status": 1,
+    "totalSale": 21
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1004",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/9TjUjQ5WwPPCQppAeKuBemSMklpX69.png",
+          "propertyRemark": "",
+          "propertyValue": "深空黑色",
+          "propertyValueId": "1780490771138"
+        },
+        {
+          "propertyCover": "2026-06/kSQWENefc6m6wNzlc4LKhT819MS0gE.png",
+          "propertyRemark": "",
+          "propertyValue": "银色",
+          "propertyValueId": "1780490809198"
+        }
+      ]
+    },
+    {
+      "coverType": 1,
+      "propertyId": "5553712174",
+      "propertyName": "规格",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/yF6JMsb1tV6bnCNU7kWLDOff5yE6aW.png",
+          "propertyRemark": "",
+          "propertyValue": "14寸 M5芯片",
+          "propertyValueId": "1780490771139"
+        },
+        {
+          "propertyCover": "2026-06/0tNAVqCakX8eQ2ftQIpCiHcUX73mlE.png",
+          "propertyRemark": "",
+          "propertyValue": "16寸 M5Pro芯片",
+          "propertyValueId": "1780490923890"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "6887378688",
+      "propertyName": "版本",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "(10+10核) 16G + 1TB",
+          "propertyValueId": "1780490771140"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "(10+10核) 24G + 1TB",
+          "propertyValueId": "1780490994958"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 12699.0,
+      "productId": "869004898763662",
+      "propertyValueIdHash": "97a84d3a61864fdccd7f99ecfb85fc16",
+      "propertyValueIds": "1780490771138-1780490771139-1780490771140",
+      "sort": 0,
+      "stock": 102
+    },
+    {
+      "price": 14199.0,
+      "productId": "869004898763662",
+      "propertyValueIdHash": "f19f4975023612a7ee0f3e172d08bbfa",
+      "propertyValueIds": "1780490771138-1780490771139-1780490994958",
+      "sort": 1,
+      "stock": 122
+    },
+    {
+      "price": 23124.0,
+      "productId": "869004898763662",
+      "propertyValueIdHash": "a0527e06e940786516b323eafc05aa89",
+      "propertyValueIds": "1780490771138-1780490923890-1780490994958",
+      "sort": 2,
+      "stock": 231
+    },
+    {
+      "price": 14624.0,
+      "productId": "869004898763662",
+      "propertyValueIdHash": "d3159e5fabb3ccfad8062ea77566c5cb",
+      "propertyValueIds": "1780490809198-1780490771139-1780490771140",
+      "sort": 3,
+      "stock": 321
+    },
+    {
+      "price": 16599.0,
+      "productId": "869004898763662",
+      "propertyValueIdHash": "c728371921e27b72b4012a9cc507e7bc",
+      "propertyValueIds": "1780490809198-1780490771139-1780490994958",
+      "sort": 4,
+      "stock": 231
+    },
+    {
+      "price": 25399.0,
+      "productId": "869004898763662",
+      "propertyValueIdHash": "03bfcbf532c928e50d69e3dbdc703f95",
+      "propertyValueIds": "1780490809198-1780490923890-1780490994958",
+      "sort": 5,
+      "stock": 321
+    }
+  ]
+}

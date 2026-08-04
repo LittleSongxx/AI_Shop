@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20022",
+    "commendType": 1,
+    "cover": "2026-06/QI7QDtLaR1mVCTtmcIbfywOhqBN0Ew.jpg,2026-06/nOycftgOw6EbD0U0Q1S02qzU92gLOU.jpg,2026-06/0egZhWs36EEK0D4WhMUTy8jijXaAPr.jpg,2026-06/rHg6EjhnJbnJBCwHC2AZ86w0JjL8kP.jpg,2026-06/8VCuSbt6Mcb45fFBltysmqJ01F7UF4.jpg",
+    "createTime": "2026-06-20 14:54:46",
+    "maxPrice": 12.0,
+    "minPrice": 12.0,
+    "pCategoryId": "10005",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/HmMm8qdnxAo2sj0tH3vqfvHMNvrrpG.png)\n![](/api/file/getResource?sourceName=2026-06/iHUCZrex2GRfPVz67ykckponn6teKL.png)\n![](/api/file/getResource?sourceName=2026-06/PtQ9uAzrbedKCwPo7EeHTEKoqIPmEF.png)\n![](/api/file/getResource?sourceName=2026-06/RqZJXNkeUd3d8krQj4f7v9FcLsUAQM.png)\n",
+    "productId": "065293686460191",
+    "productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食膨化休闲食品饼干糕点",
+    "status": 1,
+    "totalSale": 99
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "7352800591",
+      "propertyName": "规格",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/f3d4vz3A1vZkCRgmpzJ3oPK4vG2fYv.jpg",
+          "propertyRemark": "",
+          "propertyValue": "厚烧海苔分享装 385g*1袋",
+          "propertyValueId": "17819384293251"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 12.0,
+      "productId": "065293686460191",
+      "propertyValueIdHash": "e8fe120e5a424353c0b6053ff1d88876",
+      "propertyValueIds": "17819384293251",
+      "sort": 0,
+      "stock": 99900
+    }
+  ]
+}

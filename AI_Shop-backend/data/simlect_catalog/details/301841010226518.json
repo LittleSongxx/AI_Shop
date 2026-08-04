@@ -1,0 +1,92 @@
+{
+  "productInfo": {
+    "categoryId": "20002",
+    "commendType": 0,
+    "cover": "2026-06/SDcVGqX48NSOn51bKxPK3jHzpKjgVI.jpg,2026-06/JDwQ8DtxU1uV8QeeXkGhl9Ab9H5jUJ.jpg,2026-06/VLSCvzcEJvs6tz46Pg2mMLJlKt03MQ.jpg,2026-06/bw1C1fxaBkduUaehu3pqx8F2FnnupR.jpg,2026-06/iUYupp9NUMHJTlpiYl0ESMvHRmEzI4.jpg",
+    "createTime": "2026-06-20 01:22:34",
+    "maxPrice": 7399.0,
+    "minPrice": 4399.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/BBGitADiTp36HlfC8HakYMeefQs4Tu.png)\n![](/api/file/getResource?sourceName=2026-06/W61rxB721RPstTOY6bMuXTyq3mlsKR.png)\n![](/api/file/getResource?sourceName=2026-06/byAmHsKIc0hgB9S49DSeIvrLQa56Nf.png)\n![](/api/file/getResource?sourceName=2026-06/vYtaxNJqY7MGmFK5xbvGxdPaaW52it.png)\n![](/api/file/getResource?sourceName=2026-06/7QW87YGZjhYHBBKP3yJ1rWSqr0rJzP.png)\n",
+    "productId": "301841010226518",
+    "productName": "华硕破晓6X 台式机台式电脑主机",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "5553712174",
+      "propertyName": "规格",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/BmzPwYQMo4qQMd2DpvLAVoB6IZWlpU.jpg",
+          "propertyRemark": "",
+          "propertyValue": "单主机",
+          "propertyValueId": "17818895089021"
+        },
+        {
+          "propertyCover": "2026-06/Nnx57R2VNQox28LtpuW3BaV6tyJPOi.jpg",
+          "propertyRemark": "",
+          "propertyValue": "27寸显示器",
+          "propertyValueId": "1781889560413"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "6887378688",
+      "propertyName": "版本",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "新品 Core5-210H 16G 512G大机箱",
+          "propertyValueId": "17818895089022"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "新品 Core7-240H 16G 1TB大机箱",
+          "propertyValueId": "1781889598088"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 4399.0,
+      "productId": "301841010226518",
+      "propertyValueIdHash": "d0d9a95b8b22e5a5c11958e034c5316f",
+      "propertyValueIds": "17818895089021-17818895089022",
+      "sort": 0,
+      "stock": 999
+    },
+    {
+      "price": 6599.0,
+      "productId": "301841010226518",
+      "propertyValueIdHash": "4f7d204afed0d254a8a8e4a0f7afe83b",
+      "propertyValueIds": "17818895089021-1781889598088",
+      "sort": 1,
+      "stock": 999
+    },
+    {
+      "price": 5199.0,
+      "productId": "301841010226518",
+      "propertyValueIdHash": "96867e5ad06ca6d04344108850cd2d09",
+      "propertyValueIds": "1781889560413-17818895089022",
+      "sort": 2,
+      "stock": 999
+    },
+    {
+      "price": 7399.0,
+      "productId": "301841010226518",
+      "propertyValueIdHash": "7317338d3de36cbda5f7f92e47348243",
+      "propertyValueIds": "1781889560413-1781889598088",
+      "sort": 3,
+      "stock": 999
+    }
+  ]
+}

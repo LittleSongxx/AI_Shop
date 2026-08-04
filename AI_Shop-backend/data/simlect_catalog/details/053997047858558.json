@@ -1,0 +1,84 @@
+{
+  "productInfo": {
+    "categoryId": "20001",
+    "commendType": 0,
+    "cover": "2026-06/9hIWG2qJFGVjpYLpeefUfbZYyocdXR.jpg,2026-06/Cyg6otkhTTvP94QpCRjzfb3QDe8LH8.jpg,2026-06/9oKyzaQjpF5YHtvewIWeDT5hHWmzel.jpg,2026-06/mU22NMQjkwaa4Su2M67QzGeNbN6JP5.jpg,2026-06/aQtDeK0XcsTg68IcZFZe3jD0STwrQ7.jpg",
+    "createTime": "2026-06-20 01:43:37",
+    "maxPrice": 6849.0,
+    "minPrice": 6379.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/4TTug2mdqhv7KuH82T3N0OTn2QvFyC.png)\n![](/api/file/getResource?sourceName=2026-06/bGz4BYrXgPBRjNFiz0ftnd0sk5UKI1.png)\n![](/api/file/getResource?sourceName=2026-06/SohUin7Dcw82LEZJkT0PyGljTrUtaP.png)\n",
+    "productId": "053997047858558",
+    "productName": "三星（SAMSUNG） Z Fold6大折叠屏5G全网通 高端 AI商务双卡旗舰智能手机",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1001",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/GAlx8D39iXNPhUAWgCHA6UplNXQBsw.jpg",
+          "propertyRemark": "",
+          "propertyValue": "星夜银",
+          "propertyValueId": "17818909121210"
+        },
+        {
+          "propertyCover": "2026-06/ZKCuvCax7std74bZ4GRemJjjNZfFQ2.jpg",
+          "propertyRemark": "",
+          "propertyValue": "冷夜蓝",
+          "propertyValueId": "1781890936994"
+        },
+        {
+          "propertyCover": "2026-06/YZH5a33P0oqRnV0yeW39Y2WB7P4aZx.jpg",
+          "propertyRemark": "",
+          "propertyValue": "浅玫粉",
+          "propertyValueId": "1781890946377"
+        }
+      ]
+    },
+    {
+      "coverType": 0,
+      "propertyId": "1098012240",
+      "propertyName": "存储容量",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "12+512G",
+          "propertyValueId": "17818909121211"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 6849.0,
+      "productId": "053997047858558",
+      "propertyValueIdHash": "34cf4407cc4d257679465f26646c9023",
+      "propertyValueIds": "17818909121210-17818909121211",
+      "sort": 0,
+      "stock": 999
+    },
+    {
+      "price": 6849.0,
+      "productId": "053997047858558",
+      "propertyValueIdHash": "2878ed30a10f372c2fe73518dda947d6",
+      "propertyValueIds": "1781890936994-17818909121211",
+      "sort": 1,
+      "stock": 999
+    },
+    {
+      "price": 6379.0,
+      "productId": "053997047858558",
+      "propertyValueIdHash": "3ef7e1f3c166b36043c55a6f224c435f",
+      "propertyValueIds": "1781890946377-17818909121211",
+      "sort": 2,
+      "stock": 999
+    }
+  ]
+}

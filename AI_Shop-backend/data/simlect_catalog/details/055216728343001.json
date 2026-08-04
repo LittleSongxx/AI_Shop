@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20004",
+    "commendType": 0,
+    "cover": "2026-06/lrNOZddxrqEDUB3RiAZajL838GM24L.jpg,2026-06/HahSNnpm8seMGqPTOGHgZamaZ0kNgV.jpg,2026-06/yRCFXkAI5WhH4TyZRuDHDNjhfZYrAl.jpg,2026-06/krLzq9ha3CBLWsItpIvono7ihWsdZw.jpg,2026-06/5HnTv97Uc8NmgGCThtZ9deSxrcRu1L.jpg",
+    "createTime": "2026-06-20 01:55:54",
+    "maxPrice": 7291.0,
+    "minPrice": 7291.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/tWPTrKWewmb4id0vMOtYK6wunzFESZ.png)\n![](/api/file/getResource?sourceName=2026-06/aJeOSia9hCEcSG4oZ5q24Hf4QgjCZu.png)\n![](/api/file/getResource?sourceName=2026-06/8jMGEmYAsVYRzxUJIxwE1do6p0CQES.png)\n![](/api/file/getResource?sourceName=2026-06/oI77M43jljM7iUimZPAB9K2uT8d4PY.png)\n![](/api/file/getResource?sourceName=2026-06/pG1mQIRA1KPxHFyHC5EgUNNQEFNZl6.png)\n",
+    "productId": "055216728343001",
+    "productName": "COLMO北极星净水器C3套装 家用厨下十年RO反渗透母婴直饮机 触控龙头 1200G大通量净水器管线机套装 2件套丨C3净水器+A1管线机",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1012",
+      "propertyName": "型号",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "北极星C3净饮套餐",
+          "propertyValueId": "17818916784472"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 7291.0,
+      "productId": "055216728343001",
+      "propertyValueIdHash": "49100fc0555547da60776b5ace0dca93",
+      "propertyValueIds": "17818916784472",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

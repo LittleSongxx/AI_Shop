@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20012",
+    "commendType": 0,
+    "cover": "202601/akAhLymjUbAnZSDTcPqyWQbkmlxyaI_thumbnail.png,202601/PMFaNfF6XqO7ljcWL07xbdsVDqXFQR_thumbnail.png,202601/lfLVz3KlU3BEzKUR8roduagp4gNgNi_thumbnail.png,202601/uPNraZENFsQyXBYTDF5dGQ9vZAplyb_thumbnail.png,202601/Fk425053famvStg2I0TGS8iEHuibcC_thumbnail.png",
+    "createTime": "2026-01-11 18:15:56",
+    "maxPrice": 59.9,
+    "minPrice": 59.9,
+    "pCategoryId": "10003",
+    "productDesc": "![](/api/file/getResource?sourceName=202601/3gMe3J9PpAMgFiH6ied2s5wgsiP5IT.png)\n![](/api/file/getResource?sourceName=202601/LCCRtn7OF44Un4xTBQp7rCdKtGjGNf.png)\n![](/api/file/getResource?sourceName=202601/sJP6tw69O4cwIRKDINnx4jonc24v6o.png)\n![](/api/file/getResource?sourceName=202601/cwidFjuHKRQdu23GZ862LPDMN40DQP.png)\n",
+    "productId": "664740861226404",
+    "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯",
+    "status": 1,
+    "totalSale": 1
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1034",
+      "propertyName": "颜色分类",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "202601/555DX0Iy22dLM58IEOcDnFAPNkHjQJ_thumbnail.png",
+          "propertyRemark": "",
+          "propertyValue": " 0308 雨后木棉",
+          "propertyValueId": "1768126444657"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 59.9,
+      "productId": "664740861226404",
+      "propertyValueIdHash": "94234e67719428840e97e1aa60d08ca4",
+      "propertyValueIds": "1768126444657",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

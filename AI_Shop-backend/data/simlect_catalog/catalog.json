@@ -1,0 +1,4838 @@
+{
+  "catalogVersion": "simlect-mirror-a7d6063f05a397a6",
+  "categories": [
+    {
+      "categoryId": "10001",
+      "categoryName": "数码家电",
+      "children": [
+        {
+          "categoryId": "20002",
+          "categoryName": "电脑办公",
+          "children": [],
+          "pCategoryId": "10001",
+          "productPropertyList": [
+            {
+              "categoryId": "20002",
+              "coverType": 1,
+              "pCategoryId": "10001",
+              "propertyId": "1004",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20002",
+              "coverType": 1,
+              "pCategoryId": "10001",
+              "propertyId": "5553712174",
+              "propertyName": "规格",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20002",
+              "coverType": 0,
+              "pCategoryId": "10001",
+              "propertyId": "6887378688",
+              "propertyName": "版本",
+              "propertySort": 3
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20003",
+          "categoryName": "数码影音",
+          "children": [],
+          "pCategoryId": "10001",
+          "productPropertyList": [
+            {
+              "categoryId": "20003",
+              "coverType": null,
+              "pCategoryId": "10001",
+              "propertyId": "1007",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20003",
+              "coverType": null,
+              "pCategoryId": "10001",
+              "propertyId": "1008",
+              "propertyName": "型号",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20003",
+              "coverType": null,
+              "pCategoryId": "10001",
+              "propertyId": "1009",
+              "propertyName": "存储容量",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20003",
+              "coverType": 0,
+              "pCategoryId": "10001",
+              "propertyId": "3742160298",
+              "propertyName": "系列品",
+              "propertySort": 4
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20001",
+          "categoryName": "手机通讯",
+          "children": [],
+          "pCategoryId": "10001",
+          "productPropertyList": [
+            {
+              "categoryId": "20001",
+              "coverType": 1,
+              "pCategoryId": "10001",
+              "propertyId": "1001",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20001",
+              "coverType": 0,
+              "pCategoryId": "10001",
+              "propertyId": "1098012240",
+              "propertyName": "存储容量",
+              "propertySort": 2
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20004",
+          "categoryName": "家用电器",
+          "children": [],
+          "pCategoryId": "10001",
+          "productPropertyList": [
+            {
+              "categoryId": "20004",
+              "coverType": null,
+              "pCategoryId": "10001",
+              "propertyId": "1010",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20004",
+              "coverType": null,
+              "pCategoryId": "10001",
+              "propertyId": "1011",
+              "propertyName": "容量",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20004",
+              "coverType": null,
+              "pCategoryId": "10001",
+              "propertyId": "1012",
+              "propertyName": "型号",
+              "propertySort": 3
+            }
+          ],
+          "sort": 4
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 1
+    },
+    {
+      "categoryId": "10002",
+      "categoryName": "服装鞋帽",
+      "children": [
+        {
+          "categoryId": "20007",
+          "categoryName": "女装",
+          "children": [],
+          "pCategoryId": "10002",
+          "productPropertyList": [
+            {
+              "categoryId": "20007",
+              "coverType": 1,
+              "pCategoryId": "10002",
+              "propertyId": "1019",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20007",
+              "coverType": null,
+              "pCategoryId": "10002",
+              "propertyId": "1020",
+              "propertyName": "尺码",
+              "propertySort": 2
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20008",
+          "categoryName": "男装",
+          "children": [],
+          "pCategoryId": "10002",
+          "productPropertyList": [
+            {
+              "categoryId": "20008",
+              "coverType": 1,
+              "pCategoryId": "10002",
+              "propertyId": "1022",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20008",
+              "coverType": null,
+              "pCategoryId": "10002",
+              "propertyId": "1023",
+              "propertyName": "尺码",
+              "propertySort": 2
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20009",
+          "categoryName": "运动户外",
+          "children": [],
+          "pCategoryId": "10002",
+          "productPropertyList": [
+            {
+              "categoryId": "20009",
+              "coverType": 1,
+              "pCategoryId": "10002",
+              "propertyId": "1025",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20009",
+              "coverType": null,
+              "pCategoryId": "10002",
+              "propertyId": "1026",
+              "propertyName": "尺码",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20009",
+              "coverType": null,
+              "pCategoryId": "10002",
+              "propertyId": "1027",
+              "propertyName": "防护级别",
+              "propertySort": 3
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20010",
+          "categoryName": "鞋靴箱包",
+          "children": [],
+          "pCategoryId": "10002",
+          "productPropertyList": [
+            {
+              "categoryId": "20010",
+              "coverType": 1,
+              "pCategoryId": "10002",
+              "propertyId": "1028",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20010",
+              "coverType": null,
+              "pCategoryId": "10002",
+              "propertyId": "1029",
+              "propertyName": "尺码",
+              "propertySort": 2
+            }
+          ],
+          "sort": 4
+        },
+        {
+          "categoryId": "20011",
+          "categoryName": "内衣配饰",
+          "children": [],
+          "pCategoryId": "10002",
+          "productPropertyList": [
+            {
+              "categoryId": "20011",
+              "coverType": 1,
+              "pCategoryId": "10002",
+              "propertyId": "1031",
+              "propertyName": "颜色",
+              "propertySort": 1
+            }
+          ],
+          "sort": 5
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 2
+    },
+    {
+      "categoryId": "10003",
+      "categoryName": "美妆个护",
+      "children": [
+        {
+          "categoryId": "20012",
+          "categoryName": "美妆护肤",
+          "children": [],
+          "pCategoryId": "10003",
+          "productPropertyList": [
+            {
+              "categoryId": "20012",
+              "coverType": 1,
+              "pCategoryId": "10003",
+              "propertyId": "1034",
+              "propertyName": "颜色分类",
+              "propertySort": 1
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20013",
+          "categoryName": "个人护理",
+          "children": [],
+          "pCategoryId": "10003",
+          "productPropertyList": [
+            {
+              "categoryId": "20013",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1037",
+              "propertyName": "型号",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20013",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1038",
+              "propertyName": "颜色",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20013",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1039",
+              "propertyName": "刀头数量",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20013",
+              "coverType": 0,
+              "pCategoryId": "10003",
+              "propertyId": "2031902811",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20013",
+              "coverType": 1,
+              "pCategoryId": "10003",
+              "propertyId": "0303189060",
+              "propertyName": "产品",
+              "propertySort": 5
+            },
+            {
+              "categoryId": "20013",
+              "coverType": 0,
+              "pCategoryId": "10003",
+              "propertyId": "7992149822",
+              "propertyName": "其他信息",
+              "propertySort": 6
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20014",
+          "categoryName": "母婴用品",
+          "children": [],
+          "pCategoryId": "10003",
+          "productPropertyList": [
+            {
+              "categoryId": "20014",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1040",
+              "propertyName": "尺码",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20014",
+              "coverType": 0,
+              "pCategoryId": "10003",
+              "propertyId": "0588847267",
+              "propertyName": "系列品",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20014",
+              "coverType": 1,
+              "pCategoryId": "10003",
+              "propertyId": "3096733438",
+              "propertyName": "颜色",
+              "propertySort": 4
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20015",
+          "categoryName": "香水彩妆",
+          "children": [],
+          "pCategoryId": "10003",
+          "productPropertyList": [
+            {
+              "categoryId": "20015",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1043",
+              "propertyName": "香型",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20015",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1044",
+              "propertyName": "容量",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20015",
+              "coverType": null,
+              "pCategoryId": "10003",
+              "propertyId": "1045",
+              "propertyName": "套装",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20015",
+              "coverType": 0,
+              "pCategoryId": "10003",
+              "propertyId": "4568665114",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20015",
+              "coverType": 1,
+              "pCategoryId": "10003",
+              "propertyId": "7595050195",
+              "propertyName": "产品",
+              "propertySort": 5
+            }
+          ],
+          "sort": 4
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 3
+    },
+    {
+      "categoryId": "10004",
+      "categoryName": "家居生活",
+      "children": [
+        {
+          "categoryId": "20016",
+          "categoryName": "家具家装",
+          "children": [],
+          "pCategoryId": "10004",
+          "productPropertyList": [
+            {
+              "categoryId": "20016",
+              "coverType": 1,
+              "pCategoryId": "10004",
+              "propertyId": "1046",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20016",
+              "coverType": 0,
+              "pCategoryId": "10004",
+              "propertyId": "1048",
+              "propertyName": "尺寸",
+              "propertySort": 3
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20017",
+          "categoryName": "家居家纺",
+          "children": [],
+          "pCategoryId": "10004",
+          "productPropertyList": [
+            {
+              "categoryId": "20017",
+              "coverType": 1,
+              "pCategoryId": "10004",
+              "propertyId": "1049",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20017",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1050",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20018",
+          "categoryName": "厨具餐具",
+          "children": [],
+          "pCategoryId": "10004",
+          "productPropertyList": [
+            {
+              "categoryId": "20018",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1052",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20018",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1053",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20018",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1054",
+              "propertyName": "容量",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20018",
+              "coverType": 0,
+              "pCategoryId": "10004",
+              "propertyId": "9457941046",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20018",
+              "coverType": 1,
+              "pCategoryId": "10004",
+              "propertyId": "4274999756",
+              "propertyName": "款式",
+              "propertySort": 5
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20019",
+          "categoryName": "家居饰品",
+          "children": [],
+          "pCategoryId": "10004",
+          "productPropertyList": [
+            {
+              "categoryId": "20019",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1056",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20019",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1057",
+              "propertyName": "款式",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20019",
+              "coverType": 0,
+              "pCategoryId": "10004",
+              "propertyId": "4524936256",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20019",
+              "coverType": 1,
+              "pCategoryId": "10004",
+              "propertyId": "3557329908",
+              "propertyName": "颜色",
+              "propertySort": 5
+            }
+          ],
+          "sort": 4
+        },
+        {
+          "categoryId": "20020",
+          "categoryName": "收纳清洁",
+          "children": [],
+          "pCategoryId": "10004",
+          "productPropertyList": [
+            {
+              "categoryId": "20020",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1058",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20020",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1059",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20020",
+              "coverType": null,
+              "pCategoryId": "10004",
+              "propertyId": "1060",
+              "propertyName": "容量",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20020",
+              "coverType": 1,
+              "pCategoryId": "10004",
+              "propertyId": "0345311493",
+              "propertyName": "规格",
+              "propertySort": 4
+            }
+          ],
+          "sort": 5
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 4
+    },
+    {
+      "categoryId": "10005",
+      "categoryName": "食品生鲜",
+      "children": [
+        {
+          "categoryId": "20021",
+          "categoryName": "生鲜食品",
+          "children": [],
+          "pCategoryId": "10005",
+          "productPropertyList": [
+            {
+              "categoryId": "20021",
+              "coverType": 1,
+              "pCategoryId": "10005",
+              "propertyId": "1061",
+              "propertyName": "口味",
+              "propertySort": 1
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20022",
+          "categoryName": "休闲食品",
+          "children": [],
+          "pCategoryId": "10005",
+          "productPropertyList": [
+            {
+              "categoryId": "20022",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1064",
+              "propertyName": "口味",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20022",
+              "coverType": 1,
+              "pCategoryId": "10005",
+              "propertyId": "7352800591",
+              "propertyName": "规格",
+              "propertySort": 2
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20023",
+          "categoryName": "酒水饮料",
+          "children": [],
+          "pCategoryId": "10005",
+          "productPropertyList": [
+            {
+              "categoryId": "20023",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1067",
+              "propertyName": "容量",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20023",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1068",
+              "propertyName": "年份",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20023",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1069",
+              "propertyName": "包装",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20023",
+              "coverType": 1,
+              "pCategoryId": "10005",
+              "propertyId": "0863193473",
+              "propertyName": "规格",
+              "propertySort": 4
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20024",
+          "categoryName": "粮油调味",
+          "children": [],
+          "pCategoryId": "10005",
+          "productPropertyList": [
+            {
+              "categoryId": "20024",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1070",
+              "propertyName": "净含量",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20024",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1071",
+              "propertyName": "包装",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20024",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1072",
+              "propertyName": "等级",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20024",
+              "coverType": 0,
+              "pCategoryId": "10005",
+              "propertyId": "0636252148",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20024",
+              "coverType": 1,
+              "pCategoryId": "10005",
+              "propertyId": "3019891428",
+              "propertyName": "规格",
+              "propertySort": 5
+            }
+          ],
+          "sort": 4
+        },
+        {
+          "categoryId": "20025",
+          "categoryName": "滋补保健",
+          "children": [],
+          "pCategoryId": "10005",
+          "productPropertyList": [
+            {
+              "categoryId": "20025",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1073",
+              "propertyName": "规格",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20025",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1074",
+              "propertyName": "净含量",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20025",
+              "coverType": null,
+              "pCategoryId": "10005",
+              "propertyId": "1075",
+              "propertyName": "包装",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20025",
+              "coverType": 0,
+              "pCategoryId": "10005",
+              "propertyId": "1627217349",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20025",
+              "coverType": 1,
+              "pCategoryId": "10005",
+              "propertyId": "3419014094",
+              "propertyName": "规格",
+              "propertySort": 5
+            }
+          ],
+          "sort": 5
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 5
+    },
+    {
+      "categoryId": "10006",
+      "categoryName": "文体娱乐",
+      "children": [
+        {
+          "categoryId": "20026",
+          "categoryName": "图书文娱",
+          "children": [],
+          "pCategoryId": "10006",
+          "productPropertyList": [
+            {
+              "categoryId": "20026",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1076",
+              "propertyName": "版本",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20026",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1077",
+              "propertyName": "装帧",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20026",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1078",
+              "propertyName": "套装",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20026",
+              "coverType": 1,
+              "pCategoryId": "10006",
+              "propertyId": "7011105661",
+              "propertyName": "颜色",
+              "propertySort": 4
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20029",
+          "categoryName": "办公设备",
+          "children": [],
+          "pCategoryId": "10006",
+          "productPropertyList": [
+            {
+              "categoryId": "20029",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1085",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20029",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1086",
+              "propertyName": "型号",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20029",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1087",
+              "propertyName": "配置",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20029",
+              "coverType": 0,
+              "pCategoryId": "10006",
+              "propertyId": "8022543115",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20029",
+              "coverType": 1,
+              "pCategoryId": "10006",
+              "propertyId": "6891354445",
+              "propertyName": "颜色",
+              "propertySort": 5
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20027",
+          "categoryName": "运动健身",
+          "children": [],
+          "pCategoryId": "10006",
+          "productPropertyList": [
+            {
+              "categoryId": "20027",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1079",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20027",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1080",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20027",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1081",
+              "propertyName": "重量级别",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20027",
+              "coverType": 1,
+              "pCategoryId": "10006",
+              "propertyId": "2021517804",
+              "propertyName": "颜色",
+              "propertySort": 4
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20028",
+          "categoryName": "玩具乐器",
+          "children": [],
+          "pCategoryId": "10006",
+          "productPropertyList": [
+            {
+              "categoryId": "20028",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1082",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20028",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1083",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20028",
+              "coverType": null,
+              "pCategoryId": "10006",
+              "propertyId": "1084",
+              "propertyName": "型号",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20028",
+              "coverType": 0,
+              "pCategoryId": "10006",
+              "propertyId": "6580827088",
+              "propertyName": "系列品",
+              "propertySort": 4
+            },
+            {
+              "categoryId": "20028",
+              "coverType": 1,
+              "pCategoryId": "10006",
+              "propertyId": "4177694945",
+              "propertyName": "规格",
+              "propertySort": 5
+            }
+          ],
+          "sort": 4
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 6
+    },
+    {
+      "categoryId": "10007",
+      "categoryName": "汽车用品",
+      "children": [
+        {
+          "categoryId": "20030",
+          "categoryName": "汽车配件",
+          "children": [],
+          "pCategoryId": "10007",
+          "productPropertyList": [
+            {
+              "categoryId": "20030",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1088",
+              "propertyName": "型号",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20030",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1089",
+              "propertyName": "规格",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20030",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1090",
+              "propertyName": "适用车型",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20030",
+              "coverType": 1,
+              "pCategoryId": "10007",
+              "propertyId": "5278490097",
+              "propertyName": "颜色",
+              "propertySort": 4
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20031",
+          "categoryName": "汽车装饰",
+          "children": [],
+          "pCategoryId": "10007",
+          "productPropertyList": [
+            {
+              "categoryId": "20031",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1091",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20031",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1092",
+              "propertyName": "尺寸",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20031",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1093",
+              "propertyName": "款式",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20031",
+              "coverType": 1,
+              "pCategoryId": "10007",
+              "propertyId": "2138007062",
+              "propertyName": "香型",
+              "propertySort": 4
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20032",
+          "categoryName": "维修保养",
+          "children": [],
+          "pCategoryId": "10007",
+          "productPropertyList": [
+            {
+              "categoryId": "20032",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1094",
+              "propertyName": "型号",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20032",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1095",
+              "propertyName": "规格",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20032",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1096",
+              "propertyName": "容量",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20032",
+              "coverType": 1,
+              "pCategoryId": "10007",
+              "propertyId": "5172604775",
+              "propertyName": "颜色",
+              "propertySort": 4
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20033",
+          "categoryName": "车载电器",
+          "children": [],
+          "pCategoryId": "10007",
+          "productPropertyList": [
+            {
+              "categoryId": "20033",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1097",
+              "propertyName": "颜色",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20033",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1098",
+              "propertyName": "型号",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20033",
+              "coverType": null,
+              "pCategoryId": "10007",
+              "propertyId": "1099",
+              "propertyName": "功率",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20033",
+              "coverType": 1,
+              "pCategoryId": "10007",
+              "propertyId": "4326836416",
+              "propertyName": "颜色",
+              "propertySort": 4
+            }
+          ],
+          "sort": 4
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 7
+    },
+    {
+      "categoryId": "10011",
+      "categoryName": "虚拟产品",
+      "children": [
+        {
+          "categoryId": "20044",
+          "categoryName": "在线课程",
+          "children": [],
+          "pCategoryId": "10011",
+          "productPropertyList": [
+            {
+              "categoryId": "20044",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1130",
+              "propertyName": "时长",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20044",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1131",
+              "propertyName": "版本",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20044",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1132",
+              "propertyName": "套餐",
+              "propertySort": 3
+            },
+            {
+              "categoryId": "20044",
+              "coverType": 1,
+              "pCategoryId": "10011",
+              "propertyId": "7428529912",
+              "propertyName": "班型",
+              "propertySort": 4
+            }
+          ],
+          "sort": 1
+        },
+        {
+          "categoryId": "20045",
+          "categoryName": "软件服务",
+          "children": [],
+          "pCategoryId": "10011",
+          "productPropertyList": [
+            {
+              "categoryId": "20045",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1133",
+              "propertyName": "版本",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20045",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1134",
+              "propertyName": "授权数量",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20045",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1135",
+              "propertyName": "服务期限",
+              "propertySort": 3
+            }
+          ],
+          "sort": 2
+        },
+        {
+          "categoryId": "20046",
+          "categoryName": "会员服务",
+          "children": [],
+          "pCategoryId": "10011",
+          "productPropertyList": [
+            {
+              "categoryId": "20046",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1136",
+              "propertyName": "时长",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20046",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1137",
+              "propertyName": "等级",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20046",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1138",
+              "propertyName": "套餐",
+              "propertySort": 3
+            }
+          ],
+          "sort": 3
+        },
+        {
+          "categoryId": "20047",
+          "categoryName": "游戏点卡",
+          "children": [],
+          "pCategoryId": "10011",
+          "productPropertyList": [
+            {
+              "categoryId": "20047",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1139",
+              "propertyName": "面值",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "20047",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1140",
+              "propertyName": "数量",
+              "propertySort": 2
+            },
+            {
+              "categoryId": "20047",
+              "coverType": null,
+              "pCategoryId": "10011",
+              "propertyId": "1141",
+              "propertyName": "版本",
+              "propertySort": 3
+            }
+          ],
+          "sort": 4
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 11
+    },
+    {
+      "categoryId": "64617",
+      "categoryName": "其他",
+      "children": [
+        {
+          "categoryId": "88409",
+          "categoryName": "其他",
+          "children": [],
+          "pCategoryId": "64617",
+          "productPropertyList": [
+            {
+              "categoryId": "88409",
+              "coverType": 1,
+              "pCategoryId": "64617",
+              "propertyId": "3353076910",
+              "propertyName": "规格",
+              "propertySort": 1
+            },
+            {
+              "categoryId": "88409",
+              "coverType": 1,
+              "pCategoryId": "64617",
+              "propertyId": "44065",
+              "propertyName": "颜色分类",
+              "propertySort": null
+            }
+          ],
+          "sort": 1
+        }
+      ],
+      "pCategoryId": "0",
+      "productPropertyList": [],
+      "sort": 12
+    }
+  ],
+  "productCount": 47,
+  "products": [
+    {
+      "productInfo": {
+        "categoryId": "88409",
+        "commendType": 1,
+        "cover": "2026-06/Djyjtfe0oRVYaDeIZvCm7M5x71PPsG.jpg,2026-06/gHa9pTnGRS5YEKwEbOMQjvnnRRHRcb.jpg,2026-06/UDSkzqkg8gMyCrpXWyNg8ISeUXssFm.jpg,2026-06/V4jjrgW9PAA9UC52WpB09z3n4xA6JO.jpg,2026-06/rC91IbjxcjqYm3myljjghgbYBKAr3f.jpg",
+        "createTime": "2026-06-20 15:56:05",
+        "maxPrice": 33.9,
+        "minPrice": 33.9,
+        "pCategoryId": "64617",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/fv0DVHjUIuyNyU4XbSiucXY7NgEVQm.png)\n![](/api/file/getResource?sourceName=2026-06/Cq3KT3VH9g1hhAI2ENZqp1faltQT1l.png)\n![](/api/file/getResource?sourceName=2026-06/TYRam2CY5My9lKDUJS3UdhsinW2M9T.png)\n![](/api/file/getResource?sourceName=2026-06/KPyVFX5D4UIR6jm9JLGoOa9DSFFizd.png)\n![](/api/file/getResource?sourceName=2026-06/q5Sdd2TxAS4QliIax6vOoqeGiQOeWN.png)\n",
+        "productId": "622491960431656",
+        "productName": "名创优品（MINISO）小猪B-BO弹力超柔趴姿公仔毛绒玩偶儿童玩具抱枕靠枕生日礼物女",
+        "status": 1,
+        "totalSale": 88
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "3353076910",
+          "propertyName": "规格",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/imX1gB363DcY5YBkPodvorfSiizsIo.jpg",
+              "propertyRemark": "",
+              "propertyValue": "【弹力超软系列】趴姿小猪B-BO",
+              "propertyValueId": "17819421246570"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 33.9,
+          "productId": "622491960431656",
+          "propertyValueIdHash": "d9fb7afdb6be101f9809cefb0d3a95ad",
+          "propertyValueIds": "17819421246570",
+          "sort": 0,
+          "stock": 999909
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20033",
+        "commendType": 1,
+        "cover": "2026-06/0UdI1Gf76QNlvPtPdBCuGqxUSHUanl.jpg,2026-06/gUo0T1GFbNL5RPIOayiX7SzJfhqOHC.jpg,2026-06/wwyzDtJ2mKiwnOPeH5fE64lKj0ZAB9.jpg,2026-06/bJlP1L9B1ywcdrUzMChxx7FuT5vcrJ.jpg,2026-06/xEz1ADpCauhvhygL9ykWw9jGYy6uKg.jpg",
+        "createTime": "2026-06-20 15:42:02",
+        "maxPrice": 99.0,
+        "minPrice": 99.0,
+        "pCategoryId": "10007",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/xhnVBk6lzd9fJCTEDvtYJaGO5EmqwC.png)\n![](/api/file/getResource?sourceName=2026-06/2GZgP8DPaHmuw3PLWpYxsQRtcMf1Ct.png)\n![](/api/file/getResource?sourceName=2026-06/azyabYTeffJwWVIYSYcKYu2iZkVabd.png)\n![](/api/file/getResource?sourceName=2026-06/Y67epwKoyCAfexRjf5UiNld7VPiEf2.png)\n",
+        "productId": "683735539720416",
+        "productName": "CUKTECH酷态科10号超级车充自带伸缩线车载充电器可充大疆无人机多口100W/单口90W超级快充适用苹果17小米",
+        "status": 1,
+        "totalSale": 98
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "4326836416",
+          "propertyName": "颜色",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/gD5z48ljL0wCjchx0BlruTTiihK6fC.jpg",
+              "propertyRemark": "",
+              "propertyValue": "钛灰",
+              "propertyValueId": "17819412684683"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 99.0,
+          "productId": "683735539720416",
+          "propertyValueIdHash": "c49ad658a5132756218c4978816fb754",
+          "propertyValueIds": "17819412684683",
+          "sort": 0,
+          "stock": 99901
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20028",
+        "commendType": 1,
+        "cover": "2026-06/OiLb7On6jv1SrU3Fr84FdXm9mo2PlA.jpg,2026-06/zoNjw8Kbi9CgoREdYVEI0QyxNxD78l.jpg,2026-06/lxGCFdzFGQaepxsEEqx0BEefLt49Fy.jpg,2026-06/PY2ibWr1NLN6X5VOaOsQegyUNUbDZL.jpg,2026-06/Qy8hAqKZ3q8a3rhrcT3xMremIi4jMR.jpg",
+        "createTime": "2026-06-20 15:17:15",
+        "maxPrice": 1749.0,
+        "minPrice": 1749.0,
+        "pCategoryId": "10006",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/Rqh0y75ZpEdm7fJTN9RfhnmJBA4gIz.png)\n![](/api/file/getResource?sourceName=2026-06/awoaF7t96sv2R5HsUj7UvO1KDcaKN9.png)\n![](/api/file/getResource?sourceName=2026-06/ujHqdtlrfFZASO1By18gFTSEwwXQNQ.png)\n![](/api/file/getResource?sourceName=2026-06/pprPrlMbxhz6i6Nep2cD8KJ7xNcZfw.png)\n",
+        "productId": "549376645121601",
+        "productName": "雅马哈（YAMAHA）吉他FG800初学者单板民谣FS800男女学生指弹原声弹唱电箱入门吉它 FG800 沙暴渐变-41英寸原声款",
+        "status": 1,
+        "totalSale": 56
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "6580827088",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "FG800经典入门单板",
+              "propertyValueId": "17819397993283"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "4177694945",
+          "propertyName": "规格",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/MzGrCV0zq4bLwNkvnVwIusSWwbhs2z.jpg",
+              "propertyRemark": "",
+              "propertyValue": "FG800 沙暴渐变-41英寸原声款",
+              "propertyValueId": "17819397993284"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 1749.0,
+          "productId": "549376645121601",
+          "propertyValueIdHash": "0f8d1dd037d0641dd52f2c9f9d722da1",
+          "propertyValueIds": "17819397993283-17819397993284",
+          "sort": 0,
+          "stock": 9943
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20023",
+        "commendType": 1,
+        "cover": "2026-06/eFgRv8uZ7RMGS9F2eLfZh9M7cnH9YR.jpg,2026-06/GfFtpUUWjBJ4vupGyuBCSMek7jLj7G.jpg,2026-06/3zBh5fHqi7uDlXzAwHPpeJWblJFhaM.jpg,2026-06/AR6rwOWNQFbDH45cZ5qBrBvPOebykj.jpg,2026-06/5Ar3WtU80tPlgovmGPj3Td5s26xADk.jpg",
+        "createTime": "2026-06-20 14:57:17",
+        "maxPrice": 49.9,
+        "minPrice": 49.9,
+        "pCategoryId": "10005",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/rZpXj0o7QLCCOYFwcxQmjiRv2w7JwF.png)\n![](/api/file/getResource?sourceName=2026-06/Irtgktz6VAcQdAzLPxikcAiEkhIOmX.png)\n![](/api/file/getResource?sourceName=2026-06/tocsT5f41fq7Wd4j9ZzPJ6LYrOfWq6.png)\n![](/api/file/getResource?sourceName=2026-06/0FchIA6e20i6wCA2JRDPkjVGznqLbA.png)\n",
+        "productId": "303019597302892",
+        "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐",
+        "status": 1,
+        "totalSale": 99
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "0863193473",
+          "propertyName": "规格",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/BKlw2MchBz3uuNd00sRiuliq7vMsmf.jpg",
+              "propertyRemark": "",
+              "propertyValue": "可乐*12+雪碧*8+芬达*4 330ml*24",
+              "propertyValueId": "17819385819633"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 49.9,
+          "productId": "303019597302892",
+          "propertyValueIdHash": "657584f99c87292613bd4b1c61304395",
+          "propertyValueIds": "17819385819633",
+          "sort": 0,
+          "stock": 99900
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20022",
+        "commendType": 1,
+        "cover": "2026-06/QI7QDtLaR1mVCTtmcIbfywOhqBN0Ew.jpg,2026-06/nOycftgOw6EbD0U0Q1S02qzU92gLOU.jpg,2026-06/0egZhWs36EEK0D4WhMUTy8jijXaAPr.jpg,2026-06/rHg6EjhnJbnJBCwHC2AZ86w0JjL8kP.jpg,2026-06/8VCuSbt6Mcb45fFBltysmqJ01F7UF4.jpg",
+        "createTime": "2026-06-20 14:54:46",
+        "maxPrice": 12.0,
+        "minPrice": 12.0,
+        "pCategoryId": "10005",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/HmMm8qdnxAo2sj0tH3vqfvHMNvrrpG.png)\n![](/api/file/getResource?sourceName=2026-06/iHUCZrex2GRfPVz67ykckponn6teKL.png)\n![](/api/file/getResource?sourceName=2026-06/PtQ9uAzrbedKCwPo7EeHTEKoqIPmEF.png)\n![](/api/file/getResource?sourceName=2026-06/RqZJXNkeUd3d8krQj4f7v9FcLsUAQM.png)\n",
+        "productId": "065293686460191",
+        "productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食膨化休闲食品饼干糕点",
+        "status": 1,
+        "totalSale": 99
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "7352800591",
+          "propertyName": "规格",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/f3d4vz3A1vZkCRgmpzJ3oPK4vG2fYv.jpg",
+              "propertyRemark": "",
+              "propertyValue": "厚烧海苔分享装 385g*1袋",
+              "propertyValueId": "17819384293251"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 12.0,
+          "productId": "065293686460191",
+          "propertyValueIdHash": "e8fe120e5a424353c0b6053ff1d88876",
+          "propertyValueIds": "17819384293251",
+          "sort": 0,
+          "stock": 99900
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20019",
+        "commendType": 1,
+        "cover": "2026-06/uBhA4dgu65Lo61y15ZzqviWSbrdMwg.jpg,2026-06/6LkkgX8alWypzIYu1YqxeMhUtCAjUf.jpg,2026-06/F9KTWJES2yLcpLBDaXWRCFuc5C7r5n.jpg,2026-06/wamXguPEGh1JPY00qXhrfuGCkzLn6b.jpg,2026-06/LZbFHBlg6KTG97E1bJG4iaUYR63dS4.jpg",
+        "createTime": "2026-06-20 14:48:19",
+        "maxPrice": 109.0,
+        "minPrice": 109.0,
+        "pCategoryId": "10004",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/b1mQCAIpt7Sz6NVXNH0L5wzAWYGdgG.png)\n![](/api/file/getResource?sourceName=2026-06/CSMBxWVlwvulT7TE4CMlxs7E6dO5PG.png)\n![](/api/file/getResource?sourceName=2026-06/sYdt7gn5gFydkWpStX3XjEkv2ctDmj.png)\n![](/api/file/getResource?sourceName=2026-06/z5oOQ8kBrevds1cuYQyB9sT5eNWEeP.png)\n",
+        "productId": "748346463863251",
+        "productName": "杞乐招财猫乔迁礼物入户玄关摆件客厅钥匙收纳置物架搬家新居礼品装饰 铃铛猫+置物架+相框+小摆件",
+        "status": 1,
+        "totalSale": 99
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "4524936256",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "铃铛大嘴猫收纳摆件",
+              "propertyValueId": "17819380469562"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "3557329908",
+          "propertyName": "颜色",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/t1J5PNxXS8gJNhngmZERbYk8WnK8B5.jpg",
+              "propertyRemark": "",
+              "propertyValue": "铃铛猫+置物架+相框+小摆件",
+              "propertyValueId": "17819380469563"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 109.0,
+          "productId": "748346463863251",
+          "propertyValueIdHash": "19f7a81c88810a2166719d2278d276a6",
+          "propertyValueIds": "17819380469562-17819380469563",
+          "sort": 0,
+          "stock": 9900
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20015",
+        "commendType": 1,
+        "cover": "2026-06/4MsbQS6FxvnI5LypKWnY9gwTqbc5zC.jpg,2026-06/1M3AGAqxv6kkazaIbfcYU9xqGSIFWA.jpg,2026-06/hbJGMVCZEmtTwBH8JFaj6DfZuh23uS.jpg,2026-06/oiO0KuDn8zC9MWI7usek3IrhUx82kq.jpg,2026-06/BbIvxr0Hj5alYyN8e8Vwi4ors3VDMW.jpg",
+        "createTime": "2026-06-20 14:33:45",
+        "maxPrice": 1430.0,
+        "minPrice": 1430.0,
+        "pCategoryId": "10003",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/hUjGk4myNkSfjcVeBrogCkvDTnNpsA.png)\n![](/api/file/getResource?sourceName=2026-06/gtxNLGBBAgc2JeEzULGXEhp8eUam9y.png)\n![](/api/file/getResource?sourceName=2026-06/41A2ayE6TVzi1Q3QW2LKgsV8eCdQUy.png)\n",
+        "productId": "100766326868880",
+        "productName": "CHANEL【官方正品】香奈儿邂逅系列套组 香水礼盒套装 女士 生日礼物 邂逅柔情淡香水50ml+双效持色唇釉174号",
+        "status": 1,
+        "totalSale": 99
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "4568665114",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "邂逅系列礼盒",
+              "propertyValueId": "17819371910993"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "7595050195",
+          "propertyName": "产品",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/zt55jGCPZPzL0RF7i00dwwYGduAzvO.jpg",
+              "propertyRemark": "",
+              "propertyValue": "邂逅柔情淡香水50ml+双效持色唇釉174号",
+              "propertyValueId": "17819371910994"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 1430.0,
+          "productId": "100766326868880",
+          "propertyValueIdHash": "ecaa832f282d17232a50d909fe6c37d2",
+          "propertyValueIds": "17819371910993-17819371910994",
+          "sort": 0,
+          "stock": 900
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20002",
+        "commendType": 1,
+        "cover": "2026-06/hz2G9r5DxdUEKQKEHiIHM4M9aObj1v.jpg,2026-06/rl6OoPvXEG0q4cyQYOhNismh53JZv8.jpg,2026-06/28UfukHzdqr6MaHHDihKNmqaH8h9We.jpg,2026-06/6mwPYeiO7ugtMUH6UO02uWyNY30Y4R.jpg,2026-06/d2B9laCZ8kq2TmNDn3HEXxGuY2oFbp.jpg",
+        "createTime": "2026-06-20 01:27:56",
+        "maxPrice": 5099.0,
+        "minPrice": 4399.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/I0lhqGildiPbaRqc8pr88G4kKFlHg9.png)\n![](/api/file/getResource?sourceName=2026-06/l20HT46bntuHlXro56HRj4ZLcnx4aI.png)\n![](/api/file/getResource?sourceName=2026-06/5a5O6sXDMphPWbl2Jr97nz7TyLf8dj.png)\n![](/api/file/getResource?sourceName=2026-06/ccnAL8iOZKVu2HfoBspYnKzqeSNfnF.png)\n![](/api/file/getResource?sourceName=2026-06/h5dxdk7tQ6LWMe77ftinv18A7RUexN.png)\n",
+        "productId": "650980987345712",
+        "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260",
+        "status": 1,
+        "totalSale": 9
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "5553712174",
+          "propertyName": "规格",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/ve6FdM4wTFMijCylrCaiqP5MUnCsCg.jpg",
+              "propertyRemark": "",
+              "propertyValue": "超值单主机",
+              "propertyValueId": "17818899129391"
+            },
+            {
+              "propertyCover": "2026-06/eED8y4CdUjG7xnAEjXFYkYEJL3yyCT.jpg",
+              "propertyRemark": "",
+              "propertyValue": "主机+27英寸显示器",
+              "propertyValueId": "1781889979475"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "6887378688",
+          "propertyName": "版本",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "【16核旗舰】i9-12900HX 16G 1T",
+              "propertyValueId": "17818899129392"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 4399.0,
+          "productId": "650980987345712",
+          "propertyValueIdHash": "dbe48cff4b49e7632d8e386f7d58e628",
+          "propertyValueIds": "17818899129391-17818899129392",
+          "sort": 0,
+          "stock": 990
+        },
+        {
+          "price": 5099.0,
+          "productId": "650980987345712",
+          "propertyValueIdHash": "7a2efcb015278ff3533df978517d2a7a",
+          "propertyValueIds": "1781889979475-17818899129392",
+          "sort": 1,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20001",
+        "commendType": 1,
+        "cover": "2026-06/SxUHBfpEffG8Hx89vvqFCIMr9yc0cF.png,2026-06/mtONSbOc6ycgs0B2ARrudokbsJlI40.png,2026-06/v8EO2h1gyn8la9NOwR4M5MVsk0wdiY.png,2026-06/gCKWJf4UCHbwy1jAvrVvqpw8hTZF3m.png,2026-06/NsFktoGyDE2mHdQrQ17qSUp7hnoTOS.png",
+        "createTime": "2026-06-04 14:38:33",
+        "maxPrice": 16999.0,
+        "minPrice": 8999.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/j8eJxjwWmp89mYFWPVQ38gsiwkZY19.png)\n![](/api/file/getResource?sourceName=2026-06/BRUYtoVgDgvprDR9pJqU2hHeRCCSjt.png)\n![](/api/file/getResource?sourceName=2026-06/yQFkSrCnkzpV4s7LBHZOjX9dQbvM7V.png)\n![](/api/file/getResource?sourceName=2026-06/KHC0g2S3qn9LUYXplrkFBFMwthQ0IS.png)\n",
+        "productId": "895150981058759",
+        "productName": "Apple/苹果 iPhone 17 Pro Max 移动联通电信5G 双卡双待手机",
+        "status": 1,
+        "totalSale": 33
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1001",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/a61Br9M7Fu2ixHGaaXl3tFTYut83cl.png",
+              "propertyRemark": "",
+              "propertyValue": "银色",
+              "propertyValueId": "1780554968348"
+            },
+            {
+              "propertyCover": "2026-06/ddUoDxTCuI9NvI1l1y7J46D3fmguYg.png",
+              "propertyRemark": "",
+              "propertyValue": "星宇橙色",
+              "propertyValueId": "1780554977545"
+            },
+            {
+              "propertyCover": "2026-06/G6lFGeOgZjcYZlyiqE5e8Qotx4e0TO.png",
+              "propertyRemark": "",
+              "propertyValue": "深蓝色",
+              "propertyValueId": "1780554988020"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "1098012240",
+          "propertyName": "存储容量",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "256GB",
+              "propertyValueId": "1780554968349"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "512GB",
+              "propertyValueId": "1780555030813"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "1TB",
+              "propertyValueId": "1780555035131"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "2TB",
+              "propertyValueId": "1780555037839"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 8999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "137e14ea51a28c111aef8b2258c3691f",
+          "propertyValueIds": "1780554968348-1780554968349",
+          "sort": 0,
+          "stock": 564
+        },
+        {
+          "price": 10999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "9129ecfe4b2943141fa12842448699c8",
+          "propertyValueIds": "1780554968348-1780555030813",
+          "sort": 1,
+          "stock": 456
+        },
+        {
+          "price": 12999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "6a12dbb984205c4e9790311800993f4e",
+          "propertyValueIds": "1780554968348-1780555035131",
+          "sort": 2,
+          "stock": 345
+        },
+        {
+          "price": 16999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "72f6706244b6b80b05e895bc8fdfb057",
+          "propertyValueIds": "1780554968348-1780555037839",
+          "sort": 3,
+          "stock": 213
+        },
+        {
+          "price": 8999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "fdb2ee5a10e3e316bce4e73859197301",
+          "propertyValueIds": "1780554977545-1780554968349",
+          "sort": 4,
+          "stock": 567
+        },
+        {
+          "price": 10999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "c9e7f407727160be400151fa3a4af30e",
+          "propertyValueIds": "1780554977545-1780555030813",
+          "sort": 5,
+          "stock": 456
+        },
+        {
+          "price": 12999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "f47eb3f4c1fe24b6d2905730871c9f8d",
+          "propertyValueIds": "1780554977545-1780555035131",
+          "sort": 6,
+          "stock": 345
+        },
+        {
+          "price": 16999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "a1b1b5f8da9d4331a04e95b0b9a80e32",
+          "propertyValueIds": "1780554977545-1780555037839",
+          "sort": 7,
+          "stock": 230
+        },
+        {
+          "price": 8999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "ba48496c7143d320ed24a9e58d814108",
+          "propertyValueIds": "1780554988020-1780554968349",
+          "sort": 8,
+          "stock": 567
+        },
+        {
+          "price": 10999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "9f171963ae755f29f3940e3570e85f1c",
+          "propertyValueIds": "1780554988020-1780555030813",
+          "sort": 9,
+          "stock": 456
+        },
+        {
+          "price": 12999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "0ed148a98c17d0e93d19324f110e9db6",
+          "propertyValueIds": "1780554988020-1780555035131",
+          "sort": 10,
+          "stock": 345
+        },
+        {
+          "price": 16999.0,
+          "productId": "895150981058759",
+          "propertyValueIdHash": "a46f9533ec714e91424152b025dcb4ed",
+          "propertyValueIds": "1780554988020-1780555037839",
+          "sort": 11,
+          "stock": 229
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20003",
+        "commendType": 1,
+        "cover": "2026-06/izJVzAb7DJota00hWqPYWCCv0VOD35.png,2026-06/o1ATsUzs7bv20TXH33oATK7KvUFsQr.png,2026-06/L39zziYMJVTjxJChEJKNXvw8Z4y5xb.png,2026-06/sO6gtslmK02mnyoW6ntXK8tnGrwr0c.png,2026-06/yoakZ19pk4TD6CMVm65encNHQ5Sm7T.png",
+        "createTime": "2026-06-03 22:22:38",
+        "maxPrice": 4169.0,
+        "minPrice": 1417.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/2Q87GHZxs2qa4E2OzwkUWlHyf05MgW.png)\n![](/api/file/getResource?sourceName=2026-06/PlPj6L218tUqYTVElD3EhteUh0qwSv.png)\n![](/api/file/getResource?sourceName=2026-06/58Ez7laZTmbWEmRZn1EKeUgoYtpG62.png)\n![](/api/file/getResource?sourceName=2026-06/i4PKVC6qnFexypLrPsEuuV2ApeLTn1.png)\n![](/api/file/getResource?sourceName=2026-06/2XqP07tPGqVP03HLvAHrcH3u3jHWwe.png)\n",
+        "productId": "350000232815799",
+        "productName": "索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机",
+        "status": 1,
+        "totalSale": 11
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1007",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "黑色",
+              "propertyValueId": "1780496403012"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "白金色",
+              "propertyValueId": "1780496456194"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1008",
+          "propertyName": "型号",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "WH-1000XX",
+              "propertyValueId": "1780496403013"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "WH-1000XM5",
+              "propertyValueId": "1780496480942"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1009",
+          "propertyName": "存储容量",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "标准",
+              "propertyValueId": "1780496403014"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 4169.0,
+          "productId": "350000232815799",
+          "propertyValueIdHash": "c91a1fc4453caf8f246adaafe76112cd",
+          "propertyValueIds": "1780496403012-1780496403013-1780496403014",
+          "sort": 0,
+          "stock": 1321
+        },
+        {
+          "price": 1417.0,
+          "productId": "350000232815799",
+          "propertyValueIdHash": "c97065ab26ba514b63d42cdd76e3e540",
+          "propertyValueIds": "1780496403012-1780496480942-1780496403014",
+          "sort": 1,
+          "stock": 1234
+        },
+        {
+          "price": 4169.0,
+          "productId": "350000232815799",
+          "propertyValueIdHash": "2dbd579931558f18173409155bc26879",
+          "propertyValueIds": "1780496456194-1780496403013-1780496403014",
+          "sort": 2,
+          "stock": 321
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20002",
+        "commendType": 1,
+        "cover": "2026-06/E4YrHMEHPuTwPpN3MLtAuinOclQfZf.png,2026-06/CQeVAQJHAF0WlzbOrf46euanKjajJN.png,2026-06/zR0yzLKpgBoNFkRN6tsWHTooOtFdCO.png,2026-06/wlPoGtcwSLaV9cwgPV9BsBTVtZCnNU.png,2026-06/WWApUWZUAafHrLBaooeYhCWtqW8YeC.png",
+        "createTime": "2026-06-03 20:54:59",
+        "maxPrice": 25399.0,
+        "minPrice": 12699.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/i8rl7FK2z5QCCbilny3uwkyaoRj4dk.png)\n![](/api/file/getResource?sourceName=2026-06/YCLGm2L5iCyYyRgXHnjUeQO5w9ZOLE.png)\n![](/api/file/getResource?sourceName=2026-06/amIJ9T2Mr6GSRRGYeltjRqc6lHMREe.png)\n![](/api/file/getResource?sourceName=2026-06/mateOoQzaKSR0GgnaG5lUvNzfOuKEU.png)\n![](/api/file/getResource?sourceName=2026-06/mCzGovA5fGovtK8BtHlBxZWfYZ6zth.png)\n",
+        "productId": "869004898763662",
+        "productName": "Apple/苹果AI笔记本/MacBookPro14英寸M5(10+10核)16G 1T银色笔记本电脑MDE54CH/A",
+        "status": 1,
+        "totalSale": 21
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1004",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/9TjUjQ5WwPPCQppAeKuBemSMklpX69.png",
+              "propertyRemark": "",
+              "propertyValue": "深空黑色",
+              "propertyValueId": "1780490771138"
+            },
+            {
+              "propertyCover": "2026-06/kSQWENefc6m6wNzlc4LKhT819MS0gE.png",
+              "propertyRemark": "",
+              "propertyValue": "银色",
+              "propertyValueId": "1780490809198"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "5553712174",
+          "propertyName": "规格",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/yF6JMsb1tV6bnCNU7kWLDOff5yE6aW.png",
+              "propertyRemark": "",
+              "propertyValue": "14寸 M5芯片",
+              "propertyValueId": "1780490771139"
+            },
+            {
+              "propertyCover": "2026-06/0tNAVqCakX8eQ2ftQIpCiHcUX73mlE.png",
+              "propertyRemark": "",
+              "propertyValue": "16寸 M5Pro芯片",
+              "propertyValueId": "1780490923890"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "6887378688",
+          "propertyName": "版本",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "(10+10核) 16G + 1TB",
+              "propertyValueId": "1780490771140"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "(10+10核) 24G + 1TB",
+              "propertyValueId": "1780490994958"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 12699.0,
+          "productId": "869004898763662",
+          "propertyValueIdHash": "97a84d3a61864fdccd7f99ecfb85fc16",
+          "propertyValueIds": "1780490771138-1780490771139-1780490771140",
+          "sort": 0,
+          "stock": 102
+        },
+        {
+          "price": 14199.0,
+          "productId": "869004898763662",
+          "propertyValueIdHash": "f19f4975023612a7ee0f3e172d08bbfa",
+          "propertyValueIds": "1780490771138-1780490771139-1780490994958",
+          "sort": 1,
+          "stock": 122
+        },
+        {
+          "price": 23124.0,
+          "productId": "869004898763662",
+          "propertyValueIdHash": "a0527e06e940786516b323eafc05aa89",
+          "propertyValueIds": "1780490771138-1780490923890-1780490994958",
+          "sort": 2,
+          "stock": 231
+        },
+        {
+          "price": 14624.0,
+          "productId": "869004898763662",
+          "propertyValueIdHash": "d3159e5fabb3ccfad8062ea77566c5cb",
+          "propertyValueIds": "1780490809198-1780490771139-1780490771140",
+          "sort": 3,
+          "stock": 321
+        },
+        {
+          "price": 16599.0,
+          "productId": "869004898763662",
+          "propertyValueIdHash": "c728371921e27b72b4012a9cc507e7bc",
+          "propertyValueIds": "1780490809198-1780490771139-1780490994958",
+          "sort": 4,
+          "stock": 231
+        },
+        {
+          "price": 25399.0,
+          "productId": "869004898763662",
+          "propertyValueIdHash": "03bfcbf532c928e50d69e3dbdc703f95",
+          "propertyValueIds": "1780490809198-1780490923890-1780490994958",
+          "sort": 5,
+          "stock": 321
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20002",
+        "commendType": 1,
+        "cover": "2026-06/hVXgqn3HrlBSaheySBdd8PGmYw9C0Y.png,2026-06/UK3ol2dXWXyXmSUWWpzbvd1pdVWxGb.png,2026-06/1406spDx5BARn79fMvDEjsAMdZUoZT.png,2026-06/VYeNx3qexRPSNEXlrqnIZFVRjcJWTu.png,2026-06/6mT3DHcMK85AuArxMU62usPoRqC87M.png",
+        "createTime": "2026-06-03 20:38:14",
+        "maxPrice": 42299.0,
+        "minPrice": 9199.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/g84EZGoWW0Wqv5mBaSEz8jexpXNtOt.png)\n![](/api/file/getResource?sourceName=2026-06/nYi8sNYoAVQJ92CsrVrS53lJIi2tjl.png)\n![](/api/file/getResource?sourceName=2026-06/eKanZpcPWoYH8aLOC8skCEAo20nJ9d.png)\n![](/api/file/getResource?sourceName=2026-06/ALRtl2tfbVPmcFAR7c3ruIffBkNXRU.png)\n![](/api/file/getResource?sourceName=2026-06/Ly1EUiwfxUXXvOcvZfKJifPlCiv6pd.png)\n",
+        "productId": "995230446006541",
+        "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制",
+        "status": 1,
+        "totalSale": 40
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1004",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/0o3NRTTeCWTZAW7cPafSXh0hk9HQhI.png",
+              "propertyRemark": "",
+              "propertyValue": "白色",
+              "propertyValueId": "1780489902527"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "5553712174",
+          "propertyName": "规格",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/uqrguM3daFYeQK5CCXBvSyfG5KUSOd.png",
+              "propertyRemark": "",
+              "propertyValue": "Ultra7-256K 16G内存 512G固态",
+              "propertyValueId": "1780489902528"
+            },
+            {
+              "propertyCover": "2026-06/LulkY1uaNAZdRd9YFKlaYoL5MKAjJF.png",
+              "propertyRemark": "",
+              "propertyValue": "Ultra7-265K 64G 2TB固态",
+              "propertyValueId": "1780490103014"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "6887378688",
+          "propertyName": "版本",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "集成显卡 定制",
+              "propertyValueId": "1780489902529"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "RTX4090D-24G独显 定制",
+              "propertyValueId": "1780490130659"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "RTX5060Ti-8G独显 定制",
+              "propertyValueId": "1780490149740"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 9199.0,
+          "productId": "995230446006541",
+          "propertyValueIdHash": "ac875b9c0877277ebc7eaa7f3a08cd91",
+          "propertyValueIds": "1780489902527-1780489902528-1780489902529",
+          "sort": 0,
+          "stock": 60
+        },
+        {
+          "price": 33199.0,
+          "productId": "995230446006541",
+          "propertyValueIdHash": "f5241fc2889c42c6819ea22cc11cab49",
+          "propertyValueIds": "1780489902527-1780489902528-1780490130659",
+          "sort": 1,
+          "stock": 100
+        },
+        {
+          "price": 13799.0,
+          "productId": "995230446006541",
+          "propertyValueIdHash": "45fdc11e52a8a69e6008cd1c9eaa7cbc",
+          "propertyValueIds": "1780489902527-1780489902528-1780490149740",
+          "sort": 2,
+          "stock": 100
+        },
+        {
+          "price": 22899.0,
+          "productId": "995230446006541",
+          "propertyValueIdHash": "628f16574693489f683c2070efdab95d",
+          "propertyValueIds": "1780489902527-1780490103014-1780489902529",
+          "sort": 3,
+          "stock": 100
+        },
+        {
+          "price": 42299.0,
+          "productId": "995230446006541",
+          "propertyValueIdHash": "ff462af4a16fa19829228d30beb3438d",
+          "propertyValueIds": "1780489902527-1780490103014-1780490130659",
+          "sort": 4,
+          "stock": 10
+        },
+        {
+          "price": 22899.0,
+          "productId": "995230446006541",
+          "propertyValueIdHash": "790c0d41ba555dd623ad6db9b9383b94",
+          "propertyValueIds": "1780489902527-1780490103014-1780490149740",
+          "sort": 5,
+          "stock": 60
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20011",
+        "commendType": 1,
+        "cover": "202601/naOr2dwJaca3qfUperfNmWdfvWBjjl_thumbnail.png,202601/BVOXVyFntp0EkLGScXNO4JrsZpbz9S_thumbnail.png,202601/GBhkut2AotCbpfRdatkvuM8cNdt7kX_thumbnail.png,202601/ygLSnu2nTpw6jlMWEBBAxkMd6r7NCD_thumbnail.png,202601/mATTdbHRVwMZgX8TwM2H5r3G55mAH8_thumbnail.png",
+        "createTime": "2026-01-10 21:08:12",
+        "maxPrice": 35.9,
+        "minPrice": 19.9,
+        "pCategoryId": "10002",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/E9VP2PnlLVJJKTVyAtvZKDMMZXQaS6.png)\n![](/api/file/getResource?sourceName=202601/Ifm5fnM3oCTtc3pqQ3GHIQZuZuNm8u.png)\n![](/api/file/getResource?sourceName=202601/o7ZkMBqMWjL8yD6YFdRtfozHRYefN1.png)\n![](/api/file/getResource?sourceName=202601/S272XFDnJQiQk0dgVA3v27TbsihrIz.png)\n![](/api/file/getResource?sourceName=202601/NaBUf64TBqfslXsZZlJPCcABeUpNl0.png)\n![](/api/file/getResource?sourceName=202601/mlJrXPixw2lv4zv5ORJfheICqNdg3M.png)\n",
+        "productId": "763086281772264",
+        "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女",
+        "status": 1,
+        "totalSale": 102
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1031",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/7yB3uvvq0SutEBoFA2er2zHCtIuEua_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "星星糖项链",
+              "propertyValueId": "1768050383077"
+            },
+            {
+              "propertyCover": "202601/3BhSu5XC8i9HxANRPzm5Los6AqpJp1_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "月亮糖项链",
+              "propertyValueId": "1768050429180"
+            },
+            {
+              "propertyCover": "202601/rraXYFPem4YdEiRQgRHmCLKPxfpuy7_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "【星星+月亮】闺蜜两条装",
+              "propertyValueId": "1768050433492"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 19.9,
+          "productId": "763086281772264",
+          "propertyValueIdHash": "75efb5191c7da469fcc570aba1e21041",
+          "propertyValueIds": "1768050383077",
+          "sort": 0,
+          "stock": 101
+        },
+        {
+          "price": 19.9,
+          "productId": "763086281772264",
+          "propertyValueIdHash": "2675cb5d7172c3c5ff07c8c9811f71c7",
+          "propertyValueIds": "1768050429180",
+          "sort": 1,
+          "stock": 199
+        },
+        {
+          "price": 35.9,
+          "productId": "763086281772264",
+          "propertyValueIdHash": "4408ece52af09cc10aa035676bc4f668",
+          "propertyValueIds": "1768050433492",
+          "sort": 2,
+          "stock": 200
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20007",
+        "commendType": 1,
+        "cover": "202601/Es2Me5UbE9voEk0LJ5hv2cgbPXgB0l_thumbnail.jpg,202601/Uj6JdSIBYdZ2XKnp3mZDChMQHY7Kb9_thumbnail.jpg,202601/X5dQaMUMQ2p4b86LViJBdvkrjuZ0a5_thumbnail.jpg,202601/KfF11QY8Fnr1J54e2I3bYH4clRB7XP_thumbnail.jpg,202601/2szKpOb1ZSA7vcVX69pcj6ehALqh0o_thumbnail.jpg",
+        "createTime": "2026-01-10 20:39:53",
+        "maxPrice": 39.9,
+        "minPrice": 39.9,
+        "pCategoryId": "10002",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/EfulgSPGV0kypYNyuXODBmqEkX382I.png)\n![](/api/file/getResource?sourceName=202601/ROgFjsCpV5E5FWdhNjJmLBYtEhLC49.png)\n![](/api/file/getResource?sourceName=202601/kXvCaAarYbEe1SVuVdlTDrtOWEjRB4.png)\n![](/api/file/getResource?sourceName=202601/hYKwzNvYqLlhTSzDZt93aeSQnW5Pb4.png)\n![](/api/file/getResource?sourceName=202601/xl3wv9oQysCHyzFSTpGfolkNnQ70tQ.png)\n",
+        "productId": "422543322296606",
+        "productName": "女大童加绒加厚毛衣女秋冬15岁18初高中学生水貂绒翻领针织打底衫",
+        "status": 1,
+        "totalSale": 99
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1019",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/jO123JRYUau2unIfG8qBZxCZqf4AW4_thumbnail.jpg",
+              "propertyRemark": "",
+              "propertyValue": "蓝色",
+              "propertyValueId": "1768048722327"
+            },
+            {
+              "propertyCover": "202601/eJMAlt87MNyt3HnUDfVsUMafyteS3J_thumbnail.jpg",
+              "propertyRemark": "",
+              "propertyValue": "绿色",
+              "propertyValueId": "1768048730485"
+            },
+            {
+              "propertyCover": "202601/vQUUGtI45BhStNv2DlzHsTAJyoFfHZ_thumbnail.jpg",
+              "propertyRemark": "",
+              "propertyValue": "粉色",
+              "propertyValueId": "1768048730829"
+            },
+            {
+              "propertyCover": "202601/aN9Xn92lFdL8oLVbiEbkUm1QGRcuHO_thumbnail.jpg",
+              "propertyRemark": "",
+              "propertyValue": "白色",
+              "propertyValueId": "1768048731301"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1020",
+          "propertyName": "尺码",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "S",
+              "propertyValueId": "1768048722328"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "M",
+              "propertyValueId": "1768048758373"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "L",
+              "propertyValueId": "1768048758813"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "XL",
+              "propertyValueId": "1768048759629"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "2XL",
+              "propertyValueId": "1768048766773"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "d71d43a3fe1aa0ef4a03c1c3ba879b59",
+          "propertyValueIds": "1768048722327-1768048722328",
+          "sort": 0,
+          "stock": 101
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "edcaf2d83902a1e0589127bde46fcbe0",
+          "propertyValueIds": "1768048722327-1768048758373",
+          "sort": 1,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "4a3ae15a0392d395fc8049f3ce7ddbf2",
+          "propertyValueIds": "1768048722327-1768048758813",
+          "sort": 2,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "845344c667ca34de3f6dbc66daff3534",
+          "propertyValueIds": "1768048722327-1768048759629",
+          "sort": 3,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "d86a5c6f8a30d4272c7fa582176c8d43",
+          "propertyValueIds": "1768048722327-1768048766773",
+          "sort": 4,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "f59ff174ba4aec568e033f616fe0fb8f",
+          "propertyValueIds": "1768048730485-1768048722328",
+          "sort": 5,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "1145b6fbf50921920f393b8fa6e54d7f",
+          "propertyValueIds": "1768048730485-1768048758373",
+          "sort": 6,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "8779278d8f9b476c59838306819193ea",
+          "propertyValueIds": "1768048730485-1768048758813",
+          "sort": 7,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "9ec3af9caf9d2507f15d60764bbdd2c0",
+          "propertyValueIds": "1768048730485-1768048759629",
+          "sort": 8,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "35a1d95a52bfc1c651b31fc35687e2eb",
+          "propertyValueIds": "1768048730485-1768048766773",
+          "sort": 9,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "25ad09e5d79424e316290ab6a2b3071c",
+          "propertyValueIds": "1768048730829-1768048722328",
+          "sort": 10,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "5de06d8271580ee7000ad26053da42b0",
+          "propertyValueIds": "1768048730829-1768048758373",
+          "sort": 11,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "0372cce34c5f7db36532c7278801bd1f",
+          "propertyValueIds": "1768048730829-1768048758813",
+          "sort": 12,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "0c823fef545a90d294ef0ce1b8faf88a",
+          "propertyValueIds": "1768048730829-1768048759629",
+          "sort": 13,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "63a2ff53f186ecdad3a0c95e56b310d1",
+          "propertyValueIds": "1768048730829-1768048766773",
+          "sort": 14,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "194cf1f1ff07e42231bd5a06e076ebf5",
+          "propertyValueIds": "1768048731301-1768048722328",
+          "sort": 15,
+          "stock": 200
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "1374c0528345d0108cf5b2b9110ecd0e",
+          "propertyValueIds": "1768048731301-1768048758373",
+          "sort": 16,
+          "stock": 1111
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "3941978129ab6f892a75020e68ed848f",
+          "propertyValueIds": "1768048731301-1768048758813",
+          "sort": 17,
+          "stock": 213
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "dcc79cedee9b5f35358a6b2fbfe5bd47",
+          "propertyValueIds": "1768048731301-1768048759629",
+          "sort": 18,
+          "stock": 1000
+        },
+        {
+          "price": 39.9,
+          "productId": "422543322296606",
+          "propertyValueIdHash": "0423c9cf30525dc15042df72c640606c",
+          "propertyValueIds": "1768048731301-1768048766773",
+          "sort": 19,
+          "stock": 550
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "88409",
+        "commendType": 0,
+        "cover": "202601/SBTrI5RGlJdu4uv7kxygOIK2Kc8iHn_thumbnail.png,202601/a4xh1CACo85Ia6bq2blVDP42xHNJg8_thumbnail.png,202601/YUrbWvpvLnjT91VDRI86PVSnlNiQ9B_thumbnail.png,202601/hGo4ytAgDvAsbXRv85voO0lPTfPvY6_thumbnail.png,202601/ya8PqJD2tGx9ZueV9Dtc2Io60eQj5E_thumbnail.png",
+        "createTime": "2026-01-11 17:59:21",
+        "maxPrice": 25.9,
+        "minPrice": 19.9,
+        "pCategoryId": "64617",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/IIcM83JFgrYvMNbG4SDsyDjylH3xFs.png)\n![](/api/file/getResource?sourceName=202601/dHjWneG9qknhrfEDbtfvPxWNSm5Wia.png)\n![](/api/file/getResource?sourceName=202601/ZLTEsg8SiCffX03gaDAgcZPjKTcKSp.png)\n![](/api/file/getResource?sourceName=202601/mq5KqE0w7H2vsS1FUGCJceqZHKqsTT.png)\n![](/api/file/getResource?sourceName=202601/SBwVwYTe20X8Wpj4q3arTFg3I5HUR7.png)\n",
+        "productId": "917186661226040",
+        "productName": "卡皮巴拉软握按动中性笔高颜值胖胖笔熊猫笔减负速干欧包笔 0.5黑色水笔大容量刷题笔st笔头考试专用开学文具",
+        "status": 1,
+        "totalSale": 100
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "44065",
+          "propertyName": "颜色分类",
+          "propertySort": null,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/0vNcqiRrMPNzWBFPZjxIV2DogbkO0r_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "【五款大合集】20支装 (超高价值)",
+              "propertyValueId": "1768125478450"
+            },
+            {
+              "propertyCover": "202601/3R5zRwRJBpqerghogeBRI933ahVeIg_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": " 豚豚店员-4支装 (升级新款)",
+              "propertyValueId": "1768125501664"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 25.9,
+          "productId": "917186661226040",
+          "propertyValueIdHash": "444ac3778c4754b97944f5f3a0e23fbc",
+          "propertyValueIds": "1768125478450",
+          "sort": 0,
+          "stock": 199
+        },
+        {
+          "price": 19.9,
+          "productId": "917186661226040",
+          "propertyValueIdHash": "ec54a3c0108ce143bf0b6542e29ec750",
+          "propertyValueIds": "1768125501664",
+          "sort": 1,
+          "stock": 99
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20016",
+        "commendType": 0,
+        "cover": "202601/DP7ki0XqcnDviCofMkIiHlZ6rqfYaE_thumbnail.png,202601/jPT9c0pMqhtLHnT6kRayfoFZq6RbGl_thumbnail.png,202601/S3x7LxccJottSWDo61MStIsNDmSUDN_thumbnail.png,2026-06/F73JfxPY5JLJqNWHmb1X3Yop9D1U3Q.png,202601/p0Z7y8i5tlrYISJHmdEWI3jkhTF2AO_thumbnail.png",
+        "createTime": "2026-01-11 12:42:52",
+        "maxPrice": 899.0,
+        "minPrice": 499.0,
+        "pCategoryId": "10004",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/KLk9YkdbC9djpSV53AEvwUMyKYIgAg.png)\n![](/api/file/getResource?sourceName=202601/bPZfba5lqqYMOE93kPQf29jC8XDbBV.png)\n![](/api/file/getResource?sourceName=202601/PfbKq6irL7Mc8HIpowCkDM89xsdbkH.png)\n![](/api/file/getResource?sourceName=202601/KIh0lhu59NYMWVQR4ds4dFW9QYKrwL.png)\n",
+        "productId": "378919755916188",
+        "productName": "席梦思床垫家用卧室硬椰棕1.5米20cm厚乳胶软垫独立弹簧",
+        "status": 1,
+        "totalSale": 22
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1046",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/BGzotDpsENEbXn5XJ4kaK2BRMuUrKL_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "硬核支撑?静音独立弹簧线径加粗 20cm适中",
+              "propertyValueId": "1768106374323"
+            },
+            {
+              "propertyCover": "202601/T4O7OtGTA32C4Y4LGJM9t4szyWAxLY_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "实惠首选白碳钢加固弹簧+3E棕 均衡承托 22cm偏硬",
+              "propertyValueId": "1768106510018"
+            },
+            {
+              "propertyCover": "202601/0adGwg1hQSkuaUjcbzL0PPOsflw8P1_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "尊享环保抑菌竹炭分区静音布袋弹簧+3E棕 22cm厚偏硬",
+              "propertyValueId": "1768106511697"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "1048",
+          "propertyName": "尺寸",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "120x190CM",
+              "propertyValueId": "1768106374324"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "120x200CM",
+              "propertyValueId": "1768106553530"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 499.0,
+          "productId": "378919755916188",
+          "propertyValueIdHash": "b021f01e05424e0bc12f17f06eb9ebcf",
+          "propertyValueIds": "1768106374323-1768106374324",
+          "sort": 0,
+          "stock": 187
+        },
+        {
+          "price": 499.0,
+          "productId": "378919755916188",
+          "propertyValueIdHash": "7b534fe4f948575522666a7c31945752",
+          "propertyValueIds": "1768106374323-1768106553530",
+          "sort": 1,
+          "stock": 200
+        },
+        {
+          "price": 499.0,
+          "productId": "378919755916188",
+          "propertyValueIdHash": "19b67904c8d6319a7ea2451e75a15cfc",
+          "propertyValueIds": "1768106510018-1768106374324",
+          "sort": 2,
+          "stock": 195
+        },
+        {
+          "price": 899.0,
+          "productId": "378919755916188",
+          "propertyValueIdHash": "7328104c0c7f9a3dd670b6685718f9da",
+          "propertyValueIds": "1768106510018-1768106553530",
+          "sort": 3,
+          "stock": 100
+        },
+        {
+          "price": 899.0,
+          "productId": "378919755916188",
+          "propertyValueIdHash": "304dc9239c6d6d996df4abc3b8c6bdcb",
+          "propertyValueIds": "1768106511697-1768106374324",
+          "sort": 4,
+          "stock": 100
+        },
+        {
+          "price": 899.0,
+          "productId": "378919755916188",
+          "propertyValueIdHash": "e1d2d1d27d211c77fe047bd9a4889153",
+          "propertyValueIds": "1768106511697-1768106553530",
+          "sort": 5,
+          "stock": 96
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20021",
+        "commendType": 0,
+        "cover": "202601/i2xGLZRmg1pKVPCJr9jp26J6gscnyV_thumbnail.png,202601/IS7tYU2NlK0LFrG810ZGv99J5xL6Ja_thumbnail.png,202601/nvUsWQENwKmcoboPMZqIbQeenQMNUj_thumbnail.png,202601/FIGbBuGwy3ut39zc85oTcqCsDFxqzi_thumbnail.png,202601/XstrXft7fmQOXVIT73Y7TB9NppfgGw_thumbnail.png",
+        "createTime": "2026-01-10 21:52:03",
+        "maxPrice": 89.9,
+        "minPrice": 39.9,
+        "pCategoryId": "10005",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/3HbMHvk4s58Amos0hT0Kua9lWSh6hN.png)\n![](/api/file/getResource?sourceName=202601/Cih3uo5GvquqCQc9FaoWXsHnJUZVSp.png)\n![](/api/file/getResource?sourceName=202601/oKxGPjW97YLCXaO226JAVn48IxTC0M.png)\n",
+        "productId": "438316828084252",
+        "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃",
+        "status": 1,
+        "totalSale": 3
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1061",
+          "propertyName": "口味",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/T61o37DdrUL3JbocBDDNKMa7eniOdi_thumbnail.png",
+              "propertyRemark": "买5送5",
+              "propertyValue": "整箱10包",
+              "propertyValueId": "1768052963764"
+            },
+            {
+              "propertyCover": "202601/jq28F1PGLFvgzY7ZxUdmfDtmJIvjUE_thumbnail.png",
+              "propertyRemark": "买15送15",
+              "propertyValue": "整箱30包",
+              "propertyValueId": "1768053085531"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 39.9,
+          "productId": "438316828084252",
+          "propertyValueIdHash": "f4fc7960f18634140bb3c39919aeddb9",
+          "propertyValueIds": "1768052963764",
+          "sort": 0,
+          "stock": 97
+        },
+        {
+          "price": 89.9,
+          "productId": "438316828084252",
+          "propertyValueIdHash": "1e0045d66effc7214b82dd4c4b9cf773",
+          "propertyValueIds": "1768053085531",
+          "sort": 1,
+          "stock": 100
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20012",
+        "commendType": 0,
+        "cover": "202601/akAhLymjUbAnZSDTcPqyWQbkmlxyaI_thumbnail.png,202601/PMFaNfF6XqO7ljcWL07xbdsVDqXFQR_thumbnail.png,202601/lfLVz3KlU3BEzKUR8roduagp4gNgNi_thumbnail.png,202601/uPNraZENFsQyXBYTDF5dGQ9vZAplyb_thumbnail.png,202601/Fk425053famvStg2I0TGS8iEHuibcC_thumbnail.png",
+        "createTime": "2026-01-11 18:15:56",
+        "maxPrice": 59.9,
+        "minPrice": 59.9,
+        "pCategoryId": "10003",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/3gMe3J9PpAMgFiH6ied2s5wgsiP5IT.png)\n![](/api/file/getResource?sourceName=202601/LCCRtn7OF44Un4xTBQp7rCdKtGjGNf.png)\n![](/api/file/getResource?sourceName=202601/sJP6tw69O4cwIRKDINnx4jonc24v6o.png)\n![](/api/file/getResource?sourceName=202601/cwidFjuHKRQdu23GZ862LPDMN40DQP.png)\n",
+        "productId": "664740861226404",
+        "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯",
+        "status": 1,
+        "totalSale": 1
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1034",
+          "propertyName": "颜色分类",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/555DX0Iy22dLM58IEOcDnFAPNkHjQJ_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": " 0308 雨后木棉",
+              "propertyValueId": "1768126444657"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 59.9,
+          "productId": "664740861226404",
+          "propertyValueIdHash": "94234e67719428840e97e1aa60d08ca4",
+          "propertyValueIds": "1768126444657",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20008",
+        "commendType": 0,
+        "cover": "202601/pCs23yyJQRaW6Auyj3GYh8UsPM7EuL_thumbnail.jpg,202601/iefsqE9hoZuWkfMddNVcuf6f1mYnik_thumbnail.jpg,202601/7dbQc1kXd0TESCQBH1MwPu8jgBNaci_thumbnail.jpg,202601/mFMN0k8jOfm142zOcX8t7DtLSiHzDt_thumbnail.jpg,202601/1GHEodQXxSC2GGaWkqHeQ5YejviJ63_thumbnail.jpg",
+        "createTime": "2026-01-10 20:46:26",
+        "maxPrice": 189.9,
+        "minPrice": 189.9,
+        "pCategoryId": "10002",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/F3V11hIPVAnLRtryd7LNiZ2clmfOx0.png)\n![](/api/file/getResource?sourceName=202601/nLBuzMqEC7lzrmVmNIRdRhNqfaB5GN.png)\n![](/api/file/getResource?sourceName=202601/YNs9LB3HzMgeRFXpkjfelun49EL6Bs.png)\n",
+        "productId": "864824304719236",
+        "productName": "假两件格纹翻领棉服外套男冬季新款宽松加绒加厚大码男生夹克",
+        "status": 1,
+        "totalSale": 1
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1022",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/mX4mH55w82TrfH6N4oKGzHJZDxokS2_thumbnail.jpg",
+              "propertyRemark": "升级加绒款",
+              "propertyValue": "棕色",
+              "propertyValueId": "1768049124430"
+            },
+            {
+              "propertyCover": "202601/phDNO58hqftcZJOVaRTwVzfShk1cwo_thumbnail.jpg",
+              "propertyRemark": "加绒款",
+              "propertyValue": "黑色",
+              "propertyValueId": "1768049128413"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1023",
+          "propertyName": "尺码",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "M",
+              "propertyValueId": "1768049124431"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "L",
+              "propertyValueId": "1768049160885"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "XL",
+              "propertyValueId": "1768049161189"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "2XL",
+              "propertyValueId": "1768049161605"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "3XL",
+              "propertyValueId": "1768049168829"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "a926fe64ddd163da5d555efdca51d15f",
+          "propertyValueIds": "1768049124430-1768049124431",
+          "sort": 0,
+          "stock": 299
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "8b7da0343b63087230e07e7ca97f6ab6",
+          "propertyValueIds": "1768049124430-1768049160885",
+          "sort": 1,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "bd8d2ef6ebada96a9b80e7e678c73084",
+          "propertyValueIds": "1768049124430-1768049161189",
+          "sort": 2,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "c9164bf5e48a5624fb24a786dfbc053d",
+          "propertyValueIds": "1768049124430-1768049161605",
+          "sort": 3,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "9562078f6a22e5d45021e777611279b4",
+          "propertyValueIds": "1768049124430-1768049168829",
+          "sort": 4,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "d132f2253a2b8fde3a441d8d502d4c86",
+          "propertyValueIds": "1768049128413-1768049124431",
+          "sort": 5,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "9f34d88dc6b855752ccbe23c4709b74a",
+          "propertyValueIds": "1768049128413-1768049160885",
+          "sort": 6,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "19cc0f65d89b5789d661b787400958b8",
+          "propertyValueIds": "1768049128413-1768049161189",
+          "sort": 7,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "ec0f39fc0fa9dff67dd5c8c1d94ef8b8",
+          "propertyValueIds": "1768049128413-1768049161605",
+          "sort": 8,
+          "stock": 300
+        },
+        {
+          "price": 189.9,
+          "productId": "864824304719236",
+          "propertyValueIdHash": "f8c58ccab5cee51284aec41a73576a3f",
+          "propertyValueIds": "1768049128413-1768049168829",
+          "sort": 9,
+          "stock": 300
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20047",
+        "commendType": 0,
+        "cover": "2026-06/9UvGBHxeT3qfETLbpnOoRcYN9f74Kq.jpg,2026-06/PhKw9FHMsYak1liKh85SJn3EPECSH3.jpg,2026-06/JJvjTIOMeIDEYNLmodbBX1gAb551OU.jpg,2026-06/6oNs29GBhn56YWSObcGUTFYjE11sVj.jpg,2026-06/RJWhUAfvLCy9T3jWAER0MkycSL7aqy.jpg",
+        "createTime": "2026-06-20 15:52:36",
+        "maxPrice": 960.0,
+        "minPrice": 96.0,
+        "pCategoryId": "10011",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/YGSP2o7Qp5DnVsFhql13Tm9lv9Fubd.png)\n",
+        "productId": "519183041848998",
+        "productName": "任天堂港服NS充值卡香港Switch点卡100 200 300 400 500港区eshop预付卡",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1141",
+          "propertyName": "版本",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC1",
+              "propertyValueId": "17819418332082"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC2",
+              "propertyValueId": "1781941860337"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC3",
+              "propertyValueId": "1781941862513"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC4",
+              "propertyValueId": "1781941864822"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC5",
+              "propertyValueId": "1781941869103"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC6",
+              "propertyValueId": "1781941871760"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC7",
+              "propertyValueId": "1781941874615"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC8",
+              "propertyValueId": "1781941877552"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC9",
+              "propertyValueId": "1781941880065"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "DLC10",
+              "propertyValueId": "1781941882589"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 96.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "f91203dffdfa6f4a17f8cd1fa548c733",
+          "propertyValueIds": "17819418332082",
+          "sort": 0,
+          "stock": 999
+        },
+        {
+          "price": 192.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "b3c878b8b067e0acc5a873d792d0b2d0",
+          "propertyValueIds": "1781941860337",
+          "sort": 1,
+          "stock": 999
+        },
+        {
+          "price": 288.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "c000244cb72db2ad78af2df9a350d6a5",
+          "propertyValueIds": "1781941862513",
+          "sort": 2,
+          "stock": 999
+        },
+        {
+          "price": 384.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "42b3cf082eb383b009489b77b7ecddcb",
+          "propertyValueIds": "1781941864822",
+          "sort": 3,
+          "stock": 999
+        },
+        {
+          "price": 480.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "d09df7a3b96d5ecd5da7f43fcf4cae8c",
+          "propertyValueIds": "1781941869103",
+          "sort": 4,
+          "stock": 999
+        },
+        {
+          "price": 576.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "e30f4759b40fe34f0f06e0ed3bc1e7f1",
+          "propertyValueIds": "1781941871760",
+          "sort": 5,
+          "stock": 999
+        },
+        {
+          "price": 672.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "5e7a4ae3fd2796a6cca8e5374533b154",
+          "propertyValueIds": "1781941874615",
+          "sort": 6,
+          "stock": 999
+        },
+        {
+          "price": 768.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "2d2d5b3be4beca648daad5861c089ef3",
+          "propertyValueIds": "1781941877552",
+          "sort": 7,
+          "stock": 999
+        },
+        {
+          "price": 864.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "b884d4be304663f8d6e966efc32715d4",
+          "propertyValueIds": "1781941880065",
+          "sort": 8,
+          "stock": 999
+        },
+        {
+          "price": 960.0,
+          "productId": "519183041848998",
+          "propertyValueIdHash": "787a6b509b318a457f194c08fa3dc784",
+          "propertyValueIds": "1781941882589",
+          "sort": 9,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20046",
+        "commendType": 0,
+        "cover": "2026-06/DUGaqEsCZI4EHhVBXDPpYVfZKJ9nFY.jpg,2026-06/uEv3fDLxnEXzJDYl800cbdyKX5v3pr.jpg,2026-06/hjQpsOvMbjuxw5mplLoXkQ5ST72rG2.jpg,2026-06/3FYzZRim3m3nzIWwKgnqEQ0KepJoj2.jpg,2026-06/Utb0sY7ZfjRbppgeUqQ6EhDfzT8XJS.jpg",
+        "createTime": "2026-06-20 15:49:19",
+        "maxPrice": 158.0,
+        "minPrice": 158.0,
+        "pCategoryId": "10011",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/JUUyy5T2OI6AtumgKhd1iPckz4A3Qt.png)\n![](/api/file/getResource?sourceName=2026-06/rrbs89t2jsFGPAeLzHA7bv9PBtVOw0.png)\n![](/api/file/getResource?sourceName=2026-06/AWOLigOdQKHA45u7YhODV6LSSLdPfH.png)\n![](/api/file/getResource?sourceName=2026-06/q6nHyh6Ki0Fm8d5mEV09a8GKnzCaWC.png)\n![](/api/file/getResource?sourceName=2026-06/CgcWUpsC05LVmtZ1d5mV1gFM9J5RDS.png)\n",
+        "productId": "365554660873099",
+        "productName": "WPS Office【学生专享】超级会员2年卡744天论文排版外文翻译PPT模 直充到账",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1136",
+          "propertyName": "时长",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "744天",
+              "propertyValueId": "17819417099250"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1137",
+          "propertyName": "等级",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "超级会员2年卡",
+              "propertyValueId": "17819417099251"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 158.0,
+          "productId": "365554660873099",
+          "propertyValueIdHash": "587af7809d9e840e3e7bbcc093fd81c5",
+          "propertyValueIds": "17819417099250-17819417099251",
+          "sort": 0,
+          "stock": 99999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20045",
+        "commendType": 0,
+        "cover": "2026-06/JoDqEkpKc2jrUSoybe6SgsTJ5j3wOA.jpg,2026-06/ghbGi6meGEf2eW60jyZI9oRZXxpgz4.jpg,2026-06/AdRdTlo1NslsamlVy1Ns4uynaMhHmH.jpg,2026-06/rGz6EjK2SIyxSzZZjN3FivHvfkJIpw.jpg,2026-06/DK0p4iEe5q7HqDLppyuacY15BlU1xo.jpg",
+        "createTime": "2026-06-20 15:46:17",
+        "maxPrice": 890.0,
+        "minPrice": 890.0,
+        "pCategoryId": "10011",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/vJnRcfGE1Syle3SS4z4EuilZl4AZZC.png)\n![](/api/file/getResource?sourceName=2026-06/pMU6h4NE6n28M88CJH8cIdktu7xdTX.png)\n",
+        "productId": "857498255651316",
+        "productName": "SW SolidWorks软件安装包正版激活码服务 2025高级许可证企业商用序列 2024激活订阅正版授权 激活服务 2025版本【一年有效】",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1133",
+          "propertyName": "版本",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "2025版本【一年有效】",
+              "propertyValueId": "17819415083130"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 890.0,
+          "productId": "857498255651316",
+          "propertyValueIdHash": "cacdf38c13ba9519755b6a0e9bbf15db",
+          "propertyValueIds": "17819415083130",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20044",
+        "commendType": 0,
+        "cover": "2026-06/r9L058UAchM4M4kSx75wmdEI1sgoK8.jpg,2026-06/kU1kLxHMo5Deo2jN4owA3oPVqs5NLK.jpg,2026-06/w5OQJkMfcfVGymCODCzTWdM3BjNzou.jpg,2026-06/3anKatZl8ZcugPzvkK4kLdmpHu4BGv.jpg,2026-06/iNgLH1JBOMXJzfSn0kdsD77NUhb1wF.jpg",
+        "createTime": "2026-06-20 15:44:13",
+        "maxPrice": 4880.0,
+        "minPrice": 4880.0,
+        "pCategoryId": "10011",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/lYUiK3UkJDP5uP1E5xA0YQNz8VqyKA.png)\n",
+        "productId": "116420922896782",
+        "productName": "小猫爱学绘喵教育手绘商业插画板绘教程好课在线教学全套课程 日韩系统班",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "7428529912",
+          "propertyName": "班型",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/SpoIBilr7HlX1gdouDxcxemerRk3YA.jpg",
+              "propertyRemark": "",
+              "propertyValue": "日韩系统班",
+              "propertyValueId": "17819414067073"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 4880.0,
+          "productId": "116420922896782",
+          "propertyValueIdHash": "47b7881cf505d457bce7f2d02054f33e",
+          "propertyValueIds": "17819414067073",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20007",
+        "commendType": 0,
+        "cover": "2026-06/1RIU5KDj64UBwetub57PfIKXDf5YrK.jpg,2026-06/HzeKHXXWdjSN8cc4pS5OejbshjsRWm.jpg,2026-06/9mH4KOOywr7hSsUXgQ9Z06SAQJebwa.jpg,2026-06/2rMFCZkhfEk5rVUGBOgAYcx7G6pEGl.jpg,2026-06/PlcVWlveNOJ5RM9R0g2h3bVw0wpTMW.jpg",
+        "createTime": "2026-06-20 15:35:29",
+        "maxPrice": 10999.0,
+        "minPrice": 10999.0,
+        "pCategoryId": "10002",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/FwiRf31qwJvwNbauDs9peRp8m3YLyJ.png)\n![](/api/file/getResource?sourceName=2026-06/3CyQVeLiC9Xloy1OBq9Z8z1wRdWnkt.png)\n![](/api/file/getResource?sourceName=2026-06/PM17qIaDWBiKnMXcLByzH9V4MnJTeL.png)\n![](/api/file/getResource?sourceName=2026-06/g9amuJeHC4mIPMgdQNbMk5FZ6LpBEW.png)\n",
+        "productId": "587742827032945",
+        "productName": "春日野餐 古典玩偶 Lolita 洛丽塔 裙子",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1019",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/t0nyeBYggmCklQLWBPppuG0WtDp2D7.jpg",
+              "propertyRemark": "",
+              "propertyValue": "红色",
+              "propertyValueId": "17819408259360"
+            },
+            {
+              "propertyCover": "2026-06/JMLUVB1ChgjpYC9H6TyaPripU9XTVI.jpg",
+              "propertyRemark": "",
+              "propertyValue": "绿色",
+              "propertyValueId": "1781940882354"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1020",
+          "propertyName": "尺码",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "S",
+              "propertyValueId": "17819408259361"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "M",
+              "propertyValueId": "1781940869621"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "L",
+              "propertyValueId": "1781940871912"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 10999.0,
+          "productId": "587742827032945",
+          "propertyValueIdHash": "0060ba356d54cee9aed914c9d54eb3ae",
+          "propertyValueIds": "17819408259360-17819408259361",
+          "sort": 0,
+          "stock": 999
+        },
+        {
+          "price": 10999.0,
+          "productId": "587742827032945",
+          "propertyValueIdHash": "ed21e2e9f838cc00070a0c52dcacc628",
+          "propertyValueIds": "17819408259360-1781940869621",
+          "sort": 1,
+          "stock": 999
+        },
+        {
+          "price": 10999.0,
+          "productId": "587742827032945",
+          "propertyValueIdHash": "b444ef4c2cb88860ed29c088408370c0",
+          "propertyValueIds": "17819408259360-1781940871912",
+          "sort": 2,
+          "stock": 999
+        },
+        {
+          "price": 10999.0,
+          "productId": "587742827032945",
+          "propertyValueIdHash": "0b390a0dc8916155d487bbb1452ec61c",
+          "propertyValueIds": "1781940882354-17819408259361",
+          "sort": 3,
+          "stock": 999
+        },
+        {
+          "price": 10999.0,
+          "productId": "587742827032945",
+          "propertyValueIdHash": "793b81edad314067de006c22b835e828",
+          "propertyValueIds": "1781940882354-1781940869621",
+          "sort": 4,
+          "stock": 999
+        },
+        {
+          "price": 10999.0,
+          "productId": "587742827032945",
+          "propertyValueIdHash": "c8c2a7f95819df38fd11651ef0623229",
+          "propertyValueIds": "1781940882354-1781940871912",
+          "sort": 5,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20032",
+        "commendType": 0,
+        "cover": "2026-06/MGzI6tMytQZly4G8OEg4bCM3PiIqP2.jpg,2026-06/Od9XFMtdEXSqFqNtfKzDTDaftw8RIz.jpg,2026-06/tgLxu1Lvh45meA9QakzbUqKdvNNGps.jpg,2026-06/XvE7mWdD6DCqHrvfui58O42beA7HvB.jpg,2026-06/Tiq4Vqiaz81UfRDjwqHCHxtmPbEkr5.jpg",
+        "createTime": "2026-06-20 15:27:32",
+        "maxPrice": 488.0,
+        "minPrice": 488.0,
+        "pCategoryId": "10007",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/Sb39h19vTxmNjvFPYHVNGWJaSeAuMg.png)\n![](/api/file/getResource?sourceName=2026-06/CFZCd9VK5wW53fmNNMPkCIFrPUUges.png)\n![](/api/file/getResource?sourceName=2026-06/5WGjH64a1v8an0myvzwe06Jzdp9JiR.png)\n![](/api/file/getResource?sourceName=2026-06/bGwkIFZS7ty3D4fhwtEk7KzMHDw5xW.png)\n",
+        "productId": "088573992437392",
+        "productName": "君高 器材维修工具箱铝合金工具箱维修保养工具箱 军械员工具箱(京仓发货) 铝合金 25新型",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "5172604775",
+          "propertyName": "颜色",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/aBpTOKHSF2JQJq45Hc3OLdZEuNVgKZ.jpg",
+              "propertyRemark": "",
+              "propertyValue": "军械员工具箱 铝合金(京仓发货)",
+              "propertyValueId": "17819404064233"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 488.0,
+          "productId": "088573992437392",
+          "propertyValueIdHash": "2b128a73fbcc1f31046fce5291d6d008",
+          "propertyValueIds": "17819404064233",
+          "sort": 0,
+          "stock": 99999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20031",
+        "commendType": 0,
+        "cover": "2026-06/ivrBW0gIKWLUmHTvRi0zVPLP5JOLyE.jpg,2026-06/vDHfBXY7MvCDB9efOWoBzNoSdf2TqV.jpg,2026-06/lBUH3kuh49XyCuMMWPp3eiFdWQzwRv.jpg,2026-06/efIoXwvMn849QvEADbVVfNuhyrOwr8.jpg,2026-06/UzEiypG9aK51t6LkGTfaViAdNGlKMF.jpg",
+        "createTime": "2026-06-20 15:23:07",
+        "maxPrice": 109.0,
+        "minPrice": 109.0,
+        "pCategoryId": "10007",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/zcSH1ysWn2zdkzPUC7CM6chXvkIGGO.png)\n![](/api/file/getResource?sourceName=2026-06/AYP44bZCyYXdehWrBAPR5zfs07ftwm.png)\n![](/api/file/getResource?sourceName=2026-06/aZ3IGmFbPMTLgn7Vk1DeZw2LJNIHPK.png)\n![](/api/file/getResource?sourceName=2026-06/H1Y1W5LrZFAeVgPu52YPtizR7PzDF9.png)\n",
+        "productId": "435499775288057",
+        "productName": "点氛车载香薰固体香膏男士专用持久留香汽车香水车内香氛古刹檀香",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1093",
+          "propertyName": "款式",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "210g",
+              "propertyValueId": "17819401667070"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "2138007062",
+          "propertyName": "香型",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/91DuS0sj3IkDGPm40ftDjj8uNEekLE.jpg",
+              "propertyRemark": "",
+              "propertyValue": "古刹檀香丨进口香料丨全车飘香",
+              "propertyValueId": "17819401443463"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 109.0,
+          "productId": "435499775288057",
+          "propertyValueIdHash": "abd34d84ec59e4ff5625bf2a63aecd44",
+          "propertyValueIds": "17819401667070-17819401443463",
+          "sort": 0,
+          "stock": 99999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20030",
+        "commendType": 0,
+        "cover": "2026-06/y5ZgB84vp8hKIZcJeTLaD35lS4XFE2.jpg,2026-06/8lTdbjf1qI4DwqjzURwTwsx5gSQ29b.jpg,2026-06/haPbFx0HrHyZWTrs25CR2c1a6XV9dy.jpg,2026-06/pbIZkkQlFSdGXUa9f62yhXjsbO6umj.jpg,2026-06/nMQY7DlpiVD9GPFtgewiPB9P7hmUpZ.jpg",
+        "createTime": "2026-06-20 15:20:21",
+        "maxPrice": 1298.0,
+        "minPrice": 1298.0,
+        "pCategoryId": "10007",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/jtodXkCKYJEbc8IPpjtHtgJMUIETjg.png)\n![](/api/file/getResource?sourceName=2026-06/aKwAfedSE1RyzIcyEZuw6s4YBSyjVD.png)\n![](/api/file/getResource?sourceName=2026-06/pn9Ma051SrF64fFphn0prbPNGGplan.png)\n![](/api/file/getResource?sourceName=2026-06/5G6Hb5bZi64c6fCGrfDQaiciUrneB4.png)\n",
+        "productId": "627057993813554",
+        "productName": "飞艇航天级TPE汽车脚垫适用于蔚来ES8/ET5/ET5T/ES6/EC6耐刮防护配件 蔚来ES8六座（26款）TPE脚垫+银河抗污毯",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "5278490097",
+          "propertyName": "颜色",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/U8oxvtJI7CUiyKMl9Z1Q7EgooeIMfp.jpg",
+              "propertyRemark": "",
+              "propertyValue": "蔚来ES8六座（26款）TPE脚垫+银河抗污毯",
+              "propertyValueId": "17819399758783"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 1298.0,
+          "productId": "627057993813554",
+          "propertyValueIdHash": "02ba25deafa6bbaf57b50a5983cf7f46",
+          "propertyValueIds": "17819399758783",
+          "sort": 0,
+          "stock": 9999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20027",
+        "commendType": 0,
+        "cover": "2026-06/apedrrYicI8pyh4un1XUHRTIdnQCtC.jpg,2026-06/aQcP4FpBCxplbJsNj13a8YURBdsBvo.jpg,2026-06/4BRLTNkx4aV3i1iWvlPpjatVF5hJBj.jpg,2026-06/KCj8KMHAcvy21qNGIbd2ki6pub9iQ2.jpg,2026-06/3ucYUeIwOprUl6YFAAnS1CIG5pLSMV.jpg",
+        "createTime": "2026-06-20 15:13:29",
+        "maxPrice": 79.9,
+        "minPrice": 79.9,
+        "pCategoryId": "10006",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/CPuEai9UJKiichn8seydNvgsmBevFc.png)\n![](/api/file/getResource?sourceName=2026-06/xVH9osA9J18P1eR1BMyJvY3qcqLkJa.png)\n![](/api/file/getResource?sourceName=2026-06/ZrCise4Wdykh12pM6WLGxCbDz1Yxbf.png)\n![](/api/file/getResource?sourceName=2026-06/Clq4APnBNtI2y1dJX50KBjY2dwN9kz.png)\n",
+        "productId": "484914171487881",
+        "productName": "匹克（PEAK）筋膜枪按摩器肩颈腰背按摩仪肌颈膜枪专业级迷你便携式健身肌肉放松父母亲节春节情人七夕礼物男女",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "2021517804",
+          "propertyName": "颜色",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/BdIcENbf1Hsj6apY8rA3tM23NCBDYE.jpg",
+              "propertyRemark": "",
+              "propertyValue": "行业【第一】1800mAh+变速压感灯",
+              "propertyValueId": "17819395475063"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 79.9,
+          "productId": "484914171487881",
+          "propertyValueIdHash": "64b36a8c943fadcc17a93abe5134c570",
+          "propertyValueIds": "17819395475063",
+          "sort": 0,
+          "stock": 999999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20029",
+        "commendType": 0,
+        "cover": "2026-06/Vg6XutdF4eeJ3WaWIDTnyfpKVN5LV4.jpg,2026-06/mLVZMUh7N9mag1Y3kN2sDCm1YMo4Nj.jpg,2026-06/l51I6aIEBg1fISPijjlO761cSBkdR7.jpg,2026-06/fSoPI3vKGAegmJAdGWOnNIbZBSYSqt.jpg,2026-06/LTPBDy8HPUO34bj7WaakgWaUY86sqC.jpg",
+        "createTime": "2026-06-20 15:10:27",
+        "maxPrice": 13999.0,
+        "minPrice": 13999.0,
+        "pCategoryId": "10006",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/8UTMGjDkvJ6VVEQNrnT9xaW4Xmcwgs.png)\n![](/api/file/getResource?sourceName=2026-06/mjYJTXZK8agEYfHjdjAJCaFC1VJPho.png)\n![](/api/file/getResource?sourceName=2026-06/KU30L6ThqIKeABK564f4v3vrrsO2J9.png)\n![](/api/file/getResource?sourceName=2026-06/tc2Kgg03wxBaKsPe08HE7JlR8y38EM.png)\n",
+        "productId": "293985085089344",
+        "productName": "ANKER安克立体纹理百万色全彩打印喷绘印刷eufyMake UV浮雕打印自清洁3D打印安克UV打印机E1",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "8022543115",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "立体纹理打印机",
+              "propertyValueId": "17819393652823"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "6891354445",
+          "propertyName": "颜色",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/xgiFFJhJyuYDJexGSQaCV2ss4hlDs3.jpg",
+              "propertyRemark": "",
+              "propertyValue": "灰黑色",
+              "propertyValueId": "17819393652824"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 13999.0,
+          "productId": "293985085089344",
+          "propertyValueIdHash": "f1bfcbd886dbd0e958cbcf488b9c29a0",
+          "propertyValueIds": "17819393652823-17819393652824",
+          "sort": 0,
+          "stock": 9999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20026",
+        "commendType": 0,
+        "cover": "2026-06/zj6WcId2vYSJDLwPWHcMDJhGQnaCWQ.jpg,2026-06/V2o62jQi1gdvr3SUC6l0BoMgCctU0W.jpg,2026-06/ubuJuDahSB4nApfsTPyyPgf4hi0unZ.jpg,2026-06/LFCLUItoEOS8VPzmXJGRD71a5S9u4N.jpg,2026-06/TH9zWA7lKMO8AxwHB3nFBAj8Y0tTyN.jpg",
+        "createTime": "2026-06-20 15:07:26",
+        "maxPrice": 34.4,
+        "minPrice": 34.4,
+        "pCategoryId": "10006",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/HtMNlCU94HpURwhVSjXLtIiGAL5OwB.png)\n![](/api/file/getResource?sourceName=2026-06/Bbt2I7e2uVK0CB0im2CXhE34jTSSP3.png)\n![](/api/file/getResource?sourceName=2026-06/voRGAqgdA2rtpM62cScBAG8fkPCict.png)\n![](/api/file/getResource?sourceName=2026-06/FOVxOnGpVmVBXsbSbZYbvsyLm4pINL.png)\n\n",
+        "productId": "583435458113015",
+        "productName": "红楼梦 我国古典小说的巅峰之作（1书+1MP3）",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "7011105661",
+          "propertyName": "颜色",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/gHAGv5f3wBfIcBUsqOUzthCKM9NnfQ.jpg",
+              "propertyRemark": "",
+              "propertyValue": "红楼梦",
+              "propertyValueId": "17819391724073"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 34.4,
+          "productId": "583435458113015",
+          "propertyValueIdHash": "0a988e535ff53df1adec93c2476b3393",
+          "propertyValueIds": "17819391724073",
+          "sort": 0,
+          "stock": 99999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20025",
+        "commendType": 0,
+        "cover": "2026-06/3jx48XPa26oh67pmEWJqHlMrzFBgLd.jpg,2026-06/CF3jlJfL9w4v3XlLZ9LoZRwih3BjnB.jpg,2026-06/yfnZ77r1KF1bgWUr3bo4S07JohiOUh.jpg,2026-06/gGjFPdDRl61X6Y6lSHQ7TKHcayBj9Z.jpg,2026-06/IJkcCSUacyftSdPE99At3shPUfk3EL.jpg",
+        "createTime": "2026-06-20 15:03:32",
+        "maxPrice": 289.8,
+        "minPrice": 289.8,
+        "pCategoryId": "10005",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/0L4yX18qfGhZGt5nAtSqQLOR8EN5jn.png)\n![](/api/file/getResource?sourceName=2026-06/FfQgwEOVlgNN3mMvOkCwyryCqvjHhi.png)\n![](/api/file/getResource?sourceName=2026-06/dAphAsdzpqTyCdaBrb0bQ6xnbRiP57.png)\n![](/api/file/getResource?sourceName=2026-06/TsevP8jzgCuHXIS7Xqb0BdLLT2jaBd.png)\n",
+        "productId": "485810554704298",
+        "productName": "同仁堂品牌 北京同仁堂正宗西洋参片礼盒250g花旗参送父母长辈补品礼品",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "1627217349",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "爆款礼遇系列",
+              "propertyValueId": "17819389587753"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "3419014094",
+          "propertyName": "规格",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/M9Qwz0yauTisSavb6JU1gollCMHEwI.jpg",
+              "propertyRemark": "",
+              "propertyValue": "致长辈-福罐礼盒显心意 250g*1盒",
+              "propertyValueId": "17819389587754"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 289.8,
+          "productId": "485810554704298",
+          "propertyValueIdHash": "e8829f3d7b3aecd082e02c275da97e63",
+          "propertyValueIds": "17819389587753-17819389587754",
+          "sort": 0,
+          "stock": 999999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20024",
+        "commendType": 0,
+        "cover": "2026-06/5RiYRCS0mzs735otaxv5IV37xd05Ls.jpg,2026-06/wPzGrHUgmSamqdpFKVS2bEtMNkzyXy.jpg,2026-06/ikpD5IAN312sxpT1uS86URnhrsdgOf.jpg,2026-06/vaeim5UhVkt3T8ixeP3pwDY4Iza3To.jpg,2026-06/ko9ZRRohTOE4xLuJ5fPfvcMBexjIRj.jpg",
+        "createTime": "2026-06-20 15:00:11",
+        "maxPrice": 19.4,
+        "minPrice": 19.4,
+        "pCategoryId": "10005",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/gTXaksGdmqtjnjlCFl9uiugPlBP4Ge.png)\n![](/api/file/getResource?sourceName=2026-06/n3BwkrNtycEjhBJR1ldbbfLxuuhjOn.png)\n![](/api/file/getResource?sourceName=2026-06/HdMrD4pn7kUoAT6YwhHv59p2D3taMf.png)\n![](/api/file/getResource?sourceName=2026-06/RABLSyq6KmASicOATW4xY74w6W9xkK.png)\n",
+        "productId": "327158568449097",
+        "productName": "海天厨房调料组合套装油盐酱醋组合装家庭宿舍调料大全调味料做饭礼盒 【性价比Plus】常用调料12件套",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "0636252148",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "爆款调料套装",
+              "propertyValueId": "17819387631393"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "3019891428",
+          "propertyName": "规格",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/msGa8pdmDMTcRSjh8bPq8ivTmbA92F.jpg",
+              "propertyRemark": "",
+              "propertyValue": "【性价比Plus】常用调料12件套",
+              "propertyValueId": "17819387631394"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 19.4,
+          "productId": "327158568449097",
+          "propertyValueIdHash": "126870c30e7170e4e3df0eb1eb74958b",
+          "propertyValueIds": "17819387631393-17819387631394",
+          "sort": 0,
+          "stock": 999999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20020",
+        "commendType": 0,
+        "cover": "2026-06/U7LZN7XdQJXUuWtHB51RT7FHQpadPR.jpg,2026-06/ufoX9mSzvWdOYoOqWPRafRwQ0QNwy2.jpg,2026-06/9pWtjoV3AGZIH69Ys2eJBxdU1Xlchh.jpg,2026-06/eHEuuMe2ltJ5lRReZKJgU16ufUoBe3.jpg,2026-06/pCPH71CBKtwQdb6Z2K64IadFUEWsOG.jpg",
+        "createTime": "2026-06-20 14:51:38",
+        "maxPrice": 319.6,
+        "minPrice": 319.6,
+        "pCategoryId": "10004",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/FlT9BHptAfSXiFXJyjuNhJsmac5eZd.png)\n![](/api/file/getResource?sourceName=2026-06/RuXayEzbALTkcd2a8CNW5VdJScQknh.png)\n![](/api/file/getResource?sourceName=2026-06/iONemXSmqs4JCfvvzlybdE7SodAdlu.png)\n![](/api/file/getResource?sourceName=2026-06/9Q6lULvoEj3QeWpSU2mVO73NSnQXMP.png)\n",
+        "productId": "578084699484498",
+        "productName": "拖把置物架架不锈钢扫把架拖布架沥水架学校工厂落地式清洁工具收纳架 卡夹款5卡6钩",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "0345311493",
+          "propertyName": "规格",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/CicRy2BKGQER6aTSnXwSOiepkKAJdo.jpg",
+              "propertyRemark": "",
+              "propertyValue": "卡夹款5卡6钩",
+              "propertyValueId": "17819382380913"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 319.6,
+          "productId": "578084699484498",
+          "propertyValueIdHash": "3994b5987f56a764b2cb696f5725342b",
+          "propertyValueIds": "17819382380913",
+          "sort": 0,
+          "stock": 9999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20018",
+        "commendType": 0,
+        "cover": "2026-06/bXQsj5Etgp6XPCDbWJOO4psOloE55o.jpg,2026-06/tCULa6UAkz0q99OoJyM6W0t07bs6TI.jpg,2026-06/c6anMRV9cJFlE1oRGJ55607kGDSE6C.jpg,2026-06/2tRiyb0PWDU1zAo3JUHRw645d0b5P9.jpg,2026-06/YnMXWYyZclnB2bgiycZfYk8HJuHbSb.jpg",
+        "createTime": "2026-06-20 14:37:53",
+        "maxPrice": 379.0,
+        "minPrice": 379.0,
+        "pCategoryId": "10004",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/SsPQXhjnaSffRQggYuo8K9PoAeLAXJ.png)\n![](/api/file/getResource?sourceName=2026-06/4M8npsFiW3UFqWoPjugAARxSZfqhtU.png)\n![](/api/file/getResource?sourceName=2026-06/675dgk7yA7pYpkQ0n3tPpy8llaT7mN.png)\n![](/api/file/getResource?sourceName=2026-06/poMtgFIm0r5JP2VDxRvFRsMosWHnLY.png)\n\n",
+        "productId": "694835806434643",
+        "productName": "以辰景德镇68头餐具整套碗具碗碟套装家用碗筷碗盘洗碗机可用送礼物",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "9457941046",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "金枝玉叶系列",
+              "propertyValueId": "17819374367903"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "4274999756",
+          "propertyName": "款式",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/F2HKGK7wI8387FlX2AceWbShRDWO2N.jpg",
+              "propertyRemark": "",
+              "propertyValue": "【店铺主推】金枝玉叶68头",
+              "propertyValueId": "17819374367904"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 379.0,
+          "productId": "694835806434643",
+          "propertyValueIdHash": "b3534182b1ca18f4967fdae885256791",
+          "propertyValueIds": "17819374367903-17819374367904",
+          "sort": 0,
+          "stock": 9999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20014",
+        "commendType": 0,
+        "cover": "2026-06/URkRvHeRcSICJ82g80DmDZaf1CPRNT.jpg,2026-06/CD4ZHxP8GE1T32cbIcNsVsZJx9DI1K.jpg,2026-06/GvWqOftciMx4FDpgYbDwa411O3KMbw.jpg,2026-06/FSbJjxBfM80ht7rp4Qouj8RZSyGrg7.jpg,2026-06/K0SWJmaV6g3oE8rKYE1gCyfpoQTlTv.jpg",
+        "createTime": "2026-06-20 14:30:33",
+        "maxPrice": 179.0,
+        "minPrice": 179.0,
+        "pCategoryId": "10003",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/lEgdqgE8OJOH9HVeMoomvFwpAeepo8.png)\n![](/api/file/getResource?sourceName=2026-06/GAjOn7oJNybx9ny8nkO8vMwum8x8u1.png)\n![](/api/file/getResource?sourceName=2026-06/eT9yiXaxQFPycTwIp2du3RSbJNR4T0.png)\n![](/api/file/getResource?sourceName=2026-06/gfuas0FKEOpWZK0xGOuRb3evd4qVRy.png)\n",
+        "productId": "467794132963439",
+        "productName": "babycare新生儿见面礼盒衣服婴儿礼物周岁初生宝宝用品大全 淡焦黄 66cm",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1040",
+          "propertyName": "尺码",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "66cm",
+              "propertyValueId": "17819369574510"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "0588847267",
+          "propertyName": "系列品",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "轻柔天使限定礼盒",
+              "propertyValueId": "17819369574511"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "3096733438",
+          "propertyName": "颜色",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/21Tat79bobg66gee5ohluaGiTLvXTK.jpg",
+              "propertyRemark": "",
+              "propertyValue": "淡焦黄",
+              "propertyValueId": "17819369574512"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 179.0,
+          "productId": "467794132963439",
+          "propertyValueIdHash": "29cf1d6ace513f31b75d90484b99d653",
+          "propertyValueIds": "17819369574510-17819369574511-17819369574512",
+          "sort": 0,
+          "stock": 9999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20013",
+        "commendType": 0,
+        "cover": "2026-06/X3bLTxb0pDOWtc7BKGudlWR4pXW5co.jpg,2026-06/TRC8jIAgNSclIhpMWHnWOW5yDquqKv.jpg,2026-06/rMlrwga4GaMNYiE7ZoIZYSzQaMBfDs.jpg,2026-06/6Pirf1EtWcnffInZfh8gOvUXCvfwyX.jpg,2026-06/rrhiGGWAFNNaRaEaDU68dBZV4xp7N6.jpg",
+        "createTime": "2026-06-20 14:25:36",
+        "maxPrice": 259.0,
+        "minPrice": 259.0,
+        "pCategoryId": "10003",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/twdbnXciR2NFB41RmwybT0tCSUuETG.png)\n![](/api/file/getResource?sourceName=2026-06/cTYIMJsLbIKCcHsNhlN4jnKOSsgaA4.png)\n![](/api/file/getResource?sourceName=2026-06/8HdAd2t1v45kdHaN5T3ewiXGhJfp5A.png)\n![](/api/file/getResource?sourceName=2026-06/fnia9PkmEQX3FTO6FS05LuQVJ7YHMj.png)\n",
+        "productId": "811128851953351",
+        "productName": "欧莱雅第四代小蜜罐胶原面霜滋润紧致抗皱抗老补水保湿护肤品送妈妈礼物 第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml 女士优选",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 0,
+          "propertyId": "2031902811",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "面霜",
+              "propertyValueId": "17819366864733"
+            }
+          ]
+        },
+        {
+          "coverType": 1,
+          "propertyId": "0303189060",
+          "propertyName": "产品",
+          "propertySort": 5,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/3guNWVKOPIa2Kycaq5Qw5SjLAU39jH.jpg",
+              "propertyRemark": "",
+              "propertyValue": "第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml",
+              "propertyValueId": "17819366864734"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "7992149822",
+          "propertyName": "其他信息",
+          "propertySort": 6,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "女士优选",
+              "propertyValueId": "17819366864735"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 259.0,
+          "productId": "811128851953351",
+          "propertyValueIdHash": "97e63eb29644e87c88b402b2c827a734",
+          "propertyValueIds": "17819366864733-17819366864734-17819366864735",
+          "sort": 0,
+          "stock": 9999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20010",
+        "commendType": 0,
+        "cover": "2026-06/rMHi7MLPENovo8m9mkQTgHklfXorFS.jpg,2026-06/OstpA5BgEfAa44qHktXyBPP6YVTRJ1.jpg,2026-06/89vceZjlCXGxGogfdYnmZF37jgzIn0.jpg,2026-06/fAmGxbCB7ThKyKlI7UpsQtVVwEs2n1.jpg,2026-06/gyzuwIbh41kYP1DPksb9lQIOzvvoqN.jpg",
+        "createTime": "2026-06-20 14:19:42",
+        "maxPrice": 938.0,
+        "minPrice": 938.0,
+        "pCategoryId": "10002",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/PFa00WrSrWLZCHLyUKKHd00q51HUlj.png)\n![](/api/file/getResource?sourceName=2026-06/rlphQpjxcZtgZ5bDz40h4wWXTBaB6N.png)\n![](/api/file/getResource?sourceName=2026-06/OjYymddyiCNPO2BAmL9FmB8fEjHs7Y.png)\n![](/api/file/getResource?sourceName=2026-06/EN6aVTWygnX6aXe7BRM6ojksSrcVcL.png)\n",
+        "productId": "270126564877983",
+        "productName": "Walker Shop品牌新款旅行包男新款训练包干湿分离大容量手提单肩斜跨健身包 黑色大号【鞋仓+干湿分离】",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1028",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/s4ramrfnpW6OfZ91KDAuX8j0NectzO.jpg",
+              "propertyRemark": "",
+              "propertyValue": "黑色大号【鞋仓+干湿分离】",
+              "propertyValueId": "17819363169580"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 938.0,
+          "productId": "270126564877983",
+          "propertyValueIdHash": "5bc81db5c779439586beb280cb3c3103",
+          "propertyValueIds": "17819363169580",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20009",
+        "commendType": 0,
+        "cover": "2026-06/hrrJiXJ7CFp8cXaGlAvsdVdsNeOumD.jpg,2026-06/EjIPM5KCOC0lIq2IjJhgiGeF5K01DB.jpg,2026-06/v717wwY198FFBN16aIEFAxH8vdAhr6.jpg,2026-06/EHGD2qgBq6AEZSGQYFvJqBns2lzKI1.jpg,2026-06/GHkfElgxnF2veJSQE9ml7Prw1yuiUj.jpg",
+        "createTime": "2026-06-20 14:16:26",
+        "maxPrice": 1800.0,
+        "minPrice": 1800.0,
+        "pCategoryId": "10002",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/yzqnrkQAzWbnOCOMthqqK8hZRWCwtd.png)\n![](/api/file/getResource?sourceName=2026-06/OsCLX6mN0ZPEPD1YMjOiJMcDGrrdOI.png)\n![](/api/file/getResource?sourceName=2026-06/ve5qHFcDmYHyWNvzlp2aOgNHyNovSu.png)\n![](/api/file/getResource?sourceName=2026-06/shUptK58fOmS4vKRtqViF4Rr1Xa31K.png)\n",
+        "productId": "993921843864063",
+        "productName": "KAILAS凯乐石M8软壳衣男女户外登山耐磨弹力透气轻量防风连帽外套春秋 ",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1025",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/jKSnEdaxfyXF6MD919uT8CwlAGfIPE.jpg",
+              "propertyRemark": "",
+              "propertyValue": "玄青黑",
+              "propertyValueId": "17819360956630"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1026",
+          "propertyName": "尺码",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "XS",
+              "propertyValueId": "17819360956631"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "S",
+              "propertyValueId": "1781936132226"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "M",
+              "propertyValueId": "1781936133632"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "L",
+              "propertyValueId": "1781936138489"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "XL",
+              "propertyValueId": "1781936140458"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "2XL",
+              "propertyValueId": "1781936146495"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 1800.0,
+          "productId": "993921843864063",
+          "propertyValueIdHash": "3638d3373fe1c1414f783941d1f65c8c",
+          "propertyValueIds": "17819360956630-17819360956631",
+          "sort": 0,
+          "stock": 999
+        },
+        {
+          "price": 1800.0,
+          "productId": "993921843864063",
+          "propertyValueIdHash": "e30baa9d4076c5db9d4681f27145f935",
+          "propertyValueIds": "17819360956630-1781936132226",
+          "sort": 1,
+          "stock": 999
+        },
+        {
+          "price": 1800.0,
+          "productId": "993921843864063",
+          "propertyValueIdHash": "dcdcbee756b8ec82d5a97de622aedc7a",
+          "propertyValueIds": "17819360956630-1781936133632",
+          "sort": 2,
+          "stock": 999
+        },
+        {
+          "price": 1800.0,
+          "productId": "993921843864063",
+          "propertyValueIdHash": "6cb28db8e2c687c0de912a3bf6899443",
+          "propertyValueIds": "17819360956630-1781936138489",
+          "sort": 3,
+          "stock": 999
+        },
+        {
+          "price": 1800.0,
+          "productId": "993921843864063",
+          "propertyValueIdHash": "c4544af110eefa5477ac2ff8790464bc",
+          "propertyValueIds": "17819360956630-1781936140458",
+          "sort": 4,
+          "stock": 999
+        },
+        {
+          "price": 1800.0,
+          "productId": "993921843864063",
+          "propertyValueIdHash": "2b0ae2d1bd6a1fd488227492b9c38440",
+          "propertyValueIds": "17819360956630-1781936146495",
+          "sort": 5,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20004",
+        "commendType": 0,
+        "cover": "2026-06/YWjvYOeY0nyxcbdHpfIs032s5GvVAw.jpg,2026-06/URDFN1V1XwxYAcSA2Gp4D1YxQpg1mA.jpg,2026-06/o2vbTGnjAlvaJDsiBdHWK29NM4iULJ.jpg,2026-06/1uNO2I89Tumgzt0cvRloIo1S8VlMRZ.jpg,2026-06/Sbkk0tHjTLhpQUh2vojX0uk5OYkGNg.jpg",
+        "createTime": "2026-06-20 14:11:58",
+        "maxPrice": 12890.0,
+        "minPrice": 12890.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/JPL9cx7CN7gS2DjWyTLx7w1LFHZLWY.png)\n![](/api/file/getResource?sourceName=2026-06/8Xr1KEJJ9VJtwh7ScaWiq8zXQ5sWvf.png)\n![](/api/file/getResource?sourceName=2026-06/oxR4gUjTz8NfCwqlGGcD68sEqOjUFY.png)\n![](/api/file/getResource?sourceName=2026-06/HiQZf7N5yzgVsBjAv4Zk9940uIPySr.png)\n",
+        "productId": "563738828031657",
+        "productName": "西门子（SIEMENS）71升德国原装进口蒸烤一体机蒸烤炸搪瓷内胆4D热风立体环绕烤精控探针空气炸多重自清洁HS756G3B1W 黑色",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1010",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "黑色",
+              "propertyValueId": "17819358563970"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 12890.0,
+          "productId": "563738828031657",
+          "propertyValueIdHash": "7340264b46cb61351cde5c53e004ca3d",
+          "propertyValueIds": "17819358563970",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20004",
+        "commendType": 0,
+        "cover": "2026-06/lrNOZddxrqEDUB3RiAZajL838GM24L.jpg,2026-06/HahSNnpm8seMGqPTOGHgZamaZ0kNgV.jpg,2026-06/yRCFXkAI5WhH4TyZRuDHDNjhfZYrAl.jpg,2026-06/krLzq9ha3CBLWsItpIvono7ihWsdZw.jpg,2026-06/5HnTv97Uc8NmgGCThtZ9deSxrcRu1L.jpg",
+        "createTime": "2026-06-20 01:55:54",
+        "maxPrice": 7291.0,
+        "minPrice": 7291.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/tWPTrKWewmb4id0vMOtYK6wunzFESZ.png)\n![](/api/file/getResource?sourceName=2026-06/aJeOSia9hCEcSG4oZ5q24Hf4QgjCZu.png)\n![](/api/file/getResource?sourceName=2026-06/8jMGEmYAsVYRzxUJIxwE1do6p0CQES.png)\n![](/api/file/getResource?sourceName=2026-06/oI77M43jljM7iUimZPAB9K2uT8d4PY.png)\n![](/api/file/getResource?sourceName=2026-06/pG1mQIRA1KPxHFyHC5EgUNNQEFNZl6.png)\n",
+        "productId": "055216728343001",
+        "productName": "COLMO北极星净水器C3套装 家用厨下十年RO反渗透母婴直饮机 触控龙头 1200G大通量净水器管线机套装 2件套丨C3净水器+A1管线机",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1012",
+          "propertyName": "型号",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "北极星C3净饮套餐",
+              "propertyValueId": "17818916784472"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 7291.0,
+          "productId": "055216728343001",
+          "propertyValueIdHash": "49100fc0555547da60776b5ace0dca93",
+          "propertyValueIds": "17818916784472",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20004",
+        "commendType": 0,
+        "cover": "2026-06/mhqT81mtrtTqpJUguljdlBB4eoj4kB.jpg,2026-06/RFEe9jqrI8rU9BrGdidmUEnJLSYgCC.jpg,2026-06/R1e4UAs1RYkrX91d7Qs3Nq9oE7WBGr.jpg,2026-06/f5uBnRzlxZIZNHkyuGB5lDqvxgDUi4.jpg,2026-06/EH7Ufiey5JdTcdTMPIh1G6d7cFW2Wc.jpg",
+        "createTime": "2026-06-20 01:52:10",
+        "maxPrice": 7087.0,
+        "minPrice": 7087.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/Ux0WjmEGRnGt0SX2QBknu2vTEGqhcx.png)\n![](/api/file/getResource?sourceName=2026-06/I9IAz9al9t1x2UvX9RxcQIPFEkGB4a.png)\n![](/api/file/getResource?sourceName=2026-06/tjHDVBCmG7f9XtEUjEKbswKyf5d48l.png)\n![](/api/file/getResource?sourceName=2026-06/YdmxIx0Vs9byYho0MAKTG4W7XsuFBO.png)\n\n",
+        "productId": "547755968243478",
+        "productName": "352空气净化器除甲醛除花粉除菌猫毛宠物TVOC异味 除过敏认证新房家用塔式双风机Z90",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1012",
+          "propertyName": "型号",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "全效系列Z90",
+              "propertyValueId": "17818913299662"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 7087.0,
+          "productId": "547755968243478",
+          "propertyValueIdHash": "37cab855bb458dbc29802d55a9327da0",
+          "propertyValueIds": "17818913299662",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20001",
+        "commendType": 0,
+        "cover": "2026-06/9hIWG2qJFGVjpYLpeefUfbZYyocdXR.jpg,2026-06/Cyg6otkhTTvP94QpCRjzfb3QDe8LH8.jpg,2026-06/9oKyzaQjpF5YHtvewIWeDT5hHWmzel.jpg,2026-06/mU22NMQjkwaa4Su2M67QzGeNbN6JP5.jpg,2026-06/aQtDeK0XcsTg68IcZFZe3jD0STwrQ7.jpg",
+        "createTime": "2026-06-20 01:43:37",
+        "maxPrice": 6849.0,
+        "minPrice": 6379.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/4TTug2mdqhv7KuH82T3N0OTn2QvFyC.png)\n![](/api/file/getResource?sourceName=2026-06/bGz4BYrXgPBRjNFiz0ftnd0sk5UKI1.png)\n![](/api/file/getResource?sourceName=2026-06/SohUin7Dcw82LEZJkT0PyGljTrUtaP.png)\n",
+        "productId": "053997047858558",
+        "productName": "三星（SAMSUNG） Z Fold6大折叠屏5G全网通 高端 AI商务双卡旗舰智能手机",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1001",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/GAlx8D39iXNPhUAWgCHA6UplNXQBsw.jpg",
+              "propertyRemark": "",
+              "propertyValue": "星夜银",
+              "propertyValueId": "17818909121210"
+            },
+            {
+              "propertyCover": "2026-06/ZKCuvCax7std74bZ4GRemJjjNZfFQ2.jpg",
+              "propertyRemark": "",
+              "propertyValue": "冷夜蓝",
+              "propertyValueId": "1781890936994"
+            },
+            {
+              "propertyCover": "2026-06/YZH5a33P0oqRnV0yeW39Y2WB7P4aZx.jpg",
+              "propertyRemark": "",
+              "propertyValue": "浅玫粉",
+              "propertyValueId": "1781890946377"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "1098012240",
+          "propertyName": "存储容量",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "12+512G",
+              "propertyValueId": "17818909121211"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 6849.0,
+          "productId": "053997047858558",
+          "propertyValueIdHash": "34cf4407cc4d257679465f26646c9023",
+          "propertyValueIds": "17818909121210-17818909121211",
+          "sort": 0,
+          "stock": 999
+        },
+        {
+          "price": 6849.0,
+          "productId": "053997047858558",
+          "propertyValueIdHash": "2878ed30a10f372c2fe73518dda947d6",
+          "propertyValueIds": "1781890936994-17818909121211",
+          "sort": 1,
+          "stock": 999
+        },
+        {
+          "price": 6379.0,
+          "productId": "053997047858558",
+          "propertyValueIdHash": "3ef7e1f3c166b36043c55a6f224c435f",
+          "propertyValueIds": "1781890946377-17818909121211",
+          "sort": 2,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20003",
+        "commendType": 0,
+        "cover": "2026-06/RvRxT1qh1p3bwMCogWawxAEADpzlfP.jpg,2026-06/KS5gt4MvZw5rD3lQcsyyZKa0jCii9g.jpg,2026-06/xHcZwfXRbUD6cIfPtxlDTPDHkEQgU1.jpg,2026-06/kILYFJJVlUnuR7RBwWOgM5zGIt9Opu.jpg,2026-06/G4dMEpMl2BvSb6RtJRnCZZvyubsAne.jpg",
+        "createTime": "2026-06-20 01:39:42",
+        "maxPrice": 3999.0,
+        "minPrice": 3999.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/FxUcw7IXr6DylCVfJiBtSA590yqb55.png)\n![](/api/file/getResource?sourceName=2026-06/cCPHevK7vyIXPKYA8bowB9rAuHoMNh.png)\n![](/api/file/getResource?sourceName=2026-06/JcNBEfqt7E0TGBb3DBI6QaJ5uyUj94.png)\n![](/api/file/getResource?sourceName=2026-06/8nihzRcaU0lTsyrb15kn75u7VQl6wo.png)\n![](/api/file/getResource?sourceName=2026-06/HQrYKJQzCk82AZmIiqDoIotmQyda2V.png)\n",
+        "productId": "231335860060520",
+        "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1007",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "铂金银",
+              "propertyValueId": "17818907013950"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "3742160298",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "【超旗舰降噪】WH-1000XM6",
+              "propertyValueId": "17818907013953"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 3999.0,
+          "productId": "231335860060520",
+          "propertyValueIdHash": "1999572e6313cccae580033af1efda51",
+          "propertyValueIds": "17818907013950-17818907013953",
+          "sort": 0,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20003",
+        "commendType": 0,
+        "cover": "2026-06/kAZzdAvwuvXbuMOUTR87aqeL4jRbSQ.jpg,2026-06/M3zSAPhae2K1mklqQE6uT75MQSWd1d.jpg,2026-06/7gaLdadRU0zqQkQ8cGtQ0nfKPPawbV.jpg,2026-06/vqKTAmVos08bioI5NYvg4efuQCaUQn.jpg,2026-06/GNncFaWhxok8Sso0PiK6m0Nr7473UV.jpg",
+        "createTime": "2026-06-20 01:35:09",
+        "maxPrice": 3998.0,
+        "minPrice": 2054.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/zaQ6BFImG59tXNu6b0v03TSCDp4VBv.png)\n![](/api/file/getResource?sourceName=2026-06/GjnMQ3YVH0S3qNzcnVH3BQfvP1ydjy.png)\n![](/api/file/getResource?sourceName=2026-06/TAsHu4qQ4bdYZ5M2ZikZIjqqGKo5gI.png)\n![](/api/file/getResource?sourceName=2026-06/isMz2OSg9VauQPyZGJ5dqKNRmVbU0U.png)\n![](/api/file/getResource?sourceName=2026-06/BEd6JRM7CjWkJCaLInaICzHAtyeoTl.png)\n",
+        "productId": "158081823347974",
+        "productName": "哈曼卡顿AURA STUDIO 5琉璃5代琉璃4升级版蓝牙音箱 环绕立体声 下沉式低音炮 居家桌面音响 氛围感音响",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": null,
+          "propertyId": "1007",
+          "propertyName": "颜色",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "琉璃5代",
+              "propertyValueId": "17818903385550"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "琉璃4 黑色经典版",
+              "propertyValueId": "1781890352414"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "3742160298",
+          "propertyName": "系列品",
+          "propertySort": 4,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "哈曼卡顿水晶5",
+              "propertyValueId": "17818902988793"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "哈曼卡顿琉璃4/5",
+              "propertyValueId": "1781890411193"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 3998.0,
+          "productId": "158081823347974",
+          "propertyValueIdHash": "64d609dd19f3095ca2008f6b3d604b59",
+          "propertyValueIds": "17818903385550-1781890411193",
+          "sort": 0,
+          "stock": 0
+        },
+        {
+          "price": 2054.0,
+          "productId": "158081823347974",
+          "propertyValueIdHash": "78df941091c50dea66e162da30c40eff",
+          "propertyValueIds": "1781890352414-1781890411193",
+          "sort": 1,
+          "stock": 0
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20002",
+        "commendType": 0,
+        "cover": "2026-06/SDcVGqX48NSOn51bKxPK3jHzpKjgVI.jpg,2026-06/JDwQ8DtxU1uV8QeeXkGhl9Ab9H5jUJ.jpg,2026-06/VLSCvzcEJvs6tz46Pg2mMLJlKt03MQ.jpg,2026-06/bw1C1fxaBkduUaehu3pqx8F2FnnupR.jpg,2026-06/iUYupp9NUMHJTlpiYl0ESMvHRmEzI4.jpg",
+        "createTime": "2026-06-20 01:22:34",
+        "maxPrice": 7399.0,
+        "minPrice": 4399.0,
+        "pCategoryId": "10001",
+        "productDesc": "![](/api/file/getResource?sourceName=2026-06/BBGitADiTp36HlfC8HakYMeefQs4Tu.png)\n![](/api/file/getResource?sourceName=2026-06/W61rxB721RPstTOY6bMuXTyq3mlsKR.png)\n![](/api/file/getResource?sourceName=2026-06/byAmHsKIc0hgB9S49DSeIvrLQa56Nf.png)\n![](/api/file/getResource?sourceName=2026-06/vYtaxNJqY7MGmFK5xbvGxdPaaW52it.png)\n![](/api/file/getResource?sourceName=2026-06/7QW87YGZjhYHBBKP3yJ1rWSqr0rJzP.png)\n",
+        "productId": "301841010226518",
+        "productName": "华硕破晓6X 台式机台式电脑主机",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "5553712174",
+          "propertyName": "规格",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "2026-06/BmzPwYQMo4qQMd2DpvLAVoB6IZWlpU.jpg",
+              "propertyRemark": "",
+              "propertyValue": "单主机",
+              "propertyValueId": "17818895089021"
+            },
+            {
+              "propertyCover": "2026-06/Nnx57R2VNQox28LtpuW3BaV6tyJPOi.jpg",
+              "propertyRemark": "",
+              "propertyValue": "27寸显示器",
+              "propertyValueId": "1781889560413"
+            }
+          ]
+        },
+        {
+          "coverType": 0,
+          "propertyId": "6887378688",
+          "propertyName": "版本",
+          "propertySort": 3,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "新品 Core5-210H 16G 512G大机箱",
+              "propertyValueId": "17818895089022"
+            },
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "新品 Core7-240H 16G 1TB大机箱",
+              "propertyValueId": "1781889598088"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 4399.0,
+          "productId": "301841010226518",
+          "propertyValueIdHash": "d0d9a95b8b22e5a5c11958e034c5316f",
+          "propertyValueIds": "17818895089021-17818895089022",
+          "sort": 0,
+          "stock": 999
+        },
+        {
+          "price": 6599.0,
+          "productId": "301841010226518",
+          "propertyValueIdHash": "4f7d204afed0d254a8a8e4a0f7afe83b",
+          "propertyValueIds": "17818895089021-1781889598088",
+          "sort": 1,
+          "stock": 999
+        },
+        {
+          "price": 5199.0,
+          "productId": "301841010226518",
+          "propertyValueIdHash": "96867e5ad06ca6d04344108850cd2d09",
+          "propertyValueIds": "1781889560413-17818895089022",
+          "sort": 2,
+          "stock": 999
+        },
+        {
+          "price": 7399.0,
+          "productId": "301841010226518",
+          "propertyValueIdHash": "7317338d3de36cbda5f7f92e47348243",
+          "propertyValueIds": "1781889560413-1781889598088",
+          "sort": 3,
+          "stock": 999
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20012",
+        "commendType": 0,
+        "cover": "202601/KuI5GGeCeiYuqv9rZTtn9QWjoH7Q7S_thumbnail.png,202601/pHjG0mfliw7iPUABq3rhu9rbc8Jtmn_thumbnail.png,202601/2tVy0lAP8EbGX4me6f5c6q57yf4l5p_thumbnail.png,202601/Kn9YUT5pwuUmB6iSvPHBr9HrfI4ve6_thumbnail.png,202601/LAiipAPzyFzNCbFvWsKDaD1w68MdJd_thumbnail.png",
+        "createTime": "2026-01-11 18:11:16",
+        "maxPrice": 9.9,
+        "minPrice": 9.9,
+        "pCategoryId": "10003",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/saJTSrqNKuYy0ptwTpj2Kq0nrd5bGP.png)\n![](/api/file/getResource?sourceName=202601/camqKb4YZp3L3KzLMtMNcwt1JxjPVi.png)\n![](/api/file/getResource?sourceName=202601/bODm5UdWo46bMS9SnJIklGtQyMny3l.png)\n",
+        "productId": "298286497857602",
+        "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1034",
+          "propertyName": "颜色分类",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/V8IR8T6MrSknir649JaGXIi7pLusIM_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "#01乌木甜茶 ⭐【HOT】豆蔻粉红棕",
+              "propertyValueId": "1768126212913"
+            },
+            {
+              "propertyCover": "202601/PUTcY19SeV0x7qbXACNRZ4gsRTGMwe_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "#03冷杉红栗 ⭐【NEW】冰透红茶冻",
+              "propertyValueId": "1768126259416"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 9.9,
+          "productId": "298286497857602",
+          "propertyValueIdHash": "ee6f3d95fc7a1ac431e4e7c9b0a9a8ac",
+          "propertyValueIds": "1768126212913",
+          "sort": 0,
+          "stock": 200
+        },
+        {
+          "price": 9.9,
+          "productId": "298286497857602",
+          "propertyValueIdHash": "71a51ff8020ea17f1b7bd9c7cecf2afb",
+          "propertyValueIds": "1768126259416",
+          "sort": 1,
+          "stock": 200
+        }
+      ]
+    },
+    {
+      "productInfo": {
+        "categoryId": "20012",
+        "commendType": 0,
+        "cover": "202601/pUwyKfd2B813LuFGKyp0xAqHKPkWfY_thumbnail.png,202601/aD81Jp6lpqOp3loRPTqS9ehyzt7DaW_thumbnail.png,202601/pjL2kmku4CPjIUNE258Hf26mljBg35_thumbnail.png,202601/BpLcgDRa2eryX5wzdlRf4lqGlUHcEP_thumbnail.png,202601/knNGleTyvNiFblgUYOYMK5YJRoRrtz_thumbnail.png",
+        "createTime": "2026-01-10 21:42:19",
+        "maxPrice": 19.9,
+        "minPrice": 19.9,
+        "pCategoryId": "10003",
+        "productDesc": "![](/api/file/getResource?sourceName=202601/wCh9PVfO7lQJBm08H8mWBK5xzIKimC.png)\n![](/api/file/getResource?sourceName=202601/l4MG9BJNr3FNfZEGyeoWzo6NnyPC9y.png)\n![](/api/file/getResource?sourceName=202601/Bk1L6LZht90LowRMTI4MNCJWY8QqpO.png)\n![](/api/file/getResource?sourceName=202601/KGs4M5UHbVa1CmOzEGqcdN5uh8hY7P.png)\n![](/api/file/getResource?sourceName=202601/wBm32ZONkBD6Ufy8s681ohdkjVnI2C.png)\n",
+        "productId": "843304724668395",
+        "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红",
+        "status": 1,
+        "totalSale": 0
+      },
+      "productPropertyList": [
+        {
+          "coverType": 1,
+          "propertyId": "1034",
+          "propertyName": "色号",
+          "propertySort": 1,
+          "propertyValues": [
+            {
+              "propertyCover": "202601/2t29eNMx9D8QNBUmlISivOP2hT4YUG_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "不累的工",
+              "propertyValueId": "1768052450716"
+            },
+            {
+              "propertyCover": "202601/VAx20TgrYMsDZus2zE4EXJWAozfUkb_thumbnail.png",
+              "propertyRemark": "",
+              "propertyValue": "舒服的假",
+              "propertyValueId": "1768052488467"
+            }
+          ]
+        },
+        {
+          "coverType": null,
+          "propertyId": "1035",
+          "propertyName": "容量",
+          "propertySort": 2,
+          "propertyValues": [
+            {
+              "propertyCover": "",
+              "propertyRemark": "",
+              "propertyValue": "10克",
+              "propertyValueId": "1768052450717"
+            }
+          ]
+        }
+      ],
+      "skuList": [
+        {
+          "price": 19.9,
+          "productId": "843304724668395",
+          "propertyValueIdHash": "1ee624ffb7730f00d8db3417d310ec3d",
+          "propertyValueIds": "1768052450716-1768052450717",
+          "sort": 0,
+          "stock": 999
+        },
+        {
+          "price": 19.9,
+          "productId": "843304724668395",
+          "propertyValueIdHash": "4494ac8930bde6ac73125e19a1bd1910",
+          "propertyValueIds": "1768052488467-1768052450717",
+          "sort": 1,
+          "stock": 1000
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceCommendProductCount": 14,
+  "sourceOrigin": "https://www.simlect.com",
+  "sourceRegularProductCount": 33,
+  "syncedAt": "2026-08-04T13:30:11.304009+00:00"
+}

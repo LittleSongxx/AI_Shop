@@ -1,0 +1,114 @@
+{
+  "productInfo": {
+    "categoryId": "20007",
+    "commendType": 0,
+    "cover": "2026-06/1RIU5KDj64UBwetub57PfIKXDf5YrK.jpg,2026-06/HzeKHXXWdjSN8cc4pS5OejbshjsRWm.jpg,2026-06/9mH4KOOywr7hSsUXgQ9Z06SAQJebwa.jpg,2026-06/2rMFCZkhfEk5rVUGBOgAYcx7G6pEGl.jpg,2026-06/PlcVWlveNOJ5RM9R0g2h3bVw0wpTMW.jpg",
+    "createTime": "2026-06-20 15:35:29",
+    "maxPrice": 10999.0,
+    "minPrice": 10999.0,
+    "pCategoryId": "10002",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/FwiRf31qwJvwNbauDs9peRp8m3YLyJ.png)\n![](/api/file/getResource?sourceName=2026-06/3CyQVeLiC9Xloy1OBq9Z8z1wRdWnkt.png)\n![](/api/file/getResource?sourceName=2026-06/PM17qIaDWBiKnMXcLByzH9V4MnJTeL.png)\n![](/api/file/getResource?sourceName=2026-06/g9amuJeHC4mIPMgdQNbMk5FZ6LpBEW.png)\n",
+    "productId": "587742827032945",
+    "productName": "春日野餐 古典玩偶 Lolita 洛丽塔 裙子",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1019",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/t0nyeBYggmCklQLWBPppuG0WtDp2D7.jpg",
+          "propertyRemark": "",
+          "propertyValue": "红色",
+          "propertyValueId": "17819408259360"
+        },
+        {
+          "propertyCover": "2026-06/JMLUVB1ChgjpYC9H6TyaPripU9XTVI.jpg",
+          "propertyRemark": "",
+          "propertyValue": "绿色",
+          "propertyValueId": "1781940882354"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1020",
+      "propertyName": "尺码",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "S",
+          "propertyValueId": "17819408259361"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "M",
+          "propertyValueId": "1781940869621"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "L",
+          "propertyValueId": "1781940871912"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 10999.0,
+      "productId": "587742827032945",
+      "propertyValueIdHash": "0060ba356d54cee9aed914c9d54eb3ae",
+      "propertyValueIds": "17819408259360-17819408259361",
+      "sort": 0,
+      "stock": 999
+    },
+    {
+      "price": 10999.0,
+      "productId": "587742827032945",
+      "propertyValueIdHash": "ed21e2e9f838cc00070a0c52dcacc628",
+      "propertyValueIds": "17819408259360-1781940869621",
+      "sort": 1,
+      "stock": 999
+    },
+    {
+      "price": 10999.0,
+      "productId": "587742827032945",
+      "propertyValueIdHash": "b444ef4c2cb88860ed29c088408370c0",
+      "propertyValueIds": "17819408259360-1781940871912",
+      "sort": 2,
+      "stock": 999
+    },
+    {
+      "price": 10999.0,
+      "productId": "587742827032945",
+      "propertyValueIdHash": "0b390a0dc8916155d487bbb1452ec61c",
+      "propertyValueIds": "1781940882354-17819408259361",
+      "sort": 3,
+      "stock": 999
+    },
+    {
+      "price": 10999.0,
+      "productId": "587742827032945",
+      "propertyValueIdHash": "793b81edad314067de006c22b835e828",
+      "propertyValueIds": "1781940882354-1781940869621",
+      "sort": 4,
+      "stock": 999
+    },
+    {
+      "price": 10999.0,
+      "productId": "587742827032945",
+      "propertyValueIdHash": "c8c2a7f95819df38fd11651ef0623229",
+      "propertyValueIds": "1781940882354-1781940871912",
+      "sort": 5,
+      "stock": 999
+    }
+  ]
+}

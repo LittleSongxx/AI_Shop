@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20010",
+    "commendType": 0,
+    "cover": "2026-06/rMHi7MLPENovo8m9mkQTgHklfXorFS.jpg,2026-06/OstpA5BgEfAa44qHktXyBPP6YVTRJ1.jpg,2026-06/89vceZjlCXGxGogfdYnmZF37jgzIn0.jpg,2026-06/fAmGxbCB7ThKyKlI7UpsQtVVwEs2n1.jpg,2026-06/gyzuwIbh41kYP1DPksb9lQIOzvvoqN.jpg",
+    "createTime": "2026-06-20 14:19:42",
+    "maxPrice": 938.0,
+    "minPrice": 938.0,
+    "pCategoryId": "10002",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/PFa00WrSrWLZCHLyUKKHd00q51HUlj.png)\n![](/api/file/getResource?sourceName=2026-06/rlphQpjxcZtgZ5bDz40h4wWXTBaB6N.png)\n![](/api/file/getResource?sourceName=2026-06/OjYymddyiCNPO2BAmL9FmB8fEjHs7Y.png)\n![](/api/file/getResource?sourceName=2026-06/EN6aVTWygnX6aXe7BRM6ojksSrcVcL.png)\n",
+    "productId": "270126564877983",
+    "productName": "Walker Shop品牌新款旅行包男新款训练包干湿分离大容量手提单肩斜跨健身包 黑色大号【鞋仓+干湿分离】",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "1028",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/s4ramrfnpW6OfZ91KDAuX8j0NectzO.jpg",
+          "propertyRemark": "",
+          "propertyValue": "黑色大号【鞋仓+干湿分离】",
+          "propertyValueId": "17819363169580"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 938.0,
+      "productId": "270126564877983",
+      "propertyValueIdHash": "5bc81db5c779439586beb280cb3c3103",
+      "propertyValueIds": "17819363169580",
+      "sort": 0,
+      "stock": 999
+    }
+  ]
+}

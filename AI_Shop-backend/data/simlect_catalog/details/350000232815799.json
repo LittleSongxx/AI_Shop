@@ -1,0 +1,98 @@
+{
+  "productInfo": {
+    "categoryId": "20003",
+    "commendType": 1,
+    "cover": "2026-06/izJVzAb7DJota00hWqPYWCCv0VOD35.png,2026-06/o1ATsUzs7bv20TXH33oATK7KvUFsQr.png,2026-06/L39zziYMJVTjxJChEJKNXvw8Z4y5xb.png,2026-06/sO6gtslmK02mnyoW6ntXK8tnGrwr0c.png,2026-06/yoakZ19pk4TD6CMVm65encNHQ5Sm7T.png",
+    "createTime": "2026-06-03 22:22:38",
+    "maxPrice": 4169.0,
+    "minPrice": 1417.0,
+    "pCategoryId": "10001",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/2Q87GHZxs2qa4E2OzwkUWlHyf05MgW.png)\n![](/api/file/getResource?sourceName=2026-06/PlPj6L218tUqYTVElD3EhteUh0qwSv.png)\n![](/api/file/getResource?sourceName=2026-06/58Ez7laZTmbWEmRZn1EKeUgoYtpG62.png)\n![](/api/file/getResource?sourceName=2026-06/i4PKVC6qnFexypLrPsEuuV2ApeLTn1.png)\n![](/api/file/getResource?sourceName=2026-06/2XqP07tPGqVP03HLvAHrcH3u3jHWwe.png)\n",
+    "productId": "350000232815799",
+    "productName": "索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机",
+    "status": 1,
+    "totalSale": 11
+  },
+  "productPropertyList": [
+    {
+      "coverType": null,
+      "propertyId": "1007",
+      "propertyName": "颜色",
+      "propertySort": 1,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "黑色",
+          "propertyValueId": "1780496403012"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "白金色",
+          "propertyValueId": "1780496456194"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1008",
+      "propertyName": "型号",
+      "propertySort": 2,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "WH-1000XX",
+          "propertyValueId": "1780496403013"
+        },
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "WH-1000XM5",
+          "propertyValueId": "1780496480942"
+        }
+      ]
+    },
+    {
+      "coverType": null,
+      "propertyId": "1009",
+      "propertyName": "存储容量",
+      "propertySort": 3,
+      "propertyValues": [
+        {
+          "propertyCover": "",
+          "propertyRemark": "",
+          "propertyValue": "标准",
+          "propertyValueId": "1780496403014"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 4169.0,
+      "productId": "350000232815799",
+      "propertyValueIdHash": "c91a1fc4453caf8f246adaafe76112cd",
+      "propertyValueIds": "1780496403012-1780496403013-1780496403014",
+      "sort": 0,
+      "stock": 1321
+    },
+    {
+      "price": 1417.0,
+      "productId": "350000232815799",
+      "propertyValueIdHash": "c97065ab26ba514b63d42cdd76e3e540",
+      "propertyValueIds": "1780496403012-1780496480942-1780496403014",
+      "sort": 1,
+      "stock": 1234
+    },
+    {
+      "price": 4169.0,
+      "productId": "350000232815799",
+      "propertyValueIdHash": "2dbd579931558f18173409155bc26879",
+      "propertyValueIds": "1780496456194-1780496403013-1780496403014",
+      "sort": 2,
+      "stock": 321
+    }
+  ]
+}

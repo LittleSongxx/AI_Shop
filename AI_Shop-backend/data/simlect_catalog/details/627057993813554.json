@@ -1,0 +1,42 @@
+{
+  "productInfo": {
+    "categoryId": "20030",
+    "commendType": 0,
+    "cover": "2026-06/y5ZgB84vp8hKIZcJeTLaD35lS4XFE2.jpg,2026-06/8lTdbjf1qI4DwqjzURwTwsx5gSQ29b.jpg,2026-06/haPbFx0HrHyZWTrs25CR2c1a6XV9dy.jpg,2026-06/pbIZkkQlFSdGXUa9f62yhXjsbO6umj.jpg,2026-06/nMQY7DlpiVD9GPFtgewiPB9P7hmUpZ.jpg",
+    "createTime": "2026-06-20 15:20:21",
+    "maxPrice": 1298.0,
+    "minPrice": 1298.0,
+    "pCategoryId": "10007",
+    "productDesc": "![](/api/file/getResource?sourceName=2026-06/jtodXkCKYJEbc8IPpjtHtgJMUIETjg.png)\n![](/api/file/getResource?sourceName=2026-06/aKwAfedSE1RyzIcyEZuw6s4YBSyjVD.png)\n![](/api/file/getResource?sourceName=2026-06/pn9Ma051SrF64fFphn0prbPNGGplan.png)\n![](/api/file/getResource?sourceName=2026-06/5G6Hb5bZi64c6fCGrfDQaiciUrneB4.png)\n",
+    "productId": "627057993813554",
+    "productName": "飞艇航天级TPE汽车脚垫适用于蔚来ES8/ET5/ET5T/ES6/EC6耐刮防护配件 蔚来ES8六座（26款）TPE脚垫+银河抗污毯",
+    "status": 1,
+    "totalSale": 0
+  },
+  "productPropertyList": [
+    {
+      "coverType": 1,
+      "propertyId": "5278490097",
+      "propertyName": "颜色",
+      "propertySort": 4,
+      "propertyValues": [
+        {
+          "propertyCover": "2026-06/U8oxvtJI7CUiyKMl9Z1Q7EgooeIMfp.jpg",
+          "propertyRemark": "",
+          "propertyValue": "蔚来ES8六座（26款）TPE脚垫+银河抗污毯",
+          "propertyValueId": "17819399758783"
+        }
+      ]
+    }
+  ],
+  "skuList": [
+    {
+      "price": 1298.0,
+      "productId": "627057993813554",
+      "propertyValueIdHash": "02ba25deafa6bbaf57b50a5983cf7f46",
+      "propertyValueIds": "17819399758783",
+      "sort": 0,
+      "stock": 9999
+    }
+  ]
+}
