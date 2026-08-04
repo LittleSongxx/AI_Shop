@@ -33,6 +33,7 @@ _HANDOFF_REASONS = {
     "FUND_DISPUTE",
     "SEVERE_NEGATIVE_SENTIMENT",
     "REPEATED_UNRESOLVED",
+    "REPEATED_INTENT",  # A3：同一意图连续多轮未解决 → 主动建议转人工
     "LOW_CONFIDENCE",
 }
 
@@ -87,6 +88,39 @@ def main() -> int:
                 fail(problems, f"{where} 期望调 {tool} 但 expectArgs 不是 dict")
             if tool is None and row.get("expectArgs") not in (None, {}):
                 fail(problems, f"{where} 不期望调工具却写了 expectArgs")
+            # Verified-Action 维度：值必须是 bool（runner 按值区分"参与/不参与"），
+            # 且只允许出现在 refund subset（fixture 只给 REFUND 喂订单项桩数据）。
+            verified = row.get("expectToolVerified")
+            if verified is not None and not isinstance(verified, bool):
+                fail(problems, f"{where} expectToolVerified 必须是 bool")
+            if verified is True and case.subset != "refund":
+                fail(problems, f"{where} expectToolVerified=true 只允许出现在 refund subset")
+            # context 注入的键必须白名单化：拼错键（如 sessionIntnet）会静默
+            # 改变 case 语义而不是报错，跑出来的分数就不可信了。
+            ctx = row.get("context") or {}
+            if not isinstance(ctx, dict):
+                fail(problems, f"{where} context 必须是 dict")
+            else:
+                allowed_ctx = {
+                    "sessionIntent": str,
+                    "recentIntents": list,
+                    "fromProduct": bool,
+                    "consultCard": dict,
+                    "messageCard": dict,
+                    "unresolvedCount": int,
+                }
+                unknown_ctx = set(ctx) - set(allowed_ctx)
+                if unknown_ctx:
+                    fail(problems, f"{where} context 含未知键 {sorted(unknown_ctx)}")
+                for ctx_key, ctx_value in ctx.items():
+                    # 类型也白名单化：拼错类型（如 unresolvedCount=2.5）会被
+                    # runner 的 int() 静默截断、悄悄改变 case 语义（P1 审查）。
+                    if not isinstance(ctx_value, allowed_ctx[ctx_key]):
+                        fail(
+                            problems,
+                            f"{where} context.{ctx_key} 类型必须是 "
+                            f"{allowed_ctx[ctx_key].__name__}，实际是 {type(ctx_value).__name__}",
+                        )
 
         if case.kind == "guard" and not isinstance(row.get("expectBlocked"), bool):
             fail(problems, f"{where} expectBlocked 必须是 bool")

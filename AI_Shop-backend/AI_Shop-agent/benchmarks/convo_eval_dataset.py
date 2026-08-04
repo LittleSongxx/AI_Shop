@@ -34,6 +34,7 @@ CONVO_SUBSETS = frozenset(
         "aftersales",
         "chat_howto",
         "handoff",
+        "continuation",
     }
 )
 #: 输入防护类 case：跑 InputGuardrail.inspect

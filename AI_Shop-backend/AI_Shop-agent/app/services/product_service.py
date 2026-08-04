@@ -1,4 +1,6 @@
+import json
 import re
+import uuid
 
 import structlog
 
@@ -232,12 +234,22 @@ class ProductService:
                 source,
             )
 
-        assistant, biz_data = build_product_payload(products)
+        # P0-7：一次 serving 一个归因 requestId，同时进卡片 JSON 和曝光日志，
+        # 前端点击原样回传，离线分析串起 曝光→点击→(后续加购/成交) 全链。
+        request_id = uuid.uuid4().hex
+        assistant, biz_data = build_product_payload(products, request_id=request_id)
+        try:
+            displayed_ids = json.loads(biz_data or "[]")
+        except (TypeError, ValueError):
+            displayed_ids = []
+        if not isinstance(displayed_ids, list):
+            displayed_ids = []
         await redis_service.log_impression(
             user_id,
-            [str(product.get("product_id") or "") for product in products],
+            [str(product_id) for product_id in displayed_ids if product_id],
             query=query,
             source=source,
+            request_id=request_id,
         )
         return assistant, biz_data, biz_type, products, source
 

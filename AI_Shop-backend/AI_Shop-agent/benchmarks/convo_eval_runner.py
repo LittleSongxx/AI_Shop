@@ -67,6 +67,24 @@ def _args_match(expected: dict, actual: dict | None) -> bool:
     return True
 
 
+def _verify_action(row: dict, actual_tool: str | None, actual_args: dict | None) -> bool:
+    """校验"动作在该业务状态下是否正确地可执行/被拒绝"。
+
+    期望值为 True 的 case 表达两种正确行为之一：
+      - expectTool 为 None：业务状态不可执行时系统拒绝发起动作（没有幻觉提案）；
+      - expectTool 非 None：动作正常产出，且关键参数已解析（如 orderItemId）。
+    参数是否可解析由 fixture 的桩数据决定（_StubOrderService），与线上一致。
+    """
+    expected_tool = row.get("expectTool")
+    if expected_tool is None:
+        return actual_tool is None
+    if actual_tool != expected_tool:
+        return False
+    if expected_tool == "PROPOSE_REFUND":
+        return bool(actual_args and actual_args.get("orderItemId"))
+    return True
+
+
 class _StubOrderService:
     """按 case 的 fixture 喂订单项数据。
 
@@ -103,6 +121,9 @@ async def _run_convo_case(case: Case, order_stub: _StubOrderService) -> CaseOutc
         consult_card=context.get("consultCard"),
         message_card=context.get("messageCard"),
         unresolved_count=int(context.get("unresolvedCount", 0)),
+        # A2/A3：会话级意图延续与死循环检测由题面注入（模拟上一轮的事实）。
+        session_intent=context.get("sessionIntent"),
+        recent_intents=context.get("recentIntents"),
         # 关键：只评确定性路径。开了 LLM 这个评测集就不再是冻结的。
         allow_llm=False,
     )
@@ -124,6 +145,16 @@ async def _run_convo_case(case: Case, order_stub: _StubOrderService) -> CaseOutc
         checks["tool"] = actual_tool == row["expectTool"]
         if row["expectTool"] is not None:
             checks["toolArgs"] = _args_match(row.get("expectArgs") or {}, actual_args)
+    # A1 结果层（Verified-Action 雏形）：该业务状态下"动作要么可执行、要么被正确拒绝"。
+    # 考的是系统会不会在 fixture 声明不可退/参数不可解析时仍然发起提案——
+    # 对应行业"Verified Resolution"哲学里"拒绝不可执行动作"的一半。
+    # expectToolVerified=true 参与校验；显式写 false 表示该条明确不参与本维度
+    # （值必须是 bool，validate_convo_eval.py 强制），避免"写了等于没写"的陷阱。
+    verified_flag = row.get("expectToolVerified")
+    if verified_flag is True:
+        checks["verifiedAction"] = _verify_action(row, actual_tool, actual_args)
+    elif verified_flag is False:
+        checks["verifiedAction"] = True
 
     return CaseOutcome(
         id=case.id,

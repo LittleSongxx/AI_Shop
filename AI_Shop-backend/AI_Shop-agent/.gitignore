@@ -8,3 +8,6 @@ dist/
 build/
 .pytest_cache/
 .ruff_cache/
+
+# 评测产物（可复现基线，不入库）
+benchmarks/results/

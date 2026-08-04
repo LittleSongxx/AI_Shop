@@ -76,7 +76,7 @@ def _dedupe_product_cards(cards: list[dict]) -> list[dict]:
         out.append(card)
     return out
 
-def build_product_payload(products: list[dict]) -> tuple[str, str | None]:
+def build_product_payload(products: list[dict], request_id: str | None = None) -> tuple[str, str | None]:
 
     if not products:
         return "[]", None
@@ -96,6 +96,10 @@ def build_product_payload(products: list[dict]) -> tuple[str, str | None]:
             "cover": first_cover(p.get("cover")),
             "minPrice": _to_number(p.get("min_price") or p.get("minPrice")),
         }
+        # P0-7：推荐归因 token。一次 serving 一个 requestId，随卡片下发，
+        # 前端点击时原样回传——离线分析靠它把曝光、点击、加购、成交串成一条链。
+        if request_id:
+            card["requestId"] = request_id
         max_price = p.get("max_price") if p.get("max_price") is not None else p.get("maxPrice")
         if max_price is not None:
             card["maxPrice"] = _to_number(max_price)

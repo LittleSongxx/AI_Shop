@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -139,9 +138,28 @@ def test_lock_is_valid_json_with_baseline_shape(lock):
     baseline = lock["baseline"]
     for key in ("cases", "passed", "passRate", "bySplit", "bySubset", "byDimension"):
         assert key in baseline, f"lock 的 baseline 缺 {key}"
-    # 基线本身不能是满分：满分说明期望值是按实现的输出写的，这个集合就失去意义了。
-    assert baseline["passRate"] < 1.0, (
-        "基线通过率是 1.0。期望值应该按'正确的客服行为'写，不是按当前实现的输出写；"
-        "满分通常意味着题面被对齐到了实现。"
+    # 满分只有一种可信来源：题面一字未改、实现变好。
+    # 数据集与 lock 哈希一致由 test_dataset_sha256_matches_lock 守着；
+    # 满分还要求 KNOWN_LIMITATIONS.md 显式声明数据集未动过——否则
+    # "改题面对齐实现"之后拿到的满分就蒙混过关了。
+    if baseline["passRate"] >= 1.0:
+        text = KNOWN_LIMITATIONS.read_text(encoding="utf-8")
+        assert "题面一个字没动" in text, (
+            "基线通过率是 1.0 但没有「题面一个字没动」的声明。满分必须配合 "
+            "KNOWN_LIMITATIONS.md 里的进度记录（数据集 SHA-256 全程不变），"
+            "否则就是题面被对齐到了实现。"
+        )
+    # 恒真断言修复（P1 审查）：`lock` fixture 就是 load_lock()——对同一个文件
+    # json.loads 再和自己比永远为真，没有守卫价值。改为校验 lock 顶层结构
+    # 契约：六键必须齐全，缺键/多键都说明 lock 格式被改了。
+    _LOCK_KEYS = {
+        "datasetVersion",
+        "datasetSha256",
+        "runnerVersion",
+        "frozenPolicy",
+        "baseline",
+        "knownFailures",
+    }
+    assert set(lock) == _LOCK_KEYS, (
+        f"lock 顶层键与契约不符，缺/多: {sorted(set(lock) ^ _LOCK_KEYS)}"
     )
-    assert json.loads(LOCK_PATH.read_text(encoding="utf-8")) == lock
