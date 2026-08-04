@@ -21,6 +21,7 @@ import com.aishop.exception.BusinessException;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderItemService;
 import com.aishop.biz.OrderLogisticsInfoService;
+import com.aishop.biz.OrderRequestIdempotencyService;
 import com.aishop.utils.OrderPayAmountUtil;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
@@ -38,6 +39,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RequestMapping("/order")
 @RestController
@@ -51,6 +53,9 @@ public class OrderController extends ABaseController{
 
     @Resource
     private OrderLogisticsInfoService orderLogisticsInfoService;
+
+    @Resource
+    private OrderRequestIdempotencyService orderRequestIdempotencyService;
 
     // 提交订单
     @PostMapping("/postOrder")
@@ -183,9 +188,21 @@ public class OrderController extends ABaseController{
     // 确认订单
     @PostMapping("/confirmOrder")
     @GlobalInterceptor(checkLogin = true)
-    public ResponseVO confirmOrder(@NotEmpty String orderId){
-        // 获得当前用户的userId
+    public ResponseVO confirmOrder(
+            @NotEmpty String orderId,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            String idempotencyKey){
         String userId = getTokenUserInfo().getUserId();
+        executeIdempotentAction(
+                userId,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                idempotencyKey,
+                Map.of("orderId", orderId),
+                () -> confirmOrderCommand(userId, orderId));
+        return getSuccessResponseVO(null);
+    }
+
+    private void confirmOrderCommand(String userId, String orderId) {
         // 根据orderId查询订单
         OrderInfo orderInfo = orderInfoService.getOrderInfoByOrderId(orderId);
         if (orderInfo == null || !orderInfo.getUserId().equals(userId)){
@@ -197,24 +214,35 @@ public class OrderController extends ABaseController{
             throw new BusinessException("当前订单状态无法确认！");
         }
         if (!orderInfoService.confirmOrderReceipt(userId, orderId)) {
-            return getSuccessResponseVO(null);
+            return;
         }
         orderInfoService.onOrderConfirmed(userId, orderId);
-        return getSuccessResponseVO(null);
     }
 
     // 退款
     @PostMapping("/refundOrder")
     @GlobalInterceptor(checkLogin = true)
-    public ResponseVO refundOrder(@NotEmpty String orderItemId){
+    public ResponseVO refundOrder(
+            @NotEmpty String orderItemId,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            String idempotencyKey){
         String userId = getTokenUserInfo().getUserId();
+        executeIdempotentAction(
+                userId,
+                OrderRequestIdempotencyService.COMMAND_AGENT_REFUND,
+                idempotencyKey,
+                Map.of("orderItemId", orderItemId),
+                () -> refundOrderCommand(userId, orderItemId));
+        return getSuccessResponseVO(null);
+    }
+
+    private void refundOrderCommand(String userId, String orderItemId) {
         // 根据orderItemId查询订单
         OrderItem orderItem = orderItemService.getOrderItemByOrderItemId(orderItemId);
         if (orderItem == null) {
             throw new BusinessException("订单明细不存在");
         }
         orderInfoService.refund(orderItem, userId);
-        return getSuccessResponseVO(null);
     }
 
     // 订单详情（含明细）
@@ -247,6 +275,27 @@ public class OrderController extends ABaseController{
         String userId = getTokenUserInfo().getUserId();
         List<OrderCountVO> orderCountVOList = orderInfoService.getOrderCountInfo(userId);
         return getSuccessResponseVO(orderCountVOList);
+    }
+
+    private void executeIdempotentAction(
+            String userId,
+            String commandType,
+            String idempotencyKey,
+            Object request,
+            Runnable command) {
+        if (StringTools.isEmpty(idempotencyKey)) {
+            command.run();
+            return;
+        }
+        orderRequestIdempotencyService.executeMap(
+                userId,
+                commandType,
+                idempotencyKey,
+                request,
+                () -> {
+                    command.run();
+                    return Map.of("success", true);
+                });
     }
 
 }

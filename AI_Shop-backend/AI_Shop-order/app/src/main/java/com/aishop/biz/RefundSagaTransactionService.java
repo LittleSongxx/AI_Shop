@@ -91,6 +91,13 @@ public class RefundSagaTransactionService {
         return refundRequestMapper.selectById(refundRequestId);
     }
 
+    public RefundRequest findByOrderItemId(String orderItemId) {
+        if (orderItemId == null || orderItemId.isBlank()) {
+            return null;
+        }
+        return refundRequestMapper.selectByOrderItemId(orderItemId);
+    }
+
     public List<RefundRequest> selectDue(int limit) {
         return refundRequestMapper.selectDue(Math.max(1, Math.min(limit, 100)));
     }

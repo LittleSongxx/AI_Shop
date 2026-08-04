@@ -33,6 +33,19 @@ public interface OrderRequestIdempotencyMapper {
             @Param("commandType") String commandType,
             @Param("idempotencyKey") String idempotencyKey);
 
+    @Select("""
+            select id, user_id, command_type, idempotency_key, request_hash,
+                   status, response_json, create_time, update_time
+            from order_request_idempotency
+            where user_id = #{userId}
+              and command_type = #{commandType}
+              and idempotency_key = #{idempotencyKey}
+            """)
+    OrderRequestIdempotency select(
+            @Param("userId") String userId,
+            @Param("commandType") String commandType,
+            @Param("idempotencyKey") String idempotencyKey);
+
     @Update("""
             update order_request_idempotency
             set status = 'COMPLETED',
@@ -44,6 +57,38 @@ public interface OrderRequestIdempotencyMapper {
               and status = 'PROCESSING'
             """)
     int markCompleted(
+            @Param("userId") String userId,
+            @Param("commandType") String commandType,
+            @Param("idempotencyKey") String idempotencyKey,
+            @Param("responseJson") String responseJson);
+
+    @Update("""
+            update order_request_idempotency
+            set status = 'FAILED',
+                response_json = #{responseJson},
+                update_time = current_timestamp
+            where user_id = #{userId}
+              and command_type = #{commandType}
+              and idempotency_key = #{idempotencyKey}
+              and status = 'PROCESSING'
+            """)
+    int markFailed(
+            @Param("userId") String userId,
+            @Param("commandType") String commandType,
+            @Param("idempotencyKey") String idempotencyKey,
+            @Param("responseJson") String responseJson);
+
+    @Update("""
+            update order_request_idempotency
+            set status = 'COMPLETED',
+                response_json = #{responseJson},
+                update_time = current_timestamp
+            where user_id = #{userId}
+              and command_type = #{commandType}
+              and idempotency_key = #{idempotencyKey}
+              and status in ('PROCESSING', 'FAILED')
+            """)
+    int markReconciled(
             @Param("userId") String userId,
             @Param("commandType") String commandType,
             @Param("idempotencyKey") String idempotencyKey,

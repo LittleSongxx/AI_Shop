@@ -7,14 +7,19 @@ import com.aishop.entity.query.OrderCommentQuery;
 import com.aishop.entity.vo.PaginationResultVO;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.biz.OrderCommentService;
+import com.aishop.biz.OrderRequestIdempotencyService;
+import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.*;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 @RequestMapping("/order/comment")
 @RestController
 public class OrderCommentController extends ABaseController{
@@ -22,14 +27,40 @@ public class OrderCommentController extends ABaseController{
     @Resource
     private OrderCommentService orderCommentService;
 
+    @Resource
+    private OrderRequestIdempotencyService orderRequestIdempotencyService;
+
     // 评价
     @PostMapping("/postComment")
     @GlobalInterceptor(checkLogin = true)
-    public ResponseVO postComment(@NotEmpty String orderId, @NotEmpty @Size(max =300) String commentContent, @Size(max =2000) String commentImages, @NotNull @Min(1) @Max(5) Integer star){
+    public ResponseVO postComment(
+            @NotEmpty String orderId,
+            @NotEmpty @Size(max =300) String commentContent,
+            @Size(max =2000) String commentImages,
+            @NotNull @Min(1) @Max(5) Integer star,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            String idempotencyKey){
         String userId = getTokenUserInfo().getUserId();
-        boolean pendingReview = orderCommentService.postComment(userId, orderId, commentContent, commentImages, star);
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("orderId", orderId);
+        request.put("commentContent", commentContent);
+        request.put("commentImages", commentImages);
+        request.put("star", star);
+        Map<String, Object> result = executeIdempotentAction(
+                userId,
+                OrderRequestIdempotencyService.COMMAND_AGENT_PRODUCT_REVIEW,
+                idempotencyKey,
+                request,
+                () -> Map.of(
+                        "pendingReview",
+                        orderCommentService.postComment(
+                                userId,
+                                orderId,
+                                commentContent,
+                                commentImages,
+                                star)));
         Map<String, Object> data = new HashMap<>();
-        data.put("pendingReview", pendingReview);
+        data.put("pendingReview", Boolean.TRUE.equals(result.get("pendingReview")));
         return getSuccessResponseVO(data);
     }
 
@@ -58,11 +89,28 @@ public class OrderCommentController extends ABaseController{
     // 追评
     @PostMapping("/postReComment")
     @GlobalInterceptor(checkLogin = true)
-    public ResponseVO postReComment(@NotEmpty String orderId, @NotEmpty @Size(max =300) String reCommentContent, @Size(max =2000) String reCommentImages){
+    public ResponseVO postReComment(
+            @NotEmpty String orderId,
+            @NotEmpty @Size(max =300) String reCommentContent,
+            @Size(max =2000) String reCommentImages,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            String idempotencyKey){
         // 获取当前用户的userId
         String userId = getTokenUserInfo().getUserId();
-        // 评价
-        orderCommentService.postReComment(userId,orderId,reCommentContent,reCommentImages);
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("orderId", orderId);
+        request.put("reCommentContent", reCommentContent);
+        request.put("reCommentImages", reCommentImages);
+        executeIdempotentAction(
+                userId,
+                OrderRequestIdempotencyService.COMMAND_AGENT_RECOMMENT,
+                idempotencyKey,
+                request,
+                () -> {
+                    orderCommentService.postReComment(
+                            userId, orderId, reCommentContent, reCommentImages);
+                    return Map.of("success", true);
+                });
         return getSuccessResponseVO(null);
     }
 
@@ -94,5 +142,22 @@ public class OrderCommentController extends ABaseController{
     @PostMapping("/getProductCommentStats")
     public ResponseVO getProductCommentStats(String productId) {
         return getSuccessResponseVO(orderCommentService.getProductCommentStats(productId));
+    }
+
+    private Map<String, Object> executeIdempotentAction(
+            String userId,
+            String commandType,
+            String idempotencyKey,
+            Object request,
+            Supplier<Map<String, Object>> command) {
+        if (StringTools.isEmpty(idempotencyKey)) {
+            return command.get();
+        }
+        return orderRequestIdempotencyService.executeMap(
+                userId,
+                commandType,
+                idempotencyKey,
+                request,
+                command);
     }
 }

@@ -112,6 +112,112 @@ class OrderRequestIdempotencyServiceTest {
     }
 
     @Test
+    void processingRequestDoesNotExecuteCommandAgain() {
+        Map<String, String> request = Map.of("orderId", "o1");
+        OrderRequestIdempotency stored = storedRecord(request, "PROCESSING", null);
+        when(mapper.insertProcessing(any())).thenReturn(0);
+        when(mapper.selectForUpdate(
+                "u1", OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT, KEY))
+                .thenReturn(stored);
+        AtomicInteger executions = new AtomicInteger();
+
+        HttpBusinessException error = assertThrows(
+                HttpBusinessException.class,
+                () -> service.execute(
+                        "u1",
+                        OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                        KEY,
+                        request,
+                        Map.class,
+                        () -> {
+                            executions.incrementAndGet();
+                            return Map.of();
+                        }));
+
+        assertEquals(409, error.getHttpStatus());
+        assertEquals("请求正在处理中，请稍后重试", error.getMessage());
+        assertEquals(0, executions.get());
+    }
+
+    @Test
+    void failedRequestReplaysStoredFailureWithoutExecutingCommandAgain() {
+        Map<String, String> request = Map.of("orderId", "o1");
+        OrderRequestIdempotency stored = storedRecord(
+                request,
+                "FAILED",
+                JsonUtils.toJson(Map.of("errorMessage", "订单状态无法确认")));
+        when(mapper.insertProcessing(any())).thenReturn(0);
+        when(mapper.selectForUpdate(
+                "u1", OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT, KEY))
+                .thenReturn(stored);
+        AtomicInteger executions = new AtomicInteger();
+
+        HttpBusinessException error = assertThrows(
+                HttpBusinessException.class,
+                () -> service.execute(
+                        "u1",
+                        OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                        KEY,
+                        request,
+                        Map.class,
+                        () -> {
+                            executions.incrementAndGet();
+                            return Map.of();
+                        }));
+
+        assertEquals(409, error.getHttpStatus());
+        assertEquals("原请求执行失败：订单状态无法确认", error.getMessage());
+        assertEquals(0, executions.get());
+        verify(mapper, never()).markFailed(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void failedRequestWithDamagedPayloadUsesStableFallback() {
+        Map<String, String> request = Map.of("orderId", "o1");
+        OrderRequestIdempotency stored = storedRecord(request, "FAILED", "not-json");
+        when(mapper.insertProcessing(any())).thenReturn(0);
+        when(mapper.selectForUpdate(
+                "u1", OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT, KEY))
+                .thenReturn(stored);
+
+        HttpBusinessException error = assertThrows(
+                HttpBusinessException.class,
+                () -> service.execute(
+                        "u1",
+                        OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                        KEY,
+                        request,
+                        Map.class,
+                        Map::of));
+
+        assertEquals(409, error.getHttpStatus());
+        assertEquals("原请求执行失败：操作执行失败", error.getMessage());
+    }
+
+    @Test
+    void commandFailureMarksProcessingRecordFailed() {
+        when(mapper.insertProcessing(any())).thenReturn(1);
+        when(mapper.markFailed(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(1);
+        HttpBusinessException failure = new HttpBusinessException(600, "订单状态无法确认");
+
+        HttpBusinessException thrown = assertThrows(
+                HttpBusinessException.class,
+                () -> service.execute(
+                        "u1",
+                        OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                        KEY,
+                        Map.of("orderId", "o1"),
+                        Map.class,
+                        () -> { throw failure; }));
+
+        assertEquals(failure, thrown);
+        verify(mapper).markFailed(
+                anyString(), anyString(), anyString(), anyString());
+        verify(mapper, never()).markCompleted(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void missingOrUnsafeKeyReturnsBadRequest() {
         assertEquals(400, assertThrows(
                 HttpBusinessException.class,
@@ -125,5 +231,14 @@ class OrderRequestIdempotencyServiceTest {
         PayInfoDTO dto = new PayInfoDTO("form", "pay-1", new BigDecimal("10.00"));
         dto.setOrderId("order-1");
         return dto;
+    }
+
+    private static OrderRequestIdempotency storedRecord(
+            Object request, String status, String responseJson) {
+        OrderRequestIdempotency stored = new OrderRequestIdempotency();
+        stored.setRequestHash(RequestFingerprint.sha256(request));
+        stored.setStatus(status);
+        stored.setResponseJson(responseJson);
+        return stored;
     }
 }

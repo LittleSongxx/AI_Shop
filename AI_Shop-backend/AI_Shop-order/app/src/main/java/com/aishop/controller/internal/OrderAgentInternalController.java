@@ -1,6 +1,7 @@
 package com.aishop.controller.internal;
 
 import com.aishop.biz.OrderCommentService;
+import com.aishop.biz.AgentActionStatusService;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderItemService;
 import com.aishop.biz.OrderLogisticsInfoService;
@@ -49,6 +50,8 @@ public class OrderAgentInternalController extends ABaseController {
     private OrderLogisticsInfoService orderLogisticsInfoService;
     @Resource
     private OrderCommentService orderCommentService;
+    @Resource
+    private AgentActionStatusService agentActionStatusService;
 
     @PostMapping("/listOrders")
     public ResponseVO<List<Map<String, Object>>> listOrders(@RequestBody Map<String, Object> body) {
@@ -190,6 +193,12 @@ public class OrderAgentInternalController extends ABaseController {
         map.put("commentBizReply", c.getCommentBizReply());
         map.put("recommentContent", c.getRecommentContent());
         return getSuccessResponseVO(map);
+    }
+
+    @PostMapping("/actionStatus")
+    public ResponseVO<Map<String, Object>> actionStatus(
+            @RequestBody Map<String, Object> body) {
+        return getSuccessResponseVO(agentActionStatusService.resolve(body));
     }
 
     @PostMapping("/coPurchaseProductIds")
