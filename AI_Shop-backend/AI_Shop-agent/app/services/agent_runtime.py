@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -13,8 +14,17 @@ from app.harness.guardrails.product_text_guard import (
     should_force_product_cards,
     text_promises_product_cards,
 )
-from app.harness.metrics.runtime_sensors import LLM_LATENCY, STREAM_TOKENS
+from app.harness.metrics.runtime_sensors import (
+    LLM_LATENCY,
+    STREAM_CHARS,
+    STREAM_TOKENS,
+)
 from app.mcp.tools import build_mcp_tools
+from app.observability.llm_metrics import (
+    record_llm_failure,
+    record_llm_usage,
+    resolve_llm_model,
+)
 from app.services.llm_factory import ChatLLMConfig, chat_llm_config, chat_llm_for_config
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.message_service import agent_message_service
@@ -50,6 +60,7 @@ def chunk_text(content: object) -> str:
                 parts.append(part)
         return "".join(parts)
     return ""
+
 
 async def is_cancelled(user_id: str, message_id: int) -> bool:
     return await redis_service.is_cancelled(user_id, message_id)
@@ -96,13 +107,18 @@ async def stream_llm_turn(
     message_id: int,
     user_message: str | None,
     chunks: list[str],
+    *,
+    fallback: bool = False,
+    model: str | None = None,
 ):
     started = time.perf_counter()
+    resolved_model = resolve_llm_model(llm, model)
     gathered = None
     sent_visible = ""
     try:
         async for chunk in llm.astream(messages):
             if await is_cancelled(user_id, message_id):
+                record_llm_failure(resolved_model, fallback=fallback)
                 return None
             gathered = chunk if gathered is None else gathered + chunk
             visible = strip_embedded_product_json(
@@ -113,9 +129,20 @@ async def stream_llm_turn(
             if not delta:
                 continue
             chunks.append(delta)
+            # 字符数（真实口径）；旧指标同步累计保持面板兼容。
+            STREAM_CHARS.inc(len(delta))
             STREAM_TOKENS.inc(len(delta))
             await stream_service.push_chunk(user_id, message_id, delta, user_message)
+        if await is_cancelled(user_id, message_id):
+            record_llm_failure(resolved_model, fallback=fallback)
+            return None
+        if gathered is None:
+            raise RuntimeError("LLM stream ended without a response")
+        record_llm_usage(gathered, fallback=fallback, model=resolved_model)
         return gathered
+    except asyncio.CancelledError:
+        record_llm_failure(resolved_model, fallback=fallback)
+        raise
     finally:
         LLM_LATENCY.observe(max(0.0, time.perf_counter() - started))
 

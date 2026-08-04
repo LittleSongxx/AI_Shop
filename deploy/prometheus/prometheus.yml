@@ -57,6 +57,14 @@ scrape_configs:
       - targets: ["host.docker.internal:7050"]
         labels: { service: aishop-agent, tier: ai }
 
+  # ---- Python Agent Worker：独立进程，任务/队列指标只在 Worker 内更新 ----
+  # （app/worker.py 启动时 start_http_server，默认端口 7051，可用 WORKER_METRICS_PORT 覆盖）
+  - job_name: aishop-agent-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:7051"]
+        labels: { service: aishop-agent-worker, tier: ai }
+
   # ---- Prometheus 自监控：抓取失败、样本堆积先从这里看 ----
   - job_name: prometheus
     static_configs:

@@ -43,9 +43,14 @@ docker compose -f docker-compose.observability.yml up -d
 | aishop-search | 8108 | `/actuator/prometheus` |
 | aishop-admin | 8111 | `/actuator/prometheus` |
 | aishop-agent | 7050 | `/metrics` |
+| aishop-agent-worker | 7051 | `/metrics`（独立进程，任务/队列指标） |
 
 默认地址是 `host.docker.internal`，即服务在宿主机、Prometheus 在容器里。若服务也在 compose
 网络内，把它换成对应服务名。
+
+Agent 的 `APP_PORT` / `WORKER_METRICS_PORT` 可以通过 shell 环境或 Agent `.env` 修改，
+但 Prometheus 不会对挂载的 YAML 做环境变量展开；修改端口时必须同步更新
+`prometheus/prometheus.yml` 中 `aishop-agent` 和 `aishop-agent-worker` 的 targets。
 
 ## 指标来源
 
@@ -58,6 +63,10 @@ health-check 探的是注册在 Nacos 上的业务端口 `/actuator/health`，�
 
 Agent 侧是 `prometheus_client`，指标定义在 `app/harness/metrics/runtime_sensors.py`，
 `app/main.py` 把它挂在 `/metrics`。
+
+`agent_llm_call_total` 的 `result` 标签只有 `success` / `error` 两种值；意图分类、
+回复生成、历史摘要、上下文压缩和购物画像提取都使用同一计数口径。模型返回成功但业务侧
+JSON 解析失败仍属于 `success`，只有模型请求异常、超时或取消才属于 `error`。
 
 ## 面板为空时的排查顺序
 

@@ -11,6 +11,7 @@ from app.memory.context_builder import context_builder
 from app.memory.models import SessionMemory
 from app.memory.session_memory_service import session_memory_service
 from app.memory.token_estimator import estimate_text_tokens
+from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.llm_factory import create_memory_llm
 from app.services.message_service import agent_message_service
 from app.services.prompt_service import load_compress_prompt
@@ -108,7 +109,8 @@ class CompressService:
             return current
 
         llm = create_memory_llm()
-        response = await llm.ainvoke(
+        response = await invoke_llm_with_metrics(
+            llm,
             [
                 SystemMessage(content=template),
                 HumanMessage(
@@ -121,7 +123,7 @@ class CompressService:
                         "冲突时以新对话为准。"
                     )
                 ),
-            ]
+            ],
         )
 
         raw = response.content if isinstance(response.content, str) else str(response.content or "")

@@ -166,7 +166,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (intent, source) (rate(agent_intent_total[5m]))",
+          "expr": "sum by (intent, source) (rate(agent_intent_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
           "legendFormat": "{{intent}} / {{source}}"
         }
       ]
@@ -181,7 +181,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (tool, status) (rate(agent_tool_call_total[5m]))",
+          "expr": "sum by (tool, status) (rate(agent_tool_call_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
           "legendFormat": "{{tool}} / {{status}}"
         }
       ]
@@ -195,12 +195,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_llm_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_llm_latency_seconds_bucket{job=~\"aishop-agent(-worker)?\"}[5m])))",
           "legendFormat": "p95"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(agent_llm_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(agent_llm_latency_seconds_bucket{job=~\"aishop-agent(-worker)?\"}[5m])))",
           "legendFormat": "p50"
         }
       ]
@@ -214,12 +214,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_rag_latency_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_rag_latency_seconds_bucket{job=~\"aishop-agent(-worker)?\"}[5m])))",
           "legendFormat": "p95"
         },
         {
           "refId": "B",
-          "expr": "rate(agent_rag_latency_seconds_sum[5m]) / clamp_min(rate(agent_rag_latency_seconds_count[5m]), 0.001)",
+          "expr": "sum(rate(agent_rag_latency_seconds_sum{job=~\"aishop-agent(-worker)?\"}[5m])) / clamp_min(sum(rate(agent_rag_latency_seconds_count{job=~\"aishop-agent(-worker)?\"}[5m])), 0.001)",
           "legendFormat": "平均"
         }
       ]
@@ -247,7 +247,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(agent_rag_search_total{result=\"hit\"}[30m])) / clamp_min(sum(rate(agent_rag_search_total[30m])), 0.001)",
+          "expr": "sum(rate(agent_rag_search_total{job=~\"aishop-agent(-worker)?\",result=\"hit\"}[30m])) / clamp_min(sum(rate(agent_rag_search_total{job=~\"aishop-agent(-worker)?\"}[30m])), 0.001)",
           "legendFormat": "命中率"
         }
       ]
@@ -262,7 +262,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agent_circuit_state",
+          "expr": "max by (breaker) (agent_circuit_state{job=~\"aishop-agent(-worker)?\"})",
           "legendFormat": "{{breaker}}"
         }
       ]
@@ -277,12 +277,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (queue) (agent_task_inflight)",
+          "expr": "sum by (queue) (agent_task_inflight{job=\"aishop-agent-worker\"})",
           "legendFormat": "处理中 {{queue}}"
         },
         {
           "refId": "B",
-          "expr": "agent_task_backlog",
+          "expr": "max(agent_task_backlog{job=\"aishop-agent\"})",
           "legendFormat": "数据库积压"
         }
       ]
@@ -296,22 +296,82 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (queue, result) (rate(agent_task_total[5m]))",
+          "expr": "sum by (queue, result) (rate(agent_task_total{job=\"aishop-agent-worker\"}[5m]))",
           "legendFormat": "{{queue}} / {{result}}"
         }
       ]
     },
     {
       "type": "timeseries",
-      "title": "流式输出 token 速率",
+      "title": "流式输出字符速率（非 token，成本勿用此面板）",
       "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 48 },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(agent_stream_tokens_total[5m])",
-          "legendFormat": "tokens/s"
+          "expr": "sum(rate(agent_stream_chars_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "chars/s"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM 调用结果速率",
+      "description": "每次真实模型调用只记录一次 success 或 error；按模型和 fallback 状态拆分",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 54 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model, fallback, result) (rate(agent_llm_call_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "{{model}} / fallback={{fallback}} / {{result}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "LLM 调用失败率",
+      "description": "过去 30 分钟模型调用中 result=error 的占比",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 54 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.02 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(agent_llm_call_total{job=~\"aishop-agent(-worker)?\",result=\"error\"}[30m])) / clamp_min(sum(rate(agent_llm_call_total{job=~\"aishop-agent(-worker)?\"}[30m])), 0.001)",
+          "legendFormat": "失败率"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM token 消耗速率",
+      "description": "仅统计模型供应商返回的真实 usage；prompt / completion 分开展示",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 60 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (rate(agent_llm_tokens_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "{{kind}} tokens/s"
         }
       ]
     }

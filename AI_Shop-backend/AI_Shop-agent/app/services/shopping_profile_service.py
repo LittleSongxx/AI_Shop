@@ -8,6 +8,7 @@ import structlog
 
 from app.constants import CLARIFY_MAX_TEXT_LENGTH, PRODUCT_STATUS_ON_SALE
 from app.db.pool import acquire
+from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.redis_service import redis_service
 
 logger = structlog.get_logger()
@@ -379,7 +380,7 @@ class ShoppingProfileService:
         try:
             llm = create_memory_llm()
             response = await _asyncio.wait_for(
-                llm.ainvoke([HumanMessage(content=prompt)]),
+                invoke_llm_with_metrics(llm, [HumanMessage(content=prompt)]),
                 timeout=8.0,
             )
             raw = (response.content or "").strip()

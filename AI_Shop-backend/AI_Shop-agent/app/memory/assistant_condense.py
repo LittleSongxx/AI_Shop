@@ -6,6 +6,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
+from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.llm_factory import create_memory_llm
 from app.services.redis_service import redis_service
 
@@ -37,13 +38,14 @@ async def condense_assistant_for_history(text: str, max_len: int | None = None) 
 
     try:
         llm = create_memory_llm()
-        response = await llm.ainvoke(
+        response = await invoke_llm_with_metrics(
+            llm,
             [
                 SystemMessage(content=_CONDENSE_SYSTEM),
                 HumanMessage(
                     content=f"原文字数 {len(stripped)}，请压缩到 {limit} 字以内：\n\n{stripped}"
                 ),
-            ]
+            ],
         )
         content = response.content if isinstance(response.content, str) else str(response.content or "")
         condensed = content.strip()

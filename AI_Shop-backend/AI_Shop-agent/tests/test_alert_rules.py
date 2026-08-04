@@ -143,6 +143,22 @@ def test_agent_metric_names_in_alerts_actually_exist():
             assert base in declared, f"告警引用了不存在的指标 {referenced}"
 
 
+def test_agent_metrics_are_scoped_to_their_prometheus_jobs():
+    """避免 API/Worker 的同名默认值或其他抓取目标污染聚合结果。"""
+    matcher = re.compile(r"\b(agent_[a-z_]+)(?:\{([^}]*)\})?")
+    for expr in _all_exprs():
+        for metric, labels in matcher.findall(expr):
+            assert re.search(r'\bjob\s*(?:=|=~)\s*"aishop-agent', labels), (
+                f"{metric} 缺少 aishop-agent job 过滤：{expr}"
+            )
+
+
+def test_task_metrics_use_their_authoritative_process():
+    expressions = "\n".join(_all_exprs())
+    assert 'agent_task_backlog{job="aishop-agent"}' in expressions
+    assert 'agent_task_total{job="aishop-agent-worker"' in expressions
+
+
 @pytest.mark.parametrize(
     ("metric", "const", "label"),
     [

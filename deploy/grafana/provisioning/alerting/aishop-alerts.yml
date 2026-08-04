@@ -54,7 +54,7 @@ groups:
             model:
               refId: QUERY
               editorMode: code
-              expr: up
+              expr: up{job=~"aishop-.*"}
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -99,7 +99,7 @@ groups:
             model:
               refId: QUERY
               editorMode: code
-              expr: max by (breaker) (agent_circuit_state)
+              expr: max by (breaker) (agent_circuit_state{job=~"aishop-agent(-worker)?"})
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -137,8 +137,10 @@ groups:
               # 比没有这条告警更糟，因为它看起来是有覆盖的。
               # clamp_min 防零除：没有流量时整个表达式为 0，不会产生 NaN 触发告警。
               expr: >-
-                sum(rate(agent_rag_search_total{result="miss"}[10m]))
-                / clamp_min(sum(rate(agent_rag_search_total[10m])), 0.001)
+                sum(rate(agent_rag_search_total{job=~"aishop-agent(-worker)?",result="miss"}[10m]))
+                / clamp_min(
+                    sum(rate(agent_rag_search_total{job=~"aishop-agent(-worker)?"}[10m])),
+                    0.001)
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -181,7 +183,8 @@ groups:
               editorMode: code
               expr: >-
                 histogram_quantile(0.95,
-                  sum by (le) (rate(agent_llm_latency_seconds_bucket[10m])))
+                  sum by (le) (
+                    rate(agent_llm_latency_seconds_bucket{job=~"aishop-agent(-worker)?"}[10m])))
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -216,7 +219,8 @@ groups:
               editorMode: code
               expr: >-
                 histogram_quantile(0.95,
-                  sum by (le) (rate(agent_rag_latency_seconds_bucket[10m])))
+                  sum by (le) (
+                    rate(agent_rag_latency_seconds_bucket{job=~"aishop-agent(-worker)?"}[10m])))
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -249,8 +253,12 @@ groups:
               refId: QUERY
               editorMode: code
               expr: >-
-                sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[10m]))
-                / clamp_min(sum by (application) (rate(http_server_requests_seconds_count[10m])), 0.001)
+                sum by (application) (
+                  rate(http_server_requests_seconds_count{job=~"aishop-gateway|aishop-services",status=~"5.."}[10m]))
+                / clamp_min(
+                    sum by (application) (
+                      rate(http_server_requests_seconds_count{job=~"aishop-gateway|aishop-services"}[10m])),
+                    0.001)
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -294,7 +302,7 @@ groups:
             model:
               refId: QUERY
               editorMode: code
-              expr: max(agent_task_backlog)
+              expr: max(agent_task_backlog{job="aishop-agent"})
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
@@ -331,9 +339,11 @@ groups:
               refId: QUERY
               editorMode: code
               expr: >-
-                sum by (queue) (rate(agent_task_total{result="dead"}[10m]))
+                sum by (queue) (
+                  rate(agent_task_total{job="aishop-agent-worker",result="dead"}[10m]))
                 / clamp_min(
-                    sum by (queue) (rate(agent_task_total{result=~"completed|dead"}[10m])),
+                    sum by (queue) (
+                      rate(agent_task_total{job="aishop-agent-worker",result=~"completed|dead"}[10m])),
                     0.001)
               instant: true
               intervalMs: 60000
@@ -371,8 +381,12 @@ groups:
               refId: QUERY
               editorMode: code
               expr: >-
-                sum by (tool) (rate(agent_tool_call_total{status=~"error|bad_args"}[10m]))
-                / clamp_min(sum by (tool) (rate(agent_tool_call_total[10m])), 0.001)
+                sum by (tool) (
+                  rate(agent_tool_call_total{job=~"aishop-agent(-worker)?",status=~"error|bad_args"}[10m]))
+                / clamp_min(
+                    sum by (tool) (
+                      rate(agent_tool_call_total{job=~"aishop-agent(-worker)?"}[10m])),
+                    0.001)
               instant: true
               intervalMs: 60000
               maxDataPoints: 43200
