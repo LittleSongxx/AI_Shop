@@ -776,8 +776,11 @@ def _apply_handoff_policy(
         decision.confidence < threshold
         or decision.next_action == NextAction.ASK_CLARIFICATION
     )
+    # A low-confidence classification is not proof that the previous answer failed.
+    # Require three consecutive unresolved turns before forcing support; explicit
+    # user feedback that the issue is still unresolved continues to hand off now.
     unresolved = (
-        unresolved_count >= 1 and current_unresolved
+        unresolved_count >= 2 and current_unresolved
     ) or any(k in user_text for k in _UNRESOLVED_HINTS)
     severe = decision.sentiment == SentimentKind.VERY_NEGATIVE
     fund_dispute = decision.risk_level == RiskLevel.HIGH

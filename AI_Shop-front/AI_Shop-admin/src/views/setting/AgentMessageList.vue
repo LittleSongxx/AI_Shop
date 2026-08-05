@@ -463,7 +463,8 @@ const delRow = (row) => {
 
 <style scoped lang="scss">
 .ai-service-card {
-  height: calc(100vh - 95px);
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 

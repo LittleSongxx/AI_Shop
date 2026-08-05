@@ -44,32 +44,15 @@ public class SysCategoryServiceImpl implements SysCategoryService {
 	@Override
 	public List<SysCategory> findListByParam(SysCategoryQuery param) {
 		List<SysCategory> list = this.sysCategoryMapper.selectList(param);
-		if (param.getParent()!=null && param.getParent()){
+		if (Boolean.TRUE.equals(param.getParent())) {
+			// MySQL is the source of truth. Refresh the snapshot instead of allowing
+			// an unversioned Redis value to replace a newer imported catalogue.
+			saveCategoryToRedis();
 			list = findChildren(list, Constants.ZERO_STR);
 		}
-		if (param.getPropertyQuery()!=null && param.getPropertyQuery()){
+		if (Boolean.TRUE.equals(param.getPropertyQuery())) {
 			list = find4Property(list);
 		}
-		// Redis 有非空列表才走缓存；空列表多为库未导入时写入，需回源重建
-		List<?> cached = redisComponent.getCategoryList();
-		if (cached != null && !cached.isEmpty()) {
-			@SuppressWarnings("unchecked")
-			List<SysCategory> cachedList = (List<SysCategory>) cached;
-			list = findChildren(cachedList, Constants.ZERO_STR);
-			list = find4Property(list);
-			return list;
-		}
-		saveCategoryToRedis();
-		cached = redisComponent.getCategoryList();
-		if (cached != null && !cached.isEmpty()) {
-			@SuppressWarnings("unchecked")
-			List<SysCategory> cachedList = (List<SysCategory>) cached;
-			list = findChildren(cachedList, Constants.ZERO_STR);
-			list = find4Property(list);
-			return list;
-		}
-		list = findChildren(list, Constants.ZERO_STR);
-		list = find4Property(list);
 		return list;
 	}
 
@@ -217,7 +200,7 @@ public class SysCategoryServiceImpl implements SysCategoryService {
 		// 先查询当前节点的所有直接子节点
 		List<SysCategory> children = this.sysCategoryMapper.selectByPCategoryId(bean.getCategoryId());
 		// 如果当前节点下还有子节点，则连同子节点一起删除
-		if (children != null || !children.isEmpty()){
+		if (children != null && !children.isEmpty()){
 			for (SysCategory child : children) {
 				this.deleteSysCategory(child);
 			}
@@ -279,20 +262,13 @@ public class SysCategoryServiceImpl implements SysCategoryService {
 		redisComponent.saveCategory2Redis(list);
 	}
 
-	// 将信息从redis中取出
+	// 返回数据库中的实时目录，并同步刷新 Redis 快照。
 	@Override
 	public List<SysCategory> getAllCategoryList() {
-		// 从redis中取出
-		List<?> cached = redisComponent.getCategoryList();
-		if (cached == null || cached.isEmpty()) {
-			saveCategoryToRedis();
-			cached = redisComponent.getCategoryList();
-		}
-		if (cached == null) {
-			return new ArrayList<>();
-		}
-		@SuppressWarnings("unchecked")
-		List<SysCategory> list = (List<SysCategory>) cached;
+		SysCategoryQuery query = new SysCategoryQuery();
+		query.setOrderBy(com.aishop.entity.query.SafeSort.of("sort asc"));
+		List<SysCategory> list = this.sysCategoryMapper.selectList(query);
+		redisComponent.saveCategory2Redis(list);
 		return list;
 	}
 }

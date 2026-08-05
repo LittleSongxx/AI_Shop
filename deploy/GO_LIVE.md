@@ -40,7 +40,9 @@ Python Agent 使用 Alembic。表归属见 `sql/TABLE_OWNERSHIP.md`。
 
 复制 `deploy/env.production.example`，至少改掉：
 
+- `APP_ENV=production`
 - `AISHOP_PRODUCTION_READY=true`
+- `AISHOP_DEV_LOGIN_BYPASS=false` / `ALLOW_DEVELOPMENT_AUTH_BYPASS=false`
 - `AISHOP_INTERNAL_TOKEN`
 - `MYSQL_PASSWORD` / `RABBIT_PASSWORD`
 - `ADMIN_PASSWORD`
@@ -76,6 +78,6 @@ Python Agent 使用 Alembic。表归属见 `sql/TABLE_OWNERSHIP.md`。
 ## 6. 安全确认
 
 - 业务端口（8084–8111、7050）不对公网  
-- 未使用 `-Ddev` / `AISHOP_DEV_LOGIN_BYPASS=true`  
+- 未使用 `-Ddev`，且 `AISHOP_DEV_LOGIN_BYPASS=false`、`ALLOW_DEVELOPMENT_AUTH_BYPASS=false`
 - Nginx 未反代 `/actuator`  
 - 各服务启动日志出现"生产就绪校验通过"

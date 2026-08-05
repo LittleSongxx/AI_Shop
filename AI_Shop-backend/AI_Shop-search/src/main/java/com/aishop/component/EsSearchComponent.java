@@ -1,5 +1,7 @@
 package com.aishop.component;
 
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.aishop.api.support.ProductFeignSupport;
 import com.aishop.api.vo.ProductSearchIndexVO;
 import com.aishop.api.dto.ProductInfoDTO;
@@ -21,12 +23,10 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -95,58 +95,12 @@ public class EsSearchComponent {
             //es 分页从0开始
             pageNo = pageNo - 1;
             int pageSize = PageSize.SIZE15.getSize();
-            // 构建查询条件
-            Criteria criteria = new Criteria();
-            Boolean hasCondition = false;
-
-            // 对于商品名
-            // 如果productName少于等于2个字，精准匹配
-            if (!StringTools.isEmpty(keyWords)) {
-                Criteria productNameCriteria;
-                if (keyWords.length() <= 2){
-                    productNameCriteria = new Criteria("productName").contains(keyWords);
-                    productNameCriteria.or(new Criteria("productName").matches(keyWords));
-                    productNameCriteria.or(new Criteria("productName").expression("*" + keyWords + "*"));
-                }else {
-                    productNameCriteria = new Criteria("productName").contains(keyWords);
-                }
-                criteria.and(productNameCriteria);
-                hasCondition = true;
-            }
-
-            if (!StringTools.isEmpty(categoryId)) {
-                criteria.and(new Criteria("categoryId").is(categoryId));
-                hasCondition = true;
-            }
-
-            // 对于价格
-            if (priceFrom != null || priceTo != null){
-                if (priceFrom != null && priceTo != null) {
-                    // 两个条件都有：使用 and 连接
-                    criteria.and(new Criteria("minPrice").greaterThanEqual(priceFrom))
-                            .and(new Criteria("maxPrice").lessThanEqual(priceTo));
-                } else if (priceFrom != null) {
-                    // 只有最低价格
-                    criteria.and(new Criteria("minPrice").greaterThanEqual(priceFrom));
-                } else {
-                    // 只有最高价格
-                    criteria.and(new Criteria("maxPrice").lessThanEqual(priceTo));
-                }
-                hasCondition = true;
-            }
-
-            // 如果没有任何查询条件，使用 match_all 查询所有商品
-            if (!hasCondition) {
-                criteria = new Criteria("_index").exists();
-            }
-
             Sort sort = buildSort(sortKey, sortDirection);
             // 分页
             Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
             // 执行查询
-            CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);
-            criteriaQuery.setPageable(pageable);
-            SearchHits<ProductInfoDTO> searchHits = elasticsearchOperations.search(criteriaQuery, ProductInfoDTO.class);
+            NativeQuery searchQuery = buildSearchQuery(keyWords, categoryId, priceFrom, priceTo, pageable);
+            SearchHits<ProductInfoDTO> searchHits = elasticsearchOperations.search(searchQuery, ProductInfoDTO.class);
             // 处理结果
             List<ProductInfoDTO> productInfoDTOList = searchHits.getSearchHits().stream().map(SearchHit::getContent).collect(Collectors.toList());
             long totalHits = searchHits.getTotalHits();
@@ -157,6 +111,64 @@ public class EsSearchComponent {
             log.error("搜索失败", e);
             throw new com.aishop.exception.BusinessException("搜索服务暂时不可用，请稍后重试");
         }
+    }
+
+    static NativeQuery buildSearchQuery(String keyWords,
+                                        String categoryId,
+                                        BigDecimal priceFrom,
+                                        BigDecimal priceTo,
+                                        Pageable pageable) {
+        String normalizedKeywords = StringTools.isEmpty(keyWords) ? "" : keyWords.trim();
+        String normalizedCategoryId = StringTools.isEmpty(categoryId) ? "" : categoryId.trim();
+
+        boolean hasKeywords = !normalizedKeywords.isEmpty();
+        boolean hasCategory = !normalizedCategoryId.isEmpty();
+        boolean hasPrice = priceFrom != null || priceTo != null;
+
+        Query query;
+        if (!hasKeywords && !hasCategory && !hasPrice) {
+            query = Query.of(q -> q.matchAll(matchAll -> matchAll));
+        } else {
+            BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+
+            if (hasKeywords) {
+                boolQuery.should(Query.of(q -> q.match(match -> match
+                        .field("productName")
+                        .query(normalizedKeywords)
+                        .boost(3.0F))));
+                boolQuery.should(Query.of(q -> q.matchPhrase(matchPhrase -> matchPhrase
+                        .field("productName")
+                        .query(normalizedKeywords)
+                        .boost(5.0F))));
+                boolQuery.should(Query.of(q -> q.match(match -> match
+                        .field("productDesc")
+                        .query(normalizedKeywords))));
+                boolQuery.minimumShouldMatch("1");
+            }
+
+            if (hasCategory) {
+                boolQuery.filter(Query.of(q -> q.term(term -> term
+                        .field("categoryId")
+                        .value(normalizedCategoryId))));
+            }
+            if (priceFrom != null) {
+                boolQuery.filter(Query.of(q -> q.range(range -> range.number(number -> number
+                        .field("minPrice")
+                        .gte(priceFrom.doubleValue())))));
+            }
+            if (priceTo != null) {
+                boolQuery.filter(Query.of(q -> q.range(range -> range.number(number -> number
+                        .field("maxPrice")
+                        .lte(priceTo.doubleValue())))));
+            }
+
+            query = Query.of(q -> q.bool(boolQuery.build()));
+        }
+
+        return NativeQuery.builder()
+                .withQuery(query)
+                .withPageable(pageable)
+                .build();
     }
 
     static Sort buildSort(ProductSortKey sortKey, SortDirection sortDirection) {

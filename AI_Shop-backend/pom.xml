@@ -50,7 +50,8 @@
     <okhttp.version>4.12.0</okhttp.version>
     <commons-lang3.version>3.14.0</commons-lang3.version>
     <commons-codec.version>1.16.1</commons-codec.version>
-    <commons-io.version>2.11.0</commons-io.version>
+    <!-- Apache Tika 3.3.0 calls Commons IO builder APIs introduced after 2.11. -->
+    <commons-io.version>2.21.0</commons-io.version>
     <captcha.version>1.6.2</captcha.version>
     <captcha-plus.version>2.0.1</captcha-plus.version>
     <redisson.version>4.0.0</redisson.version>

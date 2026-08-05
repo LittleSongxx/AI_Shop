@@ -1,5 +1,6 @@
 import asyncio
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -103,6 +104,32 @@ async def test_hybrid_search_returns_bounded_source_trace(monkeypatch):
     assert result["source_refs"][0]["documentId"] == "7"
     assert result["source_refs"][0]["chunkId"] == "knowledge_7_1_0"
     assert result["source_refs"][0]["retrieval"] == "rerank"
+
+
+def test_rejected_candidates_are_not_exposed_as_answer_sources():
+    retriever = RagRetriever()
+    result = retriever._trace_result(
+        "不存在的规则",
+        9,
+        "hybrid",
+        False,
+        [
+            {
+                "id": "irrelevant",
+                "content": "无关内容",
+                "metadata": {"dataType": "knowledge", "documentId": "7"},
+                "score": 0.31,
+                "source": "rerank",
+            }
+        ],
+        0.0,
+    )
+
+    assert result["text"] == ""
+    assert result["source_refs"] == []
+    assert result["trace"]["hit"] is False
+    assert result["trace"]["sourceCount"] == 0
+    assert result["trace"]["candidateCount"] == 1
 
 
 def test_knn_num_candidates_keeps_a_recall_floor_and_respects_es_bounds():
@@ -233,6 +260,18 @@ def test_evidence_gate_uses_the_scale_that_produced_the_score():
     assert not retriever._has_enough_evidence([])
 
 
+def test_evidence_filter_drops_each_low_relevance_rerank_candidate():
+    retriever = RagRetriever()
+    docs = [
+        {"id": "relevant", "score": 0.73, "source": "rerank"},
+        {"id": "noise", "score": 0.35, "source": "rerank"},
+    ]
+
+    assert [doc["id"] for doc in retriever._filter_evidence_docs(docs)] == [
+        "relevant"
+    ]
+
+
 def test_evidence_gate_is_not_trivially_true_for_bm25_scores():
     """回归守卫：BM25 原始分不该再让闸门恒为真。
 
@@ -267,6 +306,214 @@ def test_rag_thresholds_are_independently_configurable():
     assert settings.rag_product_vector_min_cosine == 0.15
     assert settings.rag_evidence_min_relevance == 0.8
     assert settings.rag_evidence_min_rrf_rank == 3
+
+
+@pytest.mark.asyncio
+async def test_qwen3_compatible_rerank_uses_top_level_protocol_and_preserves_zero_score(
+    monkeypatch,
+):
+    retriever = RagRetriever()
+    settings = SimpleNamespace(
+        rerank_api_key="rerank-secret",
+        rerank_api_format="compatible",
+        rerank_base_url="https://workspace.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        rerank_model="qwen3-rerank",
+        rerank_instruct="Rank e-commerce candidates.",
+        rerank_timeout=20,
+    )
+    monkeypatch.setattr("app.rag.retriever.get_settings", lambda: settings)
+
+    breaker = SimpleNamespace(
+        allow_request=MagicMock(return_value=True),
+        record_success=MagicMock(),
+        record_failure=MagicMock(),
+    )
+    monkeypatch.setattr(
+        "app.rag.retriever.circuit_registry.get_or_create",
+        lambda *_args, **_kwargs: breaker,
+    )
+
+    captured: dict = {}
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "results": [
+                    {"index": 1, "relevance_score": 0.0},
+                    {"index": 99, "relevance_score": 1.0},
+                    {"index": 1, "relevance_score": 0.7},
+                    {"index": 0, "relevance_score": 0.8},
+                ]
+            }
+
+    class _Client:
+        async def post(self, url, **kwargs):
+            captured["url"] = url
+            captured.update(kwargs)
+            return _Response()
+
+    async def fake_client(*_args, **_kwargs):
+        return _Client()
+
+    monkeypatch.setattr("app.rag.retriever.get_client", fake_client)
+    docs = [
+        {"id": "a", "content": "办公笔记本", "score": 0.02, "source": "rrf"},
+        {"id": "b", "content": "游戏主机", "score": 0.01, "source": "rrf"},
+    ]
+
+    result = await retriever._rerank("适合办公的电脑", docs, 2)
+
+    assert [item["id"] for item in result] == ["b", "a"]
+    assert [item["score"] for item in result] == [0.0, 0.8]
+    assert all(item["source"] == "rerank" for item in result)
+    assert captured["url"] == settings.rerank_base_url
+    assert captured["headers"]["Authorization"] == "Bearer rerank-secret"
+    assert captured["json"] == {
+        "model": "qwen3-rerank",
+        "query": "适合办公的电脑",
+        "documents": ["办公笔记本", "游戏主机"],
+        "top_n": 2,
+        "instruct": "Rank e-commerce candidates.",
+    }
+    breaker.record_success.assert_called_once_with()
+    breaker.record_failure.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_dashscope_native_rerank_remains_compatible(monkeypatch):
+    retriever = RagRetriever()
+    settings = SimpleNamespace(
+        rerank_api_key="legacy-secret",
+        rerank_api_format="dashscope_native",
+        rerank_base_url="https://example.test/api/v1/services/rerank/text-rerank/text-rerank",
+        rerank_model="gte-rerank-v2",
+        rerank_instruct="ignored for native",
+        rerank_timeout=15,
+    )
+    monkeypatch.setattr("app.rag.retriever.get_settings", lambda: settings)
+    breaker = SimpleNamespace(
+        allow_request=MagicMock(return_value=True),
+        record_success=MagicMock(),
+        record_failure=MagicMock(),
+    )
+    monkeypatch.setattr(
+        "app.rag.retriever.circuit_registry.get_or_create",
+        lambda *_args, **_kwargs: breaker,
+    )
+
+    captured: dict = {}
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"output": {"results": [{"index": 0, "relevance_score": 0.72}]}}
+
+    class _Client:
+        async def post(self, _url, **kwargs):
+            captured.update(kwargs)
+            return _Response()
+
+    async def fake_client(*_args, **_kwargs):
+        return _Client()
+
+    monkeypatch.setattr("app.rag.retriever.get_client", fake_client)
+    result = await retriever._rerank(
+        "物流",
+        [{"id": "faq", "content": "物流查询说明", "score": 0.01, "source": "rrf"}],
+        1,
+    )
+
+    assert result[0]["score"] == pytest.approx(0.72)
+    assert captured["json"] == {
+        "model": "gte-rerank-v2",
+        "input": {"query": "物流", "documents": ["物流查询说明"]},
+        "parameters": {"return_documents": False, "top_n": 1},
+    }
+    breaker.record_success.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_invalid_rerank_results_fall_back_to_original_order(monkeypatch):
+    retriever = RagRetriever()
+    settings = SimpleNamespace(
+        rerank_api_key="rerank-secret",
+        rerank_api_format="compatible",
+        rerank_base_url="https://workspace.example.test/reranks",
+        rerank_model="qwen3-rerank",
+        rerank_instruct="",
+        rerank_timeout=20,
+    )
+    monkeypatch.setattr("app.rag.retriever.get_settings", lambda: settings)
+    breaker = SimpleNamespace(
+        allow_request=MagicMock(return_value=True),
+        record_success=MagicMock(),
+        record_failure=MagicMock(),
+    )
+    monkeypatch.setattr(
+        "app.rag.retriever.circuit_registry.get_or_create",
+        lambda *_args, **_kwargs: breaker,
+    )
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": [{"index": 8, "relevance_score": 0.9}]}
+
+    class _Client:
+        async def post(self, *_args, **_kwargs):
+            return _Response()
+
+    async def fake_client(*_args, **_kwargs):
+        return _Client()
+
+    monkeypatch.setattr("app.rag.retriever.get_client", fake_client)
+    docs = [
+        {"id": "first", "content": "A", "score": 0.02, "source": "rrf"},
+        {"id": "second", "content": "B", "score": 0.01, "source": "rrf"},
+    ]
+
+    result = await retriever._rerank("query", docs, 1)
+
+    assert result == docs[:1]
+    breaker.record_success.assert_not_called()
+    breaker.record_failure.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_unconfigured_rerank_does_not_create_an_http_client(monkeypatch):
+    retriever = RagRetriever()
+    settings = SimpleNamespace(rerank_api_key="")
+    monkeypatch.setattr("app.rag.retriever.get_settings", lambda: settings)
+    client_factory = AsyncMock()
+    monkeypatch.setattr("app.rag.retriever.get_client", client_factory)
+    docs = [{"id": "a", "content": "A", "score": 0.01, "source": "rrf"}]
+
+    assert await retriever._rerank("query", docs, 1) == docs
+    client_factory.assert_not_awaited()
+
+
+def test_rerank_protocol_and_instruction_are_part_of_the_semantic_cache_key():
+    retriever = RagRetriever()
+    compatible = Settings(rerank_api_format="compatible", rerank_instruct="instruction-a")
+    native = Settings(rerank_api_format="dashscope_native", rerank_instruct="instruction-a")
+    different_instruction = Settings(
+        rerank_api_format="compatible", rerank_instruct="instruction-b"
+    )
+
+    def cache_key(settings):
+        return retriever._semantic_cache_key(
+            "query", 1, 10, None, "A", settings, settings.rerank_top_n
+        )
+
+    assert cache_key(compatible) != cache_key(native)
+    assert cache_key(compatible) != cache_key(different_instruction)
 
 
 @pytest.mark.asyncio

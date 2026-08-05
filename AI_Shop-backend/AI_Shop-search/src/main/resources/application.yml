@@ -79,14 +79,19 @@ spring:
         transcription: none
       image: none
     openai:
-      api-key: ${LLM_API_KEY:sk-local-placeholder}
+      # Keep an unconfigured local install explicit. A fake key makes the
+      # service appear configured and causes every request to fail remotely.
+      api-key: ${LLM_API_KEY:}
       base-url: ${LLM_BASE_URL:https://api.deepseek.com}
       chat:
         options:
           model: ${LLM_MODEL:deepseek-chat}
       embedding:
-        api-key: ${EMBEDDING_API_KEY:${LLM_API_KEY:sk-local-placeholder}}
+        api-key: ${EMBEDDING_API_KEY:${LLM_API_KEY:}}
         base-url: ${EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+        # Spring AI appends this path to base-url. DashScope's configured base
+        # already contains /v1, so the OpenAI default /v1/embeddings would 404.
+        embeddings-path: ${EMBEDDING_PATH:/embeddings}
         options:
           model: ${EMBEDDING_MODEL:text-embedding-v4}
           dimensions: 1024
@@ -133,9 +138,9 @@ aishop:
     api-key: ${VLM_API_KEY:${DASHSCOPE_API_KEY:}}
     base-url: ${VLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
     model: ${VLM_MODEL:qwen-vl-plus}
-    max-tokens: ${VLM_MAX_TOKENS:150}
+    max-tokens: ${VLM_MAX_TOKENS:${VLM_IMAGE_MAX_TOKENS:150}}
     connect-timeout-seconds: ${VLM_CONNECT_TIMEOUT_SECONDS:5}
-    timeout-seconds: ${VLM_TIMEOUT_SECONDS:15}
+    timeout-seconds: ${VLM_TIMEOUT_SECONDS:${VLM_TIMEOUT:15}}
   feign:
     connect-timeout-ms: 3000
     read-timeout-ms: 10000

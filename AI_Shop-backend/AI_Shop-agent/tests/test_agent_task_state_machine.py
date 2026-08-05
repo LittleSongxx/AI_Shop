@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.constants import MSG_STATUS_COMPLETE
+from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.services.agent_service import AgentOrchestrator
 from app.services.message_service import AgentMessageService
 from app.services.task_service import AgentTaskService
@@ -216,12 +217,58 @@ async def test_terminal_failure_notifies_without_second_terminal_write():
             AsyncMock(return_value=(5, True)),
         ),
         patch("app.worker.agent_task_service.mark_terminal", AsyncMock()) as terminal,
+        patch(
+            "app.worker.agent_message_service.reset_unresolved_count",
+            AsyncMock(),
+        ),
         patch.object(worker, "_notify_terminal", AsyncMock()) as notify,
     ):
         await worker._retry_or_dead(message, payload, RuntimeError("boom"), "owner")
 
     terminal.assert_not_awaited()
     notify.assert_awaited_once_with(message, payload)
+
+
+@pytest.mark.asyncio
+async def test_worker_refine_recalculates_unresolved_count_from_new_decision():
+    worker = AgentWorker()
+    initial = IntentDecision(
+        intent=IntentKind.CHAT,
+        confidence=0.4,
+        next_action=NextAction.HANDOFF_SUGGESTED,
+        handoff_reason="LOW_CONFIDENCE",
+        source="default",
+    )
+    refined = IntentDecision(
+        intent=IntentKind.CHAT,
+        confidence=0.9,
+        next_action=NextAction.ANSWER,
+        source="llm",
+    )
+    payload = {
+        "messageId": 91,
+        "userId": "u1",
+        "userMessage": "支付方式有哪些",
+        "unresolvedCount": 1,
+        "intentDecision": initial.model_dump(mode="json"),
+    }
+
+    with (
+        patch(
+            "app.worker.agent_message_service.get_recent_intents",
+            AsyncMock(return_value=[]),
+        ),
+        patch("app.worker.resolve_intent", AsyncMock(return_value=refined)),
+        patch("app.worker.record_intent_metrics"),
+        patch(
+            "app.worker.agent_message_service.update_decision", AsyncMock()
+        ) as update,
+    ):
+        result = await worker._refine_decision(payload)
+
+    assert result == refined
+    assert payload["unresolvedCount"] == 0
+    update.assert_awaited_once_with(91, refined, 0)
 
 
 @pytest.mark.asyncio

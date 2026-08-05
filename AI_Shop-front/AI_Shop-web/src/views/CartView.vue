@@ -30,6 +30,16 @@
           <RouterLink :to="`/product/${row.productId}`" class="item-name" :title="row.productName">
             {{ row.productName }}
           </RouterLink>
+          <button
+            type="button"
+            class="remove-item-btn"
+            title="移出购物车"
+            aria-label="移出购物车"
+            :disabled="isUpdating(row.cartId)"
+            @click.stop="del(row.cartId)"
+          >
+            <el-icon><Delete /></el-icon>
+          </button>
           <p v-if="row.propertyData?.length" class="item-sku">
             <span v-for="(p, i) in row.propertyData" :key="i">
               {{ p.propertyName }}：{{ p.propertyValue }}
@@ -46,14 +56,16 @@
             </div>
             <div
               class="qty-stepper"
-              :class="{ disabled: !row.productOnSale || updatingCartId === row.cartId }"
+              :class="{ disabled: !row.productOnSale || isUpdating(row.cartId) }"
               @click.stop
             >
               <button
                 type="button"
                 class="qty-btn"
-                aria-label="减少数量"
-                :disabled="!row.productOnSale || updatingCartId === row.cartId || getQty(row) <= 1"
+                :class="{ 'will-remove': getQty(row) === 1 }"
+                :aria-label="getQty(row) === 1 ? '移出购物车' : '减少数量'"
+                :title="getQty(row) === 1 ? '再次减少将移出购物车' : '减少数量'"
+                :disabled="!row.productOnSale || isUpdating(row.cartId)"
                 @click="decreaseQty(row)"
               >
                 −
@@ -66,7 +78,7 @@
                 min="1"
                 :max="MAX_CART_QTY"
                 aria-label="数量"
-                :disabled="!row.productOnSale || updatingCartId === row.cartId"
+                :disabled="!row.productOnSale || isUpdating(row.cartId)"
                 @focus="onQtyFocus(row)"
                 @blur="commitQtyInput(row)"
                 @keydown.enter="($event.target as HTMLInputElement).blur()"
@@ -75,7 +87,7 @@
                 type="button"
                 class="qty-btn"
                 aria-label="增加数量"
-                :disabled="!row.productOnSale || updatingCartId === row.cartId || getQty(row) >= MAX_CART_QTY"
+                :disabled="!row.productOnSale || isUpdating(row.cartId) || getQty(row) >= MAX_CART_QTY"
                 @click="increaseQty(row)"
               >
                 +
@@ -149,6 +161,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { Delete } from '@element-plus/icons-vue';
 import LiquidGlassSurface from '@/components/common/LiquidGlassSurface.vue';
 import SwipeDeleteRow from '@/components/business/SwipeDeleteRow.vue';
 import ProductImage from '@/components/common/ProductImage.vue';
@@ -174,7 +187,7 @@ const pageLoading = ref(true);
 const loadError = ref('');
 const recommendProducts = ref<any[]>([]);
 const selectedIds = ref<Set<string>>(new Set());
-const updatingCartId = ref<string | null>(null);
+const updatingCartIds = ref<Set<string>>(new Set());
 const openSwipeId = ref<string | null>(null);
 
 const goProduct = (p: any) => {
@@ -205,6 +218,16 @@ const loadRecommend = async () => {
 
 const onSwipeClose = (cartId: string) => {
   if (openSwipeId.value === cartId) openSwipeId.value = null;
+};
+
+const isUpdating = (cartId: unknown) => updatingCartIds.value.has(String(cartId));
+
+const setUpdating = (cartId: unknown, updating: boolean) => {
+  const id = String(cartId);
+  const next = new Set(updatingCartIds.value);
+  if (updating) next.add(id);
+  else next.delete(id);
+  updatingCartIds.value = next;
 };
 
 const qtySnapshot = new Map<string, number>();
@@ -324,8 +347,12 @@ watch(
   }
 );
 
-const decreaseQty = (row: Record<string, any>) => {
-  void changeQty(row, getQty(row) - 1);
+const decreaseQty = async (row: Record<string, any>) => {
+  if (getQty(row) === 1) {
+    await del(row.cartId);
+    return;
+  }
+  await changeQty(row, getQty(row) - 1);
 };
 
 const increaseQty = (row: Record<string, any>) => {
@@ -359,7 +386,7 @@ const changeQty = async (
   val: number | undefined,
   prevOverride?: number
 ) => {
-  if (!row.productOnSale || updatingCartId.value) return;
+  if (!row.productOnSale || isUpdating(row.cartId)) return;
 
   const prev = prevOverride ?? (Number(row.buyCount) || 1);
   let count = Math.floor(Number(val) || 0);
@@ -377,7 +404,7 @@ const changeQty = async (
   const delta = count - prev;
   if (delta === 0) return;
 
-  updatingCartId.value = row.cartId;
+  setUpdating(row.cartId, true);
   try {
     await cartApi.add2Cart({
       productId: row.productId,
@@ -389,20 +416,34 @@ const changeQty = async (
   } catch {
     row.buyCount = prev;
   } finally {
-    updatingCartId.value = null;
+    setUpdating(row.cartId, false);
   }
 };
 
-const del = async (id: string) => {
+const del = async (cartId: unknown) => {
+  const id = String(cartId);
+  if (isUpdating(id)) return;
   const ok = await confirmAction('确定要将该商品移出购物车吗？', {
     title: '移出购物车',
     confirmButtonText: '移出'
   });
   if (!ok) return;
-  await cartApi.deleteCart(id);
-  if (openSwipeId.value === id) openSwipeId.value = null;
-  toast.success('已移出购物车');
-  await load();
+  if (isUpdating(id)) return;
+
+  setUpdating(id, true);
+  try {
+    await cartApi.deleteCart(id);
+    list.value = list.value.filter((row) => String(row.cartId) !== id);
+    const nextSelected = new Set(selectedIds.value);
+    nextSelected.delete(id);
+    selectedIds.value = nextSelected;
+    qtySnapshot.delete(id);
+    if (openSwipeId.value === id) openSwipeId.value = null;
+    await cartStore.fetchCartCount();
+    toast.success('已移出购物车');
+  } finally {
+    setUpdating(id, false);
+  }
 };
 
 const checkout = () => {
@@ -478,6 +519,7 @@ usePageRefresh(load);
 }
 
 .cart-item {
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -524,9 +566,38 @@ usePageRefresh(load);
   overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  padding-right: 34px;
 
   &:hover {
     color: $color-primary;
+  }
+}
+
+.remove-item-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: $color-text-muted;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover:not(:disabled) {
+    color: $color-error;
+    background: rgba($color-error, 0.08);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.45;
   }
 }
 
@@ -620,6 +691,10 @@ usePageRefresh(load);
   &:hover:not(:disabled) {
     background: $color-primary-muted;
     color: $color-primary;
+  }
+
+  &.will-remove:not(:disabled) {
+    color: $color-error;
   }
 
   &:disabled {

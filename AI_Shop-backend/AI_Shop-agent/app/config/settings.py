@@ -1,5 +1,6 @@
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, BeforeValidator, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
 
         env_file_encoding="utf-8",
 
+        env_ignore_empty=True,
         extra="ignore",
         populate_by_name=True,
     )
@@ -86,10 +88,17 @@ class Settings(BaseSettings):
 
     rerank_api_key: str = Field(
         default="",
-        validation_alias=AliasChoices("DASHSCOPE_API_KEY", "RERANK_API_KEY", "rerank_api_key"),
+        validation_alias=AliasChoices("RERANK_API_KEY", "DASHSCOPE_API_KEY", "rerank_api_key"),
     )
-    rerank_base_url: str = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
-    rerank_model: str = "gte-rerank-v2"
+    # qwen3-rerank uses the Cohere-style compatible endpoint.  The older
+    # DashScope input/output envelope remains available for existing deployments.
+    rerank_api_format: Literal["compatible", "dashscope_native"] = "compatible"
+    rerank_base_url: str = ""
+    rerank_model: str = "qwen3-rerank"
+    rerank_instruct: str = (
+        "Given an e-commerce shopping or support query, rank the candidate "
+        "passages by relevance to the user's intent."
+    )
     rerank_timeout: int = 20
     rerank_top_n: int = 6
     # P1-2：为 True 时 validate_runtime() 将缺失 rerank key 视为致命错误。
@@ -191,12 +200,12 @@ class Settings(BaseSettings):
     # system prompt has been tuned and LLM reliability validated in staging.
     agentic_rag: bool = False
     # P3-2 Multimodal RAG: VLM for image description.
-    # vlm_api_key falls back to DASHSCOPE_API_KEY so DashScope users need no new secret.
+    # A dedicated VLM key wins; DASHSCOPE_API_KEY is only the shared-key fallback.
     # Leave empty (default) to disable — images are silently ignored.
     # Recommended model: qwen-vl-plus (DashScope) or any OpenAI-compatible vision endpoint.
     vlm_api_key: str = Field(
         default="",
-        validation_alias=AliasChoices("DASHSCOPE_API_KEY", "VLM_API_KEY", "vlm_api_key"),
+        validation_alias=AliasChoices("VLM_API_KEY", "DASHSCOPE_API_KEY", "vlm_api_key"),
     )
     vlm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     vlm_model: str = "qwen-vl-plus"
@@ -257,6 +266,28 @@ class Settings(BaseSettings):
             raise ValueError("WORKER_METRICS_PORT must be between 1 and 65535")
         if self.worker_metrics_port == self.app_port:
             raise ValueError("WORKER_METRICS_PORT must differ from APP_PORT")
+        if self.rerank_timeout < 1:
+            raise ValueError("RERANK_TIMEOUT must be positive")
+        if self.rerank_top_n < 1:
+            raise ValueError("RERANK_TOP_N must be positive")
+        if self.rerank_api_key.strip():
+            base_url = self.rerank_base_url.strip()
+            if not self.rerank_model.strip():
+                raise ValueError("RERANK_MODEL must be configured when RERANK_API_KEY is set")
+            if not base_url:
+                raise ValueError("RERANK_BASE_URL must be configured when RERANK_API_KEY is set")
+            normalized_url = base_url.upper()
+            placeholder_markers = (
+                "YOUR_WORKSPACE_ID",
+                "{WORKSPACEID}",
+                "{WORKSPACE_ID}",
+                "<WORKSPACE",
+            )
+            if any(marker in normalized_url for marker in placeholder_markers):
+                raise ValueError("RERANK_BASE_URL still contains a workspace placeholder")
+            parsed = urlparse(base_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("RERANK_BASE_URL must be an absolute HTTP(S) URL")
         if not 0 <= self.rag_cache_sample_rate <= 1:
             raise ValueError("RAG_CACHE_SAMPLE_RATE must be between 0 and 1")
         if self.agent_task_lease_seconds <= self.agent_task_deadline_seconds:

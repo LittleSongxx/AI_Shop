@@ -56,7 +56,14 @@ docker compose -f docker-compose.middleware.yml ps
 > 这不只是图方便：本机常有装在 6379 / 5672 的 Redis 和 RabbitMQ，默认值要是留在标准端口，
 > 服务会**静默连上本机那一个**——连得通、但读写的是错的实例，比连不上更难查。
 >
-> 唯一还必须自己给的是 `MYSQL_PASSWORD`（默认值是占位符 `your-password`，故意不填真值）。
+> `start.sh` 的本地默认账号是 MySQL `root/root`、RabbitMQ `aishop/aishop`。首次创建数据卷前
+> 可通过 `MYSQL_ROOT_PASSWORD`、`RABBIT_USER`、`RABBIT_PASSWORD`、`RABBIT_VHOST` 覆盖；
+> Java 侧 `MYSQL_PASSWORD` 留空时会自动跟随 `MYSQL_ROOT_PASSWORD`。已有数据卷不会因修改
+> 环境变量而自动重置数据库或消息队列账号。一键脚本会把选定值以 Shell 转义格式保存到
+> 权限为 `0600` 的 `run/runtime.env`，保证后续重启继续使用同一组本地凭据。
+>
+> 单节点本地 Elasticsearch 默认使用 `ES_INDEX_REPLICAS=0`，避免副本无法分配导致集群长期
+> `yellow`；多节点部署应按节点数设置为 `1` 或更高。
 
 容器互通主机名：`mysql`、`redis`、`rabbitmq`、`nacos`、`elasticsearch`、`sentinel`、`seata-server`。  
 宿主机上的 Java 微服务仍连 `127.0.0.1`（Seata TC 已映射 `8092`）。

@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.constants import MSG_STATUS_NORMAL
+from app.domain.intent.types import IntentKind
 from app.graph.builder import build_agent_graph
+from app.graph.nodes import should_prefetch_rag
 from app.graph.runner import _should_resume
 from app.graph.state import initial_state, thread_id_for
 
@@ -27,6 +29,28 @@ def test_initial_state_shape():
 
 def test_thread_id_format():
     assert thread_id_for("user_a", 42) == "user_a:42"
+
+
+def test_policy_and_support_intents_prefetch_published_knowledge():
+    for intent in (
+        IntentKind.CHAT,
+        IntentKind.PRODUCT_CONSULT,
+        IntentKind.REFUND,
+        IntentKind.QUERY_LOGISTICS,
+        IntentKind.QUERY_COUPON,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.AFTERSALES_UNKNOWN,
+    ):
+        assert should_prefetch_rag(intent, agentic_rag=False)
+
+    for intent in (
+        IntentKind.PRODUCT_SEARCH,
+        IntentKind.QUERY_ORDER,
+        IntentKind.HUMAN_REQUEST,
+    ):
+        assert not should_prefetch_rag(intent, agentic_rag=False)
+
+    assert not should_prefetch_rag(IntentKind.REFUND, agentic_rag=True)
 
 @pytest.mark.asyncio
 async def test_should_resume_reads_dict_cursor_row():

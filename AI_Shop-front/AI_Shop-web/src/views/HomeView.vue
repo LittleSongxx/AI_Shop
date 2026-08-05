@@ -163,17 +163,9 @@ const formatPrice = (price: any): string => {
 };
 
 const displayProducts = computed(() => {
-  if (products.value.length === 0) return [];
-
-  const result: { product: any; displayIndex: number }[] = [];
-  const sourceLength = products.value.length;
-
-  for (let i = 0; i < MAX_PRODUCTS; i++) {
-    const sourceIndex = i % sourceLength;
-    result.push({ product: products.value[sourceIndex], displayIndex: i });
-  }
-
-  return result;
+  return products.value
+    .slice(0, MAX_PRODUCTS)
+    .map((product, displayIndex) => ({ product, displayIndex }));
 });
 
 const loadFeed = async (reset = false) => {

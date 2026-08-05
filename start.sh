@@ -11,6 +11,8 @@ COMPOSE_FILE="$DEPLOY/docker-compose.middleware.yml"
 PIDS="$ROOT/run/pids"
 LOGS="$ROOT/run/logs"
 RUNTIME_ENV="$ROOT/run/runtime.env"
+JAVA_BUILD_STAMP="$ROOT/run/java-build.stamp"
+LOCAL_ENV="$ROOT/.env.local"
 DEFAULT_PROJECT_FOLDER="$ROOT/run/data/aishop/upload"
 SIMLECT_SYNC_TOOL="$BACKEND/data/tools/sync_simlect_catalog.py"
 SIMLECT_CATALOG="$BACKEND/data/simlect_catalog/catalog.json"
@@ -43,6 +45,18 @@ fi
 
 # shellcheck source=deploy/service-process-registry.sh
 source "$DEPLOY/service-process-registry.sh"
+# shellcheck source=deploy/agent-ai-env.sh
+source "$DEPLOY/agent-ai-env.sh"
+
+# Optional private, repo-local business settings.  The file is ignored by Git
+# and is intentionally separate from run/runtime.env, which this script owns
+# and rewrites with generated ports and middleware credentials.
+if [[ -r "$LOCAL_ENV" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$LOCAL_ENV"
+  set +a
+fi
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || die "缺少命令: $1"
@@ -305,11 +319,22 @@ PORT_VARIABLES=(
   GATEWAY_PORT USER_PORT PRODUCT_PORT STOCK_PORT CART_PORT ORDER_PORT PAY_PORT COUPON_PORT SEARCH_PORT ADMIN_PORT
   AGENT_PORT AGENT_WORKER_METRICS_PORT MCP_PORT WEB_PORT ADMIN_WEB_PORT
 )
-RUNTIME_VARIABLES=("${PORT_VARIABLES[@]}" AISHOP_INTERNAL_TOKEN)
+RUNTIME_CREDENTIAL_VARIABLES=(
+  AISHOP_INTERNAL_TOKEN
+  MYSQL_ROOT_PASSWORD MYSQL_USER MYSQL_PASSWORD
+  RABBIT_USER RABBIT_PASSWORD RABBIT_VHOST
+  SEATA_CONSOLE_USERNAME SEATA_CONSOLE_PASSWORD SEATA_SECURITY_SECRET_KEY
+)
+RUNTIME_SETTING_VARIABLES=(ES_INDEX_REPLICAS)
+RUNTIME_VARIABLES=(
+  "${PORT_VARIABLES[@]}"
+  "${RUNTIME_CREDENTIAL_VARIABLES[@]}"
+  "${RUNTIME_SETTING_VARIABLES[@]}"
+)
 
 # A caller-supplied value wins over the saved local runtime assignment.
 declare -A CALLER_VALUES=()
-for variable in "${RUNTIME_VARIABLES[@]}" MYSQL_HOST MYSQL_USER MYSQL_PASSWORD MYSQL_ROOT_PASSWORD SEATA_IP; do
+for variable in "${RUNTIME_VARIABLES[@]}" MYSQL_HOST SEATA_IP; do
   if [[ -v "$variable" ]]; then
     CALLER_VALUES["$variable"]="${!variable}"
   fi
@@ -389,9 +414,16 @@ write_runtime_env() {
 
 prepare_environment() {
   prepare_ports
+  # Java Search and the Python Agent share AI provider settings. The Agent
+  # reads dotenv itself, while Spring Boot only sees the process environment.
+  load_agent_ai_env "$BACKEND/AI_Shop-agent/.env"
 
   export MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
-  export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
+  # The bundled local stack uses MySQL root for both schema initialization and
+  # Java services. On a fresh setup, accepting MYSQL_PASSWORD as the fallback
+  # keeps the container and clients aligned for callers that only set the
+  # application-facing variable. MYSQL_ROOT_PASSWORD remains authoritative.
+  export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}"
   export MYSQL_USER="${MYSQL_USER:-root}"
   export MYSQL_PASSWORD="${MYSQL_PASSWORD:-$MYSQL_ROOT_PASSWORD}"
   export REDIS_HOST="127.0.0.1"
@@ -399,6 +431,9 @@ prepare_environment() {
   export RABBIT_USER="${RABBIT_USER:-aishop}"
   export RABBIT_PASSWORD="${RABBIT_PASSWORD:-aishop}"
   export RABBIT_VHOST="${RABBIT_VHOST:-/}"
+  export SEATA_CONSOLE_USERNAME="${SEATA_CONSOLE_USERNAME:-seata}"
+  export SEATA_CONSOLE_PASSWORD="${SEATA_CONSOLE_PASSWORD:-seata}"
+  export SEATA_SECURITY_SECRET_KEY="${SEATA_SECURITY_SECRET_KEY:-SeataSecretKey0c382ef121d778043159209298fd40bf3850a017}"
   export NACOS_ADDR="127.0.0.1:$NACOS_PORT"
   export SENTINEL_DASHBOARD="127.0.0.1:$SENTINEL_PORT"
   export SEATA_SERVER_ADDR="127.0.0.1:$SEATA_PORT"
@@ -406,6 +441,13 @@ prepare_environment() {
   export ES_URIS="http://127.0.0.1:$ES_PORT"
   export ES_HOSTS="$ES_URIS"
   export SPRING_ELASTICSEARCH_URIS="$ES_URIS"
+  ES_INDEX_REPLICAS="${ES_INDEX_REPLICAS:-0}"
+  [[ "$ES_INDEX_REPLICAS" =~ ^[0-9]+$ ]] \
+    || die "ES_INDEX_REPLICAS 必须是 0..20 的整数，当前值: $ES_INDEX_REPLICAS"
+  ES_INDEX_REPLICAS=$((10#$ES_INDEX_REPLICAS))
+  ((ES_INDEX_REPLICAS <= 20)) \
+    || die "ES_INDEX_REPLICAS 必须是 0..20 的整数，当前值: $ES_INDEX_REPLICAS"
+  export ES_INDEX_REPLICAS
   export RABBITMQ_URL="${RABBITMQ_URL:-amqp://$RABBIT_USER:$RABBIT_PASSWORD@127.0.0.1:$RABBIT_PORT/}"
   export PROJECT_FOLDER="${PROJECT_FOLDER:-$DEFAULT_PROJECT_FOLDER}"
   if [[ "$PROJECT_FOLDER" != /* ]]; then
@@ -464,28 +506,119 @@ resolve_python() {
     || die "conda 环境 shop 未找到；请用 AISHOP_PYTHON 指定 Python 解释器"
 }
 
-ensure_jars_or_build() {
-  local jar missing=false
-  for jar in \
-    "$BACKEND/AI_Shop-gateway/target/aishop-gateway-1.0.0.jar" \
-    "$BACKEND/AI_Shop-user/app/target/aishop-user-1.0.0.jar" \
-    "$BACKEND/AI_Shop-product/app/target/aishop-product-1.0.0.jar" \
-    "$BACKEND/AI_Shop-stock/app/target/aishop-stock-1.0.0.jar" \
-    "$BACKEND/AI_Shop-cart/app/target/aishop-cart-1.0.0.jar" \
-    "$BACKEND/AI_Shop-order/app/target/aishop-order-1.0.0.jar" \
-    "$BACKEND/AI_Shop-pay/app/target/aishop-pay-1.0.0.jar" \
-    "$BACKEND/AI_Shop-coupon/app/target/aishop-coupon-1.0.0.jar" \
-    "$BACKEND/AI_Shop-search/target/aishop-search-1.0.0.jar" \
-    "$BACKEND/AI_Shop-admin/target/aishop-admin-1.0.0.jar"; do
-    [[ -f "$jar" ]] || missing=true
-  done
+validate_agent_config() {
+  local agent_dir="$BACKEND/AI_Shop-agent"
+  if ! (
+    cd "$agent_dir"
+    "$PYTHON" - <<'PY'
+import sys
 
-  if $BUILD || $missing; then
-    require_command mvn
-    info "Maven 构建中（-DskipTests）..."
-    (cd "$BACKEND" && mvn -q package -DskipTests)
-    info "Maven 构建完成"
+try:
+    from pydantic import ValidationError
+    from app.config.settings import Settings
+except Exception as exc:
+    print(
+        f"Agent 配置预检无法加载 Python 依赖：{type(exc).__name__}: {exc}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+try:
+    settings = Settings()
+    settings.validate_runtime()
+except ValidationError as exc:
+    print("Agent 配置校验失败：", file=sys.stderr)
+    for item in exc.errors(include_input=False, include_url=False):
+        print(f"  - {item.get('msg', '配置值无效')}", file=sys.stderr)
+    raise SystemExit(1)
+except Exception as exc:
+    print(
+        f"Agent 配置校验失败：{type(exc).__name__}: {exc}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
+  ); then
+    die "请修正 AI_Shop-backend/AI_Shop-agent/.env 后重试；未启动任何项目服务"
   fi
+  info "Agent 配置预检通过"
+}
+
+JAVA_JARS=(
+  "$BACKEND/AI_Shop-gateway/target/aishop-gateway-1.0.0.jar"
+  "$BACKEND/AI_Shop-user/app/target/aishop-user-1.0.0.jar"
+  "$BACKEND/AI_Shop-product/app/target/aishop-product-1.0.0.jar"
+  "$BACKEND/AI_Shop-stock/app/target/aishop-stock-1.0.0.jar"
+  "$BACKEND/AI_Shop-cart/app/target/aishop-cart-1.0.0.jar"
+  "$BACKEND/AI_Shop-order/app/target/aishop-order-1.0.0.jar"
+  "$BACKEND/AI_Shop-pay/app/target/aishop-pay-1.0.0.jar"
+  "$BACKEND/AI_Shop-coupon/app/target/aishop-coupon-1.0.0.jar"
+  "$BACKEND/AI_Shop-search/target/aishop-search-1.0.0.jar"
+  "$BACKEND/AI_Shop-admin/target/aishop-admin-1.0.0.jar"
+)
+
+java_build_inputs_are_stale() {
+  [[ -f "$JAVA_BUILD_STAMP" ]] || return 0
+  find "$BACKEND" \
+    \( -path '*/target' -o -path "$BACKEND/AI_Shop-agent" \) -prune -o \
+    -type f \( -name pom.xml -o -path '*/src/main/*' \) \
+    -newer "$JAVA_BUILD_STAMP" -print -quit | grep -q .
+}
+
+ensure_jars_or_build() {
+  local jar missing=false stale=false
+  for jar in "${JAVA_JARS[@]}"; do
+    if [[ ! -f "$jar" ]]; then
+      missing=true
+    fi
+  done
+  if java_build_inputs_are_stale; then
+    stale=true
+  fi
+
+  if $BUILD || $missing || $stale; then
+    require_command mvn
+    if $stale && ! $BUILD && ! $missing; then
+      info "检测到 Java 源码或资源比现有 JAR 新，自动重新构建..."
+    else
+      info "Maven 构建中（-DskipTests）..."
+    fi
+    (
+      cd "$BACKEND"
+      MAVEN_OPTS="${MAVEN_OPTS:--Xmx1024m -XX:+UseSerialGC}" \
+        mvn -q clean package -DskipTests
+    )
+    touch "$JAVA_BUILD_STAMP"
+    info "Maven 构建完成"
+  else
+    info "Java JAR 已是最新，跳过 Maven 构建"
+  fi
+}
+
+configure_elasticsearch_indexes() {
+  local template_body settings_body
+  template_body=$(printf \
+    '{"index_patterns":["aishop-*","aishop_*"],"priority":200,"template":{"settings":{"number_of_replicas":%d}}}' \
+    "$ES_INDEX_REPLICAS")
+  settings_body=$(printf \
+    '{"index":{"number_of_replicas":%d}}' \
+    "$ES_INDEX_REPLICAS")
+
+  curl --noproxy '*' -fsS --max-time 15 \
+    -X PUT -H 'Content-Type: application/json' \
+    --data "$template_body" \
+    "$ES_URIS/_index_template/aishop-runtime-defaults" >/dev/null \
+    || die "写入 Elasticsearch 索引模板失败"
+
+  # Update only project-owned indexes. allow_no_indices keeps a clean first
+  # start successful before Spring creates either index.
+  curl --noproxy '*' -fsS --max-time 15 \
+    -X PUT -H 'Content-Type: application/json' \
+    --data "$settings_body" \
+    "$ES_URIS/aishop-*,aishop_*/_settings?allow_no_indices=true&ignore_unavailable=true&expand_wildcards=open" \
+    >/dev/null \
+    || die "更新 Elasticsearch 项目索引副本数失败"
+  info "Elasticsearch 项目索引副本数已设为 $ES_INDEX_REPLICAS"
 }
 
 start_middleware() {
@@ -507,6 +640,7 @@ start_middleware() {
   wait_container_healthy aishop-rabbitmq "RabbitMQ" 180
   wait_container_healthy aishop-nacos "Nacos" 240
   wait_container_healthy aishop-es "Elasticsearch" 300
+  configure_elasticsearch_indexes
   wait_port "$SENTINEL_PORT" "Sentinel" 120
   wait_port "$SEATA_PORT" "Seata TC" 180
   wait_http "http://127.0.0.1:$NACOS_PORT/nacos/" "Nacos HTTP" 60
@@ -613,6 +747,20 @@ start_agent_worker() {
   local pid=$!
   write_pid_record agent-worker "$pid"
   info "拉起 agent-worker  metrics=$AGENT_WORKER_METRICS_PORT  pid=$pid  log: run/logs/agent-worker.log"
+}
+
+bootstrap_demo_data() {
+  local enabled="${AISHOP_DEMO_DATA_ENABLED:-false}"
+  case "${enabled,,}" in
+    1|true|yes|on) ;;
+    *) return 0 ;;
+  esac
+
+  local script="$ROOT/scripts/bootstrap_demo.py"
+  [[ -f "$script" ]] || die "演示初始化脚本不存在: $script"
+  info "初始化 Smarlect 本地演示数据（串行执行）..."
+  "$PYTHON" "$script" --wait-seconds "${AISHOP_DEMO_WAIT_SECONDS:-180}"
+  info "Smarlect 本地演示数据已就绪"
 }
 
 start_storefront() {
@@ -792,12 +940,27 @@ print_summary() {
 
 require_command docker
 require_command curl
-require_command java
-require_command nohup
-require_command setsid
+if ! $MIDDLEWARE_ONLY; then
+  require_command java
+  require_command nohup
+  require_command setsid
+fi
 docker info >/dev/null 2>&1 || die "Docker Desktop 未就绪或当前用户没有 Docker 权限"
 
 prepare_environment
+
+# Validate the Python configuration before allocating memory to Docker and ten
+# Spring Boot processes. --middleware-only deliberately does not require the
+# conda environment or AI credentials.
+if ! $MIDDLEWARE_ONLY; then
+  resolve_python
+  validate_agent_config
+  # Build before starting memory-heavy middleware on a clean machine. Existing
+  # healthy containers remain untouched, but a stale JAR can no longer run by
+  # accident after source or application.yml changes.
+  ensure_jars_or_build
+fi
+
 start_middleware
 
 if $MIDDLEWARE_ONLY; then
@@ -805,8 +968,6 @@ if $MIDDLEWARE_ONLY; then
   exit 0
 fi
 
-resolve_python
-ensure_jars_or_build
 install_catalog_assets
 
 info "启动 Java 微服务..."
@@ -862,6 +1023,8 @@ wait_http "http://127.0.0.1:$AGENT_PORT/health/live" "Agent 存活检查" 120
 start_agent_worker
 wait_managed_service agent-worker "$AGENT_WORKER_METRICS_PORT" "Agent Worker"
 wait_http "http://127.0.0.1:$AGENT_PORT/health/ready" "Agent 就绪检查" 180
+
+bootstrap_demo_data
 
 info "启动 Vite 前端..."
 start_storefront

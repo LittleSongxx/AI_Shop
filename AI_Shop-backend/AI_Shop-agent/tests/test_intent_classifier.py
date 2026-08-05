@@ -140,3 +140,33 @@ async def test_repeated_intent_handoff_does_not_trigger_on_second_turn():
     assert decision.intent == IntentKind.QUERY_LOGISTICS
     assert decision.next_action == NextAction.TOOL
     assert decision.handoff_reason is None
+
+
+@pytest.mark.asyncio
+async def test_second_low_confidence_turn_does_not_force_handoff():
+    decision = await resolve_intent(
+        "u1", "支付方式有哪些", allow_llm=False, unresolved_count=1
+    )
+
+    assert decision.next_action == NextAction.HANDOFF_SUGGESTED
+    assert decision.handoff_reason == "LOW_CONFIDENCE"
+
+
+@pytest.mark.asyncio
+async def test_third_consecutive_low_confidence_turn_forces_handoff():
+    decision = await resolve_intent(
+        "u1", "支付方式有哪些", allow_llm=False, unresolved_count=2
+    )
+
+    assert decision.next_action == NextAction.HANDOFF
+    assert decision.handoff_reason == "REPEATED_UNRESOLVED"
+
+
+@pytest.mark.asyncio
+async def test_explicit_unresolved_feedback_still_hands_off_immediately():
+    decision = await resolve_intent(
+        "u1", "还是没解决", allow_llm=False, unresolved_count=0
+    )
+
+    assert decision.next_action == NextAction.HANDOFF
+    assert decision.handoff_reason == "REPEATED_UNRESOLVED"

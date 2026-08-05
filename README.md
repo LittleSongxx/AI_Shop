@@ -108,14 +108,17 @@ AI_Shop/
 
 ```bash
 ./start.sh --build          # 首次：Maven 打包 + 中间件 + Java 微服务 + Agent
-./start.sh                  # 后续：跳过构建
+./start.sh                  # 后续：复用最新 JAR；源码较新时自动串行重建
 ./start.sh --middleware-only  # 只起 Docker 中间件
 ./stop.sh                   # 停 Java + Agent（中间件保留）
 ./stop.sh --middleware      # 一并停中间件
 ```
 
-`start.sh` 会等待 MySQL / Nacos / Seata 就绪再拉起 Java 服务，PID 和日志落在 `run/`。
-Agent 走 conda 环境 `shop`。下面 1–5 步是拆开的手工流程，排查问题时用。
+`start.sh` 会自动将冲突端口向后顺延，实际端口写入 `run/runtime.env`；随后等待
+MySQL / Nacos / Seata 就绪，再串行拉起 Java 服务以控制 WSL 峰值内存。非
+`--middleware-only` 启动还会预检 Agent `.env`：填写 `RERANK_API_KEY` 后，必须同时把
+`RERANK_BASE_URL` 中的 `YOUR_WORKSPACE_ID` 换成真实百炼业务空间 ID。PID 和日志落在
+`run/`，Agent 使用 conda 环境 `shop`。下面 1–5 步是拆开的手工流程，排查问题时用。
 
 ### 1. 启动中间件
 
@@ -173,11 +176,25 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 | 变量名 | 说明 |
 |--------|------|
 | `AISHOP_INTERNAL_TOKEN` | 服务间调用 `/internal/**` 的共享密钥（全服务一致） |
-| `AISHOP_PRODUCTION_READY` | 设为 `true` 才允许启动生产实例，触发完整安全校验 |
+| `ADMIN_PASSWORD` | 管理后台初始管理员密码；生产环境必须替换默认值 |
+| `MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` | 本地中间件 root 密码与 Java 数据库密码；一键脚本会安全持久化选定值 |
+| `RABBIT_PASSWORD` / `REDIS_PASSWORD` | RabbitMQ 与 Redis 凭据；本地 Redis 默认不启用密码 |
+| `SEATA_CONSOLE_PASSWORD` / `SEATA_SECURITY_SECRET_KEY` | Seata 控制台密码与 Token 签名密钥 |
+| `GRAFANA_ADMIN_PASSWORD` | 仅启动可观测性 Compose 时需要 |
+| `APP_ENV` / `AISHOP_PRODUCTION_READY` | 生产环境分别设为 `production` / `true`，触发 Python Agent 与 Java 服务的安全校验 |
 | `AISHOP_DEV_LOGIN_BYPASS` | 本地调试开关，**禁止生产开启** |
+| `ALLOW_DEVELOPMENT_AUTH_BYPASS` | Python Agent 的开发认证绕过开关，**禁止生产开启** |
 | `LLM_BASE_URL` | LLM API 基础地址（OpenAI 兼容） |
 | `LLM_API_KEY` | LLM API Key |
-| `LLM_MODEL` | 模型名称，如 `claude-opus-5` |
+| `LLM_MODEL` | 模型名称；当前示例为 `deepseek-chat`，也可填写兼容的其他模型 |
+| `EMBEDDING_API_KEY` | 向量检索和知识库索引的 Embedding Key |
+| `RERANK_API_KEY` / `RERANK_BASE_URL` | Qwen3 Rerank Key 与百炼业务空间地址；未配置时回退 RRF |
+| `MEMORY_LLM_API_KEY` | 可选记忆摘要模型 Key，留空复用 `LLM_API_KEY` |
+| `VLM_ENABLED` / `VLM_API_KEY` | 可选视觉模型开关与 Key；用于图片理解，不负责商品图片展示，商城聊天上传链路尚未接通 |
+| `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 可选 DirectMail 邮箱验证码凭据 |
+| `ALIPAY_*` | 真实支付和回调验签凭据 |
+| `AMAP_KEY` | 可选高德逆地理编码 Key |
+| `BAIDU_AIP_API_KEY/SECRET_KEY` | 可选百度图片审核凭据 |
 
 完整清单见 [AI_Shop-backend/AI_Shop-agent/.env.example](AI_Shop-backend/AI_Shop-agent/.env.example) 和 [deploy/env.production.example](deploy/env.production.example)。
 
@@ -188,6 +205,10 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 仓库里的数字分三类：实测的、框架就绪但没数据的、合成或手工编写的。引用任何指标前先看
 [docs/DATA_PROVENANCE.md](docs/DATA_PROVENANCE.md)，评测集的已知失败见
 [benchmarks/KNOWN_LIMITATIONS.md](AI_Shop-backend/AI_Shop-agent/benchmarks/KNOWN_LIMITATIONS.md)。
+
+本地全链路部署、RAG、搜索、分类、购物车和管理端滚动问题的真实排障过程见
+[docs/INTERVIEW_ENGINEERING_CASES.md](docs/INTERVIEW_ENGINEERING_CASES.md)。文档保留了错误假设、
+证据链、修复取舍与回归数据，可作为面试项目复盘材料。
 
 ---
 

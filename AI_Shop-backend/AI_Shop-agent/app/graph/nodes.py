@@ -61,6 +61,35 @@ _KEEP_INTENT: frozenset = frozenset({
     IntentKind.CANCEL_ORDER,
 })
 
+# Policy and support intents need the same published-knowledge grounding as
+# generic chat. Transactional order lookup, product search, and an explicit
+# human request do not benefit from a speculative knowledge prefetch.
+_RAG_PREFETCH_INTENTS = frozenset(
+    {
+        IntentKind.PRODUCT_CONSULT,
+        IntentKind.REFUND,
+        IntentKind.CANCEL_ORDER,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.QUERY_LOGISTICS,
+        IntentKind.QUERY_COUPON,
+        IntentKind.PRODUCT_REVIEW,
+        IntentKind.RECOMMENT,
+        IntentKind.QUERY_COMMENT,
+        IntentKind.COMPLAINT,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.INVOICE,
+        IntentKind.ADDRESS_CHANGE,
+        IntentKind.REFUND_STATUS,
+        IntentKind.AFTERSALES_UNKNOWN,
+        IntentKind.CHAT,
+    }
+)
+
+
+def should_prefetch_rag(intent: IntentKind, *, agentic_rag: bool) -> bool:
+    return not agentic_rag and intent in _RAG_PREFETCH_INTENTS
+
 async def entry_guard(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
     message_id = state["message_id"]
@@ -174,7 +203,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
     rag_trace: dict | None = None
     # P3-1: when agentic_rag=True the LLM calls SEARCH_KNOWLEDGE itself;
     # skip the fixed prefetch so the context window stays clean.
-    if not get_settings().agentic_rag and intent in (IntentKind.PRODUCT_CONSULT, IntentKind.CHAT):
+    if should_prefetch_rag(intent, agentic_rag=get_settings().agentic_rag):
         rag_query = await rewrite_for_rag(user_text, memory)
         # P3-2: prepend image description to retrieval query when available.
         if image_desc:
@@ -189,7 +218,6 @@ async def build_context_node(state: AgentGraphState) -> dict:
         faq_text = str(rag_result.get("text") or "")
         rag_source_refs = list(rag_result.get("source_refs") or [])
         rag_trace = rag_result.get("trace")
-    if intent == IntentKind.CHAT:
         knowledge_text = faq_text
 
     messages, working_turns, working_oldest_id = await context_builder.build_agent_messages(

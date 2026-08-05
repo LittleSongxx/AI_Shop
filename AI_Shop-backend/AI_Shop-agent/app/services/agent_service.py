@@ -163,6 +163,9 @@ class AgentOrchestrator:
                     None,
                     source_refs,
                 )
+                await agent_message_service.reset_unresolved_count(
+                    agent_msg["messageId"]
+                )
                 await stream_service.push_done(
                     user_id,
                     agent_msg["messageId"],
@@ -185,6 +188,9 @@ class AgentOrchestrator:
             )
             await agent_message_service.complete_message(
                 agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload", None
+            )
+            await agent_message_service.reset_unresolved_count(
+                agent_msg["messageId"]
             )
             agent_msg["deliveryState"] = "DEGRADED"
             agent_msg["assistantMessage"] = AGENT_BUSY_MESSAGE

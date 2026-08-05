@@ -5,7 +5,7 @@ export { locationApi } from './location';
 export type { LocationPayload, LocationWeatherPayload } from './location';
 
 const CACHE_KEYS = {
-  CATEGORY: 'product:category',
+  CATEGORY: 'product:category:v2',
   COMMEND: 'product:commend'
 } as const;
 

@@ -153,6 +153,7 @@ class RagRetriever:
         if cached:
             # 缓存里的 FAQ 可能已过期（发布后新版本号才会换 key），读出来再滤一遍。
             cached = self._filter_catalog(self._filter_expired(cached), catalog)
+            cached = self._filter_evidence_docs(cached)
             if not cached:
                 # 缓存条目全部已过生效窗口（effectiveEnd 已过）——这是"假命中"：
                 # 不能返回空证据、也不能把 hit=True 记进命中率/盲评样本（P1 审查），
@@ -177,7 +178,7 @@ class RagRetriever:
         # 当前目录过滤，避免旧版本结果在发布或归档后继续返回。
         # 如果 Java 与 last-known-good 目录都不可用，只允许 FAQ 分支继续，
         # 绝不能用固定版本或无目录检索可能已经归档的知识切片。
-        docs = await self._search_knowledge_docs(
+        candidates = await self._search_knowledge_docs(
             cleaned,
             effective_top_k,
             extra_filters=extra_filters,
@@ -186,12 +187,30 @@ class RagRetriever:
             active_document_ids=(catalog or {}).get("active_document_ids") if catalog else None,
             knowledge_enabled=bool(catalog),
         )
-        if not self._has_enough_evidence(docs):
+        docs = self._filter_evidence_docs(candidates)
+        if not docs:
             self._observe_search(started, False, "hybrid")
-            return self._trace_result(cleaned, version, "hybrid", False, docs, started, bucket=bucket)
+            return self._trace_result(
+                cleaned,
+                version,
+                "hybrid",
+                False,
+                candidates,
+                started,
+                bucket=bucket,
+            )
         await self._set_cache(cache_key, docs, settings.rag_cache_ttl_seconds)
         self._observe_search(started, True, "hybrid")
-        return self._trace_result(cleaned, version, "hybrid", True, docs, started, bucket=bucket)
+        return self._trace_result(
+            cleaned,
+            version,
+            "hybrid",
+            True,
+            docs,
+            started,
+            bucket=bucket,
+            candidate_count=len(candidates),
+        )
 
     def _semantic_cache_key(
         self,
@@ -207,8 +226,8 @@ class RagRetriever:
 
         旧实现只有 ``v{version}:sha256(cleaned)``——换 top_k、加类别过滤、
         换 A/B 分桶或 rerank 配置都会命中上一次策略的结果，把错误证据写进回答。
-        这里把影响检索的参数全部折叠进 key；rerank 只折叠"是否启用+模型+地址"
-        （地址变更本来就该换缓存），不折叠 API key。
+        这里把影响检索的参数全部折叠进 key；rerank 折叠启用状态、模型、地址、
+        API 格式和任务指令（这些变化都会改变结果），但不折叠 API key。
         """
         payload = {
             "q": cleaned,
@@ -218,6 +237,8 @@ class RagRetriever:
             "rerank_top_n": rerank_top_n,
             "rerank_model": settings.rerank_model,
             "rerank_url": settings.rerank_base_url,
+            "rerank_api_format": settings.rerank_api_format,
+            "rerank_instruct": settings.rerank_instruct,
             "rerank_enabled": bool(settings.rerank_api_key.strip()),
             "min_cosine": settings.rag_vector_min_cosine,
             "knn_factor": settings.knn_num_candidates_factor,
@@ -575,21 +596,28 @@ class RagRetriever:
 
     async def _rerank(self, query: str, docs: list[dict], limit: int) -> list[dict]:
         settings = get_settings()
-        if not docs or not settings.rerank_api_key.strip():
-            return docs[:limit]
+        if not docs or limit <= 0:
+            return []
+        fallback = docs[:limit]
+        if not settings.rerank_api_key.strip():
+            return fallback
         breaker = circuit_registry.get_or_create("rerank", failure_threshold=3, recovery_timeout=30)
         if not breaker.allow_request():
-            return docs[:limit]
+            return fallback
         try:
             candidates = [self._doc_text(doc)[:4000] for doc in docs]
-            client = await get_client("rerank", timeout=settings.rerank_timeout)
-            resp = await client.post(
-                settings.rerank_base_url,
-                headers={
-                    "Authorization": f"Bearer {settings.rerank_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
+            top_n = min(limit, len(candidates))
+            if settings.rerank_api_format == "compatible":
+                request_body: dict[str, Any] = {
+                    "model": settings.rerank_model,
+                    "query": query,
+                    "documents": candidates,
+                    "top_n": top_n,
+                }
+                if settings.rerank_instruct.strip():
+                    request_body["instruct"] = settings.rerank_instruct.strip()
+            else:
+                request_body = {
                     "model": settings.rerank_model,
                     "input": {
                         "query": query,
@@ -597,36 +625,61 @@ class RagRetriever:
                     },
                     "parameters": {
                         "return_documents": False,
-                        "top_n": limit,
+                        "top_n": top_n,
                     },
+                }
+            client = await get_client("rerank", timeout=settings.rerank_timeout)
+            resp = await client.post(
+                settings.rerank_base_url,
+                headers={
+                    "Authorization": f"Bearer {settings.rerank_api_key}",
+                    "Content-Type": "application/json",
                 },
+                json=request_body,
                 timeout=settings.rerank_timeout,
             )
             resp.raise_for_status()
             payload = resp.json()
-            output = payload.get("output") if isinstance(payload, dict) else {}
-            results = output.get("results") if isinstance(output, dict) else None
+            if settings.rerank_api_format == "compatible":
+                results = payload.get("results") if isinstance(payload, dict) else None
+            else:
+                output = payload.get("output") if isinstance(payload, dict) else None
+                results = output.get("results") if isinstance(output, dict) else None
             if not isinstance(results, list):
                 raise ValueError("invalid rerank response")
             reranked = []
+            seen_indexes: set[int] = set()
             for item in results:
+                if not isinstance(item, dict):
+                    continue
                 index = item.get("index")
-                if isinstance(index, int) and 0 <= index < len(docs):
+                if (
+                    isinstance(index, int)
+                    and not isinstance(index, bool)
+                    and 0 <= index < len(docs)
+                    and index not in seen_indexes
+                ):
                     doc = dict(docs[index])
-                    doc["score"] = float(
-                        item.get("relevance_score")
-                        or item.get("score")
-                        or doc.get("score")
-                        or 0
-                    )
+                    score = item.get("relevance_score")
+                    if score is None:
+                        score = item.get("score")
+                    if score is None:
+                        score = doc.get("score") or 0
+                    try:
+                        doc["score"] = float(score)
+                    except (TypeError, ValueError):
+                        continue
                     doc["source"] = "rerank"
                     reranked.append(doc)
+                    seen_indexes.add(index)
+            if not reranked:
+                raise ValueError("rerank response contains no valid results")
             breaker.record_success()
-            return reranked or docs[:limit]
+            return reranked
         except Exception as exc:
             breaker.record_failure()
             logger.warning("rerank_failed_fallback_rrf", error=str(exc))
-            return docs[:limit]
+            return fallback
 
     async def rerank_products(
         self,
@@ -886,8 +939,12 @@ class RagRetriever:
         docs: list[dict],
         started: float,
         bucket: str = "A",
+        candidate_count: int | None = None,
     ) -> dict[str, Any]:
-        refs = self._source_refs(docs, version)
+        # Only accepted documents are evidence and may be shown as citations.
+        # Rejected candidates remain observable through candidateCount/topScore,
+        # but must not look like sources that were injected into the answer.
+        refs = self._source_refs(docs, version) if hit else []
         elapsed_ms = round(max(0.0, time.perf_counter() - started) * 1000, 2)
         return {
             "text": self._format_docs(docs) if hit else "",
@@ -899,6 +956,7 @@ class RagRetriever:
                 "knowledgeVersion": version,
                 "bucket": bucket,
                 "sourceCount": len(refs),
+                "candidateCount": len(docs) if candidate_count is None else candidate_count,
                 "topScore": max(
                     (float(doc.get("score") or 0) for doc in docs),
                     default=0.0,
@@ -1056,17 +1114,24 @@ class RagRetriever:
         rerank 未配置或熔断时会静默回落到 RRF（见 ``_rerank``），所以这条兜底路径不是
         边缘情况——恰恰是没有 rerank key 的部署里的常态。
         """
-        if not docs:
-            return False
+        return bool(self._filter_evidence_docs(docs))
+
+    def _filter_evidence_docs(self, docs: list[dict]) -> list[dict]:
+        """Keep only candidates whose own score clears its scoring-scale gate."""
         settings = get_settings()
-        top = max(docs, key=lambda doc: float(doc.get("score") or 0))
-        top_score = float(top.get("score") or 0)
-        if top.get("source") == "rerank":
-            return top_score >= settings.rag_evidence_min_relevance
-        if top.get("source") == "rrf":
-            return top_score >= rrf_score_at_rank(settings.rag_evidence_min_rrf_rank)
-        # 精确 FAQ 命中（score=1.0）等不经过融合的路径。
-        return top_score >= settings.rag_evidence_min_relevance
+        rrf_floor = rrf_score_at_rank(settings.rag_evidence_min_rrf_rank)
+        accepted: list[dict] = []
+        for doc in docs:
+            score = float(doc.get("score") or 0)
+            source = doc.get("source")
+            if source == "rrf":
+                enough = score >= rrf_floor
+            else:
+                # rerank and exact/non-fused results both use a 0..1 score.
+                enough = score >= settings.rag_evidence_min_relevance
+            if enough:
+                accepted.append(doc)
+        return accepted
 
     def _filter_expired(self, docs: list[dict]) -> list[dict]:
         """过滤 FAQ 时效窗口之外的文档。

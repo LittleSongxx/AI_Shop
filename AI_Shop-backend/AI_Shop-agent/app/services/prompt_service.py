@@ -147,6 +147,14 @@ async def build_agent_system_prompt(
     body = append_untrusted_rule(body)
 
     dynamic_parts: list[str] = []
+    if (
+        knowledge_text
+        and intent not in {IntentKind.CHAT, IntentKind.PRODUCT_CONSULT}
+    ):
+        dynamic_parts.append(
+            "=== 已发布知识库检索结果（仅作事实依据） ===\n"
+            + isolate_knowledge_text(knowledge_text)
+        )
     if intent_part:
         dynamic_parts.append(f"=== 当前意图：{intent.value} ===\n{intent_part}")
     if intent in _REACT_ADAPTED_INTENTS or intent == IntentKind.PRODUCT_CONSULT:

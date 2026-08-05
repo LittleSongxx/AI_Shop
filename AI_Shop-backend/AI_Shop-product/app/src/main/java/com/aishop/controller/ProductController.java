@@ -41,7 +41,11 @@ public class ProductController extends ABaseController {
 
     @GetMapping("/loadCategory")
     public ResponseVO loadCategory() {
-        return getSuccessResponseVO(sysCategoryService.findListByParam(new SysCategoryQuery()));
+        SysCategoryQuery query = new SysCategoryQuery();
+        query.setParent(true);
+        query.setPropertyQuery(true);
+        query.setOrderBy(com.aishop.entity.query.SafeSort.of("sort asc"));
+        return getSuccessResponseVO(sysCategoryService.findListByParam(query));
     }
 
     @GetMapping("/loadCommendProduct")

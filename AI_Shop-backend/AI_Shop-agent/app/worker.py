@@ -22,7 +22,7 @@ from app.services.agent_engine import agent_engine
 from app.services.agent_queue_service import agent_queue_service
 from app.services.agent_service import agent_orchestrator
 from app.services.mcp_streamable_client import mcp_streamable_client
-from app.services.message_service import agent_message_service
+from app.services.message_service import agent_message_service, next_unresolved_count
 from app.services.pending_action_service import pending_action_service
 from app.services.redis_service import redis_service
 from app.services.stream_service import stream_service
@@ -341,6 +341,7 @@ class AgentWorker:
                 )
                 if not terminal_written:
                     raise LeaseLostError(f"task {message_id} lost before terminal write")
+                await agent_message_service.reset_unresolved_count(message_id)
                 AGENT_TASK_TOTAL.labels(
                     queue=queue_name,
                     result="cancelled" if cancelled else "terminal_outcome",
@@ -501,10 +502,15 @@ class AgentWorker:
         payload["riskLevel"] = refined.risk_level.value
         payload["nextAction"] = refined.next_action.value
         payload["handoffReason"] = refined.handoff_reason
+        previous_unresolved = max(
+            0, int(payload.get("unresolvedCount") or 0) - 1
+        )
+        refined_unresolved = next_unresolved_count(refined, previous_unresolved)
+        payload["unresolvedCount"] = refined_unresolved
         await agent_message_service.update_decision(
             int(payload["messageId"]),
             refined,
-            int(payload.get("unresolvedCount") or 0),
+            refined_unresolved,
         )
         return refined
 
@@ -580,6 +586,7 @@ class AgentWorker:
         message_id = int(payload["messageId"])
         user_id = str(payload["userId"])
         await stream_service.push_error(user_id, message_id, TERMINAL_ERROR, "agent")
+        await agent_message_service.reset_unresolved_count(message_id)
         await agent_message_service.complete_message(
             message_id, TERMINAL_ERROR, "agent", None
         )

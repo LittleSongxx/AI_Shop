@@ -643,8 +643,8 @@ const jobStatusType = (status) => ({
 
 <style lang="scss" scoped>
 .knowledge-page {
-  height: calc(100vh - 84px);
-  min-height: 520px;
+  height: 100%;
+  min-height: 0;
 
   :deep(.el-tabs) {
     display: flex;

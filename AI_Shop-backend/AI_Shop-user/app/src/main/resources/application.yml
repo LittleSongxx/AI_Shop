@@ -84,6 +84,7 @@ aliyun:
   access-key-secret: ${ALIYUN_ACCESS_KEY_SECRET:}
   directmail:
     account-name: ${ALIYUN_DM_ACCOUNT_NAME:aishop@aishop.com}
+    # DirectMail names this boolean switch ReplyToAddress; it is not an email.
     reply-to-address: ${ALIYUN_DM_REPLY_TO_ADDRESS:false}
 
 app:

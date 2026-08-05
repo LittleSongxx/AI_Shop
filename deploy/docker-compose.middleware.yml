@@ -35,7 +35,11 @@ services:
       - aishop_mysql:/var/lib/mysql
     mem_limit: ${MYSQL_MEMORY_LIMIT:-640m}
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent",
+        ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -73,9 +77,9 @@ services:
       - "${RABBIT_PORT:-5673}:5672"
       - "${RABBIT_MANAGEMENT_PORT:-15673}:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: aishop
-      RABBITMQ_DEFAULT_PASS: aishop
-      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-aishop}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:-aishop}
+      RABBITMQ_DEFAULT_VHOST: ${RABBIT_VHOST:-/}
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-memory ${RABBITMQ_MEMORY_WATERMARK:-512M}"
     volumes:
       - aishop_rabbit:/var/lib/rabbitmq
@@ -109,7 +113,7 @@ services:
       MYSQL_SERVICE_PORT: 3306
       MYSQL_SERVICE_DB_NAME: nacos
       MYSQL_SERVICE_USER: root
-      MYSQL_SERVICE_PASSWORD: root
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=10000&socketTimeout=30000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     mem_limit: ${NACOS_MEMORY_LIMIT:-768m}
     healthcheck:
@@ -186,9 +190,18 @@ services:
       SEATA_PORT: ${SEATA_PORT:-8092}
       STORE_MODE: db
       TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      SEATA_CONSOLE_USERNAME: ${SEATA_CONSOLE_USERNAME:-seata}
+      SEATA_CONSOLE_PASSWORD: ${SEATA_CONSOLE_PASSWORD:-seata}
+      SEATA_SECURITY_SECRET_KEY: ${SEATA_SECURITY_SECRET_KEY:-SeataSecretKey0c382ef121d778043159209298fd40bf3850a017}
       JVM_XMX: ${SEATA_JVM_XMX:-384m}
       JVM_XMS: ${SEATA_JVM_XMS:-192m}
       JVM_MaxDirectMemorySize: ${SEATA_JVM_DIRECT_MEMORY:-128m}
+    volumes:
+      # Keep runtime configuration in sync even when the existing image was
+      # built before application.yml changed. The image still contains a copy
+      # so it remains usable outside this Compose project.
+      - ./seata/application.yml:/seata-server/resources/application.yml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: ${SEATA_MEMORY_LIMIT:-640m}

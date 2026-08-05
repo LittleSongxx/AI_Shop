@@ -209,15 +209,19 @@ const switchToMobile = () => {
 <style lang="scss" scoped>
 .layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: transparent;
 
   .left-side {
     position: relative;
     flex-shrink: 0;
     width: 248px;
-    height: 100vh;
-    overflow: auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
     background: linear-gradient(185deg, var(--sidebar-bg) 0%, var(--sidebar-bg-end) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08);
@@ -229,7 +233,10 @@ const switchToMobile = () => {
     .left-side-content {
       position: relative;
       z-index: 1;
+      height: 100%;
       padding-bottom: 20px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
 
       .logo {
         padding: 22px 18px 18px;
@@ -372,9 +379,11 @@ const switchToMobile = () => {
   .right {
     flex: 1;
     width: 0;
-    min-height: 100vh;
+    height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 
     .top {
       flex-shrink: 0;
@@ -514,6 +523,8 @@ const switchToMobile = () => {
       box-shadow: var(--shadow-card);
       overflow: auto;
       min-height: 0;
+      min-width: 0;
+      overscroll-behavior: contain;
 
       &.is-home {
         background: transparent;

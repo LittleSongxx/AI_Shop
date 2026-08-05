@@ -33,7 +33,7 @@ class AgentMessageService:
     ) -> dict:
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        unresolved_count = _next_unresolved_count(
+        unresolved_count = next_unresolved_count(
             decision, previous_unresolved_count
         )
 
@@ -104,6 +104,14 @@ class AgentMessageService:
                     unresolved_count,
                     message_id,
                 ),
+            )
+
+    async def reset_unresolved_count(self, message_id: int) -> None:
+        """Prevent a completed/degraded infrastructure turn poisoning later routing."""
+        async with acquire() as cur:
+            await cur.execute(
+                "UPDATE agent_message SET unresolved_count=0 WHERE message_id=%s",
+                (message_id,),
             )
 
     async def bind_session(self, message_id: int, session_id: str) -> None:
@@ -330,7 +338,7 @@ class AgentMessageService:
                 WHERE user_id=%s
                   AND status IN (%s, %s)
                   AND intent IS NOT NULL
-                  AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)
+                  AND send_time > DATE_SUB(NOW(), INTERVAL 1 DAY)
                 ORDER BY message_id DESC LIMIT %s
                 """,
                 (user_id, MSG_STATUS_COMPLETE, MSG_STATUS_INTERRUPTED, safe),
@@ -468,7 +476,7 @@ _MESSAGE_SELECT_COLUMNS = """
 """
 
 
-def _next_unresolved_count(
+def next_unresolved_count(
     decision: IntentDecision | None, previous_unresolved_count: int
 ) -> int:
     if not decision:
