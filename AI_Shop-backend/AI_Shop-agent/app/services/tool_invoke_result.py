@@ -21,6 +21,8 @@ class ToolInvokeResult:
     product_ids: list[str] = field(default_factory=list)
     product_names: list[str] = field(default_factory=list)
     order_ids: list[str] = field(default_factory=list)
+    source_refs: list[dict] = field(default_factory=list)
+    retrieval_trace: dict | None = None
     protocol_version: str = MCP_PROTOCOL
     contract_version: str = MCP_TOOL_CONTRACT
 
@@ -30,11 +32,16 @@ class ToolInvokeResult:
     def to_biz_dict(self) -> dict | None:
         if not (self.product_ids or self.product_names or self.order_ids):
             return None
-        return {
+        payload = {
             "productIds": self.product_ids,
             "productNames": self.product_names,
             "orderIds": self.order_ids,
         }
+        if self.source_refs:
+            payload["sourceRefs"] = self.source_refs
+        if self.retrieval_trace:
+            payload["retrievalTrace"] = self.retrieval_trace
+        return payload
 
     def to_wire(self) -> str:
         """Serialize all results, including read-only text, with the contract."""
@@ -50,6 +57,8 @@ class ToolInvokeResult:
             "productIds": self.product_ids,
             "productNames": self.product_names,
             "orderIds": self.order_ids,
+            "sourceRefs": self.source_refs,
+            "retrievalTrace": self.retrieval_trace,
         }
         return WIRE_PREFIX + json.dumps(payload, ensure_ascii=False)
 
@@ -75,6 +84,12 @@ def parse_tool_wire(text: str | None) -> ToolInvokeResult:
         product_ids=list(obj.get("productIds") or []),
         product_names=list(obj.get("productNames") or []),
         order_ids=list(obj.get("orderIds") or []),
+        source_refs=list(obj.get("sourceRefs") or []),
+        retrieval_trace=(
+            obj.get("retrievalTrace")
+            if isinstance(obj.get("retrievalTrace"), dict)
+            else None
+        ),
         protocol_version=str(obj.get("protocolVersion") or ""),
         contract_version=str(obj.get("contractVersion") or ""),
     )

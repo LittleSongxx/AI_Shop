@@ -56,6 +56,21 @@ def test_policy_claim_requires_published_source_reference():
     assert grounded.passed is True
 
 
+def test_policy_evidence_gate_rejects_uncited_answer_without_keyword_match():
+    result = response_verifier.verify(
+        assistant="这种情况可以办理。",
+        biz_type="agent",
+        tools_called=["SEARCH_KNOWLEDGE"],
+        source_refs=[],
+        has_pending_action=False,
+        policy_evidence_required=True,
+    )
+
+    assert result.passed is False
+    assert result.action == "DEGRADE"
+    assert result.issues[0].code == "POLICY_WITHOUT_CITATION"
+
+
 def test_recommendation_hard_constraints_are_deterministic():
     result = response_verifier.verify(
         assistant="为你找到了两款",

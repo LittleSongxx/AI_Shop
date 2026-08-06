@@ -63,6 +63,8 @@ class McpToolRouter:
                             "errorCode": result.error_code,
                             "bizType": result.biz_type,
                             "hasCards": bool(result.assistant_cards),
+                            "sourceCount": len(result.source_refs),
+                            "retrievalTrace": result.retrieval_trace,
                         }
                         if result
                         else None
@@ -166,7 +168,15 @@ class McpToolRouter:
         # P3-1: in-process tools are handled locally, never forwarded to the
         # MCP Streamable HTTP server.
         if tool_name == "SEARCH_KNOWLEDGE":
-            return await self._search_knowledge(raw.get("query") or "", user_id)
+            return await self._search_knowledge(
+                raw.get("query") or "",
+                user_id,
+                category_filter=(
+                    list(raw.get("_categoryFilter") or [])
+                    if isinstance(raw.get("_categoryFilter"), list)
+                    else None
+                ),
+            )
 
         try:
             mcp_args = self._to_mcp_args(tool_name, raw)
@@ -194,7 +204,12 @@ class McpToolRouter:
     # In-process tool handlers
     # ------------------------------------------------------------------
 
-    async def _search_knowledge(self, query: str, user_id: str) -> ToolInvokeResult:
+    async def _search_knowledge(
+        self,
+        query: str,
+        user_id: str,
+        category_filter: list[str] | None = None,
+    ) -> ToolInvokeResult:
         """P3-1 Agentic RAG: in-process knowledge/FAQ retrieval.
 
         Uses the same rag_retriever pipeline (query expansion + hybrid search
@@ -215,13 +230,27 @@ class McpToolRouter:
         try:
             # Agentic RAG 路径同样带上用户的 A/B 分桶，保证缓存键与预取路径一致。
             result = await rag_retriever.search_faq_with_trace(
-                query, bucket=get_bucket(user_id)
+                query,
+                category_filter=category_filter,
+                bucket=get_bucket(user_id),
             )
             text = str(result.get("text") or "")
+            source_refs = list(result.get("source_refs") or [])
+            retrieval_trace = (
+                result.get("trace") if isinstance(result.get("trace"), dict) else None
+            )
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="success").inc()
             if not text:
-                return ToolInvokeResult(content="【知识检索】未找到相关内容")
-            return ToolInvokeResult(content=text)
+                return ToolInvokeResult(
+                    content="【知识检索】未找到通过证据门禁的相关内容",
+                    source_refs=[],
+                    retrieval_trace=retrieval_trace,
+                )
+            return ToolInvokeResult(
+                content=text,
+                source_refs=source_refs,
+                retrieval_trace=retrieval_trace,
+            )
         except Exception as e:
             logger.exception("search_knowledge_failed", query=query[:80], error=str(e))
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="error").inc()

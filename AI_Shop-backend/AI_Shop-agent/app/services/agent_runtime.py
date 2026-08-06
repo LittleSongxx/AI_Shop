@@ -288,6 +288,7 @@ async def finalize_agent_response(
     consult_card: dict | None = None,
     message_card: dict | None = None,
     order_resolution: str | None = None,
+    rag_evidence_required: bool = False,
 ) -> None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
@@ -433,6 +434,7 @@ async def finalize_agent_response(
         source_refs=source_refs,
         has_pending_action=resolved is not None,
         order_resolution=order_resolution,
+        policy_evidence_required=rag_evidence_required,
     )
     RESPONSE_VERIFIER_TOTAL.labels(
         result="pass" if verification.passed else verification.action.lower(),
@@ -456,13 +458,18 @@ async def finalize_agent_response(
         biz_type = "agent"
         biz_data = None
         try:
+            primary_issue = verification.issues[0]
             await badcase_service.add_candidate(
                 int(message_id),
-                "VERIFIER_FAILURE",
-                verification.issues[0].detail,
+                (
+                    "RAG_NO_EVIDENCE"
+                    if primary_issue.code == "POLICY_WITHOUT_CITATION"
+                    else "VERIFIER_FAILURE"
+                ),
+                primary_issue.detail,
                 run_id=agent_msg.get("runId"),
                 source="VERIFIER",
-                severity=verification.issues[0].severity,
+                severity=primary_issue.severity,
                 snapshot={
                     "action": verification.action,
                     "issues": [issue.public() for issue in verification.issues],

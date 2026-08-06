@@ -47,6 +47,11 @@ class AgentGraphState(TypedDict, total=False):
     intent_decision: dict | None
     rag_source_refs: list[dict] | None
     rag_trace: dict | None
+    rag_mode: str
+    rag_queries: list[str]
+    rag_retrieval_count: int
+    rag_agentic_allowed: bool
+    rag_evidence_required: bool
     order_resolution: str | None
     pending_order_reference: dict | None
     selected_order_reference: dict | None
@@ -86,6 +91,11 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "intent_decision": None,
         "rag_source_refs": [],
         "rag_trace": None,
+        "rag_mode": "conditional",
+        "rag_queries": [],
+        "rag_retrieval_count": 0,
+        "rag_agentic_allowed": False,
+        "rag_evidence_required": False,
         "order_resolution": None,
         "pending_order_reference": None,
         "selected_order_reference": agent_msg.get("selectedOrderReference"),

@@ -100,6 +100,15 @@ def test_force_mcp_after_model_skip_is_enabled_by_default():
     assert Settings().force_mcp_on_llm_skip is True
 
 
+def test_rag_mode_defaults_to_conditional_and_maps_legacy_flag():
+    assert Settings(_env_file=None).rag_mode == "conditional"
+    assert Settings(_env_file=None, agentic_rag=True).rag_mode == "agentic"
+    assert Settings(_env_file=None, agentic_rag=False).rag_mode == "prefetch"
+    assert Settings(
+        _env_file=None, rag_mode="conditional", agentic_rag=True
+    ).rag_mode == "conditional"
+
+
 def test_llm_pricing_json_is_parsed_from_environment(monkeypatch):
     monkeypatch.setenv(
         "LLM_PRICING_CNY_PER_MILLION_JSON",

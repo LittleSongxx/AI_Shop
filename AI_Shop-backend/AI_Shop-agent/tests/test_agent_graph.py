@@ -7,7 +7,11 @@ import pytest
 from app.constants import MSG_STATUS_NORMAL
 from app.domain.intent.types import IntentKind
 from app.graph.builder import build_agent_graph
-from app.graph.nodes import should_prefetch_rag
+from app.graph.nodes import (
+    requires_rag_evidence,
+    should_open_agentic_rag,
+    should_prefetch_rag,
+)
 from app.graph.runner import _should_resume
 from app.graph.state import initial_state, thread_id_for
 
@@ -51,6 +55,35 @@ def test_policy_and_support_intents_prefetch_published_knowledge():
         assert not should_prefetch_rag(intent, agentic_rag=False)
 
     assert not should_prefetch_rag(IntentKind.REFUND, agentic_rag=True)
+
+
+def test_conditional_rag_opens_only_for_miss_or_complex_policy_question():
+    assert should_prefetch_rag(IntentKind.REFUND, rag_mode="conditional")
+    assert not should_prefetch_rag(IntentKind.REFUND, rag_mode="agentic")
+    assert not should_open_agentic_rag(
+        rag_mode="conditional",
+        user_text="退款规则",
+        intent=IntentKind.REFUND,
+        prefetched=True,
+        has_evidence=True,
+    )
+    assert should_open_agentic_rag(
+        rag_mode="conditional",
+        user_text="退款规则",
+        intent=IntentKind.REFUND,
+        prefetched=True,
+        has_evidence=False,
+    )
+    assert should_open_agentic_rag(
+        rag_mode="conditional",
+        user_text="这个订单能不能退，同时运费规则是什么",
+        intent=IntentKind.REFUND,
+        prefetched=True,
+        has_evidence=True,
+    )
+    assert requires_rag_evidence(
+        "这个订单能不能退，规则是什么", IntentKind.QUERY_ORDER
+    )
 
 @pytest.mark.asyncio
 async def test_should_resume_reads_dict_cursor_row():

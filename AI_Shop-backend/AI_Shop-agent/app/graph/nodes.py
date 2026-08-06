@@ -95,8 +95,89 @@ _RAG_PREFETCH_INTENTS = frozenset(
 )
 
 
-def should_prefetch_rag(intent: IntentKind, *, agentic_rag: bool) -> bool:
-    return not agentic_rag and intent in _RAG_PREFETCH_INTENTS
+_RAG_POLICY_MARKERS = (
+    "规则",
+    "政策",
+    "条件",
+    "几天",
+    "多久",
+    "期限",
+    "流程",
+    "怎么办",
+    "如何",
+    "是否支持",
+    "能不能",
+    "可不可以",
+    "无理由",
+    "运费",
+    "保修",
+    "发票",
+    "在哪用",
+)
+_RAG_COMPLEX_MARKERS = ("同时", "另外", "以及", "并且", "还想", "区别", "分别")
+_RAG_BUSINESS_MARKERS = (
+    "订单",
+    "退款",
+    "退货",
+    "换货",
+    "物流",
+    "优惠券",
+    "售后",
+    "发票",
+    "地址",
+)
+
+
+def should_prefetch_rag(
+    intent: IntentKind,
+    *,
+    rag_mode: str | None = None,
+    agentic_rag: bool | None = None,
+) -> bool:
+    if rag_mode is None:
+        rag_mode = "agentic" if agentic_rag else "prefetch"
+    return rag_mode in {"prefetch", "conditional"} and intent in _RAG_PREFETCH_INTENTS
+
+
+def requires_rag_evidence(user_text: str, intent: IntentKind) -> bool:
+    text = str(user_text or "")
+    has_policy_marker = any(marker in text for marker in _RAG_POLICY_MARKERS)
+    return has_policy_marker and (
+        intent in _RAG_PREFETCH_INTENTS
+        or any(marker in text for marker in _RAG_BUSINESS_MARKERS)
+    )
+
+
+def is_complex_rag_question(user_text: str, intent: IntentKind) -> bool:
+    text = str(user_text or "")
+    return bool(
+        len(text) >= 80
+        or text.count("？") + text.count("?") >= 2
+        or sum(marker in text for marker in _RAG_COMPLEX_MARKERS) >= 1
+        or (requires_rag_evidence(text, intent) and "订单" in text)
+    )
+
+
+def should_open_agentic_rag(
+    *,
+    rag_mode: str,
+    user_text: str,
+    intent: IntentKind,
+    prefetched: bool,
+    has_evidence: bool,
+) -> bool:
+    relevant = intent in _RAG_PREFETCH_INTENTS or requires_rag_evidence(
+        user_text, intent
+    )
+    if rag_mode == "agentic":
+        return relevant
+    if rag_mode != "conditional" or not relevant:
+        return False
+    return (
+        not prefetched
+        or not has_evidence
+        or is_complex_rag_question(user_text, intent)
+    )
 
 async def entry_guard(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
@@ -215,10 +296,12 @@ async def build_context_node(state: AgentGraphState) -> dict:
     # are applied inside rag_retriever (single source), which also folds the
     # bucket into the semantic cache key so strategies never share cached results.
     ab_bucket = get_bucket(user_id)
+    settings = get_settings()
+    rag_mode = settings.rag_mode
     episode_service.update_run(
         intent=intent.value,
         scenario=intent.value.lower(),
-        experiment={"bucket": ab_bucket},
+        experiment={"bucket": ab_bucket, "ragMode": rag_mode},
     )
 
     # P3-2: describe the user's image (if any) before the retrieval step so
@@ -235,12 +318,15 @@ async def build_context_node(state: AgentGraphState) -> dict:
     knowledge_text = ""
     rag_source_refs: list[dict] = []
     rag_trace: dict | None = None
-    # P3-1: when agentic_rag=True the LLM calls SEARCH_KNOWLEDGE itself;
-    # skip the fixed prefetch so the context window stays clean.
-    if should_prefetch_rag(intent, agentic_rag=get_settings().agentic_rag):
+    rag_queries: list[str] = []
+    rag_retrieval_count = 0
+    rag_evidence_required = requires_rag_evidence(user_text, intent)
+    prefetched = should_prefetch_rag(intent, rag_mode=rag_mode)
+    if prefetched:
         rag_started = time.perf_counter()
         with get_tracer().start_as_current_span("agent.rag.retrieve") as span:
-            span.set_attribute("agent.rag.mode", "prefetch")
+            span.set_attribute("agent.rag.mode", rag_mode)
+            span.set_attribute("agent.rag.phase", "prefetch")
             span.set_attribute("agent.rag.bucket", ab_bucket)
             with measure_agent_stage("rag"):
                 rag_query = await rewrite_for_rag(user_text, memory)
@@ -254,9 +340,17 @@ async def build_context_node(state: AgentGraphState) -> dict:
                     category_filter=category_filter,
                     bucket=ab_bucket,
                 )
+            rag_queries.append(rag_retriever.query_key(rag_query))
+            rag_retrieval_count = 1
             faq_text = str(rag_result.get("text") or "")
             rag_source_refs = list(rag_result.get("source_refs") or [])
-            rag_trace = rag_result.get("trace")
+            retrieval_trace = dict(rag_result.get("trace") or {})
+            retrieval_trace.update({"retrievalNo": 1, "phase": "prefetch"})
+            rag_trace = {
+                **retrieval_trace,
+                "ragMode": rag_mode,
+                "retrievals": [retrieval_trace],
+            }
             knowledge_text = faq_text
             episode_service.record_step(
                 "RAG_RETRIEVAL",
@@ -269,6 +363,14 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 },
                 latency_ms=round((time.perf_counter() - rag_started) * 1_000),
             )
+
+    rag_agentic_allowed = should_open_agentic_rag(
+        rag_mode=rag_mode,
+        user_text=user_text,
+        intent=intent,
+        prefetched=prefetched,
+        has_evidence=bool(rag_source_refs),
+    )
 
     messages, working_turns, working_oldest_id = await context_builder.build_agent_messages(
         user_id,
@@ -297,6 +399,27 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 content=(
                     "## 用户发送了图片\n"
                     f"图片描述（内部参考，勿直接引用原文）：{image_desc}"
+                )
+            )
+        )
+
+    remaining_retrievals = max(0, 2 - rag_retrieval_count)
+    if rag_agentic_allowed and remaining_retrievals:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "【RAG 编排】本轮允许按需调用 SEARCH_KNOWLEDGE；"
+                    f"剩余检索次数 {remaining_retrievals}。每次 query 必须独立完整且不可重复；"
+                    "只能依据工具返回的通过证据门禁内容形成政策结论。"
+                )
+            )
+        )
+    else:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "【RAG 编排】本轮不开放额外 SEARCH_KNOWLEDGE 调用。"
+                    "只使用已注入且带来源的知识；没有依据时不得给出确定政策结论。"
                 )
             )
         )
@@ -371,6 +494,11 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "intent_decision": decision.model_dump(mode="json"),
         "rag_source_refs": rag_source_refs,
         "rag_trace": rag_trace,
+        "rag_mode": rag_mode,
+        "rag_queries": rag_queries,
+        "rag_retrieval_count": rag_retrieval_count,
+        "rag_agentic_allowed": rag_agentic_allowed,
+        "rag_evidence_required": rag_evidence_required,
         "pending_order_reference": (
             state.get("selected_order_reference")
             or memory.state.get("pendingOrderReference")
@@ -587,6 +715,105 @@ async def order_reference_node(state: AgentGraphState) -> dict:
         return {"route": "end"}
     return await resolve_order_reference_turn(state)
 
+
+def _rag_rejection_code(
+    state: AgentGraphState,
+    *,
+    query_key: str,
+    retrieval_count: int,
+    seen_queries: list[str],
+) -> str | None:
+    if not query_key:
+        return "RAG_EMPTY_QUERY"
+    if query_key in seen_queries:
+        return "RAG_DUPLICATE_QUERY"
+    if retrieval_count >= 2:
+        return "RAG_RETRIEVAL_LIMIT"
+    if state.get("rag_mode") == "prefetch" or not state.get("rag_agentic_allowed"):
+        return "RAG_NOT_ALLOWED"
+    return None
+
+
+def _merge_rag_sources(existing: list[dict], incoming: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for item in [*existing, *incoming]:
+        if not isinstance(item, dict):
+            continue
+        identity = str(
+            item.get("chunkId")
+            or item.get("documentId")
+            or item.get("questionId")
+            or item.get("id")
+            or item.get("source")
+            or ""
+        )
+        version = str(item.get("knowledgeVersion") or item.get("version") or "")
+        key = (identity, version)
+        if not identity or key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+    return merged
+
+
+def _merge_rag_trace(
+    existing: dict | None,
+    incoming: dict | None,
+    *,
+    rag_mode: str,
+    retrieval_no: int,
+    source_count: int,
+) -> dict:
+    entry = dict(incoming or {})
+    entry.update({"retrievalNo": retrieval_no, "phase": "agentic"})
+    retrievals = list((existing or {}).get("retrievals") or [])
+    if existing and not retrievals:
+        retrievals.append(
+            {key: value for key, value in existing.items() if key != "retrievals"}
+        )
+    retrievals.append(entry)
+    return {
+        **entry,
+        "ragMode": rag_mode,
+        "hit": any(bool(item.get("hit")) for item in retrievals),
+        "sourceCount": source_count,
+        "retrievals": retrievals,
+    }
+
+
+async def _capture_rag_rejection(state: AgentGraphState, code: str) -> None:
+    episode_service.record_step(
+        "RAG_QUERY_REJECTED",
+        node_name="tools",
+        status="BLOCKED",
+        output_data={
+            "code": code,
+            "ragMode": state.get("rag_mode"),
+            "retrievalCount": state.get("rag_retrieval_count", 0),
+        },
+    )
+    try:
+        await badcase_service.add_candidate(
+            int(state["message_id"]),
+            "RAG_QUERY_REJECTED",
+            code,
+            run_id=(state.get("agent_msg") or {}).get("runId"),
+            source="VERIFIER",
+            severity="MEDIUM",
+            snapshot={
+                "code": code,
+                "ragMode": state.get("rag_mode"),
+                "retrievalCount": state.get("rag_retrieval_count", 0),
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "rag_rejection_badcase_capture_failed",
+            message_id=state["message_id"],
+            error=type(exc).__name__,
+        )
+
 async def tools_node(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
     message_id = state["message_id"]
@@ -597,6 +824,11 @@ async def tools_node(state: AgentGraphState) -> dict:
     biz_data = state.get("biz_data")
     assistant_cards = state.get("assistant_cards")
     search_tool_hint = state.get("search_tool_hint")
+    rag_mode = str(state.get("rag_mode") or get_settings().rag_mode)
+    rag_queries = list(state.get("rag_queries") or [])
+    rag_retrieval_count = int(state.get("rag_retrieval_count") or 0)
+    rag_source_refs = list(state.get("rag_source_refs") or [])
+    rag_trace = dict(state.get("rag_trace") or {}) or None
 
     for tc in state.get("pending_tool_calls") or []:
         if await rt.is_cancelled(user_id, message_id):
@@ -614,11 +846,68 @@ async def tools_node(state: AgentGraphState) -> dict:
                 )
             )
             continue
+        tool_args = dict(tc.get("args") or {})
+        if tc["name"] == "SEARCH_KNOWLEDGE":
+            query_key = rag_retriever.query_key(str(tool_args.get("query") or ""))
+            rejection = _rag_rejection_code(
+                state,
+                query_key=query_key,
+                retrieval_count=rag_retrieval_count,
+                seen_queries=rag_queries,
+            )
+            if rejection:
+                await _capture_rag_rejection(
+                    {
+                        **state,
+                        "rag_mode": rag_mode,
+                        "rag_retrieval_count": rag_retrieval_count,
+                    },
+                    rejection,
+                )
+                messages.append(
+                    ToolMessage(
+                        content=(
+                            "【知识检索被拒绝】"
+                            f"{rejection}。请使用已有证据；无证据时保守回答或转人工。"
+                        ),
+                        tool_call_id=tc["id"],
+                    )
+                )
+                continue
+            category_map = get_settings().rag_intent_category_map
+            category_filter = category_map.get(str(state.get("intent") or "")) or None
+            if category_filter:
+                tool_args["_categoryFilter"] = category_filter
+
         result = await mcp_tool_router.invoke(
-            tc["name"], tc.get("args") or {}, user_id, call_id=tc.get("id")
+            tc["name"], tool_args, user_id, call_id=tc.get("id")
         )
         called.append(tc["name"])
         messages.append(ToolMessage(content=result.to_tool_message(), tool_call_id=tc["id"]))
+
+        if tc["name"] == "SEARCH_KNOWLEDGE":
+            rag_retrieval_count += 1
+            rag_queries.append(query_key)
+            rag_source_refs = _merge_rag_sources(
+                rag_source_refs, result.source_refs
+            )
+            rag_trace = _merge_rag_trace(
+                rag_trace,
+                result.retrieval_trace,
+                rag_mode=rag_mode,
+                retrieval_no=rag_retrieval_count,
+                source_count=len(rag_source_refs),
+            )
+            episode_service.record_step(
+                "RAG_RETRIEVAL",
+                node_name="tools",
+                input_data={"query": tool_args.get("query")},
+                output_data={
+                    "trace": result.retrieval_trace,
+                    "sourceRefs": result.source_refs,
+                    "hasEvidence": bool(result.source_refs),
+                },
+            )
 
         biz_dict = result.to_biz_dict()
         if biz_dict:
@@ -639,9 +928,17 @@ async def tools_node(state: AgentGraphState) -> dict:
                 await product_snapshot_service.ensure_consult_snapshot(user_id, str(product_id))
 
     settings = get_settings()
+    rag_update = {
+        "rag_mode": rag_mode,
+        "rag_queries": rag_queries,
+        "rag_retrieval_count": rag_retrieval_count,
+        "rag_source_refs": rag_source_refs,
+        "rag_trace": rag_trace,
+    }
     if is_order_cards_json(assistant_cards) and "QUERY_ORDERS" in called:
         logger.info("finalize_after_order_cards", user_id=user_id)
         return {
+            **rag_update,
             "llm_messages": messages,
             "tools_called": called,
             "pending_tool_calls": [],
@@ -655,6 +952,7 @@ async def tools_node(state: AgentGraphState) -> dict:
         }
     if is_product_cards_json(assistant_cards) and "SEARCH_PRODUCTS" in called:
         return {
+            **rag_update,
             "llm_messages": messages,
             "tools_called": called,
             "pending_tool_calls": [],
@@ -669,6 +967,7 @@ async def tools_node(state: AgentGraphState) -> dict:
 
     next_route = "agent_loop" if state.get("react_round", 0) < settings.graph_max_react_rounds else "finalize"
     return {
+        **rag_update,
         "llm_messages": messages,
         "tools_called": called,
         "pending_tool_calls": [],
@@ -762,6 +1061,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
             consult_card=state.get("card"),
             message_card=state.get("message_card"),
             order_resolution=state.get("order_resolution"),
+            rag_evidence_required=bool(state.get("rag_evidence_required")),
         )
     except Exception as e:
         logger.exception("graph_finalize_failed", error=str(e))

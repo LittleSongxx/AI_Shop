@@ -91,6 +91,14 @@ class RagRetriever:
         base = self._es_hosts.split(",")[0].rstrip("/")
         return f"{base}{path}"
 
+    def normalize_query(self, query: str) -> str:
+        """Canonical query used by retrieval and per-turn duplicate prevention."""
+        return self._rewrite_query(query)
+
+    def query_key(self, query: str) -> str:
+        """Punctuation-insensitive key for duplicate retrieval prevention."""
+        return self._normalize_question(self.normalize_query(query))
+
     async def warmup_faq_cache(self) -> None:
         try:
             version = await self._knowledge_version()
@@ -128,7 +136,7 @@ class RagRetriever:
         effective_top_k = int(overrides.get("rag_top_k") or top_k or settings.rag_top_k)
         rerank_top_n = int(overrides.get("rerank_top_n") or settings.rerank_top_n)
 
-        cleaned = self._rewrite_query(query)
+        cleaned = self.normalize_query(query)
         if not cleaned:
             self._observe_search(started, False, "empty")
             return self._trace_result(cleaned, 0, "empty", False, [], started)

@@ -77,6 +77,7 @@ class ResponseVerifier:
         recommendation_constraints: dict | None = None,
         recommendation_candidates: list[dict] | None = None,
         support_case: dict | None = None,
+        policy_evidence_required: bool = False,
     ) -> VerificationResult:
         text = str(assistant or "").strip()
         called = frozenset(str(tool) for tool in tools_called or [])
@@ -119,7 +120,9 @@ class ResponseVerifier:
                 )
             )
 
-        if _POLICY_CLAIM_RE.search(text) and not _has_sources(source_refs):
+        if (
+            policy_evidence_required or _POLICY_CLAIM_RE.search(text)
+        ) and not _has_sources(source_refs):
             issues.append(
                 VerificationIssue(
                     "POLICY_WITHOUT_CITATION",

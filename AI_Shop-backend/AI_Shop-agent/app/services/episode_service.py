@@ -70,6 +70,7 @@ _RAW_TEXT_KEYS = frozenset(
         "content",
         "messages",
         "address",
+        "query",
     }
 )
 

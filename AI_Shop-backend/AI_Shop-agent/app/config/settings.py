@@ -229,9 +229,10 @@ class Settings(BaseSettings):
     #   AB_TEST_CONFIG='{"B":{"rag_top_k":20,"rerank_top_n":10}}'
     ab_test_buckets: int = 0
     ab_test_config: dict[str, dict] = {}
-    # P3-1 Agentic RAG: when True, build_context_node skips the fixed RAG call
-    # and the LLM must invoke SEARCH_KNOWLEDGE explicitly.  Keep False until the
-    # system prompt has been tuned and LLM reliability validated in staging.
+    # Bounded RAG orchestration. ``agentic_rag`` remains only for old deployments:
+    # when it is explicitly configured and RAG_MODE is absent, true maps to agentic
+    # and false maps to prefetch. New environments default to conditional.
+    rag_mode: Literal["prefetch", "conditional", "agentic"] = "conditional"
     agentic_rag: bool = False
     # P3-2 Multimodal RAG: VLM for image description.
     # A dedicated VLM key wins; DASHSCOPE_API_KEY is only the shared-key fallback.
@@ -282,6 +283,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_internal_contracts(self) -> "Settings":
+        if "rag_mode" not in self.model_fields_set and "agentic_rag" in self.model_fields_set:
+            self.rag_mode = "agentic" if self.agentic_rag else "prefetch"
         if self.embedding_dimensions != self.es_vector_dimensions:
             raise ValueError(
                 "EMBEDDING_DIMENSIONS and ES_VECTOR_DIMENSIONS must be identical"
