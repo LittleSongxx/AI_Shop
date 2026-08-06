@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     episode_flush_interval_ms: int = 200
     episode_success_sample_rate: float = 0.10
     episode_retention_days: int = 30
+
+    # Shadow answer judge. An explicit model and usable API key are both required;
+    # otherwise the queue stays disabled and the user path does no extra work.
+    judge_model: str = ""
+    judge_api_key: str = ""
+    judge_base_url: str = ""
+    judge_timeout: int = 15
+    judge_sample_rate: float = 0.05
+    judge_low_score_threshold: float = 0.65
+    judge_queue_size: int = 500
     java_web_url: str = "http://localhost:8080"
     mcp_server_url: str = Field(
         default="http://127.0.0.1:7060",
@@ -316,6 +326,14 @@ class Settings(BaseSettings):
             raise ValueError("EPISODE_SUCCESS_SAMPLE_RATE must be between 0 and 1")
         if self.episode_retention_days < 1:
             raise ValueError("EPISODE_RETENTION_DAYS must be positive")
+        if self.judge_timeout < 1:
+            raise ValueError("JUDGE_TIMEOUT must be positive")
+        if not 0 <= self.judge_sample_rate <= 1:
+            raise ValueError("JUDGE_SAMPLE_RATE must be between 0 and 1")
+        if not 0 <= self.judge_low_score_threshold <= 1:
+            raise ValueError("JUDGE_LOW_SCORE_THRESHOLD must be between 0 and 1")
+        if self.judge_queue_size < 10:
+            raise ValueError("JUDGE_QUEUE_SIZE must be at least 10")
         if self.rerank_timeout < 1:
             raise ValueError("RERANK_TIMEOUT must be positive")
         if self.rerank_top_n < 1:

@@ -29,6 +29,7 @@ from app.rag.retriever import (
 from app.services.agent_queue_service import agent_queue_service
 from app.services.episode_service import episode_service
 from app.services.health_service import health_service
+from app.services.judge_service import judge_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.redis_service import redis_service
 
@@ -81,6 +82,7 @@ async def lifespan(app: FastAPI):
         await asyncio.to_thread(run_migrations)
 
     await episode_service.start()
+    await judge_service.start()
     await session_memory_service.ensure_table()
     await start_ws_listener(redis_service.client)
     _knowledge_listener_task = asyncio.create_task(_knowledge_release_listener())
@@ -107,6 +109,7 @@ async def lifespan(app: FastAPI):
     await close_checkpointer()
     await mcp_streamable_client.close()
     await close_http_clients()
+    await judge_service.close()
     await episode_service.close()
     await close_pool()
     await redis_service.close()

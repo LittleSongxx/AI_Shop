@@ -9,6 +9,7 @@ from app.models.response import ResponseVO, error, success
 from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
+from app.services.badcase_service import badcase_service
 from app.services.episode_query_service import episode_query_service
 from app.services.message_service import agent_message_service
 from app.services.order_selection_store import (
@@ -543,12 +544,15 @@ async def admin_badcases(
     _token: str = Depends(_require_internal_token),
 ) -> ResponseVO:
     body = await _read_admin_body(request)
-    data = await support_service.list_badcases(
-        _as_int(body.get("pageNo"), 1) or 1,
-        _as_int(body.get("pageSize"), 30) or 30,
-        str(body.get("status") or "").strip() or None,
-    )
-    return success(data)
+    try:
+        data = await badcase_service.list_candidates(
+            _as_int(body.get("pageNo"), 1) or 1,
+            _as_int(body.get("pageSize"), 30) or 30,
+            str(body.get("status") or "").strip() or "NEW",
+        )
+        return success(data)
+    except ValueError as exc:
+        return error(600, str(exc))
 
 
 @router.post("/admin/reviewBadcase")
@@ -561,16 +565,37 @@ async def admin_review_badcase(
     if not candidate_id:
         return error(600, "candidateId 不能为空")
     try:
-        data = await support_service.review_badcase(
+        data = await badcase_service.review(
             candidate_id,
             _required_text(body, "status"),
             _required_text(body, "reviewer"),
-            str(body.get("remark") or "").strip() or None,
-            str(body.get("faqAnswer") or "").strip() or None,
+            remark=str(body.get("remark") or "").strip() or None,
+            labels=(body.get("labels") if isinstance(body.get("labels"), list) else []),
+            owner=str(body.get("owner") or "").strip() or None,
+            fix_version=str(body.get("fixVersion") or "").strip() or None,
+            regression=(
+                body.get("regression")
+                if isinstance(body.get("regression"), dict)
+                else None
+            ),
         )
         return success(data)
     except ValueError as exc:
         return error(600, str(exc))
+
+
+@router.post("/admin/regressionCases")
+async def admin_regression_cases(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    data = await badcase_service.list_regression_cases(
+        _as_int(body.get("pageNo"), 1) or 1,
+        _as_int(body.get("pageSize"), 30) or 30,
+        str(body.get("status") or "").strip() or None,
+    )
+    return success(data)
 
 
 def _required_text(body: dict, key: str) -> str:

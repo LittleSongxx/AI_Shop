@@ -8,7 +8,8 @@ from app.domain.tool_policy import policy_for
 from app.harness.guardrails.tool_guard import ToolGuardrail
 from app.harness.metrics.runtime_sensors import TOOL_CALL_TOTAL, measure_agent_stage
 from app.observability.telemetry import get_tracer
-from app.services.episode_service import episode_service
+from app.services.badcase_service import badcase_service
+from app.services.episode_service import current_episode, episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -76,6 +77,34 @@ class McpToolRouter:
                     error_message=str(error) if error else None,
                     latency_ms=elapsed_ms,
                 )
+                if (result is not None and not result.success) or error is not None:
+                    context = current_episode()
+                    try:
+                        await badcase_service.add_candidate(
+                            context.message_id if context else None,
+                            "TOOL_ERROR",
+                            f"{tool_name} 调用失败",
+                            run_id=context.run_id if context else None,
+                            source="TOOL",
+                            severity=(
+                                "HIGH" if tool_name.startswith("PROPOSE_") else "MEDIUM"
+                            ),
+                            snapshot={
+                                "toolName": tool_name,
+                                "callId": call_id,
+                                "errorCode": (
+                                    result.error_code
+                                    if result
+                                    else type(error).__name__ if error else None
+                                ),
+                            },
+                        )
+                    except Exception as capture_error:
+                        logger.warning(
+                            "tool_badcase_capture_failed",
+                            tool=tool_name,
+                            error=type(capture_error).__name__,
+                        )
 
     def _observable_args(self, tool_name: str, args: dict, user_id: str) -> dict:
         """Return the normalized shape without retaining a claimed identity."""

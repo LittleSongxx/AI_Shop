@@ -471,7 +471,7 @@ class SupportService:
         async with acquire() as cur:
             await cur.execute(
                 """
-                SELECT message_id, user_message, assistant_message, biz_type, intent
+                SELECT message_id, run_id, user_message, assistant_message, biz_type, intent
                 FROM agent_message
                 WHERE message_id=%s AND user_id=%s
                 """,
@@ -490,16 +490,24 @@ class SupportService:
                 """,
                 (message_id, user_id, rating, reason, detail),
             )
-            if rating < 0:
-                await cur.execute(
-                    """
-                    INSERT IGNORE INTO ai_badcase_candidate
-                        (message_id, candidate_type, reason, status, snapshot_json, created_at, updated_at)
-                    SELECT message_id, 'NEGATIVE_FEEDBACK', COALESCE(%s, '用户点踩'),
-                           'PENDING', JSON_OBJECT('detail', COALESCE(%s, '')), NOW(), NOW()
-                    FROM agent_message WHERE message_id=%s
-                    """,
-                    (reason, detail, message_id),
+        if rating < 0:
+            from app.services.badcase_service import badcase_service
+
+            try:
+                await badcase_service.add_candidate(
+                    message_id,
+                    "NEGATIVE_FEEDBACK",
+                    reason or "用户点踩",
+                    run_id=(row or {}).get("run_id"),
+                    source="USER_FEEDBACK",
+                    severity="HIGH",
+                    snapshot={"detail": detail or ""},
+                )
+            except Exception as exc:
+                logger.warning(
+                    "feedback_badcase_capture_failed",
+                    message_id=message_id,
+                    error=type(exc).__name__,
                 )
         if rating > 0 and _eligible_faq_candidate(row):
             try:
@@ -523,65 +531,32 @@ class SupportService:
         reason: str,
         snapshot: dict | None = None,
     ) -> None:
-        async with acquire() as cur:
-            await cur.execute(
-                """
-                INSERT INTO ai_badcase_candidate
-                    (message_id, candidate_type, reason, status, snapshot_json,
-                     created_at, updated_at)
-                VALUES (%s, %s, %s, 'PENDING', %s, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE reason=VALUES(reason),
-                    snapshot_json=VALUES(snapshot_json), updated_at=NOW()
-                """,
-                (
-                    message_id,
-                    candidate_type,
-                    (reason or "")[:255],
-                    json.dumps(snapshot or {}, ensure_ascii=False),
-                ),
+        from app.services.badcase_service import badcase_service
+
+        try:
+            await badcase_service.add_candidate(
+                message_id,
+                candidate_type,
+                reason,
+                snapshot=snapshot,
+            )
+        except Exception as exc:
+            logger.warning(
+                "badcase_capture_failed",
+                message_id=message_id,
+                candidate_type=candidate_type,
+                error=type(exc).__name__,
             )
 
     async def list_badcases(
         self,
         page_no: int = 1,
         page_size: int = 30,
-        status: str | None = "PENDING",
+        status: str | None = "NEW",
     ) -> dict:
-        page_no = max(1, page_no)
-        page_size = max(1, min(page_size, 100))
-        offset = (page_no - 1) * page_size
-        where = "1=1"
-        params: list = []
-        if status:
-            where += " AND b.status=%s"
-            params.append(status)
-        async with acquire() as cur:
-            await cur.execute(
-                f"SELECT COUNT(*) AS cnt FROM ai_badcase_candidate b WHERE {where}",
-                params,
-            )
-            row = await cur.fetchone()
-            total = int(row["cnt"]) if row else 0
-            await cur.execute(
-                f"""
-                SELECT b.*, m.user_message, m.assistant_message, m.intent,
-                       m.intent_confidence, m.sentiment
-                FROM ai_badcase_candidate b
-                LEFT JOIN agent_message m ON m.message_id=b.message_id
-                WHERE {where}
-                ORDER BY b.created_at DESC
-                LIMIT %s OFFSET %s
-                """,
-                params + [page_size, offset],
-            )
-            rows = list(await cur.fetchall())
-        return {
-            "totalCount": total,
-            "pageNo": page_no,
-            "pageSize": page_size,
-            "pageTotal": (total + page_size - 1) // page_size if total else 0,
-            "list": [_public_badcase(item) for item in rows],
-        }
+        from app.services.badcase_service import badcase_service
+
+        return await badcase_service.list_candidates(page_no, page_size, status)
 
     async def review_badcase(
         self,
@@ -591,52 +566,16 @@ class SupportService:
         remark: str | None = None,
         faq_answer: str | None = None,
     ) -> dict:
-        next_status = (status or "").strip().upper()
-        if next_status not in {"RESOLVED", "IGNORED"}:
-            raise ValueError("坏例状态只支持 RESOLVED 或 IGNORED")
+        from app.services.badcase_service import badcase_service
 
-        async with acquire() as cur:
-            await cur.execute(
-                """
-                SELECT b.*, m.user_message, m.assistant_message, m.biz_type, m.intent
-                FROM ai_badcase_candidate b
-                LEFT JOIN agent_message m ON m.message_id=b.message_id
-                WHERE b.candidate_id=%s
-                """,
-                (candidate_id,),
-            )
-            row = await cur.fetchone()
-            if not row:
-                raise ValueError("坏例不存在")
-            if row.get("status") != "PENDING":
-                raise ValueError("坏例已经处理")
-
-        answer = (faq_answer or "").strip()
-        if next_status == "RESOLVED" and answer:
-            question = str(row.get("user_message") or "").strip()
-            if not question:
-                raise ValueError("该坏例没有可用的用户问题，不能生成 FAQ")
-            await java_internal_client.submit_faq_candidate(
-                question,
-                answer[:1200],
-                int(row["message_id"]) if row.get("message_id") else None,
-                category="badcase_fixed",
-            )
-
-        async with acquire() as cur:
-            await cur.execute(
-                """
-                UPDATE ai_badcase_candidate
-                SET status=%s, reviewer=%s, review_remark=%s, updated_at=NOW()
-                WHERE candidate_id=%s AND status='PENDING'
-                """,
-                (next_status, reviewer, (remark or "")[:500], candidate_id),
-            )
-            row["status"] = next_status
-            row["reviewer"] = reviewer
-            row["review_remark"] = (remark or "")[:500]
-
-        return _public_badcase(row)
+        if faq_answer:
+            raise ValueError("请通过审核后的回归 Case 管理修复，不再直接写入 FAQ")
+        return await badcase_service.review(
+            candidate_id,
+            status,
+            reviewer,
+            remark=remark,
+        )
 
     async def publish_admin(self, payload: dict) -> None:
         await redis_service.client.publish(WS_MESSAGE_TOPIC_ADMIN, json.dumps(payload, ensure_ascii=False))

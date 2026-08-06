@@ -605,9 +605,15 @@ class EpisodeService:
                         """
                         UPDATE agent_run
                         SET intent=COALESCE(%s,intent), scenario=COALESCE(%s,scenario),
-                            experiment_json=COALESCE(%s,experiment_json),
-                            quality_json=COALESCE(%s,quality_json),
-                            reward_signals_json=COALESCE(%s,reward_signals_json)
+                            experiment_json=JSON_MERGE_PATCH(
+                                COALESCE(experiment_json,JSON_OBJECT()),
+                                COALESCE(%s,JSON_OBJECT())),
+                            quality_json=JSON_MERGE_PATCH(
+                                COALESCE(quality_json,JSON_OBJECT()),
+                                COALESCE(%s,JSON_OBJECT())),
+                            reward_signals_json=JSON_MERGE_PATCH(
+                                COALESCE(reward_signals_json,JSON_OBJECT()),
+                                COALESCE(%s,JSON_OBJECT()))
                         WHERE run_id=%s
                         """,
                         (

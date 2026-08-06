@@ -166,3 +166,34 @@ EPISODE_WRITE_LATENCY = Histogram(
     "Episode batch persistence latency",
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
 )
+
+JUDGE_EVALUATION_TOTAL = Counter(
+    "agent_judge_evaluation_total",
+    "Asynchronous answer judge outcomes",
+    ["result"],
+)
+JUDGE_DROPPED_TOTAL = Counter(
+    "agent_judge_dropped_total",
+    "Judge requests dropped from the fail-open shadow path",
+    ["reason"],
+)
+JUDGE_QUEUE_DEPTH = Gauge(
+    "agent_judge_queue_depth",
+    "Pending requests in the shadow judge queue",
+)
+JUDGE_LATENCY = Histogram(
+    "agent_judge_latency_seconds",
+    "Shadow judge provider latency",
+    buckets=[0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30],
+)
+JUDGE_SCORE = Histogram(
+    "agent_judge_score",
+    "Shadow judge score by quality dimension",
+    ["dimension"],
+    buckets=[0, 0.25, 0.5, 0.65, 0.75, 0.9, 1],
+)
+RESPONSE_VERIFIER_TOTAL = Counter(
+    "agent_response_verifier_total",
+    "Deterministic final-response verification outcomes",
+    ["result", "rule"],
+)

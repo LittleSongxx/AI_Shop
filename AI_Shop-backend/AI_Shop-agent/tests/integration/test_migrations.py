@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 
@@ -11,6 +12,7 @@ from app.config.settings import get_settings
 from app.db.migrations import _REQUIRED_COLUMNS, CURRENT_REVISION, run_migrations
 from app.db.pool import close_pool, init_pool
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction
+from app.services.badcase_service import badcase_service
 from app.services.episode_service import EpisodeService, bind_episode
 from app.services.order_selection_store import (
     OrderSelectionConflict,
@@ -210,6 +212,8 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
         with _database_connection(incomplete) as connection, connection.cursor() as cursor:
             cursor.execute("DROP TABLE support_message")
             cursor.execute("DROP TABLE agent_pending_action")
+            cursor.execute("DROP TABLE agent_regression_case")
+            cursor.execute("ALTER TABLE ai_badcase_candidate DROP COLUMN run_id")
             cursor.execute("ALTER TABLE agent_run DROP COLUMN capture_level")
             cursor.execute("ALTER TABLE agent_run DROP COLUMN scenario")
             cursor.execute("ALTER TABLE agent_step DROP COLUMN output_json")
@@ -450,6 +454,10 @@ async def test_episode_writer_persists_sanitized_ordered_trace():
                     "orderId": "ORDER2026080712345678",
                 },
             )
+            service.update_run(quality={"verifierPassed": True})
+            service.update_run(
+                quality={"judge": {"groundedness": 0.9, "lowScore": False}}
+            )
             service.finish_run("ok")
         await asyncio.sleep(0.4)
         await service.close()
@@ -467,8 +475,83 @@ async def test_episode_writer_persists_sanitized_ordered_trace():
             payload = cursor.fetchone()[0]
             assert "13812345678" not in payload
             assert "ORDER2026080712345678" not in payload
+            cursor.execute(
+                "SELECT quality_json FROM agent_run WHERE run_id=%s",
+                ("run-episode-1",),
+            )
+            quality = json.loads(cursor.fetchone()[0])
+            assert quality["verifierPassed"] is True
+            assert quality["judge"]["groundedness"] == 0.9
     finally:
         await service.close()
+        await close_pool()
+        get_settings.cache_clear()
+        _drop_database(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("RUN_AGENT_MIGRATION_TESTS") != "1",
+    reason="requires a real MySQL 8 server",
+)
+async def test_badcase_lifecycle_requires_reviewed_passing_regression_case():
+    database = f"agent_migration_badcase_{uuid.uuid4().hex[:10]}"
+    try:
+        _create_database(database)
+        _migrate(database)
+        with _database_connection(database) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO agent_message
+                    (user_message,assistant_message,send_time,user_id,status,intent)
+                VALUES ('订单为什么没退款','无法确认',NOW(),'u1',2,'REFUND_STATUS')
+                """
+            )
+            message_id = cursor.lastrowid
+        await init_pool()
+
+        candidate_id = await badcase_service.add_candidate(
+            message_id,
+            "VERIFIER_FAILURE",
+            "动态事实无工具依据",
+            source="VERIFIER",
+            severity="HIGH",
+        )
+        with pytest.raises(ValueError, match="不能从 NEW"):
+            await badcase_service.review(
+                candidate_id, "FIXING", "admin", owner="owner"
+            )
+        await badcase_service.review(candidate_id, "TRIAGED", "admin")
+        await badcase_service.review(
+            candidate_id, "LABELED", "admin", labels=["grounding", "refund"]
+        )
+        await badcase_service.review(
+            candidate_id, "FIXING", "admin", owner="agent-team"
+        )
+        regression_added = await badcase_service.review(
+            candidate_id,
+            "REGRESSION_ADDED",
+            "admin",
+            regression={
+                "name": "退款状态必须有事实依据",
+                "scenario": "REFUND_STATUS",
+                "input": {"userMessage": "订单为什么没退款"},
+                "expected": {"requiredTools": ["QUERY_REFUND_STATUS"]},
+            },
+        )
+        case_id = int(regression_added["regressionCaseId"])
+        with pytest.raises(ValueError, match="PASS"):
+            await badcase_service.review(candidate_id, "VERIFIED", "admin")
+        await badcase_service.record_regression_result(case_id, "PASS")
+        await badcase_service.review(candidate_id, "VERIFIED", "admin")
+        closed = await badcase_service.review(candidate_id, "CLOSED", "admin")
+
+        assert closed["status"] == "CLOSED"
+        assert closed["labels"] == ["grounding", "refund"]
+        cases = await badcase_service.list_regression_cases()
+        assert cases["totalCount"] == 1
+        assert cases["list"][0]["lastResult"] == "PASS"
+    finally:
         await close_pool()
         get_settings.cache_clear()
         _drop_database(database)

@@ -32,6 +32,7 @@ from app.rag.ab_test import get_bucket
 from app.rag.query_rewriter import rewrite_for_rag
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
+from app.services.badcase_service import badcase_service
 from app.services.episode_service import episode_service
 from app.services.llm_factory import has_fallback_chat_llm
 from app.services.mcp_tool_router import mcp_tool_router
@@ -702,6 +703,22 @@ async def finalize_node(state: AgentGraphState) -> dict:
             )
             chunks = [guarded]
             full_text = guarded
+            try:
+                await badcase_service.add_candidate(
+                    int(state["message_id"]),
+                    "GUARD_BLOCK",
+                    "输出 Guard 修复了不受支持的完成或能力声明",
+                    run_id=agent_msg.get("runId"),
+                    source="VERIFIER",
+                    severity="HIGH",
+                    snapshot={"rule": "false_completion"},
+                )
+            except Exception as exc:
+                logger.warning(
+                    "guard_badcase_capture_failed",
+                    message_id=state["message_id"],
+                    error=type(exc).__name__,
+                )
         else:
             episode_service.record_step(
                 "GUARD",
@@ -744,6 +761,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
             user_text=state.get("user_text"),
             consult_card=state.get("card"),
             message_card=state.get("message_card"),
+            order_resolution=state.get("order_resolution"),
         )
     except Exception as e:
         logger.exception("graph_finalize_failed", error=str(e))

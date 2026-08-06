@@ -28,6 +28,7 @@ from app.services.agent_engine import agent_engine
 from app.services.agent_queue_service import agent_queue_service
 from app.services.agent_service import agent_orchestrator
 from app.services.episode_service import bind_episode, episode_service
+from app.services.judge_service import judge_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.message_service import agent_message_service, next_unresolved_count
 from app.services.pending_action_service import pending_action_service
@@ -97,6 +98,7 @@ class AgentWorker:
         await redis_service.connect()
         await init_pool()
         await episode_service.start()
+        await judge_service.start()
         try:
             await self._connect_queue_until_ready()
             await self._start_consumer(
@@ -221,6 +223,7 @@ class AgentWorker:
             await agent_queue_service.close()
             await mcp_streamable_client.close()
             await close_http_clients()
+            await judge_service.close()
             await episode_service.close()
             await close_pool()
             await redis_service.close()

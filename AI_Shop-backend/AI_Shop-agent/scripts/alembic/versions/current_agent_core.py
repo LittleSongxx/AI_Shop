@@ -467,24 +467,59 @@ def upgrade() -> None:
         (
             candidate_id bigint AUTO_INCREMENT PRIMARY KEY,
             message_id int NULL,
+            run_id varchar(64) NULL,
             candidate_type varchar(32) NOT NULL,
             reason varchar(255) NOT NULL,
-            status varchar(16) DEFAULT 'PENDING' NOT NULL,
+            status varchar(24) DEFAULT 'NEW' NOT NULL,
+            source varchar(32) DEFAULT 'SYSTEM' NOT NULL,
+            severity varchar(16) DEFAULT 'MEDIUM' NOT NULL,
             snapshot_json json NULL,
+            labels_json json NULL,
+            judge_json json NULL,
+            owner varchar(100) NULL,
+            fix_version varchar(64) NULL,
+            regression_case_id bigint NULL,
+            occurrence_count int DEFAULT 1 NOT NULL,
+            first_seen_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
             reviewer varchar(100) NULL,
             review_remark varchar(500) NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
                 ON UPDATE CURRENT_TIMESTAMP,
             CONSTRAINT uk_badcase_message_type UNIQUE (message_id, candidate_type),
-            KEY idx_badcase_status (status, created_at)
+            KEY idx_badcase_status (status, created_at),
+            KEY idx_badcase_run (run_id, created_at)
         ) COMMENT 'Agent badcase review pool' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_regression_case
+        (
+            case_id bigint AUTO_INCREMENT PRIMARY KEY,
+            candidate_id bigint NULL,
+            case_key varchar(128) NOT NULL,
+            name varchar(255) NOT NULL,
+            scenario varchar(40) NULL,
+            input_json json NOT NULL,
+            expected_json json NOT NULL,
+            status varchar(16) DEFAULT 'ACTIVE' NOT NULL,
+            created_by varchar(100) NOT NULL,
+            last_result varchar(16) NULL,
+            last_run_at datetime NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
+                ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT uk_agent_regression_case_key UNIQUE (case_key),
+            KEY idx_agent_regression_status (status, updated_at)
+        ) COMMENT 'human-reviewed Agent regression cases' CHARSET = utf8mb4
         """
     )
 
     _reconcile_agent_message()
     _reconcile_episode_tables()
     _reconcile_pending_action()
+    _reconcile_quality_tables()
     _reconcile_indexes()
 
 
@@ -661,6 +696,46 @@ def _reconcile_pending_action() -> None:
         )
 
 
+def _reconcile_quality_tables() -> None:
+    """Upgrade the legacy two-state badcase pool without discarding reviews."""
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("ai_badcase_candidate")
+    }
+    definitions = {
+        "run_id": "varchar(64) NULL",
+        "source": "varchar(32) NOT NULL DEFAULT 'SYSTEM'",
+        "severity": "varchar(16) NOT NULL DEFAULT 'MEDIUM'",
+        "labels_json": "json NULL",
+        "judge_json": "json NULL",
+        "owner": "varchar(100) NULL",
+        "fix_version": "varchar(64) NULL",
+        "regression_case_id": "bigint NULL",
+        "occurrence_count": "int NOT NULL DEFAULT 1",
+        "first_seen_at": "datetime NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    }
+    for name, ddl in definitions.items():
+        if name not in columns:
+            op.execute(f"ALTER TABLE ai_badcase_candidate ADD COLUMN {name} {ddl}")
+
+    op.execute(
+        """
+        UPDATE ai_badcase_candidate
+        SET status = CASE status
+            WHEN 'PENDING' THEN 'NEW'
+            WHEN 'RESOLVED' THEN 'CLOSED'
+            ELSE status
+        END,
+        first_seen_at = COALESCE(first_seen_at, created_at, NOW()),
+        occurrence_count = GREATEST(COALESCE(occurrence_count, 1), 1)
+        """
+    )
+    op.execute(
+        "ALTER TABLE ai_badcase_candidate MODIFY COLUMN status varchar(24) "
+        "NOT NULL DEFAULT 'NEW'"
+    )
+
+
 def _reconcile_indexes() -> None:
     indexes = {
         "agent_message": (
@@ -742,6 +817,15 @@ def _reconcile_indexes() -> None:
                 True,
             ),
             ("idx_badcase_status", ("status", "created_at"), False),
+            ("idx_badcase_run", ("run_id", "created_at"), False),
+        ),
+        "agent_regression_case": (
+            ("uk_agent_regression_case_key", ("case_key",), True),
+            (
+                "idx_agent_regression_status",
+                ("status", "updated_at"),
+                False,
+            ),
         ),
     }
     inspector = sa.inspect(op.get_bind())
@@ -763,6 +847,7 @@ def downgrade() -> None:
     for table_name in (
         "agent_step",
         "agent_run",
+        "agent_regression_case",
         "ai_badcase_candidate",
         "agent_message_feedback",
         "agent_task",

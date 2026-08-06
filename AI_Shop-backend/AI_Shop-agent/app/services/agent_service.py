@@ -9,18 +9,21 @@ from app.constants import AGENT_QUEUE_LOW
 from app.domain.intent.classifier import resolve_intent
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.harness.guardrails.input_guard import InputGuardrail
-from app.harness.metrics.runtime_sensors import measure_agent_stage
+from app.harness.metrics.runtime_sensors import RESPONSE_VERIFIER_TOTAL, measure_agent_stage
 from app.memory.session_memory_service import session_memory_service
 from app.observability.telemetry import current_trace_id
 from app.rag.retriever import rag_retriever
 from app.services.agent_queue_service import agent_queue_service
+from app.services.badcase_service import badcase_service
 from app.services.episode_service import episode_service, new_run_id
+from app.services.judge_service import judge_service
 from app.services.message_service import agent_message_service
 from app.services.order_reference_resolver import ORDER_REFERENCE_INTENTS
 from app.services.order_selection_store import order_selection_store
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.rate_limit_service import rate_limit_service
 from app.services.redis_service import redis_service
+from app.services.response_verifier import response_verifier
 from app.services.sensitive_word_service import sensitive_word_service
 from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
@@ -153,6 +156,18 @@ class AgentOrchestrator:
             input_data={"message": original_user_text},
             output_data=decision.model_dump(mode="json"),
         )
+        try:
+            await badcase_service.detect_user_correction(
+                user_id=user_id,
+                current_message_id=int(agent_msg["messageId"]),
+                user_text=original_user_text,
+            )
+        except Exception as exc:
+            logger.warning(
+                "user_correction_badcase_capture_failed",
+                message_id=agent_msg["messageId"],
+                error=type(exc).__name__,
+            )
         agent_msg["fromProduct"] = from_product
 
         if active_support:
@@ -202,6 +217,55 @@ class AgentOrchestrator:
                         "version": faq.get("version"),
                     }
                 ]
+                verification = response_verifier.verify(
+                    assistant=answer,
+                    biz_type="faq",
+                    tools_called=[],
+                    source_refs=source_refs,
+                    has_pending_action=False,
+                )
+                RESPONSE_VERIFIER_TOTAL.labels(
+                    result=(
+                        "pass" if verification.passed else verification.action.lower()
+                    ),
+                    rule=(
+                        verification.issues[0].code if verification.issues else "NONE"
+                    ),
+                ).inc()
+                answer = verification.assistant
+                episode_service.update_run(
+                    run_id=run_id,
+                    quality=verification.quality(),
+                )
+                episode_service.record_step(
+                    "RESPONSE_VERIFIER",
+                    run_id=run_id,
+                    node_name="api",
+                    status="OK" if verification.passed else "BLOCKED",
+                    output_data=verification.quality(),
+                )
+                if not verification.passed:
+                    try:
+                        await badcase_service.add_candidate(
+                            int(agent_msg["messageId"]),
+                            "VERIFIER_FAILURE",
+                            verification.issues[0].detail,
+                            run_id=run_id,
+                            source="VERIFIER",
+                            severity=verification.issues[0].severity,
+                            snapshot={
+                                "action": verification.action,
+                                "issues": [
+                                    issue.public() for issue in verification.issues
+                                ],
+                            },
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "faq_verifier_badcase_capture_failed",
+                            message_id=agent_msg["messageId"],
+                            error=type(exc).__name__,
+                        )
                 await agent_message_service.complete_message(
                     agent_msg["messageId"],
                     answer,
@@ -232,6 +296,16 @@ class AgentOrchestrator:
                 )
                 episode_service.finish_run(
                     "faq", run_id=run_id, force_keep=episode_keep
+                )
+                judge_service.enqueue(
+                    run_id=run_id,
+                    message_id=int(agent_msg["messageId"]),
+                    user_text=original_user_text,
+                    assistant=answer,
+                    intent=decision.intent.value,
+                    tools_called=[],
+                    source_refs=source_refs,
+                    verifier_passed=verification.passed,
                 )
                 return agent_msg
 
@@ -518,12 +592,19 @@ class AgentOrchestrator:
             safe_message,
             agent_msg["messageId"],
         )
-        await support_service.add_badcase(
-            agent_msg["messageId"],
-            "HUMAN_HANDOFF",
-            decision.get("handoff_reason") or "转人工",
-            {"decision": decision},
-        )
+        handoff_reason = decision.get("handoff_reason") or "AI_HANDOFF"
+        if handoff_reason in {
+            "AI_HANDOFF",
+            "LOW_CONFIDENCE",
+            "REPEATED_INTENT",
+            "REPEATED_UNRESOLVED",
+        }:
+            await support_service.add_badcase(
+                agent_msg["messageId"],
+                "ABNORMAL_HANDOFF",
+                handoff_reason,
+                {"decision": decision},
+            )
         await agent_message_service.complete_message(
             agent_msg["messageId"],
             SUPPORT_TRANSFER_MESSAGE,

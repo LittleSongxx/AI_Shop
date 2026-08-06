@@ -88,6 +88,63 @@
       ],
       "title": "工具调用结果",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (result, rule) (rate(agent_response_verifier_total[5m]))",
+          "legendFormat": "{{result}} / {{rule}}",
+          "refId": "A"
+        }
+      ],
+      "title": "确定性 Verifier 结果",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "fieldConfig": { "defaults": { "min": 0, "max": 1 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (dimension) (rate(agent_judge_score_sum[15m])) / sum by (dimension) (rate(agent_judge_score_count[15m]))",
+          "legendFormat": "{{dimension}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Shadow Judge 维度均分",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (result) (rate(agent_judge_evaluation_total[5m]))",
+          "legendFormat": "judge / {{result}}",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum by (reason) (rate(agent_judge_dropped_total[5m]))",
+          "legendFormat": "dropped / {{reason}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Shadow Judge 队列与结果",
+      "type": "timeseries"
     }
   ],
   "refresh": "15s",
@@ -98,5 +155,5 @@
   "timezone": "browser",
   "title": "AI_Shop Agent Quality",
   "uid": "aishop-agent-quality",
-  "version": 1
+  "version": 2
 }

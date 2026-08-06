@@ -18,6 +18,7 @@ from app.harness.guardrails.product_text_guard import (
 )
 from app.harness.metrics.runtime_sensors import (
     LLM_LATENCY,
+    RESPONSE_VERIFIER_TOTAL,
     STREAM_CHARS,
     STREAM_TOKENS,
     observe_agent_stage,
@@ -29,12 +30,15 @@ from app.observability.llm_metrics import (
     resolve_llm_model,
 )
 from app.observability.telemetry import get_tracer
+from app.services.badcase_service import badcase_service
 from app.services.episode_service import episode_service
+from app.services.judge_service import judge_service
 from app.services.llm_factory import ChatLLMConfig, chat_llm_config, chat_llm_for_config
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.message_service import agent_message_service
 from app.services.pending_action_service import pending_action_service
 from app.services.redis_service import redis_service
+from app.services.response_verifier import response_verifier
 from app.services.stream_service import stream_service
 from app.utils.biz_payload import (
     build_action_confirm_payload,
@@ -283,6 +287,7 @@ async def finalize_agent_response(
     user_text: str | None = None,
     consult_card: dict | None = None,
     message_card: dict | None = None,
+    order_resolution: str | None = None,
 ) -> None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
@@ -293,6 +298,7 @@ async def finalize_agent_response(
         consult_card,
         from_product=bool(agent_msg.get("fromProduct")),
     )
+    called = list(tools_called or [])
 
     resolved = await resolve_action_confirm(full_text, messages, user_id)
     if resolved:
@@ -310,7 +316,6 @@ async def finalize_agent_response(
             full_text = "操作确认卡片无效，请重新说明退款/评价/收货需求后重试。"
             assistant_cards = None
 
-        called = list(tools_called or [])
         wants_orders = "QUERY_ORDERS" in called or wants_order_list_cards(user_text)
         recovered_order_cards = _recover_order_cards(assistant_cards, called) if wants_orders else None
         if wants_orders and (
@@ -421,6 +426,55 @@ async def finalize_agent_response(
 
     assistant = _strip_emojis_from_assistant(assistant)
 
+    verification = response_verifier.verify(
+        assistant=assistant,
+        biz_type=biz_type,
+        tools_called=called,
+        source_refs=source_refs,
+        has_pending_action=resolved is not None,
+        order_resolution=order_resolution,
+    )
+    RESPONSE_VERIFIER_TOTAL.labels(
+        result="pass" if verification.passed else verification.action.lower(),
+        rule=verification.issues[0].code if verification.issues else "NONE",
+    ).inc()
+    episode_service.update_run(quality=verification.quality())
+    episode_service.record_step(
+        "RESPONSE_VERIFIER",
+        node_name="finalize",
+        status="OK" if verification.passed else "BLOCKED",
+        input_data={
+            "bizType": biz_type,
+            "toolsCalled": called,
+            "hasPendingAction": resolved is not None,
+            "hasSources": bool(source_refs),
+        },
+        output_data=verification.quality(),
+    )
+    if not verification.passed:
+        assistant = verification.assistant
+        biz_type = "agent"
+        biz_data = None
+        try:
+            await badcase_service.add_candidate(
+                int(message_id),
+                "VERIFIER_FAILURE",
+                verification.issues[0].detail,
+                run_id=agent_msg.get("runId"),
+                source="VERIFIER",
+                severity=verification.issues[0].severity,
+                snapshot={
+                    "action": verification.action,
+                    "issues": [issue.public() for issue in verification.issues],
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "verifier_badcase_capture_failed",
+                message_id=message_id,
+                error=type(exc).__name__,
+            )
+
     await agent_message_service.complete_message(
         message_id,
         assistant,
@@ -435,6 +489,17 @@ async def finalize_agent_response(
         biz_type,
         agent_msg.get("userMessage"),
         source_refs,
+    )
+    judge_service.enqueue(
+        run_id=agent_msg.get("runId"),
+        message_id=int(message_id),
+        user_text=user_text,
+        assistant=assistant,
+        intent=(agent_msg.get("intentDecision") or {}).get("intent")
+        or agent_msg.get("intent"),
+        tools_called=called,
+        source_refs=source_refs,
+        verifier_passed=verification.passed,
     )
 
 async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") -> None:
