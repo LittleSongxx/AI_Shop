@@ -146,6 +146,7 @@ def upgrade() -> None:
         (
             user_id varchar(32) NOT NULL PRIMARY KEY,
             profile_json json NULL,
+            revision bigint NOT NULL DEFAULT 0,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
                 ON UPDATE CURRENT_TIMESTAMP
         ) COMMENT 'durable shopping preferences (budget/brand/scenario)'
@@ -518,6 +519,7 @@ def upgrade() -> None:
 
     _reconcile_agent_message()
     _reconcile_episode_tables()
+    _reconcile_shopping_profile()
     _reconcile_pending_action()
     _reconcile_quality_tables()
     _reconcile_indexes()
@@ -631,6 +633,21 @@ def _reconcile_episode_tables() -> None:
     )
     op.execute(
         "ALTER TABLE agent_step MODIFY COLUMN run_id varchar(64) NOT NULL"
+    )
+
+
+def _reconcile_shopping_profile() -> None:
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("agent_shopping_profile")
+    }
+    if "revision" not in columns:
+        op.execute(
+            "ALTER TABLE agent_shopping_profile "
+            "ADD COLUMN revision bigint NOT NULL DEFAULT 0 AFTER profile_json"
+        )
+    op.execute(
+        "UPDATE agent_shopping_profile SET revision=0 WHERE revision IS NULL"
     )
 
 

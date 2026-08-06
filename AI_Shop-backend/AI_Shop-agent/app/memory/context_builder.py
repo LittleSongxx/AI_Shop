@@ -10,6 +10,11 @@ from app.memory.models import SessionMemory
 from app.memory.token_estimator import estimate_text_tokens
 from app.services.message_service import agent_message_service
 from app.services.prompt_service import build_agent_system_prompt
+from app.services.shopping_need_service import (
+    effective_profile_from_need,
+    recent_candidate_ids,
+    shopping_need_is_active,
+)
 from app.services.shopping_profile_service import _has_signal, shopping_profile_service
 from app.utils.prompt_boundary import isolate_user_message
 
@@ -114,6 +119,58 @@ def build_context_block(memory: SessionMemory, shopping_profile: dict | None = N
             lines.append("\n## 购物偏好")
             lines.append(profile_summary)
 
+    shopping_need = state.get("shoppingNeed")
+    if shopping_need_is_active(shopping_need):
+        need = shopping_need or {}
+        budget = need.get("budget") or {}
+        soft = need.get("softPreferences") or {}
+        exclusions = need.get("exclusions") or {}
+        lines.append("\n## 当前选购需求")
+        lines.append(
+            " | ".join(
+                part
+                for part in (
+                    f"品类: {need.get('category')}" if need.get("category") else "",
+                    (
+                        f"预算: {budget.get('min') or '*'}-{budget.get('max') or '*'}元"
+                        if budget.get("min") is not None
+                        or budget.get("max") is not None
+                        else ""
+                    ),
+                    (
+                        "场景: " + ", ".join(need.get("scenarios") or [])
+                        if need.get("scenarios")
+                        else ""
+                    ),
+                    (
+                        "偏好: "
+                        + ", ".join(
+                            [
+                                *(soft.get("brands") or []),
+                                *(soft.get("features") or []),
+                            ]
+                        )
+                        if soft.get("brands") or soft.get("features")
+                        else ""
+                    ),
+                    (
+                        "排除: " + ", ".join(exclusions.get("brands") or [])
+                        if exclusions.get("brands")
+                        else ""
+                    ),
+                )
+                if part
+            )
+        )
+        missing = list(need.get("missingSlots") or [])
+        if missing:
+            lines.append(f"下一次最多追问一个槽位: {missing[0]}")
+        candidate_ids = recent_candidate_ids(need)
+        if candidate_ids:
+            lines.append(
+                "近期可比较候选商品Id: " + ", ".join(candidate_ids[:12])
+            )
+
     lines.append("\n## 当前状态")
     consult = state.get("consultProduct")
     if consult and consult.get("productName"):
@@ -166,7 +223,10 @@ class ContextBuilder:
             ),
             shopping_profile_service.get_profile(user_id),
         )
-        context_block = build_context_block(memory, shopping_profile)
+        effective_profile = effective_profile_from_need(
+            shopping_profile, memory.state.get("shoppingNeed")
+        )
+        context_block = build_context_block(memory, effective_profile)
 
         turns = await agent_message_service.load_turns_for_memory(user_id)
         working_turns, working_oldest_id = select_working_turns(

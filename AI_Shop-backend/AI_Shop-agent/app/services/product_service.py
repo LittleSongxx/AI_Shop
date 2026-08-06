@@ -94,7 +94,7 @@ class ProductService:
         exclude_product_id: str | None = None,
     ) -> tuple[str, str | None, str, list[dict], str]:
 
-        profile = await shopping_profile_service.get_profile(user_id)
+        profile = await shopping_profile_service.get_effective_profile(user_id)
         if shopping_profile_service.should_clarify(
             user_text,
             keyword,
@@ -230,6 +230,11 @@ class ProductService:
             if not products and source != "out_of_stock":
                 source = "constraint_miss"
         for product in products:
+            resolved_brand = shopping_profile_service.resolve_known_brand(
+                product, profile
+            )
+            if resolved_brand:
+                product["brand"] = resolved_brand
             product["_recommend_reason"] = shopping_profile_service.recommend_reason(
                 product,
                 profile,
@@ -447,9 +452,10 @@ def format_search_tool_message(
     kw_display = (normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求"
 
     if source == "clarify":
-        return (
-            "【需求澄清】为了更准确地推荐，请告诉我商品类别、预算或使用场景，"
-            "例如“3000元以内的办公笔记本”。"
+        from app.services.shopping_need_service import next_clarification_question
+
+        return "【需求澄清】" + next_clarification_question(
+            profile, user_text=keyword
         )
     if source == "constraint_miss":
         summary = shopping_profile_service.summary(profile)

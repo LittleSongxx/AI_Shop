@@ -39,6 +39,7 @@ from app.services.message_service import agent_message_service
 from app.services.pending_action_service import pending_action_service
 from app.services.redis_service import redis_service
 from app.services.response_verifier import response_verifier
+from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
 from app.utils.biz_payload import (
     build_action_confirm_payload,
@@ -427,6 +428,34 @@ async def finalize_agent_response(
 
     assistant = _strip_emojis_from_assistant(assistant)
 
+    recommendation_constraints: dict | None = None
+    recommendation_candidates: list[dict] | None = None
+    if "SEARCH_PRODUCTS" in called and is_product_cards_json(assistant_cards):
+        try:
+            parsed_candidates = json.loads(assistant_cards or "[]")
+            effective_profile = await shopping_profile_service.get_effective_profile(
+                user_id
+            )
+            recommendation_constraints = {
+                "budgetMin": effective_profile.get("budgetMin"),
+                "budgetMax": effective_profile.get("budgetMax"),
+                "excludedBrands": effective_profile.get("excludedBrands") or [],
+                "requiredBrands": (
+                    effective_profile.get("brands") or []
+                    if effective_profile.get("acceptSubstitute") is False
+                    else []
+                ),
+            }
+            recommendation_candidates = (
+                parsed_candidates if isinstance(parsed_candidates, list) else None
+            )
+        except Exception as exc:
+            logger.warning(
+                "recommendation_verifier_context_failed",
+                user_id=user_id,
+                error=type(exc).__name__,
+            )
+
     verification = response_verifier.verify(
         assistant=assistant,
         biz_type=biz_type,
@@ -434,6 +463,8 @@ async def finalize_agent_response(
         source_refs=source_refs,
         has_pending_action=resolved is not None,
         order_resolution=order_resolution,
+        recommendation_constraints=recommendation_constraints,
+        recommendation_candidates=recommendation_candidates,
         policy_evidence_required=rag_evidence_required,
     )
     RESPONSE_VERIFIER_TOTAL.labels(

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 import structlog
 
 from app.config.settings import get_settings
@@ -20,11 +18,13 @@ from app.services.judge_service import judge_service
 from app.services.message_service import agent_message_service
 from app.services.order_reference_resolver import ORDER_REFERENCE_INTENTS
 from app.services.order_selection_store import order_selection_store
+from app.services.product_comparison_service import normalize_comparison_ids
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.rate_limit_service import rate_limit_service
 from app.services.redis_service import redis_service
 from app.services.response_verifier import response_verifier
 from app.services.sensitive_word_service import sensitive_word_service
+from app.services.shopping_need_service import shopping_need_service
 from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
 from app.services.support_service import support_service
@@ -51,6 +51,9 @@ _EPISODE_FULL_INTENTS = frozenset(
         IntentKind.AFTERSALES_UNKNOWN,
     }
 )
+_SHOPPING_MEMORY_INTENTS = frozenset(
+    {IntentKind.PRODUCT_SEARCH, IntentKind.PRODUCT_CONSULT}
+)
 
 
 class AgentOrchestrator:
@@ -61,6 +64,7 @@ class AgentOrchestrator:
         message: str,
         from_product: bool = False,
         consult_product_id: str | None = None,
+        comparison_product_ids: list[str] | None = None,
         rate_limit_scope: str = "sendMessage",
     ) -> dict:
         settings = get_settings()
@@ -82,6 +86,13 @@ class AgentOrchestrator:
         if verdict.blocked:
             raise ValueError("检测到异常输入")
 
+        selected_comparison_ids: list[str] | None = None
+        if comparison_product_ids:
+            selected_comparison_ids = normalize_comparison_ids(comparison_product_ids)
+            allowed = set(await shopping_need_service.allowed_candidate_ids(user_id))
+            if any(product_id not in allowed for product_id in selected_comparison_ids):
+                raise ValueError("只能比较当前或近期推荐列表中的商品")
+
         if from_product and consult_product_id:
             await product_snapshot_service.ensure_consult_snapshot(
                 user_id, consult_product_id.strip()
@@ -96,11 +107,6 @@ class AgentOrchestrator:
             await product_snapshot_service.resolve_active_snapshot(user_id, card)
             await redis_service.set_consult_active(user_id)
 
-        await shopping_profile_service.update_profile(user_id, original_user_text)
-        # LLM enrichment runs in the background — never blocks this turn.
-        asyncio.create_task(
-            shopping_profile_service.async_enrich_profile(user_id, original_user_text)
-        )
         previous_unresolved = await agent_message_service.get_unresolved_count(user_id)
         # A2/A3：会话级意图延续 + 死循环检测的输入。一次查询同时给两处用。
         recent_intents = await agent_message_service.get_recent_intents(user_id)
@@ -156,6 +162,34 @@ class AgentOrchestrator:
             input_data={"message": original_user_text},
             output_data=decision.model_dump(mode="json"),
         )
+        if decision.intent in _SHOPPING_MEMORY_INTENTS:
+            try:
+                durable_profile = await shopping_profile_service.update_profile(
+                    user_id,
+                    original_user_text,
+                    source_message_id=int(agent_msg["messageId"]),
+                )
+                need = await shopping_need_service.capture_user_turn(
+                    user_id,
+                    int(agent_msg["messageId"]),
+                    original_user_text,
+                    durable_profile,
+                )
+                episode_service.record_step(
+                    "SHOPPING_NEED_UPDATE",
+                    run_id=run_id,
+                    node_name="api",
+                    output_data={
+                        "hasNeed": bool(need),
+                        "missingSlots": (need or {}).get("missingSlots") or [],
+                    },
+                )
+            except Exception as exc:
+                logger.warning(
+                    "shopping_memory_update_failed",
+                    message_id=agent_msg["messageId"],
+                    error=type(exc).__name__,
+                )
         try:
             await badcase_service.detect_user_correction(
                 user_id=user_id,
@@ -169,6 +203,8 @@ class AgentOrchestrator:
                 error=type(exc).__name__,
             )
         agent_msg["fromProduct"] = from_product
+        if selected_comparison_ids:
+            agent_msg["comparisonProductIds"] = selected_comparison_ids
 
         if active_support:
             await support_service.route_user_message(

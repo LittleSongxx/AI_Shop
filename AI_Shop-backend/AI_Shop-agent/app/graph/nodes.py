@@ -424,6 +424,18 @@ async def build_context_node(state: AgentGraphState) -> dict:
             )
         )
 
+    selected_comparison_ids = list(state.get("comparison_product_ids") or [])
+    if selected_comparison_ids:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "【商品比较选择】用户已在界面选择商品Id："
+                    + ", ".join(selected_comparison_ids)
+                    + "。需要比较时调用 COMPARE_PRODUCTS；不得替换或追加其他商品Id。"
+                )
+            )
+        )
+
     if card and card.get("productId") and snapshot and intent != IntentKind.PRODUCT_CONSULT:
         messages.append(
             SystemMessage(
@@ -847,6 +859,8 @@ async def tools_node(state: AgentGraphState) -> dict:
             )
             continue
         tool_args = dict(tc.get("args") or {})
+        if tc["name"] == "COMPARE_PRODUCTS" and state.get("comparison_product_ids"):
+            tool_args["productIds"] = list(state["comparison_product_ids"])
         if tc["name"] == "SEARCH_KNOWLEDGE":
             query_key = rag_retriever.query_key(str(tool_args.get("query") or ""))
             rejection = _rag_rejection_code(
@@ -1088,6 +1102,7 @@ async def post_turn_node(state: AgentGraphState) -> dict:
             message_id=message_id,
             user_text=user_text,
             assistant_text=assistant_text,
+            assistant_cards=state.get("assistant_cards"),
             tools_called=state.get("tools_called") or [],
             tool_biz=state.get("tool_biz"),
             card=card,

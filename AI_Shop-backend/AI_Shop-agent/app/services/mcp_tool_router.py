@@ -287,6 +287,8 @@ class McpToolRouter:
             return out
         if tool_name == "GET_PRODUCT_DETAIL":
             return {"userId": uid, "productId": g("productId", "product_id")}
+        if tool_name == "COMPARE_PRODUCTS":
+            return {"userId": uid, "productIds": list(g("productIds", "product_ids") or [])}
         if tool_name in ("QUERY_LOGISTICS", "QUERY_COMMENT", "PROPOSE_CONFIRM_RECEIPT"):
             return {"userId": uid, "orderId": g("orderId", "order_id")}
         if tool_name == "QUERY_REFUND_STATUS":

@@ -465,7 +465,7 @@ async def tool_search_products(
         consult,
         products,
         source,
-        profile=await shopping_profile_service.get_profile(user_id),
+        profile=await shopping_profile_service.get_effective_profile(user_id),
     )
     if not products:
         return ToolInvokeResult(content=content, biz_type=biz_type)
@@ -511,3 +511,23 @@ async def tool_get_product_detail(user_id: str, product_id: str) -> str:
 
     _ = user_id
     return await product_service.get_product_detail_text(product_id)
+
+
+async def tool_compare_products(
+    user_id: str, product_ids: list[str]
+) -> "ToolInvokeResult":
+    from app.services.product_comparison_service import (
+        ProductComparisonError,
+        product_comparison_service,
+    )
+    from app.services.tool_invoke_result import ToolInvokeResult
+
+    try:
+        return await product_comparison_service.compare(user_id, product_ids)
+    except ProductComparisonError as exc:
+        return ToolInvokeResult(
+            content=f"【商品比较失败】{exc}",
+            success=False,
+            error_code=exc.code,
+            biz_type="product_comparison",
+        )

@@ -100,6 +100,7 @@ _REQUIRED_COLUMNS = {
     "agent_shopping_profile": {
         "user_id",
         "profile_json",
+        "revision",
         "updated_at",
     },
     "agent_pending_action": {

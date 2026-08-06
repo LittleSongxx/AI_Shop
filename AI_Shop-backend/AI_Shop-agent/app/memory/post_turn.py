@@ -14,6 +14,7 @@ from app.memory.models import SessionMemory
 from app.memory.session_memory_service import session_memory_service
 from app.services.prompt_service import load_agent_prompt
 from app.services.redis_service import redis_service
+from app.services.shopping_need_service import shopping_need_service
 
 logger = structlog.get_logger()
 
@@ -27,6 +28,7 @@ class PostTurnService:
         message_id: int,
         user_text: str,
         assistant_text: str,
+        assistant_cards: str | None,
         tools_called: list[str],
         tool_biz: dict | None,
         card: dict | None,
@@ -42,6 +44,12 @@ class PostTurnService:
         self._sync_tool_results(memory, tools_called, tool_biz, assistant_text)
 
         await session_memory_service.save(memory, redis_service.client)
+
+        candidates = self._displayed_product_candidates(assistant_cards)
+        if "SEARCH_PRODUCTS" in tools_called and candidates:
+            await shopping_need_service.record_candidates(
+                user_id, message_id, candidates
+            )
 
         system_prompt = await load_agent_prompt()
 
@@ -148,5 +156,21 @@ class PostTurnService:
             last["searchedProductNames"] = []
         if "QUERY_ORDERS" in tools_called and not last.get("queriedOrders"):
             last["queriedOrders"] = []
+
+    @staticmethod
+    def _displayed_product_candidates(raw: str | None) -> list[dict]:
+        if not raw or not raw.lstrip().startswith("["):
+            return []
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        return [
+            item
+            for item in parsed
+            if isinstance(item, dict) and item.get("productId")
+        ][:12]
 
 post_turn_service = PostTurnService()

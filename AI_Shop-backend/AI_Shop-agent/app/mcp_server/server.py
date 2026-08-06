@@ -85,6 +85,14 @@ async def get_product_detail(userId: str, productId: str) -> str:
     return _text(await tools.tool_get_product_detail(userId, productId))
 
 
+@mcp.tool(
+    name="COMPARE_PRODUCTS",
+    description="[READ] 使用实时商品快照比较 2 到 4 个当前或近期推荐候选",
+)
+async def compare_products(userId: str, productIds: list[str]) -> str:
+    return _text(await tools.tool_compare_products(userId, productIds))
+
+
 @mcp.tool(name="QUERY_LOGISTICS", description="[READ] 查询订单物流轨迹（不是查订单列表）")
 async def query_logistics(userId: str, orderId: str) -> str:
     return _text(await tools.query_logistics(userId, orderId))

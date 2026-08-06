@@ -176,6 +176,7 @@ def _has_sources(source_refs: list[dict] | dict | None) -> bool:
 
 
 def _recommendations_satisfy(constraints: dict, candidates: list[dict]) -> bool:
+    budget_min = constraints.get("budgetMin")
     budget_max = constraints.get("budgetMax")
     required = {
         str(item).strip().lower()
@@ -187,14 +188,29 @@ def _recommendations_satisfy(constraints: dict, candidates: list[dict]) -> bool:
         for item in constraints.get("excludedBrands") or []
         if str(item).strip()
     }
+    required_brands = {
+        str(item).strip().lower()
+        for item in constraints.get("requiredBrands") or []
+        if str(item).strip()
+    }
     for candidate in candidates:
         try:
-            if budget_max is not None and float(candidate.get("price")) > float(budget_max):
+            minimum = candidate.get("minPrice")
+            if minimum is None:
+                minimum = candidate.get("price")
+            maximum = candidate.get("maxPrice")
+            if maximum is None:
+                maximum = minimum
+            if budget_max is not None and float(minimum) > float(budget_max):
+                return False
+            if budget_min is not None and float(maximum) < float(budget_min):
                 return False
         except (TypeError, ValueError):
             return False
         brand = str(candidate.get("brand") or "").strip().lower()
         if brand and brand in excluded:
+            return False
+        if required_brands and brand not in required_brands:
             return False
         searchable = " ".join(
             str(candidate.get(key) or "").lower()

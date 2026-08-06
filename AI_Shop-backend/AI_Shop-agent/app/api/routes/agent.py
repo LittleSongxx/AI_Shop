@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request
 
 from app.api.deps import TokenUserInfo, get_request_token, require_login
@@ -6,6 +8,10 @@ from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
 from app.exceptions import PendingActionExpired
 from app.harness.metrics.runtime_sensors import ORDER_SELECTION_TOTAL
 from app.models.response import ResponseVO, error, success
+from app.models.shopping_profile import (
+    ShoppingProfileClearRequest,
+    ShoppingProfileUpdateRequest,
+)
 from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
@@ -22,6 +28,10 @@ from app.services.recommendation_attribution_service import (
     recommendation_attribution_service,
 )
 from app.services.redis_service import redis_service
+from app.services.shopping_profile_service import (
+    ProfileRevisionConflict,
+    shopping_profile_service,
+)
 from app.services.support_service import support_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -39,6 +49,19 @@ def _form_bool(value: str | bool | None) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).lower() in ("true", "1", "yes")
+
+
+def _form_string_list(value: str | None) -> list[str] | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = [item.strip() for item in raw.split(",")]
+    if not isinstance(parsed, list):
+        raise ValueError("comparisonProductIds 必须是数组")
+    return [str(item).strip() for item in parsed if str(item or "").strip()]
 
 def _require_internal_token(x_internal_token: str | None = Header(None, alias="X-Internal-Token")) -> str:
 
@@ -80,6 +103,7 @@ async def send_message(
     message: str = Form(...),
     fromProduct: str | None = Form(None),
     consultProductId: str | None = Form(None),
+    comparisonProductIds: str | None = Form(None),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
     try:
@@ -91,6 +115,7 @@ async def send_message(
                 message,
                 _form_bool(fromProduct),
                 consultProductId,
+                _form_string_list(comparisonProductIds),
             )
         return success(data)
     except PendingActionExpired as e:
@@ -199,6 +224,55 @@ async def get_product_consult_context(
 ) -> ResponseVO:
     ctx = await agent_orchestrator.get_consult_context(user.user_id)
     return success(ctx)
+
+
+@router.get("/shoppingProfile")
+async def get_shopping_profile(
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    return success(await shopping_profile_service.get_profile(user.user_id))
+
+
+@router.post("/shoppingProfile/update")
+async def update_shopping_profile(
+    payload: ShoppingProfileUpdateRequest,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        updated = await shopping_profile_service.manual_update(
+            user.user_id,
+            payload.profile.model_dump(by_alias=True, exclude_unset=True),
+            payload.expectedRevision,
+        )
+        return success(updated)
+    except ProfileRevisionConflict as exc:
+        return ResponseVO(
+            status="error",
+            code=409,
+            info="购物偏好已更新，请基于当前版本重试",
+            data=exc.current,
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/shoppingProfile/clear")
+async def clear_shopping_profile(
+    payload: ShoppingProfileClearRequest,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        updated = await shopping_profile_service.clear_profile(
+            user.user_id, payload.expectedRevision
+        )
+        return success(updated)
+    except ProfileRevisionConflict as exc:
+        return ResponseVO(
+            status="error",
+            code=409,
+            info="购物偏好已更新，请基于当前版本重试",
+            data=exc.current,
+        )
 
 
 @router.post("/requestHuman")

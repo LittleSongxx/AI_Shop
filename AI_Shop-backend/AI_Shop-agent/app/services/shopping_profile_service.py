@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
 
 from app.constants import CLARIFY_MAX_TEXT_LENGTH, PRODUCT_STATUS_ON_SALE
-from app.db.pool import acquire
+from app.db.pool import acquire, transaction
 from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.redis_service import redis_service
 
@@ -95,10 +97,56 @@ _ACCEPT_SUBSTITUTE_HINTS = (
 )
 _REJECT_SUBSTITUTE_HINTS = ("不接受替代", "不要替代", "只要这个品牌", "必须是这个品牌", "只考虑这个品牌")
 
+_PROFILE_FIELDS = (
+    "category",
+    "budgetMin",
+    "budgetMax",
+    "brands",
+    "excludedBrands",
+    "scenarios",
+    "features",
+    "acceptSubstitute",
+)
+_SHORT_LIVED_FIELDS = frozenset(
+    {"category", "budgetMin", "budgetMax", "acceptSubstitute"}
+)
+_LIST_FIELDS = frozenset(
+    {"brands", "excludedBrands", "scenarios", "features"}
+)
+_CHAT_TTL_DAYS = {field: (30 if field in _SHORT_LIVED_FIELDS else 90) for field in _PROFILE_FIELDS}
+_MANUAL_TTL_DAYS = 180
+
+
+class ProfileRevisionConflict(Exception):
+    def __init__(self, current: dict[str, Any]):
+        super().__init__("购物偏好已被其他请求更新")
+        self.current = current
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _iso(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_time(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
 
 def empty_profile() -> dict[str, Any]:
     return {
-        "version": 1,
+        "version": 2,
+        "revision": 0,
         "category": None,
         "budgetMin": None,
         "budgetMax": None,
@@ -107,7 +155,60 @@ def empty_profile() -> dict[str, Any]:
         "scenarios": [],
         "features": [],
         "acceptSubstitute": None,
+        "fieldMeta": {},
     }
+
+
+def _field_has_value(profile: dict[str, Any], field: str) -> bool:
+    value = profile.get(field)
+    return bool(value) if field in _LIST_FIELDS else value is not None
+
+
+def prune_expired_profile(
+    profile: dict[str, Any] | None, *, now: datetime | None = None
+) -> dict[str, Any]:
+    normalized = merge_profiles(profile, empty_profile())
+    metadata = dict(normalized.get("fieldMeta") or {})
+    current = now or _utc_now()
+    for field in _PROFILE_FIELDS:
+        field_meta = metadata.get(field)
+        if not isinstance(field_meta, dict):
+            continue
+        expires_at = _parse_time(field_meta.get("expiresAt"))
+        if expires_at is None or expires_at > current:
+            continue
+        normalized[field] = [] if field in _LIST_FIELDS else None
+        metadata.pop(field, None)
+    normalized["fieldMeta"] = metadata
+    return normalized
+
+
+def _stamp_fields(
+    profile: dict[str, Any],
+    incoming: dict[str, Any],
+    *,
+    source: str,
+    source_message_id: int | None,
+    ttl_days: int | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    result = deepcopy(profile)
+    metadata = dict(result.get("fieldMeta") or {})
+    current = now or _utc_now()
+    for field in _PROFILE_FIELDS:
+        if not _field_has_value(incoming, field):
+            continue
+        days = ttl_days or _CHAT_TTL_DAYS[field]
+        field_meta: dict[str, Any] = {
+            "source": source,
+            "updatedAt": _iso(current),
+            "expiresAt": _iso(current + timedelta(days=days)),
+        }
+        if source_message_id is not None:
+            field_meta["sourceMessageId"] = source_message_id
+        metadata[field] = field_meta
+    result["fieldMeta"] = metadata
+    return result
 
 
 def _amount(value: str, unit: str | None) -> float:
@@ -244,7 +345,12 @@ def merge_profiles(current: dict[str, Any] | None, incoming: dict[str, Any]) -> 
     result = empty_profile()
     if isinstance(current, dict):
         result.update({key: current.get(key) for key in result if key in current})
-    result["version"] = 1
+    result["version"] = 2
+    try:
+        result["revision"] = max(0, int(result.get("revision") or 0))
+    except (TypeError, ValueError):
+        result["revision"] = 0
+    result["fieldMeta"] = dict(result.get("fieldMeta") or {})
     for key in ("scenarios", "features"):
         result[key] = _merge_unique(result.get(key) or [], incoming.get(key) or [])
     result["brands"] = list(result.get("brands") or [])
@@ -267,6 +373,9 @@ def merge_profiles(current: dict[str, Any] | None, incoming: dict[str, Any]) -> 
         result["budgetMax"] = incoming["budgetMax"]
     if incoming.get("acceptSubstitute") is not None:
         result["acceptSubstitute"] = incoming["acceptSubstitute"]
+    incoming_meta = incoming.get("fieldMeta")
+    if isinstance(incoming_meta, dict):
+        result["fieldMeta"].update(incoming_meta)
     return result
 
 
@@ -284,68 +393,108 @@ class ShoppingProfileService:
         try:
             cached = await redis_service.get_shopping_profile(user_id)
             if cached:
-                return merge_profiles(cached, empty_profile())
+                return prune_expired_profile(cached)
         except Exception as exc:
             logger.warning("shopping_profile_redis_read_failed", user_id=user_id, error=str(exc))
 
         stored = await self._load_from_db(user_id)
         if not stored:
             return empty_profile()
-        merged = merge_profiles(stored, empty_profile())
+        merged = prune_expired_profile(stored)
         await self._save_redis(user_id, merged)
         return merged
 
-    async def update_profile(self, user_id: str, text: str | None) -> dict[str, Any]:
+    async def get_effective_profile(self, user_id: str) -> dict[str, Any]:
+        durable = await self.get_profile(user_id)
+        try:
+            from app.services.shopping_need_service import (
+                effective_profile_from_need,
+                shopping_need_service,
+            )
+
+            return effective_profile_from_need(
+                durable, await shopping_need_service.load(user_id)
+            )
+        except Exception as exc:
+            logger.warning(
+                "shopping_need_read_failed",
+                user_id=user_id,
+                error=type(exc).__name__,
+            )
+            return durable
+
+    async def update_profile(
+        self,
+        user_id: str,
+        text: str | None,
+        *,
+        source_message_id: int | None = None,
+    ) -> dict[str, Any]:
         incoming = extract_profile(text)
         if not user_id or not _has_signal(incoming):
             return await self.get_profile(user_id)
         current = await self.get_profile(user_id)
-        merged = merge_profiles(current, incoming)
-        # Neither store may break an ordinary chat turn, so both writes are
-        # best-effort and the merged value is returned regardless.
-        await self._save_redis(user_id, merged)
-        await self._save_db(user_id, merged)
-        return merged
+        for _attempt in range(3):
+            base = deepcopy(current)
+            current_category = str(base.get("category") or "")
+            incoming_category = str(incoming.get("category") or "")
+            if (
+                current_category
+                and incoming_category
+                and current_category != incoming_category
+            ):
+                base["budgetMin"] = None
+                base["budgetMax"] = None
+                base["scenarios"] = []
+                base["features"] = []
+                for field in ("budgetMin", "budgetMax", "scenarios", "features"):
+                    base.setdefault("fieldMeta", {}).pop(field, None)
+            incoming_min = incoming.get("budgetMin")
+            incoming_max = incoming.get("budgetMax")
+            if (
+                incoming_max is not None
+                and base.get("budgetMin") is not None
+                and float(base["budgetMin"]) > float(incoming_max)
+            ):
+                base["budgetMin"] = None
+                base.setdefault("fieldMeta", {}).pop("budgetMin", None)
+            if (
+                incoming_min is not None
+                and base.get("budgetMax") is not None
+                and float(base["budgetMax"]) < float(incoming_min)
+            ):
+                base["budgetMax"] = None
+                base.setdefault("fieldMeta", {}).pop("budgetMax", None)
+            merged = merge_profiles(base, incoming)
+            merged = _stamp_fields(
+                merged,
+                incoming,
+                source="EXPLICIT_CHAT",
+                source_message_id=source_message_id,
+            )
+            merged["revision"] = int(base.get("revision") or 0) + 1
+            persisted = await self._save_db(user_id, merged)
+            if persisted is not False:
+                # ``None`` means MySQL was unavailable. The hot chat path remains
+                # fail-open by caching the explicit signal; a later read/write can
+                # reconcile it without failing this user turn.
+                await self._save_redis(user_id, merged)
+                return merged
+            latest = await self._load_from_db(user_id)
+            if latest is None:
+                await self._save_redis(user_id, merged)
+                return merged
+            current = prune_expired_profile(latest)
+
+        # Sustained contention is not allowed to delay the chat response. Return
+        # the authoritative latest row; the user's current turn still lives in
+        # ShoppingNeedState and therefore remains effective for this session.
+        await self._save_redis(user_id, current)
+        return current
 
     async def async_enrich_profile(self, user_id: str, text: str | None) -> None:
-        """Background LLM-based profile enrichment.
-
-        Intended to be launched via ``asyncio.create_task()`` — never awaited
-        directly on the hot path.  Fires only when the text is long enough to
-        carry signals that regex reliably misses (complex natural language,
-        contextual hints, negations embedded in sentences).
-
-        On success, the LLM result is merged on top of the current profile
-        (regex already ran; LLM fills the gaps it could not capture) and
-        persisted to both Redis and MySQL.  Any failure is silent so a bad LLM
-        call can never disrupt the main conversation.
-        """
-        if not user_id or not text:
-            return
-        stripped = text.strip()
-        # Regex handles short, keyword-style inputs well.  Only spend an LLM
-        # call on texts that are long enough to contain sentence-level context.
-        if len(stripped) < 15:
-            return
-        try:
-            enriched = await self._llm_extract_profile(stripped)
-            if not enriched or not _has_signal(enriched):
-                return
-            current = await self.get_profile(user_id)
-            # LLM result is the "incoming" layer — it may override regex fields
-            # only when it carries explicit signal (merge_profiles respects None).
-            merged = merge_profiles(current, enriched)
-            await self._save_redis(user_id, merged)
-            await self._save_db(user_id, merged)
-            logger.info(
-                "profile_llm_enriched",
-                user_id=user_id,
-                category=enriched.get("category"),
-                budget_max=enriched.get("budgetMax"),
-                brands=enriched.get("brands"),
-            )
-        except Exception as exc:
-            logger.warning("profile_llm_enrich_failed", user_id=user_id, error=str(exc))
+        """Retained for compatibility; model inference never mutates long-term memory."""
+        _ = (user_id, text)
 
     async def _llm_extract_profile(self, text: str) -> dict[str, Any] | None:
         """Call the LLM to extract a structured shopping profile from natural language.
@@ -419,25 +568,41 @@ class ShoppingProfileService:
         except Exception as exc:
             logger.warning("shopping_profile_redis_write_failed", user_id=user_id, error=str(exc))
 
-    async def _save_db(self, user_id: str, profile: dict[str, Any]) -> None:
+    async def _save_db(
+        self, user_id: str, profile: dict[str, Any]
+    ) -> bool | None:
         try:
             async with acquire() as cur:
+                next_revision = int(profile.get("revision") or 1)
+                expected_revision = max(0, next_revision - 1)
                 await cur.execute(
-                    """INSERT INTO agent_shopping_profile (user_id, profile_json, updated_at)
-                       VALUES (%s, %s, NOW())
+                    """INSERT INTO agent_shopping_profile
+                           (user_id, profile_json, revision, updated_at)
+                       VALUES (%s, %s, %s, NOW())
                        ON DUPLICATE KEY UPDATE
-                         profile_json=VALUES(profile_json),
-                         updated_at=VALUES(updated_at)""",
-                    (user_id, json.dumps(profile, ensure_ascii=False)),
+                         profile_json=IF(revision=%s, VALUES(profile_json), profile_json),
+                         updated_at=IF(revision=%s, VALUES(updated_at), updated_at),
+                         revision=IF(revision=%s, VALUES(revision), revision)""",
+                    (
+                        user_id,
+                        json.dumps(profile, ensure_ascii=False),
+                        next_revision,
+                        expected_revision,
+                        expected_revision,
+                        expected_revision,
+                    ),
                 )
+                return bool(cur.rowcount)
         except Exception as exc:
             logger.warning("shopping_profile_db_write_failed", user_id=user_id, error=str(exc))
+            return None
 
     async def _load_from_db(self, user_id: str) -> dict[str, Any] | None:
         try:
             async with acquire() as cur:
                 await cur.execute(
-                    "SELECT profile_json FROM agent_shopping_profile WHERE user_id=%s",
+                    "SELECT profile_json, revision "
+                    "FROM agent_shopping_profile WHERE user_id=%s",
                     (user_id,),
                 )
                 row = await cur.fetchone()
@@ -453,7 +618,198 @@ class ShoppingProfileService:
             except json.JSONDecodeError:
                 logger.warning("shopping_profile_db_corrupt", user_id=user_id)
                 return None
-        return stored if isinstance(stored, dict) else None
+        if not isinstance(stored, dict):
+            return None
+        stored["revision"] = int(row.get("revision") or stored.get("revision") or 0)
+        return stored
+
+    async def manual_update(
+        self,
+        user_id: str,
+        updates: dict[str, Any],
+        expected_revision: int,
+    ) -> dict[str, Any]:
+        patch = self._normalize_manual_patch(updates)
+        if not patch:
+            current = await self.get_profile(user_id)
+            if int(current.get("revision") or 0) != expected_revision:
+                raise ProfileRevisionConflict(current)
+            return current
+        updated = await self._manual_write(
+            user_id,
+            expected_revision=expected_revision,
+            patch=patch,
+            clear=False,
+        )
+        await self._save_redis(user_id, updated)
+        await self._rebase_session_need(user_id, updated)
+        return updated
+
+    async def clear_profile(
+        self, user_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        updated = await self._manual_write(
+            user_id,
+            expected_revision=expected_revision,
+            patch={},
+            clear=True,
+        )
+        await self._save_redis(user_id, updated)
+        await self._rebase_session_need(user_id, updated)
+        return updated
+
+    @staticmethod
+    async def _rebase_session_need(
+        user_id: str, profile: dict[str, Any]
+    ) -> None:
+        try:
+            from app.services.shopping_need_service import shopping_need_service
+
+            await shopping_need_service.rebase_profile(user_id, profile)
+        except Exception as exc:
+            logger.warning(
+                "shopping_need_rebase_failed",
+                user_id=user_id,
+                error=type(exc).__name__,
+            )
+
+    async def _manual_write(
+        self,
+        user_id: str,
+        *,
+        expected_revision: int,
+        patch: dict[str, Any],
+        clear: bool,
+    ) -> dict[str, Any]:
+        if expected_revision < 0:
+            raise ValueError("expectedRevision 不能小于 0")
+        async with transaction() as cur:
+            await cur.execute(
+                "SELECT profile_json, revision FROM agent_shopping_profile "
+                "WHERE user_id=%s FOR UPDATE",
+                (user_id,),
+            )
+            row = await cur.fetchone()
+            current = self._profile_from_row(row)
+            current_revision = int(current.get("revision") or 0)
+            if current_revision != expected_revision:
+                raise ProfileRevisionConflict(prune_expired_profile(current))
+
+            next_revision = current_revision + 1
+            if clear:
+                updated = empty_profile()
+                updated["revision"] = next_revision
+            else:
+                updated = prune_expired_profile(current)
+                metadata = dict(updated.get("fieldMeta") or {})
+                stamp_input = empty_profile()
+                for field, value in patch.items():
+                    updated[field] = deepcopy(value)
+                    if _field_has_value(updated, field):
+                        stamp_input[field] = deepcopy(value)
+                    else:
+                        metadata.pop(field, None)
+                updated["fieldMeta"] = metadata
+                self._validate_profile_values(updated)
+                updated = _stamp_fields(
+                    updated,
+                    stamp_input,
+                    source="MANUAL",
+                    source_message_id=None,
+                    ttl_days=_MANUAL_TTL_DAYS,
+                )
+                updated["revision"] = next_revision
+
+            payload = json.dumps(updated, ensure_ascii=False)
+            if row:
+                await cur.execute(
+                    "UPDATE agent_shopping_profile "
+                    "SET profile_json=%s, revision=%s, updated_at=NOW() "
+                    "WHERE user_id=%s",
+                    (payload, next_revision, user_id),
+                )
+            else:
+                await cur.execute(
+                    "INSERT INTO agent_shopping_profile "
+                    "(user_id, profile_json, revision, updated_at) "
+                    "VALUES (%s, %s, %s, NOW())",
+                    (user_id, payload, next_revision),
+                )
+        return updated
+
+    @staticmethod
+    def _profile_from_row(row: dict | None) -> dict[str, Any]:
+        if not row:
+            return empty_profile()
+        stored = row.get("profile_json")
+        if isinstance(stored, str):
+            try:
+                stored = json.loads(stored)
+            except json.JSONDecodeError:
+                stored = {}
+        profile = merge_profiles(stored if isinstance(stored, dict) else {}, empty_profile())
+        profile["revision"] = int(row.get("revision") or profile.get("revision") or 0)
+        return profile
+
+    @staticmethod
+    def _normalize_manual_patch(updates: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(updates, dict):
+            raise ValueError("profile 必须是对象")
+        result: dict[str, Any] = {}
+        for field in _PROFILE_FIELDS:
+            if field not in updates:
+                continue
+            value = updates[field]
+            if field in _LIST_FIELDS:
+                if value is None:
+                    result[field] = []
+                    continue
+                if not isinstance(value, list):
+                    raise ValueError(f"{field} 必须是数组")
+                result[field] = [
+                    str(item).strip()
+                    for item in value
+                    if str(item or "").strip()
+                ][:10]
+            elif field in {"budgetMin", "budgetMax"}:
+                if value is None:
+                    result[field] = None
+                    continue
+                try:
+                    number = float(value)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"{field} 必须是非负数字") from exc
+                if number < 0:
+                    raise ValueError(f"{field} 必须是非负数字")
+                result[field] = number
+            elif field == "acceptSubstitute":
+                if value is not None and not isinstance(value, bool):
+                    raise ValueError("acceptSubstitute 必须是布尔值或 null")
+                result[field] = value
+            else:
+                normalized = str(value).strip()[:80] if value is not None else ""
+                result[field] = normalized or None
+        budget_min = result.get("budgetMin")
+        budget_max = result.get("budgetMax")
+        if budget_min is not None and budget_max is not None and budget_min > budget_max:
+            raise ValueError("budgetMin 不能大于 budgetMax")
+        preferred = set(result.get("brands") or [])
+        excluded = set(result.get("excludedBrands") or [])
+        if preferred.intersection(excluded):
+            raise ValueError("偏好品牌与排除品牌不能重复")
+        return result
+
+    @staticmethod
+    def _validate_profile_values(profile: dict[str, Any]) -> None:
+        budget_min = profile.get("budgetMin")
+        budget_max = profile.get("budgetMax")
+        if budget_min is not None and budget_max is not None:
+            if float(budget_min) > float(budget_max):
+                raise ValueError("budgetMin 不能大于 budgetMax")
+        preferred = set(profile.get("brands") or [])
+        excluded = set(profile.get("excludedBrands") or [])
+        if preferred.intersection(excluded):
+            raise ValueError("偏好品牌与排除品牌不能重复")
 
     @staticmethod
     def has_hard_constraints(profile: dict[str, Any] | None) -> bool:
@@ -685,6 +1041,28 @@ class ShoppingProfileService:
                 return "与你正在看的商品相似"
             return "根据搜索结果推荐"
         return "、".join(reasons)
+
+    def resolve_known_brand(
+        self, product: dict[str, Any], profile: dict[str, Any] | None
+    ) -> str | None:
+        existing = str(product.get("brand") or "").strip()
+        if existing:
+            return existing
+        product_text = self._product_text(product).lower()
+        preferred = list((profile or {}).get("brands") or [])
+        excluded = list((profile or {}).get("excludedBrands") or [])
+        for brand in [*preferred, *excluded]:
+            aliases = next(
+                (
+                    aliases
+                    for canonical, aliases in _BRAND_ALIASES
+                    if canonical == brand
+                ),
+                (brand,),
+            )
+            if _brand_in_text(product_text, aliases):
+                return str(brand)
+        return None
 
 
 shopping_profile_service = ShoppingProfileService()

@@ -90,3 +90,29 @@ def test_recommendation_hard_constraints_are_deterministic():
 
     assert result.passed is False
     assert result.action == "CLARIFY"
+
+
+def test_recommendation_budget_range_and_required_brand_are_checked():
+    result = response_verifier.verify(
+        assistant="已找到候选",
+        biz_type="product_search",
+        tools_called=["SEARCH_PRODUCTS"],
+        source_refs=None,
+        has_pending_action=False,
+        recommendation_constraints={
+            "budgetMin": 3000,
+            "budgetMax": 5000,
+            "requiredBrands": ["华为"],
+        },
+        recommendation_candidates=[
+            {
+                "productName": "其他品牌手机",
+                "brand": "其他",
+                "minPrice": 2000,
+                "maxPrice": 2500,
+            }
+        ],
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "RECOMMENDATION_CONSTRAINT_VIOLATION"

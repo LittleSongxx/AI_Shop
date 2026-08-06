@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ from app.services.shopping_profile_service import (
     empty_profile,
     extract_profile,
     merge_profiles,
+    prune_expired_profile,
 )
 
 
@@ -32,6 +34,88 @@ def test_extract_profile_parses_budget_brand_category_and_preferences():
     assert profile["excludedBrands"] == ["苹果"]
     assert profile["scenarios"] == ["办公"]
     assert profile["features"] == ["续航"]
+
+
+@pytest.mark.asyncio
+async def test_explicit_profile_fields_get_governed_ttl_and_message_source(monkeypatch):
+    service = ShoppingProfileService()
+    monkeypatch.setattr(service, "get_profile", AsyncMock(return_value=empty_profile()))
+    monkeypatch.setattr(service, "_save_redis", AsyncMock())
+    monkeypatch.setattr(service, "_save_db", AsyncMock())
+
+    profile = await service.update_profile(
+        "u1",
+        "3000以内的华为手机，办公续航",
+        source_message_id=77,
+    )
+
+    category_meta = profile["fieldMeta"]["category"]
+    brand_meta = profile["fieldMeta"]["brands"]
+    category_expiry = datetime.fromisoformat(
+        category_meta["expiresAt"].replace("Z", "+00:00")
+    )
+    brand_expiry = datetime.fromisoformat(
+        brand_meta["expiresAt"].replace("Z", "+00:00")
+    )
+    assert category_meta["source"] == "EXPLICIT_CHAT"
+    assert category_meta["sourceMessageId"] == 77
+    assert timedelta(days=59) < brand_expiry - category_expiry < timedelta(days=61)
+    assert profile["revision"] == 1
+
+
+@pytest.mark.asyncio
+async def test_automatic_profile_update_retries_on_revision_conflict(monkeypatch):
+    service = ShoppingProfileService()
+    stale = {**empty_profile(), "revision": 1, "category": "手机"}
+    latest = {
+        **empty_profile(),
+        "revision": 2,
+        "category": "手机",
+        "brands": ["华为"],
+    }
+    save_db = AsyncMock(side_effect=[False, True])
+    save_redis = AsyncMock()
+    monkeypatch.setattr(service, "get_profile", AsyncMock(return_value=stale))
+    monkeypatch.setattr(service, "_load_from_db", AsyncMock(return_value=latest))
+    monkeypatch.setattr(service, "_save_db", save_db)
+    monkeypatch.setattr(service, "_save_redis", save_redis)
+
+    updated = await service.update_profile(
+        "u1", "预算5000元的手机", source_message_id=88
+    )
+
+    assert save_db.await_count == 2
+    assert updated["revision"] == 3
+    assert updated["brands"] == ["华为"]
+    assert updated["budgetMax"] == 5000
+    save_redis.assert_awaited_once_with("u1", updated)
+
+
+def test_expired_fields_are_removed_independently():
+    now = datetime(2026, 8, 7, tzinfo=timezone.utc)
+    profile = {
+        **empty_profile(),
+        "category": "手机",
+        "brands": ["华为"],
+        "fieldMeta": {
+            "category": {"expiresAt": (now - timedelta(seconds=1)).isoformat()},
+            "brands": {"expiresAt": (now + timedelta(days=1)).isoformat()},
+        },
+    }
+
+    pruned = prune_expired_profile(profile, now=now)
+
+    assert pruned["category"] is None
+    assert pruned["brands"] == ["华为"]
+    assert "category" not in pruned["fieldMeta"]
+
+
+def test_partial_manual_patch_is_validated_against_existing_values():
+    profile = {**empty_profile(), "budgetMin": 3000, "budgetMax": 5000}
+    profile["budgetMax"] = 2000
+
+    with pytest.raises(ValueError, match="budgetMin"):
+        ShoppingProfileService._validate_profile_values(profile)
 
 
 def test_extract_profile_supports_units_and_upper_budget():
@@ -308,26 +392,22 @@ async def test_short_text_does_not_spend_an_llm_call(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_enrichment_merges_on_top_of_the_existing_profile(monkeypatch):
-    """LLM 结果是"增量层"：它补正则拿不到的字段，不该抹掉已有约束。"""
+async def test_llm_enrichment_never_persists_inferred_preferences(monkeypatch):
+    """模型推断不等于用户明确表达，不能自动进入长期记忆。"""
     service = ShoppingProfileService()
-    current = {**empty_profile(), "budgetMax": 3000.0}
     enriched = {**empty_profile(), "category": "笔记本电脑", "scenarios": ["办公"]}
-    saved: dict = {}
 
     monkeypatch.setattr(service, "_llm_extract_profile", AsyncMock(return_value=enriched))
-    monkeypatch.setattr(service, "get_profile", AsyncMock(return_value=current))
-
-    async def capture(user_id, profile):
-        saved.update(profile)
-
-    monkeypatch.setattr(service, "_save_redis", capture)
-    monkeypatch.setattr(service, "_save_db", capture)
+    save_redis = AsyncMock()
+    save_db = AsyncMock()
+    monkeypatch.setattr(service, "_save_redis", save_redis)
+    monkeypatch.setattr(service, "_save_db", save_db)
 
     await service.async_enrich_profile("u1", "我想找一台适合日常办公用的机器，轻薄一点")
 
-    assert saved["category"] == "笔记本电脑"
-    assert saved["budgetMax"] == 3000.0, "LLM 富化把正则已经拿到的预算抹掉了"
+    service._llm_extract_profile.assert_not_awaited()
+    save_redis.assert_not_awaited()
+    save_db.assert_not_awaited()
 
 
 @pytest.mark.asyncio

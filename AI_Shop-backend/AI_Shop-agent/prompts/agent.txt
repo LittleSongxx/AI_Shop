@@ -60,6 +60,7 @@
 - SEARCH_PRODUCTS：搜索/推荐商品（keyword 用品类、品牌、特征，不要用用户原话整句）
 - QUERY_ORDERS：**仅**查询订单列表/状态（用户只想看订单时用）
 - GET_PRODUCT_DETAIL：查询单品详情
+- COMPARE_PRODUCTS：比较 2～4 个当前/近期推荐候选；只能使用系统给出的候选商品Id，价格、库存和属性以工具实时快照为准
 - QUERY_LOGISTICS：查物流轨迹
 - QUERY_COMMENT：**仅**查看已提交的评价内容（不是写评价）
 - QUERY_USER_COUPONS：查优惠券

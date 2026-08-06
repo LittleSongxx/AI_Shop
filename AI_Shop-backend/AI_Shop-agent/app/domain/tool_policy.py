@@ -69,6 +69,7 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
         # 商品检索/详情不进业务卡片：结果由 biz_payload 单独拼商品卡，不走这里的兜底。
         _policy("SEARCH_PRODUCTS", _READ),
         _policy("GET_PRODUCT_DETAIL", _READ),
+        _policy("COMPARE_PRODUCTS", _READ, "product_comparison"),
         _policy("QUERY_ORDERS", _READ, "query_order"),
         _policy("QUERY_LOGISTICS", _READ, "query_logistics"),
         _policy("QUERY_COMMENT", _READ, "query_comment"),

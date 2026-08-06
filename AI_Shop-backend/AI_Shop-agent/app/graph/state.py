@@ -17,6 +17,7 @@ class AgentGraphState(TypedDict, total=False):
     from_product: bool
     card: dict | None
     message_card: dict | None
+    comparison_product_ids: list[str]
 
     cancelled: bool
     finished: bool
@@ -68,6 +69,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "from_product": bool(agent_msg.get("fromProduct")),
         "card": card,
         "message_card": card,
+        "comparison_product_ids": list(agent_msg.get("comparisonProductIds") or []),
         "cancelled": False,
         "finished": False,
         "route": "agent_loop",

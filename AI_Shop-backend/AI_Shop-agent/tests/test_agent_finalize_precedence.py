@@ -74,3 +74,37 @@ async def test_order_selection_is_persisted_as_the_terminal_payload():
 
     assert complete.await_args.args[1] == selection
     assert complete.await_args.args[2] == "order_selection"
+
+
+@pytest.mark.asyncio
+async def test_product_comparison_card_is_the_terminal_payload():
+    comparison = json.dumps(
+        {
+            "type": "PRODUCT_COMPARISON",
+            "snapshotType": "REAL_TIME",
+            "products": [
+                {"productId": "p1", "productName": "A", "minPrice": 100},
+                {"productId": "p2", "productName": "B", "minPrice": 120},
+            ],
+        },
+        ensure_ascii=False,
+    )
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+    ):
+        await finalize_agent_response(
+            {"userId": "u1", "messageId": 31, "userMessage": "比较这两个"},
+            ["已经比较好了"],
+            [],
+            assistant_cards=comparison,
+            biz_type="product_comparison",
+            tools_called=["COMPARE_PRODUCTS"],
+            user_text="比较这两个",
+        )
+
+    assert complete.await_args.args[1] == comparison
+    assert complete.await_args.args[2] == "product_comparison"

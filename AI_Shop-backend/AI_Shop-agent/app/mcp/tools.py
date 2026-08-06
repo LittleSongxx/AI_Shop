@@ -22,6 +22,15 @@ class ProductDetailArgs(BaseModel):
     productId: str = Field(description="商品Id")
 
 
+class CompareProductsArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    productIds: list[str] = Field(
+        min_length=2,
+        max_length=4,
+        description="当前或近期推荐候选中的 2 到 4 个商品Id",
+    )
+
+
 class UserIdOrderArgs(BaseModel):
     userId: str = Field(description="用户Id")
     orderId: str = Field(description="订单Id")
@@ -94,6 +103,14 @@ def build_mcp_tools() -> list[StructuredTool]:
             name="GET_PRODUCT_DETAIL",
             description="[READ] 查询商品详情",
             args_schema=ProductDetailArgs,
+        ),
+        StructuredTool.from_function(
+            coroutine=lambda userId, productIds: _call(
+                "COMPARE_PRODUCTS", userId=userId, productIds=productIds
+            ),
+            name="COMPARE_PRODUCTS",
+            description="[READ] 使用实时价格、库存和属性比较 2 到 4 个近期推荐候选",
+            args_schema=CompareProductsArgs,
         ),
         StructuredTool.from_function(
             coroutine=lambda userId, orderId: _call(

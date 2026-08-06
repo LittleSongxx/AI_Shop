@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import uuid
+from datetime import datetime, timezone
 
 import pymysql
 import pytest
@@ -19,6 +20,10 @@ from app.services.order_selection_store import (
     order_selection_store,
 )
 from app.services.recommendation_event_store import recommendation_event_store
+from app.services.shopping_profile_service import (
+    ProfileRevisionConflict,
+    ShoppingProfileService,
+)
 
 pytestmark = pytest.mark.mysql
 
@@ -217,6 +222,7 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
             cursor.execute("ALTER TABLE agent_run DROP COLUMN capture_level")
             cursor.execute("ALTER TABLE agent_run DROP COLUMN scenario")
             cursor.execute("ALTER TABLE agent_step DROP COLUMN output_json")
+            cursor.execute("ALTER TABLE agent_shopping_profile DROP COLUMN revision")
             cursor.execute(
                 "ALTER TABLE agent_message MODIFY COLUMN user_message varchar(500) NULL"
             )
@@ -414,6 +420,55 @@ async def test_recommendation_event_facts_are_deduplicated_and_validated():
                 "GROUP BY event_type ORDER BY event_type"
             )
             assert cursor.fetchall() == (("CLICK", 1), ("IMPRESSION", 2))
+    finally:
+        await close_pool()
+        get_settings.cache_clear()
+        _drop_database(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("RUN_AGENT_MIGRATION_TESTS") != "1",
+    reason="requires a real MySQL 8 server",
+)
+async def test_shopping_profile_manual_updates_use_revision_cas():
+    database = f"agent_migration_profile_{uuid.uuid4().hex[:10]}"
+    service = ShoppingProfileService()
+    try:
+        _create_database(database)
+        _migrate(database)
+        await init_pool()
+
+        first = await service.manual_update(
+            "u-profile",
+            {"category": "手机", "brands": ["华为"]},
+            expected_revision=0,
+        )
+        assert first["revision"] == 1
+        assert first["fieldMeta"]["category"]["source"] == "MANUAL"
+        manual_expiry = datetime.fromisoformat(
+            first["fieldMeta"]["category"]["expiresAt"].replace("Z", "+00:00")
+        )
+        remaining_days = (manual_expiry - datetime.now(timezone.utc)).days
+        assert 179 <= remaining_days <= 180
+
+        with pytest.raises(ProfileRevisionConflict) as conflict:
+            await service.manual_update(
+                "u-profile", {"brands": ["苹果"]}, expected_revision=0
+            )
+        assert conflict.value.current["revision"] == 1
+        assert conflict.value.current["brands"] == ["华为"]
+
+        second = await service.manual_update(
+            "u-profile", {"budgetMax": 5000}, expected_revision=1
+        )
+        assert second["revision"] == 2
+        assert second["budgetMax"] == 5000
+
+        cleared = await service.clear_profile("u-profile", expected_revision=2)
+        assert cleared["revision"] == 3
+        assert cleared["category"] is None
+        assert cleared["brands"] == []
     finally:
         await close_pool()
         get_settings.cache_clear()
