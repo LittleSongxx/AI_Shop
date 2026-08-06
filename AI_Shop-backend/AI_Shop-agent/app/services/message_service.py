@@ -527,6 +527,7 @@ def _should_include_assistant_in_history(assistant_message: str | None) -> bool:
             if isinstance(obj, dict) and obj.get("type") in (
                 "ACTION_CONFIRM",
                 "PRODUCT_SEARCH_RESULT",
+                "ORDER_SELECTION",
             ):
                 return False
         except json.JSONDecodeError:

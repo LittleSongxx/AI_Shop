@@ -26,6 +26,13 @@
       <template v-else-if="actionConfirmCard">
         <AgentConfirmCard :card="actionConfirmCard" @updated="onActionCardUpdated" />
       </template>
+      <template v-else-if="orderSelectionCard">
+        <AgentOrderSelectionCard
+          :card="orderSelectionCard"
+          :disabled="isStreaming"
+          @select="(payload) => emit('select-order', payload)"
+        />
+      </template>
       <template v-else-if="isOrderSearchEmpty">
         <p class="biz-title">订单查询</p>
         <p class="empty-hint">未查询到相关订单，请核对订单号或稍后再试。</p>
@@ -42,6 +49,24 @@
       <template v-else-if="displayText">
         <MarkdownContent :content="displayText" :agent-rich="agentRich" />
       </template>
+      <details v-if="sourceRefs.length" class="source-panel">
+        <summary>参考来源（{{ sourceRefs.length }}）</summary>
+        <ol>
+          <li v-for="(sourceRef, index) in sourceRefs" :key="sourceKey(sourceRef, index)">
+            <a
+              v-if="sourceHref(sourceRef)"
+              :href="sourceHref(sourceRef) || undefined"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ sourceLabel(sourceRef, index) }}
+            </a>
+            <span v-else>{{ sourceLabel(sourceRef, index) }}</span>
+            <p v-if="sourceRef.snippet">{{ sourceRef.snippet }}</p>
+            <small v-if="sourceMeta(sourceRef)">{{ sourceMeta(sourceRef) }}</small>
+          </li>
+        </ol>
+      </details>
       <p v-if="messageStatus === 3 && hasRenderableContent" class="interrupt-tip">回复已中断，以上为已生成内容</p>
       </template>
       <div v-if="canFeedback" class="feedback-row" aria-label="回复反馈">
@@ -73,18 +98,53 @@ import MarkdownContent from '@/components/common/MarkdownContent.vue';
 import AgentProductList from '@/components/agent/AgentProductList.vue';
 import AgentOrderList from '@/components/agent/AgentOrderList.vue';
 import AgentConfirmCard, { type ActionConfirmCardData } from '@/components/agent/AgentConfirmCard.vue';
+import AgentOrderSelectionCard, {
+  type OrderSelectionCardData
+} from '@/components/agent/AgentOrderSelectionCard.vue';
 import { agentApi } from '@/api/modules';
 import { cleanAgentActionStreamText, containsAgentTable, stripEmbeddedProductJson } from '@/utils/agentMessageRender';
 import { toast } from '@/utils/toast';
+import { normalizeSourceRefs, type AgentSourceRef } from '@/utils/agentHistory';
 
 const props = defineProps<{
   data: Record<string, any>;
   waiting?: boolean;
 }>();
 
+const emit = defineEmits<{
+  'select-order': [payload: unknown];
+}>();
+
 const messageStatus = computed(() => Number(props.data.status ?? 2));
 
 const isStreaming = computed(() => messageStatus.value === 1);
+
+const sourceRefs = computed(() => normalizeSourceRefs(props.data.sourceRefs));
+
+const sourceLabel = (sourceRef: AgentSourceRef, index: number) => {
+  const documentPath = [sourceRef.title, sourceRef.heading]
+    .map((value) => String(value || '').trim())
+    .filter((value, position, values) => value && values.indexOf(value) === position);
+  if (documentPath.length) return documentPath.join(' · ');
+  return sourceRef.question || sourceRef.source || `来源 ${index + 1}`;
+};
+
+const sourceHref = (sourceRef: AgentSourceRef) => {
+  const url = String(sourceRef.url || '').trim();
+  return /^https?:\/\//i.test(url) ? url : null;
+};
+
+const sourceMeta = (sourceRef: AgentSourceRef) => {
+  const values = [
+    sourceRef.source,
+    sourceRef.version != null ? `版本 ${sourceRef.version}` : '',
+    sourceRef.retrieval
+  ].filter(Boolean);
+  return [...new Set(values)].join(' · ');
+};
+
+const sourceKey = (sourceRef: AgentSourceRef, index: number) =>
+  sourceRef.chunkId || `${sourceRef.type || 'source'}:${sourceRef.questionId || sourceRef.documentId || index}`;
 
 const parseJsonList = (raw?: string | null) => {
   if (!raw || typeof raw !== 'string') return null;
@@ -133,6 +193,17 @@ const parseJsonObject = (raw?: string | null) => {
 };
 
 const actionConfirmCard = ref<ActionConfirmCardData | null>(null);
+
+const orderSelectionCard = computed<OrderSelectionCardData | null>(() => {
+  if (isStreaming.value) return null;
+  const parsed = parseJsonObject(props.data.assistantMessage);
+  if (
+    parsed?.type !== 'ORDER_SELECTION'
+    || !parsed.selectionId
+    || !Array.isArray(parsed.candidates)
+  ) return null;
+  return parsed as unknown as OrderSelectionCardData;
+});
 
 const syncActionConfirmCard = () => {
   if (isStreaming.value) {
@@ -229,10 +300,12 @@ const streamText = computed(() => cleanAgentActionStreamText(props.data.assistan
 const displayText = computed(() => {
   if (productList.value?.length || orderList.value?.length) return '';
   if (actionConfirmCard.value) return '';
+  if (orderSelectionCard.value) return '';
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return '';
   const parsed = parseJsonObject(props.data.assistantMessage);
   if (parsed?.type === 'ACTION_CONFIRM') return '';
   if (parsed?.type === 'PRODUCT_SEARCH_RESULT') return '';
+  if (parsed?.type === 'ORDER_SELECTION') return '';
   let text = (props.data.assistantMessage || '').trim();
   if (text === '[]') return '';
   // Hide bare product-id JSON arrays the model sometimes dumps.
@@ -261,6 +334,7 @@ const showAi = computed(() => {
   if (messageStatus.value === 3) return hasRenderableContent.value;
   if (productList.value?.length || orderList.value?.length) return true;
   if (actionConfirmCard.value) return true;
+  if (orderSelectionCard.value) return true;
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return true;
   if (displayText.value) return true;
   return false;
@@ -271,9 +345,11 @@ const hasRenderableContent = computed(
     !!(productList.value?.length ||
       orderList.value?.length ||
       actionConfirmCard.value ||
+      orderSelectionCard.value ||
       isProductSearchEmpty.value ||
       isOrderSearchEmpty.value ||
       displayText.value ||
+      sourceRefs.value.length ||
       props.waiting ||
       (isStreaming.value && streamText.value))
 );
@@ -284,9 +360,11 @@ const isWideBubble = computed(
       productList.value?.length ||
       orderList.value?.length ||
       actionConfirmCard.value ||
+      orderSelectionCard.value ||
       isProductSearchEmpty.value ||
       isOrderSearchEmpty.value ||
       agentRich.value
+      || sourceRefs.value.length
     )
 );
 
@@ -402,6 +480,42 @@ const submitFeedback = async (rating: 1 | -1) => {
 
 .product-intro {
   margin: 0 0 8px;
+}
+
+.source-panel {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid $color-border-gray;
+  color: $color-text-muted;
+  font-size: 12px;
+
+  summary {
+    width: fit-content;
+    cursor: pointer;
+    color: $color-text-body;
+  }
+
+  ol {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+
+  li + li {
+    margin-top: 8px;
+  }
+
+  a {
+    color: $color-primary;
+  }
+
+  p {
+    margin: 3px 0;
+    line-height: 1.45;
+  }
+
+  small {
+    color: $color-text-muted;
+  }
 }
 
 .stream-text {

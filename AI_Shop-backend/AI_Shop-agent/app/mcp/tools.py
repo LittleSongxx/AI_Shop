@@ -32,6 +32,12 @@ class UserIdOrderItemArgs(BaseModel):
     orderItemId: str = Field(description="订单项Id")
 
 
+class RefundStatusArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    orderId: str | None = Field(None, description="订单Id")
+    orderItemId: str | None = Field(None, description="订单项Id")
+
+
 class ReviewArgs(BaseModel):
     userId: str
     orderId: str
@@ -78,7 +84,7 @@ def build_mcp_tools() -> list[StructuredTool]:
                 "QUERY_ORDERS", userId=userId, orderId=orderId
             ),
             name="QUERY_ORDERS",
-            description="[READ] 仅查询订单列表或订单状态；用户要评价/退款/确认收货时不要用本工具",
+            description="[READ] 查询当前用户的订单列表或订单状态；自然语言目标由系统解析器先定位",
             args_schema=QueryOrdersArgs,
         ),
         StructuredTool.from_function(
@@ -106,6 +112,17 @@ def build_mcp_tools() -> list[StructuredTool]:
             args_schema=UserIdOrderArgs,
         ),
         StructuredTool.from_function(
+            coroutine=lambda userId, orderId=None, orderItemId=None: _call(
+                "QUERY_REFUND_STATUS",
+                userId=userId,
+                orderId=orderId,
+                orderItemId=orderItemId,
+            ),
+            name="QUERY_REFUND_STATUS",
+            description="[READ] 查询当前用户订单或订单项的退款进度",
+            args_schema=RefundStatusArgs,
+        ),
+        StructuredTool.from_function(
             coroutine=lambda userId, status=None: _call(
                 "QUERY_USER_COUPONS", userId=userId, status=status
             ),
@@ -131,7 +148,7 @@ def build_mcp_tools() -> list[StructuredTool]:
                 "PROPOSE_CONFIRM_RECEIPT", userId=userId, orderId=orderId
             ),
             name="PROPOSE_CONFIRM_RECEIPT",
-            description="[WRITE] 确认收货提案；用户说确认收货时直接调用，不要先 QUERY_ORDERS",
+            description="[WRITE] 为系统已验证归属和状态的订单生成确认收货提案",
             args_schema=UserIdOrderArgs,
         ),
         StructuredTool.from_function(
@@ -139,7 +156,7 @@ def build_mcp_tools() -> list[StructuredTool]:
                 "PROPOSE_REFUND", userId=userId, orderItemId=orderItemId
             ),
             name="PROPOSE_REFUND",
-            description="[WRITE] 退款提案；用户要退款时直接调用，不要先 QUERY_ORDERS",
+            description="[WRITE] 为系统已验证归属和状态的订单项生成退款提案",
             args_schema=UserIdOrderItemArgs,
         ),
         StructuredTool.from_function(

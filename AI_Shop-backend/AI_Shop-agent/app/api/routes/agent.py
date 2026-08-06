@@ -4,13 +4,21 @@ from app.api.deps import TokenUserInfo, get_request_token, require_login
 from app.config.settings import get_settings
 from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
 from app.exceptions import PendingActionExpired
+from app.harness.metrics.runtime_sensors import ORDER_SELECTION_TOTAL
 from app.models.response import ResponseVO, error, success
 from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
 from app.services.message_service import agent_message_service
+from app.services.order_selection_store import (
+    OrderSelectionConflict,
+    OrderSelectionExpired,
+)
 from app.services.pending_action_service import pending_action_service
 from app.services.rate_limit_service import rate_limit_service
+from app.services.recommendation_attribution_service import (
+    recommendation_attribution_service,
+)
 from app.services.redis_service import redis_service
 from app.services.support_service import support_service
 
@@ -89,6 +97,45 @@ async def send_message(
 
         return error(600, str(e))
 
+
+@router.post("/selectOrderCandidate")
+async def select_order_candidate(
+    selectionId: str = Form(...),
+    targetType: str = Form(...),
+    targetId: str = Form(...),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    """Continue a rendered order candidate without asking the user to type an ID."""
+    selection_id = selectionId.strip()
+    target_type = targetType.strip().upper()
+    target_id = targetId.strip()
+    if not selection_id or not target_id or target_type not in {"ORDER", "ORDER_ITEM"}:
+        return error(600, "订单候选参数无效")
+    metric_intent = "UNKNOWN"
+    try:
+        result = await agent_orchestrator.send_selected_order_candidate(
+            user.user_id,
+            selection_id,
+            target_type,
+            target_id,
+        )
+        metric_intent = str(result.get("intent") or "UNKNOWN")
+        outcome = "selected" if result.get("selectionId") else "idempotent"
+        ORDER_SELECTION_TOTAL.labels(intent=metric_intent, outcome=outcome).inc()
+        return success(result)
+    except OrderSelectionExpired as exc:
+        ORDER_SELECTION_TOTAL.labels(intent=metric_intent, outcome="expired").inc()
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except OrderSelectionConflict as exc:
+        ORDER_SELECTION_TOTAL.labels(intent=metric_intent, outcome="conflict").inc()
+        return error(409, str(exc))
+    except ValueError as exc:
+        ORDER_SELECTION_TOTAL.labels(intent=metric_intent, outcome="invalid").inc()
+        return error(600, str(exc))
+    except Exception:
+        ORDER_SELECTION_TOTAL.labels(intent=metric_intent, outcome="error").inc()
+        raise
+
 @router.post("/cancelMessage")
 async def cancel_message(
     messageId: int = Form(...),
@@ -121,7 +168,7 @@ async def report_click(
         or position > IMPRESSION_LOG_MAX_PRODUCTS
     ):
         return error(600, "点击归因参数无效")
-    attribution = await redis_service.log_attributed_click(
+    attribution = await recommendation_attribution_service.record_click(
         user.user_id,
         request_id,
         product_id,
@@ -129,7 +176,7 @@ async def report_click(
     )
     if attribution is None:
         return error(600, "点击归因无效或已过期")
-    return success(None)
+    return success(attribution)
 
 
 @router.post("/clearProductConsult")
@@ -273,6 +320,26 @@ async def admin_load_messages(
         page_no, page_size, user_id, biz_type
     )
     return success(data)
+
+
+@router.post("/admin/loadPendingActions")
+async def admin_load_pending_actions(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    """Read-only lookup for uncertain writes and manual-review records."""
+    body = await _read_admin_body(request)
+    try:
+        rows = await pending_action_service.list_for_review(
+            status=str(body.get("status") or "MANUAL_REVIEW"),
+            token=body.get("actionToken"),
+            user_id=body.get("userId"),
+            business_key=body.get("businessKey"),
+            limit=_as_int(body.get("limit"), 100) or 100,
+        )
+        return success({"items": rows, "total": len(rows)})
+    except ValueError as exc:
+        return error(600, str(exc))
 
 @router.post("/admin/getMessage")
 async def admin_get_message(

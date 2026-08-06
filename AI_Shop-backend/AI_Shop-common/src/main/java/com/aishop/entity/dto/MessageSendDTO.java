@@ -31,6 +31,8 @@ public class MessageSendDTO<T> implements Serializable {
 
     private String createTime;
 
+    private Object sourceRefs;
+
     private Integer outPutType = 0;
 
     private String userId;
@@ -129,5 +131,13 @@ public class MessageSendDTO<T> implements Serializable {
 
     public void setCreateTime(String createTime) {
         this.createTime = createTime;
+    }
+
+    public Object getSourceRefs() {
+        return sourceRefs;
+    }
+
+    public void setSourceRefs(Object sourceRefs) {
+        this.sourceRefs = sourceRefs;
     }
 }

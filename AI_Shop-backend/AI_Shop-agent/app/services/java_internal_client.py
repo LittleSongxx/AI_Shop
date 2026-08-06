@@ -120,21 +120,44 @@ class JavaInternalClient:
         )
         return normalize_keys(data) if data else None
 
+    async def get_refund_status(
+        self,
+        user_id: str,
+        *,
+        order_id: str | None = None,
+        order_item_id: str | None = None,
+    ) -> list[dict]:
+        body: dict[str, Any] = {"userId": user_id}
+        if order_id:
+            body["orderId"] = order_id
+        if order_item_id:
+            body["orderItemId"] = order_item_id
+        data = await self.post_json("/internal/order/agent/refundStatus", body)
+        return normalize_keys(data or [])
+
     async def get_agent_action_status(
         self,
         user_id: str,
         action_type: str,
         idempotency_key: str,
         params: dict,
+        *,
+        max_attempts: int | None = None,
+        reconcile_window_seconds: int | None = None,
     ) -> dict:
+        body = {
+            "userId": user_id,
+            "actionType": action_type,
+            "idempotencyKey": idempotency_key,
+            "params": params,
+        }
+        if max_attempts is not None:
+            body["maxAttempts"] = int(max_attempts)
+        if reconcile_window_seconds is not None:
+            body["reconcileWindowSeconds"] = int(reconcile_window_seconds)
         data = await self.post_json(
             "/internal/order/agent/actionStatus",
-            {
-                "userId": user_id,
-                "actionType": action_type,
-                "idempotencyKey": idempotency_key,
-                "params": params,
-            },
+            body,
         )
         return normalize_keys(data) if isinstance(data, dict) else {}
 
@@ -303,7 +326,32 @@ class JavaInternalClient:
                 raise ValueError("knowledge catalog contains an empty document id")
             if value not in active_ids:
                 active_ids.append(value)
-        return {"version": version, "active_document_ids": active_ids}
+        documents = normalized.get("documents")
+        if documents is not None and not isinstance(documents, list):
+            raise ValueError("knowledge catalog documents is invalid")
+        normalized_documents: list[dict[str, Any]] = []
+        for document in documents or []:
+            if not isinstance(document, dict):
+                raise ValueError("knowledge catalog document is invalid")
+            row = normalize_keys(document)
+            document_id = str(row.get("document_id") or "").strip()
+            source_name = str(row.get("source_name") or "").strip()
+            content_hash = str(row.get("content_hash") or "").strip().lower()
+            if not document_id or not source_name or len(content_hash) != 64:
+                raise ValueError("knowledge catalog document fields are invalid")
+            normalized_documents.append(
+                {
+                    "document_id": document_id,
+                    "source_name": source_name,
+                    "content_hash": content_hash,
+                    "version": int(row.get("version") or 0),
+                }
+            )
+        return {
+            "version": version,
+            "active_document_ids": active_ids,
+            "documents": normalized_documents,
+        }
 
     async def exact_faq(
         self,

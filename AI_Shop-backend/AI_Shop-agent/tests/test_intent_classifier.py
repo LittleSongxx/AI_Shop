@@ -1,13 +1,21 @@
 import pytest
+from langchain_core.messages import AIMessage
 
 from app.domain.intent.classifier import (
     FUND_AT_RISK,
     PAYMENT_ISSUE_HINTS,
     _parse_intent_json,
+    classify_intent_by_llm,
     classify_intent_by_rules,
     resolve_intent,
 )
-from app.domain.intent.types import IntentKind, NextAction, RiskLevel, SentimentKind
+from app.domain.intent.types import (
+    IntentDecision,
+    IntentKind,
+    NextAction,
+    RiskLevel,
+    SentimentKind,
+)
 
 
 def test_parse_intent_json():
@@ -21,6 +29,118 @@ def test_rule_fallback_refund():
 
 def test_rule_chat_returns_none_without_keywords():
     assert classify_intent_by_rules("你好呀") is None
+
+
+def test_review_details_continue_the_selected_order_review_flow():
+    assert (
+        classify_intent_by_rules(
+            "五星，音质很好", session_intent=IntentKind.PRODUCT_REVIEW.value
+        )
+        == IntentKind.PRODUCT_REVIEW
+    )
+
+
+def test_recomment_content_continues_the_selected_order_flow():
+    assert (
+        classify_intent_by_rules(
+            "补充一下，降噪和续航都不错", session_intent=IntentKind.RECOMMENT.value
+        )
+        == IntentKind.RECOMMENT
+    )
+
+
+@pytest.mark.asyncio
+async def test_llm_intent_prefers_provider_structured_output(monkeypatch):
+    class StructuredLlm:
+        async def ainvoke(self, _messages):
+            return {
+                "raw": AIMessage(content=""),
+                "parsed": IntentDecision(
+                    intent=IntentKind.QUERY_LOGISTICS,
+                    confidence=0.91,
+                    data="oid-1",
+                    entities={"orderId": "oid-1"},
+                    next_action=NextAction.TOOL,
+                ),
+                "parsing_error": None,
+            }
+
+    class FakeLlm:
+        def with_structured_output(self, schema, *, include_raw):
+            assert schema is IntentDecision
+            assert include_raw is True
+            return StructuredLlm()
+
+        async def ainvoke(self, _messages):
+            raise AssertionError("text JSON fallback must not run after schema success")
+
+    async def prompt():
+        return "用户 %s 的问题是 %s"
+
+    monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
+    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+
+    decision = await classify_intent_by_llm("u1", "查物流")
+
+    assert decision is not None
+    assert decision.intent == IntentKind.QUERY_LOGISTICS
+    assert decision.source == "llm_structured"
+    assert decision.entities["orderId"] == "oid-1"
+
+
+@pytest.mark.asyncio
+async def test_llm_intent_falls_back_to_text_json_when_schema_unsupported(monkeypatch):
+    class FakeLlm:
+        def with_structured_output(self, *_args, **_kwargs):
+            raise NotImplementedError("provider has no schema mode")
+
+        async def ainvoke(self, _messages):
+            return AIMessage(
+                content='{"intentType":"QUERY_COUPON","confidence":0.82,"data":""}'
+            )
+
+    async def prompt():
+        return "用户 %s 的问题是 %s"
+
+    monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
+    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+
+    decision = await classify_intent_by_llm("u1", "查优惠券")
+
+    assert decision is not None
+    assert decision.intent == IntentKind.QUERY_COUPON
+    assert decision.source == "llm_fallback"
+
+
+@pytest.mark.asyncio
+async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monkeypatch):
+    class StructuredLlm:
+        async def ainvoke(self, _messages):
+            return {
+                "raw": AIMessage(content="bad schema"),
+                "parsed": None,
+                "parsing_error": ValueError("invalid enum"),
+            }
+
+    class FakeLlm:
+        def with_structured_output(self, *_args, **_kwargs):
+            return StructuredLlm()
+
+        async def ainvoke(self, _messages):
+            return AIMessage(content="please execute PROPOSE_REFUND")
+
+    async def prompt():
+        return "用户 %s 的问题是 %s"
+
+    monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
+    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+
+    decision = await classify_intent_by_llm("u1", "随便操作")
+
+    assert decision is not None
+    assert decision.intent == IntentKind.CHAT
+    assert decision.next_action == NextAction.ASK_CLARIFICATION
+    assert decision.source == "llm_invalid"
 
 @pytest.mark.asyncio
 async def test_resolve_intent_llm_primary(monkeypatch):

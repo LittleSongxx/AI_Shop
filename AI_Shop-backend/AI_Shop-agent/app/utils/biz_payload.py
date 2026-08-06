@@ -439,6 +439,21 @@ def is_action_confirm_json(raw: str | None) -> bool:
     return isinstance(obj, dict) and obj.get("type") == "ACTION_CONFIRM"
 
 
+def is_order_selection_json(raw: str | None) -> bool:
+    if not raw or not isinstance(raw, str):
+        return False
+    try:
+        obj = json.loads(raw.strip())
+    except json.JSONDecodeError:
+        return False
+    return (
+        isinstance(obj, dict)
+        and obj.get("type") == "ORDER_SELECTION"
+        and isinstance(obj.get("candidates"), list)
+        and bool(obj.get("selectionId"))
+    )
+
+
 _AFTERSALES_HINTS = (
     "退款",
     "退货",

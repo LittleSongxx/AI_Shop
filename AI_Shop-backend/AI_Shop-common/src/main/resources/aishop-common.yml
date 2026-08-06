@@ -84,7 +84,7 @@ seata:
 
 # /actuator/prometheus 无鉴权，会暴露 URI 模板、SQL、线程池等内部细节。
 # 这里沿用既有做法：actuator 留在业务端口，由 Nginx / 网关不对外反代 /actuator 来隔离
-# （见 deploy/nginx.aishop.conf.example、deploy/GO_LIVE.md），Prometheus 只从内网抓。
+# （见 deploy/nginx.aishop.conf.example、deploy/上线检查清单.md），Prometheus 只从内网抓。
 # 不能改 management.server.port：spring.cloud.loadbalancer 的 health-check 探的是
 # 注册到 Nacos 的业务端口 /actuator/health，挪走会让所有实例被判定下线。
 management:

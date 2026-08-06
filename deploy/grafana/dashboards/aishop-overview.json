@@ -363,15 +363,110 @@
     {
       "type": "timeseries",
       "title": "LLM token 消耗速率",
-      "description": "仅统计模型供应商返回的真实 usage；prompt / completion 分开展示",
+      "description": "仅统计模型供应商返回的真实 usage；按 input / output、模型和 fallback 拆分",
       "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
       "gridPos": { "h": 6, "w": 24, "x": 0, "y": 60 },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (kind) (rate(agent_llm_tokens_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
-          "legendFormat": "{{kind}} tokens/s"
+          "expr": "sum by (kind, model, fallback) (rate(agent_llm_tokens_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "{{model}} / fallback={{fallback}} / {{kind}} tokens/s"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent 固定阶段延迟 p95",
+      "description": "仅包含 queue_wait / intent / rag / first_token / tool / generation / total 七个固定阶段",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 66 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(agent_stage_latency_seconds_bucket{job=~\"aishop-agent(-worker)?\"}[5m])))",
+          "legendFormat": "{{stage}} p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM 人民币成本（最近 1 小时）",
+      "description": "只计算 LLM_PRICING_CNY_PER_MILLION_JSON 中明确配置的模型价格；total 为 input + output",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 74 },
+      "fieldConfig": { "defaults": { "unit": "currencyCNY" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind, model, fallback) (increase(agent_llm_cost_cny_total{job=~\"aishop-agent(-worker)?\"}[1h]))",
+          "legendFormat": "{{model}} / fallback={{fallback}} / {{kind}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "未定价 LLM token 速率",
+      "description": "模型返回了真实 usage，但价格表没有该模型；该值大于 0 时成本面板不完整",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 74 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind, model, fallback) (rate(agent_llm_unpriced_tokens_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "{{model}} / fallback={{fallback}} / {{kind}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "意图结构化输出结果速率",
+      "description": "schema_success 为 provider schema 成功；fallback 为文本 JSON 兼容路径；invalid 会进入安全澄清意图",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 80 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(agent_intent_schema_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "订单自然语言解析结果",
+      "description": "按固定 intent / outcome 观察唯一命中、多候选、无匹配、无资格和依赖故障；不含用户或订单标签",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 86 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (intent, outcome) (rate(agent_order_reference_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "{{intent}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "订单解析延迟与候选选择",
+      "description": "解析 p95 与候选卡选择结果；selection 指标只使用 intent / outcome 低基数标签",
+      "datasource": { "type": "prometheus", "uid": "aishop-prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 86 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_order_reference_latency_seconds_bucket{job=~\"aishop-agent(-worker)?\"}[5m])))",
+          "legendFormat": "解析 p95（秒）"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (intent, outcome) (rate(agent_order_selection_total{job=~\"aishop-agent(-worker)?\"}[5m]))",
+          "legendFormat": "选择 {{intent}} / {{outcome}}"
         }
       ]
     }

@@ -1,9 +1,18 @@
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from prometheus_client import Counter, Gauge, Histogram
 
 INTENT_TOTAL = Counter(
     "agent_intent_total",
     "意图识别次数",
     ["intent", "source"],
+)
+INTENT_SCHEMA_TOTAL = Counter(
+    "agent_intent_schema_total",
+    "LLM 意图结构化输出结果",
+    ["result"],
 )
 
 RAG_SEARCH_TOTAL = Counter(
@@ -71,13 +80,64 @@ CHECKPOINT_PERSIST_FAILURES = Counter(
 LLM_TOKEN_TOTAL = Counter(
     "agent_llm_tokens_total",
     "LLM token 用量（provider usage 字段）",
-    ["kind"],
+    ["kind", "model", "fallback"],
+)
+LLM_COST_CNY = Counter(
+    "agent_llm_cost_cny",
+    "按配置单价计算的 LLM 人民币成本",
+    ["kind", "model", "fallback"],
+)
+LLM_UNPRICED_TOKEN_TOTAL = Counter(
+    "agent_llm_unpriced_tokens_total",
+    "未配置价格的 LLM token 数",
+    ["kind", "model", "fallback"],
 )
 LLM_CALL_TOTAL = Counter(
     "agent_llm_call_total",
     "LLM 调用次数（按成功/失败与 fallback 标记）",
     ["model", "fallback", "result"],
 )
+
+AGENT_STAGE_NAMES = frozenset(
+    {"queue_wait", "intent", "rag", "first_token", "tool", "generation", "total"}
+)
+AGENT_STAGE_LATENCY = Histogram(
+    "agent_stage_latency_seconds",
+    "Agent 固定低基数阶段时延",
+    ["stage"],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120],
+)
+
+ORDER_REFERENCE_TOTAL = Counter(
+    "agent_order_reference_total",
+    "自然语言订单引用解析结果",
+    ["intent", "outcome"],
+)
+ORDER_REFERENCE_LATENCY = Histogram(
+    "agent_order_reference_latency_seconds",
+    "自然语言订单引用解析延迟",
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
+)
+ORDER_SELECTION_TOTAL = Counter(
+    "agent_order_selection_total",
+    "订单候选卡选择结果",
+    ["intent", "outcome"],
+)
+
+
+def observe_agent_stage(stage: str, seconds: float) -> None:
+    if stage not in AGENT_STAGE_NAMES:
+        raise ValueError(f"unsupported agent latency stage: {stage}")
+    AGENT_STAGE_LATENCY.labels(stage=stage).observe(max(0.0, float(seconds)))
+
+
+@contextmanager
+def measure_agent_stage(stage: str) -> Iterator[None]:
+    started = time.perf_counter()
+    try:
+        yield
+    finally:
+        observe_agent_stage(stage, time.perf_counter() - started)
 
 # A5：转人工决策的可观测信号。原因分布必须可查询——
 # "为什么转人工"和"转人工率"同样重要（误转/漏转都比"少转"难发现）。

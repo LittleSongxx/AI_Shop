@@ -19,6 +19,19 @@ _STAR_RE = re.compile(
     r"(?:评[价分]|打)\s*([1-5])\s*星|([1-5])\s*星|星级\s*[：:]*\s*([1-5])|给.{0,8}([1-5])\s*分",
     re.I,
 )
+_CN_STAR_RE = re.compile(r"([一二三四五壹贰叁肆伍])\s*星")
+_CN_STAR_VALUES = {
+    "一": 1,
+    "壹": 1,
+    "二": 2,
+    "贰": 2,
+    "三": 3,
+    "叁": 3,
+    "四": 4,
+    "肆": 4,
+    "五": 5,
+    "伍": 5,
+}
 _POSITIVE_STAR_HINTS = ("好评", "很好", "不错", "可以", "满意", "推荐", "赞", "棒", "给力", "喜欢")
 _NEGATIVE_STAR_HINTS = ("差评", "很差", "太差", "失望", "糟糕", "垃圾", "坑")
 _NEUTRAL_STAR_HINTS = ("一般", "还行", "凑合", "普通")
@@ -47,13 +60,14 @@ def extract_review_star(text: str) -> int | None:
         for g in m.groups():
             if g:
                 return int(g)
+    cn_match = _CN_STAR_RE.search(t)
+    if cn_match:
+        return _CN_STAR_VALUES[cn_match.group(1)]
     if any(k in t for k in _NEGATIVE_STAR_HINTS):
         return 1
     if any(k in t for k in _NEUTRAL_STAR_HINTS):
         return 3
     if any(k in t for k in _POSITIVE_STAR_HINTS):
-        return 5
-    if "评价" in t or "打分" in t or "评星" in t:
         return 5
     return None
 
@@ -67,6 +81,7 @@ def extract_review_content(text: str, order_id: str | None) -> str | None:
     if order_id:
         cleaned = cleaned.replace(order_id, " ")
     cleaned = _STAR_RE.sub(" ", cleaned)
+    cleaned = _CN_STAR_RE.sub(" ", cleaned)
 
     sentiment = ""
     for k in _POSITIVE_STAR_HINTS + _NEGATIVE_STAR_HINTS + _NEUTRAL_STAR_HINTS:

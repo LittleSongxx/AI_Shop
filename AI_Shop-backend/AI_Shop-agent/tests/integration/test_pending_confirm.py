@@ -153,7 +153,7 @@ async def test_confirm_returns_saved_result_when_completion_lookup_is_needed(ser
 
 
 @pytest.mark.asyncio
-async def test_uncertain_transport_failure_stays_executing_for_reconciliation(service):
+async def test_uncertain_transport_failure_becomes_inconclusive(service):
     pending = {
         "token": "act_uncertain",
         "userId": "u1",
@@ -166,6 +166,13 @@ async def test_uncertain_transport_failure_stays_executing_for_reconciliation(se
     async def executor(_):
         raise ConnectionError("response connection closed")
 
+    uncertain = {
+        **pending,
+        "status": 6,
+        "statusName": "INCONCLUSIVE",
+        "reconcileAttempts": 0,
+    }
+
     with patch.object(
         pending_action_store,
         "claim",
@@ -176,7 +183,14 @@ async def test_uncertain_transport_failure_stays_executing_for_reconciliation(se
             "complete",
             AsyncMock(),
         ) as complete:
-            with patch("app.services.pending_action_service.redis_service") as redis:
+            with (
+                patch.object(
+                    pending_action_store,
+                    "mark_inconclusive",
+                    AsyncMock(return_value=uncertain),
+                ) as mark_inconclusive,
+                patch("app.services.pending_action_service.redis_service") as redis,
+            ):
                 redis.ensure_connected = AsyncMock()
                 redis.try_lock_pending_action = AsyncMock(return_value=True)
                 redis.unlock_pending_action = AsyncMock()
@@ -189,7 +203,9 @@ async def test_uncertain_transport_failure_stays_executing_for_reconciliation(se
     assert ok is False
     assert "正在核对" in msg
     complete.assert_not_awaited()
-    redis.save_pending_action.assert_awaited_once_with("act_uncertain", pending)
+    mark_inconclusive.assert_awaited_once()
+    assert redis.save_pending_action.await_count == 2
+    redis.save_pending_action.assert_any_await("act_uncertain", uncertain)
 
 
 @pytest.mark.asyncio
@@ -211,12 +227,12 @@ async def test_reconciler_confirms_only_when_java_reports_success(service):
     with (
         patch.object(
             pending_action_store,
-            "list_stale_executing",
+            "list_reconcilable",
             AsyncMock(return_value=[pending]),
         ),
         patch.object(
             pending_action_store,
-            "complete",
+            "complete_reconciled",
             AsyncMock(return_value=final),
         ) as complete,
         patch(
@@ -244,7 +260,7 @@ async def test_reconciler_confirms_only_when_java_reports_success(service):
 
 
 @pytest.mark.asyncio
-async def test_reconciler_keeps_inconclusive_action_executing(service):
+async def test_reconciler_records_inconclusive_attempt_without_replaying_write(service):
     pending = {
         "token": "act_processing",
         "userId": "u1",
@@ -253,13 +269,28 @@ async def test_reconciler_keeps_inconclusive_action_executing(service):
         "status": 3,
         "statusName": "EXECUTING",
     }
+    uncertain = {
+        **pending,
+        "status": 6,
+        "statusName": "INCONCLUSIVE",
+        "reconcileAttempts": 1,
+    }
     with (
         patch.object(
             pending_action_store,
-            "list_stale_executing",
+            "list_reconcilable",
             AsyncMock(return_value=[pending]),
         ),
-        patch.object(pending_action_store, "complete", AsyncMock()) as complete,
+        patch.object(
+            pending_action_store,
+            "complete_reconciled",
+            AsyncMock(),
+        ) as complete,
+        patch.object(
+            pending_action_store,
+            "record_inconclusive_attempt",
+            AsyncMock(return_value=uncertain),
+        ) as record_attempt,
         patch(
             "app.services.pending_action_service.java_internal_client.get_agent_action_status",
             AsyncMock(return_value={"status": "PROCESSING"}),
@@ -274,7 +305,8 @@ async def test_reconciler_keeps_inconclusive_action_executing(service):
 
     assert reconciled == 0
     complete.assert_not_awaited()
-    redis.save_pending_action.assert_not_awaited()
+    record_attempt.assert_awaited_once()
+    redis.save_pending_action.assert_awaited_once_with("act_processing", uncertain)
 
 
 @pytest.mark.asyncio
@@ -366,7 +398,7 @@ async def test_structured_remote_rejection_reconciles_definitive_failure(service
 
 
 @pytest.mark.asyncio
-async def test_structured_remote_rejection_with_processing_status_stays_executing(service):
+async def test_structured_remote_rejection_with_processing_status_becomes_inconclusive(service):
     pending = {
         "token": "act_remote_processing",
         "userId": "u1",
@@ -378,9 +410,16 @@ async def test_structured_remote_rejection_with_processing_status_stays_executin
     async def executor(_):
         raise RemoteActionRejected("请求正在处理中")
 
+    uncertain = {**pending, "status": 6, "statusName": "INCONCLUSIVE"}
+
     with (
         patch.object(pending_action_store, "claim", AsyncMock(return_value=(True, pending))),
         patch.object(pending_action_store, "complete", AsyncMock()) as complete,
+        patch.object(
+            pending_action_store,
+            "mark_inconclusive",
+            AsyncMock(return_value=uncertain),
+        ) as mark_inconclusive,
         patch(
             "app.services.pending_action_service.java_internal_client.get_agent_action_status",
             AsyncMock(return_value={"status": "PROCESSING"}),
@@ -397,3 +436,34 @@ async def test_structured_remote_rejection_with_processing_status_stays_executin
     assert ok is False
     assert "核对" in msg
     complete.assert_not_awaited()
+    mark_inconclusive.assert_awaited_once()
+    redis.save_pending_action.assert_any_await(pending["token"], uncertain)
+
+
+@pytest.mark.asyncio
+async def test_confirm_manual_review_never_executes_side_effect(service):
+    pending = {
+        "token": "act_manual",
+        "userId": "u1",
+        "actionType": "REFUND",
+        "status": 7,
+        "statusName": "MANUAL_REVIEW",
+    }
+    executor = AsyncMock()
+    with (
+        patch.object(
+            pending_action_store,
+            "claim",
+            AsyncMock(return_value=(False, pending)),
+        ),
+        patch("app.services.pending_action_service.redis_service") as redis,
+    ):
+        redis.ensure_connected = AsyncMock()
+        redis.try_lock_pending_action = AsyncMock(return_value=True)
+        redis.unlock_pending_action = AsyncMock()
+        action_type, ok, msg = await service.confirm("u1", pending["token"], executor)
+
+    assert action_type == "REFUND"
+    assert ok is False
+    assert "人工复核" in msg
+    executor.assert_not_awaited()

@@ -22,6 +22,7 @@ import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderItemService;
 import com.aishop.biz.OrderLogisticsInfoService;
 import com.aishop.biz.OrderRequestIdempotencyService;
+import com.aishop.integration.RecommendationAttributionClient;
 import com.aishop.utils.OrderPayAmountUtil;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
@@ -57,6 +58,9 @@ public class OrderController extends ABaseController{
     @Resource
     private OrderRequestIdempotencyService orderRequestIdempotencyService;
 
+    @Resource
+    private RecommendationAttributionClient recommendationAttributionClient;
+
     // 提交订单
     @PostMapping("/postOrder")
     @GlobalInterceptor(checkLogin = true)
@@ -64,9 +68,13 @@ public class OrderController extends ABaseController{
             @Valid @RequestBody PostOrderDTO postOrderDTO,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             HttpServletResponse response){
+        String userId = getTokenUserInfo().getUserId();
+        // Remote attribution validation happens before the transactional service
+        // proxy. Failure only clears optional touchpoints and never blocks checkout.
+        recommendationAttributionClient.validateAndApply(userId, postOrderDTO.getOrderList());
         // 根据userId和postOrderDTO生成订单
         PayInfoDTO payInfoDTO = orderInfoService.postOrder(
-                getTokenUserInfo().getUserId(), postOrderDTO, idempotencyKey);
+                userId, postOrderDTO, idempotencyKey);
         if (Boolean.TRUE.equals(payInfoDTO.getIdempotencyReplayed())) {
             response.setHeader("Idempotency-Replayed", "true");
         }

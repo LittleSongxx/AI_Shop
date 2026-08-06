@@ -4,10 +4,14 @@ import asyncio
 import time
 from typing import Any
 
+from app.config.settings import get_settings
 from app.harness.metrics.runtime_sensors import (
     LLM_CALL_TOTAL,
+    LLM_COST_CNY,
     LLM_LATENCY,
     LLM_TOKEN_TOTAL,
+    LLM_UNPRICED_TOKEN_TOTAL,
+    observe_agent_stage,
 )
 
 
@@ -29,8 +33,12 @@ def record_llm_usage(
     """Record a successful provider response and any real token usage it carries."""
     if response is None:
         return
-    metadata = getattr(response, "response_metadata", None) or {}
-    usage_meta = getattr(response, "usage_metadata", None)
+    # LangChain structured output with include_raw=True returns
+    # {raw, parsed, parsing_error}. Usage lives on raw, not on the wrapper dict.
+    metric_response = response.get("raw") if isinstance(response, dict) else response
+    metric_response = metric_response or response
+    metadata = getattr(metric_response, "response_metadata", None) or {}
+    usage_meta = getattr(metric_response, "usage_metadata", None)
     if isinstance(usage_meta, dict) and (
         usage_meta.get("input_tokens") is not None
         or usage_meta.get("output_tokens") is not None
@@ -45,19 +53,42 @@ def record_llm_usage(
         else:
             prompt = None
             completion = None
-    if isinstance(prompt, int) and prompt >= 0:
-        LLM_TOKEN_TOTAL.labels(kind="prompt").inc(prompt)
-    if isinstance(completion, int) and completion >= 0:
-        LLM_TOKEN_TOTAL.labels(kind="completion").inc(completion)
     response_model = str(
         metadata.get("model_name")
-        or getattr(response, "model", None)
+        or getattr(metric_response, "model", None)
         or model
         or "unknown"
     )
+    fallback_label = "true" if fallback else "false"
+    pricing = get_settings().llm_pricing_cny_per_million_json.get(response_model)
+    token_counts = {
+        "input": prompt if isinstance(prompt, int) and prompt >= 0 else None,
+        "output": completion if isinstance(completion, int) and completion >= 0 else None,
+    }
+    for kind, count in token_counts.items():
+        if count is None:
+            continue
+        LLM_TOKEN_TOTAL.labels(
+            kind=kind, model=response_model, fallback=fallback_label
+        ).inc(count)
+        if pricing is None:
+            LLM_UNPRICED_TOKEN_TOTAL.labels(
+                kind=kind, model=response_model, fallback=fallback_label
+            ).inc(count)
+            LLM_UNPRICED_TOKEN_TOTAL.labels(
+                kind="total", model=response_model, fallback=fallback_label
+            ).inc(count)
+            continue
+        cost = count * float(pricing[kind]) / 1_000_000
+        LLM_COST_CNY.labels(
+            kind=kind, model=response_model, fallback=fallback_label
+        ).inc(cost)
+        LLM_COST_CNY.labels(
+            kind="total", model=response_model, fallback=fallback_label
+        ).inc(cost)
     LLM_CALL_TOTAL.labels(
         model=response_model,
-        fallback="true" if fallback else "false",
+        fallback=fallback_label,
         result="success",
     ).inc()
 
@@ -93,4 +124,6 @@ async def invoke_llm_with_metrics(
         record_llm_usage(response, fallback=fallback, model=resolved_model)
         return response
     finally:
-        LLM_LATENCY.observe(max(0.0, time.perf_counter() - started))
+        elapsed = max(0.0, time.perf_counter() - started)
+        LLM_LATENCY.observe(elapsed)
+        observe_agent_stage("generation", elapsed)

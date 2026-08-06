@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import uuid
 
 import structlog
 
-from app.exceptions import PendingActionExpired, RemoteActionRejected
+from app.config.settings import get_settings
+from app.exceptions import PendingActionConflict, PendingActionExpired, RemoteActionRejected
 from app.services.java_internal_client import java_internal_client
 from app.services.pending_action_store import pending_action_store
 from app.services.redis_service import redis_service
@@ -23,6 +25,15 @@ class PendingActionService:
     STATUS_EXECUTING = 3
     STATUS_FAILED = 4
     STATUS_EXPIRED = 5
+    STATUS_INCONCLUSIVE = 6
+    STATUS_MANUAL_REVIEW = 7
+
+    _RESOURCE_FIELDS = {
+        "REFUND": "orderItemId",
+        "CONFIRM_RECEIPT": "orderId",
+        "PRODUCT_REVIEW": "orderId",
+        "RECOMMENT": "orderId",
+    }
 
     async def create_pending(
         self,
@@ -32,6 +43,21 @@ class PendingActionService:
         summary: str,
     ) -> dict:
         await redis_service.ensure_connected()
+        canonical_params = json.dumps(
+            params,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        resource_field = self._RESOURCE_FIELDS.get(action_type)
+        resource_id = str(params.get(resource_field) or "").strip() if resource_field else ""
+        if not resource_id:
+            raise ValueError(f"{action_type} 缺少可用于业务去重的资源 ID")
+        business_key = f"{user_id}:{action_type}:{resource_id}"
+        if len(business_key) > 255:
+            raise ValueError("业务去重键超过数据库长度限制")
+        args_fingerprint = hashlib.sha256(canonical_params.encode("utf-8")).hexdigest()
         token = f"act_{uuid.uuid4().hex}"
         _label, confirm_text, risk_tip = ACTION_LABELS.get(
             action_type, (action_type, "确认", "")
@@ -41,16 +67,36 @@ class PendingActionService:
             "userId": user_id,
             "messageId": await redis_service.get_bound_message_id(user_id),
             "actionType": action_type,
-            "paramsJson": json.dumps(params, ensure_ascii=False),
+            "paramsJson": canonical_params,
+            "businessKey": business_key,
+            "argsFingerprint": args_fingerprint,
             "summary": summary,
             "confirmText": confirm_text,
             "riskTip": risk_tip,
             "status": self.STATUS_PENDING,
             "createTime": int(time.time() * 1000),
         }
-        await pending_action_store.create(pending)
-        await redis_service.save_pending_action(token, pending)
-        return pending
+        stored, created = await pending_action_store.create(pending)
+        if not created and stored.get("argsFingerprint") != args_fingerprint:
+            logger.warning(
+                "pending_action_business_conflict",
+                business_key=business_key,
+                existing_token=stored.get("token"),
+                existing_status=stored.get("statusName"),
+            )
+            raise PendingActionConflict(
+                "同一业务对象已有参数不同的活跃提案；请先取消旧提案。"
+                "若旧提案正在核对或人工复核，请等待处理完成，不能重复提交。"
+            )
+        if not created:
+            logger.info(
+                "pending_action_reused",
+                business_key=business_key,
+                token=stored.get("token"),
+                status=stored.get("statusName"),
+            )
+        await redis_service.save_pending_action(stored["token"], stored)
+        return stored
 
     async def get_by_token(self, token: str) -> dict | None:
         if not token:
@@ -70,6 +116,31 @@ class PendingActionService:
         if pending.get("status") == self.STATUS_EXPIRED:
             raise PendingActionExpired("操作已过期")
         return pending
+
+    async def list_for_review(
+        self,
+        *,
+        status: str = "MANUAL_REVIEW",
+        token: str | None = None,
+        user_id: str | None = None,
+        business_key: str | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        allowed = {
+            pending_action_store.EXECUTING,
+            pending_action_store.INCONCLUSIVE,
+            pending_action_store.MANUAL_REVIEW,
+        }
+        normalized_status = str(status or pending_action_store.MANUAL_REVIEW).upper()
+        if normalized_status not in allowed:
+            raise ValueError("status 仅支持 EXECUTING、INCONCLUSIVE 或 MANUAL_REVIEW")
+        return await pending_action_store.list_for_review(
+            status=normalized_status,
+            token=str(token).strip() if token else None,
+            user_id=str(user_id).strip() if user_id else None,
+            business_key=str(business_key).strip() if business_key else None,
+            limit=limit,
+        )
 
     async def confirm(self, user_id: str, token: str, executor) -> tuple[str, bool, str]:
         await redis_service.ensure_connected()
@@ -94,6 +165,18 @@ class PendingActionService:
                     or pending.get("errorMessage")
                     or "该操作已处理",
                 )
+            if status == self.STATUS_INCONCLUSIVE:
+                return (
+                    pending.get("actionType"),
+                    False,
+                    "操作结果仍在核对中，请勿重复操作",
+                )
+            if status == self.STATUS_MANUAL_REVIEW:
+                return (
+                    pending.get("actionType"),
+                    False,
+                    "自动核对已到边界，操作已进入人工复核，请勿重复操作",
+                )
             # not claimed → 另一请求正持有 EXECUTING slot，幂等拒绝
             # claimed=True → claim() 已将 status 写为 EXECUTING，正常向下执行
             if not claimed:
@@ -115,6 +198,10 @@ class PendingActionService:
                     action_type=pending.get("actionType"),
                     error=str(exc),
                 )
+                await self._mark_inconclusive(
+                    pending,
+                    reason=f"remote_rejected:{type(exc).__name__}:{str(exc)[:300]}",
+                )
                 return (
                     pending.get("actionType"),
                     False,
@@ -129,13 +216,17 @@ class PendingActionService:
                 )
             except Exception as exc:
                 # 网络超时、连接中断或进程取消都无法证明 Java 写操作失败：
-                # 请求可能已经提交，只是响应没回来。保留 EXECUTING，交给
-                # reconciler 查询幂等账本和订单领域状态，避免重复退款/评价。
+                # 请求可能已经提交，只是响应没回来。显式进入 INCONCLUSIVE，
+                # 只查询幂等账本和订单领域状态，避免重复退款/评价。
                 logger.warning(
                     "pending_action_execution_outcome_uncertain",
                     token=token,
                     action_type=pending.get("actionType"),
                     error=str(exc),
+                )
+                await self._mark_inconclusive(
+                    pending,
+                    reason=f"transport_unknown:{type(exc).__name__}:{str(exc)[:300]}",
                 )
                 return (
                     pending.get("actionType"),
@@ -163,11 +254,14 @@ class PendingActionService:
         if not isinstance(params, dict) or not token:
             return None
         try:
+            settings = get_settings()
             remote = await java_internal_client.get_agent_action_status(
                 str(pending.get("userId") or ""),
                 str(pending.get("actionType") or ""),
                 token,
                 params,
+                max_attempts=settings.pending_action_reconcile_max_attempts,
+                reconcile_window_seconds=settings.pending_action_reconcile_deadline_seconds,
             )
         except Exception as exc:
             logger.warning(
@@ -191,9 +285,41 @@ class PendingActionService:
                 pending_action_store.FAILED,
                 error_message=result_message or str(error),
             )
-        # PROCESSING/UNKNOWN are deliberately left EXECUTING. A transient
-        # status read must never authorize a second refund or review.
+        if remote_status == "MANUAL_REVIEW":
+            uncertain = await self._mark_inconclusive(
+                pending,
+                reason="remote_status=MANUAL_REVIEW",
+            )
+            if uncertain:
+                manual = await pending_action_store.record_inconclusive_attempt(
+                    token,
+                    max_attempts=1,
+                    deadline_seconds=settings.pending_action_reconcile_deadline_seconds,
+                    reason="remote_status=MANUAL_REVIEW",
+                )
+                if manual:
+                    await redis_service.save_pending_action(token, manual)
+            return (
+                pending.get("actionType"),
+                False,
+                "自动核对已到边界，操作已进入人工复核，请勿重复操作",
+            )
+        # PROCESSING/INCONCLUSIVE/UNKNOWN must never authorize a second write.
         return None
+
+    async def _mark_inconclusive(self, pending: dict, *, reason: str) -> dict | None:
+        settings = get_settings()
+        token = str(pending.get("token") or "")
+        if not token:
+            return None
+        uncertain = await pending_action_store.mark_inconclusive(
+            token,
+            settings.pending_action_reconcile_deadline_seconds,
+            reason,
+        )
+        if uncertain:
+            await redis_service.save_pending_action(token, uncertain)
+        return uncertain
 
     async def _complete(
         self,
@@ -233,14 +359,14 @@ class PendingActionService:
         )
 
     async def reconcile_stale_executing(self, stale_seconds: int = 600) -> int:
-        """用 Java 幂等账本与领域状态核对悬挂的 EXECUTING 动作。
+        """用 Java 幂等账本与领域状态核对不确定动作。
 
-        只有 Java 明确返回 SUCCESS/FAILED 时才写终态。PROCESSING、UNKNOWN
-        或查询失败都保持 EXECUTING 并告警，禁止自动重试；把不确定结果写成
-        FAILED 会允许用户换 token 再执行一次，可能造成重复退款或重复评价。
+        只有 Java 明确返回 SUCCESS/FAILED 时才写终态。其他结果只增加查询次数，
+        达到次数或时间边界后进入 MANUAL_REVIEW；此路径绝不调用写接口。
         """
         await redis_service.ensure_connected()
-        stale = await pending_action_store.list_stale_executing(stale_seconds)
+        settings = get_settings()
+        stale = await pending_action_store.list_reconcilable(stale_seconds)
         reconciled = 0
         for pending in stale:
             token = pending.get("token") or pending.get("actionToken")
@@ -256,34 +382,58 @@ class PendingActionService:
                     params = {}
                 if not isinstance(params, dict):
                     params = {}
-                remote = await java_internal_client.get_agent_action_status(
-                    str(pending.get("userId") or ""),
-                    str(pending.get("actionType") or ""),
-                    str(token),
-                    params,
-                )
-                remote_status = str(remote.get("status") or "UNKNOWN").upper()
-                result_message = str(remote.get("result_message") or "").strip()
+                try:
+                    remote = await java_internal_client.get_agent_action_status(
+                        str(pending.get("userId") or ""),
+                        str(pending.get("actionType") or ""),
+                        str(token),
+                        params,
+                        max_attempts=settings.pending_action_reconcile_max_attempts,
+                        reconcile_window_seconds=(
+                            settings.pending_action_reconcile_deadline_seconds
+                        ),
+                    )
+                    remote_status = str(remote.get("status") or "UNKNOWN").upper()
+                    result_message = str(remote.get("result_message") or "").strip()
+                except Exception as exc:
+                    remote_status = "QUERY_ERROR"
+                    result_message = f"{type(exc).__name__}:{str(exc)[:300]}"
+
                 if remote_status == "SUCCESS":
-                    final = await pending_action_store.complete(
+                    final = await pending_action_store.complete_reconciled(
                         token,
                         pending_action_store.CONFIRMED,
                         result_message=result_message or "操作已完成",
                     )
                     expected_status = pending_action_store.CONFIRMED
                 elif remote_status == "FAILED":
-                    final = await pending_action_store.complete(
+                    final = await pending_action_store.complete_reconciled(
                         token,
                         pending_action_store.FAILED,
                         error_message=result_message or "操作执行失败",
                     )
                     expected_status = pending_action_store.FAILED
                 else:
+                    max_attempts = (
+                        1
+                        if remote_status == "MANUAL_REVIEW"
+                        else settings.pending_action_reconcile_max_attempts
+                    )
+                    final = await pending_action_store.record_inconclusive_attempt(
+                        token,
+                        max_attempts=max_attempts,
+                        deadline_seconds=settings.pending_action_reconcile_deadline_seconds,
+                        reason=f"remote_status={remote_status};{result_message}"[:512],
+                    )
+                    if final:
+                        await redis_service.save_pending_action(token, final)
                     logger.warning(
                         "pending_action_reconcile_inconclusive",
                         token=token,
                         action_type=pending.get("actionType"),
                         remote_status=remote_status,
+                        local_status=final.get("statusName") if final else None,
+                        attempts=final.get("reconcileAttempts") if final else None,
                     )
                     continue
 

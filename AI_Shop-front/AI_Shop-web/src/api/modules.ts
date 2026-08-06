@@ -1,5 +1,6 @@
 import request from './http';
 import { withCache } from '@/utils/apiCache';
+import type { RecommendationAttribution } from '@/utils/recommendationAttribution';
 
 export { locationApi } from './location';
 export type { LocationPayload, LocationWeatherPayload } from './location';
@@ -124,44 +125,52 @@ export const couponApi = {
     request.postForm('/discountCoupon/getDiscountCouponDetail', { couponId })
 };
 
-const reportAgentProductClick = (
+const reportAgentProductClick = async (
   productId: string,
   requestId: string,
   position: number
-): Promise<void> => {
+): Promise<RecommendationAttribution> => {
   const payload = new FormData();
   payload.append('productId', productId);
   payload.append('requestId', requestId);
   payload.append('position', String(position));
 
-  // Analytics must neither surface the shared HTTP client's error toast nor be
-  // cancelled by a hard navigation. sendBeacon includes same-origin cookies;
-  // keepalive fetch covers browsers that cannot queue this particular payload.
-  if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-    try {
-      if (navigator.sendBeacon('/api/agent/reportClick', payload)) {
-        return Promise.resolve();
-      }
-    } catch {
-      // Fall through to keepalive fetch.
-    }
-  }
-  return fetch('/api/agent/reportClick', {
-    method: 'POST',
-    body: payload,
-    credentials: 'include',
-    keepalive: true
-  }).then((response) => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 800);
+  try {
+    const response = await fetch('/api/agent/reportClick', {
+      method: 'POST',
+      body: payload,
+      credentials: 'include',
+      signal: controller.signal
+    });
     if (!response.ok) {
       throw new Error(`Click attribution failed with HTTP ${response.status}`);
     }
-  });
+    const result = await response.json();
+    if (result?.code !== 200 || !result?.data) {
+      throw new Error(result?.info || 'Click attribution was rejected');
+    }
+    const attribution = result.data as RecommendationAttribution;
+    if (
+      attribution.requestId !== requestId ||
+      attribution.productId !== productId ||
+      Number(attribution.position) !== position
+    ) {
+      throw new Error('Click attribution response mismatch');
+    }
+    return attribution;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 };
 
 export const agentApi = {
   loadHistoryMessage: (params: Record<string, unknown>) => request.postForm('/agent/loadHistoryMessage', params),
   sendMessage: (message: string, fromProduct?: boolean, consultProductId?: string) =>
     request.postForm('/agent/sendMessage', { message, fromProduct, consultProductId }),
+  selectOrderCandidate: (selectionId: string, targetType: 'ORDER' | 'ORDER_ITEM', targetId: string) =>
+    request.postForm('/agent/selectOrderCandidate', { selectionId, targetType, targetId }),
   cancelMessage: (messageId: number, assistantMessage?: string) =>
     request.postForm('/agent/cancelMessage', { messageId, assistantMessage }),
   reportClick: reportAgentProductClick,

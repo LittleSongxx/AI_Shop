@@ -47,6 +47,9 @@ class AgentGraphState(TypedDict, total=False):
     intent_decision: dict | None
     rag_source_refs: list[dict] | None
     rag_trace: dict | None
+    order_resolution: str | None
+    pending_order_reference: dict | None
+    selected_order_reference: dict | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -83,6 +86,9 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "intent_decision": None,
         "rag_source_refs": [],
         "rag_trace": None,
+        "order_resolution": None,
+        "pending_order_reference": None,
+        "selected_order_reference": agent_msg.get("selectedOrderReference"),
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

@@ -11,6 +11,10 @@ public class OrderRequestIdempotency {
     private String requestHash;
     private String status;
     private String responseJson;
+    private Integer reconcileAttempts;
+    private Date reconcileDeadline;
+    private Date lastReconcileAt;
+    private String reviewReason;
     private Date createTime;
     private Date updateTime;
 
@@ -68,6 +72,38 @@ public class OrderRequestIdempotency {
 
     public void setResponseJson(String responseJson) {
         this.responseJson = responseJson;
+    }
+
+    public Integer getReconcileAttempts() {
+        return reconcileAttempts;
+    }
+
+    public void setReconcileAttempts(Integer reconcileAttempts) {
+        this.reconcileAttempts = reconcileAttempts;
+    }
+
+    public Date getReconcileDeadline() {
+        return reconcileDeadline;
+    }
+
+    public void setReconcileDeadline(Date reconcileDeadline) {
+        this.reconcileDeadline = reconcileDeadline;
+    }
+
+    public Date getLastReconcileAt() {
+        return lastReconcileAt;
+    }
+
+    public void setLastReconcileAt(Date lastReconcileAt) {
+        this.lastReconcileAt = lastReconcileAt;
+    }
+
+    public String getReviewReason() {
+        return reviewReason;
+    }
+
+    public void setReviewReason(String reviewReason) {
+        this.reviewReason = reviewReason;
     }
 
     public Date getCreateTime() {

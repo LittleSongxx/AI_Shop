@@ -17,9 +17,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from benchmarks.run_search_relevance import (
+    DEFAULT_CATALOG,
     DEFAULT_DATASET,
+    DEFAULT_LOCK,
+    _ndcg,
+    evaluate_graded_relevance,
     evaluate_query_understanding,
+    graded_gate_failures,
     load_cases,
+    validate_graded_contract,
 )
 
 
@@ -53,6 +59,51 @@ def test_every_subset_is_covered(report: dict):
     """一个品类整体挂掉会体现为某个 subset 全错，这里单独看一眼分组。"""
     for subset, stats in report["bySubset"].items():
         assert stats["passed"] == stats["graded"], f"subset {subset} 有失败用例"
+
+
+def test_graded_dataset_and_catalog_match_frozen_lock():
+    contract = validate_graded_contract(
+        load_cases(DEFAULT_DATASET), DEFAULT_DATASET, DEFAULT_LOCK, DEFAULT_CATALOG
+    )
+    assert contract["productCount"] == 47
+    assert contract["labelledCases"] == 30
+    assert contract["thresholds"] == {"recallAt10": 0.8, "mrr": 0.65, "ndcgAt10": 0.7}
+
+
+def test_graded_ndcg_respects_relevance_grades():
+    grades = {"best": 3, "related": 1}
+    assert _ndcg(["best", "related"], grades, 10) == pytest.approx(1.0)
+    assert _ndcg(["related", "best"], grades, 10) < 1.0
+    assert _ndcg(["unrelated"], grades, 10) == 0.0
+
+
+@pytest.mark.asyncio
+async def test_graded_gate_fails_when_one_recall_channel_is_globally_empty(monkeypatch):
+    async def fake_retrieve(_query: str, _k: int) -> dict[str, list[str]]:
+        return {"keyword": ["p1"], "vector": [], "fused": ["p1"]}
+
+    monkeypatch.setattr(
+        "benchmarks.run_search_relevance._retrieve_channels", fake_retrieve
+    )
+    result = await evaluate_graded_relevance(
+        [
+            {
+                "id": "graded-test",
+                "query": "query",
+                "relevantProductIds": ["p1"],
+                "relevanceGrades": {"p1": 3},
+            }
+        ],
+        10,
+    )
+
+    assert result["recallAt10"] == 1.0
+    assert result["recallChannelsHealthy"] is False
+    assert graded_gate_failures(
+        result, k=10, min_recall=0.8, min_mrr=0.65, min_ndcg=0.7
+    ) == [
+        "both keyword and vector recall channels must return candidates (keyword=1, vector=0)"
+    ]
 
 
 def _format_failures(report: dict, field: str) -> str:

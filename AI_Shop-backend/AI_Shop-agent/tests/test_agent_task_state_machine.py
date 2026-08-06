@@ -66,6 +66,25 @@ async def test_worker_fails_fast_when_metrics_port_is_already_in_use():
 
 
 @pytest.mark.asyncio
+async def test_worker_retries_the_initial_queue_connection_with_bounded_backoff():
+    worker = AgentWorker()
+    connect = AsyncMock(side_effect=[ConnectionError("listener not ready"), None])
+    close = AsyncMock()
+    sleep = AsyncMock()
+
+    with (
+        patch("app.worker.agent_queue_service.connect", connect),
+        patch("app.worker.agent_queue_service.close", close),
+        patch("app.worker.asyncio.sleep", sleep),
+    ):
+        await worker._connect_queue_until_ready()
+
+    assert connect.await_count == 2
+    close.assert_awaited_once()
+    sleep.assert_awaited_once_with(1)
+
+
+@pytest.mark.asyncio
 async def test_mark_failed_writes_dead_atomically_at_retry_limit():
     cursor = _Cursor(one={"retry_count": 5, "status": "DEAD"})
     with patch("app.services.task_service.acquire", _acquire_for(cursor)):
@@ -314,6 +333,7 @@ async def test_completion_guard_failure_is_treated_as_lease_loss():
             AsyncMock(return_value=False),
         ),
         patch("app.worker.redis_service.release_agent_user_lock", AsyncMock()),
+        patch("app.worker.observe_agent_stage") as observe_stage,
         patch.object(worker, "_execute_payload", AsyncMock(return_value="ok")),
         patch(
             "app.worker.agent_task_service.mark_completed",
@@ -326,6 +346,8 @@ async def test_completion_guard_failure_is_treated_as_lease_loss():
     message.ack.assert_awaited_once()
     message.nack.assert_not_awaited()
     failed.assert_not_awaited()
+    observed_stages = [call.args[0] for call in observe_stage.call_args_list]
+    assert observed_stages == ["total"]
 
 
 @pytest.mark.asyncio

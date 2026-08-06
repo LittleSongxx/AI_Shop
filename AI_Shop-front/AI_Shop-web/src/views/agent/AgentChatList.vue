@@ -31,6 +31,7 @@
           v-if="shouldShowAi(item)"
           :data="item"
           :waiting="Number(item.status) === 1 && streamWaiting && item === currentMessage"
+          @select-order="onSelectOrder"
         />
       </div>
     </div>
@@ -45,7 +46,6 @@ import AgentChatItem from '@/components/agent/AgentChatItem.vue';
 import AgentUserBubble from '@/components/agent/AgentUserBubble.vue';
 import { useAgentMessageStore } from '@/stores/agentMessage';
 import { useAuthStore } from '@/stores/auth';
-import { AGENT_OUTPUT_TYPE } from '@/constants/backendEnums';
 import { mitter } from '@/utils/eventBus';
 import { toast } from '@/utils/toast';
 import {
@@ -53,6 +53,8 @@ import {
   mergeHistoryMessages,
   normalizeAgentHistoryMessage,
   sortHistoryMessages,
+  upsertAgentHttpMessage,
+  upsertAgentStreamMessage,
   type AgentHistoryMessage
 } from '@/utils/agentHistory';
 
@@ -95,46 +97,17 @@ const onListScroll = () => {
   void loadHistoryMessage();
 };
 
-const resolveActiveMessage = (messageId?: number | string) => {
-  if (messageId == null) return currentMessage.value;
-  if (currentMessage.value && String(currentMessage.value.messageId) === String(messageId)) {
-    return currentMessage.value;
+const finishAnswering = (message: AgentHistoryMessage) => {
+  if (
+    !currentMessage.value ||
+    String(currentMessage.value.messageId) !== String(message.messageId)
+  ) {
+    return;
   }
-  return messageList.value.find((m) => String(m.messageId) === String(messageId)) ?? null;
-};
-
-const finishAnswering = (newVal: Record<string, any>, outputType: number) => {
   streamWaiting.value = false;
   answering.value = false;
   mitter.emit('answering', false);
-
-  let target = resolveActiveMessage(newVal.messageId);
-  if (!target && currentMessage.value) {
-    target = currentMessage.value;
-  }
-  if (target) {
-    if (outputType === AGENT_OUTPUT_TYPE.ERROR) {
-      target.assistantMessage = newVal.assistantMessage || '服务器返回错误，请联系管理员';
-    } else {
-      const finalText = newVal.assistantMessage;
-      if (finalText != null && String(finalText).trim() !== '') {
-        target.assistantMessage = String(finalText);
-      }
-      if (newVal.bizType) {
-        target.bizType = newVal.bizType;
-      }
-    }
-    target.status = 2;
-  }
-
-  if (
-    !newVal.messageId ||
-    !currentMessage.value ||
-    String(currentMessage.value.messageId) === String(newVal.messageId)
-  ) {
-    currentMessage.value = null;
-  }
-
+  currentMessage.value = null;
   void scrollBottom(true);
 };
 
@@ -171,20 +144,19 @@ watch(
   () => agentMessageStore.message,
   (newVal) => {
     if (!newVal) return;
-
-    const outputType = Number(newVal.outPutType);
-    if (outputType === AGENT_OUTPUT_TYPE.DONE || outputType === AGENT_OUTPUT_TYPE.ERROR) {
-      finishAnswering(newVal, outputType);
+    const result = upsertAgentStreamMessage(messageList.value, newVal);
+    if (!result) return;
+    if (result.terminal) {
+      finishAnswering(result.message);
+      if (result.created) void scrollBottom();
       return;
     }
-
-    const target = resolveActiveMessage(newVal.messageId);
-    if (!target) return;
-
-    streamWaiting.value = false;
-    target.assistantMessage = (target.assistantMessage || '') + (newVal.assistantMessage || '');
-    target.status = 1;
-    if (newVal.bizType) target.bizType = newVal.bizType;
+    if (
+      currentMessage.value &&
+      String(currentMessage.value.messageId) === String(result.message.messageId)
+    ) {
+      streamWaiting.value = false;
+    }
     void scrollBottom();
   },
   { deep: true }
@@ -194,21 +166,47 @@ const onSendMessage = (payload?: unknown) => {
   const message = payload as Record<string, any>;
   if (!message?.messageId) return;
 
-  currentMessage.value = {
-    messageId: Number(message.messageId),
-    userMessage: message.userMessage,
-    assistantMessage: '',
-    status: 1,
-    bizType: message.bizType,
-    sendTime: message.sendTime
-  };
-  messageList.value.push(currentMessage.value);
+  const target = upsertAgentHttpMessage(messageList.value, message);
+  if (!target) return;
+  currentMessage.value = target.status === 1 ? target : null;
 
-  answering.value = true;
-  streamWaiting.value = true;
+  answering.value = target.status === 1;
+  streamWaiting.value = target.status === 1;
   stickToBottom.value = true;
-  mitter.emit('answering', { answering: true, messageId: message.messageId });
+  if (target.status === 1) {
+    mitter.emit('answering', { answering: true, messageId: message.messageId });
+  }
   void scrollBottom(true);
+};
+
+const onSelectOrder = async (payload: unknown) => {
+  const data = payload as {
+    card?: { selectionId?: string };
+    candidate?: { targetType?: 'ORDER' | 'ORDER_ITEM'; targetId?: string };
+    done?: (success: boolean) => void;
+  };
+  const selectionId = data.card?.selectionId;
+  const targetType = data.candidate?.targetType;
+  const targetId = data.candidate?.targetId;
+  if (!selectionId || !targetType || !targetId) {
+    data.done?.(false);
+    toast.error('订单候选参数无效');
+    return;
+  }
+  if (answering.value) {
+    data.done?.(false);
+    toast.info('请等待当前回复完成');
+    return;
+  }
+  try {
+    const message = await agentApi.selectOrderCandidate(selectionId, targetType, targetId);
+    if (!message?.messageId) throw new Error('订单候选处理失败');
+    data.done?.(true);
+    mitter.emit('sendMessage', { ...message });
+  } catch (error: any) {
+    data.done?.(false);
+    toast.error(error?.info || error?.message || '订单候选处理失败，请重试');
+  }
 };
 
 const onCancelMessage = async (payload?: unknown) => {
@@ -265,11 +263,7 @@ const loadHistoryMessage = async () => {
       rawList.map((row) => normalizeAgentHistoryMessage(row))
     );
 
-    if (nextPage === 1) {
-      messageList.value = incoming;
-    } else {
-      messageList.value = mergeHistoryMessages(incoming, messageList.value);
-    }
+    messageList.value = mergeHistoryMessages(incoming, messageList.value);
 
     pageNo.value = page.pageNo || nextPage;
     pageTotal.value = page.pageTotal || 1;

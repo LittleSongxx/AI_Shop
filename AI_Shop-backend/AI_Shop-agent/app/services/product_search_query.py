@@ -82,6 +82,26 @@ def match_terms_for_query(query: str | None) -> list[str]:
     return terms
 
 
+def topic_terms_for_text(text: str | None) -> list[str]:
+    """Return managed taxonomy terms only when the text names a known topic."""
+    value = (text or "").strip().lower()
+    if not value:
+        return []
+    terms: list[str] = []
+    seen: set[str] = set()
+    for topic in _topics():
+        aliases = _topic_aliases(topic)
+        topic_terms = topic.get("terms") or aliases
+        if not any(alias.lower() in value for alias in aliases + [str(v) for v in topic_terms]):
+            continue
+        for term in topic_terms:
+            normalized = str(term or "").strip().lower()
+            if len(normalized) >= 2 and normalized not in seen:
+                seen.add(normalized)
+                terms.append(normalized)
+    return terms
+
+
 def product_matches_query_terms(product: dict, terms: list[str]) -> bool:
     if not terms:
         return True

@@ -1,5 +1,13 @@
 # AI_Shop — AI 驱动的微服务电商平台
 
+> 内容状态：当前有效
+>
+> 整改基线：`f639599e335b97f6156cc41923d53948bcbf6549`
+>
+> 最后核验时间：2026-08-06（Asia/Shanghai）
+>
+> 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
+
 基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，集成 AI 购物导购、智能客服与 RAG 知识库。工程化基础扎实：分布式事务、消息可靠投递、分布式锁、安全过滤均有具体实现。
 
 ---
@@ -27,11 +35,11 @@
 |------|---------|
 | 框架 | FastAPI + LangGraph（ReAct Agent） |
 | LLM | OpenAI 兼容接口（可接任意模型） |
-| RAG | 向量检索（pgvector/ES）+ BM25 混合 |
+| RAG | Elasticsearch 向量检索 + BM25 + RRF/rerank 混合 |
 | 工具调用 | MCP（Model Context Protocol）双向通信 |
 | 会话记忆 | Redis 短期 + MySQL 长期持久化 |
 | 可观测 | OpenTelemetry（OTLP）+ Prometheus 指标 |
-| 测试 | pytest（363 用例：362 通过 / 1 跳过，以 CI 为准） |
+| 测试 | pytest（443 通过 / 2 个真实 MySQL 用例显式跳过；这 2 个已在 MySQL 8 gate 单独通过） |
 
 ### 前端
 
@@ -66,7 +74,6 @@ AI_Shop/
 ├── AI_Shop-front/
 │   ├── AI_Shop-web/              # 用户端 Vue 3
 │   └── AI_Shop-admin/            # 管理后台 Vue 3
-├── AI_Shop-search/               # ES 索引构建脚本
 ├── deploy/                       # Docker Compose、Nginx 示例、上线清单
 └── sql/                          # 初始化 DDL
 ```
@@ -100,8 +107,8 @@ AI_Shop/
 
 ### 前置依赖
 
-- JDK 21+、Maven 3.9+
-- Python 3.11–3.12
+- JDK 17+、Maven 3.9+
+- Python 3.11–3.13
 - Docker & Docker Compose
 
 ### 0. 一键起停（推荐）
@@ -131,13 +138,16 @@ docker compose -f docker-compose.middleware.yml up -d
 
 > Redis / RabbitMQ / Seata 的宿主机端口是 +1 偏移（6380 / 5673 / 8092），避免和本机已装的同类服务冲突。
 > 配置里的默认值已经是偏移后的端口，所以不传环境变量也能连上；手工起服务时唯一必须给的是
-> `MYSQL_PASSWORD`。详见 [deploy/MIDDLEWARE_DOCKER.md](deploy/MIDDLEWARE_DOCKER.md)。
+> `MYSQL_PASSWORD`。详见 [deploy/本地中间件启动指南.md](deploy/本地中间件启动指南.md)。
 
 ### 2. 初始化数据库
 
 ```bash
-mysql -h 127.0.0.1 -u root -p < sql/init.sql
+bash deploy/init-mysql-meta.sh
 ```
+
+该脚本初始化数据库、Nacos/Seata 元数据和 undo_log；业务表由各 Java 服务的
+`R__current_schema.sql` 在启动时幂等迁移，Agent 表由 Alembic 迁移。
 
 ### 3. 构建 Java 微服务
 
@@ -202,12 +212,15 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ## 数据与指标口径
 
+说明文档总入口见 [docs/文档导航.md](docs/文档导航.md)，整改后的 AI 能力、验证结果和
+秋招适配复评见 [docs/AI应用整改复核_2026-08-06.md](docs/AI应用整改复核_2026-08-06.md)。
+
 仓库里的数字分三类：实测的、框架就绪但没数据的、合成或手工编写的。引用任何指标前先看
-[docs/DATA_PROVENANCE.md](docs/DATA_PROVENANCE.md)，评测集的已知失败见
-[benchmarks/KNOWN_LIMITATIONS.md](AI_Shop-backend/AI_Shop-agent/benchmarks/KNOWN_LIMITATIONS.md)。
+[docs/项目数据口径与功能边界.md](docs/项目数据口径与功能边界.md)，评测集的限制与变更见
+[冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)。
 
 本地全链路部署、RAG、搜索、分类、购物车和管理端滚动问题的真实排障过程见
-[docs/INTERVIEW_ENGINEERING_CASES.md](docs/INTERVIEW_ENGINEERING_CASES.md)。文档保留了错误假设、
+[docs/项目问题排查与修复复盘.md](docs/项目问题排查与修复复盘.md)。文档保留了错误假设、
 证据链、修复取舍与回归数据，可作为面试项目复盘材料。
 
 ---

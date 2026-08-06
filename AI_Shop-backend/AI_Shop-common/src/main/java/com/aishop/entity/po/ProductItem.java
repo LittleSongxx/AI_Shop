@@ -1,6 +1,7 @@
 package com.aishop.entity.po;
 
 import com.aishop.constants.Constants;
+import com.aishop.entity.dto.RecommendationAttributionCarrier;
 import com.aishop.utils.StringTools;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -8,8 +9,10 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.Date;
+
 @Validated
-public class ProductItem {
+public class ProductItem implements RecommendationAttributionCarrier {
     @NotEmpty
     private String productId;
     @NotEmpty
@@ -59,11 +62,51 @@ public class ProductItem {
 
     private String propertyValueIdHash;
 
+    private String aiRequestId;
+
+    private Integer aiPosition;
+
+    private String aiSource;
+
+    private Date aiAttributedAt;
+
     public String getPropertyValueIdHash() {
         return propertyValueIdHash;
     }
 
     public void setPropertyValueIdHash(String propertyValueIdHash) {
         this.propertyValueIdHash = propertyValueIdHash;
+    }
+
+    public String getAiRequestId() {
+        return aiRequestId;
+    }
+
+    public void setAiRequestId(String aiRequestId) {
+        this.aiRequestId = aiRequestId;
+    }
+
+    public Integer getAiPosition() {
+        return aiPosition;
+    }
+
+    public void setAiPosition(Integer aiPosition) {
+        this.aiPosition = aiPosition;
+    }
+
+    public String getAiSource() {
+        return aiSource;
+    }
+
+    public void setAiSource(String aiSource) {
+        this.aiSource = aiSource;
+    }
+
+    public Date getAiAttributedAt() {
+        return aiAttributedAt;
+    }
+
+    public void setAiAttributedAt(Date aiAttributedAt) {
+        this.aiAttributedAt = aiAttributedAt;
     }
 }

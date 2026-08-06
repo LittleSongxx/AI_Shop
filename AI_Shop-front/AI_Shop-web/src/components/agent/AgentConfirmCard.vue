@@ -518,4 +518,8 @@ const onCancel = async () => {
 .is-executing {
   border-color: rgba($color-primary, 0.4);
 }
+
+.is-manual-review {
+  border-color: rgba(#b45309, 0.45);
+}
 </style>

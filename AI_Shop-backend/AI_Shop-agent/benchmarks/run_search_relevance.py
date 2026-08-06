@@ -5,12 +5,11 @@ Layer 1 - query understanding (default, always runnable):
     No Elasticsearch, no LLM, no product catalogue. This is what guards against a
     taxonomy edit silently breaking recall for a whole category.
 
-Layer 2 - graded relevance (--graded, needs live services + labels):
+Layer 2 - graded relevance (--graded, needs live services + locked labels):
     Runs the real hybrid retrieval path and scores Recall@K / MRR / NDCG@K against
-    hand-labelled relevantProductIds. Skipped when nothing is labelled, which is
-    the current state of this repo: generate_products.sql only produces
-    placeholder titles like "商品-105-00001", so there is nothing meaningful to
-    label. Load a real catalogue, then use --emit-template to bootstrap labels.
+    hand-labelled relevantProductIds from the reproducible 47-product mirror.
+    A missing label set, catalog mismatch, missing ES index, or dead recall
+    channel is a failure rather than a successful skip.
 
 Usage:
     python benchmarks/run_search_relevance.py
@@ -22,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
 import sys
@@ -33,6 +33,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 DEFAULT_DATASET = Path(__file__).with_name("search_relevance_v1.jsonl")
+DEFAULT_LOCK = Path(__file__).with_name("search_relevance_v1.lock.json")
+DEFAULT_CATALOG = PROJECT_ROOT.parent / "data" / "simlect_catalog" / "catalog.json"
 
 
 def load_cases(path: Path) -> list[dict]:
@@ -126,14 +128,14 @@ def _dcg(gains: list[float]) -> float:
     return sum(gain / math.log2(rank + 1) for rank, gain in enumerate(gains, start=1))
 
 
-def _ndcg(ranked_ids: list[str], relevant: set[str], k: int) -> float:
-    gains = [1.0 if pid in relevant else 0.0 for pid in ranked_ids[:k]]
-    ideal = [1.0] * min(len(relevant), k)
+def _ndcg(ranked_ids: list[str], grades: dict[str, float], k: int) -> float:
+    gains = [float(grades.get(pid, 0.0)) for pid in ranked_ids[:k]]
+    ideal = sorted((float(value) for value in grades.values()), reverse=True)[:k]
     best = _dcg(ideal)
     return (_dcg(gains) / best) if best else 0.0
 
 
-async def _retrieve(query: str, k: int) -> list[str]:
+async def _retrieve_channels(query: str, k: int) -> dict[str, list[str]]:
     """Run the same dual recall + RRF fusion the live search path uses."""
     from app.constants import PRODUCT_CANDIDATE_SIZE
     from app.rag.retriever import rag_retriever
@@ -143,7 +145,107 @@ async def _retrieve(query: str, k: int) -> list[str]:
     normalized = normalize_product_search_query(query) or query
     keyword_ids = await rag_retriever.search_product_keyword_ids(normalized, PRODUCT_CANDIDATE_SIZE)
     vector_ids = await rag_retriever.search_product_vector_ids(normalized, PRODUCT_CANDIDATE_SIZE)
-    return rrf_merge(keyword_ids, vector_ids, k)
+    return {
+        "keyword": keyword_ids,
+        "vector": vector_ids,
+        "fused": rrf_merge(keyword_ids, vector_ids, k),
+    }
+
+
+async def _retrieve(query: str, k: int) -> list[str]:
+    return (await _retrieve_channels(query, k))["fused"]
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(64 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_graded_contract(
+    cases: list[dict], dataset: Path, lock_path: Path, catalog_path: Path
+) -> dict[str, Any]:
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    if lock.get("schemaVersion") != 1:
+        errors.append("unsupported search relevance lock schema")
+    dataset_sha = _sha256(dataset)
+    catalog_sha = _sha256(catalog_path)
+    if dataset_sha != lock.get("datasetSha256"):
+        errors.append("search dataset SHA does not match lock")
+    if catalog_sha != lock.get("catalogSha256"):
+        errors.append("catalog SHA does not match lock")
+    if catalog.get("catalogVersion") != lock.get("catalogVersion"):
+        errors.append("catalog version does not match lock")
+
+    product_rows = catalog.get("products") or []
+    product_ids = [
+        str((detail.get("productInfo") or {}).get("productId") or "")
+        for detail in product_rows
+    ]
+    products = {product_id for product_id in product_ids if product_id}
+    if len(products) != len(product_ids):
+        errors.append("catalog contains an empty or duplicate product ID")
+    labelled = [case for case in cases if "relevantProductIds" in case]
+    if len(labelled) != int(lock.get("labelledCases") or 0) or not labelled:
+        errors.append("labelled case count does not match lock")
+    labelled_ids = [str(case.get("id") or "") for case in labelled]
+    if len(set(labelled_ids)) != len(labelled_ids) or "" in labelled_ids:
+        errors.append("labelled cases contain an empty or duplicate ID")
+    for case in labelled:
+        relevant = case.get("relevantProductIds")
+        grades = case.get("relevanceGrades")
+        if not isinstance(relevant, list) or not relevant:
+            errors.append(f"{case.get('id')} has no relevant products")
+            continue
+        if not isinstance(grades, dict) or set(map(str, relevant)) != set(map(str, grades)):
+            errors.append(f"{case.get('id')} relevanceGrades do not match relevantProductIds")
+        elif any(
+            not isinstance(grade, (int, float)) or isinstance(grade, bool) or grade <= 0
+            for grade in grades.values()
+        ):
+            errors.append(f"{case.get('id')} relevanceGrades must be positive numbers")
+        missing = sorted(set(map(str, relevant)) - products)
+        if missing:
+            errors.append(f"{case.get('id')} references products absent from catalog: {missing}")
+    if (
+        len(products) != int(catalog.get("productCount") or 0)
+        or len(products) != int(lock.get("productCount") or 0)
+        or len(products) != 47
+    ):
+        errors.append(f"expected the locked 47-product catalog, got {len(products)}")
+    thresholds = lock.get("thresholds") or {}
+    expected_thresholds = {"recallAt10": 0.80, "mrr": 0.65, "ndcgAt10": 0.70}
+    if thresholds != expected_thresholds:
+        errors.append(f"quality thresholds do not match the frozen gate: {expected_thresholds}")
+    if errors:
+        raise ValueError("graded search contract invalid:\n- " + "\n- ".join(errors))
+    return {
+        "datasetSha256": dataset_sha,
+        "catalogSha256": catalog_sha,
+        "catalogVersion": catalog.get("catalogVersion"),
+        "productCount": len(products),
+        "labelledCases": len(labelled),
+        "thresholds": thresholds,
+    }
+
+
+async def _require_live_product_index(minimum_count: int) -> int:
+    from app.infra.http_client import get_client
+    from app.rag.retriever import PRODUCT_INDEX, rag_retriever
+
+    client = await get_client("es", timeout=10)
+    response = await client.get(rag_retriever._es_url(f"/{PRODUCT_INDEX}/_count"), timeout=10)
+    response.raise_for_status()
+    count = int((response.json() or {}).get("count") or 0)
+    if count < minimum_count:
+        raise RuntimeError(
+            f"Elasticsearch product index contains {count} documents; expected at least {minimum_count}"
+        )
+    return count
 
 
 async def evaluate_graded_relevance(cases: list[dict], k: int) -> dict[str, Any]:
@@ -153,26 +255,44 @@ async def evaluate_graded_relevance(cases: list[dict], k: int) -> dict[str, Any]
         if isinstance(case.get("relevantProductIds"), list) and case["relevantProductIds"]
     ]
     if not labelled:
-        return {
-            "skipped": True,
-            "reason": (
-                "No case carries relevantProductIds. This repo's generate_products.sql "
-                "only produces placeholder titles, so there is nothing meaningful to "
-                "label. Load a real catalogue then run --emit-template."
-            ),
-        }
+        raise ValueError("graded relevance requires non-empty relevantProductIds labels")
 
     recalls: list[float] = []
     reciprocal: list[float] = []
     ndcgs: list[float] = []
     misses: list[dict] = []
+    per_case: list[dict] = []
+    keyword_non_empty = vector_non_empty = 0
     for case in labelled:
         relevant = {str(pid) for pid in case["relevantProductIds"]}
-        ranked = await _retrieve(case.get("query") or "", k)
+        grades = {
+            str(pid): float(grade)
+            for pid, grade in (case.get("relevanceGrades") or {}).items()
+        }
+        channels = await _retrieve_channels(case.get("query") or "", k)
+        ranked = channels["fused"]
+        keyword_non_empty += int(bool(channels["keyword"]))
+        vector_non_empty += int(bool(channels["vector"]))
         hit_positions = [rank for rank, pid in enumerate(ranked, start=1) if pid in relevant]
-        recalls.append(len(set(ranked) & relevant) / len(relevant))
-        reciprocal.append(1.0 / hit_positions[0] if hit_positions else 0.0)
-        ndcgs.append(_ndcg(ranked, relevant, k))
+        recall = len(set(ranked) & relevant) / len(relevant)
+        rr = 1.0 / hit_positions[0] if hit_positions else 0.0
+        ndcg = _ndcg(ranked, grades, k)
+        recalls.append(recall)
+        reciprocal.append(rr)
+        ndcgs.append(ndcg)
+        per_case.append(
+            {
+                "id": case.get("id"),
+                "query": case.get("query"),
+                "relevantProductIds": sorted(relevant),
+                "returned": ranked,
+                "recall": round(recall, 4),
+                "reciprocalRank": round(rr, 4),
+                "ndcg": round(ndcg, 4),
+                "keywordCandidates": len(channels["keyword"]),
+                "vectorCandidates": len(channels["vector"]),
+            }
+        )
         if not hit_positions:
             misses.append(
                 {"id": case.get("id"), "query": case.get("query"), "returned": ranked[:5]}
@@ -180,14 +300,35 @@ async def evaluate_graded_relevance(cases: list[dict], k: int) -> dict[str, Any]
 
     count = len(labelled)
     return {
-        "skipped": False,
         "labelledCases": count,
         "k": k,
         f"recallAt{k}": round(sum(recalls) / count, 4),
         "mrr": round(sum(reciprocal) / count, 4),
         f"ndcgAt{k}": round(sum(ndcgs) / count, 4),
+        "keywordNonEmptyCases": keyword_non_empty,
+        "vectorNonEmptyCases": vector_non_empty,
+        "recallChannelsHealthy": keyword_non_empty > 0 and vector_non_empty > 0,
         "zeroHitCases": misses,
+        "perCase": per_case,
     }
+
+
+def graded_gate_failures(
+    graded: dict[str, Any], *, k: int, min_recall: float, min_mrr: float, min_ndcg: float
+) -> list[str]:
+    failures: list[str] = []
+    if not graded["recallChannelsHealthy"]:
+        failures.append(
+            "both keyword and vector recall channels must return candidates "
+            f"(keyword={graded['keywordNonEmptyCases']}, vector={graded['vectorNonEmptyCases']})"
+        )
+    if graded[f"recallAt{k}"] < min_recall:
+        failures.append(f"Recall@{k} {graded[f'recallAt{k}']} < {min_recall}")
+    if graded["mrr"] < min_mrr:
+        failures.append(f"MRR@{k} {graded['mrr']} < {min_mrr}")
+    if graded[f"ndcgAt{k}"] < min_ndcg:
+        failures.append(f"NDCG@{k} {graded[f'ndcgAt{k}']} < {min_ndcg}")
+    return failures
 
 
 async def emit_template(cases: list[dict], out_path: Path, k: int) -> None:
@@ -244,11 +385,8 @@ def _print_report(report: dict[str, Any]) -> None:
     if not graded:
         return
     print("\n=== Layer 2: graded relevance ===")
-    if graded.get("skipped"):
-        print(f"  skipped: {graded['reason']}")
-        return
     for key, value in graded.items():
-        if key in ("skipped", "zeroHitCases"):
+        if key in ("zeroHitCases", "perCase"):
             continue
         print(f"  {key:<16}: {value}")
     if graded["zeroHitCases"]:
@@ -272,6 +410,12 @@ async def run(args: argparse.Namespace) -> int:
         "queryUnderstanding": evaluate_query_understanding(cases),
     }
     if args.graded:
+        report["contract"] = validate_graded_contract(
+            cases, args.dataset, args.lock, args.catalog
+        )
+        report["contract"]["liveEsProductCount"] = await _require_live_product_index(
+            report["contract"]["productCount"]
+        )
         report["gradedRelevance"] = await evaluate_graded_relevance(cases, args.top_k)
 
     _print_report(report)
@@ -282,16 +426,30 @@ async def run(args: argparse.Namespace) -> int:
         print(f"\nreport written to {args.out}", file=sys.stderr)
 
     understanding = report["queryUnderstanding"]
-    below_threshold = (
-        understanding["keywordAccuracy"] < args.min_keyword_accuracy
-        or understanding["termCoverage"] < args.min_term_coverage
-    )
-    if below_threshold and not args.no_fail:
-        print(
-            "\nFAIL: below threshold "
-            f"(keyword >= {args.min_keyword_accuracy}, term >= {args.min_term_coverage})",
-            file=sys.stderr,
+    gate_failures: list[str] = []
+    if understanding["keywordAccuracy"] < args.min_keyword_accuracy:
+        gate_failures.append(
+            f"keyword accuracy {understanding['keywordAccuracy']} < {args.min_keyword_accuracy}"
         )
+    if understanding["termCoverage"] < args.min_term_coverage:
+        gate_failures.append(
+            f"term coverage {understanding['termCoverage']} < {args.min_term_coverage}"
+        )
+    if args.graded:
+        graded = report["gradedRelevance"]
+        gate_failures.extend(
+            graded_gate_failures(
+                graded,
+                k=args.top_k,
+                min_recall=args.min_recall,
+                min_mrr=args.min_mrr,
+                min_ndcg=args.min_ndcg,
+            )
+        )
+    if gate_failures and not args.no_fail:
+        print("\nFAIL: quality gate failed", file=sys.stderr)
+        for failure in gate_failures:
+            print(f"  - {failure}", file=sys.stderr)
         return 1
     return 0
 
@@ -299,6 +457,8 @@ async def run(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
+    parser.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
+    parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument(
         "--graded",
         action="store_true",
@@ -312,6 +472,9 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--min-keyword-accuracy", type=float, default=1.0)
     parser.add_argument("--min-term-coverage", type=float, default=1.0)
+    parser.add_argument("--min-recall", type=float, default=0.80)
+    parser.add_argument("--min-mrr", type=float, default=0.65)
+    parser.add_argument("--min-ndcg", type=float, default=0.70)
     parser.add_argument("--out", help="write the full report as JSON")
     parser.add_argument(
         "--no-fail",

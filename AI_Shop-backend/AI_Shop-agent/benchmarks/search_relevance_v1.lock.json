@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "datasetSha256": "504dcc80e8cda371256fba94690083a5bd49369156dc81f15f9f6efcf5078af8",
+  "catalogSha256": "fd40ec1288682e508ab4a6c325d67e00186960f16a006c30bc7238370e40cbc3",
+  "catalogVersion": "simlect-mirror-a7d6063f05a397a6",
+  "productCount": 47,
+  "labelledCases": 30,
+  "thresholds": {
+    "recallAt10": 0.8,
+    "mrr": 0.65,
+    "ndcgAt10": 0.7
+  }
+}

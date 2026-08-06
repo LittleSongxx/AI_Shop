@@ -23,6 +23,7 @@ class AgentTaskService:
             seconds=settings.agent_task_deadline_seconds
         )
         payload["deadlineAt"] = deadline.isoformat()
+        payload["enqueuedAtEpochMs"] = int(datetime.now().timestamp() * 1000)
         async with acquire() as cur:
             await cur.execute(
                 """
@@ -109,8 +110,8 @@ class AgentTaskService:
           - 租约已过期（lease_until < NOW）——原持有者疑似崩溃，接管。
 
         持有有效租约的其他 Worker 一律拒绝——MQ 重投再也不会导致双执行。
-        旧的"5 分钟僵超时"启发式被租约取代：lease_seconds 大于任务截止时间
-        （deadline + 余量），正常跑的任务不会被误接管。
+        旧的"5 分钟僵超时"启发式被短租约 + 周期续租取代：租约必须短于
+        任务截止时间，正常执行持续续租，进程崩溃后才能在 deadline 内接管。
 
         注意：接管只发生在「有消息可认领」时。消费端在租约仍有效时收到
         重投会直接丢弃本份消息（见 worker），崩溃任务的真正恢复靠

@@ -44,7 +44,10 @@ CREATE TABLE IF NOT EXISTS `lock_table`
     `branch_id`      BIGINT       NOT NULL,
     `resource_id`    VARCHAR(256),
     `table_name`     VARCHAR(32),
-    `pk`             VARCHAR(36),
+    -- sku_stock/product_sku use a 15+32 character composite primary key.
+    -- Seata serializes composite keys with a separator, so the official
+    -- VARCHAR(36) sample truncates valid project lock keys during branch registration.
+    `pk`             VARCHAR(128),
     `status`         TINYINT      NOT NULL DEFAULT '0' COMMENT '0:locked ,1:rollbacking',
     `gmt_create`     DATETIME,
     `gmt_modified`   DATETIME,
@@ -53,6 +56,10 @@ CREATE TABLE IF NOT EXISTS `lock_table`
     KEY `idx_branch_id` (`branch_id`),
     KEY `idx_xid` (`xid`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- CREATE TABLE IF NOT EXISTS does not reconcile an existing local database.
+-- Keep this widening idempotent so init-mysql-meta upgrades pre-fix volumes too.
+ALTER TABLE `lock_table` MODIFY COLUMN `pk` VARCHAR(128);
 
 CREATE TABLE IF NOT EXISTS `distributed_lock`
 (

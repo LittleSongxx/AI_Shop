@@ -1,32 +1,32 @@
 {
   "datasetVersion": "aishop_convo_v1",
-  "datasetSha256": "dd1348b8159955591734e0b0c5e16782f43858d1594ff89a5a1fd6f54bd1987e",
-  "runnerVersion": "aishop_convo_eval_runner_v1",
+  "datasetSha256": "a401d58ae1b936e6f2d27939451e4c7e0b9c948bf6f50dcbbac7dc43a75912bf",
+  "runnerVersion": "aishop_convo_eval_runner_v3",
   "frozenPolicy": {
     "resampling": "forbidden",
     "relabeling": "forbidden",
-    "note": "期望值按正确的客服行为写；跑出来错的留在集合里并记入 KNOWN_LIMITATIONS.md"
+    "note": "期望值按正确的客服行为写；跑出来错的留在集合里并记入冻结会话评测限制与变更记录.md"
   },
   "baseline": {
-    "cases": 120,
-    "passed": 120,
+    "cases": 134,
+    "passed": 134,
     "passRate": 1.0,
     "bySplit": {
       "dev": {
-        "cases": 72,
-        "passed": 72,
+        "cases": 79,
+        "passed": 79,
         "passRate": 1.0
       },
       "test": {
-        "cases": 48,
-        "passed": 48,
+        "cases": 55,
+        "passed": 55,
         "passRate": 1.0
       }
     },
     "bySubset": {
       "aftersales": {
-        "cases": 10,
-        "passed": 10,
+        "cases": 12,
+        "passed": 12,
         "passRate": 1.0
       },
       "cancel_order": {
@@ -35,8 +35,8 @@
         "passRate": 1.0
       },
       "chat_howto": {
-        "cases": 6,
-        "passed": 6,
+        "cases": 7,
+        "passed": 7,
         "passRate": 1.0
       },
       "confirm_receipt": {
@@ -70,8 +70,8 @@
         "passRate": 1.0
       },
       "logistics": {
-        "cases": 7,
-        "passed": 7,
+        "cases": 9,
+        "passed": 9,
         "passRate": 1.0
       },
       "order_query": {
@@ -90,13 +90,13 @@
         "passRate": 1.0
       },
       "refund": {
-        "cases": 10,
-        "passed": 10,
+        "cases": 17,
+        "passed": 17,
         "passRate": 1.0
       },
       "review": {
-        "cases": 8,
-        "passed": 8,
+        "cases": 10,
+        "passed": 10,
         "passRate": 1.0
       },
       "tool_policy": {
@@ -121,14 +121,19 @@
         "passed": 14,
         "passRate": 1.0
       },
+      "forbiddenTools": {
+        "graded": 13,
+        "passed": 13,
+        "passRate": 1.0
+      },
       "handoffReason": {
         "graded": 8,
         "passed": 8,
         "passRate": 1.0
       },
       "intent": {
-        "graded": 94,
-        "passed": 94,
+        "graded": 108,
+        "passed": 108,
         "passRate": 1.0
       },
       "mismatchFlagged": {
@@ -137,8 +142,8 @@
         "passRate": 1.0
       },
       "nextAction": {
-        "graded": 85,
-        "passed": 85,
+        "graded": 100,
+        "passed": 100,
         "passRate": 1.0
       },
       "noSnakeCaseLeak": {
@@ -146,14 +151,74 @@
         "passed": 5,
         "passRate": 1.0
       },
+      "orderCard": {
+        "graded": 13,
+        "passed": 13,
+        "passRate": 1.0
+      },
+      "orderResolution": {
+        "graded": 13,
+        "passed": 13,
+        "passRate": 1.0
+      },
+      "orderTarget": {
+        "graded": 9,
+        "passed": 9,
+        "passRate": 1.0
+      },
+      "orderTool": {
+        "graded": 13,
+        "passed": 13,
+        "passRate": 1.0
+      },
+      "selectionCard": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionForbiddenTools": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionIntent": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionOrderTool": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionResolution": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionTarget": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionToolArgs": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
+      "selectionValid": {
+        "graded": 2,
+        "passed": 2,
+        "passRate": 1.0
+      },
       "tool": {
-        "graded": 92,
-        "passed": 92,
+        "graded": 103,
+        "passed": 103,
         "passRate": 1.0
       },
       "toolArgs": {
-        "graded": 36,
-        "passed": 36,
+        "graded": 35,
+        "passed": 35,
         "passRate": 1.0
       },
       "verifiedAction": {

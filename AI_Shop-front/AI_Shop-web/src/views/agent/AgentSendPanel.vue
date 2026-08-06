@@ -456,7 +456,12 @@ watch(
   (msg) => {
     if (!msg) return;
     const outputType = Number(msg.outPutType);
-    if (outputType === AGENT_OUTPUT_TYPE.DONE || outputType === AGENT_OUTPUT_TYPE.ERROR) {
+    if (
+      (outputType === AGENT_OUTPUT_TYPE.DONE || outputType === AGENT_OUTPUT_TYPE.ERROR) &&
+      messageId.value != null &&
+      msg.messageId != null &&
+      String(messageId.value) === String(msg.messageId)
+    ) {
       resetComposerIdle();
     }
   }

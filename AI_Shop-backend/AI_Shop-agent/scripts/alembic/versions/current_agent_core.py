@@ -54,6 +54,30 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        CREATE TABLE IF NOT EXISTS agent_order_selection
+        (
+            selection_id          varchar(64) NOT NULL PRIMARY KEY,
+            user_id               varchar(32) NOT NULL,
+            source_message_id     bigint NULL,
+            intent                varchar(40) NOT NULL,
+            original_text         varchar(4000) NOT NULL,
+            candidates_json       json NOT NULL,
+            context_json          json NULL,
+            status                varchar(16) NOT NULL DEFAULT 'ACTIVE',
+            expires_at            datetime NOT NULL,
+            selected_target_type  varchar(32) NULL,
+            selected_target_id    varchar(128) NULL,
+            selected_message_id   bigint NULL,
+            created_at            datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at            datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_agent_selection_user_status (user_id, status, expires_at),
+            UNIQUE KEY uk_agent_selection_message (selected_message_id)
+        ) CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci
+        """
+    )
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS agent_shopping_profile
         (
             user_id varchar(32) NOT NULL PRIMARY KEY,
@@ -73,19 +97,51 @@ def upgrade() -> None:
             action_type varchar(64) NOT NULL,
             message_id bigint NULL,
             params_json json NOT NULL,
+            business_key varchar(255) NOT NULL,
+            args_fingerprint char(64) NOT NULL,
             summary varchar(512) NULL,
             confirm_text varchar(64) NULL,
             risk_tip varchar(512) NULL,
             status varchar(16) NOT NULL,
             result_message text NULL,
             error_message text NULL,
+            reconcile_attempts int DEFAULT 0 NOT NULL,
+            reconcile_deadline datetime NULL,
+            last_reconcile_at datetime NULL,
+            review_reason varchar(512) NULL,
             expires_at datetime NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
                 ON UPDATE CURRENT_TIMESTAMP,
+            active_business_key varchar(255) GENERATED ALWAYS AS (
+                CASE WHEN status IN ('PENDING','EXECUTING','INCONCLUSIVE','MANUAL_REVIEW')
+                     THEN business_key ELSE NULL END
+            ) STORED,
             KEY idx_agent_pending_user (user_id, status, expires_at),
-            KEY idx_agent_pending_expire (status, expires_at)
+            KEY idx_agent_pending_expire (status, expires_at),
+            UNIQUE KEY uk_agent_pending_active_business (active_business_key)
         ) CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_recommendation_event
+        (
+            event_id bigint AUTO_INCREMENT PRIMARY KEY,
+            user_id varchar(32) NOT NULL,
+            request_id varchar(128) NOT NULL,
+            product_id varchar(64) NOT NULL,
+            position smallint unsigned NOT NULL,
+            source varchar(40) NOT NULL,
+            event_type varchar(16) NOT NULL,
+            occurred_at datetime(3) NOT NULL,
+            created_at datetime(3) DEFAULT CURRENT_TIMESTAMP(3) NOT NULL,
+            CONSTRAINT uk_agent_rec_event
+                UNIQUE (request_id, product_id, position, event_type),
+            KEY idx_agent_rec_user_time (user_id, occurred_at),
+            KEY idx_agent_rec_request_type (request_id, event_type)
+        ) COMMENT 'auditable recommendation impression and click facts'
+          CHARSET = utf8mb4
         """
     )
     op.execute(
@@ -363,6 +419,7 @@ def upgrade() -> None:
     )
 
     _reconcile_agent_message()
+    _reconcile_pending_action()
     _reconcile_indexes()
 
 
@@ -398,6 +455,68 @@ def _reconcile_agent_message() -> None:
     op.execute("ALTER TABLE agent_message MODIFY COLUMN biz_data mediumtext NULL")
 
 
+def _reconcile_pending_action() -> None:
+    """Add business-level dedupe and bounded reconciliation to legacy databases."""
+    inspector = sa.inspect(op.get_bind())
+    columns = {column["name"] for column in inspector.get_columns("agent_pending_action")}
+    definitions = {
+        "business_key": sa.Column("business_key", sa.String(255), nullable=True),
+        "args_fingerprint": sa.Column("args_fingerprint", sa.String(64), nullable=True),
+        "reconcile_attempts": sa.Column(
+            "reconcile_attempts",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("0"),
+        ),
+        "reconcile_deadline": sa.Column("reconcile_deadline", sa.DateTime(), nullable=True),
+        "last_reconcile_at": sa.Column("last_reconcile_at", sa.DateTime(), nullable=True),
+        "review_reason": sa.Column("review_reason", sa.String(512), nullable=True),
+    }
+    for name, column in definitions.items():
+        if name not in columns:
+            op.add_column("agent_pending_action", column)
+
+    # Old rows did not retain enough information to reconstruct a truthful business
+    # identity. Give each one a non-conflicting legacy key instead of guessing from a
+    # mutable summary. The JSON hash remains useful for audit, but is not presented as
+    # the canonical fingerprint produced by the new application path.
+    op.execute(
+        """
+        UPDATE agent_pending_action
+        SET business_key = CONCAT('legacy:', action_token)
+        WHERE business_key IS NULL OR business_key = ''
+        """
+    )
+    op.execute(
+        """
+        UPDATE agent_pending_action
+        SET args_fingerprint = LOWER(SHA2(CAST(params_json AS CHAR), 256))
+        WHERE args_fingerprint IS NULL OR args_fingerprint = ''
+        """
+    )
+    op.execute(
+        "ALTER TABLE agent_pending_action MODIFY COLUMN business_key varchar(255) NOT NULL"
+    )
+    op.execute(
+        "ALTER TABLE agent_pending_action MODIFY COLUMN args_fingerprint char(64) NOT NULL"
+    )
+
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("agent_pending_action")
+    }
+    if "active_business_key" not in columns:
+        op.execute(
+            """
+            ALTER TABLE agent_pending_action
+            ADD COLUMN active_business_key varchar(255) GENERATED ALWAYS AS (
+                CASE WHEN status IN ('PENDING','EXECUTING','INCONCLUSIVE','MANUAL_REVIEW')
+                     THEN business_key ELSE NULL END
+            ) STORED
+            """
+        )
+
+
 def _reconcile_indexes() -> None:
     indexes = {
         "agent_message": (
@@ -409,6 +528,14 @@ def _reconcile_indexes() -> None:
                 False,
             ),
         ),
+        "agent_order_selection": (
+            (
+                "idx_agent_selection_user_status",
+                ("user_id", "status", "expires_at"),
+                False,
+            ),
+            ("uk_agent_selection_message", ("selected_message_id",), True),
+        ),
         "agent_pending_action": (
             (
                 "idx_agent_pending_user",
@@ -416,6 +543,20 @@ def _reconcile_indexes() -> None:
                 False,
             ),
             ("idx_agent_pending_expire", ("status", "expires_at"), False),
+            (
+                "uk_agent_pending_active_business",
+                ("active_business_key",),
+                True,
+            ),
+        ),
+        "agent_recommendation_event": (
+            (
+                "uk_agent_rec_event",
+                ("request_id", "product_id", "position", "event_type"),
+                True,
+            ),
+            ("idx_agent_rec_user_time", ("user_id", "occurred_at"), False),
+            ("idx_agent_rec_request_type", ("request_id", "event_type"), False),
         ),
         "support_session": (
             ("idx_support_queue", ("status", "urgency", "created_at"), False),
@@ -470,8 +611,10 @@ def downgrade() -> None:
         "agent_task",
         "support_message",
         "support_session",
+        "agent_recommendation_event",
         "agent_pending_action",
         "agent_shopping_profile",
+        "agent_order_selection",
         "agent_session_memory",
         "agent_message",
     ):

@@ -35,6 +35,7 @@ class StreamService:
         assistant_message: str = "",
         biz_type: str | None = None,
         user_message: str | None = None,
+        source_refs: list[dict] | dict | None = None,
     ) -> None:
 
         dto = MessageSendDTO(
@@ -44,6 +45,7 @@ class StreamService:
             assistant_message=assistant_message,
             biz_type=biz_type,
             out_put_type=DONE,
+            source_refs=source_refs,
         )
         await self._publish(dto)
 

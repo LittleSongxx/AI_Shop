@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth';
 import { showNotification, type NotificationData } from '@/utils/notification';
 import { toast } from '@/utils/toast';
 import { resolveAgentWsUrl } from '@/utils/websocket/url';
+import type { AgentSourceRef } from '@/utils/agentHistory';
 
 export interface AppWsMessage {
   messageType?: 'agent' | 'notify' | string;
@@ -17,6 +18,7 @@ export interface AppWsMessage {
   title?: string;
   content?: string;
   createTime?: string;
+  sourceRefs?: AgentSourceRef[] | { sources?: AgentSourceRef[] };
 }
 
 type UnreadRefreshHandler = () => void | Promise<void>;

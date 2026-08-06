@@ -16,7 +16,11 @@ from app.domain.intent.types import (
     SentimentKind,
     UrgencyKind,
 )
-from app.harness.metrics.runtime_sensors import HANDOFF_TOTAL, INTENT_TOTAL
+from app.harness.metrics.runtime_sensors import (
+    HANDOFF_TOTAL,
+    INTENT_SCHEMA_TOTAL,
+    INTENT_TOTAL,
+)
 from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.llm_factory import create_memory_llm
 from app.services.prompt_service import load_user_intent_classifier_prompt
@@ -113,6 +117,7 @@ _TOOL_INTENTS = frozenset(
         IntentKind.REFUND,
         IntentKind.CONFIRM_RECEIPT,
         IntentKind.QUERY_LOGISTICS,
+        IntentKind.QUERY_FULFILLMENT,
         IntentKind.QUERY_COUPON,
         IntentKind.PRODUCT_REVIEW,
         IntentKind.RECOMMENT,
@@ -130,11 +135,25 @@ def _structural_intent(
     consult_card: dict | None = None,
     message_card: dict | None = None,
 ) -> IntentKind | None:
+    if _has_order_action_cue(user_text):
+        return None
     if is_product_consult_turn(
         user_text, message_card, consult_card, from_product=from_product
     ):
         return IntentKind.PRODUCT_CONSULT
     return None
+
+
+def _has_order_action_cue(text: str) -> bool:
+    value = text or ""
+    return any(
+        hint in value
+        for hint in (
+            "退款", "退货", "退钱", "取消", "确认收货", "物流", "快递",
+            "发货了吗", "没发货", "未发货", "催发货", "评价", "好评", "差评", "五星", "追评",
+            "发票", "改地址", "修改地址", "破损", "损坏", "坏了", "错发", "漏发",
+        )
+    )
 
 
 def classify_intent_by_rules(
@@ -174,11 +193,28 @@ def classify_intent_by_rules(
         "退款进度", "退款到哪", "退款到账", "退款什么时候", "退款状态",
         "多久到账", "几天到账", "何时到账", "什么时候到账", "多久退", "几天退",
     )):
-        return IntentKind.REFUND_STATUS
+        personal_refund = any(
+            k in text
+            for k in ("我的退款", "这笔退款", "那笔退款", "退款单", "我退的", "给我退")
+        ) or bool(extract_order_id(text) or extract_order_item_id(text))
+        generic_policy = any(k in text for k in ("一般", "通常", "大概", "规则", "正常"))
+        if personal_refund or not generic_policy and not re.search(r"^(退款|退货).*(多久|几天|何时|什么时候)", text):
+            return IntentKind.REFUND_STATUS
+        return IntentKind.CHAT
     if any(k in text for k in PAYMENT_ISSUE_HINTS):
         return IntentKind.PAYMENT_ISSUE
-    if any(k in text for k in ("破损", "损坏", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
+    if any(k in text for k in ("破损", "损坏", "坏了", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
         return IntentKind.DAMAGED_OR_WRONG_ITEM
+
+    if (
+        not any(k in text for k in (
+            "退款", "退货", "退钱", "取消", "确认收货", "评价", "追评",
+            "地址", "发票", "物流", "快递", "包裹", "运单",
+        ))
+        and any(k in text for k in ("催发货", "催一下发货", "发货了吗", "发货了没", "怎么还没发货", "怎么还不发货", "还没发货", "没发货", "未发货"))
+    ):
+        if not any(k in text for k in ("一般多久发货", "通常多久发货", "多久能发货", "什么时候能发货")):
+            return IntentKind.QUERY_FULFILLMENT
 
     # logi-006：物流异常问法（「物流一直不动怎么办」）要的是轨迹而不是操作说明，
     # 必须抢在 howto 分支之前——否则「怎么」+「物流」会先命中 howto 判成 CHAT。
@@ -238,12 +274,34 @@ def classify_intent_by_rules(
 
     if any(k in text for k in ("开发票", "发票", "抬头", "税号")):
         return IntentKind.INVOICE
-    if any(k in text for k in ("修改地址", "改地址", "收货地址错", "地址填错", "换地址")):
+    if any(k in text for k in ("修改地址", "改地址", "收货地址错", "地址填错", "换地址")) or (
+        "地址" in text and any(k in text for k in ("改", "修改", "换"))
+    ):
         return IntentKind.ADDRESS_CHANGE
     if "投诉" in text or any(k in text for k in _VERY_NEGATIVE_HINTS):
         return IntentKind.COMPLAINT
 
     if any(k in text for k in ("追评", "再评", "二次评价")):
+        return IntentKind.RECOMMENT
+    # 订单已在上一轮被确定性定位后，用户通常只补充“五星，音质很好”，
+    # 不会再次复述“我要评价”。评分表达是写提案的必要参数，因此只在上一轮
+    # 明确处于评价流程时延续，避免把普通的“五分”商品咨询误判成写操作。
+    if session_intent == IntentKind.PRODUCT_REVIEW.value and re.search(
+        r"(?:[1-5一二三四五]|[壹贰叁肆伍])\s*(?:星|分)", text
+    ):
+        return IntentKind.PRODUCT_REVIEW
+    if (
+        session_intent == IntentKind.RECOMMENT.value
+        and len(text) <= 120
+        and any(
+            hint in text
+            for hint in (
+                "音质", "降噪", "做工", "质量", "续航", "手感", "包装",
+                "物流", "客服", "好用", "满意", "不错", "很好", "一般",
+                "失望", "差", "补充", "追加",
+            )
+        )
+    ):
         return IntentKind.RECOMMENT
     # refund-005：「这东西我不想要了，退了吧」之前匹配不到「退款/退货/退钱」。
     # refund-008 过宽修复：「要退」「想退」是子串匹配，政策/疑问问法（"要不要退
@@ -279,6 +337,8 @@ def classify_intent_by_rules(
     if any(k in text for k in ("物流", "快递", "到哪了", "运单", "包裹")):
         return IntentKind.QUERY_LOGISTICS
     if any(k in text for k in ("查看评价", "评价内容", "写了什么评价", "我的评价")):
+        return IntentKind.QUERY_COMMENT
+    if "评价" in text and any(k in text for k in ("查一下", "查查", "看看", "那单", "这单")):
         return IntentKind.QUERY_COMMENT
     # review-004：只说「我要评价」也要认出评价意图，再由工具层追问单号，
     # 不能落成 CHAT + 建议转人工。
@@ -370,6 +430,7 @@ def classify_high_confidence_intent(
         IntentKind.REFUND_STATUS,
         IntentKind.INVOICE,
         IntentKind.ADDRESS_CHANGE,
+        IntentKind.QUERY_FULFILLMENT,
     }:
         return ruled, order_id
     if order_id and any(
@@ -502,8 +563,56 @@ async def classify_intent_by_llm(
         base = f"{template}\n\n用户ID：{user_id}\n用户问题：{user_text}"
 
     prompt = f"{base}\n\n{context}"
+    messages = [
+        SystemMessage(
+            content=(
+                "你是电商客服意图分类器。严格按提供的 IntentDecision schema 返回；"
+                "不要解释，不要执行任何业务操作。"
+            )
+        ),
+        HumanMessage(content=prompt),
+    ]
     try:
         llm = create_memory_llm()
+    except Exception as exc:
+        INTENT_SCHEMA_TOTAL.labels(result="invalid").inc()
+        logger.warning(
+            "intent_llm_create_failed_safe_fallback",
+            error_type=type(exc).__name__,
+            error=str(exc)[:300],
+        )
+        return _build_decision(
+            IntentKind.CHAT,
+            user_text,
+            confidence=0.0,
+            source="llm_invalid",
+            next_action=NextAction.ASK_CLARIFICATION,
+        )
+
+    structured_error: Exception | None = None
+    try:
+        structured_llm = llm.with_structured_output(IntentDecision, include_raw=True)
+        response = await invoke_llm_with_metrics(
+            structured_llm,
+            messages,
+            model=get_settings().memory_llm_model or get_settings().llm_model,
+        )
+        parsed = response.get("parsed") if isinstance(response, dict) else response
+        parsing_error = response.get("parsing_error") if isinstance(response, dict) else None
+        if parsing_error is not None:
+            raise ValueError(f"structured intent parsing failed: {parsing_error}")
+        decision = IntentDecision.model_validate(parsed)
+        INTENT_SCHEMA_TOTAL.labels(result="schema_success").inc()
+        return _normalize_llm_decision(decision, user_text, source="llm_structured")
+    except Exception as exc:
+        structured_error = exc
+        logger.info(
+            "intent_structured_output_fallback",
+            error_type=type(exc).__name__,
+            error=str(exc)[:300],
+        )
+
+    try:
         response = await invoke_llm_with_metrics(
             llm,
             [
@@ -516,6 +625,7 @@ async def classify_intent_by_llm(
                 ),
                 HumanMessage(content=prompt),
             ],
+            model=get_settings().memory_llm_model or get_settings().llm_model,
         )
         content = (
             response.content
@@ -525,38 +635,80 @@ async def classify_intent_by_llm(
         obj = _parse_intent_json(content)
         if not obj:
             logger.warning("intent_llm_parse_failed", raw=content[:200])
-            return None
-        try:
-            intent = IntentKind(
-                str(obj.get("intentType") or obj.get("intent_type") or "").upper()
-            )
-        except ValueError:
-            logger.warning("intent_llm_unknown_intent", raw=content[:200])
-            return None
-        data = str(obj.get("data") or obj.get("keyword") or "").strip()
-        entities = obj.get("entities") if isinstance(obj.get("entities"), dict) else {}
-        entities = {str(k): str(v) for k, v in entities.items() if v not in (None, "")}
-        return IntentDecision(
-            intent=intent,
-            confidence=_clamp_confidence(obj.get("confidence"), 0.75),
-            entities={**extract_entities(user_text, data), **entities},
-            sentiment=_enum_or_default(
-                SentimentKind, obj.get("sentiment"), analyze_sentiment(user_text)
-            ),
-            urgency=_enum_or_default(UrgencyKind, obj.get("urgency"), UrgencyKind.NORMAL),
-            risk_level=_enum_or_default(
-                RiskLevel, obj.get("riskLevel") or obj.get("risk_level"), RiskLevel.LOW
-            ),
-            next_action=_enum_or_default(
-                NextAction, obj.get("nextAction") or obj.get("next_action"), NextAction.ANSWER
-            ),
-            handoff_reason=str(obj.get("handoffReason") or "").strip() or None,
-            source="llm",
-            data=data,
-        )
+            raise ValueError("intent text fallback did not return JSON")
+        decision = _decision_from_text_json(obj, user_text)
+        INTENT_SCHEMA_TOTAL.labels(result="fallback").inc()
+        return decision
     except Exception as exc:
-        logger.warning("intent_llm_failed", error=str(exc))
-        return None
+        INTENT_SCHEMA_TOTAL.labels(result="invalid").inc()
+        logger.warning(
+            "intent_llm_invalid_safe_fallback",
+            structured_error_type=(type(structured_error).__name__ if structured_error else None),
+            fallback_error_type=type(exc).__name__,
+            error=str(exc)[:300],
+        )
+        return _build_decision(
+            IntentKind.CHAT,
+            user_text,
+            confidence=0.0,
+            source="llm_invalid",
+            next_action=NextAction.ASK_CLARIFICATION,
+        )
+
+
+def _normalize_llm_decision(
+    decision: IntentDecision, user_text: str, *, source: str
+) -> IntentDecision:
+    data = str(decision.data or "").strip()
+    entities = {
+        str(key): str(value)
+        for key, value in (decision.entities or {}).items()
+        if value not in (None, "")
+    }
+    return decision.model_copy(
+        update={
+            "confidence": _clamp_confidence(decision.confidence, 0.75),
+            "entities": {**extract_entities(user_text, data), **entities},
+            "source": source,
+            "data": data,
+        }
+    )
+
+
+def _decision_from_text_json(
+    obj: dict[str, object], user_text: str
+) -> IntentDecision:
+    try:
+        intent = IntentKind(
+            str(obj.get("intentType") or obj.get("intent_type") or "").upper()
+        )
+    except ValueError as exc:
+        raise ValueError("unknown intent in text fallback") from exc
+    data = str(obj.get("data") or obj.get("keyword") or "").strip()
+    raw_entities = obj.get("entities") if isinstance(obj.get("entities"), dict) else {}
+    entities = {
+        str(key): str(value)
+        for key, value in raw_entities.items()
+        if value not in (None, "")
+    }
+    return IntentDecision(
+        intent=intent,
+        confidence=_clamp_confidence(obj.get("confidence"), 0.75),
+        entities={**extract_entities(user_text, data), **entities},
+        sentiment=_enum_or_default(
+            SentimentKind, obj.get("sentiment"), analyze_sentiment(user_text)
+        ),
+        urgency=_enum_or_default(UrgencyKind, obj.get("urgency"), UrgencyKind.NORMAL),
+        risk_level=_enum_or_default(
+            RiskLevel, obj.get("riskLevel") or obj.get("risk_level"), RiskLevel.LOW
+        ),
+        next_action=_enum_or_default(
+            NextAction, obj.get("nextAction") or obj.get("next_action"), NextAction.ANSWER
+        ),
+        handoff_reason=str(obj.get("handoffReason") or "").strip() or None,
+        source="llm_fallback",
+        data=data,
+    )
 
 
 async def resolve_intent(
@@ -746,6 +898,7 @@ def _record_and_apply(
         in {
             IntentKind.QUERY_ORDER,
             IntentKind.QUERY_LOGISTICS,
+            IntentKind.QUERY_FULFILLMENT,
             IntentKind.REFUND_STATUS,
             IntentKind.CANCEL_ORDER,
             IntentKind.CONFIRM_RECEIPT,

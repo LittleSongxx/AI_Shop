@@ -1,0 +1,218 @@
+name: aishop-fault-drill
+
+x-agent-environment: &agent-environment
+  APP_ENV: development
+  APP_RELOAD: "false"
+  OTEL_ENABLED: "false"
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  MYSQL_USER: root
+  MYSQL_PASSWORD: fault-root
+  MYSQL_DATABASE: aishop_agent_fault_drill
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_DB: "9"
+  RABBITMQ_URL: amqp://fault-drill:fault-drill@rabbitmq:5672/%2Ffault-drill
+  AGENT_QUEUE_EXCHANGE: fault-drill.agent.tasks
+  AGENT_TASK_DEADLINE_SECONDS: "120"
+  AGENT_TASK_LEASE_SECONDS: "30"
+  AGENT_TASK_DISPATCH_TIMEOUT_SECONDS: "5"
+  AGENT_TASK_RECOVERY_INTERVAL_SECONDS: "1"
+  AGENT_TASK_MAX_RETRIES: "2"
+  AGENT_USER_LOCK_TTL_SECONDS: "30"
+  AGENT_WORKER_HEARTBEAT_TTL_SECONDS: "10"
+  PENDING_ACTION_RECONCILE_INTERVAL_SECONDS: "300"
+  LLM_API_KEY: fault-drill-key
+  LLM_BASE_URL: http://llm-stub:8080/v1
+  LLM_MODEL: fault-drill-model
+  LLM_FALLBACK_MODEL: fault-drill-model
+  EMBEDDING_API_KEY: fault-drill-key
+  EMBEDDING_BASE_URL: http://llm-stub:8080/v1
+  EMBEDDING_MODEL: fault-drill-embedding
+  FAULT_CHECKPOINT_REDIS_URL: redis://checkpoint-redis:6379/11
+  TZ: UTC
+
+networks:
+  fault-drill-net:
+    name: aishop-fault-drill-net
+    driver: bridge
+
+volumes:
+  fault-drill-mysql:
+  fault-drill-redis:
+  fault-drill-checkpoint-redis:
+  fault-drill-rabbitmq:
+
+services:
+  mysql:
+    image: mysql:8.3
+    container_name: aishop-fault-drill-mysql
+    networks: [fault-drill-net]
+    ports:
+      - "13316:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: fault-root
+      MYSQL_DATABASE: aishop_agent_fault_drill
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --default-authentication-plugin=caching_sha2_password
+    volumes:
+      - fault-drill-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    container_name: aishop-fault-drill-redis
+    networks: [fault-drill-net]
+    ports:
+      - "16380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - fault-drill-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    restart: "no"
+
+  checkpoint-redis:
+    image: redis:7-alpine
+    container_name: aishop-fault-drill-checkpoint-redis
+    networks: [fault-drill-net]
+    ports:
+      - "16381:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - fault-drill-checkpoint-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    restart: "no"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: aishop-fault-drill-rabbitmq
+    networks: [fault-drill-net]
+    ports:
+      - "15674:5672"
+      - "25674:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: fault-drill
+      RABBITMQ_DEFAULT_PASS: fault-drill
+      RABBITMQ_DEFAULT_VHOST: /fault-drill
+    volumes:
+      - fault-drill-rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    restart: "no"
+
+  llm-stub:
+    build:
+      context: ../../AI_Shop-backend/AI_Shop-agent
+      dockerfile: ../../deploy/fault-drill/Dockerfile.agent
+    image: aishop-agent-fault-drill:local
+    container_name: aishop-fault-drill-llm-stub
+    networks: [fault-drill-net]
+    ports:
+      - "17080:8080"
+    command:
+      - uvicorn
+      - fault_drill.llm_stub:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
+  agent-api:
+    image: aishop-agent-fault-drill:local
+    container_name: aishop-fault-drill-agent-api
+    networks: [fault-drill-net]
+    ports:
+      - "17050:7050"
+    environment:
+      <<: *agent-environment
+    command:
+      - uvicorn
+      - fault_drill.api:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "7050"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      checkpoint-redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      llm-stub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7050/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    restart: "no"
+
+  worker-a:
+    image: aishop-agent-fault-drill:local
+    container_name: aishop-fault-drill-worker-a
+    networks: [fault-drill-net]
+    ports:
+      - "17051:7051"
+    environment:
+      <<: *agent-environment
+      WORKER_METRICS_PORT: "7051"
+    command: ["python", "-m", "fault_drill.worker"]
+    depends_on:
+      agent-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7051/metrics', timeout=2)"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    profiles: ["workers"]
+    restart: "no"
+
+  worker-b:
+    image: aishop-agent-fault-drill:local
+    container_name: aishop-fault-drill-worker-b
+    networks: [fault-drill-net]
+    ports:
+      - "17052:7052"
+    environment:
+      <<: *agent-environment
+      WORKER_METRICS_PORT: "7052"
+    command: ["python", "-m", "fault_drill.worker"]
+    depends_on:
+      agent-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7052/metrics', timeout=2)"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    profiles: ["workers"]
+    restart: "no"

@@ -18,7 +18,9 @@ from app.services.product_search_query import (
     filter_products_by_query_relevance,
     normalize_product_search_query,
 )
-from app.services.redis_service import redis_service
+from app.services.recommendation_attribution_service import (
+    recommendation_attribution_service,
+)
 from app.services.search_recommend_service import search_recommend_service
 from app.services.shopping_profile_service import shopping_profile_service
 from app.utils.biz_payload import build_product_payload, first_cover
@@ -244,7 +246,7 @@ class ProductService:
             displayed_ids = []
         if not isinstance(displayed_ids, list):
             displayed_ids = []
-        await redis_service.log_impression(
+        await recommendation_attribution_service.record_impression(
             user_id,
             [str(product_id) for product_id in displayed_ids if product_id],
             query=query,

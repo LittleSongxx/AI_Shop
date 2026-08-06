@@ -336,6 +336,10 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			orderItem.setOrderItemStatus(OrderItemStatusEnum.NORMAL.getStatus());
 			orderItem.setRemark(productItem.getRemark());
 			orderItem.setRefundOrderId(null);
+			orderItem.setAiRequestId(productItem.getAiRequestId());
+			orderItem.setAiPosition(productItem.getAiPosition());
+			orderItem.setAiSource(productItem.getAiSource());
+			orderItem.setAiAttributedAt(productItem.getAiAttributedAt());
 			String cover = null;
 			// 优先取 propertyValue 中的 cover
 			for (ProductPropertyValueSnapshotVO pv : propertyValueList) {
@@ -426,11 +430,10 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 
 			log.info("提交订单,payOrderId={}, 订单数量={}, 总金额={}", unifiedPayOrderId, orderInfoList.size(), totalAmount);
 
-			PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(
-					payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount);
-
 			payFeignSupport.createPending(userId, unifiedPayOrderId, orderInfoList.get(0).getOrderId(),
 					totalAmount, postOrderDTO.getPayMethod());
+			PayInfoDTO payInfoDTO = requestInitialPayInfoBestEffort(
+					payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount);
 
 			for (OrderInfo orderInfo : orderInfoList) {
 				PayOrderMessageDTO dto = new PayOrderMessageDTO();
@@ -467,6 +470,19 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				}
 			}
 			throw ex;
+		}
+	}
+
+	PayInfoDTO requestInitialPayInfoBestEffort(
+			String payScene, String payOrderId, String subject, BigDecimal amount) {
+		try {
+			return payFeignSupport.getPayUrl(payScene, payOrderId, subject, amount);
+		} catch (RuntimeException ex) {
+			log.warn(
+					"支付表单暂不可用，订单保持待支付并允许支付页重试, payOrderId={}, error={}",
+					payOrderId,
+					ex.getMessage());
+			return new PayInfoDTO(null, payOrderId, amount);
 		}
 	}
 

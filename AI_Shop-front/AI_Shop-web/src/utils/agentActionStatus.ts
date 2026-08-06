@@ -4,12 +4,14 @@ export const AGENT_ACTION_STATUS = {
   CANCELLED: 2,
   EXECUTING: 3,
   FAILED: 4,
-  EXPIRED: 5
+  EXPIRED: 5,
+  INCONCLUSIVE: 6,
+  MANUAL_REVIEW: 7
 } as const;
 
 export const normalizeAgentActionStatus = (value: unknown): number => {
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 5
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 7
     ? parsed
     : AGENT_ACTION_STATUS.PENDING;
 };
@@ -21,7 +23,10 @@ export const agentActionStatusClass = (value: unknown): string => {
     case AGENT_ACTION_STATUS.CANCELLED:
       return 'is-cancelled';
     case AGENT_ACTION_STATUS.EXECUTING:
+    case AGENT_ACTION_STATUS.INCONCLUSIVE:
       return 'is-executing';
+    case AGENT_ACTION_STATUS.MANUAL_REVIEW:
+      return 'is-manual-review';
     case AGENT_ACTION_STATUS.FAILED:
       return 'is-failed';
     case AGENT_ACTION_STATUS.EXPIRED:
@@ -39,6 +44,10 @@ export const agentActionStatusLabel = (value: unknown): string => {
       return '已取消';
     case AGENT_ACTION_STATUS.EXECUTING:
       return '执行中，请勿重复操作';
+    case AGENT_ACTION_STATUS.INCONCLUSIVE:
+      return '执行结果核对中，请勿重复操作';
+    case AGENT_ACTION_STATUS.MANUAL_REVIEW:
+      return '自动核对已到边界，等待人工复核';
     case AGENT_ACTION_STATUS.FAILED:
       return '执行失败，请重新发起';
     case AGENT_ACTION_STATUS.EXPIRED:

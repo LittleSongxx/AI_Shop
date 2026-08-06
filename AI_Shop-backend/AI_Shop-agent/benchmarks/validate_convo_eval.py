@@ -95,6 +95,44 @@ def main() -> int:
                 fail(problems, f"{where} expectToolVerified 必须是 bool")
             if verified is True and case.subset != "refund":
                 fail(problems, f"{where} expectToolVerified=true 只允许出现在 refund subset")
+            selection = row.get("selection")
+            if selection is not None:
+                if "orderFixture" not in row:
+                    fail(problems, f"{where} selection 必须与 orderFixture 一起使用")
+                if not isinstance(selection, dict):
+                    fail(problems, f"{where} selection 必须是 dict")
+                else:
+                    if selection.get("targetType") not in {"ORDER", "ORDER_ITEM"}:
+                        fail(problems, f"{where} selection.targetType 非法")
+                    if not str(selection.get("targetId") or "").strip():
+                        fail(problems, f"{where} selection.targetId 为空")
+                    if "followUpText" in selection and not isinstance(
+                        selection["followUpText"], str
+                    ):
+                        fail(problems, f"{where} selection.followUpText 必须是 str")
+                selection_intent = row.get("expectSelectionIntent")
+                if (
+                    selection_intent is not None
+                    and selection_intent not in IntentKind.__members__
+                ):
+                    fail(
+                        problems,
+                        f"{where} expectSelectionIntent 不是合法意图: {selection_intent}",
+                    )
+                selection_tool = row.get("expectSelectionOrderTool")
+                if selection_tool is not None and selection_tool not in ALL_ALLOWED_TOOLS:
+                    fail(
+                        problems,
+                        f"{where} expectSelectionOrderTool 不在白名单里: {selection_tool}",
+                    )
+                selection_args = row.get("expectSelectionArgs")
+                if selection_tool is not None and not isinstance(selection_args, dict):
+                    fail(
+                        problems,
+                        f"{where} 期望选择后调用 {selection_tool} 但 expectSelectionArgs 不是 dict",
+                    )
+                if selection_args is not None and not isinstance(selection_args, dict):
+                    fail(problems, f"{where} expectSelectionArgs 必须是 dict")
             # context 注入的键必须白名单化：拼错键（如 sessionIntnet）会静默
             # 改变 case 语义而不是报错，跑出来的分数就不可信了。
             ctx = row.get("context") or {}

@@ -153,6 +153,41 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0.3] }
 
+      - uid: aishop-order-reference-dependency-errors
+        title: 订单自然语言解析依赖连续失败
+        condition: THRESHOLD
+        for: 5m
+        annotations:
+          summary: "最近 10 分钟订单解析依赖失败超过 2 次"
+          description: >-
+            outcome=dependency_error 表示 Agent 无法从 Java 订单服务取得本人订单事实。
+            此时用户看到的是明确降级文案，不会被误导为“没有订单”。先检查 Gateway、
+            Order 服务和内部令牌；阈值是工程初值，不代表生产 SLO。
+        labels:
+          severity: warning
+          tier: ai
+        data:
+          - refId: QUERY
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: aishop-prometheus
+            model:
+              refId: QUERY
+              editorMode: code
+              expr: >-
+                sum(increase(agent_order_reference_total{
+                  job=~"aishop-agent(-worker)?",outcome="dependency_error"}[10m]))
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+
   # ======================================================================== #
   # 三、延迟：用户感知得到的慢                                                  #
   # ======================================================================== #
@@ -232,6 +267,42 @@ groups:
               expression: QUERY
               conditions:
                 - evaluator: { type: gt, params: [2] }
+
+      - uid: aishop-agent-total-p95-slow
+        title: Agent 端到端 p95 延迟超过 30s
+        condition: THRESHOLD
+        for: 5m
+        annotations:
+          summary: "Agent 端到端 p95 {{ $values.QUERY.Value }}s，超过 30s"
+          description: >-
+            total 从消息入队起算，覆盖排队、意图、检索、工具和生成；旧任务载荷没有入队时间时
+            才退化为 Worker 实际处理时长。先按 stage 面板定位慢点，再检查 Worker 积压、
+            Java 工具依赖和模型延迟。30 秒只是当前工程告警边界，不代表已验证的线上 SLO。
+        labels:
+          severity: warning
+          tier: ai
+        data:
+          - refId: QUERY
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: aishop-prometheus
+            model:
+              refId: QUERY
+              editorMode: code
+              expr: >-
+                histogram_quantile(0.95,
+                  sum by (le) (
+                    rate(agent_stage_latency_seconds_bucket{job=~"aishop-agent(-worker)?",stage="total"}[10m])))
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator: { type: gt, params: [30] }
 
       - uid: aishop-http-5xx
         title: 网关 5xx 比例超过 1%
@@ -398,3 +469,45 @@ groups:
               expression: QUERY
               conditions:
                 - evaluator: { type: gt, params: [0.1] }
+
+  # ======================================================================== #
+  # 五、成本口径：有调用但没有可核算价格                                          #
+  # ======================================================================== #
+  - orgId: 1
+    name: aishop-cost-accounting
+    folder: AI_Shop
+    interval: 1m
+    rules:
+      - uid: aishop-llm-unpriced-tokens
+        title: LLM 存在未定价 token
+        condition: THRESHOLD
+        for: 10m
+        annotations:
+          summary: "最近 10 分钟仍有未定价 token，人民币成本口径不完整"
+          description: >-
+            当前模型或 fallback 模型没有出现在 LLM_PRICING_CNY_PER_MILLION_JSON 中，
+            token 用量仍被记录，但人民币成本不会被猜测填充。确认实际 provider 账单价格和模型名后
+            再补配置，并核对 input/output 两项；这不是服务故障，但会使成本报表低估。
+        labels:
+          severity: warning
+          tier: ai
+        data:
+          - refId: QUERY
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: aishop-prometheus
+            model:
+              refId: QUERY
+              editorMode: code
+              expr: >-
+                sum(increase(agent_llm_unpriced_tokens_total{job=~"aishop-agent(-worker)?",kind="total"}[10m]))
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator: { type: gt, params: [0] }

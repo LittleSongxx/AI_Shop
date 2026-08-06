@@ -8,6 +8,13 @@ import pytest
 
 from app.config.settings import get_settings
 from app.db.migrations import _REQUIRED_COLUMNS, CURRENT_REVISION, run_migrations
+from app.db.pool import close_pool, init_pool
+from app.domain.intent.types import IntentDecision, IntentKind, NextAction
+from app.services.order_selection_store import (
+    OrderSelectionConflict,
+    order_selection_store,
+)
+from app.services.recommendation_event_store import recommendation_event_store
 
 pytestmark = pytest.mark.mysql
 
@@ -154,7 +161,8 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
     original = f"agent_migration_original_{suffix}"
     incomplete = f"agent_migration_incomplete_{suffix}"
     duplicates = f"agent_migration_duplicates_{suffix}"
-    databases = (fresh, original, incomplete, duplicates)
+    pending_legacy = f"agent_migration_pending_{suffix}"
+    databases = (fresh, original, incomplete, duplicates, pending_legacy)
 
     try:
         for database in databases:
@@ -163,6 +171,29 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
         _migrate(fresh)
         _migrate(fresh)
         _assert_current_schema(fresh)
+        with _database_connection(fresh) as connection, connection.cursor() as cursor:
+            insert = """
+                INSERT INTO agent_pending_action
+                    (action_token, user_id, action_type, params_json, business_key,
+                     args_fingerprint, status, expires_at, created_at, updated_at)
+                VALUES (%s, 'u-dedupe', 'REFUND', '{"orderItemId":"item-1"}',
+                        'u-dedupe:REFUND:item-1', %s, %s,
+                        DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW(), NOW())
+            """
+            cursor.execute(insert, ("act_first", "a" * 64, "PENDING"))
+            with pytest.raises(pymysql.err.IntegrityError):
+                cursor.execute(insert, ("act_second", "a" * 64, "PENDING"))
+            cursor.execute(
+                "UPDATE agent_pending_action SET status='MANUAL_REVIEW' "
+                "WHERE action_token='act_first'"
+            )
+            with pytest.raises(pymysql.err.IntegrityError):
+                cursor.execute(insert, ("act_second", "a" * 64, "PENDING"))
+            cursor.execute(
+                "UPDATE agent_pending_action SET status='CANCELLED' "
+                "WHERE action_token='act_first'"
+            )
+            cursor.execute(insert, ("act_second", "a" * 64, "PENDING"))
 
         _create_original_schema(original)
         _migrate(original)
@@ -197,6 +228,51 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
                 "SELECT user_message, biz_data FROM agent_message WHERE user_id='u2'"
             )
             assert cursor.fetchone() == ("still here", '{"kept":true}')
+
+        # 模拟 alembic_version 已是 current、但待确认表仍是旧契约且已有业务数据。
+        # 迁移不能把旧参数猜成新的业务键；必须使用 legacy:<token> 隔离回填。
+        _migrate(pending_legacy)
+        with _database_connection(pending_legacy) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "ALTER TABLE agent_pending_action DROP INDEX uk_agent_pending_active_business"
+            )
+            cursor.execute("ALTER TABLE agent_pending_action DROP COLUMN active_business_key")
+            for column in (
+                "business_key",
+                "args_fingerprint",
+                "reconcile_attempts",
+                "reconcile_deadline",
+                "last_reconcile_at",
+                "review_reason",
+            ):
+                cursor.execute(f"ALTER TABLE agent_pending_action DROP COLUMN {column}")
+            cursor.execute(
+                """
+                INSERT INTO agent_pending_action
+                    (action_token, user_id, action_type, message_id, params_json,
+                     summary, status, expires_at, created_at, updated_at)
+                VALUES
+                    ('act_legacy_row', 'u-old', 'REFUND', 1,
+                     '{"orderItemId":"legacy_item"}', '历史退款提案', 'PENDING',
+                     DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW(), NOW())
+                """
+            )
+        _migrate(pending_legacy)
+        _assert_current_schema(pending_legacy)
+        with _database_connection(pending_legacy) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT business_key, LENGTH(args_fingerprint), active_business_key,
+                       reconcile_attempts
+                FROM agent_pending_action WHERE action_token='act_legacy_row'
+                """
+            )
+            assert cursor.fetchone() == (
+                "legacy:act_legacy_row",
+                64,
+                "legacy:act_legacy_row",
+                0,
+            )
 
         # 模拟旧版本允许同一用户存在多个活跃人工会话的数据库。升级必须保留
         # 两条会话记录，并把重复会话的消息迁入最早创建的主会话；直接 DELETE
@@ -274,3 +350,223 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
         get_settings.cache_clear()
         for database in databases:
             _drop_database(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("RUN_AGENT_MIGRATION_TESTS") != "1",
+    reason="requires a real MySQL 8 server",
+)
+async def test_recommendation_event_facts_are_deduplicated_and_validated():
+    database = f"agent_migration_rec_{uuid.uuid4().hex[:10]}"
+    request_id = uuid.uuid4().hex
+    try:
+        _create_database(database)
+        _migrate(database)
+        await init_pool()
+
+        await recommendation_event_store.record_impressions(
+            "u1", request_id, ["p1", "p2"], "hybrid"
+        )
+        await recommendation_event_store.record_impressions(
+            "u1", request_id, ["p1", "p2"], "hybrid"
+        )
+        first = await recommendation_event_store.record_click(
+            "u1", request_id, "p2", 2
+        )
+        duplicate = await recommendation_event_store.record_click(
+            "u1", request_id, "p2", 2
+        )
+
+        assert first is not None
+        assert duplicate == first
+        assert await recommendation_event_store.record_click(
+            "u2", request_id, "p2", 2
+        ) is None
+        assert await recommendation_event_store.record_click(
+            "u1", request_id, "p1", 2
+        ) is None
+        assert await recommendation_event_store.record_click(
+            "u1", request_id, "p2", 1
+        ) is None
+
+        validated = await recommendation_event_store.validate_batch(
+            "u1",
+            [
+                {"requestId": request_id, "productId": "p2", "position": 2},
+                {"requestId": request_id, "productId": "p1", "position": 1},
+            ],
+        )
+        assert validated == [first]
+
+        with _database_connection(database) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT event_type, COUNT(*) FROM agent_recommendation_event "
+                "GROUP BY event_type ORDER BY event_type"
+            )
+            assert cursor.fetchall() == (("CLICK", 1), ("IMPRESSION", 2))
+    finally:
+        await close_pool()
+        get_settings.cache_clear()
+        _drop_database(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("RUN_AGENT_MIGRATION_TESTS") != "1",
+    reason="requires a real MySQL 8 server",
+)
+async def test_order_selection_consumption_is_atomic_idempotent_and_recoverable():
+    database = f"agent_migration_selection_{uuid.uuid4().hex[:10]}"
+    candidates = [
+        {
+            "targetType": "ORDER_ITEM",
+            "targetId": "SMITEM202608050002",
+            "orderId": "SM202608050002",
+            "orderItemId": "SMITEM202608050002",
+            "productName": "索尼无线降噪耳机",
+        },
+        {
+            "targetType": "ORDER_ITEM",
+            "targetId": "SMITEM202608040001",
+            "orderId": "SM202608040001",
+            "orderItemId": "SMITEM202608040001",
+            "productName": "苹果无线耳机",
+        },
+    ]
+    decision = IntentDecision(
+        intent=IntentKind.REFUND,
+        confidence=1.0,
+        next_action=NextAction.TOOL,
+        source="order_selection",
+    )
+    try:
+        _create_database(database)
+        _migrate(database)
+        await init_pool()
+
+        selection = await order_selection_store.create(
+            user_id="u1",
+            source_message_id=30,
+            intent="REFUND",
+            original_text="没发货的耳机我要退款",
+            candidates=candidates,
+            context={"intentDecision": decision.model_dump(mode="json")},
+        )
+        kwargs = {
+            "selection_id": selection["selectionId"],
+            "user_id": "u1",
+            "target_type": "ORDER_ITEM",
+            "target_id": "SMITEM202608050002",
+            "message": "选择索尼无线降噪耳机订单继续退款。",
+            "decision": decision,
+            "previous_unresolved_count": 0,
+            "queue_name": "agent.high",
+            "priority": 100,
+            "trace_id": uuid.uuid4().hex,
+            "selected_reference": {
+                **candidates[0],
+                "intent": "REFUND",
+                "expiresAt": selection["expiresAt"],
+            },
+        }
+        first, created = await order_selection_store.consume_with_message_and_task(
+            **kwargs
+        )
+        repeated, repeated_created = (
+            await order_selection_store.consume_with_message_and_task(**kwargs)
+        )
+
+        assert created is True
+        assert repeated_created is False
+        assert repeated["messageId"] == first["messageId"]
+        with pytest.raises(OrderSelectionConflict):
+            await order_selection_store.consume_with_message_and_task(
+                **{
+                    **kwargs,
+                    "target_id": "SMITEM202608040001",
+                    "selected_reference": candidates[1],
+                }
+            )
+
+        rollback_selection = await order_selection_store.create(
+            user_id="u1",
+            source_message_id=31,
+            intent="REFUND",
+            original_text="退耳机",
+            candidates=[candidates[0]],
+        )
+        rollback_trace = uuid.uuid4().hex
+        with pytest.raises(pymysql.err.DataError):
+            await order_selection_store.consume_with_message_and_task(
+                **{
+                    **kwargs,
+                    "selection_id": rollback_selection["selectionId"],
+                    "priority": 1000,
+                    "trace_id": rollback_trace,
+                }
+            )
+
+        stale_selection = await order_selection_store.create(
+            user_id="u1",
+            source_message_id=32,
+            intent="REFUND",
+            original_text="退耳机",
+            candidates=[candidates[0]],
+        )
+        with _database_connection(database) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE agent_order_selection
+                SET status='PROCESSING', selected_target_type='ORDER_ITEM',
+                    selected_target_id='SMITEM202608050002',
+                    updated_at=DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                WHERE selection_id=%s
+                """,
+                (stale_selection["selectionId"],),
+            )
+        stale_message, stale_created = (
+            await order_selection_store.consume_with_message_and_task(
+                **{
+                    **kwargs,
+                    "selection_id": stale_selection["selectionId"],
+                    "trace_id": uuid.uuid4().hex,
+                }
+            )
+        )
+        assert stale_created is True
+        assert stale_message["messageId"] != first["messageId"]
+
+        with _database_connection(database) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT status, selected_message_id
+                FROM agent_order_selection WHERE selection_id=%s
+                """,
+                (selection["selectionId"],),
+            )
+            assert cursor.fetchone() == ("CONSUMED", first["messageId"])
+            cursor.execute(
+                "SELECT COUNT(*) FROM agent_message WHERE trace_id=%s",
+                (kwargs["trace_id"],),
+            )
+            assert cursor.fetchone() == (1,)
+            cursor.execute(
+                "SELECT COUNT(*) FROM agent_task WHERE message_id=%s",
+                (first["messageId"],),
+            )
+            assert cursor.fetchone() == (1,)
+            cursor.execute(
+                "SELECT status FROM agent_order_selection WHERE selection_id=%s",
+                (rollback_selection["selectionId"],),
+            )
+            assert cursor.fetchone() == ("ACTIVE",)
+            cursor.execute(
+                "SELECT COUNT(*) FROM agent_message WHERE trace_id=%s",
+                (rollback_trace,),
+            )
+            assert cursor.fetchone() == (0,)
+    finally:
+        await close_pool()
+        get_settings.cache_clear()
+        _drop_database(database)

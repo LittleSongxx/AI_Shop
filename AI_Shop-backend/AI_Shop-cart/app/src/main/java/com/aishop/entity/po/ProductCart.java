@@ -2,6 +2,7 @@ package com.aishop.entity.po;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import com.aishop.entity.dto.RecommendationAttributionCarrier;
 import com.aishop.entity.enums.DateTimePatternEnum;
 import com.aishop.utils.DateUtil;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -10,7 +11,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 
-public class ProductCart implements Serializable {
+public class ProductCart implements Serializable, RecommendationAttributionCarrier {
 
 	private String cartId;
 
@@ -28,6 +29,16 @@ public class ProductCart implements Serializable {
 	private Integer buyCount;
 
 	private BigDecimal addPrice;
+
+	private String aiRequestId;
+
+	private Integer aiPosition;
+
+	private String aiSource;
+
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	private Date aiAttributedAt;
 
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
 	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -91,6 +102,38 @@ public class ProductCart implements Serializable {
 
 	public BigDecimal getAddPrice(){
 		return this.addPrice;
+	}
+
+	public String getAiRequestId() {
+		return aiRequestId;
+	}
+
+	public void setAiRequestId(String aiRequestId) {
+		this.aiRequestId = aiRequestId;
+	}
+
+	public Integer getAiPosition() {
+		return aiPosition;
+	}
+
+	public void setAiPosition(Integer aiPosition) {
+		this.aiPosition = aiPosition;
+	}
+
+	public String getAiSource() {
+		return aiSource;
+	}
+
+	public void setAiSource(String aiSource) {
+		this.aiSource = aiSource;
+	}
+
+	public Date getAiAttributedAt() {
+		return aiAttributedAt;
+	}
+
+	public void setAiAttributedAt(Date aiAttributedAt) {
+		this.aiAttributedAt = aiAttributedAt;
 	}
 
 	public void setLastUpdateTime(Date lastUpdateTime){

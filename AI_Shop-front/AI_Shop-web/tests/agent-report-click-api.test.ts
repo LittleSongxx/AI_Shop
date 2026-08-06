@@ -7,36 +7,61 @@ describe('agent click reporting transport', () => {
     vi.unstubAllGlobals();
   });
 
-  it('queues the small authenticated form through sendBeacon', async () => {
-    const sendBeacon = vi.fn(() => true);
-    vi.stubGlobal('navigator', { sendBeacon });
+  it('waits for and returns the server-validated touchpoint', async () => {
+    const attribution = {
+      requestId: 'request-2',
+      productId: 'p2',
+      position: 2,
+      source: 'hybrid',
+      occurredAt: '2026-08-06T09:00:00.000'
+    };
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: attribution })
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
 
-    await agentApi.reportClick('p2', 'request-2', 2);
+    await expect(agentApi.reportClick('p2', 'request-2', 2)).resolves.toEqual(attribution);
 
-    expect(sendBeacon).toHaveBeenCalledOnce();
-    const [url, body] = sendBeacon.mock.calls[0] as unknown as [string, FormData];
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, options] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit & { body: FormData }
+    ];
     expect(url).toBe('/api/agent/reportClick');
+    const body = options.body;
     expect(body.get('productId')).toBe('p2');
     expect(body.get('requestId')).toBe('request-2');
     expect(body.get('position')).toBe('2');
+    expect(options.keepalive).toBeUndefined();
+    expect(options.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('uses a keepalive request when the beacon queue is full', async () => {
-    const sendBeacon = vi.fn(() => false);
-    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, status: 200 }));
-    vi.stubGlobal('navigator', { sendBeacon });
+  it('rejects a mismatched response instead of persisting forged attribution', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            code: 200,
+            data: {
+              requestId: 'different',
+              productId: 'p3',
+              position: 3,
+              source: 'hybrid',
+              occurredAt: '2026-08-06T09:00:00.000'
+            }
+          })
+      })
+    );
     vi.stubGlobal('fetch', fetchMock);
 
-    await agentApi.reportClick('p3', 'request-3', 3);
-
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/agent/reportClick',
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-        keepalive: true
-      })
+    await expect(agentApi.reportClick('p3', 'request-3', 3)).rejects.toThrow(
+      'response mismatch'
     );
   });
 });

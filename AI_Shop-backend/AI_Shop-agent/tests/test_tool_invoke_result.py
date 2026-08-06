@@ -9,6 +9,8 @@ from app.services.tool_invoke_result import (
 def test_tool_result_round_trip_preserves_contract_and_business_data():
     source = ToolInvokeResult(
         content="ok",
+        success=False,
+        error_code="REMOTE_REJECTED",
         biz_type="PRODUCT_LIST",
         product_ids=["1001"],
     )
@@ -16,6 +18,8 @@ def test_tool_result_round_trip_preserves_contract_and_business_data():
     restored = parse_tool_wire(source.to_wire())
 
     assert restored.content == "ok"
+    assert restored.success is False
+    assert restored.error_code == "REMOTE_REJECTED"
     assert restored.biz_type == "PRODUCT_LIST"
     assert restored.product_ids == ["1001"]
     assert restored.protocol_version == MCP_PROTOCOL
@@ -45,3 +49,12 @@ def test_snake_case_fields_are_not_another_wire_contract():
     assert parsed.product_ids == []
     assert parsed.protocol_version == ""
     assert parsed.contract_version == ""
+
+
+def test_mcp_server_does_not_wrap_business_failure_text_as_success():
+    from app.mcp_server.server import _text
+
+    parsed = parse_tool_wire(_text("【退款失败】请输入要退款的订单项ID"))
+
+    assert parsed.success is False
+    assert parsed.error_code == "BUSINESS_REJECTED"

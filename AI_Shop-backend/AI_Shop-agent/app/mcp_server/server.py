@@ -49,7 +49,13 @@ mcp = FastMCP(
 def _text(result) -> str:
     if isinstance(result, ToolInvokeResult):
         return result.to_wire()
-    return ToolInvokeResult(content=str(result)).to_wire()
+    content = str(result)
+    failed = content.lstrip().startswith("【") and "失败】" in content[:40]
+    return ToolInvokeResult(
+        content=content,
+        success=not failed,
+        error_code="BUSINESS_REJECTED" if failed else None,
+    ).to_wire()
 
 
 @mcp.tool(name="MCP_CONTRACT", description="[SYSTEM] report the AI_Shop tool contract version")
@@ -68,7 +74,7 @@ async def search_products(
 
 @mcp.tool(
     name="QUERY_ORDERS",
-    description="[READ] 仅查询订单列表或订单状态；用户要评价/退款/确认收货时不要用本工具",
+    description="[READ] 查询当前用户的订单列表或订单状态；自然语言目标由系统解析器先定位",
 )
 async def query_orders(userId: str, orderId: str | None = None) -> str:
     return _text(await tools.tool_query_orders(userId, orderId))
@@ -89,6 +95,15 @@ async def query_comment(userId: str, orderId: str) -> str:
     return _text(await tools.query_comment(userId, orderId))
 
 
+@mcp.tool(name="QUERY_REFUND_STATUS", description="[READ] 查询当前用户订单或订单项的退款进度")
+async def query_refund_status(
+    userId: str,
+    orderId: str | None = None,
+    orderItemId: str | None = None,
+) -> str:
+    return _text(await tools.query_refund_status(userId, orderId, orderItemId))
+
+
 @mcp.tool(name="QUERY_USER_COUPONS", description="[READ] 查询用户优惠券")
 async def query_user_coupons(userId: str, status: int | None = None) -> str:
     return _text(await tools.query_user_coupons(userId, status))
@@ -96,7 +111,7 @@ async def query_user_coupons(userId: str, status: int | None = None) -> str:
 
 @mcp.tool(
     name="PROPOSE_CONFIRM_RECEIPT",
-    description="[WRITE] 确认收货提案；用户说确认收货时直接调用，不要先 QUERY_ORDERS",
+    description="[WRITE] 为系统已验证归属和状态的订单生成确认收货提案",
 )
 async def propose_confirm_receipt(userId: str, orderId: str) -> str:
     return _text(await tools.propose_confirm_receipt(userId, orderId))
@@ -104,7 +119,7 @@ async def propose_confirm_receipt(userId: str, orderId: str) -> str:
 
 @mcp.tool(
     name="PROPOSE_REFUND",
-    description="[WRITE] 退款提案；用户要退款时直接调用，不要先 QUERY_ORDERS",
+    description="[WRITE] 为系统已验证归属和状态的订单项生成退款提案",
 )
 async def propose_refund(userId: str, orderItemId: str) -> str:
     return _text(await tools.propose_refund(userId, orderItemId))

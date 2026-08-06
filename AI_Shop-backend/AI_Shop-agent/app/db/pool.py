@@ -57,3 +57,32 @@ async def acquire():
         async with conn.cursor(aiomysql.DictCursor) as cur:
 
             yield cur
+
+
+@asynccontextmanager
+async def transaction():
+    """Yield one cursor whose statements commit or roll back as a unit."""
+
+    if not _pool:
+
+        raise RuntimeError("DB pool not initialized")
+
+    async with _pool.acquire() as conn:
+
+        await conn.begin()
+
+        try:
+
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+
+                yield cur
+
+        except BaseException:
+
+            await conn.rollback()
+
+            raise
+
+        else:
+
+            await conn.commit()

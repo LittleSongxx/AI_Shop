@@ -11,6 +11,7 @@ import com.aishop.api.vo.ProductCartVO;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.biz.ProductCartService;
+import com.aishop.integration.RecommendationAttributionClient;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
@@ -27,6 +28,9 @@ public class ProductCartController extends ABaseController{
 
     @Resource
     private ProductCartService productCartService;
+
+    @Resource
+    private RecommendationAttributionClient recommendationAttributionClient;
     // 加入购物车
     @PostMapping("/add2Cart")
     @GlobalInterceptor(checkLogin = true)
@@ -37,6 +41,7 @@ public class ProductCartController extends ABaseController{
         }
         String userId = tokenUserInfo.getUserId();
         productCart.setUserId(userId);
+        recommendationAttributionClient.validateAndApply(userId, List.of(productCart));
         productCartService.add2Cart(productCart);
         return getSuccessResponseVO(null);
     }

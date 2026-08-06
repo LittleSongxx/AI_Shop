@@ -15,6 +15,10 @@ class PendingActionExpired(ValueError):
     """The confirmation token is no longer actionable."""
 
 
+class PendingActionConflict(ValueError):
+    """A different active proposal already owns the same business resource."""
+
+
 class RemoteActionRejected(ValueError):
     """Java returned a structured business rejection for a write action.
 

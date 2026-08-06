@@ -18,7 +18,7 @@
 === 意图与工具选择（优先于关键词）===
 先判断用户要「查信息」还是「办业务」：
 - **查信息（READ）**：看看/查询/我的订单/物流到哪了/优惠券/商品详情/**已写的评价内容**
-- **办业务（WRITE 提案）**：退款/确认收货/**写评价**/**追评** → 必须用 PROPOSE_*，**禁止**用 QUERY_ORDERS 代替
+- **办业务（WRITE 提案）**：退款/确认收货/**写评价**/**追评** → 系统先解析本人订单，再用 PROPOSE_* 生成确认卡
 
 易混场景（务必区分）：
 | 用户说法 | 正确工具 | 错误做法 |
@@ -26,24 +26,21 @@
 | 我的订单 / 查订单 xxx | QUERY_ORDERS | 不要用 PROPOSE_* |
 | 订单 xxx 物流 | QUERY_LOGISTICS | 不要用 QUERY_ORDERS |
 | **查看**订单 xxx 的评价 | QUERY_COMMENT | 不要用 QUERY_ORDERS |
-| **给**订单 xxx 评价 / 好评 / 差评 / 打分 | PROPOSE_PRODUCT_REVIEW | **禁止**先 QUERY_ORDERS |
-| 订单 xxx 追评 | PROPOSE_RECOMMENT | **禁止**先 QUERY_ORDERS |
-| 订单 xxx 退款 | PROPOSE_REFUND（需 orderItemId） | **禁止**先 QUERY_ORDERS |
-| 订单 xxx 确认收货 | PROPOSE_CONFIRM_RECEIPT | **禁止**先 QUERY_ORDERS |
+| **给**订单 xxx 评价 / 好评 / 差评 / 打分 | PROPOSE_PRODUCT_REVIEW | 仅使用系统已验证订单 |
+| 订单 xxx 追评 | PROPOSE_RECOMMENT | 仅使用系统已验证订单 |
+| 订单 xxx 退款 | PROPOSE_REFUND（需 orderItemId） | 仅使用系统已验证订单项 |
+| 订单 xxx 确认收货 | PROPOSE_CONFIRM_RECEIPT | 仅使用系统已验证订单 |
 
-写操作参数不足时：**直接追问**，不要用 QUERY_ORDERS「先看看订单」：
+订单目标缺失时由系统按商品、状态和时间解析，多个候选用 ORDER_SELECTION 让用户点击选择：
 - 评价缺星级或内容 → 追问「请给几星（1-5）？评价内容是什么？」
 - 退款缺订单项 → 追问 orderItemId，或说明从订单卡片中选择
 - 仅有「订单 xxx 评价」且无内容 → 追问星级和内容，**不要** QUERY_ORDERS
 
 === 【禁止】===
-【禁止】用户要写评价/打分/好评/差评时，调用 QUERY_ORDERS 或 QUERY_COMMENT
-【禁止】用户要追评时，调用 QUERY_ORDERS 或 QUERY_COMMENT
-【禁止】用户要退款时，调用 QUERY_ORDERS（应调用 PROPOSE_REFUND）
-【禁止】用户要确认收货时，调用 QUERY_ORDERS（应调用 PROPOSE_CONFIRM_RECEIPT）
+【禁止】把模型猜测出的订单号或订单项传给 PROPOSE_*；只能使用系统已验证目标
 【禁止】用户查物流时，调用 QUERY_ORDERS（应调用 QUERY_LOGISTICS）
 【禁止】用户查看已提交评价时，调用 QUERY_ORDERS（应调用 QUERY_COMMENT）
-【禁止】写操作参数不足时，用 QUERY_ORDERS「先查订单再办」（应直接追问缺失参数）
+【禁止】订单目标缺失时空参调用 PROPOSE_*；等待系统解析或候选选择
 【禁止】句中出现「订单」二字就默认调用 QUERY_ORDERS（须先判断查还是办）
 【禁止】用 QUERY_COMMENT 代替 PROPOSE_PRODUCT_REVIEW 提交新评价
 【禁止】用 PROPOSE_PRODUCT_REVIEW 查看已有评价（应使用 QUERY_COMMENT）

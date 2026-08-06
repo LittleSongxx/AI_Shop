@@ -4,7 +4,7 @@ import structlog
 
 from app.domain.tool_policy import policy_for
 from app.harness.guardrails.tool_guard import ToolGuardrail
-from app.harness.metrics.runtime_sensors import TOOL_CALL_TOTAL
+from app.harness.metrics.runtime_sensors import TOOL_CALL_TOTAL, measure_agent_stage
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -20,12 +20,20 @@ class McpToolRouter:
     """
 
     async def invoke(self, tool_name: str, args: dict, user_id: str) -> ToolInvokeResult:
+        with measure_agent_stage("tool"):
+            return await self._invoke_unmeasured(tool_name, args, user_id)
+
+    async def _invoke_unmeasured(
+        self, tool_name: str, args: dict, user_id: str
+    ) -> ToolInvokeResult:
 
         # 白名单即策略表：表里没有就是未知工具，不放行。
         policy = policy_for(tool_name)
         if policy is None:
             TOOL_CALL_TOTAL.labels(tool=tool_name, status="denied").inc()
-            return ToolInvokeResult(content=f"未知工具: {tool_name}")
+            return ToolInvokeResult(
+                content=f"未知工具: {tool_name}", success=False, error_code="TOOL_DENIED"
+            )
 
         raw = dict(args or {})
 
@@ -70,11 +78,19 @@ class McpToolRouter:
         except TypeError as e:
             logger.warning("mcp_tool_bad_args", tool=tool_name, error=str(e))
             TOOL_CALL_TOTAL.labels(tool=tool_name, status="bad_args").inc()
-            return ToolInvokeResult(content="【操作失败】参数不完整")
+            return ToolInvokeResult(
+                content="【操作失败】参数不完整",
+                success=False,
+                error_code="BAD_ARGS",
+            )
         except Exception as e:
             logger.exception("mcp_tool_failed", tool=tool_name, error=str(e))
             TOOL_CALL_TOTAL.labels(tool=tool_name, status="error").inc()
-            return ToolInvokeResult(content="【操作失败】系统处理异常，请稍后重试")
+            return ToolInvokeResult(
+                content="【操作失败】系统处理异常，请稍后重试",
+                success=False,
+                error_code="TOOL_ERROR",
+            )
 
     # ------------------------------------------------------------------
     # In-process tool handlers
@@ -93,7 +109,11 @@ class McpToolRouter:
 
         if not query:
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="bad_args").inc()
-            return ToolInvokeResult(content="【知识检索失败】请提供检索关键词")
+            return ToolInvokeResult(
+                content="【知识检索失败】请提供检索关键词",
+                success=False,
+                error_code="BAD_ARGS",
+            )
         try:
             # Agentic RAG 路径同样带上用户的 A/B 分桶，保证缓存键与预取路径一致。
             result = await rag_retriever.search_faq_with_trace(
@@ -107,7 +127,11 @@ class McpToolRouter:
         except Exception as e:
             logger.exception("search_knowledge_failed", query=query[:80], error=str(e))
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="error").inc()
-            return ToolInvokeResult(content="【知识检索失败】系统处理异常，请稍后重试")
+            return ToolInvokeResult(
+                content="【知识检索失败】系统处理异常，请稍后重试",
+                success=False,
+                error_code="TOOL_ERROR",
+            )
 
     # ------------------------------------------------------------------
     # Argument normalisation (MCP server tools only)
@@ -138,6 +162,12 @@ class McpToolRouter:
             return {"userId": uid, "productId": g("productId", "product_id")}
         if tool_name in ("QUERY_LOGISTICS", "QUERY_COMMENT", "PROPOSE_CONFIRM_RECEIPT"):
             return {"userId": uid, "orderId": g("orderId", "order_id")}
+        if tool_name == "QUERY_REFUND_STATUS":
+            return {
+                "userId": uid,
+                "orderId": g("orderId", "order_id"),
+                "orderItemId": g("orderItemId", "order_item_id"),
+            }
         if tool_name == "QUERY_USER_COUPONS":
             out = {"userId": uid}
             st = g("status")

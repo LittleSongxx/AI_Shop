@@ -209,6 +209,7 @@
       <el-button class="btn-cart" type="primary" plain round @click="openAddCartSheet">加入购物车</el-button>
       <el-button class="btn-buy" type="primary" round @click="buyNow">立即购买</el-button>
     </LiquidGlassSurface>
+    <CommentReportDialog ref="reportDialogRef" />
   </div>
   <div v-else-if="loading" class="detail-loading card">
     <el-skeleton animated :rows="10" />
@@ -219,7 +220,6 @@
       <el-button round @click="router.push('/')">返回首页</el-button>
     </el-empty>
   </div>
-  <CommentReportDialog ref="reportDialogRef" />
 </template>
 
 <script setup lang="ts">

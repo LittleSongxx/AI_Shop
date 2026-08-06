@@ -225,6 +225,7 @@ class McpStreamableClient:
                 parts.append(json.dumps(block.model_dump() if hasattr(block, "model_dump") else str(block)))
         if getattr(raw, "isError", False):
             logger.warning("mcp_tool_error", tool=name, content=parts)
+            raise RuntimeError("MCP 工具返回错误结果")
         result = parse_tool_wire("\n".join(parts) if parts else "")
         if result.protocol_version != MCP_PROTOCOL:
             raise RuntimeError("MCP 协议契约不匹配")

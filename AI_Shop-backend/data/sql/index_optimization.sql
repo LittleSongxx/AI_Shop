@@ -5,7 +5,7 @@
 -- 执行后：运行文末 EXPLAIN 验证
 --
 -- 【分库】本项目是「一域一库」，涉及的表分散在 5 个库里，不能用一个 USE 跑完整个脚本。
--- 每段前面都有各自的 USE，按段执行；库名与归属见 sql/TABLE_OWNERSHIP.md。
+-- 每段前面都有各自的 USE，按段执行；库名与归属见 sql/分库表归属.md。
 --   aishop_order   : order_info, comment_report, order_logistics_info
 --   aishop_product : product_info
 --   aishop_user    : image_moderation_record（写入侧，admin 经 Feign 访问）

@@ -18,6 +18,7 @@ from app.harness.metrics.runtime_sensors import (
     LLM_LATENCY,
     STREAM_CHARS,
     STREAM_TOKENS,
+    observe_agent_stage,
 )
 from app.mcp.tools import build_mcp_tools
 from app.observability.llm_metrics import (
@@ -39,6 +40,7 @@ from app.utils.biz_payload import (
     compact_product_search_intro,
     is_action_confirm_json,
     is_order_cards_json,
+    is_order_selection_json,
     is_product_cards_json,
     looks_like_aftersales_or_order_text,
     strip_embedded_product_json,
@@ -115,6 +117,7 @@ async def stream_llm_turn(
     resolved_model = resolve_llm_model(llm, model)
     gathered = None
     sent_visible = ""
+    first_token_observed = False
     try:
         async for chunk in llm.astream(messages):
             if await is_cancelled(user_id, message_id):
@@ -128,6 +131,9 @@ async def stream_llm_turn(
             sent_visible = visible
             if not delta:
                 continue
+            if not first_token_observed:
+                observe_agent_stage("first_token", time.perf_counter() - started)
+                first_token_observed = True
             chunks.append(delta)
             # 字符数（真实口径）；旧指标同步累计保持面板兼容。
             STREAM_CHARS.inc(len(delta))
@@ -144,7 +150,9 @@ async def stream_llm_turn(
         record_llm_failure(resolved_model, fallback=fallback)
         raise
     finally:
-        LLM_LATENCY.observe(max(0.0, time.perf_counter() - started))
+        elapsed = max(0.0, time.perf_counter() - started)
+        LLM_LATENCY.observe(elapsed)
+        observe_agent_stage("generation", elapsed)
 
 def _strip_emojis_from_assistant(assistant: str) -> str:
     text = (assistant or "").strip()
@@ -193,6 +201,7 @@ _NON_PRODUCT_TOOLS = frozenset({
     "QUERY_ORDERS",
     "QUERY_LOGISTICS",
     "QUERY_COMMENT",
+    "QUERY_REFUND_STATUS",
     "QUERY_USER_COUPONS",
     "PROPOSE_REFUND",
     "PROPOSE_CONFIRM_RECEIPT",
@@ -249,6 +258,9 @@ async def finalize_agent_response(
     resolved = await resolve_action_confirm(full_text, messages, user_id)
     if resolved:
         assistant, biz_data, biz_type = resolved
+    elif is_order_selection_json(assistant_cards):
+        assistant = assistant_cards or ""
+        biz_type = "order_selection"
     else:
         # Drop fabricated act tokens so they never surface as "expired" cards.
         full_text = re.sub(r"【act_[a-f0-9]{32}】", "", full_text or "", flags=re.I).strip()
@@ -261,7 +273,14 @@ async def finalize_agent_response(
 
         called = list(tools_called or [])
         wants_orders = "QUERY_ORDERS" in called or wants_order_list_cards(user_text)
-        if any(t in _WRITE_PROPOSE_TOOLS for t in called):
+        recovered_order_cards = _recover_order_cards(assistant_cards, called) if wants_orders else None
+        if wants_orders and (
+            is_order_cards_json(recovered_order_cards)
+            or (recovered_order_cards or "").strip() == "[]"
+        ):
+            assistant = recovered_order_cards or "[]"
+            biz_type = "query_order"
+        elif any(t in _WRITE_PROPOSE_TOOLS for t in called):
             # PROPOSE ran but Redis token missing / invalid — do not fall into product UI.
             assistant = trim_assistant(full_text) or (
                 "未能生成有效确认卡片。请确认订单号/订单项、评价星级与内容后重试。"
@@ -271,7 +290,7 @@ async def finalize_agent_response(
             biz_type = biz_type or "agent"
         elif wants_orders:
             # Always render order cards — never leave LLM markdown/HTML tables as the UI.
-            cards = _recover_order_cards(assistant_cards, called)
+            cards = recovered_order_cards
             if is_order_cards_json(cards):
                 assistant = cards or "[]"
                 biz_type = "query_order"
@@ -363,9 +382,6 @@ async def finalize_agent_response(
 
     assistant = _strip_emojis_from_assistant(assistant)
 
-    await stream_service.push_done(
-        user_id, message_id, assistant, biz_type, agent_msg.get("userMessage")
-    )
     await agent_message_service.complete_message(
         message_id,
         assistant,
@@ -373,14 +389,22 @@ async def finalize_agent_response(
         biz_data,
         source_refs,
     )
+    await stream_service.push_done(
+        user_id,
+        message_id,
+        assistant,
+        biz_type,
+        agent_msg.get("userMessage"),
+        source_refs,
+    )
 
 async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") -> None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
-    await stream_service.push_error(user_id, message_id, "服务暂时不可用，请稍后重试", prompt_type)
     await agent_message_service.complete_message(
         message_id, partial or "服务异常", prompt_type, None
     )
+    await stream_service.push_error(user_id, message_id, "服务暂时不可用，请稍后重试", prompt_type)
 
 @lru_cache(maxsize=8)
 def _agent_llm_with_tools(config: ChatLLMConfig):

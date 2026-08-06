@@ -113,6 +113,7 @@ class RagRetriever:
         top_k: int | None = None,
         category_filter: list[str] | None = None,
         bucket: str = "A",
+        include_evaluation_candidates: bool = False,
     ) -> dict[str, Any]:
         """Search FAQ/knowledge and retain bounded evidence for observability.
 
@@ -144,12 +145,21 @@ class RagRetriever:
         if exact:
             docs = [self._faq_row_to_doc(exact, score=1.0)]
             self._observe_search(started, True, "exact")
-            return self._trace_result(cleaned, version, "exact", True, docs, started, bucket=bucket)
+            return self._trace_result(
+                cleaned,
+                version,
+                "exact",
+                True,
+                docs,
+                started,
+                bucket=bucket,
+                evaluation_candidates=docs if include_evaluation_candidates else None,
+            )
 
         cache_key = self._semantic_cache_key(
             cleaned, version, effective_top_k, category_filter, bucket, settings, rerank_top_n
         )
-        cached = await self._get_cache(cache_key)
+        cached = None if include_evaluation_candidates else await self._get_cache(cache_key)
         if cached:
             # 缓存里的 FAQ 可能已过期（发布后新版本号才会换 key），读出来再滤一遍。
             cached = self._filter_catalog(self._filter_expired(cached), catalog)
@@ -198,8 +208,10 @@ class RagRetriever:
                 candidates,
                 started,
                 bucket=bucket,
+                evaluation_candidates=candidates if include_evaluation_candidates else None,
             )
-        await self._set_cache(cache_key, docs, settings.rag_cache_ttl_seconds)
+        if not include_evaluation_candidates:
+            await self._set_cache(cache_key, docs, settings.rag_cache_ttl_seconds)
         self._observe_search(started, True, "hybrid")
         return self._trace_result(
             cleaned,
@@ -210,6 +222,7 @@ class RagRetriever:
             started,
             bucket=bucket,
             candidate_count=len(candidates),
+            evaluation_candidates=candidates if include_evaluation_candidates else None,
         )
 
     def _semantic_cache_key(
@@ -940,13 +953,14 @@ class RagRetriever:
         started: float,
         bucket: str = "A",
         candidate_count: int | None = None,
+        evaluation_candidates: list[dict] | None = None,
     ) -> dict[str, Any]:
         # Only accepted documents are evidence and may be shown as citations.
         # Rejected candidates remain observable through candidateCount/topScore,
         # but must not look like sources that were injected into the answer.
         refs = self._source_refs(docs, version) if hit else []
         elapsed_ms = round(max(0.0, time.perf_counter() - started) * 1000, 2)
-        return {
+        result = {
             "text": self._format_docs(docs) if hit else "",
             "source_refs": refs,
             "trace": {
@@ -964,6 +978,11 @@ class RagRetriever:
                 "latencyMs": elapsed_ms,
             },
         }
+        if evaluation_candidates is not None:
+            result["_evaluationCandidateRefs"] = self._source_refs(
+                evaluation_candidates, version
+            )
+        return result
 
     def _source_refs(self, docs: list[dict], version: int) -> list[dict]:
         # 传入的 docs 就是最终注入 prompt 的证据集合（已按 effective

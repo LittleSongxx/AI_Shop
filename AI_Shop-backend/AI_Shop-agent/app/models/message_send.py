@@ -14,6 +14,7 @@ class MessageSendDTO(BaseModel):
     title: str | None = None
     content: str | None = None
     create_time: str | None = Field(None, alias="createTime")
+    source_refs: list[dict] | dict | None = Field(None, alias="sourceRefs")
 
     model_config = {"populate_by_name": True}
 

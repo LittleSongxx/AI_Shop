@@ -19,6 +19,10 @@
 		<result column="buy_count" property="buyCount"  />
 		<!--加入购物车时的单价-->
 		<result column="add_price" property="addPrice"  />
+		<result column="ai_request_id" property="aiRequestId"  />
+		<result column="ai_position" property="aiPosition"  />
+		<result column="ai_source" property="aiSource"  />
+		<result column="ai_attributed_at" property="aiAttributedAt"  />
 		<!--更新时间-->
 		<result column="last_update_time" property="lastUpdateTime"  />
 		<!--创建时间-->
@@ -29,7 +33,8 @@
 	<!-- 通用查询结果列-->
 	<sql id="base_column_list">
 		 p.cart_id,p.user_id,p.product_id,p.property_value_ids,p.property_value_id_hash,
-		 p.buy_count,p.add_price,p.last_update_time,p.create_time
+		 p.buy_count,p.add_price,p.ai_request_id,p.ai_position,p.ai_source,
+		 p.ai_attributed_at,p.last_update_time,p.create_time
 	</sql>
 
 	<sql id="base_condition_filed">
@@ -134,6 +139,18 @@
 			<if test="bean.addPrice != null">
 				 add_price,
 			</if>
+			<if test="bean.aiRequestId != null">
+				 ai_request_id,
+			</if>
+			<if test="bean.aiPosition != null">
+				 ai_position,
+			</if>
+			<if test="bean.aiSource != null">
+				 ai_source,
+			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_attributed_at,
+			</if>
 			<if test="bean.lastUpdateTime != null">
 				 last_update_time,
 			</if>
@@ -162,6 +179,18 @@
 			</if>
 			<if test="bean.addPrice!=null">
 				 #{bean.addPrice},
+			</if>
+			<if test="bean.aiRequestId!=null">
+				 #{bean.aiRequestId},
+			</if>
+			<if test="bean.aiPosition!=null">
+				 #{bean.aiPosition},
+			</if>
+			<if test="bean.aiSource!=null">
+				 #{bean.aiSource},
+			</if>
+			<if test="bean.aiAttributedAt!=null">
+				 #{bean.aiAttributedAt},
 			</if>
 			<if test="bean.lastUpdateTime!=null">
 				 #{bean.lastUpdateTime},
@@ -197,6 +226,18 @@
 			<if test="bean.addPrice != null">
 				 add_price,
 			</if>
+			<if test="bean.aiRequestId != null">
+				 ai_request_id,
+			</if>
+			<if test="bean.aiPosition != null">
+				 ai_position,
+			</if>
+			<if test="bean.aiSource != null">
+				 ai_source,
+			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_attributed_at,
+			</if>
 			<if test="bean.lastUpdateTime != null">
 				 last_update_time,
 			</if>
@@ -226,6 +267,18 @@
 			<if test="bean.addPrice!=null">
 				 #{bean.addPrice},
 			</if>
+			<if test="bean.aiRequestId!=null">
+				 #{bean.aiRequestId},
+			</if>
+			<if test="bean.aiPosition!=null">
+				 #{bean.aiPosition},
+			</if>
+			<if test="bean.aiSource!=null">
+				 #{bean.aiSource},
+			</if>
+			<if test="bean.aiAttributedAt!=null">
+				 #{bean.aiAttributedAt},
+			</if>
 			<if test="bean.lastUpdateTime!=null">
 				 #{bean.lastUpdateTime},
 			</if>
@@ -253,6 +306,12 @@
 			<if test="bean.buyCount!=null">
 				 buy_count = VALUES(buy_count),
 			</if>
+			<if test="bean.aiAttributedAt!=null">
+				 ai_request_id = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_request_id), ai_request_id),
+				 ai_position = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_position), ai_position),
+				 ai_source = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_source), ai_source),
+				 ai_attributed_at = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_attributed_at), ai_attributed_at),
+			</if>
 			<!-- 已存在行不覆盖加入时单价 -->
 			<if test="bean.lastUpdateTime!=null">
 				 last_update_time = VALUES(last_update_time),
@@ -273,6 +332,10 @@
 			 property_value_id_hash,
 			 buy_count,
 			 add_price,
+			 ai_request_id,
+			 ai_position,
+			 ai_source,
+			 ai_attributed_at,
 			 last_update_time,
 			 create_time
 		 )values
@@ -285,6 +348,10 @@
 				 #{item.propertyValueIdHash},
 				 #{item.buyCount},
 				 #{item.addPrice},
+				 #{item.aiRequestId},
+				 #{item.aiPosition},
+				 #{item.aiSource},
+				 #{item.aiAttributedAt},
 				 #{item.lastUpdateTime},
 				 #{item.createTime}
 			 )
@@ -301,6 +368,10 @@
 			 property_value_id_hash,
 			 buy_count,
 			 add_price,
+			 ai_request_id,
+			 ai_position,
+			 ai_source,
+			 ai_attributed_at,
 			 last_update_time,
 			 create_time
 		 )values
@@ -313,6 +384,10 @@
 				 #{item.propertyValueIdHash},
 				 #{item.buyCount},
 				 #{item.addPrice},
+				 #{item.aiRequestId},
+				 #{item.aiPosition},
+				 #{item.aiSource},
+				 #{item.aiAttributedAt},
 				 #{item.lastUpdateTime},
 				 #{item.createTime}
 			 )
@@ -324,6 +399,10 @@
 			property_value_ids = VALUES(property_value_ids),
 			property_value_id_hash = VALUES(property_value_id_hash),
 			buy_count = VALUES(buy_count),
+			ai_request_id = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_request_id), ai_request_id),
+			ai_position = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_position), ai_position),
+			ai_source = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_source), ai_source),
+			ai_attributed_at = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; VALUES(ai_attributed_at), VALUES(ai_attributed_at), ai_attributed_at),
 			last_update_time = VALUES(last_update_time),
 			create_time = VALUES(create_time)
 	</insert>
@@ -352,6 +431,12 @@
 			</if>
 			<if test="bean.addPrice != null">
 				 add_price = #{bean.addPrice},
+			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_request_id = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiRequestId}, ai_request_id),
+				 ai_position = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiPosition}, ai_position),
+				 ai_source = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiSource}, ai_source),
+				 ai_attributed_at = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiAttributedAt}, ai_attributed_at),
 			</if>
 			<if test="bean.lastUpdateTime != null">
 				 last_update_time = #{bean.lastUpdateTime},
@@ -391,6 +476,12 @@
 			<if test="bean.addPrice != null">
 				 add_price = #{bean.addPrice},
 			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_request_id = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiRequestId}, ai_request_id),
+				 ai_position = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiPosition}, ai_position),
+				 ai_source = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiSource}, ai_source),
+				 ai_attributed_at = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiAttributedAt}, ai_attributed_at),
+			</if>
 			<if test="bean.lastUpdateTime != null">
 				 last_update_time = #{bean.lastUpdateTime},
 			</if>
@@ -426,6 +517,12 @@
 			</if>
 			<if test="bean.addPrice != null">
 				 add_price = #{bean.addPrice},
+			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_request_id = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiRequestId}, ai_request_id),
+				 ai_position = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiPosition}, ai_position),
+				 ai_source = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiSource}, ai_source),
+				 ai_attributed_at = IF(ai_attributed_at IS NULL OR ai_attributed_at &lt; #{bean.aiAttributedAt}, #{bean.aiAttributedAt}, ai_attributed_at),
 			</if>
 			<if test="bean.lastUpdateTime != null">
 				 last_update_time = #{bean.lastUpdateTime},

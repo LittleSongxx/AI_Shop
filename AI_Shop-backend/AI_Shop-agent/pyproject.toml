@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "aishop-agent"
 version = "1.0.0"
 description = "AI customer service and shopping guide service for AI Shop"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11,<3.14"
 dependencies = [
   "alembic>=1.14,<2",
   "aio-pika>=9.4,<10",

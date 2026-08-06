@@ -457,7 +457,8 @@ class RedisService:
         """仅当锁仍归 owner 时续期；锁已被别人拿走则返回 False。
 
         Worker 长任务处理期间调用（worker._renew_lease_loop），否则锁
-        TTL(180s) 比任务租约(240s) 短，>180s 的任务会把同用户新消息放进来。
+        用户锁和任务租约都由 Worker 周期续期；任何一份续期失败都停止执行，
+        避免同用户并发或租约被接管后旧 Worker 继续产生副作用。
         """
         result = await self.client.eval(
             """

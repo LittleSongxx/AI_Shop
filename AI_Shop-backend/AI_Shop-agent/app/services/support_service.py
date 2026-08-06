@@ -131,39 +131,64 @@ class SupportService:
 
     async def claim(self, session_id: str, admin_id: str) -> dict | None:
         async with acquire() as cur:
-            await cur.execute(
-                """
-                UPDATE support_session
-                SET status='ASSIGNED', assigned_admin=%s, assigned_at=NOW(), updated_at=NOW()
-                WHERE session_id=%s
-                  AND (
-                    status='QUEUED'
-                    OR (status='ASSIGNED' AND assigned_admin=%s)
-                  )
-                """,
-                (admin_id, session_id, admin_id),
-            )
-            if cur.rowcount == 0:
-                raise ValueError("会话已被其他客服认领或已经结束")
+            await cur.execute("START TRANSACTION")
+            try:
+                await cur.execute(
+                    "SELECT * FROM support_session WHERE session_id=%s FOR UPDATE",
+                    (session_id,),
+                )
+                locked = await cur.fetchone()
+                if not locked or locked.get("status") not in _ACTIVE_STATUSES:
+                    raise ValueError("会话不存在或已经结束")
+                owner = locked.get("assigned_admin")
+                if owner not in (None, admin_id):
+                    raise ValueError("会话已被其他客服认领")
+                if locked.get("status") == SUPPORT_STATUS_QUEUED or owner is None:
+                    await cur.execute(
+                        """
+                        UPDATE support_session
+                        SET status='ASSIGNED', assigned_admin=%s,
+                            assigned_at=COALESCE(assigned_at, NOW()), updated_at=NOW()
+                        WHERE session_id=%s
+                        """,
+                        (admin_id, session_id),
+                    )
+                await cur.execute("COMMIT")
+            except BaseException:
+                await cur.execute("ROLLBACK")
+                raise
         session = await self.get_by_id(session_id)
         await self.publish_admin({"event": "support.updated", "session": self._public_session(session)})
         return session
 
     async def activate(self, session_id: str, admin_id: str) -> dict | None:
         async with acquire() as cur:
-            await cur.execute(
-                """
-                UPDATE support_session
-                SET status='ACTIVE', assigned_admin=%s, assigned_at=COALESCE(assigned_at, NOW()),
-                    updated_at=NOW()
-                WHERE session_id=%s
-                  AND status IN ('QUEUED', 'ASSIGNED', 'ACTIVE')
-                  AND (assigned_admin IS NULL OR assigned_admin=%s)
-                """,
-                (admin_id, session_id, admin_id),
-            )
-            if cur.rowcount == 0:
-                raise ValueError("会话已被其他客服认领或已经结束")
+            await cur.execute("START TRANSACTION")
+            try:
+                await cur.execute(
+                    "SELECT * FROM support_session WHERE session_id=%s FOR UPDATE",
+                    (session_id,),
+                )
+                locked = await cur.fetchone()
+                if not locked or locked.get("status") not in _ACTIVE_STATUSES:
+                    raise ValueError("会话不存在或已经结束")
+                owner = locked.get("assigned_admin")
+                if owner not in (None, admin_id):
+                    raise ValueError("会话已被其他客服认领")
+                if locked.get("status") != SUPPORT_STATUS_ACTIVE or owner is None:
+                    await cur.execute(
+                        """
+                        UPDATE support_session
+                        SET status='ACTIVE', assigned_admin=%s,
+                            assigned_at=COALESCE(assigned_at, NOW()), updated_at=NOW()
+                        WHERE session_id=%s
+                        """,
+                        (admin_id, session_id),
+                    )
+                await cur.execute("COMMIT")
+            except BaseException:
+                await cur.execute("ROLLBACK")
+                raise
         session = await self.get_by_id(session_id)
         await self.publish_admin({"event": "support.updated", "session": self._public_session(session)})
         return session
@@ -188,19 +213,19 @@ class SupportService:
                     raise ValueError("会话尚未认领或已结束")
                 if session.get("assigned_admin") not in (None, admin_id):
                     raise ValueError("会话已被其他客服认领")
-                await cur.execute(
-                    """
-                    UPDATE support_session
-                    SET status='ACTIVE', assigned_admin=%s,
-                        assigned_at=COALESCE(assigned_at, NOW()), updated_at=NOW()
-                    WHERE session_id=%s
-                      AND status IN ('ASSIGNED', 'ACTIVE')
-                      AND (assigned_admin IS NULL OR assigned_admin=%s)
-                    """,
-                    (admin_id, session_id, admin_id),
-                )
-                if cur.rowcount != 1:
-                    raise ValueError("会话已被其他客服认领或已经结束")
+                if (
+                    session.get("status") != SUPPORT_STATUS_ACTIVE
+                    or session.get("assigned_admin") is None
+                ):
+                    await cur.execute(
+                        """
+                        UPDATE support_session
+                        SET status='ACTIVE', assigned_admin=%s,
+                            assigned_at=COALESCE(assigned_at, NOW()), updated_at=NOW()
+                        WHERE session_id=%s
+                        """,
+                        (admin_id, session_id),
+                    )
                 await cur.execute(
                     """
                     INSERT INTO support_message

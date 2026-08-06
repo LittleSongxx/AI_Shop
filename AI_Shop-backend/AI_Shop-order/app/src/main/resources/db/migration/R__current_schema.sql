@@ -32,8 +32,56 @@ create table if not exists order_item
     buy_count              int            null comment '数量',
     order_item_status      tinyint(1)     null comment '状态 1:正常 0:已退款',
     remark                 varchar(300)   null comment '备注',
-    refund_order_id        varchar(32)    null comment '退款订单号'
+    refund_order_id        varchar(32)    null comment '退款订单号',
+    ai_request_id          varchar(128)   null comment '已验证的推荐请求ID',
+    ai_position            smallint unsigned null comment '推荐位次（从1开始）',
+    ai_source              varchar(40)    null comment '服务端推荐来源',
+    ai_attributed_at       datetime(3)    null comment '已验证点击时间'
 ) comment '订单明细表' collate = utf8mb4_general_ci row_format = DYNAMIC;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'order_item'
+              AND column_name = 'ai_request_id'),
+    'SELECT 1',
+    'ALTER TABLE order_item ADD COLUMN ai_request_id varchar(128) NULL COMMENT ''validated recommendation request ID'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'order_item'
+              AND column_name = 'ai_position'),
+    'SELECT 1',
+    'ALTER TABLE order_item ADD COLUMN ai_position smallint unsigned NULL COMMENT ''one-based recommendation position'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'order_item'
+              AND column_name = 'ai_source'),
+    'SELECT 1',
+    'ALTER TABLE order_item ADD COLUMN ai_source varchar(40) NULL COMMENT ''server-owned recommendation source'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'order_item'
+              AND column_name = 'ai_attributed_at'),
+    'SELECT 1',
+    'ALTER TABLE order_item ADD COLUMN ai_attributed_at datetime(3) NULL COMMENT ''validated click time'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 create table if not exists refund_request
 (
@@ -98,6 +146,10 @@ create table if not exists order_request_idempotency
     request_hash    char(64)                            not null,
     status          varchar(16) default 'PROCESSING'    not null,
     response_json   mediumtext                          null,
+    reconcile_attempts int      default 0               not null,
+    reconcile_deadline datetime                           null,
+    last_reconcile_at datetime                            null,
+    review_reason   varchar(512)                          null,
     create_time     datetime    default current_timestamp not null,
     update_time     datetime    default current_timestamp not null on update current_timestamp,
     constraint uk_order_request_idempotency unique (user_id, command_type, idempotency_key),
@@ -195,6 +247,64 @@ SET @sql = IF(
     ),
     'SELECT 1',
     'ALTER TABLE local_message_outbox ADD COLUMN lease_owner varchar(64) NULL COMMENT ''current dispatcher instance'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Agent write-result reconciliation fields. These support bounded ledger/domain
+-- checks and manual review; they are not an exactly-once guarantee.
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'order_request_idempotency'
+          AND column_name = 'reconcile_attempts'
+    ),
+    'SELECT 1',
+    'ALTER TABLE order_request_idempotency ADD COLUMN reconcile_attempts int DEFAULT 0 NOT NULL'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'order_request_idempotency'
+          AND column_name = 'reconcile_deadline'
+    ),
+    'SELECT 1',
+    'ALTER TABLE order_request_idempotency ADD COLUMN reconcile_deadline datetime NULL'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'order_request_idempotency'
+          AND column_name = 'last_reconcile_at'
+    ),
+    'SELECT 1',
+    'ALTER TABLE order_request_idempotency ADD COLUMN last_reconcile_at datetime NULL'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'order_request_idempotency'
+          AND column_name = 'review_reason'
+    ),
+    'SELECT 1',
+    'ALTER TABLE order_request_idempotency ADD COLUMN review_reason varchar(512) NULL'
 );
 PREPARE stmt FROM @sql;
 EXECUTE stmt;

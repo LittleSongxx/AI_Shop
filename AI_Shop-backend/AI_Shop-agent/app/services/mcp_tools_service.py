@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -11,6 +13,7 @@ from app.constants import (
     REFUNDABLE_ORDER_STATUSES,
     REVIEWABLE_ORDER_STATUSES,
 )
+from app.exceptions import PendingActionConflict
 from app.services.java_internal_client import java_internal_client
 from app.services.order_service import order_service
 from app.services.pending_action_service import pending_action_service
@@ -128,6 +131,50 @@ async def query_comment(user_id: str, order_id: str) -> str:
         logger.exception("mcp_query_comment_failed", user_id=user_id, order_id=order_id)
         return "【查询评价失败】系统处理异常，请稍后重试或联系客服"
 
+
+async def query_refund_status(
+    user_id: str,
+    order_id: str | None = None,
+    order_item_id: str | None = None,
+) -> ToolInvokeResult:
+    from app.services.tool_invoke_result import ToolInvokeResult
+
+    if not order_id and not order_item_id:
+        return ToolInvokeResult(
+            content="【查询退款进度失败】请先选择退款订单或订单项",
+            success=False,
+            error_code="BAD_ARGS",
+        )
+    try:
+        rows = await java_internal_client.get_refund_status(
+            user_id,
+            order_id=order_id,
+            order_item_id=order_item_id,
+        )
+        if not rows:
+            return ToolInvokeResult(content="该订单暂未查到退款申请记录。", biz_type="query_refund_status")
+        return ToolInvokeResult(
+            content=json.dumps(rows, ensure_ascii=False, default=str),
+            biz_type="query_refund_status",
+            order_ids=[
+                str(row.get("order_id") or "")
+                for row in rows
+                if row.get("order_id")
+            ],
+        )
+    except Exception:
+        logger.exception(
+            "mcp_query_refund_status_failed",
+            user_id=user_id,
+            order_id=order_id,
+            order_item_id=order_item_id,
+        )
+        return ToolInvokeResult(
+            content="【查询退款进度失败】系统处理异常，请稍后重试或联系客服",
+            success=False,
+            error_code="TOOL_ERROR",
+        )
+
 async def query_user_coupons(user_id: str, status: int | None = None) -> str:
 
     if not user_id:
@@ -214,6 +261,8 @@ async def propose_confirm_receipt(user_id: str, order_id: str) -> str:
             f"确认收货：订单 {order_id}，实付金额 {order['amount']} 元",
         )
         return _propose_reply("确认收货", pending)
+    except PendingActionConflict as exc:
+        return f"【确认收货失败】{exc}"
     except Exception:
         logger.exception(
             "mcp_propose_confirm_receipt_failed",
@@ -298,6 +347,8 @@ async def propose_refund(user_id: str, order_item_id: str) -> str:
             f"退款：订单项 {order_item_id}（{name}），金额 {item['item_amount']} 元",
         )
         return _propose_reply("退款", pending)
+    except PendingActionConflict as exc:
+        return f"【退款失败】{exc}"
     except Exception:
         logger.exception(
             "mcp_propose_refund_failed",
@@ -337,6 +388,8 @@ async def propose_product_review(user_id: str, order_id: str, content: str, star
             f"提交评价：订单 {order_id}，{star} 星，内容「{_truncate(content)}」",
         )
         return _propose_reply("评价", pending)
+    except PendingActionConflict as exc:
+        return f"【评价失败】{exc}"
     except Exception:
         logger.exception(
             "mcp_propose_product_review_failed",
@@ -373,6 +426,8 @@ async def propose_recomment(user_id: str, order_id: str, content: str) -> str:
             f"提交追评：订单 {order_id}，内容「{_truncate(content)}」",
         )
         return _propose_reply("追评", pending)
+    except PendingActionConflict as exc:
+        return f"【追评失败】{exc}"
     except Exception:
         logger.exception(
             "mcp_propose_recomment_failed",

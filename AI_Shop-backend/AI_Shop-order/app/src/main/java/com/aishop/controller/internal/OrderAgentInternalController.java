@@ -5,12 +5,14 @@ import com.aishop.biz.AgentActionStatusService;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderItemService;
 import com.aishop.biz.OrderLogisticsInfoService;
+import com.aishop.biz.RefundSagaTransactionService;
 import com.aishop.controller.ABaseController;
 import com.aishop.api.enums.OrderStatusEnum;
 import com.aishop.entity.po.OrderComment;
 import com.aishop.entity.po.OrderInfo;
 import com.aishop.entity.po.OrderItem;
 import com.aishop.entity.po.OrderLogisticsInfo;
+import com.aishop.entity.po.RefundRequest;
 import com.aishop.entity.query.OrderCommentQuery;
 import com.aishop.entity.query.OrderInfoQuery;
 import com.aishop.entity.query.OrderItemQuery;
@@ -52,6 +54,8 @@ public class OrderAgentInternalController extends ABaseController {
     private OrderCommentService orderCommentService;
     @Resource
     private AgentActionStatusService agentActionStatusService;
+    @Resource
+    private RefundSagaTransactionService refundSagaTransactionService;
 
     @PostMapping("/listOrders")
     public ResponseVO<List<Map<String, Object>>> listOrders(@RequestBody Map<String, Object> body) {
@@ -195,6 +199,45 @@ public class OrderAgentInternalController extends ABaseController {
         return getSuccessResponseVO(map);
     }
 
+    @PostMapping("/refundStatus")
+    public ResponseVO<List<Map<String, Object>>> refundStatus(@RequestBody Map<String, Object> body) {
+        String userId = str(body, "userId");
+        String orderId = str(body, "orderId");
+        String orderItemId = str(body, "orderItemId");
+        if (StringTools.isEmpty(userId)
+                || (StringTools.isEmpty(orderId) && StringTools.isEmpty(orderItemId))) {
+            return getSuccessResponseVO(Collections.emptyList());
+        }
+
+        List<RefundRequest> requests = new ArrayList<>();
+        if (!StringTools.isEmpty(orderItemId)) {
+            RefundRequest request = refundSagaTransactionService.findByOrderItemId(orderItemId);
+            if (request != null && userId.equals(request.getUserId())) {
+                requests.add(request);
+            }
+        } else {
+            OrderInfo order = orderInfoService.getOrderInfoByOrderId(orderId);
+            if (order == null || !userId.equals(order.getUserId())) {
+                return getSuccessResponseVO(Collections.emptyList());
+            }
+            OrderItemQuery itemQuery = new OrderItemQuery();
+            itemQuery.setOrderId(orderId);
+            List<OrderItem> items = orderItemService.findListByParam(itemQuery);
+            if (items != null) {
+                for (OrderItem item : items) {
+                    RefundRequest request = refundSagaTransactionService.findByOrderItemId(
+                            item.getOrderItemId());
+                    if (request != null && userId.equals(request.getUserId())) {
+                        requests.add(request);
+                    }
+                }
+            }
+        }
+        return getSuccessResponseVO(requests.stream()
+                .map(this::toRefundStatusMap)
+                .collect(Collectors.toList()));
+    }
+
     @PostMapping("/actionStatus")
     public ResponseVO<Map<String, Object>> actionStatus(
             @RequestBody Map<String, Object> body) {
@@ -285,6 +328,31 @@ public class OrderAgentInternalController extends ABaseController {
         m.put("buyCount", item.getBuyCount());
         m.put("orderItemStatus", item.getOrderItemStatus());
         return m;
+    }
+
+    private Map<String, Object> toRefundStatusMap(RefundRequest request) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("refundRequestId", request.getRefundRequestId());
+        result.put("orderId", request.getOrderId());
+        result.put("orderItemId", request.getOrderItemId());
+        result.put("status", request.getStatus());
+        result.put("statusName", refundStatusName(request.getStatus()));
+        result.put("refundAmount", request.getRefundAmount());
+        result.put("createdAt", formatDate(request.getCreatedAt()));
+        result.put("completedAt", formatDate(request.getCompletedAt()));
+        return result;
+    }
+
+    private static String refundStatusName(String status) {
+        if (status == null) return "处理中";
+        return switch (status) {
+            case "PENDING_PAYMENT" -> "等待原路退款";
+            case "PAYMENT_CONFIRMED" -> "退款资金已确认";
+            case "STOCK_PENDING" -> "退款已受理，库存处理中";
+            case "COMPLETED" -> "退款已完成";
+            case "MANUAL_REVIEW" -> "退款需人工复核";
+            default -> "退款处理中";
+        };
     }
 
     private static boolean inTimeRange(Date orderTime, String timeStart, String timeEnd) {

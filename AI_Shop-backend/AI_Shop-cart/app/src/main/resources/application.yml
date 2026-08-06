@@ -91,6 +91,10 @@ aishop:
   feign:
     connect-timeout-ms: 3000
     read-timeout-ms: 10000
+  agent:
+    base-url: ${AGENT_BASE_URL:http://127.0.0.1:7050}
+    attribution-connect-timeout-ms: ${AGENT_ATTRIBUTION_CONNECT_TIMEOUT_MS:200}
+    attribution-read-timeout-ms: ${AGENT_ATTRIBUTION_READ_TIMEOUT_MS:500}
   security:
     admin-interceptor: true
 

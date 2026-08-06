@@ -1,9 +1,9 @@
 <template>
   <div class="agent-products">
-    <RouterLink
+    <button
       v-for="(item, index) in list"
       :key="item.productId || `p-${index}`"
-      :to="`/product/${item.productId}`"
+      type="button"
       class="product-link"
       @click="onProductClick(item, index)"
     >
@@ -17,23 +17,25 @@
         </span>
       </p>
       <p v-if="item.reason" class="reason">{{ item.reason }}</p>
-    </RouterLink>
+    </button>
     <p v-if="!list.length" class="empty">暂无相关商品</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router';
+import { useRouter } from 'vue-router';
 import ProductImage from '@/components/common/ProductImage.vue';
 import { saveAgentConsultProduct } from '@/utils/agentProductConsult';
 import { useAuthStore } from '@/stores/auth';
 import { agentApi } from '@/api/modules';
+import { saveRecommendationAttribution } from '@/utils/recommendationAttribution';
 
 defineProps<{ list: Record<string, any>[] }>();
 
 const authStore = useAuthStore();
+const router = useRouter();
 
-const onProductClick = (item: Record<string, any>, position = 0) => {
+const onProductClick = async (item: Record<string, any>, position = 0) => {
   if (!item?.productId || !item?.productName) return;
   saveAgentConsultProduct(
     {
@@ -44,17 +46,21 @@ const onProductClick = (item: Record<string, any>, position = 0) => {
     },
     authStore.userInfo?.userId as string | undefined
   );
-  // P0-7 推荐归因：requestId 是 serving 时随卡片下发的归因 token，
-  // 点击原样回传（fire-and-forget，失败不影响跳转）。
   const requestId = item.requestId ? String(item.requestId) : '';
-  if (!requestId) return;
-  agentApi
-    .reportClick(
+  const userId = String(authStore.userInfo?.userId || '');
+  if (requestId && userId) {
+    try {
+      const attribution = await agentApi.reportClick(
       String(item.productId),
       requestId,
       position + 1
-    )
-    .catch(() => {});
+      );
+      saveRecommendationAttribution(attribution, userId);
+    } catch {
+      // Navigation is the primary action; attribution is best effort.
+    }
+  }
+  await router.push(`/product/${item.productId}`);
 };
 
 const formatPrice = (val: unknown) => Number(val ?? 0).toFixed(2);
@@ -90,6 +96,9 @@ const formatPriceRange = (item: Record<string, any>) => {
   text-decoration: none;
   color: inherit;
   background: #fafafa;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
 
   &:hover {
     border-color: rgba($color-primary, 0.4);

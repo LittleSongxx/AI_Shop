@@ -26,6 +26,7 @@ from app.services.tool_invoke_result import ToolInvokeResult
 logger = structlog.get_logger()
 
 _CANCEL_ORDER_GUIDE = "客服侧暂不支持直接取消订单，请到「我的订单」页面自行取消。"
+_TOOL_FAILURE_TEXT = "业务数据查询失败，请稍后重试；当前回复不会猜测订单或操作状态。"
 
 
 def _biz_type_for(result: ToolInvokeResult, tool_name: str) -> str | None:
@@ -57,8 +58,37 @@ def _finalize_with_tool(
     }
 
 
+def _finalize_tool_failure(messages: list, error: Exception, *, intent: str | None) -> dict:
+    logger.error(
+        "forced_mcp_degraded",
+        intent=intent,
+        error_type=type(error).__name__,
+        error=str(error)[:300],
+    )
+    return {
+        "llm_messages": messages,
+        "tools_called": [],
+        "tool_biz": None,
+        "biz_type": None,
+        "biz_data": None,
+        "assistant_cards": None,
+        "search_tool_hint": None,
+        "search_fallback_done": True,
+        "chunks": [_TOOL_FAILURE_TEXT],
+        "pending_tool_calls": [],
+        "route": "finalize",
+    }
+
+
 def _has_cards(result: ToolInvokeResult) -> bool:
     return bool(result.assistant_cards and result.assistant_cards.strip() not in ("", "[]"))
+
+
+def _failed_result(messages: list, result: ToolInvokeResult, *, intent: str | None) -> dict | None:
+    if result.success:
+        return None
+    error = RuntimeError(result.error_code or result.content or "tool failed")
+    return _finalize_tool_failure(messages, error, intent=intent)
 
 
 async def forced_product_search(
@@ -77,7 +107,12 @@ async def forced_product_search(
     args: dict = {"keyword": keyword}
     if exclude_product_id:
         args["excludeProductId"] = str(exclude_product_id)
-    result = await mcp_tool_router.invoke("SEARCH_PRODUCTS", args, user_id)
+    try:
+        result = await mcp_tool_router.invoke("SEARCH_PRODUCTS", args, user_id)
+    except Exception as exc:
+        return _finalize_tool_failure(messages, exc, intent=IntentKind.PRODUCT_SEARCH.value)
+    if failed := _failed_result(messages, result, intent=IntentKind.PRODUCT_SEARCH.value):
+        return failed
     logger.info(
         log_event,
         user_id=user_id,
@@ -103,11 +138,19 @@ async def forced_tool_for_intent(
     user_text: str,
 ) -> dict | None:
     """意图要求工具但模型没调时，替它调。参数不全则返回 None 交回模型追问。"""
-    forced = await required_tool_for_intent(intent, intent_data, user_text, user_id)
+    try:
+        forced = await required_tool_for_intent(intent, intent_data, user_text, user_id)
+    except Exception as exc:
+        return _finalize_tool_failure(messages, exc, intent=intent)
     if not forced:
         return None
     tool_name, tool_args = forced
-    result = await mcp_tool_router.invoke(tool_name, tool_args, user_id)
+    try:
+        result = await mcp_tool_router.invoke(tool_name, tool_args, user_id)
+    except Exception as exc:
+        return _finalize_tool_failure(messages, exc, intent=intent)
+    if failed := _failed_result(messages, result, intent=intent):
+        return failed
     tool_text = result.to_tool_message() or ""
     messages.append(ToolMessage(content=tool_text or "未查询到相关记录。", tool_call_id="forced_mcp"))
     logger.warning(
@@ -141,9 +184,14 @@ async def forced_order_list(
     order_id: str | None,
 ) -> dict:
     """用户明确在要订单列表时强制查一次，保证前端拿到卡片而不是表格文本。"""
-    result = await mcp_tool_router.invoke(
-        "QUERY_ORDERS", {"orderId": order_id} if order_id else {}, user_id
-    )
+    try:
+        result = await mcp_tool_router.invoke(
+            "QUERY_ORDERS", {"orderId": order_id} if order_id else {}, user_id
+        )
+    except Exception as exc:
+        return _finalize_tool_failure(messages, exc, intent=intent)
+    if failed := _failed_result(messages, result, intent=intent):
+        return failed
     tool_text = result.to_tool_message() or ""
     messages.append(
         ToolMessage(content=tool_text or "未查询到相关订单。", tool_call_id="forced_orders_ui")

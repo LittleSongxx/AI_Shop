@@ -13,6 +13,8 @@ MCP_TOOL_CONTRACT = "aishop-tools/current"
 @dataclass
 class ToolInvokeResult:
     content: str
+    success: bool = True
+    error_code: str | None = None
     biz_type: str | None = None
     biz_data: str | None = None
     assistant_cards: str | None = None
@@ -40,6 +42,8 @@ class ToolInvokeResult:
             "protocolVersion": self.protocol_version,
             "contractVersion": self.contract_version,
             "content": self.content or "",
+            "success": self.success,
+            "errorCode": self.error_code,
             "bizType": self.biz_type,
             "bizData": self.biz_data,
             "assistantCards": self.assistant_cards,
@@ -63,6 +67,8 @@ def parse_tool_wire(text: str | None) -> ToolInvokeResult:
         return ToolInvokeResult(content=raw, protocol_version="", contract_version="")
     return ToolInvokeResult(
         content=str(obj.get("content") or ""),
+        success=obj.get("success") is not False,
+        error_code=obj.get("errorCode"),
         biz_type=obj.get("bizType"),
         biz_data=obj.get("bizData"),
         assistant_cards=obj.get("assistantCards"),

@@ -33,14 +33,33 @@ def _delta(reads_before: dict, reads_after: dict, name: str, labels: dict) -> fl
 def _snapshot(queries: list[tuple[str, dict]]) -> dict:
     return {
         name: {
-            tuple(sorted(labels.items())): _read(name, labels) for name, labels in queries
+            tuple(sorted(labels.items())): _read(query_name, labels)
+            for query_name, labels in queries
+            if query_name == name
         }
         for name, _ in queries
     }
 
 
-_TOKEN_PROMPT = ("agent_llm_tokens_total", {"kind": "prompt"})
-_TOKEN_COMPLETION = ("agent_llm_tokens_total", {"kind": "completion"})
+def _token_labels(kind: str, model: str, fallback: bool) -> tuple[str, dict]:
+    return (
+        "agent_llm_tokens_total",
+        {"kind": kind, "model": model, "fallback": str(fallback).lower()},
+    )
+
+
+def _unpriced_labels(kind: str, model: str, fallback: bool) -> tuple[str, dict]:
+    return (
+        "agent_llm_unpriced_tokens_total",
+        {"kind": kind, "model": model, "fallback": str(fallback).lower()},
+    )
+
+
+def _cost_labels(kind: str, model: str, fallback: bool) -> tuple[str, dict]:
+    return (
+        "agent_llm_cost_cny_total",
+        {"kind": kind, "model": model, "fallback": str(fallback).lower()},
+    )
 
 
 def _call_labels(model: str, fallback: bool, result: str = "success") -> tuple[str, dict]:
@@ -56,7 +75,11 @@ def _call_labels(model: str, fallback: bool, result: str = "success") -> tuple[s
 
 def test_non_streaming_token_usage():
     """非流式路径：response_metadata["token_usage"]（OpenAI 命名）。"""
-    before = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("claude-opus-5", False)])
+    token_input = _token_labels("input", "claude-opus-5", False)
+    token_output = _token_labels("output", "claude-opus-5", False)
+    unpriced_total = _unpriced_labels("total", "claude-opus-5", False)
+    queries = [token_input, token_output, unpriced_total, _call_labels("claude-opus-5", False)]
+    before = _snapshot(queries)
     msg = AIMessage(
         content="hi",
         response_metadata={
@@ -65,16 +88,20 @@ def test_non_streaming_token_usage():
         },
     )
     record_llm_usage(msg)
-    after = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("claude-opus-5", False)])
+    after = _snapshot(queries)
 
-    assert _delta(before, after, *_TOKEN_PROMPT) == 120
-    assert _delta(before, after, *_TOKEN_COMPLETION) == 34
+    assert _delta(before, after, *token_input) == 120
+    assert _delta(before, after, *token_output) == 34
+    assert _delta(before, after, *unpriced_total) == 154
     assert _delta(before, after, *_call_labels("claude-opus-5", False)) == 1
 
 
 def test_streaming_usage_metadata():
     """流式路径：AIMessage.usage_metadata（input_tokens/output_tokens）。"""
-    before = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", True)])
+    token_input = _token_labels("input", "unknown", True)
+    token_output = _token_labels("output", "unknown", True)
+    queries = [token_input, token_output, _call_labels("unknown", True)]
+    before = _snapshot(queries)
     msg = AIMessage(
         content="hi",
         # langchain_core 0.3.x 校验要求 total_tokens 必填（真实流式响应恒有）
@@ -82,31 +109,35 @@ def test_streaming_usage_metadata():
         response_metadata={"finish_reason": "stop"},
     )
     record_llm_usage(msg, fallback=True)
-    after = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", True)])
+    after = _snapshot(queries)
 
-    assert _delta(before, after, *_TOKEN_PROMPT) == 200
-    assert _delta(before, after, *_TOKEN_COMPLETION) == 15
+    assert _delta(before, after, *token_input) == 200
+    assert _delta(before, after, *token_output) == 15
     assert _delta(before, after, *_call_labels("unknown", True)) == 1
 
 
 def test_no_usage_still_counts_call():
     """没有 usage 字段时只记调用次数，不崩溃、不反推 token。"""
-    before = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", False)])
+    token_input = _token_labels("input", "unknown", False)
+    token_output = _token_labels("output", "unknown", False)
+    queries = [token_input, token_output, _call_labels("unknown", False)]
+    before = _snapshot(queries)
     msg = AIMessage(content="hi", response_metadata={"finish_reason": "stop"})
     record_llm_usage(msg)
-    after = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", False)])
+    after = _snapshot(queries)
 
-    assert _delta(before, after, *_TOKEN_PROMPT) == 0
-    assert _delta(before, after, *_TOKEN_COMPLETION) == 0
+    assert _delta(before, after, *token_input) == 0
+    assert _delta(before, after, *token_output) == 0
     assert _delta(before, after, *_call_labels("unknown", False)) == 1
 
 
 def test_none_response_ignored():
-    before = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", False)])
+    token_input = _token_labels("input", "unknown", False)
+    before = _snapshot([token_input, _call_labels("unknown", False)])
     record_llm_usage(None)
-    after = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", False)])
+    after = _snapshot([token_input, _call_labels("unknown", False)])
 
-    assert _delta(before, after, *_TOKEN_PROMPT) == 0
+    assert _delta(before, after, *token_input) == 0
     assert _delta(before, after, *_call_labels("unknown", False)) == 0
 
 
@@ -116,14 +147,66 @@ def test_none_response_ignored():
 ])
 def test_wrong_or_incomplete_keys_never_count_tokens(response_metadata):
     """旧注释声称的 "usage" 键在 0.3.35 不存在：即使出现也绝不误记。"""
-    before = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", False)])
+    token_input = _token_labels("input", "unknown", False)
+    token_output = _token_labels("output", "unknown", False)
+    queries = [token_input, token_output, _call_labels("unknown", False)]
+    before = _snapshot(queries)
     msg = AIMessage(content="hi", response_metadata=response_metadata)
     record_llm_usage(msg)
-    after = _snapshot([_TOKEN_PROMPT, _TOKEN_COMPLETION, _call_labels("unknown", False)])
+    after = _snapshot(queries)
 
-    assert _delta(before, after, *_TOKEN_PROMPT) == 0
-    assert _delta(before, after, *_TOKEN_COMPLETION) == 0
+    assert _delta(before, after, *token_input) == 0
+    assert _delta(before, after, *token_output) == 0
     assert _delta(before, after, *_call_labels("unknown", False)) == 1
+
+
+def test_configured_price_records_input_output_and_total_cost(monkeypatch):
+    monkeypatch.setattr(
+        "app.observability.llm_metrics.get_settings",
+        lambda: SimpleNamespace(
+            llm_pricing_cny_per_million_json={
+                "priced-model": {"input": 2.0, "output": 8.0}
+            }
+        ),
+    )
+    cost_input = _cost_labels("input", "priced-model", False)
+    cost_output = _cost_labels("output", "priced-model", False)
+    cost_total = _cost_labels("total", "priced-model", False)
+    unpriced = _unpriced_labels("total", "priced-model", False)
+    queries = [cost_input, cost_output, cost_total, unpriced]
+    before = _snapshot(queries)
+    msg = AIMessage(
+        content="ok",
+        response_metadata={
+            "model_name": "priced-model",
+            "token_usage": {"prompt_tokens": 1_000, "completion_tokens": 500},
+        },
+    )
+
+    record_llm_usage(msg)
+    after = _snapshot(queries)
+
+    assert _delta(before, after, *cost_input) == pytest.approx(0.002)
+    assert _delta(before, after, *cost_output) == pytest.approx(0.004)
+    assert _delta(before, after, *cost_total) == pytest.approx(0.006)
+    assert _delta(before, after, *unpriced) == 0
+
+
+def test_structured_output_wrapper_preserves_raw_usage():
+    token_input = _token_labels("input", "schema-model", False)
+    before = _snapshot([token_input])
+    raw = AIMessage(
+        content="",
+        response_metadata={
+            "model_name": "schema-model",
+            "token_usage": {"prompt_tokens": 42, "completion_tokens": 3},
+        },
+    )
+
+    record_llm_usage({"raw": raw, "parsed": {"intent": "CHAT"}})
+    after = _snapshot([token_input])
+
+    assert _delta(before, after, *token_input) == 42
 
 
 @pytest.mark.asyncio

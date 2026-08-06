@@ -494,9 +494,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .stream()
                 .map(String::valueOf)
                 .toList();
+        List<Map<String, Object>> documents = camelRows(jdbcTemplate.queryForList(
+                """
+                SELECT document_id, source_name, content_hash, version
+                FROM knowledge_document
+                WHERE status='PUBLISHED'
+                ORDER BY document_id
+                """));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version", version);
         result.put("activeDocumentIds", activeDocumentIds);
+        result.put("documents", documents);
         return result;
     }
 

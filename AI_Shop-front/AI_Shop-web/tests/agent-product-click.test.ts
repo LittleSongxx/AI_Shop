@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AgentProductList from '@/components/agent/AgentProductList.vue';
 import { agentApi } from '@/api/modules';
 
+const push = vi.fn();
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push })
+}));
+
 vi.mock('@/api/modules', () => ({
   agentApi: {
     reportClick: vi.fn()
@@ -35,7 +41,14 @@ const products = [
 
 describe('agent product click attribution', () => {
   beforeEach(() => {
-    vi.mocked(agentApi.reportClick).mockReset().mockResolvedValue(undefined);
+    push.mockReset();
+    vi.mocked(agentApi.reportClick).mockReset().mockResolvedValue({
+      requestId: '0123456789abcdef0123456789abcdef',
+      productId: 'p2',
+      position: 2,
+      source: 'hybrid',
+      occurredAt: new Date().toISOString()
+    });
   });
 
   it('reports the serving token with a one-based product position', async () => {
@@ -43,7 +56,6 @@ describe('agent product click attribution', () => {
       props: { list: products },
       global: {
         stubs: {
-          RouterLink: { template: '<a><slot /></a>' },
           ProductImage: true
         }
       }
@@ -56,6 +68,7 @@ describe('agent product click attribution', () => {
       '0123456789abcdef0123456789abcdef',
       2
     );
+    expect(push).toHaveBeenCalledWith('/product/p2');
   });
 
   it('does not send an unattributable event for historical cards without a token', async () => {
@@ -63,7 +76,6 @@ describe('agent product click attribution', () => {
       props: { list: [{ productId: 'legacy', productName: '旧卡片', minPrice: 8 }] },
       global: {
         stubs: {
-          RouterLink: { template: '<a><slot /></a>' },
           ProductImage: true
         }
       }
@@ -72,5 +84,6 @@ describe('agent product click attribution', () => {
     await fireEvent.click(view.getByText('旧卡片'));
 
     expect(agentApi.reportClick).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith('/product/legacy');
   });
 });

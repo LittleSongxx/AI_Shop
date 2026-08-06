@@ -3,6 +3,7 @@ package com.aishop.entity.po;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.io.Serializable;
+import java.util.Date;
 
 public class OrderItem implements Serializable {
 
@@ -29,6 +30,14 @@ public class OrderItem implements Serializable {
 	private String remark;
 
 	private String refundOrderId;
+
+	private String aiRequestId;
+
+	private Integer aiPosition;
+
+	private String aiSource;
+
+	private Date aiAttributedAt;
 
 	public void setOrderItemId(String orderItemId){
 		this.orderItemId = orderItemId;
@@ -124,6 +133,38 @@ public class OrderItem implements Serializable {
 
 	public String getRefundOrderId(){
 		return this.refundOrderId;
+	}
+
+	public String getAiRequestId() {
+		return aiRequestId;
+	}
+
+	public void setAiRequestId(String aiRequestId) {
+		this.aiRequestId = aiRequestId;
+	}
+
+	public Integer getAiPosition() {
+		return aiPosition;
+	}
+
+	public void setAiPosition(Integer aiPosition) {
+		this.aiPosition = aiPosition;
+	}
+
+	public String getAiSource() {
+		return aiSource;
+	}
+
+	public void setAiSource(String aiSource) {
+		this.aiSource = aiSource;
+	}
+
+	public Date getAiAttributedAt() {
+		return aiAttributedAt;
+	}
+
+	public void setAiAttributedAt(Date aiAttributedAt) {
+		this.aiAttributedAt = aiAttributedAt;
 	}
 
 	@Override

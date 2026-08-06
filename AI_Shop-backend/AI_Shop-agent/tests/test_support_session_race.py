@@ -131,7 +131,7 @@ async def test_reply_locks_session_and_commits_state_with_both_messages():
         "status": "ASSIGNED",
         "assigned_admin": "admin-a",
     }
-    cursor = _Cursor(rowcount=1, row=session)
+    cursor = _Cursor(rowcount=0, row=session)
     final = {**session, "status": "ACTIVE"}
     with (
         patch("app.services.support_service.acquire", _acquire_for(cursor)),
@@ -147,6 +147,33 @@ async def test_reply_locks_session_and_commits_state_with_both_messages():
     assert any("UPDATE support_session" in sql for sql in statements)
     assert any("INSERT INTO support_message" in sql for sql in statements)
     assert any("INSERT INTO agent_message" in sql for sql in statements)
+    assert statements[-1] == "COMMIT"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method_name", ["claim", "activate"])
+async def test_repeated_owner_transition_is_idempotent_when_update_would_change_zero_rows(method_name):
+    service = SupportService()
+    session = {
+        "session_id": "session-1",
+        "user_id": "u1",
+        "status": "ACTIVE" if method_name == "activate" else "ASSIGNED",
+        "assigned_admin": "admin-a",
+    }
+    cursor = _Cursor(rowcount=0, row=session)
+    with (
+        patch("app.services.support_service.acquire", _acquire_for(cursor)),
+        patch.object(service, "get_by_id", AsyncMock(return_value=session)),
+        patch.object(service, "publish_admin", AsyncMock()),
+    ):
+        result = await getattr(service, method_name)("session-1", "admin-a")
+
+    assert result == session
+    statements = [sql.strip() for sql, _ in cursor.calls]
+    assert statements[:2] == [
+        "START TRANSACTION",
+        "SELECT * FROM support_session WHERE session_id=%s FOR UPDATE",
+    ]
     assert statements[-1] == "COMMIT"
 
 

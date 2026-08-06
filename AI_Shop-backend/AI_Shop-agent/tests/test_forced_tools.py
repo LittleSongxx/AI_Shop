@@ -4,6 +4,8 @@
 "用户问订单能不能看到订单卡片"，回归了就是可见故障。
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from app.domain.intent.types import IntentKind
@@ -168,3 +170,118 @@ async def test_forced_order_list_passes_order_id_when_known(record_invoke):
     )
 
     assert calls == [("QUERY_ORDERS", {"orderId": "o9"}, "u1")]
+
+
+async def test_forced_tool_failure_never_reuses_llm_business_claim(monkeypatch):
+    async def fail_invoke(*_args, **_kwargs):
+        raise TimeoutError("MCP unavailable")
+
+    monkeypatch.setattr(forced_tools.mcp_tool_router, "invoke", fail_invoke)
+
+    out = await forced_tools.forced_tool_for_intent(
+        messages=[],
+        user_id="u1",
+        intent=IntentKind.QUERY_ORDER.value,
+        intent_data=None,
+        user_text="我的订单状态是已发货吗",
+    )
+
+    assert out["route"] == "finalize"
+    assert out["tools_called"] == []
+    assert "不会猜测" in out["chunks"][0]
+    assert "已发货" not in out["chunks"][0]
+
+
+@pytest.mark.parametrize(
+    ("intent", "intent_data", "user_text", "expected_tool", "expected_args"),
+    [
+        (IntentKind.QUERY_ORDER.value, None, "我的订单", "QUERY_ORDERS", {}),
+        (
+            IntentKind.QUERY_LOGISTICS.value,
+            "order-1",
+            "快递到哪了",
+            "QUERY_LOGISTICS",
+            {"orderId": "order-1"},
+        ),
+        (IntentKind.QUERY_COUPON.value, None, "我有哪些券", "QUERY_USER_COUPONS", {}),
+        (
+            IntentKind.CONFIRM_RECEIPT.value,
+            "order-2",
+            "确认收货",
+            "PROPOSE_CONFIRM_RECEIPT",
+            {"orderId": "order-2"},
+        ),
+        (
+            IntentKind.PRODUCT_REVIEW.value,
+            "order-3",
+            "非常满意，5星",
+            "PROPOSE_PRODUCT_REVIEW",
+            {"orderId": "order-3", "commentContent": "非常满意", "star": 5},
+        ),
+        (
+            IntentKind.RECOMMENT.value,
+            "order-4",
+            "追评 用了一周依然很好",
+            "PROPOSE_RECOMMENT",
+            {"orderId": "order-4", "reCommentContent": "用了一周依然很好"},
+        ),
+    ],
+)
+async def test_required_business_intents_force_the_expected_tool(
+    record_invoke, intent, intent_data, user_text, expected_tool, expected_args
+):
+    calls, _ = record_invoke
+
+    out = await forced_tools.forced_tool_for_intent(
+        messages=[],
+        user_id="u1",
+        intent=intent,
+        intent_data=intent_data,
+        user_text=user_text,
+    )
+
+    assert calls == [(expected_tool, expected_args, "u1")]
+    assert out["tools_called"] == [expected_tool]
+    assert out["route"] == "finalize"
+
+
+async def test_refund_intent_forces_verified_order_item(record_invoke, monkeypatch):
+    calls, _ = record_invoke
+    order_item_id = "20260612204304352OBbW6OiMj2BUUhY_1"
+    monkeypatch.setattr(
+        "app.services.order_service.order_service.get_order_item",
+        AsyncMock(return_value={"order_item_id": order_item_id}),
+    )
+
+    out = await forced_tools.forced_tool_for_intent(
+        messages=[],
+        user_id="u1",
+        intent=IntentKind.REFUND.value,
+        intent_data=order_item_id,
+        user_text=f"给 {order_item_id} 退款",
+    )
+
+    assert calls == [("PROPOSE_REFUND", {"orderItemId": order_item_id}, "u1")]
+    assert out["tools_called"] == ["PROPOSE_REFUND"]
+
+
+async def test_structured_tool_failure_uses_safe_degradation(record_invoke):
+    _, box = record_invoke
+    box["result"] = ToolInvokeResult(
+        content="【操作失败】下游超时",
+        success=False,
+        error_code="TOOL_ERROR",
+    )
+
+    out = await forced_tools.forced_tool_for_intent(
+        messages=[],
+        user_id="u1",
+        intent=IntentKind.QUERY_ORDER.value,
+        intent_data=None,
+        user_text="我的订单已经发货了吗",
+    )
+
+    assert out["tools_called"] == []
+    assert out["assistant_cards"] is None
+    assert "不会猜测" in out["chunks"][0]
+    assert "已发货" not in out["chunks"][0]

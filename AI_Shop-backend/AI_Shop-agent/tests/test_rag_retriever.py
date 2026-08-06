@@ -236,15 +236,14 @@ def test_rrf_keeps_fusion_score_and_preserves_engine_score():
 
 
 def test_evidence_gate_uses_the_scale_that_produced_the_score():
-    """同一个 0.5 不能同时判 rerank 归一分和 RRF 融合分。"""
+    """冻结的 rerank 门槛不能被误用于判定 RRF 融合分。"""
     retriever = RagRetriever()
 
-    # rerank 之后：0~1 归一相关性，0.5 这个绝对阈值在这里才说得通。
-    assert retriever._has_enough_evidence([{"score": 0.62, "source": "rerank"}])
-    assert not retriever._has_enough_evidence([{"score": 0.31, "source": "rerank"}])
+    # rerank 之后使用 2026-08-06 评测冻结的 0.65 绝对阈值。
+    assert retriever._has_enough_evidence([{"score": 0.65, "source": "rerank"}])
+    assert not retriever._has_enough_evidence([{"score": 0.64, "source": "rerank"}])
 
-    # 没有 rerank（未配 key 或熔断）：RRF 分永远远小于 0.5，拿 0.5 判会把所有证据
-    # 都判成不足；按名次判才有意义。
+    # 没有 rerank（未配 key 或熔断）：RRF 分远小于 0.65，按名次判才有意义。
     settings = get_settings()
     rank_floor = settings.rag_evidence_min_rrf_rank
     assert retriever._has_enough_evidence(

@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
+import type { AgentSourceRef } from '@/utils/agentHistory';
 
 export interface AgentWsMessage {
   messageId?: number | string;
@@ -8,6 +9,8 @@ export interface AgentWsMessage {
   bizType?: string;
   outPutType?: number;
   userId?: string;
+  messageType?: string;
+  sourceRefs?: AgentSourceRef[] | { sources?: AgentSourceRef[] };
 }
 
 export const useAgentMessageStore = defineStore('agentMessage', () => {

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { accountApi } from '@/api/modules';
 import { fetchMemberCenter } from '@/api/memberCenter';
 import { useCartStore } from '@/stores/cart';
+import { clearRecommendationAttributions } from '@/utils/recommendationAttribution';
 
 const MEMBER_CACHE_TTL = 5 * 60 * 1000;
 const MEMBER_CACHE_KEY = 'eshop_member_level';
@@ -142,6 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionReady = false;
     clearCache(MEMBER_CACHE_KEY);
     clearCache(MEMBER_CENTER_CACHE_KEY);
+    clearRecommendationAttributions();
     memberLevelCode.value = 1;
     memberLevelName.value = '';
     memberGrowthValue.value = 0;

@@ -119,11 +119,20 @@ class KnowledgeBaseServiceImplTest {
                 argThat(sql -> sql.contains("status='PUBLISHED'")),
                 eq(Long.class)))
                 .thenReturn(List.of(11L, 12L));
+        when(jdbcTemplate.queryForList(
+                argThat(sql -> sql.contains("source_name") && sql.contains("content_hash"))))
+                .thenReturn(List.of(Map.of(
+                        "document_id", 11L,
+                        "source_name", "shipping.md",
+                        "content_hash", "a".repeat(64),
+                        "version", 2)));
 
         Map<String, Object> catalog = service.releaseCatalog();
 
         assertEquals(9L, catalog.get("version"));
         assertEquals(List.of("11", "12"), catalog.get("activeDocumentIds"));
+        assertEquals("shipping.md", ((List<Map<String, Object>>) catalog.get("documents"))
+                .get(0).get("sourceName"));
     }
 
     @Test

@@ -72,6 +72,7 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
         _policy("QUERY_ORDERS", _READ, "query_order"),
         _policy("QUERY_LOGISTICS", _READ, "query_logistics"),
         _policy("QUERY_COMMENT", _READ, "query_comment"),
+        _policy("QUERY_REFUND_STATUS", _READ, "query_refund_status"),
         _policy("QUERY_USER_COUPONS", _READ, "query_coupon"),
         # P3-1 Agentic RAG: in-process knowledge/FAQ retrieval tool.
         _policy("SEARCH_KNOWLEDGE", _READ),

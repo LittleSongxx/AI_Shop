@@ -11,6 +11,10 @@ import { resolveImageUrl } from '@/utils/image';
 import { saveCheckoutSession } from '@/utils/checkout';
 import { toast } from '@/utils/toast';
 import { MAX_CART_QTY } from '@/constants/validation';
+import {
+  loadRecommendationAttribution,
+  recommendationAttributionCommandFields
+} from '@/utils/recommendationAttribution';
 
 export function useProductDetailPage() {
   const route = useRoute();
@@ -271,6 +275,10 @@ export function useProductDetailPage() {
       return;
     }
     const cover = thumbList.value[0] || productInfo.value?.cover?.split(',')[0];
+    const attribution = loadRecommendationAttribution(
+      authStore.userInfo?.userId as string | undefined,
+      String(productInfo.value.productId)
+    );
     const checkoutItems = [
       {
         productId: productInfo.value.productId,
@@ -280,7 +288,10 @@ export function useProductDetailPage() {
         propertyValueIdHash: selectedSku.value.propertyValueIdHash,
         propertyData: buildPropertyData(),
         price: Number(selectedSku.value.price ?? productInfo.value?.minPrice ?? 0),
-        buyCount: quantity.value
+        buyCount: quantity.value,
+        aiSource: attribution?.source,
+        aiAttributedAt: attribution?.occurredAt,
+        ...recommendationAttributionCommandFields(attribution)
       }
     ];
     saveCheckoutSession(checkoutItems, 0);

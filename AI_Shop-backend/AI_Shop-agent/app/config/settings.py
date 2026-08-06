@@ -72,6 +72,15 @@ class Settings(BaseSettings):
     llm_fallback_model: str = "deepseek-chat"
     llm_timeout: int = 60
     llm_max_retries: int = 3
+    # 每百万 token 人民币单价。模型未配置时只累计 token 和 unpriced，
+    # 不使用可能过时的内置价格猜测。
+    llm_pricing_cny_per_million_json: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices(
+            "LLM_PRICING_CNY_PER_MILLION_JSON",
+            "llm_pricing_cny_per_million_json",
+        ),
+    )
 
     memory_llm_api_key: str = ""
     memory_llm_base_url: str = ""
@@ -134,9 +143,9 @@ class Settings(BaseSettings):
     agent_worker_low_concurrency: int = 2
     agent_task_max_retries: int = 5
     agent_task_deadline_seconds: int = 120
-    # 任务租约时长：必须大于 deadline（deadline + 余量），正常跑的任务不会被误接管。
-    # Worker 处理期间每 lease/3 秒续租一次；Worker 崩溃后租约到期，其他 Worker 才能接管。
-    agent_task_lease_seconds: int = 240
+    # 租约必须短于总处理 deadline：正常 Worker 持续续租；Worker 崩溃后，其他
+    # Worker 才能在 deadline 内接管。若 lease >= deadline，接管时任务必然已经过期。
+    agent_task_lease_seconds: int = 30
     # MQ 发布前的 DISPATCHING 预占超时。只有该状态超时才允许恢复重发；
     # 已由 RabbitMQ confirm 的 QUEUED 任务不会被周期复制。
     agent_task_dispatch_timeout_seconds: int = 30
@@ -145,6 +154,8 @@ class Settings(BaseSettings):
     # B1：悬挂在 EXECUTING 的待确认动作补终态（执行方崩溃后不再永久"处理中"）。
     pending_action_stale_seconds: int = 600
     pending_action_reconcile_interval_seconds: int = 300
+    pending_action_reconcile_max_attempts: int = 6
+    pending_action_reconcile_deadline_seconds: int = 3600
     agent_support_summary_limit: int = 12
     agent_worker_heartbeat_ttl_seconds: int = 30
     support_first_response_sla_seconds: int = 300
@@ -174,8 +185,10 @@ class Settings(BaseSettings):
     # 商品召回比知识库召回更容忍噪声：搜出来的商品会再过一遍 rerank 和 MMR，
     # 而且用户能直接看出哪个不相关；知识库召回的噪声会被写进 prompt 当证据。
     rag_product_vector_min_cosine: float = 0.20
-    # rerank 之后的归一化相关性（0~1）。这一道才是原来 0.5 唯一说得通的地方。
-    rag_evidence_min_relevance: float = 0.5
+    # rerank 之后的归一化相关性（0~1）。0.65 来自锁定的 34 条 RAG 集在
+    # 2026-08-06 的阈值扫描：Recall@10/MRR=0.9167，拒答 F1=0.9524。
+    # 完整数据哈希和回归下限见 scripts/rag_golden.lock.json。
+    rag_evidence_min_relevance: float = 0.65
     # 无 rerank 时的兜底闸门，单位是 RRF 融合分而不是任何引擎的原始分。
     # RRF 的全部意义就是丢掉不可比的原始分只留排名，所以这道闸门只能用排名表达：
     # "至少在某一路里进了前 N 名"。1/(60+N) 是 RRF 的定义式，N 越大越宽松。
@@ -244,7 +257,7 @@ class Settings(BaseSettings):
     intent_rule_fallback: bool = True
     intent_handoff_confidence: float = 0.55
     order_query_lookback_days: int = 90
-    force_mcp_on_llm_skip: bool = False
+    force_mcp_on_llm_skip: bool = True
 
     @model_validator(mode="after")
     def validate_internal_contracts(self) -> "Settings":
@@ -262,6 +275,20 @@ class Settings(BaseSettings):
             )
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
+        for model, pricing in self.llm_pricing_cny_per_million_json.items():
+            if not str(model).strip() or not isinstance(pricing, dict):
+                raise ValueError("LLM pricing requires a non-empty model and an object price")
+            if set(pricing) != {"input", "output"}:
+                raise ValueError(
+                    f"LLM pricing for {model} must contain exactly input and output"
+                )
+            if any(
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or value < 0
+                for value in pricing.values()
+            ):
+                raise ValueError(f"LLM pricing for {model} must be non-negative numbers")
         if not 1 <= self.worker_metrics_port <= 65_535:
             raise ValueError("WORKER_METRICS_PORT must be between 1 and 65535")
         if self.worker_metrics_port == self.app_port:
@@ -290,10 +317,14 @@ class Settings(BaseSettings):
                 raise ValueError("RERANK_BASE_URL must be an absolute HTTP(S) URL")
         if not 0 <= self.rag_cache_sample_rate <= 1:
             raise ValueError("RAG_CACHE_SAMPLE_RATE must be between 0 and 1")
-        if self.agent_task_lease_seconds <= self.agent_task_deadline_seconds:
+        if self.agent_task_lease_seconds < 30:
             raise ValueError(
-                "AGENT_TASK_LEASE_SECONDS must be greater than "
-                "AGENT_TASK_DEADLINE_SECONDS"
+                "AGENT_TASK_LEASE_SECONDS must be at least 30"
+            )
+        if self.agent_task_lease_seconds >= self.agent_task_deadline_seconds:
+            raise ValueError(
+                "AGENT_TASK_LEASE_SECONDS must be less than "
+                "AGENT_TASK_DEADLINE_SECONDS so a crashed task can be recovered"
             )
         if self.agent_task_dispatch_timeout_seconds < 5:
             raise ValueError("AGENT_TASK_DISPATCH_TIMEOUT_SECONDS must be at least 5")
@@ -305,6 +336,10 @@ class Settings(BaseSettings):
             raise ValueError("PENDING_ACTION_STALE_SECONDS must be positive")
         if self.pending_action_reconcile_interval_seconds < 1:
             raise ValueError("PENDING_ACTION_RECONCILE_INTERVAL_SECONDS must be positive")
+        if self.pending_action_reconcile_max_attempts < 1:
+            raise ValueError("PENDING_ACTION_RECONCILE_MAX_ATTEMPTS must be positive")
+        if self.pending_action_reconcile_deadline_seconds < 1:
+            raise ValueError("PENDING_ACTION_RECONCILE_DEADLINE_SECONDS must be positive")
         if self.agent_worker_heartbeat_ttl_seconds < 5:
             raise ValueError("AGENT_WORKER_HEARTBEAT_TTL_SECONDS must be at least 5")
         return self

@@ -31,7 +31,7 @@ from benchmarks.convo_eval_dataset import (  # noqa: E402
 )
 from benchmarks.convo_eval_runner import run_all_sync, summarize  # noqa: E402
 
-RUNNER_VERSION = "aishop_convo_eval_runner_v1"
+RUNNER_VERSION = "aishop_convo_eval_runner_v3"
 
 
 def check_gate(summary: dict, lock: dict, actual_sha: str) -> list[str]:
@@ -61,7 +61,7 @@ def check_gate(summary: dict, lock: dict, actual_sha: str) -> list[str]:
     if fixed:
         problems.append(
             f"这些已知失败已经修好了，但还挂在 lock 的 knownFailures 里：{fixed}。"
-            "把它们从 lock 和 KNOWN_LIMITATIONS.md 里删掉——lock 记的是当前事实。"
+            "把它们从 lock 和 冻结会话评测限制与变更记录.md 里删掉——lock 记的是当前事实。"
         )
 
     baseline = lock.get("baseline", {})
@@ -110,7 +110,7 @@ def main() -> int:
             "frozenPolicy": {
                 "resampling": "forbidden",
                 "relabeling": "forbidden",
-                "note": "期望值按正确的客服行为写；跑出来错的留在集合里并记入 KNOWN_LIMITATIONS.md",
+                "note": "期望值按正确的客服行为写；跑出来错的留在集合里并记入冻结会话评测限制与变更记录.md",
             },
             "baseline": {
                 "cases": summary["cases"],

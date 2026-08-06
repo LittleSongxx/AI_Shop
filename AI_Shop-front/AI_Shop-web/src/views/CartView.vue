@@ -461,7 +461,11 @@ const checkout = () => {
     propertyValueIdHash: row.propertyValueIdHash,
     propertyData: row.propertyData,
     price: Number(row.price),
-    buyCount: Number(row.buyCount) || 1
+    buyCount: Number(row.buyCount) || 1,
+    aiRequestId: row.aiRequestId,
+    aiPosition: row.aiPosition,
+    aiSource: row.aiSource,
+    aiAttributedAt: row.aiAttributedAt
   }));
   saveCheckoutSession(items, 1);
   router.push('/checkout');

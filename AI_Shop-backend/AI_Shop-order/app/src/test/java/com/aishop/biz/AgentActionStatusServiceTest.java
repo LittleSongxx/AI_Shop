@@ -74,21 +74,76 @@ class AgentActionStatusServiceTest {
     }
 
     @Test
-    void processingLedgerWithoutDomainEvidenceRemainsProcessing() {
+    void processingLedgerWithoutDomainEvidenceBecomesInconclusive() {
         when(idempotencyService.find(
                 USER,
                 OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
                 KEY)).thenReturn(record("PROCESSING"));
         when(orderInfoService.getOrderInfoByOrderId("o1")).thenReturn(null);
+        when(idempotencyService.recordInconclusive(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                KEY,
+                6,
+                3600,
+                "账本未终结且未观察到领域结果"))
+                .thenReturn(record("INCONCLUSIVE"));
 
         Map<String, Object> result = service.resolve(receiptBody());
 
-        assertEquals(AgentActionStatusService.STATUS_PROCESSING, result.get("status"));
+        assertEquals(AgentActionStatusService.STATUS_INCONCLUSIVE, result.get("status"));
         verify(idempotencyService, never()).markReconciled(
                 USER,
                 OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
                 KEY,
                 "订单已确认收货");
+    }
+
+    @Test
+    void manualReviewLedgerStillChecksDomainButNeverStartsAnotherCommand() {
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                KEY)).thenReturn(record("MANUAL_REVIEW"));
+        when(orderInfoService.getOrderInfoByOrderId("o1")).thenReturn(null);
+
+        Map<String, Object> result = service.resolve(receiptBody());
+
+        assertEquals(AgentActionStatusService.STATUS_MANUAL_REVIEW, result.get("status"));
+        verify(idempotencyService, never()).recordInconclusive(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                KEY,
+                6,
+                3600,
+                "账本未终结且未观察到领域结果");
+    }
+
+    @Test
+    void configuredAttemptBoundaryCanMoveLedgerToManualReview() {
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                KEY)).thenReturn(record("INCONCLUSIVE"));
+        when(orderInfoService.getOrderInfoByOrderId("o1")).thenReturn(null);
+        OrderRequestIdempotency manual = record("MANUAL_REVIEW");
+        manual.setReconcileAttempts(1);
+        when(idempotencyService.recordInconclusive(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                KEY,
+                1,
+                60,
+                "账本未终结且未观察到领域结果"))
+                .thenReturn(manual);
+        Map<String, Object> body = new java.util.LinkedHashMap<>(receiptBody());
+        body.put("maxAttempts", 1);
+        body.put("reconcileWindowSeconds", 10);
+
+        Map<String, Object> result = service.resolve(body);
+
+        assertEquals(AgentActionStatusService.STATUS_MANUAL_REVIEW, result.get("status"));
+        assertEquals(1, result.get("reconcileAttempts"));
     }
 
     @Test

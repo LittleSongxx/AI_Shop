@@ -20,9 +20,10 @@ import java.util.Map;
  * Reconciles Agent write commands after an HTTP response is lost.
  *
  * <p>The idempotency ledger is authoritative when it contains a completed
- * response. A PROCESSING or legacy request is additionally checked against the
+ * response. A non-terminal or legacy request is additionally checked against
  * order domain state so a command that committed just before a process/network
- * failure can still be closed as successful.</p>
+ * failure can still be closed as successful. This is a bounded reconciliation
+ * ledger, not an exactly-once guarantee.</p>
  */
 @Service
 public class AgentActionStatusService {
@@ -30,6 +31,8 @@ public class AgentActionStatusService {
     public static final String STATUS_SUCCESS = "SUCCESS";
     public static final String STATUS_FAILED = "FAILED";
     public static final String STATUS_PROCESSING = "PROCESSING";
+    public static final String STATUS_INCONCLUSIVE = "INCONCLUSIVE";
+    public static final String STATUS_MANUAL_REVIEW = "MANUAL_REVIEW";
     public static final String STATUS_UNKNOWN = "UNKNOWN";
 
     @Resource
@@ -62,7 +65,9 @@ public class AgentActionStatusService {
         Map<String, Object> params = params(body.get("params"));
         if (effectObserved(userId, actionType, params)) {
             if (ledger != null && ("PROCESSING".equals(ledger.getStatus())
-                    || "FAILED".equals(ledger.getStatus()))) {
+                    || "FAILED".equals(ledger.getStatus())
+                    || "INCONCLUSIVE".equals(ledger.getStatus())
+                    || "MANUAL_REVIEW".equals(ledger.getStatus()))) {
                 idempotencyService.markReconciled(
                         userId,
                         commandType,
@@ -74,8 +79,21 @@ public class AgentActionStatusService {
         if (ledger != null && "FAILED".equals(ledger.getStatus())) {
             return result(STATUS_FAILED, failureMessage(ledger));
         }
+        if (ledger != null && "MANUAL_REVIEW".equals(ledger.getStatus())) {
+            return result(STATUS_MANUAL_REVIEW, "自动核对已到边界，等待人工复核", ledger);
+        }
         if (ledger != null) {
-            return result(STATUS_PROCESSING, "操作仍在处理中");
+            OrderRequestIdempotency updated = idempotencyService.recordInconclusive(
+                    userId,
+                    commandType,
+                    idempotencyKey,
+                    boundedInt(body.get("maxAttempts"), 6, 1, 100),
+                    boundedInt(body.get("reconcileWindowSeconds"), 3600, 60, 7 * 24 * 3600),
+                    "账本未终结且未观察到领域结果");
+            if (updated != null && "MANUAL_REVIEW".equals(updated.getStatus())) {
+                return result(STATUS_MANUAL_REVIEW, "自动核对已到边界，等待人工复核", updated);
+            }
+            return result(STATUS_INCONCLUSIVE, "尚未观察到确定执行结果", updated);
         }
         return result(STATUS_UNKNOWN, "未找到可确认的执行记录");
     }
@@ -164,6 +182,19 @@ public class AgentActionStatusService {
         return result;
     }
 
+    private static Map<String, Object> result(
+            String status, String message, OrderRequestIdempotency ledger) {
+        Map<String, Object> result = result(status, message);
+        if (ledger == null) {
+            return result;
+        }
+        result.put("reconcileAttempts", ledger.getReconcileAttempts());
+        result.put("reconcileDeadline", ledger.getReconcileDeadline());
+        result.put("lastReconcileAt", ledger.getLastReconcileAt());
+        result.put("reviewReason", ledger.getReviewReason());
+        return result;
+    }
+
     private static String successMessage(String actionType) {
         return switch (actionType) {
             case "REFUND" -> "退款操作已受理";
@@ -192,5 +223,15 @@ public class AgentActionStatusService {
 
     private static String stringValue(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private static int boundedInt(Object raw, int fallback, int minimum, int maximum) {
+        int value;
+        try {
+            value = raw == null ? fallback : Integer.parseInt(String.valueOf(raw));
+        } catch (NumberFormatException ignored) {
+            value = fallback;
+        }
+        return Math.max(minimum, Math.min(value, maximum));
     }
 }

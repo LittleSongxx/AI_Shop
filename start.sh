@@ -86,10 +86,33 @@ show_service_log() {
   tail -n 40 "$log" >&2 || true
 }
 
+reset_service_log() {
+  : >"$LOGS/$1.log"
+}
+
 service_startup_failed() {
   local name=$1 log="$LOGS/$1.log"
   [[ -f "$log" ]] || return 1
   grep -Eq "APPLICATION FAILED TO START|Web server failed to start|Port [0-9]+ is already in use|Address already in use" "$log"
+}
+
+service_target_port_bind_failed() {
+  local name=$1 port=$2 log="$LOGS/$1.log"
+  [[ -f "$log" ]] || return 1
+  grep -Eiq \
+    "Port[[:space:]]+$port[[:space:]]+(was|is)[[:space:]]+already[[:space:]]+in[[:space:]]+use|bind on address .*[, :]$port.*address already in use" \
+    "$log"
+}
+
+wait_port_released() {
+  local port=$1 timeout=${2:-8} end=$((SECONDS + timeout))
+  while [[ $SECONDS -lt $end ]]; do
+    if ! port_is_listening "$port"; then
+      return 0
+    fi
+    sleep 1
+  done
+  ! port_is_listening "$port"
 }
 
 show_container_log() {
@@ -190,11 +213,27 @@ ensure_host_ports() {
 
 wait_managed_service() {
   local name=$1 port=$2 label=$3 timeout=${4:-150}
+  local retry_limit=${AISHOP_START_BIND_RETRIES:-2} retry_count=0
   local end=$((SECONDS + timeout)) identity_end=$((SECONDS + 5))
   echo -n "  等待 $label..."
   while [[ $SECONDS -lt $end ]]; do
     if service_startup_failed "$name"; then
+      local target_bind_failed=false
+      if service_target_port_bind_failed "$name" "$port"; then
+        target_bind_failed=true
+      fi
       stop_managed_service_for_restart "$name" 10 || true
+      if $target_bind_failed && ((retry_count < retry_limit)) && wait_port_released "$port" 8; then
+        retry_count=$((retry_count + 1))
+        echo " 端口竞态"
+        warn "$label 的目标端口 $port 已重新空闲，进行第 $retry_count/$retry_limit 次有界重试"
+        sleep $((retry_count * 2))
+        restart_managed_service_after_bind_failure "$name" "$port"
+        end=$((SECONDS + timeout))
+        identity_end=$((SECONDS + 5))
+        echo -n "  等待 $label..."
+        continue
+      fi
       echo " 失败"
       show_service_log "$name"
       die "$label 启动失败（详见 run/logs/$name.log）"
@@ -413,6 +452,10 @@ write_runtime_env() {
 }
 
 prepare_environment() {
+  AISHOP_START_BIND_RETRIES="${AISHOP_START_BIND_RETRIES:-2}"
+  [[ "$AISHOP_START_BIND_RETRIES" =~ ^[0-3]$ ]] \
+    || die "AISHOP_START_BIND_RETRIES 必须是 0..3 的整数，当前值: $AISHOP_START_BIND_RETRIES"
+  export AISHOP_START_BIND_RETRIES
   prepare_ports
   # Java Search and the Python Agent share AI provider settings. The Agent
   # reads dotenv itself, while Spring Boot only sees the process environment.
@@ -557,6 +600,10 @@ JAVA_JARS=(
   "$BACKEND/AI_Shop-admin/target/aishop-admin-1.0.0.jar"
 )
 
+JAVA_MANAGED_SERVICES=(
+  admin search coupon pay order cart stock product user gateway
+)
+
 java_build_inputs_are_stale() {
   [[ -f "$JAVA_BUILD_STAMP" ]] || return 0
   find "$BACKEND" \
@@ -566,7 +613,7 @@ java_build_inputs_are_stale() {
 }
 
 ensure_jars_or_build() {
-  local jar missing=false stale=false
+  local jar service missing=false stale=false
   for jar in "${JAVA_JARS[@]}"; do
     if [[ ! -f "$jar" ]]; then
       missing=true
@@ -583,6 +630,15 @@ ensure_jars_or_build() {
     else
       info "Maven 构建中（-DskipTests）..."
     fi
+    # Spring Boot reads nested JAR entries lazily. Replacing an executable JAR
+    # underneath a live JVM can therefore surface as NoClassDefFoundError long
+    # after the build itself succeeded.
+    for service in "${JAVA_MANAGED_SERVICES[@]}"; do
+      if is_running "$service"; then
+        warn "Java JAR 即将重建，先停止正在运行的 $service"
+        stop_managed_service_for_restart "$service"
+      fi
+    done
     (
       cd "$BACKEND"
       MAVEN_OPTS="${MAVEN_OPTS:--Xmx1024m -XX:+UseSerialGC}" \
@@ -677,6 +733,7 @@ start_java() {
   [[ -f "$jar" ]] || die "JAR 不存在: $jar；请使用 ./start.sh --build"
   local -a java_opts
   read -r -a java_opts <<<"$JAVA_OPTS"
+  reset_service_log "$name"
   if [[ "$name" == "gateway" ]]; then
     # The gateway starts before the business services.  The environment
     # overrides also protect an already-built JAR until source is rebuilt.
@@ -703,6 +760,7 @@ start_mcp() {
   fi
   ensure_memory_headroom "MCP"
   ensure_port_free "$MCP_PORT" "MCP"
+  reset_service_log mcp
   (
     cd "$BACKEND/AI_Shop-agent"
     export AISHOP_MANAGED_SERVICE=mcp
@@ -721,6 +779,7 @@ start_agent_api() {
   fi
   ensure_memory_headroom "Agent API"
   ensure_port_free "$AGENT_PORT" "Agent API"
+  reset_service_log agent
   (
     cd "$BACKEND/AI_Shop-agent"
     export AISHOP_MANAGED_SERVICE=agent
@@ -739,6 +798,7 @@ start_agent_worker() {
   fi
   ensure_memory_headroom "Agent Worker"
   ensure_port_free "$AGENT_WORKER_METRICS_PORT" "Agent Worker"
+  reset_service_log agent-worker
   (
     cd "$BACKEND/AI_Shop-agent"
     export AISHOP_MANAGED_SERVICE=agent-worker
@@ -773,6 +833,7 @@ start_storefront() {
   [[ -f "$FRONT/AI_Shop-web/node_modules/vite/bin/vite.js" ]] \
     || die "商城前端依赖未安装：cd AI_Shop-front/AI_Shop-web && npm ci"
   ensure_port_free "$WEB_PORT" "商城前端"
+  reset_service_log web
   (
     cd "$FRONT/AI_Shop-web"
     export AISHOP_MANAGED_SERVICE=web
@@ -797,6 +858,7 @@ start_admin_web() {
   [[ -f "$FRONT/AI_Shop-admin/node_modules/vite/bin/vite.js" ]] \
     || die "管理前端依赖未安装：cd AI_Shop-front/AI_Shop-admin && npm ci"
   ensure_port_free "$ADMIN_WEB_PORT" "管理前端"
+  reset_service_log admin-web
   (
     cd "$FRONT/AI_Shop-admin"
     export AISHOP_MANAGED_SERVICE=admin-web
@@ -808,6 +870,22 @@ start_admin_web() {
   local pid=$!
   write_pid_record admin-web "$pid"
   info "拉起 admin-web  port=$ADMIN_WEB_PORT  pid=$pid  log: run/logs/admin-web.log"
+}
+
+restart_managed_service_after_bind_failure() {
+  local name=$1 port=$2 jar
+  case "$name" in
+    gateway|user|product|stock|cart|order|pay|coupon|search|admin)
+      jar=$(service_marker "$name")
+      start_java "$name" "$jar" "$port"
+      ;;
+    mcp) start_mcp ;;
+    agent) start_agent_api ;;
+    agent-worker) start_agent_worker ;;
+    web) start_storefront ;;
+    admin-web) start_admin_web ;;
+    *) die "未知托管服务 $name，无法执行端口竞态重试" ;;
+  esac
 }
 
 mysql_query() {

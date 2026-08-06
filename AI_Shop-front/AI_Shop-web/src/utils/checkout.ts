@@ -10,6 +10,10 @@ export interface CheckoutLineItem {
   price: number;
   buyCount: number;
   remark?: string;
+  aiRequestId?: string;
+  aiPosition?: number;
+  aiSource?: string;
+  aiAttributedAt?: string;
 }
 
 export interface CouponRushCheckoutMeta {

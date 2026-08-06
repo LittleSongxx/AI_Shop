@@ -393,7 +393,9 @@ export function useCheckoutPage(mode: CheckoutPageMode = 'mobile') {
           productId: item.productId,
           propertyValueIds: item.propertyValueIds,
           buyCount: Number(item.buyCount) || 1,
-          remark: item.remark?.trim() || remark.value.trim() || ''
+          remark: item.remark?.trim() || remark.value.trim() || '',
+          aiRequestId: item.aiRequestId,
+          aiPosition: item.aiPosition
         }));
         const orderPayload = {
           payMethod: payMethod.value,

@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -137,6 +141,62 @@ class OrderRequestIdempotencyServiceTest {
         assertEquals(409, error.getHttpStatus());
         assertEquals("请求正在处理中，请稍后重试", error.getMessage());
         assertEquals(0, executions.get());
+    }
+
+    @Test
+    void uncertainAndManualReviewRequestsNeverExecuteCommandAgain() {
+        Map<String, String> request = Map.of("orderId", "o1");
+        for (String status : List.of("INCONCLUSIVE", "MANUAL_REVIEW")) {
+            OrderRequestIdempotency stored = storedRecord(request, status, null);
+            when(mapper.insertProcessing(any())).thenReturn(0);
+            when(mapper.selectForUpdate(
+                    "u1", OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT, KEY))
+                    .thenReturn(stored);
+            AtomicInteger executions = new AtomicInteger();
+
+            HttpBusinessException error = assertThrows(
+                    HttpBusinessException.class,
+                    () -> service.execute(
+                            "u1",
+                            OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT,
+                            KEY,
+                            request,
+                            Map.class,
+                            () -> {
+                                executions.incrementAndGet();
+                                return Map.of();
+                            }));
+
+            assertEquals(409, error.getHttpStatus());
+            assertEquals(0, executions.get());
+        }
+    }
+
+    @Test
+    void reconciliationAttemptUsesBoundedValuesAndReadsBackLedger() {
+        OrderRequestIdempotency expected = new OrderRequestIdempotency();
+        expected.setStatus("INCONCLUSIVE");
+        when(mapper.recordInconclusive(
+                anyString(), anyString(), anyString(), anyInt(), any(Date.class), anyString()))
+                .thenReturn(1);
+        when(mapper.select(
+                "u1", OrderRequestIdempotencyService.COMMAND_AGENT_REFUND, KEY))
+                .thenReturn(expected);
+
+        OrderRequestIdempotency actual = service.recordInconclusive(
+                "u1",
+                OrderRequestIdempotencyService.COMMAND_AGENT_REFUND,
+                KEY,
+                0,
+                5,
+                "needs review");
+
+        assertEquals(expected, actual);
+        verify(mapper).recordInconclusive(
+                anyString(), anyString(), anyString(),
+                eq(1),
+                any(Date.class),
+                eq("needs review"));
     }
 
     @Test

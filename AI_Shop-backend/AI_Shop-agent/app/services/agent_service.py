@@ -8,11 +8,15 @@ import structlog
 from app.config.settings import get_settings
 from app.constants import AGENT_QUEUE_LOW
 from app.domain.intent.classifier import resolve_intent
+from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.harness.guardrails.input_guard import InputGuardrail
+from app.harness.metrics.runtime_sensors import measure_agent_stage
 from app.memory.session_memory_service import session_memory_service
 from app.rag.retriever import rag_retriever
 from app.services.agent_queue_service import agent_queue_service
 from app.services.message_service import agent_message_service
+from app.services.order_reference_resolver import ORDER_REFERENCE_INTENTS
+from app.services.order_selection_store import order_selection_store
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.rate_limit_service import rate_limit_service
 from app.services.redis_service import redis_service
@@ -37,6 +41,7 @@ class AgentOrchestrator:
         message: str,
         from_product: bool = False,
         consult_product_id: str | None = None,
+        rate_limit_scope: str = "sendMessage",
     ) -> dict:
         settings = get_settings()
         # 一次 inspect 同时完成归一化、注入判定和净化，避免同一段文本归一化两遍。
@@ -45,7 +50,7 @@ class AgentOrchestrator:
         if not message:
             raise ValueError("请输入咨询内容")
 
-        if not await rate_limit_service.allow(user_id, "sendMessage", 1, 1):
+        if not await rate_limit_service.allow(user_id, rate_limit_scope, 1, 1):
             raise ValueError("发送消息过于频繁，请稍后再试")
 
         if settings.ai_chat_limit > 0:
@@ -81,17 +86,18 @@ class AgentOrchestrator:
         recent_intents = await agent_message_service.get_recent_intents(user_id)
         session_intent = recent_intents[0] if recent_intents else None
         consult_card = await self._resolve_consult_card_for_routing(user_id)
-        decision = await resolve_intent(
-            user_id,
-            original_user_text,
-            from_product=from_product,
-            consult_card=consult_card,
-            message_card=card,
-            unresolved_count=previous_unresolved,
-            allow_llm=False,
-            session_intent=session_intent,
-            recent_intents=recent_intents,
-        )
+        with measure_agent_stage("intent"):
+            decision = await resolve_intent(
+                user_id,
+                original_user_text,
+                from_product=from_product,
+                consult_card=consult_card,
+                message_card=card,
+                unresolved_count=previous_unresolved,
+                allow_llm=False,
+                session_intent=session_intent,
+                recent_intents=recent_intents,
+            )
 
         if card:
             filtered_text = await sensitive_word_service.replace(original_user_text)
@@ -136,12 +142,7 @@ class AgentOrchestrator:
                 agent_msg, safe_message, decision.model_dump(mode="json")
             )
 
-        if decision.intent.value in {
-            "CHAT",
-            "INVOICE",
-            "ADDRESS_CHANGE",
-            "AFTERSALES_UNKNOWN",
-        }:
+        if decision.intent.value == "CHAT":
             faq = await rag_retriever.exact_faq_answer(original_user_text)
             if faq:
                 answer = await sensitive_word_service.replace(
@@ -172,6 +173,7 @@ class AgentOrchestrator:
                     answer,
                     "faq",
                     safe_message,
+                    source_refs,
                 )
                 agent_msg["deliveryState"] = "FAQ_FAST_PATH"
                 agent_msg["assistantMessage"] = answer
@@ -183,11 +185,11 @@ class AgentOrchestrator:
             queue_name == AGENT_QUEUE_LOW
             and await agent_task_service.count_pending() >= settings.task_queue_max
         ):
-            await stream_service.push_error(
-                user_id, agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload"
-            )
             await agent_message_service.complete_message(
                 agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload", None
+            )
+            await stream_service.push_error(
+                user_id, agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload"
             )
             await agent_message_service.reset_unresolved_count(
                 agent_msg["messageId"]
@@ -216,6 +218,146 @@ class AgentOrchestrator:
         except Exception as exc:
             logger.warning(
                 "agent_task_publish_deferred",
+                message_id=agent_msg["messageId"],
+                queue_name=queue_name,
+                error=str(exc),
+            )
+            agent_msg["deliveryState"] = "PENDING_RECOVERY"
+        return agent_msg
+
+    async def send_selected_order_candidate(
+        self,
+        user_id: str,
+        selection_id: str,
+        target_type: str,
+        target_id: str,
+    ) -> dict:
+        """Persist one candidate choice and its task in a single transaction."""
+
+        preview = await order_selection_store.preview(
+            selection_id=selection_id,
+            user_id=user_id,
+            target_type=target_type,
+            target_id=target_id,
+        )
+        if preview.get("alreadyConsumed"):
+            existing = await order_selection_store.selected_message(selection_id, user_id)
+            if existing:
+                return existing
+            raise ValueError("该候选消息正在恢复，请稍后重试")
+
+        intent_value = str(preview.get("intent") or "")
+        if intent_value not in ORDER_REFERENCE_INTENTS:
+            raise ValueError("订单候选意图无效，请重新发起")
+        intent = IntentKind(intent_value)
+        candidate = dict(preview.get("candidate") or {})
+        if not candidate:
+            raise ValueError("订单候选已失效，请重新发起")
+
+        settings = get_settings()
+        if settings.ai_chat_limit > 0:
+            total = await agent_message_service.count_user_messages(user_id)
+            if total >= settings.ai_chat_limit:
+                raise ValueError("AI购物体验已经结束")
+
+        active_support = await support_service.get_active(user_id)
+        if active_support:
+            raise ValueError("当前会话已转人工，请直接告诉客服要处理的订单")
+
+        context = preview.get("context") or {}
+        raw_decision = context.get("intentDecision") if isinstance(context, dict) else None
+        try:
+            decision = IntentDecision.model_validate(raw_decision or {})
+        except (TypeError, ValueError):
+            decision = IntentDecision(
+                intent=intent,
+                confidence=1.0,
+                next_action=NextAction.TOOL,
+                source="order_selection",
+            )
+        entities = dict(decision.entities)
+        if candidate.get("orderId"):
+            entities["orderId"] = str(candidate["orderId"])
+        if candidate.get("orderItemId"):
+            entities["orderItemId"] = str(candidate["orderItemId"])
+        decision = decision.model_copy(
+            update={
+                "intent": intent,
+                "confidence": max(decision.confidence, 0.99),
+                "entities": entities,
+                "next_action": NextAction.TOOL,
+                "handoff_reason": None,
+                "source": "order_selection",
+            }
+        )
+
+        label = {
+            IntentKind.REFUND: "退款",
+            IntentKind.REFUND_STATUS: "查询退款进度",
+            IntentKind.QUERY_LOGISTICS: "查询物流",
+            IntentKind.QUERY_FULFILLMENT: "查询发货状态",
+            IntentKind.CANCEL_ORDER: "取消订单",
+            IntentKind.CONFIRM_RECEIPT: "确认收货",
+            IntentKind.PRODUCT_REVIEW: "评价",
+            IntentKind.RECOMMENT: "追评",
+            IntentKind.QUERY_COMMENT: "查看评价",
+            IntentKind.ADDRESS_CHANGE: "处理地址问题",
+            IntentKind.INVOICE: "处理发票问题",
+            IntentKind.DAMAGED_OR_WRONG_ITEM: "处理商品问题",
+        }.get(intent, "继续处理")
+        target_label = str(candidate.get("productName") or target_id)
+        original = str(preview.get("originalText") or "").strip()
+        readable = f"选择“{target_label}”订单继续{label}。"
+        if original:
+            readable += f"原诉求：{original}"
+        verdict = input_guard.inspect(readable)
+        if verdict.blocked:
+            raise ValueError("订单候选内容校验失败，请重新发起")
+        safe_message = await sensitive_word_service.replace(verdict.text)
+
+        await redis_service.pause_consult(user_id)
+        previous_unresolved = await agent_message_service.get_unresolved_count(user_id)
+        queue_name, priority = agent_queue_service.queue_for_decision(decision)
+        if (
+            queue_name == AGENT_QUEUE_LOW
+            and await agent_task_service.count_pending() >= settings.task_queue_max
+        ):
+            raise ValueError(AGENT_BUSY_MESSAGE)
+
+        trace_id = uuid.uuid4().hex
+        selected_reference = {
+            **candidate,
+            "intent": intent.value,
+            "selectionId": selection_id,
+            "expiresAt": preview.get("expiresAt"),
+        }
+        agent_msg, created = await order_selection_store.consume_with_message_and_task(
+            selection_id=selection_id,
+            user_id=user_id,
+            target_type=target_type,
+            target_id=target_id,
+            message=safe_message,
+            decision=decision,
+            previous_unresolved_count=previous_unresolved,
+            queue_name=queue_name,
+            priority=priority,
+            trace_id=trace_id,
+            selected_reference=selected_reference,
+        )
+        if not created:
+            return agent_msg
+
+        try:
+            if not await agent_task_service.mark_dispatching(agent_msg["messageId"]):
+                agent_msg["deliveryState"] = "DUPLICATE"
+                return agent_msg
+            await agent_queue_service.publish(queue_name, agent_msg)
+            await agent_task_service.mark_queued(agent_msg["messageId"])
+            agent_msg["deliveryState"] = "QUEUED"
+        except Exception as exc:
+            logger.warning(
+                "agent_order_selection_publish_deferred",
+                selection_id=selection_id,
                 message_id=agent_msg["messageId"],
                 queue_name=queue_name,
                 error=str(exc),
@@ -295,11 +437,12 @@ class AgentOrchestrator:
         reason: str | None = None,
         source_message_id: int | None = None,
     ) -> dict:
-        decision = await resolve_intent(
-            user_id,
-            reason or "转人工客服",
-            allow_llm=False,
-        )
+        with measure_agent_stage("intent"):
+            decision = await resolve_intent(
+                user_id,
+                reason or "转人工客服",
+                allow_llm=False,
+            )
         payload = decision.model_dump(mode="json")
         payload["handoff_reason"] = "USER_REQUEST"
         summary = support_service.build_summary(reason or "用户主动申请人工客服", payload)

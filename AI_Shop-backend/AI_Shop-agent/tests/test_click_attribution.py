@@ -9,7 +9,10 @@ from app.constants import (
     IMPRESSION_ATTRIBUTION_TTL,
     REDIS_AGENT_IMPRESSION_REQUEST,
 )
-from app.services.redis_service import RedisService, redis_service
+from app.services.recommendation_attribution_service import (
+    recommendation_attribution_service,
+)
+from app.services.redis_service import RedisService
 
 
 class FakePipeline:
@@ -133,8 +136,10 @@ async def test_impression_snapshot_validates_user_product_and_one_based_position
 
 @pytest.mark.asyncio
 async def test_report_click_rejects_invalid_attribution_without_logging(monkeypatch):
-    log_attributed = AsyncMock(return_value=None)
-    monkeypatch.setattr(redis_service, "log_attributed_click", log_attributed)
+    record_click = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        recommendation_attribution_service, "record_click", record_click
+    )
 
     response = await report_click(
         productId="p2",
@@ -145,25 +150,27 @@ async def test_report_click_rejects_invalid_attribution_without_logging(monkeypa
 
     assert response.status == "error"
     assert response.code == 600
-    log_attributed.assert_awaited_once()
+    record_click.assert_awaited_once_with(
+        "u1", "0123456789abcdef0123456789abcdef", "p2", 2
+    )
 
 
 @pytest.mark.asyncio
 async def test_report_click_logs_only_canonical_snapshot_values(monkeypatch):
     request_id = "0123456789abcdef0123456789abcdef"
-    log_attributed = AsyncMock(
+    record_click = AsyncMock(
         return_value={
             "source": "hot_sale",
             "position": 2,
             "requestId": request_id,
             "productId": "p2",
-            "duplicate": False,
+            "occurredAt": "2026-08-06T09:00:00.000",
         }
     )
     monkeypatch.setattr(
-        redis_service,
-        "log_attributed_click",
-        log_attributed,
+        recommendation_attribution_service,
+        "record_click",
+        record_click,
     )
 
     response = await report_click(
@@ -174,7 +181,14 @@ async def test_report_click_logs_only_canonical_snapshot_values(monkeypatch):
     )
 
     assert response.status == "success"
-    log_attributed.assert_awaited_once_with(
+    assert response.data == {
+        "source": "hot_sale",
+        "position": 2,
+        "requestId": request_id,
+        "productId": "p2",
+        "occurredAt": "2026-08-06T09:00:00.000",
+    }
+    record_click.assert_awaited_once_with(
         "u1",
         request_id,
         "p2",

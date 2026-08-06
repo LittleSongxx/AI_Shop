@@ -198,6 +198,7 @@
       <p v-if="loadingMore" class="load-tip">加载中…</p>
       <p v-else-if="finished && similarProducts.length" class="load-tip">已展示全部推荐商品</p>
     </section>
+    <CommentReportDialog ref="reportDialogRef" />
   </div>
 
   <div v-else-if="loading" class="pc-detail-loading card">
@@ -209,7 +210,6 @@
       <el-button round @click="router.push('/')">返回首页</el-button>
     </el-empty>
   </div>
-  <CommentReportDialog ref="reportDialogRef" />
 </template>
 
 <script setup lang="ts">

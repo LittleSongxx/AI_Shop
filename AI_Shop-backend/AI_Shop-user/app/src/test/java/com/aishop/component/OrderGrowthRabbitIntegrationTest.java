@@ -30,10 +30,12 @@ class OrderGrowthRabbitIntegrationTest {
         String exchange = "codex.user.growth." + suffix;
         String queue = "codex.user.growth." + suffix;
         String routingKey = "growth";
+        String rabbitHost = System.getenv().getOrDefault("RABBIT_HOST", "127.0.0.1");
+        int rabbitPort = Integer.parseInt(System.getenv().getOrDefault("RABBIT_PORT", "5673"));
         CachingConnectionFactory connectionFactory =
-                new CachingConnectionFactory("127.0.0.1", 15673);
-        connectionFactory.setUsername("aishop");
-        connectionFactory.setPassword("aishop");
+                new CachingConnectionFactory(rabbitHost, rabbitPort);
+        connectionFactory.setUsername(System.getenv().getOrDefault("RABBIT_USER", "aishop"));
+        connectionFactory.setPassword(System.getenv().getOrDefault("RABBIT_PASSWORD", "aishop"));
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(new Jackson2JsonMessageConverter(JsonUtils.mapper()));
 

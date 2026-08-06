@@ -29,6 +29,10 @@
 		<result column="remark" property="remark"  />
 		<!--退款订单号-->
 		<result column="refund_order_id" property="refundOrderId"  />
+		<result column="ai_request_id" property="aiRequestId"  />
+		<result column="ai_position" property="aiPosition"  />
+		<result column="ai_source" property="aiSource"  />
+		<result column="ai_attributed_at" property="aiAttributedAt"  />
 	</resultMap>
 
 
@@ -36,7 +40,8 @@
 	<sql id="base_column_list">
 		 o.order_item_id,o.order_id,o.cover,o.product_id,o.product_name,
 		 o.property_value_id_hash,o.property_info,o.item_amount,o.buy_count,o.order_item_status,
-		 o.remark,o.refund_order_id
+		 o.remark,o.refund_order_id,o.ai_request_id,o.ai_position,o.ai_source,
+		 o.ai_attributed_at
 	</sql>
 
 	<sql id="base_condition_filed">
@@ -168,6 +173,18 @@
 			<if test="bean.refundOrderId != null">
 				 refund_order_id,
 			</if>
+			<if test="bean.aiRequestId != null">
+				 ai_request_id,
+			</if>
+			<if test="bean.aiPosition != null">
+				 ai_position,
+			</if>
+			<if test="bean.aiSource != null">
+				 ai_source,
+			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_attributed_at,
+			</if>
 		 </trim>
 		 <trim prefix="values (" suffix=")" suffixOverrides="," >
 			<if test="bean.orderItemId!=null">
@@ -205,6 +222,18 @@
 			</if>
 			<if test="bean.refundOrderId!=null">
 				 #{bean.refundOrderId},
+			</if>
+			<if test="bean.aiRequestId!=null">
+				 #{bean.aiRequestId},
+			</if>
+			<if test="bean.aiPosition!=null">
+				 #{bean.aiPosition},
+			</if>
+			<if test="bean.aiSource!=null">
+				 #{bean.aiSource},
+			</if>
+			<if test="bean.aiAttributedAt!=null">
+				 #{bean.aiAttributedAt},
 			</if>
 		 </trim>
 	</insert>
@@ -249,6 +278,18 @@
 			<if test="bean.refundOrderId != null">
 				 refund_order_id,
 			</if>
+			<if test="bean.aiRequestId != null">
+				 ai_request_id,
+			</if>
+			<if test="bean.aiPosition != null">
+				 ai_position,
+			</if>
+			<if test="bean.aiSource != null">
+				 ai_source,
+			</if>
+			<if test="bean.aiAttributedAt != null">
+				 ai_attributed_at,
+			</if>
 		 </trim>
 		 <trim prefix="values (" suffix=")" suffixOverrides=",">
 			<if test="bean.orderItemId!=null">
@@ -286,6 +327,18 @@
 			</if>
 			<if test="bean.refundOrderId!=null">
 				 #{bean.refundOrderId},
+			</if>
+			<if test="bean.aiRequestId!=null">
+				 #{bean.aiRequestId},
+			</if>
+			<if test="bean.aiPosition!=null">
+				 #{bean.aiPosition},
+			</if>
+			<if test="bean.aiSource!=null">
+				 #{bean.aiSource},
+			</if>
+			<if test="bean.aiAttributedAt!=null">
+				 #{bean.aiAttributedAt},
 			</if>
 		 </trim>
 		 on DUPLICATE key update 
@@ -343,7 +396,11 @@
 			 buy_count,
 			 order_item_status,
 			 remark,
-			 refund_order_id
+			 refund_order_id,
+			 ai_request_id,
+			 ai_position,
+			 ai_source,
+			 ai_attributed_at
 		 )values
 		 <foreach collection="list" item="item" separator=",">
 			 (
@@ -358,7 +415,11 @@
 				 #{item.buyCount},
 				 #{item.orderItemStatus},
 				 #{item.remark},
-				 #{item.refundOrderId}
+				 #{item.refundOrderId},
+				 #{item.aiRequestId},
+				 #{item.aiPosition},
+				 #{item.aiSource},
+				 #{item.aiAttributedAt}
 			 )
 		 </foreach>
 	</insert>
@@ -377,7 +438,11 @@
 			 buy_count,
 			 order_item_status,
 			 remark,
-			 refund_order_id
+			 refund_order_id,
+			 ai_request_id,
+			 ai_position,
+			 ai_source,
+			 ai_attributed_at
 		 )values
 		 <foreach collection="list" item="item" separator=",">
 			 (
@@ -392,7 +457,11 @@
 				 #{item.buyCount},
 				 #{item.orderItemStatus},
 				 #{item.remark},
-				 #{item.refundOrderId}
+				 #{item.refundOrderId},
+				 #{item.aiRequestId},
+				 #{item.aiPosition},
+				 #{item.aiSource},
+				 #{item.aiAttributedAt}
 			 )
 		 </foreach>
 			on DUPLICATE key update 

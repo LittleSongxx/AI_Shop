@@ -3,6 +3,7 @@ package com.aishop.api.vo;
 import jakarta.validation.constraints.NotEmpty;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 
 public class ProductCartVO {
@@ -22,6 +23,14 @@ public class ProductCartVO {
     private BigDecimal price;
 
     private BigDecimal addPrice;
+
+    private String aiRequestId;
+
+    private Integer aiPosition;
+
+    private String aiSource;
+
+    private Date aiAttributedAt;
 
     public Integer getBuyCount() {
         return buyCount;
@@ -101,6 +110,38 @@ public class ProductCartVO {
 
     public void setAddPrice(BigDecimal addPrice) {
         this.addPrice = addPrice;
+    }
+
+    public String getAiRequestId() {
+        return aiRequestId;
+    }
+
+    public void setAiRequestId(String aiRequestId) {
+        this.aiRequestId = aiRequestId;
+    }
+
+    public Integer getAiPosition() {
+        return aiPosition;
+    }
+
+    public void setAiPosition(Integer aiPosition) {
+        this.aiPosition = aiPosition;
+    }
+
+    public String getAiSource() {
+        return aiSource;
+    }
+
+    public void setAiSource(String aiSource) {
+        this.aiSource = aiSource;
+    }
+
+    public Date getAiAttributedAt() {
+        return aiAttributedAt;
+    }
+
+    public void setAiAttributedAt(Date aiAttributedAt) {
+        this.aiAttributedAt = aiAttributedAt;
     }
 
     public Boolean getProductOnSale() {

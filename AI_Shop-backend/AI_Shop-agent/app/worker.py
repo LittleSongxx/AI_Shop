@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+import time
 import uuid
 from datetime import datetime
 from typing import Awaitable, Callable
@@ -15,7 +16,12 @@ from app.constants import AGENT_QUEUE_FAST, AGENT_QUEUE_HIGH, AGENT_QUEUE_LOW
 from app.db.pool import close_pool, init_pool
 from app.domain.intent.classifier import record_intent_metrics, resolve_intent
 from app.domain.intent.types import IntentDecision
-from app.harness.metrics.runtime_sensors import AGENT_TASK_INFLIGHT, AGENT_TASK_TOTAL
+from app.harness.metrics.runtime_sensors import (
+    AGENT_TASK_INFLIGHT,
+    AGENT_TASK_TOTAL,
+    measure_agent_stage,
+    observe_agent_stage,
+)
 from app.infra.http_client import close_clients as close_http_clients
 from app.observability.telemetry import shutdown_telemetry
 from app.services.agent_engine import agent_engine
@@ -73,8 +79,8 @@ class AgentWorker:
             ) from exc
         await redis_service.connect()
         await init_pool()
-        await agent_queue_service.connect()
         try:
+            await self._connect_queue_until_ready()
             await self._start_consumer(
                 AGENT_QUEUE_HIGH, settings.agent_worker_high_concurrency
             )
@@ -128,6 +134,34 @@ class AgentWorker:
                 heartbeat_task.cancel()
                 await asyncio.gather(heartbeat_task, return_exceptions=True)
             await self.close()
+
+    async def _connect_queue_until_ready(self) -> None:
+        """Keep a Worker alive through the broker's short startup/restart window.
+
+        ``aio_pika.connect_robust`` reconnects an established connection, but its
+        initial connection is fail-fast. RabbitMQ can already pass a node-ping
+        health check before its AMQP listener accepts connections, so a Worker
+        started in that window used to exit permanently. The API publish path
+        remains fail-fast and returns PENDING_RECOVERY; only the background
+        Worker waits here because it cannot do useful work without the broker.
+        """
+
+        delay_seconds = 1
+        while True:
+            try:
+                await agent_queue_service.connect()
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "agent_worker_queue_startup_retry",
+                    retry_in_seconds=delay_seconds,
+                    error=str(exc),
+                )
+                await agent_queue_service.close()
+                await asyncio.sleep(delay_seconds)
+                delay_seconds = min(delay_seconds * 2, 5)
 
     async def _heartbeat_loop(self, ttl_seconds: int) -> None:
         interval = max(int(ttl_seconds) // 3, 1)
@@ -285,11 +319,22 @@ class AgentWorker:
             await message.nack(requeue=True)
             return
 
+        processing_started = time.perf_counter()
+        enqueued_at_ms = payload.get("enqueuedAtEpochMs")
+        enqueued_at_seconds: float | None = None
+        if (
+            isinstance(enqueued_at_ms, (int, float))
+            and not isinstance(enqueued_at_ms, bool)
+            and enqueued_at_ms > 0
+        ):
+            enqueued_at_seconds = float(enqueued_at_ms) / 1000
+            observe_agent_stage("queue_wait", time.time() - enqueued_at_seconds)
+
         AGENT_TASK_INFLIGHT.labels(queue=queue_name).inc()
         AGENT_TASK_TOTAL.labels(queue=queue_name, result="started").inc()
         # 处理期间周期续租（任务租约 + 用户锁）；续租失败说明租约已被接管
-        # （我们超时了），停手。用户锁 TTL 比任务租约短（180s < 240s），
-        # 长任务不续用户锁会让同用户新消息并发进来，所以一并续。
+        # （我们超时了），停手。任务租约和用户锁都可能先于总 deadline 到期，
+        # 长任务不同时续这两份租约会让任务被接管或让同用户新消息并发进来。
         lease_lost = asyncio.Event()
         renewer = asyncio.create_task(
             self._renew_lease_loop(
@@ -381,6 +426,12 @@ class AgentWorker:
             await asyncio.gather(renewer, return_exceptions=True)
             AGENT_TASK_INFLIGHT.labels(queue=queue_name).dec()
             await redis_service.release_agent_user_lock(user_id, lock_owner)
+            total_seconds = (
+                time.time() - enqueued_at_seconds
+                if enqueued_at_seconds is not None
+                else time.perf_counter() - processing_started
+            )
+            observe_agent_stage("total", total_seconds)
 
     async def _renew_lease_loop(
         self,
@@ -477,17 +528,18 @@ class AgentWorker:
         # 的 CHAT 也在 send 路径计了）。这里重算不重复计数，只在与原决策不同
         # 时补计一次 refined——否则同一消息 INTENT_TOTAL/HANDOFF_TOTAL 双计，
         # 转人工率虚高（P1 审查）。
-        refined = await resolve_intent(
-            str(payload["userId"]),
-            user_text,
-            from_product=bool(payload.get("fromProduct")),
-            message_card=card,
-            unresolved_count=max(0, int(payload.get("unresolvedCount") or 0) - 1),
-            allow_llm=True,
-            session_intent=recent_intents[0] if recent_intents else None,
-            recent_intents=recent_intents,
-            record_metrics=False,
-        )
+        with measure_agent_stage("intent"):
+            refined = await resolve_intent(
+                str(payload["userId"]),
+                user_text,
+                from_product=bool(payload.get("fromProduct")),
+                message_card=card,
+                unresolved_count=max(0, int(payload.get("unresolvedCount") or 0) - 1),
+                allow_llm=True,
+                session_intent=recent_intents[0] if recent_intents else None,
+                recent_intents=recent_intents,
+                record_metrics=False,
+            )
         if decision is None or (
             refined.intent != decision.intent
             or refined.next_action != decision.next_action

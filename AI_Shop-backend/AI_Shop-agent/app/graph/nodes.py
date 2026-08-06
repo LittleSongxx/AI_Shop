@@ -17,8 +17,10 @@ from app.graph.forced_tools import (
     forced_product_search,
     forced_tool_for_intent,
 )
+from app.graph.order_reference_flow import resolve_order_reference_turn
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
+from app.harness.metrics.runtime_sensors import measure_agent_stage
 from app.memory.context_builder import context_builder
 from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
@@ -52,6 +54,7 @@ output_guard = OutputGuardrail()
 _KEEP_INTENT: frozenset = frozenset({
     IntentKind.QUERY_ORDER,
     IntentKind.QUERY_LOGISTICS,
+    IntentKind.QUERY_FULFILLMENT,
     IntentKind.QUERY_COMMENT,
     IntentKind.QUERY_COUPON,
     IntentKind.PRODUCT_REVIEW,
@@ -158,16 +161,17 @@ async def build_context_node(state: AgentGraphState) -> dict:
         # A2/A3：会话级意图延续与死循环检测的输入（send_message 已算过决策的
         # 情况下走不到这里；只有 agent_msg 没带 intentDecision 时才补查）。
         recent_intents = await agent_message_service.get_recent_intents(user_id)
-        decision = await resolve_intent(
-            user_id,
-            user_text,
-            from_product=from_product,
-            consult_card=consult_card,
-            message_card=card,
-            unresolved_count=int(state["agent_msg"].get("unresolvedCount") or 0),
-            session_intent=recent_intents[0] if recent_intents else None,
-            recent_intents=recent_intents,
-        )
+        with measure_agent_stage("intent"):
+            decision = await resolve_intent(
+                user_id,
+                user_text,
+                from_product=from_product,
+                consult_card=consult_card,
+                message_card=card,
+                unresolved_count=int(state["agent_msg"].get("unresolvedCount") or 0),
+                session_intent=recent_intents[0] if recent_intents else None,
+                recent_intents=recent_intents,
+            )
     intent = decision.intent
     intent_source = decision.source
     intent_data = decision.data
@@ -204,17 +208,18 @@ async def build_context_node(state: AgentGraphState) -> dict:
     # P3-1: when agentic_rag=True the LLM calls SEARCH_KNOWLEDGE itself;
     # skip the fixed prefetch so the context window stays clean.
     if should_prefetch_rag(intent, agentic_rag=get_settings().agentic_rag):
-        rag_query = await rewrite_for_rag(user_text, memory)
-        # P3-2: prepend image description to retrieval query when available.
-        if image_desc:
-            rag_query = f"{image_desc} {rag_query}".strip()
-        _cat_map = get_settings().rag_intent_category_map
-        category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
-        rag_result = await rag_retriever.search_faq_with_trace(
-            rag_query,
-            category_filter=category_filter,
-            bucket=ab_bucket,
-        )
+        with measure_agent_stage("rag"):
+            rag_query = await rewrite_for_rag(user_text, memory)
+            # P3-2: prepend image description to retrieval query when available.
+            if image_desc:
+                rag_query = f"{image_desc} {rag_query}".strip()
+            _cat_map = get_settings().rag_intent_category_map
+            category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
+            rag_result = await rag_retriever.search_faq_with_trace(
+                rag_query,
+                category_filter=category_filter,
+                bucket=ab_bucket,
+            )
         faq_text = str(rag_result.get("text") or "")
         rag_source_refs = list(rag_result.get("source_refs") or [])
         rag_trace = rag_result.get("trace")
@@ -321,6 +326,10 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "intent_decision": decision.model_dump(mode="json"),
         "rag_source_refs": rag_source_refs,
         "rag_trace": rag_trace,
+        "pending_order_reference": (
+            state.get("selected_order_reference")
+            or memory.state.get("pendingOrderReference")
+        ),
         "react_round": 0,
         "pending_tool_calls": [],
         "route": "agent_loop",
@@ -526,6 +535,12 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         "pending_tool_calls": [],
         "route": "finalize",
     }
+
+
+async def order_reference_node(state: AgentGraphState) -> dict:
+    if state.get("cancelled") or state.get("finished"):
+        return {"route": "end"}
+    return await resolve_order_reference_turn(state)
 
 async def tools_node(state: AgentGraphState) -> dict:
     user_id = state["user_id"]

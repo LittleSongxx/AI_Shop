@@ -26,7 +26,11 @@ from benchmarks.convo_eval_dataset import (
 from benchmarks.convo_eval_runner import run_all, summarize
 from benchmarks.run_convo_eval import check_gate
 
-KNOWN_LIMITATIONS = Path(__file__).resolve().parents[1] / "benchmarks" / "KNOWN_LIMITATIONS.md"
+LIMITATIONS_DOC = (
+    Path(__file__).resolve().parents[1]
+    / "benchmarks"
+    / "冻结会话评测限制与变更记录.md"
+)
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +47,7 @@ def test_dataset_sha256_matches_lock(lock):
     assert dataset_sha256() == lock["datasetSha256"], (
         f"{DATASET_PATH.name} 的内容变了。改题面是可以的，但必须跑一次 "
         "`run_convo_eval.py --bootstrap-lock` 重新生成基线，"
-        "并在 KNOWN_LIMITATIONS.md 里说明变的是什么。"
+        "并在冻结会话评测限制与变更记录.md 里说明变的是什么。"
     )
 
 
@@ -69,22 +73,22 @@ async def test_known_failures_are_exactly_the_current_failures(lock):
     """
     summary = await _summary()
     assert set(summary["failedIds"]) == set(lock["knownFailures"]), (
-        "已知失败清单和实际失败不一致。修好了就从 lock 和 KNOWN_LIMITATIONS.md 里删掉，"
+        "已知失败清单和实际失败不一致。修好了就从 lock 和冻结会话评测限制与变更记录.md 里删掉，"
         "新坏了就先修，确实修不了再加进去并写清原因。"
     )
 
 
 def _documented_ids() -> set[str]:
-    """取 KNOWN_LIMITATIONS.md 里那个显式块的内容。
+    """取冻结会话评测限制与变更记录里的显式块内容。
 
     不用全文搜 case id：正文会引用通过的 case 做对照（"cancel-004 是通过的"），
     全文搜会把这些对照当成"文档挂着已修好的失败"。对照本身是文档里最有信息量的部分
     ——同一类问法在一处答对、在另一处答错，才说明问题不是取舍而是漏做。
     """
-    text = KNOWN_LIMITATIONS.read_text(encoding="utf-8")
+    text = LIMITATIONS_DOC.read_text(encoding="utf-8")
     begin = "<!-- KNOWN_FAILURE_IDS:BEGIN -->"
     end = "<!-- KNOWN_FAILURE_IDS:END -->"
-    assert begin in text and end in text, "KNOWN_LIMITATIONS.md 里的已知失败清单块不见了"
+    assert begin in text and end in text, "冻结会话评测限制与变更记录里的已知失败清单块不见了"
     block = text[text.index(begin) + len(begin): text.index(end)]
     return {token for token in block.replace("`", " ").split() if "-" in token}
 
@@ -111,7 +115,7 @@ def test_documented_ids_are_real_case_ids():
 
 def test_every_known_failure_has_prose_explanation(lock):
     """光有 id 清单不够：每条都要在正文里出现过，说明它是什么、为什么留着。"""
-    text = KNOWN_LIMITATIONS.read_text(encoding="utf-8")
+    text = LIMITATIONS_DOC.read_text(encoding="utf-8")
     end = text.index("<!-- KNOWN_FAILURE_IDS:END -->")
     prose = text[end:]
     missing = sorted(cid for cid in lock["knownFailures"] if f"`{cid}`" not in prose)
@@ -140,13 +144,13 @@ def test_lock_is_valid_json_with_baseline_shape(lock):
         assert key in baseline, f"lock 的 baseline 缺 {key}"
     # 满分只有一种可信来源：题面一字未改、实现变好。
     # 数据集与 lock 哈希一致由 test_dataset_sha256_matches_lock 守着；
-    # 满分还要求 KNOWN_LIMITATIONS.md 显式声明数据集未动过——否则
+    # 满分还要求限制与变更文档显式声明数据集未动过——否则
     # "改题面对齐实现"之后拿到的满分就蒙混过关了。
     if baseline["passRate"] >= 1.0:
-        text = KNOWN_LIMITATIONS.read_text(encoding="utf-8")
+        text = LIMITATIONS_DOC.read_text(encoding="utf-8")
         assert "题面一个字没动" in text, (
             "基线通过率是 1.0 但没有「题面一个字没动」的声明。满分必须配合 "
-            "KNOWN_LIMITATIONS.md 里的进度记录（数据集 SHA-256 全程不变），"
+            "冻结会话评测限制与变更记录里的进度记录（数据集 SHA-256 全程不变），"
             "否则就是题面被对齐到了实现。"
         )
     # 恒真断言修复（P1 审查）：`lock` fixture 就是 load_lock()——对同一个文件

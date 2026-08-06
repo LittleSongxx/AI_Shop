@@ -94,6 +94,7 @@ class AgentQueueService:
             "DAMAGED_OR_WRONG_ITEM",
             "REFUND",
             "REFUND_STATUS",
+            "QUERY_FULFILLMENT",
         }:
             return AGENT_QUEUE_HIGH, 100
         if decision.intent.value in {"CHAT", "INVOICE", "ADDRESS_CHANGE"}:

@@ -7,7 +7,7 @@
 #
 # 安全边界：/actuator/prometheus 和 /metrics 都无鉴权，会暴露 URI 模板、SQL、线程池等内部细节。
 # 这份配置假定 Prometheus 与被抓服务同处内网，且 Nginx / 网关不对外反代 /actuator 与 /metrics
-# （见 deploy/nginx.aishop.conf.example、deploy/GO_LIVE.md）。若要跨网段抓取，先加鉴权或 mTLS。
+# （见 deploy/nginx.aishop.conf.example、deploy/上线检查清单.md）。若要跨网段抓取，先加鉴权或 mTLS。
 #
 # 目标地址默认走 host.docker.internal，即 Prometheus 跑在容器里、服务跑在宿主机（本地开发的常见形态）。
 # 若服务也在 compose 网络里，把 host.docker.internal 换成对应的服务名。
@@ -57,7 +57,7 @@ scrape_configs:
       - targets: ["host.docker.internal:7050"]
         labels: { service: aishop-agent, tier: ai }
 
-  # ---- Python Agent Worker：独立进程，任务/队列指标只在 Worker 内更新 ----
+  # ---- Python Agent Worker：独立进程，任务/队列、阶段时延、LLM token/成本在此更新 ----
   # （app/worker.py 启动时 start_http_server，默认端口 7051，可用 WORKER_METRICS_PORT 覆盖）
   - job_name: aishop-agent-worker
     metrics_path: /metrics

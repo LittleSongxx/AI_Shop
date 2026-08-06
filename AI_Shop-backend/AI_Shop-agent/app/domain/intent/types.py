@@ -11,6 +11,7 @@ class IntentKind(str, Enum):
     CANCEL_ORDER = "CANCEL_ORDER"
     CONFIRM_RECEIPT = "CONFIRM_RECEIPT"
     QUERY_LOGISTICS = "QUERY_LOGISTICS"
+    QUERY_FULFILLMENT = "QUERY_FULFILLMENT"
     QUERY_COUPON = "QUERY_COUPON"
     PRODUCT_REVIEW = "PRODUCT_REVIEW"
     RECOMMENT = "RECOMMENT"
@@ -83,6 +84,7 @@ INTENT_PROMPT_KEY: dict[IntentKind, str] = {
     IntentKind.CANCEL_ORDER: "cancel_order",
     IntentKind.CONFIRM_RECEIPT: "confirm_receipt",
     IntentKind.QUERY_LOGISTICS: "query_logistics",
+    IntentKind.QUERY_FULFILLMENT: "query_order",
     IntentKind.QUERY_COUPON: "query_coupon",
     IntentKind.PRODUCT_REVIEW: "product_review",
     IntentKind.RECOMMENT: "recomment",

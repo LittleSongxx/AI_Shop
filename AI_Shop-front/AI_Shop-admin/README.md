@@ -1,4 +1,12 @@
-# AI_Shop-admin · UI 说明
+# AI_Shop-admin
+
+> 内容状态：当前有效
+>
+> 整改基线：`f639599e335b97f6156cc41923d53948bcbf6549`
+>
+> 最后核验时间：2026-08-06（Asia/Shanghai）
+>
+> 适用环境：本地开发、CI 构建与运营后台联调；生产参数以部署清单为准
 
 运营后台（Vue），接口经 Gateway `/admin-api`。
 

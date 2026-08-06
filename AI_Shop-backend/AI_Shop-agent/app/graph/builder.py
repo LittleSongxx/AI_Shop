@@ -10,6 +10,7 @@ from app.graph.nodes import (
     cleanup_node,
     entry_guard,
     finalize_node,
+    order_reference_node,
     post_turn_node,
     tools_node,
 )
@@ -34,6 +35,12 @@ def _after_agent_loop(state: AgentGraphState) -> str:
         return "cleanup"
     return "finalize"
 
+
+def _after_order_reference(state: AgentGraphState) -> str:
+    if state.get("cancelled"):
+        return "cleanup"
+    return "finalize" if state.get("route") == "finalize" else "agent_loop"
+
 def _after_tools(state: AgentGraphState) -> str:
 
     if state.get("cancelled"):
@@ -55,6 +62,7 @@ def build_agent_graph():
 
     graph.add_node("entry", entry_guard)
     graph.add_node("build_context", build_context_node)
+    graph.add_node("order_reference", order_reference_node)
     graph.add_node("agent_loop", agent_loop_node)
     graph.add_node("tools", tools_node)
     graph.add_node("finalize", finalize_node)
@@ -64,7 +72,12 @@ def build_agent_graph():
     graph.set_entry_point("entry")
 
     graph.add_conditional_edges("entry", _after_entry, {"build_context": "build_context", "cleanup": "cleanup"})
-    graph.add_edge("build_context", "agent_loop")
+    graph.add_edge("build_context", "order_reference")
+    graph.add_conditional_edges(
+        "order_reference",
+        _after_order_reference,
+        {"agent_loop": "agent_loop", "finalize": "finalize", "cleanup": "cleanup"},
+    )
     graph.add_conditional_edges(
         "agent_loop",
         _after_agent_loop,

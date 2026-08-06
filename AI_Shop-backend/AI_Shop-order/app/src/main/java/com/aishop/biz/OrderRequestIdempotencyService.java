@@ -9,6 +9,8 @@ import com.aishop.utils.RequestFingerprint;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.util.Date;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -55,6 +57,12 @@ public class OrderRequestIdempotencyService {
             }
             if ("PROCESSING".equals(existing.getStatus())) {
                 throw new HttpBusinessException(409, "请求正在处理中，请稍后重试");
+            }
+            if ("INCONCLUSIVE".equals(existing.getStatus())) {
+                throw new HttpBusinessException(409, "原请求结果正在核对，不能重复执行");
+            }
+            if ("MANUAL_REVIEW".equals(existing.getStatus())) {
+                throw new HttpBusinessException(409, "原请求正在人工复核，不能重复执行");
             }
             if ("FAILED".equals(existing.getStatus())) {
                 throw new HttpBusinessException(
@@ -142,6 +150,26 @@ public class OrderRequestIdempotencyService {
                         "resultMessage", resultMessage))) == 1;
     }
 
+    public OrderRequestIdempotency recordInconclusive(
+            String userId,
+            String commandType,
+            String idempotencyKey,
+            int maxAttempts,
+            int reconcileWindowSeconds,
+            String reviewReason) {
+        int boundedAttempts = Math.max(1, Math.min(maxAttempts, 100));
+        int boundedWindow = Math.max(60, Math.min(reconcileWindowSeconds, 7 * 24 * 3600));
+        Date deadline = Date.from(Instant.now().plusSeconds(boundedWindow));
+        mapper.recordInconclusive(
+                userId,
+                commandType,
+                idempotencyKey,
+                boundedAttempts,
+                deadline,
+                truncate(reviewReason, 512));
+        return mapper.select(userId, commandType, idempotencyKey);
+    }
+
     private static String storedFailureMessage(String responseJson) {
         if (responseJson != null && !responseJson.isBlank()) {
             try {
@@ -164,6 +192,13 @@ public class OrderRequestIdempotencyService {
         return error.getMessage().length() > 500
                 ? error.getMessage().substring(0, 500)
                 : error.getMessage();
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     public void validateKey(String idempotencyKey) {
