@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 
 import structlog
 
@@ -12,8 +11,10 @@ from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.harness.guardrails.input_guard import InputGuardrail
 from app.harness.metrics.runtime_sensors import measure_agent_stage
 from app.memory.session_memory_service import session_memory_service
+from app.observability.telemetry import current_trace_id
 from app.rag.retriever import rag_retriever
 from app.services.agent_queue_service import agent_queue_service
+from app.services.episode_service import episode_service, new_run_id
 from app.services.message_service import agent_message_service
 from app.services.order_reference_resolver import ORDER_REFERENCE_INTENTS
 from app.services.order_selection_store import order_selection_store
@@ -31,6 +32,22 @@ logger = structlog.get_logger()
 input_guard = InputGuardrail()
 AGENT_BUSY_MESSAGE = "当前咨询较多，请稍后再试，或缩小商品需求范围"
 SUPPORT_TRANSFER_MESSAGE = "已为您转接人工客服，客服接入后会在当前对话中回复。"
+_EPISODE_FULL_INTENTS = frozenset(
+    {
+        IntentKind.REFUND,
+        IntentKind.REFUND_STATUS,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.CANCEL_ORDER,
+        IntentKind.PRODUCT_REVIEW,
+        IntentKind.RECOMMENT,
+        IntentKind.COMPLAINT,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.ADDRESS_CHANGE,
+        IntentKind.INVOICE,
+        IntentKind.AFTERSALES_UNKNOWN,
+    }
+)
 
 
 class AgentOrchestrator:
@@ -107,7 +124,8 @@ class AgentOrchestrator:
 
         active_support = await support_service.get_active(user_id)
         queue_name, priority = agent_queue_service.queue_for_decision(decision)
-        trace_id = uuid.uuid4().hex
+        run_id = new_run_id()
+        trace_id = current_trace_id()
         agent_msg = await agent_message_service.save_user_message(
             user_id,
             safe_message,
@@ -115,7 +133,25 @@ class AgentOrchestrator:
             previous_unresolved_count=previous_unresolved,
             queue_name=queue_name,
             session_id=active_support.get("session_id") if active_support else None,
+            run_id=run_id,
             trace_id=trace_id,
+        )
+        episode_keep = episode_service.start_run(
+            run_id=run_id,
+            message_id=int(agent_msg["messageId"]),
+            user_id=user_id,
+            session_id=agent_msg.get("sessionId"),
+            intent=decision.intent.value,
+            queue_name=queue_name,
+            force_keep=decision.should_handoff or decision.intent in _EPISODE_FULL_INTENTS,
+        )
+        agent_msg["episodeKeep"] = episode_keep
+        episode_service.record_step(
+            "INTENT_DECISION",
+            run_id=run_id,
+            node_name="api",
+            input_data={"message": original_user_text},
+            output_data=decision.model_dump(mode="json"),
         )
         agent_msg["fromProduct"] = from_product
 
@@ -135,6 +171,15 @@ class AgentOrchestrator:
             )
             agent_msg["supportSession"] = support_service.public_session(active_support)
             agent_msg["deliveryState"] = "HUMAN_SUPPORT"
+            episode_service.record_step(
+                "HUMAN_SESSION_ROUTE",
+                run_id=run_id,
+                node_name="api",
+                output_data={"sessionId": active_support.get("session_id")},
+            )
+            episode_service.finish_run(
+                "human_support", run_id=run_id, force_keep=True
+            )
             return agent_msg
 
         if decision.should_handoff:
@@ -179,6 +224,15 @@ class AgentOrchestrator:
                 agent_msg["assistantMessage"] = answer
                 agent_msg["bizType"] = "faq"
                 agent_msg["sourceRefs"] = source_refs
+                episode_service.record_step(
+                    "FAQ_FAST_PATH",
+                    run_id=run_id,
+                    node_name="api",
+                    output_data={"sourceRefs": source_refs},
+                )
+                episode_service.finish_run(
+                    "faq", run_id=run_id, force_keep=episode_keep
+                )
                 return agent_msg
 
         if (
@@ -196,6 +250,16 @@ class AgentOrchestrator:
             )
             agent_msg["deliveryState"] = "DEGRADED"
             agent_msg["assistantMessage"] = AGENT_BUSY_MESSAGE
+            episode_service.record_step(
+                "OVERLOAD",
+                run_id=run_id,
+                node_name="api",
+                status="ERROR",
+                error_code="QUEUE_OVERLOAD",
+            )
+            episode_service.finish_run(
+                "degraded", run_id=run_id, force_keep=True
+            )
             return agent_msg
 
         created = await agent_task_service.create(
@@ -215,6 +279,12 @@ class AgentOrchestrator:
             await agent_queue_service.publish(queue_name, agent_msg)
             await agent_task_service.mark_queued(agent_msg["messageId"])
             agent_msg["deliveryState"] = "QUEUED"
+            episode_service.record_step(
+                "MQ_PUBLISH",
+                run_id=run_id,
+                node_name="api",
+                output_data={"queue": queue_name, "status": "QUEUED"},
+            )
         except Exception as exc:
             logger.warning(
                 "agent_task_publish_deferred",
@@ -223,6 +293,15 @@ class AgentOrchestrator:
                 error=str(exc),
             )
             agent_msg["deliveryState"] = "PENDING_RECOVERY"
+            episode_service.record_step(
+                "MQ_PUBLISH",
+                run_id=run_id,
+                node_name="api",
+                status="ERROR",
+                error_code=type(exc).__name__,
+                error_message=str(exc),
+                output_data={"queue": queue_name, "status": "PENDING_RECOVERY"},
+            )
         return agent_msg
 
     async def send_selected_order_candidate(
@@ -324,7 +403,8 @@ class AgentOrchestrator:
         ):
             raise ValueError(AGENT_BUSY_MESSAGE)
 
-        trace_id = uuid.uuid4().hex
+        run_id = new_run_id()
+        trace_id = current_trace_id()
         selected_reference = {
             **candidate,
             "intent": intent.value,
@@ -341,11 +421,29 @@ class AgentOrchestrator:
             previous_unresolved_count=previous_unresolved,
             queue_name=queue_name,
             priority=priority,
+            run_id=run_id,
             trace_id=trace_id,
             selected_reference=selected_reference,
         )
         if not created:
             return agent_msg
+
+        episode_keep = episode_service.start_run(
+            run_id=run_id,
+            message_id=int(agent_msg["messageId"]),
+            user_id=user_id,
+            session_id=None,
+            intent=decision.intent.value,
+            queue_name=queue_name,
+            force_keep=True,
+        )
+        agent_msg["episodeKeep"] = episode_keep
+        episode_service.record_step(
+            "ORDER_TARGET_SELECTED",
+            run_id=run_id,
+            node_name="api",
+            output_data=selected_reference,
+        )
 
         try:
             if not await agent_task_service.mark_dispatching(agent_msg["messageId"]):
@@ -354,6 +452,12 @@ class AgentOrchestrator:
             await agent_queue_service.publish(queue_name, agent_msg)
             await agent_task_service.mark_queued(agent_msg["messageId"])
             agent_msg["deliveryState"] = "QUEUED"
+            episode_service.record_step(
+                "MQ_PUBLISH",
+                run_id=run_id,
+                node_name="api",
+                output_data={"queue": queue_name, "status": "QUEUED"},
+            )
         except Exception as exc:
             logger.warning(
                 "agent_order_selection_publish_deferred",
@@ -363,6 +467,14 @@ class AgentOrchestrator:
                 error=str(exc),
             )
             agent_msg["deliveryState"] = "PENDING_RECOVERY"
+            episode_service.record_step(
+                "MQ_PUBLISH",
+                run_id=run_id,
+                node_name="api",
+                status="ERROR",
+                error_code=type(exc).__name__,
+                error_message=str(exc),
+            )
         return agent_msg
 
     async def _resolve_consult_card_for_routing(self, user_id: str) -> dict | None:
@@ -429,6 +541,18 @@ class AgentOrchestrator:
         agent_msg["supportSession"] = support_service.public_session(session)
         agent_msg["deliveryState"] = "HUMAN_SUPPORT"
         agent_msg["assistantMessage"] = SUPPORT_TRANSFER_MESSAGE
+        episode_service.record_step(
+            "HANDOFF",
+            run_id=agent_msg.get("runId"),
+            node_name="support",
+            output_data={
+                "reason": decision.get("handoff_reason") or "AI_HANDOFF",
+                "sessionId": session.get("session_id"),
+            },
+        )
+        episode_service.finish_run(
+            "handoff", run_id=agent_msg.get("runId"), force_keep=True
+        )
         return agent_msg
 
     async def request_human(

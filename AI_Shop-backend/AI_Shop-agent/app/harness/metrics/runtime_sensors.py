@@ -146,3 +146,23 @@ HANDOFF_TOTAL = Counter(
     "转人工决策（HANDOFF / HANDOFF_SUGGESTED）",
     ["reason"],
 )
+
+EPISODE_EVENT_TOTAL = Counter(
+    "agent_episode_event_total",
+    "Application-level Agent episode events by persistence result",
+    ["event", "result"],
+)
+EPISODE_DROPPED_TOTAL = Counter(
+    "agent_episode_dropped_total",
+    "Episode events intentionally dropped from the fail-open writer",
+    ["reason"],
+)
+EPISODE_QUEUE_DEPTH = Gauge(
+    "agent_episode_queue_depth",
+    "Pending events in the in-process Episode persistence queue",
+)
+EPISODE_WRITE_LATENCY = Histogram(
+    "agent_episode_write_latency_seconds",
+    "Episode batch persistence latency",
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+)

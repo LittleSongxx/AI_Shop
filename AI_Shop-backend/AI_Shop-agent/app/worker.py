@@ -27,6 +27,7 @@ from app.observability.telemetry import shutdown_telemetry
 from app.services.agent_engine import agent_engine
 from app.services.agent_queue_service import agent_queue_service
 from app.services.agent_service import agent_orchestrator
+from app.services.episode_service import bind_episode, episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.message_service import agent_message_service, next_unresolved_count
 from app.services.pending_action_service import pending_action_service
@@ -37,6 +38,22 @@ from app.utils.product_consult import parse_consult_card
 
 logger = structlog.get_logger()
 TERMINAL_ERROR = "服务暂时不可用，已为您保留本次咨询记录，请稍后重试或转人工客服。"
+_EPISODE_FULL_INTENTS = frozenset(
+    {
+        "REFUND",
+        "REFUND_STATUS",
+        "CONFIRM_RECEIPT",
+        "CANCEL_ORDER",
+        "PRODUCT_REVIEW",
+        "RECOMMENT",
+        "COMPLAINT",
+        "PAYMENT_ISSUE",
+        "DAMAGED_OR_WRONG_ITEM",
+        "ADDRESS_CHANGE",
+        "INVOICE",
+        "AFTERSALES_UNKNOWN",
+    }
+)
 
 
 class LeaseLostError(RuntimeError):
@@ -79,6 +96,7 @@ class AgentWorker:
             ) from exc
         await redis_service.connect()
         await init_pool()
+        await episode_service.start()
         try:
             await self._connect_queue_until_ready()
             await self._start_consumer(
@@ -203,6 +221,7 @@ class AgentWorker:
             await agent_queue_service.close()
             await mcp_streamable_client.close()
             await close_http_clients()
+            await episode_service.close()
             await close_pool()
             await redis_service.close()
         finally:
@@ -269,10 +288,58 @@ class AgentWorker:
                 value = value.decode("utf-8", errors="replace")
             carrier[str(key)] = str(value)
         ctx = TraceContextTextMapPropagator().extract(carrier)
+        episode_payload: dict = {}
+        try:
+            decoded = json.loads(message.body.decode("utf-8"))
+            if isinstance(decoded, dict):
+                episode_payload = decoded
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
         with trace.get_tracer("aishop.agent").start_as_current_span(
             "agent.task.consume", context=ctx
-        ):
-            await self._process_message_inner(queue_name, message)
+        ) as span:
+            run_id = str(episode_payload.get("runId") or "") or None
+            raw_message_id = episode_payload.get("messageId")
+            try:
+                message_id = int(raw_message_id) if raw_message_id is not None else None
+            except (TypeError, ValueError):
+                message_id = None
+            user_id = str(episode_payload.get("userId") or "")
+            if message_id is not None:
+                span.set_attribute("agent.message_id", message_id)
+            if run_id:
+                span.set_attribute("agent.run_id", run_id)
+            force_keep = bool(episode_payload.get("episodeKeep")) or str(
+                episode_payload.get("intent") or ""
+            ) in _EPISODE_FULL_INTENTS
+            with bind_episode(
+                run_id,
+                message_id=message_id,
+                user_id=user_id,
+                force_keep=force_keep,
+            ):
+                if run_id and message_id is not None and user_id:
+                    episode_service.start_run(
+                        run_id=run_id,
+                        message_id=message_id,
+                        user_id=user_id,
+                        session_id=episode_payload.get("sessionId"),
+                        intent=str(episode_payload.get("intent") or "") or None,
+                        queue_name=queue_name,
+                        force_keep=force_keep,
+                    )
+                episode_service.mark_running(run_id)
+                episode_service.record_step(
+                    "MQ_RECEIVE",
+                    run_id=run_id,
+                    node_name="worker",
+                    input_data={
+                        "queue": queue_name,
+                        "redelivered": bool(message.redelivered),
+                        "messageId": message_id,
+                    },
+                )
+                await self._process_message_inner(queue_name, message)
 
     async def _process_message_inner(
         self,
@@ -363,6 +430,7 @@ class AgentWorker:
                 AGENT_TASK_TOTAL.labels(
                     queue=queue_name, result="cancelled"
                 ).inc()
+                episode_service.finish_run("cancelled")
                 await message.ack()
                 return
             if self._deadline_expired(payload):
@@ -594,6 +662,14 @@ class AgentWorker:
                 queue=str(payload.get("queueName") or "unknown"),
                 result="dead",
             ).inc()
+            episode_service.record_step(
+                "WORKER_ERROR",
+                node_name="worker",
+                status="ERROR",
+                error_code=type(exc).__name__,
+                error_message=str(exc),
+            )
+            episode_service.finish_run("worker_error", force_keep=True)
             await self._notify_terminal(message, payload)
             return
         # P0-2a：退避 + 抖动，不立即重发——由 recover_pending 扫描在
@@ -628,6 +704,14 @@ class AgentWorker:
             )
             await message.ack()
             return
+        episode_service.record_step(
+            "DEADLINE",
+            node_name="worker",
+            status="ERROR",
+            error_code="TASK_DEADLINE",
+            error_message=error,
+        )
+        episode_service.finish_run("deadline", force_keep=True)
         await self._notify_terminal(message, payload)
 
     async def _notify_terminal(

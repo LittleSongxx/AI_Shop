@@ -7,6 +7,8 @@ import time
 from functools import lru_cache
 
 import structlog
+from opentelemetry import context as otel_context
+from opentelemetry import trace
 
 from app.domain.intent.rules import wants_order_list_cards
 from app.harness.guardrails.output_guard import strip_emojis
@@ -26,6 +28,8 @@ from app.observability.llm_metrics import (
     record_llm_usage,
     resolve_llm_model,
 )
+from app.observability.telemetry import get_tracer
+from app.services.episode_service import episode_service
 from app.services.llm_factory import ChatLLMConfig, chat_llm_config, chat_llm_for_config
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.message_service import agent_message_service
@@ -49,6 +53,7 @@ from app.utils.biz_payload import (
 from app.utils.product_consult import is_product_consult_turn, parse_consult_card
 
 logger = structlog.get_logger()
+tracer = get_tracer()
 
 def chunk_text(content: object) -> str:
     if isinstance(content, str):
@@ -118,9 +123,17 @@ async def stream_llm_turn(
     gathered = None
     sent_visible = ""
     first_token_observed = False
+    usage: dict = {}
+    episode_status = "OK"
+    episode_error: Exception | None = None
+    span = tracer.start_span("agent.llm.stream")
+    context_token = otel_context.attach(trace.set_span_in_context(span))
+    span.set_attribute("gen_ai.request.model", resolved_model)
+    span.set_attribute("agent.llm.fallback", bool(fallback))
     try:
         async for chunk in llm.astream(messages):
             if await is_cancelled(user_id, message_id):
+                episode_status = "CANCELLED"
                 record_llm_failure(resolved_model, fallback=fallback)
                 return None
             gathered = chunk if gathered is None else gathered + chunk
@@ -140,19 +153,45 @@ async def stream_llm_turn(
             STREAM_TOKENS.inc(len(delta))
             await stream_service.push_chunk(user_id, message_id, delta, user_message)
         if await is_cancelled(user_id, message_id):
+            episode_status = "CANCELLED"
             record_llm_failure(resolved_model, fallback=fallback)
             return None
         if gathered is None:
             raise RuntimeError("LLM stream ended without a response")
-        record_llm_usage(gathered, fallback=fallback, model=resolved_model)
+        usage = record_llm_usage(
+            gathered, fallback=fallback, model=resolved_model
+        )
         return gathered
     except asyncio.CancelledError:
+        episode_status = "CANCELLED"
         record_llm_failure(resolved_model, fallback=fallback)
+        raise
+    except Exception as exc:
+        episode_status = "ERROR"
+        episode_error = exc
+        span.record_exception(exc)
         raise
     finally:
         elapsed = max(0.0, time.perf_counter() - started)
         LLM_LATENCY.observe(elapsed)
         observe_agent_stage("generation", elapsed)
+        episode_service.record_step(
+            "LLM_CALL",
+            node_name="llm",
+            status=episode_status,
+            input_data={"messages": messages, "fallback": fallback, "stream": True},
+            output_data={
+                **usage,
+                "visibleChars": len(sent_visible),
+                "hasToolCalls": bool(getattr(gathered, "tool_calls", None)),
+            },
+            model_name=resolved_model,
+            error_code=type(episode_error).__name__ if episode_error else None,
+            error_message=str(episode_error) if episode_error else None,
+            latency_ms=round(elapsed * 1_000),
+        )
+        otel_context.detach(context_token)
+        span.end()
 
 def _strip_emojis_from_assistant(assistant: str) -> str:
     text = (assistant or "").strip()

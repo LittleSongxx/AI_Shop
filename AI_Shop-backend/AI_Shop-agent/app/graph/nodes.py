@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import structlog
 from langchain_core.messages import SystemMessage, ToolMessage
 
@@ -25,10 +27,12 @@ from app.memory.context_builder import context_builder
 from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
 from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_bucket
 from app.rag.query_rewriter import rewrite_for_rag
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
+from app.services.episode_service import episode_service
 from app.services.llm_factory import has_fallback_chat_llm
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.message_service import agent_message_service
@@ -97,10 +101,21 @@ async def entry_guard(state: AgentGraphState) -> dict:
     user_id = state["user_id"]
     message_id = state["message_id"]
     if await rt.is_cancelled(user_id, message_id):
+        episode_service.record_step(
+            "GUARD",
+            node_name="entry",
+            status="BLOCKED",
+            output_data={"guard": "cancellation", "decision": "BLOCK"},
+        )
         return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
     card, user_text = rt.parse_agent_message(state["agent_msg"])
     # P3-2: optional image URL forwarded by the frontend alongside the text message.
     image_url: str | None = state["agent_msg"].get("imageUrl") or None
+    episode_service.record_step(
+        "GUARD",
+        node_name="entry",
+        output_data={"guard": "cancellation", "decision": "PASS", "hasImage": bool(image_url)},
+    )
     return {"card": card, "message_card": card, "user_text": user_text, "image_url": image_url, "cancelled": False}
 
 async def build_context_node(state: AgentGraphState) -> dict:
@@ -114,6 +129,15 @@ async def build_context_node(state: AgentGraphState) -> dict:
     from_product = state.get("from_product", False)
 
     memory = await session_memory_service.load(user_id, redis_service.client)
+    episode_service.record_step(
+        "MEMORY_READ",
+        node_name="build_context",
+        output_data={
+            "turnCount": memory.turn_count,
+            "stateKeys": sorted(memory.state.keys()),
+            "hasSummary": bool(memory.summary),
+        },
+    )
     consult_card = await rt.resolve_consult_card(
         user_id, card, memory.state, from_product=from_product
     )
@@ -190,6 +214,11 @@ async def build_context_node(state: AgentGraphState) -> dict:
     # are applied inside rag_retriever (single source), which also folds the
     # bucket into the semantic cache key so strategies never share cached results.
     ab_bucket = get_bucket(user_id)
+    episode_service.update_run(
+        intent=intent.value,
+        scenario=intent.value.lower(),
+        experiment={"bucket": ab_bucket},
+    )
 
     # P3-2: describe the user's image (if any) before the retrieval step so
     # the description enriches both the RAG query and the LLM context window.
@@ -208,22 +237,37 @@ async def build_context_node(state: AgentGraphState) -> dict:
     # P3-1: when agentic_rag=True the LLM calls SEARCH_KNOWLEDGE itself;
     # skip the fixed prefetch so the context window stays clean.
     if should_prefetch_rag(intent, agentic_rag=get_settings().agentic_rag):
-        with measure_agent_stage("rag"):
-            rag_query = await rewrite_for_rag(user_text, memory)
-            # P3-2: prepend image description to retrieval query when available.
-            if image_desc:
-                rag_query = f"{image_desc} {rag_query}".strip()
-            _cat_map = get_settings().rag_intent_category_map
-            category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
-            rag_result = await rag_retriever.search_faq_with_trace(
-                rag_query,
-                category_filter=category_filter,
-                bucket=ab_bucket,
+        rag_started = time.perf_counter()
+        with get_tracer().start_as_current_span("agent.rag.retrieve") as span:
+            span.set_attribute("agent.rag.mode", "prefetch")
+            span.set_attribute("agent.rag.bucket", ab_bucket)
+            with measure_agent_stage("rag"):
+                rag_query = await rewrite_for_rag(user_text, memory)
+                # P3-2: prepend image description to retrieval query when available.
+                if image_desc:
+                    rag_query = f"{image_desc} {rag_query}".strip()
+                _cat_map = get_settings().rag_intent_category_map
+                category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
+                rag_result = await rag_retriever.search_faq_with_trace(
+                    rag_query,
+                    category_filter=category_filter,
+                    bucket=ab_bucket,
+                )
+            faq_text = str(rag_result.get("text") or "")
+            rag_source_refs = list(rag_result.get("source_refs") or [])
+            rag_trace = rag_result.get("trace")
+            knowledge_text = faq_text
+            episode_service.record_step(
+                "RAG_RETRIEVAL",
+                node_name="build_context",
+                input_data={"query": rag_query, "categoryFilter": category_filter},
+                output_data={
+                    "trace": rag_trace,
+                    "sourceRefs": rag_source_refs,
+                    "hasEvidence": bool(faq_text and rag_source_refs),
+                },
+                latency_ms=round((time.perf_counter() - rag_started) * 1_000),
             )
-        faq_text = str(rag_result.get("text") or "")
-        rag_source_refs = list(rag_result.get("source_refs") or [])
-        rag_trace = rag_result.get("trace")
-        knowledge_text = faq_text
 
     messages, working_turns, working_oldest_id = await context_builder.build_agent_messages(
         user_id,
@@ -569,7 +613,9 @@ async def tools_node(state: AgentGraphState) -> dict:
                 )
             )
             continue
-        result = await mcp_tool_router.invoke(tc["name"], tc.get("args") or {}, user_id)
+        result = await mcp_tool_router.invoke(
+            tc["name"], tc.get("args") or {}, user_id, call_id=tc.get("id")
+        )
         called.append(tc["name"])
         messages.append(ToolMessage(content=result.to_tool_message(), tool_call_id=tc["id"]))
 
@@ -647,8 +693,21 @@ async def finalize_node(state: AgentGraphState) -> dict:
         tools_called = state.get("tools_called") or []
         guarded = output_guard.validate_no_false_completion(full_text, tools_called)
         if guarded != full_text:
+            episode_service.record_step(
+                "GUARD",
+                node_name="finalize",
+                status="REPAIRED",
+                input_data={"assistantText": full_text},
+                output_data={"assistantText": guarded, "rule": "false_completion"},
+            )
             chunks = [guarded]
             full_text = guarded
+        else:
+            episode_service.record_step(
+                "GUARD",
+                node_name="finalize",
+                output_data={"guard": "false_completion", "decision": "PASS"},
+            )
 
         # A3：HANDOFF_SUGGESTED（REPEATED_INTENT / 低置信）此前只被计数、
         # 用户看不到任何提示。这里在回答末尾补一句可见的建议转人工文案——
@@ -716,6 +775,14 @@ async def post_turn_node(state: AgentGraphState) -> dict:
             card=card,
             working_turns=state.get("working_turns") or [],
             working_oldest_id=state.get("working_oldest_id"),
+        )
+        episode_service.record_step(
+            "MEMORY_WRITE",
+            node_name="post_turn",
+            output_data={
+                "toolsCalled": state.get("tools_called") or [],
+                "hasCard": bool(card),
+            },
         )
     except Exception as e:
         logger.exception("post_turn_failed", user_id=user_id, error=str(e))

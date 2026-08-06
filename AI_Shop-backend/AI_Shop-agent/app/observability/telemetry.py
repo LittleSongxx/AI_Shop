@@ -24,6 +24,21 @@ def get_tracer():
     return trace.get_tracer("aishop.agent")
 
 
+def current_trace_id() -> str | None:
+    """Return the active W3C trace id, never an unrelated application UUID."""
+    context = trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return None
+    return f"{context.trace_id:032x}"
+
+
+def current_span_id() -> str | None:
+    context = trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return None
+    return f"{context.span_id:016x}"
+
+
 def _telemetry_enabled() -> bool:
     from app.config.settings import get_settings
 
@@ -40,7 +55,7 @@ def _build_provider():
     resource = Resource.create(
         {
             "service.name": settings.otel_service_name,
-            "service.version": "current",
+            "service.version": settings.app_version,
             "deployment.environment": settings.app_env,
         }
     )

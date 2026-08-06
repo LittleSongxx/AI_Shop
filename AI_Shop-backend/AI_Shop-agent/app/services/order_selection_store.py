@@ -114,6 +114,7 @@ class OrderSelectionStore:
         priority: int,
         trace_id: str,
         selected_reference: dict[str, Any],
+        run_id: str | None = None,
     ) -> tuple[dict[str, Any], bool]:
         """Atomically consume a candidate and create its durable worker task.
 
@@ -189,9 +190,9 @@ class OrderSelectionStore:
                 """
                 INSERT INTO agent_message
                     (user_message, send_time, user_id, status, session_id, intent,
-                     intent_confidence, sentiment, urgency, risk_level, trace_id,
+                     intent_confidence, sentiment, urgency, risk_level, run_id, trace_id,
                      unresolved_count, queue_name)
-                VALUES (%s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     message,
@@ -203,6 +204,7 @@ class OrderSelectionStore:
                     decision.sentiment.value,
                     decision.urgency.value,
                     decision.risk_level.value,
+                    run_id,
                     trace_id,
                     unresolved_count,
                     queue_name,
@@ -216,7 +218,9 @@ class OrderSelectionStore:
                 "status": MSG_STATUS_NORMAL,
                 "sendTime": now.strftime("%Y-%m-%d %H:%M:%S"),
                 "sessionId": None,
+                "runId": run_id,
                 "traceId": trace_id,
+                "episodeKeep": True,
                 "queueName": queue_name,
                 "unresolvedCount": unresolved_count,
                 "fromProduct": False,

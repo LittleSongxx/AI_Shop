@@ -28,6 +28,7 @@ def upgrade() -> None:
             sentiment          varchar(20) NULL,
             urgency            varchar(20) NULL,
             risk_level         varchar(20) NULL,
+            run_id             varchar(64) NULL,
             trace_id           varchar(64) NULL,
             source_refs        json NULL,
             latency_ms         int NULL,
@@ -35,8 +36,71 @@ def upgrade() -> None:
             queue_name         varchar(64) NULL,
             KEY idx_agent_message_user (user_id, message_id),
             KEY idx_agent_message_session (session_id, message_id),
+            UNIQUE KEY uk_agent_message_run (run_id),
             KEY idx_agent_message_quality (intent, sentiment, send_time)
         ) COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_run
+        (
+            run_id                 varchar(64) NOT NULL PRIMARY KEY,
+            message_id             int NULL,
+            user_id                varchar(32) NOT NULL,
+            session_id             varchar(36) NULL,
+            otel_trace_id          char(32) NULL,
+            status                 varchar(20) NOT NULL DEFAULT 'QUEUED',
+            outcome                varchar(32) NULL,
+            scenario               varchar(40) NULL,
+            intent                 varchar(40) NULL,
+            queue_name             varchar(64) NULL,
+            model_name             varchar(128) NULL,
+            version_json           json NULL,
+            experiment_json        json NULL,
+            input_tokens           int NOT NULL DEFAULT 0,
+            output_tokens          int NOT NULL DEFAULT 0,
+            cost_cny               decimal(14, 8) NOT NULL DEFAULT 0,
+            latency_ms             int NULL,
+            quality_json           json NULL,
+            reward_signals_json    json NULL,
+            capture_level          varchar(16) NOT NULL DEFAULT 'FULL',
+            dataset_eligible       varchar(16) NOT NULL DEFAULT 'UNREVIEWED',
+            started_at             datetime(3) NOT NULL,
+            completed_at           datetime(3) NULL,
+            created_at             datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at             datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_run_message (message_id),
+            KEY idx_agent_run_trace (otel_trace_id),
+            KEY idx_agent_run_status_time (status, started_at),
+            KEY idx_agent_run_user_time (user_id, started_at)
+        ) COMMENT 'durable application-level Agent episode' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_step
+        (
+            step_id        bigint AUTO_INCREMENT PRIMARY KEY,
+            run_id         varchar(64) NOT NULL,
+            event_type     varchar(40) NOT NULL,
+            node_name      varchar(64) NULL,
+            round_no       smallint NULL,
+            status         varchar(20) NOT NULL,
+            span_id        char(16) NULL,
+            input_json     json NULL,
+            output_json    json NULL,
+            model_name     varchar(128) NULL,
+            tool_name      varchar(64) NULL,
+            call_id        varchar(128) NULL,
+            error_code     varchar(64) NULL,
+            error_message  varchar(512) NULL,
+            latency_ms     int NULL,
+            occurred_at    datetime(3) NOT NULL,
+            KEY idx_agent_step_run_time (run_id, occurred_at, step_id),
+            KEY idx_agent_step_type_status (event_type, status, occurred_at)
+        ) COMMENT 'sanitized observable Agent decisions and actions' CHARSET = utf8mb4
         """
     )
     op.execute(
@@ -419,6 +483,7 @@ def upgrade() -> None:
     )
 
     _reconcile_agent_message()
+    _reconcile_episode_tables()
     _reconcile_pending_action()
     _reconcile_indexes()
 
@@ -434,6 +499,7 @@ def _reconcile_agent_message() -> None:
         "sentiment": sa.Column("sentiment", sa.String(20), nullable=True),
         "urgency": sa.Column("urgency", sa.String(20), nullable=True),
         "risk_level": sa.Column("risk_level", sa.String(20), nullable=True),
+        "run_id": sa.Column("run_id", sa.String(64), nullable=True),
         "trace_id": sa.Column("trace_id", sa.String(64), nullable=True),
         "source_refs": sa.Column("source_refs", sa.JSON(), nullable=True),
         "latency_ms": sa.Column("latency_ms", sa.Integer(), nullable=True),
@@ -453,6 +519,84 @@ def _reconcile_agent_message() -> None:
         "ALTER TABLE agent_message MODIFY COLUMN user_message varchar(4000) NULL"
     )
     op.execute("ALTER TABLE agent_message MODIFY COLUMN biz_data mediumtext NULL")
+
+
+def _reconcile_episode_tables() -> None:
+    """Complete Episode tables created by an interrupted or preview migration."""
+    bind = op.get_bind()
+    definitions = {
+        "agent_run": {
+            "message_id": "bigint NULL",
+            "user_id": "varchar(32) NULL",
+            "session_id": "varchar(36) NULL",
+            "otel_trace_id": "char(32) NULL",
+            "status": "varchar(20) NOT NULL DEFAULT 'QUEUED'",
+            "outcome": "varchar(32) NULL",
+            "scenario": "varchar(40) NULL",
+            "intent": "varchar(40) NULL",
+            "queue_name": "varchar(64) NULL",
+            "model_name": "varchar(128) NULL",
+            "version_json": "json NULL",
+            "experiment_json": "json NULL",
+            "input_tokens": "int NOT NULL DEFAULT 0",
+            "output_tokens": "int NOT NULL DEFAULT 0",
+            "cost_cny": "decimal(14, 8) NOT NULL DEFAULT 0",
+            "latency_ms": "int NULL",
+            "quality_json": "json NULL",
+            "reward_signals_json": "json NULL",
+            "capture_level": "varchar(16) NOT NULL DEFAULT 'FULL'",
+            "dataset_eligible": "varchar(16) NOT NULL DEFAULT 'UNREVIEWED'",
+            "started_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
+            "completed_at": "datetime(3) NULL",
+            "created_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
+            "updated_at": (
+                "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) "
+                "ON UPDATE CURRENT_TIMESTAMP(3)"
+            ),
+        },
+        "agent_step": {
+            "run_id": "varchar(64) NULL",
+            "event_type": "varchar(40) NOT NULL DEFAULT 'LEGACY_EVENT'",
+            "node_name": "varchar(64) NULL",
+            "round_no": "smallint NULL",
+            "status": "varchar(20) NOT NULL DEFAULT 'OK'",
+            "span_id": "char(16) NULL",
+            "input_json": "json NULL",
+            "output_json": "json NULL",
+            "model_name": "varchar(128) NULL",
+            "tool_name": "varchar(64) NULL",
+            "call_id": "varchar(128) NULL",
+            "error_code": "varchar(64) NULL",
+            "error_message": "varchar(512) NULL",
+            "latency_ms": "int NULL",
+            "occurred_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
+        },
+    }
+    inspector = sa.inspect(bind)
+    for table_name, table_definitions in definitions.items():
+        existing = {
+            column["name"] for column in inspector.get_columns(table_name)
+        }
+        for name, ddl in table_definitions.items():
+            if name not in existing:
+                op.execute(f"ALTER TABLE {table_name} ADD COLUMN {name} {ddl}")
+
+    # Preview builds briefly allowed nullable ownership columns. Preserve those rows,
+    # but mark their provenance explicitly before enforcing the runtime contract.
+    op.execute(
+        "UPDATE agent_run SET user_id='<LEGACY>' "
+        "WHERE user_id IS NULL OR user_id=''"
+    )
+    op.execute(
+        "ALTER TABLE agent_run MODIFY COLUMN user_id varchar(32) NOT NULL"
+    )
+    op.execute(
+        "UPDATE agent_step SET run_id=CONCAT('legacy-step-', step_id) "
+        "WHERE run_id IS NULL OR run_id=''"
+    )
+    op.execute(
+        "ALTER TABLE agent_step MODIFY COLUMN run_id varchar(64) NOT NULL"
+    )
 
 
 def _reconcile_pending_action() -> None:
@@ -522,11 +666,22 @@ def _reconcile_indexes() -> None:
         "agent_message": (
             ("idx_agent_message_user", ("user_id", "message_id"), False),
             ("idx_agent_message_session", ("session_id", "message_id"), False),
+            ("uk_agent_message_run", ("run_id",), True),
             (
                 "idx_agent_message_quality",
                 ("intent", "sentiment", "send_time"),
                 False,
             ),
+        ),
+        "agent_run": (
+            ("uk_agent_run_message", ("message_id",), True),
+            ("idx_agent_run_trace", ("otel_trace_id",), False),
+            ("idx_agent_run_status_time", ("status", "started_at"), False),
+            ("idx_agent_run_user_time", ("user_id", "started_at"), False),
+        ),
+        "agent_step": (
+            ("idx_agent_step_run_time", ("run_id", "occurred_at", "step_id"), False),
+            ("idx_agent_step_type_status", ("event_type", "status", "occurred_at"), False),
         ),
         "agent_order_selection": (
             (
@@ -606,6 +761,8 @@ def _reconcile_indexes() -> None:
 
 def downgrade() -> None:
     for table_name in (
+        "agent_step",
+        "agent_run",
         "ai_badcase_candidate",
         "agent_message_feedback",
         "agent_task",

@@ -15,6 +15,7 @@ from app.graph.nodes import (
     tools_node,
 )
 from app.graph.state import AgentGraphState
+from app.graph.tracing import traced_node
 from app.services.redis_service import redis_service
 
 
@@ -60,14 +61,14 @@ def build_agent_graph():
 
     graph = StateGraph(AgentGraphState)
 
-    graph.add_node("entry", entry_guard)
-    graph.add_node("build_context", build_context_node)
-    graph.add_node("order_reference", order_reference_node)
-    graph.add_node("agent_loop", agent_loop_node)
-    graph.add_node("tools", tools_node)
-    graph.add_node("finalize", finalize_node)
-    graph.add_node("post_turn", post_turn_node)
-    graph.add_node("cleanup", cleanup_node)
+    graph.add_node("entry", traced_node("entry", entry_guard))
+    graph.add_node("build_context", traced_node("build_context", build_context_node))
+    graph.add_node("order_reference", traced_node("order_reference", order_reference_node))
+    graph.add_node("agent_loop", traced_node("agent_loop", agent_loop_node))
+    graph.add_node("tools", traced_node("tools", tools_node))
+    graph.add_node("finalize", traced_node("finalize", finalize_node))
+    graph.add_node("post_turn", traced_node("post_turn", post_turn_node))
+    graph.add_node("cleanup", traced_node("cleanup", cleanup_node))
 
     graph.set_entry_point("entry")
 

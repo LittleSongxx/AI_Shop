@@ -29,6 +29,7 @@ class AgentMessageService:
         previous_unresolved_count: int = 0,
         queue_name: str | None = None,
         session_id: str | None = None,
+        run_id: str | None = None,
         trace_id: str | None = None,
     ) -> dict:
 
@@ -42,9 +43,9 @@ class AgentMessageService:
                 """
                 INSERT INTO agent_message
                     (user_message, send_time, user_id, status, session_id, intent,
-                     intent_confidence, sentiment, urgency, risk_level, trace_id,
+                     intent_confidence, sentiment, urgency, risk_level, run_id, trace_id,
                      unresolved_count, queue_name)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     message,
@@ -57,6 +58,7 @@ class AgentMessageService:
                     decision.sentiment.value if decision else None,
                     decision.urgency.value if decision else None,
                     decision.risk_level.value if decision else None,
+                    run_id,
                     trace_id,
                     unresolved_count,
                     queue_name,
@@ -71,6 +73,7 @@ class AgentMessageService:
             "status": MSG_STATUS_NORMAL,
             "sendTime": now,
             "sessionId": session_id,
+            "runId": run_id,
             "traceId": trace_id,
             "queueName": queue_name,
             "unresolvedCount": unresolved_count,
@@ -461,6 +464,7 @@ def _row_to_dict(row: dict) -> dict:
         "sentiment": row.get("sentiment"),
         "urgency": row.get("urgency"),
         "riskLevel": row.get("risk_level"),
+        "runId": row.get("run_id"),
         "traceId": row.get("trace_id"),
         "sourceRefs": _json_value(row.get("source_refs")),
         "latencyMs": row.get("latency_ms"),
@@ -471,7 +475,7 @@ def _row_to_dict(row: dict) -> dict:
 _MESSAGE_SELECT_COLUMNS = """
     message_id, assistant_message, user_message, send_time, user_id, status,
     biz_type, biz_data, session_id, intent, intent_confidence, sentiment,
-    urgency, risk_level, trace_id, source_refs, latency_ms, unresolved_count,
+    urgency, risk_level, run_id, trace_id, source_refs, latency_ms, unresolved_count,
     queue_name
 """
 

@@ -7,17 +7,42 @@
 # 加 name 之前起过的话，历史指标留在 deploy_* 那套卷里，没被删，按需手动迁移。
 name: shop
 
-# Prometheus + Grafana，只做指标采集与展示，不含任何业务组件。
+# Prometheus + Grafana + OTel Collector + Tempo，只做观测，不含业务组件。
 # 中间件（MySQL/Redis/RabbitMQ/ES/Nacos/Seata）见 docker-compose.middleware.yml。
 #
 #   docker compose -f docker-compose.observability.yml up -d
 #   Grafana  http://localhost:3000   (admin / 见 GF_SECURITY_ADMIN_PASSWORD)
 #   Prometheus http://localhost:9090
+#   OTLP gRPC localhost:4317 / HTTP localhost:4318
 #
 # 默认抓取目标写的是 host.docker.internal，即服务跑在宿主机、这两个容器跑在 Docker 里。
 # 端口只绑 127.0.0.1：两个面板都无鉴权保护指标内容，不要直接暴露到公网。
 
 services:
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: aishop-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.113.0
+    container_name: aishop-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yml"]
+    depends_on:
+      - tempo
+    volumes:
+      - ./otel/collector.yml:/etc/otelcol/config.yml:ro
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: aishop-prometheus
@@ -42,6 +67,7 @@ services:
     restart: unless-stopped
     depends_on:
       - prometheus
+      - tempo
     environment:
       # 密码从环境变量注入，不要把明文写进仓库
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -59,3 +85,4 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
+  tempo-data:

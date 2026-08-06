@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import structlog
 
 from app.constants import MSG_STATUS_NORMAL
@@ -7,10 +9,13 @@ from app.db.pool import acquire
 from app.graph.builder import get_compiled_graph
 from app.graph.checkpoint.redis_saver import get_checkpointer
 from app.graph.state import initial_state, thread_id_for
+from app.observability.telemetry import get_tracer
 from app.services.agent_runtime import parse_agent_message
+from app.services.episode_service import episode_service
 from app.services.redis_service import redis_service
 
 logger = structlog.get_logger()
+tracer = get_tracer()
 
 async def _should_resume(user_id: str, message_id: int, thread_id: str) -> bool:
 
@@ -52,21 +57,83 @@ async def run_agent_graph(agent_msg: dict) -> str:
     graph = get_compiled_graph()
     checkpointer = get_checkpointer(redis_service.client)
 
-    try:
-        if await _should_resume(user_id, message_id, thread_id):
-            logger.info("graph_resume", thread_id=thread_id, message_id=message_id)
-            result = await graph.ainvoke(None, config)
-            return str(result.get("outcome") or "ok")
-
-        await checkpointer.adelete_thread(thread_id)
-        card, user_text = parse_agent_message(agent_msg)
-        state = initial_state(agent_msg, card, user_text)
-        logger.info("graph_invoke", thread_id=thread_id, message_id=message_id)
-
-        result = await graph.ainvoke(state, config)
-        return str(result.get("outcome") or "ok")
-    finally:
+    started = time.perf_counter()
+    with tracer.start_as_current_span("agent.graph") as span:
+        span.set_attribute("agent.message_id", int(message_id))
+        span.set_attribute("agent.run_id", str(agent_msg.get("runId") or ""))
+        episode_service.record_step(
+            "GRAPH_START",
+            node_name="graph",
+            input_data={
+                "messageId": message_id,
+                "intent": agent_msg.get("intent"),
+                "queue": agent_msg.get("queueName"),
+            },
+        )
         try:
-            await checkpointer.adelete_thread(thread_id)
-        except Exception as e:
-            logger.warning("graph_checkpoint_cleanup_failed", thread_id=thread_id, error=str(e))
+            if await _should_resume(user_id, message_id, thread_id):
+                logger.info("graph_resume", thread_id=thread_id, message_id=message_id)
+                episode_service.record_step(
+                    "STATE_TRANSITION",
+                    node_name="graph",
+                    output_data={"transition": "RESUME"},
+                )
+                result = await graph.ainvoke(None, config)
+            else:
+                await checkpointer.adelete_thread(thread_id)
+                card, user_text = parse_agent_message(agent_msg)
+                state = initial_state(agent_msg, card, user_text)
+                logger.info("graph_invoke", thread_id=thread_id, message_id=message_id)
+                result = await graph.ainvoke(state, config)
+
+            outcome = str(result.get("outcome") or "ok")
+            elapsed_ms = round((time.perf_counter() - started) * 1_000)
+            episode_service.update_run(
+                intent=result.get("intent"),
+                experiment={
+                    "rag": result.get("rag_trace"),
+                }
+                if result.get("rag_trace")
+                else None,
+            )
+            episode_service.record_step(
+                "GRAPH_END",
+                node_name="graph",
+                status="OK" if outcome == "ok" else "ERROR",
+                output_data={
+                    "outcome": outcome,
+                    "intent": result.get("intent"),
+                    "tools": result.get("tools_called") or [],
+                },
+                latency_ms=elapsed_ms,
+            )
+            episode_service.finish_run(
+                outcome,
+                latency_ms=elapsed_ms,
+                force_keep=True if outcome != "ok" else None,
+            )
+            return outcome
+        except Exception as exc:
+            elapsed_ms = round((time.perf_counter() - started) * 1_000)
+            span.record_exception(exc)
+            episode_service.record_step(
+                "GRAPH_ERROR",
+                node_name="graph",
+                status="ERROR",
+                error_code=type(exc).__name__,
+                error_message=str(exc),
+                latency_ms=elapsed_ms,
+            )
+            episode_service.finish_run(
+                "graph_exception", latency_ms=elapsed_ms, force_keep=True
+            )
+            raise
+        finally:
+            try:
+                await checkpointer.adelete_thread(thread_id)
+            except Exception as e:
+                logger.warning(
+                    "graph_checkpoint_cleanup_failed",
+                    thread_id=thread_id,
+                    error=str(e),
+                )

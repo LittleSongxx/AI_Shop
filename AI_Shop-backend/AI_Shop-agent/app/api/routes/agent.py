@@ -9,6 +9,7 @@ from app.models.response import ResponseVO, error, success
 from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
+from app.services.episode_query_service import episode_query_service
 from app.services.message_service import agent_message_service
 from app.services.order_selection_store import (
     OrderSelectionConflict,
@@ -319,6 +320,38 @@ async def admin_load_messages(
     data = await agent_message_service.admin_load_messages(
         page_no, page_size, user_id, biz_type
     )
+    return success(data)
+
+
+@router.post("/admin/traceRuns")
+async def admin_trace_runs(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    data = await episode_query_service.list_runs(
+        page_no=_as_int(body.get("pageNo"), 1) or 1,
+        page_size=_as_int(body.get("pageSize"), 30) or 30,
+        status=str(body.get("status") or "").strip() or None,
+        intent=str(body.get("intent") or "").strip() or None,
+        user_id=str(body.get("userId") or "").strip() or None,
+        outcome=str(body.get("outcome") or "").strip() or None,
+    )
+    return success(data)
+
+
+@router.post("/admin/traceDetail")
+async def admin_trace_detail(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    run_id = str(body.get("runId") or "").strip()
+    if not run_id:
+        return error(600, "runId 不能为空")
+    data = await episode_query_service.detail(run_id)
+    if data is None:
+        return error(404, "Trace 不存在或已过保留期")
     return success(data)
 
 

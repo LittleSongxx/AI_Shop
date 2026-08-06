@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import time
+
 import structlog
 
 from app.domain.tool_policy import policy_for
 from app.harness.guardrails.tool_guard import ToolGuardrail
 from app.harness.metrics.runtime_sensors import TOOL_CALL_TOTAL, measure_agent_stage
+from app.observability.telemetry import get_tracer
+from app.services.episode_service import episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -19,9 +23,74 @@ class McpToolRouter:
     is never forwarded to the MCP Streamable HTTP server.
     """
 
-    async def invoke(self, tool_name: str, args: dict, user_id: str) -> ToolInvokeResult:
-        with measure_agent_stage("tool"):
-            return await self._invoke_unmeasured(tool_name, args, user_id)
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict,
+        user_id: str,
+        call_id: str | None = None,
+    ) -> ToolInvokeResult:
+        started = time.perf_counter()
+        result: ToolInvokeResult | None = None
+        error: Exception | None = None
+        observable_args = self._observable_args(tool_name, args, user_id)
+        with get_tracer().start_as_current_span("agent.tool.call") as span:
+            span.set_attribute("agent.tool.name", tool_name)
+            if call_id:
+                span.set_attribute("agent.tool.call_id", call_id)
+            try:
+                with measure_agent_stage("tool"):
+                    result = await self._invoke_unmeasured(tool_name, args, user_id)
+                span.set_attribute("agent.tool.success", bool(result.success))
+                return result
+            except Exception as exc:
+                error = exc
+                span.record_exception(exc)
+                raise
+            finally:
+                elapsed_ms = round((time.perf_counter() - started) * 1_000)
+                episode_service.record_step(
+                    "TOOL_CALL",
+                    node_name="tools",
+                    status=(
+                        "OK" if result and result.success else "ERROR"
+                    ),
+                    input_data={"args": observable_args},
+                    output_data=(
+                        {
+                            "success": result.success,
+                            "errorCode": result.error_code,
+                            "bizType": result.biz_type,
+                            "hasCards": bool(result.assistant_cards),
+                        }
+                        if result
+                        else None
+                    ),
+                    tool_name=tool_name,
+                    call_id=call_id,
+                    error_code=(
+                        result.error_code
+                        if result
+                        else type(error).__name__ if error else "UNHANDLED_ERROR"
+                    ),
+                    error_message=str(error) if error else None,
+                    latency_ms=elapsed_ms,
+                )
+
+    def _observable_args(self, tool_name: str, args: dict, user_id: str) -> dict:
+        """Return the normalized shape without retaining a claimed identity."""
+        raw = dict(args or {})
+        raw.pop("user_id", None)
+        raw["userId"] = user_id
+        if tool_name == "SEARCH_KNOWLEDGE":
+            return {"userId": user_id, "query": raw.get("query") or ""}
+        try:
+            return self._to_mcp_args(tool_name, raw)
+        except Exception:
+            return {
+                "userId": user_id,
+                "argumentKeys": sorted(str(key) for key in raw if key != "userId"),
+            }
 
     async def _invoke_unmeasured(
         self, tool_name: str, args: dict, user_id: str

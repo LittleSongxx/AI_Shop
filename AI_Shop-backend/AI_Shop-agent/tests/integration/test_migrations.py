@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 
@@ -10,6 +11,7 @@ from app.config.settings import get_settings
 from app.db.migrations import _REQUIRED_COLUMNS, CURRENT_REVISION, run_migrations
 from app.db.pool import close_pool, init_pool
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction
+from app.services.episode_service import EpisodeService, bind_episode
 from app.services.order_selection_store import (
     OrderSelectionConflict,
     order_selection_store,
@@ -208,6 +210,9 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
         with _database_connection(incomplete) as connection, connection.cursor() as cursor:
             cursor.execute("DROP TABLE support_message")
             cursor.execute("DROP TABLE agent_pending_action")
+            cursor.execute("ALTER TABLE agent_run DROP COLUMN capture_level")
+            cursor.execute("ALTER TABLE agent_run DROP COLUMN scenario")
+            cursor.execute("ALTER TABLE agent_step DROP COLUMN output_json")
             cursor.execute(
                 "ALTER TABLE agent_message MODIFY COLUMN user_message varchar(500) NULL"
             )
@@ -406,6 +411,64 @@ async def test_recommendation_event_facts_are_deduplicated_and_validated():
             )
             assert cursor.fetchall() == (("CLICK", 1), ("IMPRESSION", 2))
     finally:
+        await close_pool()
+        get_settings.cache_clear()
+        _drop_database(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("RUN_AGENT_MIGRATION_TESTS") != "1",
+    reason="requires a real MySQL 8 server",
+)
+async def test_episode_writer_persists_sanitized_ordered_trace():
+    database = f"agent_migration_episode_{uuid.uuid4().hex[:10]}"
+    service = EpisodeService()
+    try:
+        _create_database(database)
+        _migrate(database)
+        await init_pool()
+        await service.start()
+        keep = service.start_run(
+            run_id="run-episode-1",
+            message_id=101,
+            user_id="u1",
+            session_id=None,
+            intent="REFUND",
+            queue_name="agent.high",
+            force_keep=True,
+        )
+        with bind_episode(
+            "run-episode-1", message_id=101, user_id="u1", force_keep=keep
+        ):
+            service.mark_running()
+            service.record_step(
+                "TOOL_CALL",
+                tool_name="QUERY_ORDERS",
+                input_data={
+                    "userMessage": "手机号13812345678",
+                    "orderId": "ORDER2026080712345678",
+                },
+            )
+            service.finish_run("ok")
+        await asyncio.sleep(0.4)
+        await service.close()
+
+        with _database_connection(database) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT status,capture_level FROM agent_run WHERE run_id=%s",
+                ("run-episode-1",),
+            )
+            assert cursor.fetchone() == ("SUCCEEDED", "FULL")
+            cursor.execute(
+                "SELECT input_json FROM agent_step WHERE run_id=%s ORDER BY step_id",
+                ("run-episode-1",),
+            )
+            payload = cursor.fetchone()[0]
+            assert "13812345678" not in payload
+            assert "ORDER2026080712345678" not in payload
+    finally:
+        await service.close()
         await close_pool()
         get_settings.cache_clear()
         _drop_database(database)

@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     app_host: str = "0.0.0.0"
     app_port: int = 7050
+    app_version: str = "dev"
     # Worker 是独立进程，任务指标在 Worker 内更新；Prometheus 抓这个端口
     # （deploy/prometheus/prometheus.yml 已加 aishop-agent-worker job）。
     worker_metrics_port: int = 7051
@@ -50,6 +51,16 @@ class Settings(BaseSettings):
     otel_enabled: bool = False
     otel_service_name: str = "aishop-agent"
     otel_otlp_endpoint: str = ""
+    tempo_query_url: str = "http://localhost:3000/explore"
+
+    # Application-level Episode traces are independent of the OTLP exporter.
+    # They stay useful in local/test environments where distributed tracing is off.
+    episode_enabled: bool = True
+    episode_queue_size: int = 2_000
+    episode_batch_size: int = 100
+    episode_flush_interval_ms: int = 200
+    episode_success_sample_rate: float = 0.10
+    episode_retention_days: int = 30
     java_web_url: str = "http://localhost:8080"
     mcp_server_url: str = Field(
         default="http://127.0.0.1:7060",
@@ -293,6 +304,18 @@ class Settings(BaseSettings):
             raise ValueError("WORKER_METRICS_PORT must be between 1 and 65535")
         if self.worker_metrics_port == self.app_port:
             raise ValueError("WORKER_METRICS_PORT must differ from APP_PORT")
+        if self.episode_queue_size < 100:
+            raise ValueError("EPISODE_QUEUE_SIZE must be at least 100")
+        if not 1 <= self.episode_batch_size <= self.episode_queue_size:
+            raise ValueError(
+                "EPISODE_BATCH_SIZE must be between 1 and EPISODE_QUEUE_SIZE"
+            )
+        if self.episode_flush_interval_ms < 10:
+            raise ValueError("EPISODE_FLUSH_INTERVAL_MS must be at least 10")
+        if not 0 <= self.episode_success_sample_rate <= 1:
+            raise ValueError("EPISODE_SUCCESS_SAMPLE_RATE must be between 0 and 1")
+        if self.episode_retention_days < 1:
+            raise ValueError("EPISODE_RETENTION_DAYS must be positive")
         if self.rerank_timeout < 1:
             raise ValueError("RERANK_TIMEOUT must be positive")
         if self.rerank_top_n < 1:
