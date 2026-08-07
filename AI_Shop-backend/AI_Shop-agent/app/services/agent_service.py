@@ -295,6 +295,15 @@ class AgentOrchestrator:
                 episode_service.update_run(
                     run_id=run_id,
                     quality=verification.quality(),
+                    reward_signals={
+                        "verifier": {
+                            "passed": verification.passed,
+                            "action": verification.action,
+                            "issueCodes": [
+                                issue.code for issue in verification.issues
+                            ],
+                        }
+                    },
                 )
                 episode_service.record_step(
                     "RESPONSE_VERIFIER",

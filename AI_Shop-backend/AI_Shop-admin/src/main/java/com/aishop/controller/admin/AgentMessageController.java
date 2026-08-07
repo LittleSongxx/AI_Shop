@@ -170,6 +170,24 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 				"traceDetail", Map.of("runId", runId.trim())));
 	}
 
+	@PostMapping("/reviewEpisode")
+	public ResponseVO reviewEpisode(
+			String runId, String datasetEligible, String note, HttpServletRequest request) {
+		if (StringTools.isEmpty(runId)) {
+			throw new BusinessException("runId不能为空");
+		}
+		if (StringTools.isEmpty(datasetEligible)) {
+			throw new BusinessException("datasetEligible不能为空");
+		}
+		Map<String, Object> body = new HashMap<>();
+		body.put("runId", runId.trim());
+		body.put("datasetEligible", datasetEligible.trim());
+		putIfText(body, "note", note);
+		// Reviewer identity is always derived from the authenticated admin session.
+		body.put("reviewer", currentAdmin(request));
+		return getSuccessResponseVO(agentMessageService.callSupport("reviewEpisode", body));
+	}
+
 	private Map<String, Object> caseBody(String caseId, HttpServletRequest request) {
 		if (StringTools.isEmpty(caseId)) {
 			throw new BusinessException("caseId不能为空");
@@ -221,6 +239,15 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
 		return getSuccessResponseVO(agentMessageService.callSupport("regressionCases", body));
+	}
+
+	@PostMapping("/runRegressionCases")
+	public ResponseVO runRegressionCases(Long caseId) {
+		Map<String, Object> body = new HashMap<>();
+		if (caseId != null) {
+			body.put("caseId", caseId);
+		}
+		return getSuccessResponseVO(agentMessageService.callSupport("runRegressionCases", body));
 	}
 
 	private Map<String, Object> supportBody(String sessionId, HttpServletRequest request) {

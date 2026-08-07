@@ -17,6 +17,7 @@ from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
 from app.services.badcase_service import badcase_service
 from app.services.episode_query_service import episode_query_service
+from app.services.episode_review_service import episode_review_service
 from app.services.message_service import agent_message_service
 from app.services.order_selection_store import (
     OrderSelectionConflict,
@@ -28,6 +29,7 @@ from app.services.recommendation_attribution_service import (
     recommendation_attribution_service,
 )
 from app.services.redis_service import redis_service
+from app.services.regression_replay_service import regression_replay_service
 from app.services.shopping_profile_service import (
     ProfileRevisionConflict,
     shopping_profile_service,
@@ -456,6 +458,24 @@ async def admin_trace_detail(
     return success(data)
 
 
+@router.post("/admin/reviewEpisode")
+async def admin_review_episode(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    try:
+        data = await episode_review_service.review(
+            _required_text(body, "runId"),
+            _required_text(body, "datasetEligible"),
+            _required_text(body, "reviewer"),
+            note=str(body.get("note") or "").strip() or None,
+        )
+        return success(data)
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
 @router.post("/admin/supportCases")
 async def admin_support_cases(
     request: Request,
@@ -779,6 +799,22 @@ async def admin_regression_cases(
         str(body.get("status") or "").strip() or None,
     )
     return success(data)
+
+
+@router.post("/admin/runRegressionCases")
+async def admin_run_regression_cases(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await regression_replay_service.run_active(
+                _as_int(body.get("caseId"))
+            )
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
 
 
 def _required_text(body: dict, key: str) -> str:

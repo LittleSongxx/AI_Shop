@@ -22,6 +22,7 @@ from app.harness.metrics.runtime_sensors import (
     EPISODE_DROPPED_TOTAL,
     EPISODE_EVENT_TOTAL,
     EPISODE_QUEUE_DEPTH,
+    EPISODE_TERMINAL_TOTAL,
     EPISODE_WRITE_LATENCY,
 )
 from app.observability.telemetry import current_span_id, current_trace_id
@@ -137,6 +138,12 @@ def _text_fingerprint(value: object) -> dict[str, object]:
         "sha256": hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest(),
         "chars": len(text),
     }
+
+
+def text_fingerprint(value: object) -> dict[str, object]:
+    """Expose a safe text fact for Episode signals without retaining raw text."""
+
+    return _text_fingerprint(value)
 
 
 def sanitize_episode_payload(value: Any, *, key: str = "") -> Any:
@@ -429,6 +436,7 @@ class EpisodeService:
         context = current_episode()
         keep = bool(context.force_keep) if context and force_keep is None else bool(force_keep)
         terminal_status = status or self._status_for_outcome(outcome)
+        EPISODE_TERMINAL_TOTAL.labels(status=terminal_status).inc()
         self._enqueue(
             {
                 "op": "finish",

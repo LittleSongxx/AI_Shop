@@ -19,6 +19,7 @@ from app.db.migrations import (
 from app.db.pool import close_pool, init_pool
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.services.badcase_service import badcase_service
+from app.services.episode_review_service import episode_review_service
 from app.services.episode_service import EpisodeService, bind_episode
 from app.services.order_selection_store import (
     OrderSelectionConflict,
@@ -55,9 +56,14 @@ def test_current_schema_contract_includes_support_and_episode_training_gates():
         "resolution_summary",
         "resolved_at",
     }.issubset(_REQUIRED_COLUMNS["support_case"])
-    assert {"run_id", "dataset_eligible", "reward_signals_json"}.issubset(
-        _REQUIRED_COLUMNS["agent_run"]
-    )
+    assert {
+        "run_id",
+        "dataset_eligible",
+        "dataset_reviewed_by",
+        "dataset_reviewed_at",
+        "dataset_review_note",
+        "reward_signals_json",
+    }.issubset(_REQUIRED_COLUMNS["agent_run"])
     assert ("agent_pending_action", "idx_agent_pending_run") in _REQUIRED_INDEXES
     assert ("support_case", "uk_support_case_idempotency") in _REQUIRED_INDEXES
 
@@ -573,6 +579,65 @@ async def test_episode_writer_persists_sanitized_ordered_trace():
             assert quality["judge"]["groundedness"] == 0.9
     finally:
         await service.close()
+        await close_pool()
+        get_settings.cache_clear()
+        _drop_database(database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("RUN_AGENT_MIGRATION_TESTS") != "1",
+    reason="requires a real MySQL 8 server",
+)
+async def test_episode_dataset_approval_requires_confirmed_aftersales_facts():
+    database = f"agent_migration_review_{uuid.uuid4().hex[:10]}"
+    try:
+        _create_database(database)
+        _migrate(database)
+        with _database_connection(database) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO agent_run
+                    (run_id,user_id,status,scenario,quality_json,reward_signals_json,
+                     started_at,completed_at)
+                VALUES
+                    ('run-review-incomplete','u1','SUCCEEDED','ORDER_AFTERSALES',
+                     '{"verifierPassed":true}',
+                     '{"actionType":"CANCEL_ORDER","actionProposed":true,"userConfirmed":false}',
+                     NOW(3),NOW(3)),
+                    ('run-review-complete','u1','SUCCEEDED','ORDER_AFTERSALES',
+                     '{"verifierPassed":true}',JSON_OBJECT(),NOW(3),NOW(3))
+                """
+            )
+            cursor.execute(
+                """
+                INSERT INTO agent_pending_action
+                    (action_token,user_id,action_type,run_id,params_json,business_key,
+                     args_fingerprint,status,expires_at,created_at,updated_at)
+                VALUES
+                    ('act_review_complete','u1','CANCEL_ORDER','run-review-complete',
+                     '{"orderStatusBefore":0}','u1:CANCEL_ORDER:o1',
+                     REPEAT('a',64),'CONFIRMED',DATE_ADD(NOW(),INTERVAL 1 HOUR),NOW(),NOW())
+                """
+            )
+        await init_pool()
+
+        with pytest.raises(ValueError, match="AWAITING_CONFIRMATION"):
+            await episode_review_service.review(
+                "run-review-incomplete", "APPROVED", "admin"
+            )
+
+        approved = await episode_review_service.review(
+            "run-review-complete",
+            "APPROVED",
+            "admin",
+            note="confirmed domain outcome",
+        )
+        assert approved["datasetEligible"] == "APPROVED"
+        assert approved["datasetReviewedBy"] == "admin"
+        assert approved["episodeEvaluation"]["trainingEligible"] is True
+        assert approved["rewardSignals"]["remoteOutcomeKnown"] is True
+    finally:
         await close_pool()
         get_settings.cache_clear()
         _drop_database(database)

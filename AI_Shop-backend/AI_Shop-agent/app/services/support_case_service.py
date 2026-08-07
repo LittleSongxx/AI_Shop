@@ -10,7 +10,11 @@ import structlog
 from aiomysql import IntegrityError
 
 from app.db.pool import acquire
-from app.services.episode_service import current_episode, episode_service
+from app.services.episode_service import (
+    current_episode,
+    episode_service,
+    text_fingerprint,
+)
 from app.services.java_internal_client import java_internal_client
 from app.services.pending_action_service import pending_action_service
 
@@ -528,6 +532,9 @@ class SupportCaseService:
                 "humanResolutionCode": resolution_code.strip(),
                 "humanRootCause": root_cause.strip(),
                 "humanResolved": True,
+                "humanResolutionSummaryFingerprint": text_fingerprint(
+                    resolution_summary.strip()
+                ),
                 "supportSessionId": linked_session_id,
             },
         )

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.api.routes import agent
 from app.config.settings import get_settings
 from app.services.episode_query_service import episode_query_service
+from app.services.episode_review_service import episode_review_service
 
 
 def _app() -> FastAPI:
@@ -65,3 +66,32 @@ def test_trace_admin_list_and_detail_return_sanitized_episode(monkeypatch):
         outcome=None,
     )
     detail.assert_awaited_once_with("run-1")
+
+
+def test_episode_review_admin_api_forwards_internal_reviewer(monkeypatch):
+    review = AsyncMock(
+        return_value={"runId": "run-1", "datasetEligible": "APPROVED"}
+    )
+    monkeypatch.setattr(episode_review_service, "review", review)
+    headers = {"X-Internal-Token": get_settings().internal_token}
+
+    with TestClient(_app()) as client:
+        response = client.post(
+            "/api/agent/admin/reviewEpisode",
+            headers=headers,
+            json={
+                "runId": "run-1",
+                "datasetEligible": "APPROVED",
+                "reviewer": "admin-from-java-session",
+                "note": "完整售后终态",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["datasetEligible"] == "APPROVED"
+    review.assert_awaited_once_with(
+        "run-1",
+        "APPROVED",
+        "admin-from-java-session",
+        note="完整售后终态",
+    )

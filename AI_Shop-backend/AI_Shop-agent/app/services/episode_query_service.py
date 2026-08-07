@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 from app.config.settings import get_settings
 from app.db.pool import acquire
+from app.services.episode_evaluator import evaluate_order_aftersales_episode
 
 
 class EpisodeQueryService:
@@ -41,7 +42,8 @@ class EpisodeQueryService:
                 SELECT run_id,message_id,user_id,session_id,otel_trace_id,status,
                        outcome,scenario,intent,queue_name,model_name,input_tokens,
                        output_tokens,cost_cny,latency_ms,capture_level,
-                       dataset_eligible,started_at,completed_at
+                       dataset_eligible,dataset_reviewed_by,dataset_reviewed_at,
+                       dataset_review_note,started_at,completed_at
                 FROM agent_run
                 WHERE {where}
                 ORDER BY started_at DESC, run_id DESC
@@ -78,7 +80,7 @@ class EpisodeQueryService:
                 (run_id,),
             )
             steps = list(await cur.fetchall())
-        return {
+        public = {
             **self._public_run(run),
             "version": self._decode(run.get("version_json")),
             "experiment": self._decode(run.get("experiment_json")),
@@ -86,6 +88,8 @@ class EpisodeQueryService:
             "rewardSignals": self._decode(run.get("reward_signals_json")),
             "steps": [self._public_step(row) for row in steps],
         }
+        public["episodeEvaluation"] = evaluate_order_aftersales_episode(public)
+        return public
 
     @staticmethod
     def _public_run(row: dict) -> dict:
@@ -109,6 +113,11 @@ class EpisodeQueryService:
             "latencyMs": row.get("latency_ms"),
             "captureLevel": row.get("capture_level"),
             "datasetEligible": row.get("dataset_eligible"),
+            "datasetReviewedBy": row.get("dataset_reviewed_by"),
+            "datasetReviewedAt": EpisodeQueryService._format_time(
+                row.get("dataset_reviewed_at")
+            ),
+            "datasetReviewNote": row.get("dataset_review_note"),
             "startedAt": EpisodeQueryService._format_time(row.get("started_at")),
             "completedAt": EpisodeQueryService._format_time(row.get("completed_at")),
         }

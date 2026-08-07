@@ -499,7 +499,16 @@ async def finalize_agent_response(
         result="pass" if verification.passed else verification.action.lower(),
         rule=verification.issues[0].code if verification.issues else "NONE",
     ).inc()
-    episode_service.update_run(quality=verification.quality())
+    episode_service.update_run(
+        quality=verification.quality(),
+        reward_signals={
+            "verifier": {
+                "passed": verification.passed,
+                "action": verification.action,
+                "issueCodes": [issue.code for issue in verification.issues],
+            }
+        },
+    )
     episode_service.record_step(
         "RESPONSE_VERIFIER",
         node_name="finalize",

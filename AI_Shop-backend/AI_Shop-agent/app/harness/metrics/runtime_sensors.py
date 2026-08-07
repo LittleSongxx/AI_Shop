@@ -197,3 +197,24 @@ RESPONSE_VERIFIER_TOTAL = Counter(
     "Deterministic final-response verification outcomes",
     ["result", "rule"],
 )
+
+EPISODE_TERMINAL_TOTAL = Counter(
+    "agent_episode_terminal_total",
+    "Agent Episode terminal states",
+    ["status"],
+)
+BADCASE_CANDIDATE_TOTAL = Counter(
+    "agent_badcase_candidate_total",
+    "Badcase candidate signals received",
+    ["source", "severity"],
+)
+DATASET_REVIEW_TOTAL = Counter(
+    "agent_dataset_review_total",
+    "Human Episode dataset review decisions",
+    ["decision"],
+)
+REGRESSION_REPLAY_TOTAL = Counter(
+    "agent_regression_replay_total",
+    "Deterministic regression replay results",
+    ["result"],
+)

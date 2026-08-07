@@ -7,6 +7,10 @@ from datetime import datetime
 from typing import Any
 
 from app.db.pool import acquire
+from app.harness.metrics.runtime_sensors import (
+    BADCASE_CANDIDATE_TOTAL,
+    REGRESSION_REPLAY_TOTAL,
+)
 from app.services.episode_service import sanitize_episode_payload
 
 BADCASE_STATUSES = frozenset(
@@ -122,6 +126,7 @@ class BadcaseService:
             row = await cur.fetchone()
         if not row:
             raise RuntimeError("badcase candidate was not persisted")
+        BADCASE_CANDIDATE_TOTAL.labels(source=source, severity=severity).inc()
         return int(row["candidate_id"])
 
     async def detect_user_correction(
@@ -355,6 +360,7 @@ class BadcaseService:
             )
             if cur.rowcount != 1:
                 raise ValueError("回归 Case 不存在")
+        REGRESSION_REPLAY_TOTAL.labels(result=result).inc()
 
     async def _create_regression_case(
         self, cur, candidate: dict, regression: dict, reviewer: str

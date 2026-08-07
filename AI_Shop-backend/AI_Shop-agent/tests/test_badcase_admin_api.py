@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.api.routes import agent
 from app.config.settings import get_settings
 from app.services.badcase_service import badcase_service
+from app.services.regression_replay_service import regression_replay_service
 
 
 def _app() -> FastAPI:
@@ -80,3 +81,22 @@ def test_regression_case_list_route(monkeypatch):
     assert response.status_code == 200
     assert response.json()["data"]["list"][0]["caseId"] == 9
     cases.assert_awaited_once_with(2, 20, "ACTIVE")
+
+
+def test_regression_replay_route_runs_one_active_case(monkeypatch):
+    replay = AsyncMock(
+        return_value={"total": 1, "passed": 1, "failed": 0, "errors": 0}
+    )
+    monkeypatch.setattr(regression_replay_service, "run_active", replay)
+    headers = {"X-Internal-Token": get_settings().internal_token}
+
+    with TestClient(_app()) as client:
+        response = client.post(
+            "/api/agent/admin/runRegressionCases",
+            headers=headers,
+            json={"caseId": 9},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["passed"] == 1
+    replay.assert_awaited_once_with(9)

@@ -63,6 +63,28 @@ cd AI_Shop-backend/AI_Shop-agent
 `tests/test_convo_eval_frozen.py` 在 `pytest` 里跑同一套逻辑，
 所以数据集漂移、指标退步、已知失败被悄悄改标签，都会在普通测试里就炸。
 
+## 订单售后 Episode 评测
+
+`order_aftersales_episode_v1.jsonl` 和对应 lock 冻结了取消订单、未知远端结果、
+工单待处理/人工解决、Verifier 失败与人工审核资格等事实轨迹。它只判断轨迹事实是否
+完整以及是否经过人工批准，不合成单一 Reward，也不导出训练集：
+
+```bash
+.venv/bin/python benchmarks/run_episode_eval.py
+```
+
+人工审核生成的 ACTIVE Badcase 回归 Case 可通过以下命令重放；文本 Case 禁用 LLM，
+Episode Case 复用同一个确定性 evaluator：
+
+```bash
+.venv/bin/python scripts/run_badcase_replay.py
+```
+
+端到端 WebSocket 性能门禁使用 `scripts/agent_performance_gate.py`。确定性模式默认
+100 请求、并发 10；Live 模式默认 20 请求、并发 2。两者都要求至少提供与并发数相同
+的测试用户 token，以遵守每用户每秒限流；确定性模式还需通过 `INTERNAL_TOKEN`
+读取脱敏 Episode Trace，从而计算 queue wait。
+
 ## 门禁怎么判
 
 runner 拿本次结果和 lock 里的基线比，两个方向都算失败：

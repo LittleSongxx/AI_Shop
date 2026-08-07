@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 
 import structlog
@@ -78,6 +79,27 @@ class McpToolRouter:
                     ),
                     error_message=str(error) if error else None,
                     latency_ms=elapsed_ms,
+                )
+                signal_key = hashlib.sha256(
+                    f"{tool_name}:{call_id or time.time_ns()}".encode("utf-8")
+                ).hexdigest()[:16]
+                episode_service.update_run(
+                    reward_signals={
+                        "toolResults": {
+                            signal_key: {
+                                "toolName": tool_name,
+                                "success": bool(result and result.success),
+                                "errorCode": (
+                                    result.error_code
+                                    if result
+                                    else type(error).__name__ if error else "UNHANDLED_ERROR"
+                                ),
+                                "bizType": result.biz_type if result else None,
+                                "hasCards": bool(result and result.assistant_cards),
+                                "hasSourceRefs": bool(result and result.source_refs),
+                            }
+                        }
+                    }
                 )
                 if (result is not None and not result.success) or error is not None:
                     context = current_episode()

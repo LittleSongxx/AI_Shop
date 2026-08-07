@@ -5,8 +5,11 @@
         <div class="filter-row">
           <el-select v-model="traceFilters.status" clearable placeholder="运行状态" class="filter-control">
             <el-option label="运行中" value="RUNNING" />
-            <el-option label="完成" value="COMPLETED" />
+            <el-option label="成功" value="SUCCEEDED" />
             <el-option label="失败" value="FAILED" />
+            <el-option label="已降级" value="DEGRADED" />
+            <el-option label="转人工" value="HANDOFF" />
+            <el-option label="已取消" value="CANCELLED" />
           </el-select>
           <el-input v-model="traceFilters.intent" clearable placeholder="意图" class="filter-control" />
           <el-input v-model="traceFilters.userId" clearable placeholder="用户 ID" class="filter-control" />
@@ -87,10 +90,21 @@
           <div><span>Trace ID</span><b>{{ traceDrawer.detail.traceId || '—' }}</b></div>
           <div><span>终态</span><b>{{ traceDrawer.detail.outcome || traceDrawer.detail.status || '—' }}</b></div>
           <div><span>模型 / Token</span><b>{{ traceDrawer.detail.modelName || '—' }} · {{ tokenTotal(traceDrawer.detail) }}</b></div>
+          <div><span>数据审核</span><b>{{ traceDrawer.detail.datasetEligible || 'UNREVIEWED' }} · {{ traceDrawer.detail.datasetReviewedBy || '未审核' }}</b></div>
+          <div><span>训练资格判定</span><b>{{ traceDrawer.detail.episodeEvaluation?.verdict || '—' }}</b></div>
         </div>
         <div class="drawer-actions top-actions">
           <a v-if="traceDrawer.detail.tempoTraceUrl" :href="traceDrawer.detail.tempoTraceUrl" target="_blank" rel="noopener noreferrer" class="tempo-link">在 Tempo 查看</a>
         </div>
+        <section class="episode-review">
+          <div class="review-heading"><h3>人工数据审核</h3><el-tag :type="traceDrawer.detail.episodeEvaluation?.reviewEligible ? 'success' : 'warning'">{{ traceDrawer.detail.episodeEvaluation?.reviewEligible ? '事实完整' : '暂不可批准' }}</el-tag></div>
+          <p>{{ traceDrawer.detail.episodeEvaluation?.verdict || '尚无资格判定' }}<template v-if="traceDrawer.detail.datasetReviewedAt"> · {{ traceDrawer.detail.datasetReviewedAt }}</template></p>
+          <el-input v-model="episodeReviewNote" type="textarea" :rows="2" maxlength="1000" placeholder="审核备注" />
+          <div class="drawer-actions">
+            <el-button :loading="episodeReviewing" type="danger" plain @click="reviewEpisode('REJECTED')">拒绝</el-button>
+            <el-button :loading="episodeReviewing" type="success" :disabled="!traceDrawer.detail.episodeEvaluation?.reviewEligible" @click="reviewEpisode('APPROVED')">批准为训练候选</el-button>
+          </div>
+        </section>
         <section class="quality-json"><h3>质量与事实 Reward Signals</h3><pre>{{ pretty({ quality: traceDrawer.detail.quality, rewardSignals: traceDrawer.detail.rewardSignals, experiment: traceDrawer.detail.experiment }) }}</pre></section>
         <section class="waterfall">
           <article v-for="(step, index) in traceDrawer.detail.steps || []" :key="step.stepId || index" class="trace-step">
@@ -126,12 +140,14 @@
     </el-drawer>
 
     <el-drawer v-model="regressionDrawer.show" title="回归 Case" :size="drawerSize">
+      <div class="drawer-actions regression-actions"><el-button type="primary" :icon="VideoPlay" :loading="regressionDrawer.running" @click="runRegressions()">运行全部 ACTIVE Case</el-button></div>
       <el-table :data="regressionDrawer.page.list" v-loading="regressionDrawer.loading" stripe>
         <el-table-column label="ID" prop="caseId" width="70" />
         <el-table-column label="名称" prop="name" min-width="180" />
         <el-table-column label="场景" prop="scenario" min-width="120" />
         <el-table-column label="状态" prop="status" width="95" />
         <el-table-column label="最近结果" width="105"><template #default="{ row }"><el-tag :type="row.lastResult === 'PASS' ? 'success' : row.lastResult === 'FAIL' ? 'danger' : 'info'">{{ row.lastResult || '未运行' }}</el-tag></template></el-table-column>
+        <el-table-column label="操作" width="85" fixed="right"><template #default="{ row }"><el-button link type="primary" :icon="VideoPlay" :loading="regressionDrawer.runningCaseId === row.caseId" @click="runRegressions(row.caseId)">运行</el-button></template></el-table-column>
       </el-table>
     </el-drawer>
 
@@ -164,6 +180,7 @@
 <script setup>
 import { computed, defineComponent, getCurrentInstance, h, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElPagination } from 'element-plus'
+import { VideoPlay } from '@element-plus/icons-vue'
 
 const { proxy } = getCurrentInstance()
 const activeTab = ref('trace')
@@ -191,6 +208,8 @@ const traceFilters = reactive({ status: '', intent: '', userId: '', outcome: '' 
 const tracePage = ref(emptyPage())
 const traceLoading = ref(false)
 const traceDrawer = reactive({ show: false, detail: null })
+const episodeReviewing = ref(false)
+const episodeReviewNote = ref('')
 const loadTraces = async (pageNo = 1) => {
   traceLoading.value = true
   try { tracePage.value = normalizePage(await request(proxy.Api.agentTraceRuns, { ...traceFilters, pageNo, pageSize: 20 })) } finally { traceLoading.value = false }
@@ -199,7 +218,19 @@ const openTrace = async (row) => {
   const detail = await request(proxy.Api.agentTraceDetail, { runId: row.runId })
   if (!detail) return
   traceDrawer.detail = detail
+  episodeReviewNote.value = detail.datasetReviewNote || ''
   traceDrawer.show = true
+}
+const reviewEpisode = async (datasetEligible) => {
+  episodeReviewing.value = true
+  try {
+    const detail = await request(proxy.Api.agentReviewEpisode, { runId: traceDrawer.detail.runId, datasetEligible, note: episodeReviewNote.value })
+    if (!detail) return
+    traceDrawer.detail = detail
+    episodeReviewNote.value = detail.datasetReviewNote || ''
+    ElMessage.success(datasetEligible === 'APPROVED' ? 'Episode 已批准为训练候选' : 'Episode 已拒绝')
+    await loadTraces(tracePage.value.pageNo)
+  } finally { episodeReviewing.value = false }
 }
 
 const badcaseStatuses = ['NEW', 'TRIAGED', 'LABELED', 'FIXING', 'REGRESSION_ADDED', 'VERIFIED', 'CLOSED', 'IGNORED', 'NOT_A_BUG']
@@ -217,7 +248,7 @@ const loadBadcases = async (pageNo = 1) => {
 }
 const openBadcase = (row) => {
   badcaseDrawer.row = row
-  Object.assign(badcaseReview, { status: (badcaseTransitions[row.status] || [])[0] || '', labels: (row.labels || []).join(', '), owner: row.owner || '', fixVersion: row.fixVersion || '', remark: row.reviewRemark || '', regressionName: '', regressionScenario: row.intent || '', regressionInput: JSON.stringify({ messageId: row.messageId, userMessage: row.userMessage }, null, 2), regressionExpected: JSON.stringify({ verifier: 'PASS' }, null, 2) })
+  Object.assign(badcaseReview, { status: (badcaseTransitions[row.status] || [])[0] || '', labels: (row.labels || []).join(', '), owner: row.owner || '', fixVersion: row.fixVersion || '', remark: row.reviewRemark || '', regressionName: '', regressionScenario: row.intent || '', regressionInput: JSON.stringify({ messageId: row.messageId, userMessage: row.userMessage }, null, 2), regressionExpected: JSON.stringify({ intent: row.intent || 'REPLACE_WITH_EXPECTED_INTENT' }, null, 2) })
   badcaseDrawer.show = true
 }
 const parseJson = (value, label) => { try { const parsed = JSON.parse(value); if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error(); return parsed } catch { throw new Error(`${label}必须是 JSON 对象`) } }
@@ -241,10 +272,24 @@ const reviewBadcase = async () => {
     await loadBadcases(badcasePage.value.pageNo)
   } finally { badcaseReviewing.value = false }
 }
-const regressionDrawer = reactive({ show: false, loading: false, page: emptyPage() })
+const regressionDrawer = reactive({ show: false, loading: false, running: false, runningCaseId: null, page: emptyPage() })
 const openRegressions = async () => {
   regressionDrawer.show = true; regressionDrawer.loading = true
   try { regressionDrawer.page = normalizePage(await request(proxy.Api.agentRegressionCases, { pageNo: 1, pageSize: 50, status: '' })) } finally { regressionDrawer.loading = false }
+}
+const runRegressions = async (caseId) => {
+  regressionDrawer.running = !caseId
+  regressionDrawer.runningCaseId = caseId || null
+  try {
+    const result = await request(proxy.Api.agentRunRegressionCases, caseId ? { caseId } : {})
+    if (!result) return
+    if (result.failed || result.errors) ElMessage.warning(`回归完成：${result.passed} 通过，${result.failed} 失败，${result.errors} 异常`)
+    else ElMessage.success(`回归完成：${result.passed} 个 Case 全部通过`)
+    await openRegressions()
+  } finally {
+    regressionDrawer.running = false
+    regressionDrawer.runningCaseId = null
+  }
 }
 
 const supportFilters = reactive({ status: '', userId: '' })
@@ -286,7 +331,7 @@ const onTabChange = (name) => { if (name === 'trace' && !tracePage.value.list.le
 const pretty = (value) => JSON.stringify(value || {}, null, 2)
 const tokenTotal = (row) => Number(row?.inputTokens || 0) + Number(row?.outputTokens || 0)
 const formatDuration = (value) => value == null ? '—' : Number(value) >= 1000 ? `${(Number(value) / 1000).toFixed(2)}s` : `${Number(value)}ms`
-const runStatusType = (value) => value === 'FAILED' ? 'danger' : value === 'COMPLETED' ? 'success' : 'warning'
+const runStatusType = (value) => value === 'FAILED' ? 'danger' : value === 'SUCCEEDED' ? 'success' : ['DEGRADED', 'HANDOFF'].includes(value) ? 'warning' : 'info'
 const datasetType = (value) => value === 'APPROVED' ? 'success' : value === 'REJECTED' ? 'danger' : 'info'
 const badcaseStatusType = (value) => ['CLOSED', 'VERIFIED'].includes(value) ? 'success' : ['IGNORED', 'NOT_A_BUG'].includes(value) ? 'info' : value === 'NEW' ? 'danger' : 'warning'
 const terminalBadcase = (value) => ['CLOSED', 'IGNORED', 'NOT_A_BUG'].includes(value)
@@ -312,6 +357,11 @@ onMounted(loadTraces)
 .detail-summary b { overflow-wrap: anywhere; color: var(--text); font-size: 13px; }
 .top-actions { margin: 12px 0; }
 .tempo-link { color: var(--primary); font-size: 13px; text-decoration: none; }
+.episode-review { margin: 14px 0; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.review-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.review-heading h3 { margin: 0; font-size: 14px; }
+.episode-review > p { margin: 0 0 10px; color: var(--text2); font-size: 12px; }
+.regression-actions { margin: 0 0 12px; }
 .quality-json h3, .waterfall h3 { margin: 16px 0 8px; font-size: 14px; }
 pre { max-width: 100%; margin: 8px 0 0; padding: 10px; overflow: auto; border-radius: 6px; background: #f5f7f8; color: #263238; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .waterfall { margin-top: 16px; }

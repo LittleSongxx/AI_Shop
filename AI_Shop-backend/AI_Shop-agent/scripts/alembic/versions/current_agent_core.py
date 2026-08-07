@@ -66,6 +66,9 @@ def upgrade() -> None:
             reward_signals_json    json NULL,
             capture_level          varchar(16) NOT NULL DEFAULT 'FULL',
             dataset_eligible       varchar(16) NOT NULL DEFAULT 'UNREVIEWED',
+            dataset_reviewed_by    varchar(100) NULL,
+            dataset_reviewed_at    datetime(3) NULL,
+            dataset_review_note    varchar(1000) NULL,
             started_at             datetime(3) NOT NULL,
             completed_at           datetime(3) NULL,
             created_at             datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -622,6 +625,9 @@ def _reconcile_episode_tables() -> None:
             "reward_signals_json": "json NULL",
             "capture_level": "varchar(16) NOT NULL DEFAULT 'FULL'",
             "dataset_eligible": "varchar(16) NOT NULL DEFAULT 'UNREVIEWED'",
+            "dataset_reviewed_by": "varchar(100) NULL",
+            "dataset_reviewed_at": "datetime(3) NULL",
+            "dataset_review_note": "varchar(1000) NULL",
             "started_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
             "completed_at": "datetime(3) NULL",
             "created_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
@@ -665,6 +671,16 @@ def _reconcile_episode_tables() -> None:
     )
     op.execute(
         "ALTER TABLE agent_run MODIFY COLUMN user_id varchar(32) NOT NULL"
+    )
+    op.execute(
+        "UPDATE agent_run SET dataset_eligible='UNREVIEWED', "
+        "dataset_reviewed_by=NULL, dataset_reviewed_at=NULL, dataset_review_note=NULL "
+        "WHERE dataset_eligible IS NULL OR dataset_eligible NOT IN "
+        "('UNREVIEWED','APPROVED','REJECTED')"
+    )
+    op.execute(
+        "ALTER TABLE agent_run MODIFY COLUMN dataset_eligible varchar(16) "
+        "NOT NULL DEFAULT 'UNREVIEWED'"
     )
     op.execute(
         "UPDATE agent_step SET run_id=CONCAT('legacy-step-', step_id) "

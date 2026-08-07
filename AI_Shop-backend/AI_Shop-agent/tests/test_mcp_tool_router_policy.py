@@ -107,3 +107,41 @@ async def test_read_tool_leaves_no_audit_log(sent_to_mcp):
         await mcp_tool_router.invoke("QUERY_ORDERS", {"orderId": "O1"}, "u1")
 
     assert [e for e in logs if e["event"] == "write_tool_invoked"] == []
+
+
+async def test_tool_result_records_factual_episode_reward_signal(monkeypatch):
+    async def fake_call_tool(name, args):
+        assert name == "QUERY_ORDERS"
+        return ToolInvokeResult(
+            content="订单查询完成",
+            biz_type="query_order",
+            assistant_cards='[{"orderId":"O1"}]',
+            source_refs=[{"type": "ORDER", "id": "O1"}],
+        )
+
+    updates: list[dict] = []
+    monkeypatch.setattr(router_module.mcp_streamable_client, "call_tool", fake_call_tool)
+    monkeypatch.setattr(
+        router_module.episode_service,
+        "update_run",
+        lambda **kwargs: updates.append(kwargs),
+    )
+
+    await mcp_tool_router.invoke(
+        "QUERY_ORDERS",
+        {"orderId": "O1"},
+        "u1",
+        call_id="call-order-1",
+    )
+
+    assert len(updates) == 1
+    tool_results = updates[0]["reward_signals"]["toolResults"]
+    assert len(tool_results) == 1
+    assert next(iter(tool_results.values())) == {
+        "toolName": "QUERY_ORDERS",
+        "success": True,
+        "errorCode": None,
+        "bizType": "query_order",
+        "hasCards": True,
+        "hasSourceRefs": True,
+    }
