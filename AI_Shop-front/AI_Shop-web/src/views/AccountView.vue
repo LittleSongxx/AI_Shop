@@ -212,7 +212,9 @@ import {
   Wallet,
   Box,
   Van,
-  Star
+  Star,
+  User,
+  Tickets
 } from '@element-plus/icons-vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import MemberSummaryCard from '@/components/account/MemberSummaryCard.vue';
@@ -354,7 +356,9 @@ const menus = [
   { label: '收藏', path: '/wishlist', icon: Star },
   { label: '足迹', path: '/footprint', icon: Box },
   { label: '签到中心', path: '/sign', icon: Present },
-  { label: '智能客服', path: '/ai-assistant', icon: ChatDotRound }
+  { label: '智能客服', path: '/ai-assistant', icon: ChatDotRound },
+  { label: '购物偏好', path: '/shopping-profile', icon: User },
+  { label: '我的工单', path: '/support-cases', icon: Tickets }
 ];
 
 const loadMember = async () => {

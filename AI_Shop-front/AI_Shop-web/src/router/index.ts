@@ -111,6 +111,8 @@ const router = createRouter({
     subPage('/pay-records', () => import('@/views/PayRecordView.vue'), { title: '支付记录', requiresAuth: true }),
     subPage('/notifications', () => import('@/views/NotificationView.vue'), { title: '消息中心', requiresAuth: true }),
     subPage('/after-sale', () => import('@/views/AfterSaleView.vue'), { title: '售后管理' }),
+    subPage('/shopping-profile', () => import('@/views/ShoppingProfileView.vue'), { title: '购物偏好', requiresAuth: true }),
+    subPage('/support-cases', () => import('@/views/SupportCasesView.vue'), { title: '我的工单', requiresAuth: true }),
     subPage('/recommend', () => import('@/views/RecommendView.vue'), { title: '编辑精选' }),
     subPage('/login', () => import('@/views/LoginView.vue'), {
       title: '登录',

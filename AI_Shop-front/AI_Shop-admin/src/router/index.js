@@ -14,6 +14,7 @@ const DESKTOP_TO_MOBILE = {
   '/user/userList': '/m/user',
   '/user/address': '/m/more/address',
   '/setting/agentMessage': '/m/more/agent',
+  '/setting/agentQuality': '/m/more/agentQuality',
   '/discountCoupon': '/m/more/coupon',
   '/marketing/searchHot': '/m/more/searchHot',
   '/data/statistics': '/m/more/statistics',
@@ -62,6 +63,7 @@ const router = createRouter({
         { path: 'user', component: () => import('@/views/mobile/MobileUserList.vue'), meta: { title: '用户管理', tab: '/m/user' } },
         { path: 'more', component: () => import('@/views/mobile/MobileMore.vue'), meta: { title: '更多', tab: '/m/more' } },
         { path: 'more/agent', component: () => import('@/views/mobile/MobileAgentMessage.vue'), meta: { title: '客服记录', tab: '/m/more', showBack: true } },
+        { path: 'more/agentQuality', component: () => import('@/views/setting/AgentQualityCenter.vue'), meta: { title: 'Agent 质量中心', tab: '/m/more', showBack: true } },
         { path: 'more/coupon', component: () => import('@/views/mobile/MobileCoupon.vue'), meta: { title: '优惠券', tab: '/m/more', showBack: true } },
         { path: 'more/searchHot', component: () => import('@/views/mobile/MobileSearchHot.vue'), meta: { title: '热搜词', tab: '/m/more', showBack: true } },
         { path: 'more/statistics', component: () => import('@/views/mobile/MobileStatistics.vue'), meta: { title: '统计明细', tab: '/m/more', showBack: true } },
@@ -274,6 +276,14 @@ const router = createRouter({
           component: () => import('@/views/setting/AgentMessageList.vue'),
           meta: {
             itemList: ["系统设置", "客服对话记录"]
+          }
+        },
+        {
+          path: '/setting/agentQuality',
+          name: 'Agent质量中心',
+          component: () => import('@/views/setting/AgentQualityCenter.vue'),
+          meta: {
+            itemList: ["系统设置", "Agent质量中心"]
           }
         },
         {

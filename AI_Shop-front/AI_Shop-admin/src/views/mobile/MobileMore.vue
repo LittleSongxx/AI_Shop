@@ -43,7 +43,8 @@ const groups = [
       { label: '评价管理', icon: 'commend', path: '/m/order/comment' },
       { label: '举报管理', icon: 'commend', path: '/m/order/report' },
       { label: '图片违规复核', icon: 'search', path: '/m/more/imageModeration' },
-      { label: '客服记录', icon: 'robot', path: '/m/more/agent' }
+      { label: '客服记录', icon: 'robot', path: '/m/more/agent' },
+      { label: 'Agent质量', icon: 'setting', path: '/m/more/agentQuality' }
     ]
   },
   {

@@ -32,6 +32,7 @@
           :data="item"
           :waiting="Number(item.status) === 1 && streamWaiting && item === currentMessage"
           @select-order="onSelectOrder"
+          @compare-products="onCompareProducts"
         />
       </div>
     </div>
@@ -207,6 +208,15 @@ const onSelectOrder = async (payload: unknown) => {
     data.done?.(false);
     toast.error(error?.info || error?.message || '订单候选处理失败，请重试');
   }
+};
+
+const onCompareProducts = (productIds: string[]) => {
+  const ids = [...new Set((productIds || []).map((id) => String(id).trim()).filter(Boolean))];
+  if (ids.length < 2 || ids.length > 4) {
+    toast.error('请选择 2 到 4 个商品进行比较');
+    return;
+  }
+  mitter.emit('compareProducts', { productIds: ids });
 };
 
 const onCancelMessage = async (payload?: unknown) => {

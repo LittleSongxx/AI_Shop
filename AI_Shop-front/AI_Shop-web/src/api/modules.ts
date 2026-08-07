@@ -167,8 +167,34 @@ const reportAgentProductClick = async (
 
 export const agentApi = {
   loadHistoryMessage: (params: Record<string, unknown>) => request.postForm('/agent/loadHistoryMessage', params),
-  sendMessage: (message: string, fromProduct?: boolean, consultProductId?: string) =>
-    request.postForm('/agent/sendMessage', { message, fromProduct, consultProductId }),
+  sendMessage: (
+    message: string,
+    fromProduct?: boolean,
+    consultProductId?: string,
+    options?: {
+      imagePath?: string;
+      imageModerationId?: number;
+      comparisonProductIds?: string[];
+    }
+  ) =>
+    request.postForm('/agent/sendMessage', {
+      message,
+      fromProduct,
+      consultProductId,
+      imagePath: options?.imagePath,
+      imageModerationId: options?.imageModerationId,
+      comparisonProductIds: options?.comparisonProductIds?.length
+        ? JSON.stringify(options.comparisonProductIds)
+        : undefined
+    }),
+  getShoppingProfile: () => request.get<ShoppingProfile>('/agent/shoppingProfile'),
+  updateShoppingProfile: (expectedRevision: number, profile: Partial<ShoppingProfile>) =>
+    request.post<ShoppingProfile>('/agent/shoppingProfile/update', { expectedRevision, profile }),
+  clearShoppingProfile: (expectedRevision: number) =>
+    request.post<ShoppingProfile>('/agent/shoppingProfile/clear', { expectedRevision }),
+  listSupportCases: (limit = 20) => request.get<SupportCase[]>('/agent/supportCases', { params: { limit } }),
+  getSupportCase: (caseId: string) =>
+    request.get<SupportCase>('/agent/supportCaseDetail', { params: { caseId } }),
   selectOrderCandidate: (selectionId: string, targetType: 'ORDER' | 'ORDER_ITEM', targetId: string) =>
     request.postForm('/agent/selectOrderCandidate', { selectionId, targetType, targetId }),
   cancelMessage: (messageId: number, assistantMessage?: string) =>
@@ -245,6 +271,9 @@ export const payTradeApi = {
 export interface ImageUploadResult {
   path: string;
   pendingReview?: boolean;
+  moderationId?: number;
+  moderationStatus?: string;
+  scene?: string;
 }
 
 export interface ImageUploadOptions {
@@ -256,7 +285,7 @@ export const fileApi = {
   uploadImage: async (
     file: Blob,
     createThumbnail = true,
-    scene?: 'avatar' | 'comment',
+    scene?: 'avatar' | 'comment' | 'support',
     orderId?: string,
     options?: ImageUploadOptions
   ): Promise<ImageUploadResult> => {
@@ -296,6 +325,66 @@ export const fileApi = {
       typeof data === 'object' && data !== null && 'pendingReview' in data
         ? !!(data as { pendingReview?: boolean }).pendingReview
         : false;
-    return { path, pendingReview };
+    const moderationId =
+      typeof data === 'object' && data !== null && (data as { moderationId?: unknown }).moderationId != null
+        ? Number((data as { moderationId?: unknown }).moderationId)
+        : undefined;
+    const moderationStatus =
+      typeof data === 'object' && data !== null && (data as { moderationStatus?: unknown }).moderationStatus
+        ? String((data as { moderationStatus?: unknown }).moderationStatus)
+        : undefined;
+    const sceneValue =
+      typeof data === 'object' && data !== null && (data as { scene?: unknown }).scene
+        ? String((data as { scene?: unknown }).scene)
+        : undefined;
+    return {
+      path,
+      pendingReview,
+      moderationId: Number.isFinite(moderationId) ? moderationId : undefined,
+      moderationStatus,
+      scene: sceneValue
+    };
   }
 };
+
+export interface ShoppingProfile {
+  version?: number;
+  revision: number;
+  category?: string | null;
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  brands: string[];
+  excludedBrands: string[];
+  scenarios: string[];
+  features: string[];
+  acceptSubstitute?: boolean | null;
+  fieldMeta?: Record<string, unknown>;
+}
+
+export interface SupportCase {
+  caseId: string | number;
+  caseNo?: string;
+  userId?: string;
+  orderId?: string;
+  orderItemId?: string;
+  category?: string;
+  categoryLabel?: string;
+  status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED' | string;
+  description?: string;
+  evidence?: {
+    path?: string;
+    moderationId?: number;
+    moderationStatus?: string;
+    scene?: string;
+    vlmStatus?: string;
+    vlmDescription?: string;
+  };
+  supportSessionId?: string;
+  assignedAdmin?: string;
+  resolutionCode?: string;
+  rootCause?: string;
+  resolutionSummary?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  resolvedAt?: string;
+}

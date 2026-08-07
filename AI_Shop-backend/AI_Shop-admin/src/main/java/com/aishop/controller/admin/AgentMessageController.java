@@ -9,6 +9,7 @@ import com.aishop.biz.AgentMessageService;
 import com.aishop.component.RedisComponent;
 import com.aishop.exception.BusinessException;
 import com.aishop.utils.AuthCookieHelper;
+import com.aishop.utils.JsonUtils;
 import com.aishop.utils.StringTools;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -194,6 +195,10 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 			String status,
 			String faqAnswer,
 			String remark,
+			String labels,
+			String owner,
+			String fixVersion,
+			String regression,
 			HttpServletRequest request) {
 		if (candidateId == null) {
 			throw new BusinessException("candidateId不能为空");
@@ -203,8 +208,19 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 		body.put("status", status);
 		body.put("faqAnswer", faqAnswer);
 		body.put("remark", remark);
+		putJsonIfPresent(body, "labels", labels, java.util.List.class);
+		putIfText(body, "owner", owner);
+		putIfText(body, "fixVersion", fixVersion);
+		putJsonIfPresent(body, "regression", regression, Map.class);
 		body.put("reviewer", currentAdmin(request));
 		return getSuccessResponseVO(agentMessageService.callSupport("reviewBadcase", body));
+	}
+
+	@PostMapping("/regressionCases")
+	public ResponseVO regressionCases(Integer pageNo, Integer pageSize, String status) {
+		Map<String, Object> body = page(pageNo, pageSize);
+		putIfText(body, "status", status);
+		return getSuccessResponseVO(agentMessageService.callSupport("regressionCases", body));
 	}
 
 	private Map<String, Object> supportBody(String sessionId, HttpServletRequest request) {
@@ -240,6 +256,22 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	private void putIfText(Map<String, Object> body, String key, String value) {
 		if (!StringTools.isEmpty(value)) {
 			body.put(key, value.trim());
+		}
+	}
+
+	private void putJsonIfPresent(
+			Map<String, Object> body, String key, String value, Class<?> expectedType) {
+		if (StringTools.isEmpty(value)) {
+			return;
+		}
+		try {
+			Object parsed = JsonUtils.parse(value.trim());
+			if (!expectedType.isInstance(parsed)) {
+				throw new BusinessException(key + "格式无效");
+			}
+			body.put(key, parsed);
+		} catch (IllegalStateException e) {
+			throw new BusinessException(key + "格式无效");
 		}
 	}
 }

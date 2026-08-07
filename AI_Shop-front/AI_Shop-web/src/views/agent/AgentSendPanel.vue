@@ -71,6 +71,33 @@
     </section>
 
     <footer class="chat-input-bar ignore">
+      <input
+        ref="imageInputRef"
+        class="image-input"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        @change="onImageSelected"
+      />
+      <div v-if="imageAttachment" class="attachment-strip">
+        <img :src="imageAttachment.previewUrl" alt="售后图片预览" class="attachment-preview" />
+        <div class="attachment-meta">
+          <span>{{ imageAttachment.statusText }}</span>
+          <small v-if="imageAttachment.moderationStatus">审核：{{ imageAttachment.moderationStatus }}</small>
+        </div>
+        <button type="button" class="attachment-remove" aria-label="删除图片" @click="removeAttachment">删除</button>
+      </div>
+      <div class="input-leading">
+        <button
+          type="button"
+          class="image-attach-btn"
+          aria-label="添加售后图片"
+          title="添加售后图片"
+          :disabled="answering || uploadingImage"
+          @click="openImagePicker"
+        >
+          {{ uploadingImage ? '上传中' : '图片' }}
+        </button>
+      </div>
       <textarea
         ref="textareaRef"
         v-model="input"
@@ -102,7 +129,7 @@
         type="button"
         class="btn-send btn-send-native"
         aria-label="发送消息"
-        :disabled="!input.trim()"
+        :disabled="!canSubmitMessage"
         @click="sendMessage"
       >
         发送
@@ -118,7 +145,7 @@ import { inject, nextTick, onMounted, onUnmounted, ref, watch, computed } from '
 import { useRoute, useRouter } from 'vue-router';
 import { agentComposerEmbeddedKey } from '@/composables/agentEmbed';
 import { useDevice } from '@/composables/useDevice';
-import { agentApi } from '@/api/modules';
+import { agentApi, fileApi, type ImageUploadResult } from '@/api/modules';
 import LiquidGlassSurface from '@/components/common/LiquidGlassSurface.vue';
 import AgentConsultProductCard from '@/components/agent/AgentConsultProductCard.vue';
 import { AGENT_OUTPUT_TYPE } from '@/constants/backendEnums';
@@ -136,6 +163,7 @@ import { mitter } from '@/utils/eventBus';
 import { lockViewportAfterInput, recoverIosViewportZoom } from '@/utils/mobileViewport';
 import { toast } from '@/utils/toast';
 import { showTopAlert } from '@/utils/topAlert';
+import { resolveImageUrl } from '@/utils/image';
 
 const TIP_POOL = [
   '帮我推荐热销商品',
@@ -260,10 +288,28 @@ const resolveConsultProductId = (): string | undefined => {
 
 const composerRef = ref<HTMLElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const imageInputRef = ref<HTMLInputElement | null>(null);
 const input = ref('');
 const TEXTAREA_MAX_HEIGHT = 96;
 const answering = ref(false);
 const messageId = ref<number | null>(null);
+
+type ImageAttachment = ImageUploadResult & { previewUrl: string; statusText: string };
+const imageAttachment = ref<ImageAttachment | null>(null);
+const uploadingImage = ref(false);
+const imageUploadError = ref('');
+const comparisonProductIds = ref<string[]>([]);
+
+const attachmentReady = computed(() =>
+  !imageAttachment.value || (
+    imageAttachment.value.moderationStatus === 'APPROVED' && !!imageAttachment.value.moderationId
+  )
+);
+
+const canSubmitMessage = computed(() => {
+  if (!input.value.trim() || answering.value || uploadingImage.value) return false;
+  return attachmentReady.value;
+});
 
 const resetComposerIdle = () => {
   answering.value = false;
@@ -336,8 +382,71 @@ const applyTip = (tip: string) => {
   adjustTextareaHeight();
 };
 
-const dispatchSend = async (text: string) => {
+const openImagePicker = () => {
+  if (answering.value || uploadingImage.value) return;
+  imageInputRef.value?.click();
+};
+
+const removeAttachment = () => {
+  imageAttachment.value = null;
+  imageUploadError.value = '';
+  if (imageInputRef.value) imageInputRef.value.value = '';
+};
+
+const onImageSelected = async (event: Event) => {
+  const inputEl = event.target as HTMLInputElement;
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件');
+    inputEl.value = '';
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    toast.error('图片不能超过 10MB');
+    inputEl.value = '';
+    return;
+  }
+  uploadingImage.value = true;
+  imageUploadError.value = '';
+  const localPreview = URL.createObjectURL(file);
+  try {
+    const uploaded = await fileApi.uploadImage(file, true, 'support');
+    const moderationStatus = String(uploaded.moderationStatus || (uploaded.pendingReview ? 'PENDING' : 'APPROVED')).toUpperCase();
+    imageAttachment.value = {
+      ...uploaded,
+      moderationStatus,
+      previewUrl: resolveImageUrl(uploaded.path, { useThumbnail: true }) || localPreview,
+      statusText: moderationStatus === 'APPROVED' ? '图片已通过审核，可以发送' : '图片待审核，暂不能发送'
+    };
+    URL.revokeObjectURL(localPreview);
+    if (moderationStatus !== 'APPROVED') toast.warning('图片正在审核，通过后才能提交售后问题');
+  } catch (error: any) {
+    URL.revokeObjectURL(localPreview);
+    imageUploadError.value = error?.info || error?.message || '图片上传失败';
+    toast.error(imageUploadError.value);
+  } finally {
+    uploadingImage.value = false;
+    inputEl.value = '';
+  }
+};
+
+const onCompareProducts = (payload?: unknown) => {
+  const ids = (payload as { productIds?: unknown })?.productIds;
+  if (!Array.isArray(ids)) return;
+  comparisonProductIds.value = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))].slice(0, 4);
+  if (comparisonProductIds.value.length < 2) return;
+  input.value = '请比较我选择的商品';
+  adjustTextareaHeight();
+  if (!answering.value) void sendMessage();
+};
+
+const dispatchSend = async (text: string, options?: { comparisonProductIds?: string[] }) => {
   if (!text || answering.value) return false;
+  if (!attachmentReady.value) {
+    toast.warning('请等待图片审核通过后再发送');
+    return false;
+  }
 
   ensureAppWebSocket();
 
@@ -346,7 +455,11 @@ const dispatchSend = async (text: string) => {
     const isProductPage = /^\/product\/\d+$/.test(path);
     const fromProduct = pendingProduct.value !== null || isProductPage;
     const consultProductId = fromProduct ? resolveConsultProductId() : undefined;
-    const data = await agentApi.sendMessage(text, fromProduct, consultProductId);
+    const data = await agentApi.sendMessage(text, fromProduct, consultProductId, {
+      imagePath: imageAttachment.value?.path,
+      imageModerationId: imageAttachment.value?.moderationId,
+      comparisonProductIds: options?.comparisonProductIds || comparisonProductIds.value
+    });
     if (!data?.messageId) {
       toast.error('发送失败，请重试');
       return false;
@@ -355,6 +468,8 @@ const dispatchSend = async (text: string) => {
     data.assistantMessage = '';
     answering.value = true;
     mitter.emit('sendMessage', { ...data });
+    removeAttachment();
+    comparisonProductIds.value = [];
     return true;
   } catch (e: any) {
     if (e?.info === 'AI购物体验已经结束') {
@@ -482,6 +597,7 @@ onMounted(() => {
   }
   mitter.on('answering', onAnswering);
   mitter.on('sendMessage', onSendMessageSync);
+  mitter.on('compareProducts', onCompareProducts);
   syncComposerInset();
   composerResizeObserver = new ResizeObserver(syncComposerInset);
   if (composerRef.value) composerResizeObserver.observe(composerRef.value);
@@ -513,6 +629,8 @@ onUnmounted(() => {
   recoverIosViewportZoom();
   mitter.off('answering', onAnswering);
   mitter.off('sendMessage', onSendMessageSync);
+  mitter.off('compareProducts', onCompareProducts);
+  removeAttachment();
   teardownComposerInset();
   composerInsetReadyEmitted = false;
 });
@@ -703,9 +821,62 @@ onUnmounted(() => {
 .chat-input-bar {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: flex-end;
   padding: 10px $app-page-gutter;
+
+  .image-input { display: none; }
+
+  .attachment-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid $color-border-gray;
+    border-radius: $radius-sm;
+    background: $color-surface-inset;
+  }
+
+  .attachment-preview {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    border-radius: $radius-xs;
+    object-fit: cover;
+    background: #fff;
+  }
+
+  .attachment-meta {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+    color: $color-text-body;
+    font-size: 12px;
+
+    small { color: $color-text-muted; font-size: 10px; }
+  }
+
+  .attachment-remove,
+  .image-attach-btn {
+    min-height: 32px;
+    padding: 0 9px;
+    border: 1px solid $color-border-gray;
+    border-radius: $radius-sm;
+    background: #fff;
+    color: $color-text-muted;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:disabled { cursor: not-allowed; opacity: 0.5; }
+  }
+
+  .attachment-remove { flex: 0 0 auto; color: $color-error; }
+  .input-leading { flex: 0 0 auto; display: flex; align-items: flex-end; }
 
   .agent-chat-textarea {
     flex: 1;

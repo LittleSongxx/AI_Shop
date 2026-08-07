@@ -13,7 +13,13 @@
           :content="productIntro"
         />
         <p v-else class="biz-title">为您推荐以下商品</p>
-        <AgentProductList :list="productList" />
+        <AgentProductList :list="productList" @compare-products="(ids) => emit('compare-products', ids)" />
+      </template>
+      <template v-else-if="comparisonCard">
+        <AgentProductComparison :card="comparisonCard" />
+      </template>
+      <template v-else-if="supportCaseCard">
+        <AgentSupportCaseCard :card="supportCaseCard" />
       </template>
       <template v-else-if="isProductSearchEmpty">
         <p class="biz-title">商品搜索</p>
@@ -96,6 +102,8 @@ import { computed, ref, watch } from 'vue';
 import { Service } from '@element-plus/icons-vue';
 import MarkdownContent from '@/components/common/MarkdownContent.vue';
 import AgentProductList from '@/components/agent/AgentProductList.vue';
+import AgentProductComparison from '@/components/agent/AgentProductComparison.vue';
+import AgentSupportCaseCard from '@/components/agent/AgentSupportCaseCard.vue';
 import AgentOrderList from '@/components/agent/AgentOrderList.vue';
 import AgentConfirmCard, { type ActionConfirmCardData } from '@/components/agent/AgentConfirmCard.vue';
 import AgentOrderSelectionCard, {
@@ -113,6 +121,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'select-order': [payload: unknown];
+  'compare-products': [productIds: string[]];
 }>();
 
 const messageStatus = computed(() => Number(props.data.status ?? 2));
@@ -203,6 +212,24 @@ const orderSelectionCard = computed<OrderSelectionCardData | null>(() => {
     || !Array.isArray(parsed.candidates)
   ) return null;
   return parsed as unknown as OrderSelectionCardData;
+});
+
+const structuredCard = computed<Record<string, any> | null>(() => {
+  if (isStreaming.value) return null;
+  const parsed = parseJsonObject(props.data.assistantMessage);
+  return parsed?.type ? parsed : null;
+});
+
+const comparisonCard = computed<Record<string, any> | null>(() => {
+  const card = structuredCard.value;
+  return card?.type === 'PRODUCT_COMPARISON' && Array.isArray(card.products) ? card : null;
+});
+
+const supportCaseCard = computed<Record<string, any> | null>(() => {
+  const card = structuredCard.value;
+  if (card?.type === 'SUPPORT_CASE_LIST' && Array.isArray(card.cases)) return card;
+  if (card?.type === 'SUPPORT_CASE_DETAIL' && card.case && typeof card.case === 'object') return card;
+  return null;
 });
 
 const syncActionConfirmCard = () => {
@@ -298,7 +325,7 @@ const isOrderSearchEmpty = computed(() => {
 const streamText = computed(() => cleanAgentActionStreamText(props.data.assistantMessage));
 
 const displayText = computed(() => {
-  if (productList.value?.length || orderList.value?.length) return '';
+  if (productList.value?.length || orderList.value?.length || comparisonCard.value || supportCaseCard.value) return '';
   if (actionConfirmCard.value) return '';
   if (orderSelectionCard.value) return '';
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return '';
@@ -306,6 +333,7 @@ const displayText = computed(() => {
   if (parsed?.type === 'ACTION_CONFIRM') return '';
   if (parsed?.type === 'PRODUCT_SEARCH_RESULT') return '';
   if (parsed?.type === 'ORDER_SELECTION') return '';
+  if (parsed?.type === 'PRODUCT_COMPARISON' || parsed?.type === 'SUPPORT_CASE_LIST' || parsed?.type === 'SUPPORT_CASE_DETAIL') return '';
   let text = (props.data.assistantMessage || '').trim();
   if (text === '[]') return '';
   // Hide bare product-id JSON arrays the model sometimes dumps.
@@ -332,7 +360,7 @@ const showAi = computed(() => {
   if (props.waiting) return true;
   if (isStreaming.value) return true;
   if (messageStatus.value === 3) return hasRenderableContent.value;
-  if (productList.value?.length || orderList.value?.length) return true;
+  if (productList.value?.length || orderList.value?.length || comparisonCard.value || supportCaseCard.value) return true;
   if (actionConfirmCard.value) return true;
   if (orderSelectionCard.value) return true;
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return true;
@@ -344,6 +372,8 @@ const hasRenderableContent = computed(
   () =>
     !!(productList.value?.length ||
       orderList.value?.length ||
+      comparisonCard.value ||
+      supportCaseCard.value ||
       actionConfirmCard.value ||
       orderSelectionCard.value ||
       isProductSearchEmpty.value ||
@@ -359,6 +389,8 @@ const isWideBubble = computed(
     !!(
       productList.value?.length ||
       orderList.value?.length ||
+      comparisonCard.value ||
+      supportCaseCard.value ||
       actionConfirmCard.value ||
       orderSelectionCard.value ||
       isProductSearchEmpty.value ||

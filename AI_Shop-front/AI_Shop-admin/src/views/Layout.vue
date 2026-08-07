@@ -158,6 +158,7 @@ const menuList = ref([
       { name: 'RAG知识库', path: '/setting/rag' },
       { name: '敏感词管理', path: '/setting/sensitiveWord' },
       { name: '客服对话记录', path: '/setting/agentMessage' },
+      { name: 'Agent质量中心', path: '/setting/agentQuality' },
     ],
   },
   {

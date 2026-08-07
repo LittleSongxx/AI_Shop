@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/vue';
+import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AgentProductList from '@/components/agent/AgentProductList.vue';
@@ -85,5 +86,21 @@ describe('agent product click attribution', () => {
 
     expect(agentApi.reportClick).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith('/product/legacy');
+  });
+
+  it('selects two to four server-issued candidates before requesting comparison', async () => {
+    const onCompareProducts = vi.fn();
+    const view = mount(AgentProductList, {
+      props: { list: products, onCompareProducts },
+      global: { stubs: { ProductImage: true } }
+    });
+
+    const toggles = view.findAll('.compare-toggle');
+    await toggles[0].trigger('click');
+    await toggles[1].trigger('click');
+    await view.get('.compare-submit').trigger('click');
+
+    expect(view.emitted('compare-products')).toEqual([[['p1', 'p2']]]);
+    expect(onCompareProducts).toHaveBeenCalledWith(['p1', 'p2']);
   });
 });
