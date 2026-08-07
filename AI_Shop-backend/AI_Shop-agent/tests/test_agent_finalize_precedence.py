@@ -108,3 +108,43 @@ async def test_product_comparison_card_is_the_terminal_payload():
 
     assert complete.await_args.args[1] == comparison
     assert complete.await_args.args[2] == "product_comparison"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("card_type", "biz_type"),
+    [
+        ("SUPPORT_CASE_LIST", "support_case_list"),
+        ("SUPPORT_CASE_DETAIL", "support_case_detail"),
+    ],
+)
+async def test_support_case_cards_are_terminal_and_preserve_structured_payload(
+    card_type, biz_type
+):
+    payload = (
+        {"type": card_type, "cases": [{"caseId": 1, "caseNo": "SC20260807ABC123"}]}
+        if card_type == "SUPPORT_CASE_LIST"
+        else {
+            "type": card_type,
+            "case": {"caseId": 1, "caseNo": "SC20260807ABC123", "status": "OPEN"},
+        }
+    )
+    cards = json.dumps(payload, ensure_ascii=False)
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+    ):
+        await finalize_agent_response(
+            {"userId": "u1", "messageId": 32, "userMessage": "查工单"},
+            ["模型补充文本"],
+            [],
+            assistant_cards=cards,
+            tools_called=["QUERY_SUPPORT_CASES"],
+            user_text="查我的工单",
+        )
+
+    assert complete.await_args.args[1] == cards
+    assert complete.await_args.args[2] == biz_type

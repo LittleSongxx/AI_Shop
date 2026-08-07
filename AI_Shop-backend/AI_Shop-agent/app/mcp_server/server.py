@@ -94,12 +94,12 @@ async def compare_products(userId: str, productIds: list[str]) -> str:
 
 
 @mcp.tool(name="QUERY_LOGISTICS", description="[READ] 查询订单物流轨迹（不是查订单列表）")
-async def query_logistics(userId: str, orderId: str) -> str:
+async def query_logistics(userId: str, orderId: str, runId: str | None = None) -> str:
     return _text(await tools.query_logistics(userId, orderId))
 
 
 @mcp.tool(name="QUERY_COMMENT", description="[READ] 查看订单已提交的评价内容（不是写评价）")
-async def query_comment(userId: str, orderId: str) -> str:
+async def query_comment(userId: str, orderId: str, runId: str | None = None) -> str:
     return _text(await tools.query_comment(userId, orderId))
 
 
@@ -108,6 +108,7 @@ async def query_refund_status(
     userId: str,
     orderId: str | None = None,
     orderItemId: str | None = None,
+    runId: str | None = None,
 ) -> str:
     return _text(await tools.query_refund_status(userId, orderId, orderItemId))
 
@@ -121,16 +122,78 @@ async def query_user_coupons(userId: str, status: int | None = None) -> str:
     name="PROPOSE_CONFIRM_RECEIPT",
     description="[WRITE] 为系统已验证归属和状态的订单生成确认收货提案",
 )
-async def propose_confirm_receipt(userId: str, orderId: str) -> str:
-    return _text(await tools.propose_confirm_receipt(userId, orderId))
+async def propose_confirm_receipt(
+    userId: str, orderId: str, runId: str | None = None
+) -> str:
+    return _text(await tools.propose_confirm_receipt(userId, orderId, runId))
+
+
+@mcp.tool(
+    name="PROPOSE_CANCEL_ORDER",
+    description="[WRITE] 为系统已验证归属且待付款的订单生成取消提案",
+)
+async def propose_cancel_order(
+    userId: str, orderId: str, runId: str | None = None
+) -> str:
+    return _text(await tools.propose_cancel_order(userId, orderId, runId))
+
+
+@mcp.tool(
+    name="PROPOSE_CREATE_SUPPORT_CASE",
+    description="[WRITE] 创建售后工单提案；地址修改和发票也只能走工单",
+)
+async def propose_create_support_case(
+    userId: str,
+    category: str,
+    description: str,
+    orderId: str | None = None,
+    orderItemId: str | None = None,
+    imagePath: str | None = None,
+    imageModerationId: int | None = None,
+    imageDescription: str | None = None,
+    vlmStatus: str | None = None,
+    runId: str | None = None,
+    sourceMessageId: int | None = None,
+    forcedHandoff: bool = False,
+    priority: str = "NORMAL",
+) -> str:
+    return _text(
+        await tools.propose_create_support_case(
+            userId,
+            category,
+            description,
+            orderId,
+            orderItemId,
+            imagePath,
+            imageModerationId,
+            imageDescription,
+            vlmStatus,
+            runId,
+            sourceMessageId,
+            forcedHandoff,
+            priority,
+        )
+    )
+
+
+@mcp.tool(
+    name="QUERY_SUPPORT_CASES",
+    description="[READ] 查询当前用户本人近期售后工单或指定工单详情",
+)
+async def query_support_cases(
+    userId: str, caseId: str | None = None, runId: str | None = None
+) -> str:
+    return _text(await tools.query_support_cases(userId, caseId))
 
 
 @mcp.tool(
     name="PROPOSE_REFUND",
     description="[WRITE] 为系统已验证归属和状态的订单项生成退款提案",
 )
-async def propose_refund(userId: str, orderItemId: str) -> str:
-    return _text(await tools.propose_refund(userId, orderItemId))
+async def propose_refund(
+    userId: str, orderItemId: str, runId: str | None = None
+) -> str:
+    return _text(await tools.propose_refund(userId, orderItemId, runId))
 
 
 @mcp.tool(
@@ -142,13 +205,25 @@ async def propose_product_review(
     orderId: str,
     commentContent: str,
     star: int,
+    runId: str | None = None,
 ) -> str:
-    return _text(await tools.propose_product_review(userId, orderId, commentContent, star))
+    return _text(
+        await tools.propose_product_review(
+            userId, orderId, commentContent, star, runId
+        )
+    )
 
 
 @mcp.tool(name="PROPOSE_RECOMMENT", description="[WRITE] 提交追评提案；不是查评价")
-async def propose_recomment(userId: str, orderId: str, reCommentContent: str) -> str:
-    return _text(await tools.propose_recomment(userId, orderId, reCommentContent))
+async def propose_recomment(
+    userId: str,
+    orderId: str,
+    reCommentContent: str,
+    runId: str | None = None,
+) -> str:
+    return _text(
+        await tools.propose_recomment(userId, orderId, reCommentContent, runId)
+    )
 
 
 def main() -> None:

@@ -14,6 +14,8 @@ class AgentGraphState(TypedDict, total=False):
     user_message: str
     user_text: str
     image_url: str | None
+    image_evidence: dict | None
+    image_description: str | None
     from_product: bool
     card: dict | None
     message_card: dict | None
@@ -66,6 +68,8 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "user_message": agent_msg.get("userMessage") or "",
         "user_text": user_text,
         "image_url": None,
+        "image_evidence": agent_msg.get("imageEvidence"),
+        "image_description": None,
         "from_product": bool(agent_msg.get("fromProduct")),
         "card": card,
         "message_card": card,

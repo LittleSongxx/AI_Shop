@@ -32,6 +32,7 @@ from app.services.shopping_profile_service import (
     ProfileRevisionConflict,
     shopping_profile_service,
 )
+from app.services.support_case_service import support_case_service
 from app.services.support_service import support_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -104,6 +105,8 @@ async def send_message(
     fromProduct: str | None = Form(None),
     consultProductId: str | None = Form(None),
     comparisonProductIds: str | None = Form(None),
+    imagePath: str | None = Form(None),
+    imageModerationId: int | None = Form(None),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
     try:
@@ -116,6 +119,8 @@ async def send_message(
                 _form_bool(fromProduct),
                 consultProductId,
                 _form_string_list(comparisonProductIds),
+                imagePath,
+                imageModerationId,
             )
         return success(data)
     except PendingActionExpired as e:
@@ -123,6 +128,27 @@ async def send_message(
     except ValueError as e:
 
         return error(600, str(e))
+
+
+@router.get("/supportCases")
+async def list_support_cases(
+    limit: int = 20,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    return success(
+        await support_case_service.list_for_user(user.user_id, limit=limit)
+    )
+
+
+@router.get("/supportCaseDetail")
+async def support_case_detail(
+    caseId: str,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    rows = await support_case_service.list_for_user(user.user_id, caseId, limit=1)
+    if not rows:
+        return error(404, "工单不存在或无权查看")
+    return success(rows[0])
 
 
 @router.post("/selectOrderCandidate")
@@ -428,6 +454,89 @@ async def admin_trace_detail(
     if data is None:
         return error(404, "Trace 不存在或已过保留期")
     return success(data)
+
+
+@router.post("/admin/supportCases")
+async def admin_support_cases(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    try:
+        data = await support_case_service.list_admin(
+            page_no=_as_int(body.get("pageNo"), 1) or 1,
+            page_size=_as_int(body.get("pageSize"), 30) or 30,
+            status=str(body.get("status") or "").strip() or None,
+            user_id=str(body.get("userId") or "").strip() or None,
+        )
+        return success(data)
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/supportCaseDetail")
+async def admin_support_case_detail(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    case_id = str(body.get("caseId") or body.get("caseNo") or "").strip()
+    if not case_id:
+        return error(600, "caseId 不能为空")
+    data = await support_case_service.get(case_id)
+    if not data:
+        return error(404, "工单不存在")
+    return success(data)
+
+
+@router.post("/admin/supportCaseClaim")
+async def admin_support_case_claim(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    try:
+        data = await support_case_service.claim(
+            _required_text(body, "caseId"), _required_text(body, "adminId")
+        )
+        return success(data)
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/supportCaseInProgress")
+async def admin_support_case_in_progress(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    try:
+        data = await support_case_service.in_progress(
+            _required_text(body, "caseId"), _required_text(body, "adminId")
+        )
+        return success(data)
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/supportCaseResolve")
+async def admin_support_case_resolve(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    try:
+        data = await support_case_service.resolve(
+            _required_text(body, "caseId"),
+            _required_text(body, "adminId"),
+            _required_text(body, "resolutionCode"),
+            _required_text(body, "rootCause"),
+            _required_text(body, "resolutionSummary"),
+            support_session_id=str(body.get("supportSessionId") or "").strip() or None,
+        )
+        return success(data)
+    except ValueError as exc:
+        return error(600, str(exc))
 
 
 @router.post("/admin/loadPendingActions")

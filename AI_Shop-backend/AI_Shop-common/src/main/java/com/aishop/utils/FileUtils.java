@@ -141,6 +141,42 @@ public class FileUtils {
         }
     }
 
+    /**
+     * Copy an approved quarantine image to a normal path without deleting the
+     * source. The caller can commit its database update before removing the
+     * quarantine copy, avoiding a row that points at a missing file.
+     */
+    public void copyQuarantineToNormal(String quarantinePath, String normalRelativePath,
+                                       boolean createThumbnail) {
+        if (StringTools.isEmpty(quarantinePath) || !isModerationQuarantinePath(quarantinePath)) {
+            throw new BusinessException("隔离区图片路径无效");
+        }
+        if (StringTools.isEmpty(normalRelativePath) || isModerationQuarantinePath(normalRelativePath)) {
+            throw new BusinessException("正式图片路径无效");
+        }
+        File src = resolveStoredFile(quarantinePath);
+        if (!src.exists()) {
+            throw new BusinessException("隔离区图片不存在");
+        }
+        File dest = resolveStoredFile(normalRelativePath);
+        File parent = dest.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new BusinessException("创建上传目录失败");
+        }
+        try {
+            java.nio.file.Files.copy(src.toPath(), dest.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            if (createThumbnail) {
+                String suffix = StringTools.getFileSuffix(normalRelativePath);
+                String thumbName = dest.getName().replace(
+                        suffix, Constants.IMAGE_THUMBNAIL_SUFFIX + suffix);
+                createImageThumbnail(dest.getAbsolutePath(), new File(parent, thumbName).getAbsolutePath());
+            }
+        } catch (IOException e) {
+            throw new BusinessException("迁移审核图片失败");
+        }
+    }
+
     public static boolean isModerationQuarantinePath(String path) {
         return path != null && path.startsWith(Constants.MODERATION_PENDING_PREFIX);
     }

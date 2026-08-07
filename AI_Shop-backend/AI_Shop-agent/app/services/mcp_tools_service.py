@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.constants import (
+    CANCELLABLE_ORDER_STATUSES,
     CONFIRM_RECEIPT_ORDER_STATUSES,
     ORDER_ITEM_STATUS_NORMAL,
     ORDER_STATUS_NAMES,
@@ -233,7 +234,49 @@ async def _order_items_params(order_id: str, order: dict | None = None) -> list[
         for i in items[:5]
     ]
 
-async def propose_confirm_receipt(user_id: str, order_id: str) -> str:
+async def propose_cancel_order(
+    user_id: str, order_id: str, run_id: str | None = None
+) -> str:
+    if not order_id:
+        return "【取消订单失败】请输入要取消的订单号"
+    try:
+        order = await order_service.get_order(order_id)
+        if not order:
+            return "【取消订单失败】订单不存在"
+        if order["user_id"] != user_id:
+            return "【取消订单失败】您没有权限操作此订单"
+        status = order.get("order_status")
+        if status not in CANCELLABLE_ORDER_STATUSES:
+            return (
+                f"【取消订单失败】当前订单状态无法取消，当前状态：{_status_name(status)}"
+            )
+        params = {
+            "orderId": order_id,
+            "orderAmount": float(order["amount"]),
+            "orderStatusBefore": status,
+            "payScene": order.get("pay_scene"),
+            "orderItems": await _order_items_params(order_id, order),
+        }
+        pending = await pending_action_service.create_pending(
+            "CANCEL_ORDER",
+            user_id,
+            params,
+            f"取消订单：订单 {order_id}，实付金额 {order['amount']} 元",
+            run_id=run_id,
+        )
+        return _propose_reply("取消订单", pending)
+    except PendingActionConflict as exc:
+        return f"【取消订单失败】{exc}"
+    except Exception:
+        logger.exception(
+            "mcp_propose_cancel_order_failed", user_id=user_id, order_id=order_id
+        )
+        return "【取消订单失败】系统处理异常，请稍后重试或联系客服"
+
+
+async def propose_confirm_receipt(
+    user_id: str, order_id: str, run_id: str | None = None
+) -> str:
 
     if not order_id:
         return "【确认收货失败】请输入要确认收货的订单号"
@@ -259,6 +302,7 @@ async def propose_confirm_receipt(user_id: str, order_id: str) -> str:
             user_id,
             params,
             f"确认收货：订单 {order_id}，实付金额 {order['amount']} 元",
+            run_id=run_id,
         )
         return _propose_reply("确认收货", pending)
     except PendingActionConflict as exc:
@@ -271,7 +315,9 @@ async def propose_confirm_receipt(user_id: str, order_id: str) -> str:
         )
         return "【确认收货失败】系统处理异常，请稍后重试或联系客服"
 
-async def propose_refund(user_id: str, order_item_id: str) -> str:
+async def propose_refund(
+    user_id: str, order_item_id: str, run_id: str | None = None
+) -> str:
 
     if not order_item_id:
         return "【退款失败】请输入要退款的订单项ID"
@@ -345,6 +391,7 @@ async def propose_refund(user_id: str, order_item_id: str) -> str:
             user_id,
             params,
             f"退款：订单项 {order_item_id}（{name}），金额 {item['item_amount']} 元",
+            run_id=run_id,
         )
         return _propose_reply("退款", pending)
     except PendingActionConflict as exc:
@@ -357,7 +404,13 @@ async def propose_refund(user_id: str, order_item_id: str) -> str:
         )
         return "【退款失败】系统处理异常，请稍后重试或联系客服"
 
-async def propose_product_review(user_id: str, order_id: str, content: str, star: int) -> str:
+async def propose_product_review(
+    user_id: str,
+    order_id: str,
+    content: str,
+    star: int,
+    run_id: str | None = None,
+) -> str:
 
     if not order_id:
         return "【评价失败】请输入要评价的订单号"
@@ -386,6 +439,7 @@ async def propose_product_review(user_id: str, order_id: str, content: str, star
             user_id,
             params,
             f"提交评价：订单 {order_id}，{star} 星，内容「{_truncate(content)}」",
+            run_id=run_id,
         )
         return _propose_reply("评价", pending)
     except PendingActionConflict as exc:
@@ -398,7 +452,9 @@ async def propose_product_review(user_id: str, order_id: str, content: str, star
         )
         return "【评价失败】系统处理异常，请稍后重试或联系客服"
 
-async def propose_recomment(user_id: str, order_id: str, content: str) -> str:
+async def propose_recomment(
+    user_id: str, order_id: str, content: str, run_id: str | None = None
+) -> str:
 
     if not order_id:
         return "【追评失败】请输入要追评的订单号"
@@ -424,6 +480,7 @@ async def propose_recomment(user_id: str, order_id: str, content: str) -> str:
             user_id,
             params,
             f"提交追评：订单 {order_id}，内容「{_truncate(content)}」",
+            run_id=run_id,
         )
         return _propose_reply("追评", pending)
     except PendingActionConflict as exc:
@@ -435,6 +492,94 @@ async def propose_recomment(user_id: str, order_id: str, content: str) -> str:
             order_id=order_id,
         )
         return "【追评失败】系统处理异常，请稍后重试或联系客服"
+
+
+async def propose_create_support_case(
+    user_id: str,
+    category: str,
+    description: str,
+    order_id: str | None = None,
+    order_item_id: str | None = None,
+    image_path: str | None = None,
+    image_moderation_id: int | None = None,
+    image_description: str | None = None,
+    vlm_status: str | None = None,
+    run_id: str | None = None,
+    source_message_id: int | None = None,
+    forced_handoff: bool = False,
+    priority: str = "NORMAL",
+) -> str:
+    from app.services.support_case_service import support_case_service
+
+    try:
+        return await support_case_service.propose(
+            user_id,
+            category,
+            description,
+            order_id=order_id,
+            order_item_id=order_item_id,
+            image_path=image_path,
+            image_moderation_id=image_moderation_id,
+            image_description=image_description,
+            vlm_status=vlm_status,
+            run_id=run_id,
+            source_message_id=source_message_id,
+            forced_handoff=forced_handoff,
+            priority=priority,
+        )
+    except PendingActionConflict as exc:
+        return f"【创建工单失败】{exc}"
+    except ValueError as exc:
+        return f"【创建工单失败】{exc}"
+    except Exception:
+        logger.exception(
+            "mcp_propose_support_case_failed",
+            user_id=user_id,
+            category=category,
+        )
+        return "【创建工单失败】系统处理异常，请稍后重试或联系客服"
+
+
+async def query_support_cases(
+    user_id: str, case_id: str | None = None
+) -> "ToolInvokeResult":
+    from app.services.support_case_service import support_case_service
+    from app.services.tool_invoke_result import ToolInvokeResult
+
+    try:
+        rows = await support_case_service.list_for_user(user_id, case_id)
+        if case_id and not rows:
+            return ToolInvokeResult(
+                content="【工单查询失败】工单不存在或无权查看",
+                success=False,
+                error_code="NOT_FOUND",
+                biz_type="support_case_detail",
+            )
+        if case_id:
+            card = {"type": "SUPPORT_CASE_DETAIL", "case": rows[0]}
+            return ToolInvokeResult(
+                content=f"【工单查询成功】工单 {rows[0]['caseNo']} 状态为 {rows[0]['status']}",
+                biz_type="support_case_detail",
+                assistant_cards=json.dumps(card, ensure_ascii=False),
+            )
+        card = {"type": "SUPPORT_CASE_LIST", "cases": rows}
+        return ToolInvokeResult(
+            content=(
+                f"【工单查询成功】共找到 {len(rows)} 条近期工单"
+                if rows
+                else "【工单查询成功】暂无售后工单"
+            ),
+            biz_type="support_case_list",
+            assistant_cards=json.dumps(card, ensure_ascii=False),
+        )
+    except Exception:
+        logger.exception("mcp_query_support_cases_failed", user_id=user_id)
+        return ToolInvokeResult(
+            content="【工单查询失败】系统处理异常，请稍后重试或联系客服",
+            success=False,
+            error_code="TOOL_ERROR",
+            biz_type="support_case_list",
+        )
 
 async def tool_search_products(
     user_id: str,

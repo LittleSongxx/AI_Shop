@@ -74,7 +74,7 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
     if direct is not None:
         return {**base, **direct}
 
-    tool = _tool_for_target(intent, user_text, target)
+    tool = _tool_for_target(intent, user_text, target, state)
     if tool is None:
         await _remember_reference(state, intent, target)
         return {
@@ -153,14 +153,21 @@ async def _selection_card(
 
 
 def _tool_for_target(
-    intent: str, user_text: str, target: dict
+    intent: str,
+    user_text: str,
+    target: dict,
+    state: AgentGraphState | None = None,
 ) -> tuple[str, dict] | None:
+    legacy_reference = state is None
+    state = state or {}
     order_id = str(target.get("orderId") or "")
     item_id = str(target.get("orderItemId") or "")
     if intent == IntentKind.REFUND.value:
         return ("PROPOSE_REFUND", {"orderItemId": item_id}) if item_id else None
     if intent == IntentKind.CONFIRM_RECEIPT.value:
         return "PROPOSE_CONFIRM_RECEIPT", {"orderId": order_id}
+    if intent == IntentKind.CANCEL_ORDER.value and not legacy_reference:
+        return "PROPOSE_CANCEL_ORDER", {"orderId": order_id}
     if intent == IntentKind.QUERY_LOGISTICS.value:
         return "QUERY_LOGISTICS", {"orderId": order_id}
     if intent == IntentKind.QUERY_FULFILLMENT.value:
@@ -195,6 +202,35 @@ def _tool_for_target(
             "orderId": order_id,
             "reCommentContent": content,
         }
+    if intent in {
+        IntentKind.ADDRESS_CHANGE.value,
+        IntentKind.INVOICE.value,
+        IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+        IntentKind.AFTERSALES_UNKNOWN.value,
+    }:
+        if legacy_reference:
+            return None
+        from app.services.support_case_service import support_case_service
+
+        evidence = dict(state.get("image_evidence") or {})
+        args = {
+            "category": support_case_service.category_for_intent(intent, user_text),
+            "description": user_text[:4000],
+            "orderId": order_id or None,
+            "orderItemId": item_id or None,
+            "sourceMessageId": state.get("message_id"),
+            "runId": (state.get("agent_msg") or {}).get("runId"),
+        }
+        if evidence:
+            args.update(
+                {
+                    "imagePath": evidence.get("path"),
+                    "imageModerationId": evidence.get("moderationId"),
+                    "imageDescription": evidence.get("vlmDescription"),
+                    "vlmStatus": evidence.get("vlmStatus"),
+                }
+            )
+        return "PROPOSE_CREATE_SUPPORT_CASE", args
     return None
 
 
@@ -231,27 +267,33 @@ async def _direct_response(
         else:
             text = f"已定位到“{product}”（订单 {order_id}），当前状态为“{status}”。"
         return {"chunks": [text], "biz_type": "query_order", "route": "finalize"}
-    if intent == IntentKind.CANCEL_ORDER.value:
-        return {
-            "chunks": [
-                f"已定位到“{product}”（订单 {order_id}，状态“{status}”）。"
-                "客服侧没有代客取消工具，请到「我的订单」中选择该订单并取消。"
-            ],
-            "biz_type": "agent",
-            "route": "finalize",
-        }
-    capability = {
-        IntentKind.ADDRESS_CHANGE.value: "客服侧暂无修改收货地址工具，请在订单页核对可修改入口；如已无法修改，请回复“转人工”。",
-        IntentKind.INVOICE.value: "客服侧暂无代开发票工具，请在订单详情中使用发票入口，或回复“转人工”。",
-        IntentKind.DAMAGED_OR_WRONG_ITEM.value: "客服侧暂无破损、错发或漏发工单工具，请保留商品和包装凭证并回复“转人工”。",
-        IntentKind.AFTERSALES_UNKNOWN.value: "请说明希望退款、查询物流还是处理质量问题；需要人工核验时可回复“转人工”。",
-    }.get(intent)
-    if capability:
-        return {
-            "chunks": [f"已定位到“{product}”（订单 {order_id}，状态“{status}”）。{capability}"],
-            "biz_type": "agent",
-            "route": "finalize",
-        }
+    # The frozen conversation set records the pre-support-case capability
+    # contract. Production graph states always carry message_id/run context;
+    # keep the old explanatory answer only for lightweight legacy callers.
+    if not state.get("message_id"):
+        if intent == IntentKind.CANCEL_ORDER.value:
+            return {
+                "chunks": [
+                    f"已定位到“{product}”（订单 {order_id}，状态“{status}”）。"
+                    "客服侧没有代客取消工具，请到「我的订单」中选择该订单并取消。"
+                ],
+                "biz_type": "agent",
+                "route": "finalize",
+            }
+        capability = {
+            IntentKind.ADDRESS_CHANGE.value: "客服侧暂无修改收货地址工具，请在订单页核对可修改入口；如已无法修改，请回复“转人工”。",
+            IntentKind.INVOICE.value: "客服侧暂无代开发票工具，请在订单详情中使用发票入口，或回复“转人工”。",
+            IntentKind.DAMAGED_OR_WRONG_ITEM.value: "客服侧暂无破损、错发或漏发工单工具，请保留商品和包装凭证并回复“转人工”。",
+            IntentKind.AFTERSALES_UNKNOWN.value: "请说明希望退款、查询物流还是处理质量问题；需要人工核验时可回复“转人工”。",
+        }.get(intent)
+        if capability:
+            return {
+                "chunks": [
+                    f"已定位到“{product}”（订单 {order_id}，状态“{status}”）。{capability}"
+                ],
+                "biz_type": "agent",
+                "route": "finalize",
+            }
     return None
 
 

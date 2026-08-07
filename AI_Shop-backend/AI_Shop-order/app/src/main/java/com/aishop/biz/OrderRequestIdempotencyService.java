@@ -22,6 +22,7 @@ public class OrderRequestIdempotencyService {
     public static final String COMMAND_COUPON_RUSH_PREPARE = "COUPON_RUSH_PREPARE";
     public static final String COMMAND_COUPON_RUSH_PAY = "COUPON_RUSH_PAY";
     public static final String COMMAND_AGENT_REFUND = "AGENT_REFUND";
+    public static final String COMMAND_AGENT_CANCEL_ORDER = "AGENT_CANCEL_ORDER";
     public static final String COMMAND_AGENT_CONFIRM_RECEIPT = "AGENT_CONFIRM_RECEIPT";
     public static final String COMMAND_AGENT_PRODUCT_REVIEW = "AGENT_PRODUCT_REVIEW";
     public static final String COMMAND_AGENT_RECOMMENT = "AGENT_RECOMMENT";

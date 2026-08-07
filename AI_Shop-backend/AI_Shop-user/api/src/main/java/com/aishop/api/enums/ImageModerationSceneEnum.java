@@ -2,7 +2,8 @@ package com.aishop.api.enums;
 
 public enum ImageModerationSceneEnum {
     AVATAR("avatar", "头像"),
-    COMMENT("comment", "评论图片");
+    COMMENT("comment", "评论图片"),
+    SUPPORT("support", "售后凭证");
 
     private final String code;
     private final String desc;

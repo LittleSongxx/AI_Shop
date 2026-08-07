@@ -113,6 +113,11 @@ class McpToolRouter:
         raw = dict(args or {})
         raw.pop("user_id", None)
         raw["userId"] = user_id
+        policy = policy_for(tool_name)
+        if policy and policy.is_write:
+            context = current_episode()
+            if context and context.run_id:
+                raw.setdefault("runId", context.run_id)
         if tool_name == "SEARCH_KNOWLEDGE":
             return {"userId": user_id, "query": raw.get("query") or ""}
         try:
@@ -158,6 +163,9 @@ class McpToolRouter:
         # 写操作留一条审计线索：出问题时要能回答"谁在什么时候发起了哪个提案"。
         # 只读调用量大且没有追溯价值，不记。
         if policy.is_write:
+            context = current_episode()
+            if context and context.run_id:
+                raw.setdefault("runId", context.run_id)
             logger.info(
                 "write_tool_invoked",
                 tool=tool_name,
@@ -289,14 +297,27 @@ class McpToolRouter:
             return {"userId": uid, "productId": g("productId", "product_id")}
         if tool_name == "COMPARE_PRODUCTS":
             return {"userId": uid, "productIds": list(g("productIds", "product_ids") or [])}
-        if tool_name in ("QUERY_LOGISTICS", "QUERY_COMMENT", "PROPOSE_CONFIRM_RECEIPT"):
-            return {"userId": uid, "orderId": g("orderId", "order_id")}
+        if tool_name in (
+            "QUERY_LOGISTICS",
+            "QUERY_COMMENT",
+            "PROPOSE_CONFIRM_RECEIPT",
+            "PROPOSE_CANCEL_ORDER",
+        ):
+            out = {"userId": uid, "orderId": g("orderId", "order_id")}
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
         if tool_name == "QUERY_REFUND_STATUS":
-            return {
+            out = {
                 "userId": uid,
                 "orderId": g("orderId", "order_id"),
                 "orderItemId": g("orderItemId", "order_item_id"),
             }
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
         if tool_name == "QUERY_USER_COUPONS":
             out = {"userId": uid}
             st = g("status")
@@ -304,20 +325,66 @@ class McpToolRouter:
                 out["status"] = st
             return out
         if tool_name == "PROPOSE_REFUND":
-            return {"userId": uid, "orderItemId": g("orderItemId", "order_item_id")}
+            out = {
+                "userId": uid,
+                "orderItemId": g("orderItemId", "order_item_id"),
+            }
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
         if tool_name == "PROPOSE_PRODUCT_REVIEW":
-            return {
+            out = {
                 "userId": uid,
                 "orderId": g("orderId", "order_id"),
                 "commentContent": g("commentContent", "comment_content"),
                 "star": g("star"),
             }
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
         if tool_name == "PROPOSE_RECOMMENT":
-            return {
+            out = {
                 "userId": uid,
                 "orderId": g("orderId", "order_id"),
                 "reCommentContent": g("reCommentContent", "re_comment_content"),
             }
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
+        if tool_name == "PROPOSE_CREATE_SUPPORT_CASE":
+            out = {
+                "userId": uid,
+                "category": g("category"),
+                "description": g("description"),
+            }
+            optional = {
+                "orderId": g("orderId", "order_id"),
+                "orderItemId": g("orderItemId", "order_item_id"),
+                "imagePath": g("imagePath", "image_path"),
+                "imageModerationId": g(
+                    "imageModerationId", "image_moderation_id"
+                ),
+                "imageDescription": g("imageDescription", "image_description"),
+                "vlmStatus": g("vlmStatus", "vlm_status"),
+                "runId": g("runId", "run_id"),
+                "sourceMessageId": g("sourceMessageId", "source_message_id"),
+                "forcedHandoff": g("forcedHandoff", "forced_handoff"),
+                "priority": g("priority"),
+            }
+            out.update({key: value for key, value in optional.items() if value is not None})
+            return out
+        if tool_name == "QUERY_SUPPORT_CASES":
+            out = {"userId": uid}
+            case_id = g("caseId", "case_id", "caseNo", "case_no")
+            if case_id:
+                out["caseId"] = case_id
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
         return {"userId": uid}
 
 

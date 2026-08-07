@@ -101,6 +101,8 @@ public class AgentActionStatusService {
     public static String commandType(String actionType) {
         return switch (actionType) {
             case "REFUND" -> OrderRequestIdempotencyService.COMMAND_AGENT_REFUND;
+            case "CANCEL_ORDER" ->
+                    OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER;
             case "CONFIRM_RECEIPT" ->
                     OrderRequestIdempotencyService.COMMAND_AGENT_CONFIRM_RECEIPT;
             case "PRODUCT_REVIEW" ->
@@ -114,6 +116,8 @@ public class AgentActionStatusService {
             String userId, String actionType, Map<String, Object> params) {
         return switch (actionType) {
             case "REFUND" -> refundObserved(userId, stringValue(params.get("orderItemId")));
+            case "CANCEL_ORDER" ->
+                    cancellationObserved(userId, stringValue(params.get("orderId")));
             case "CONFIRM_RECEIPT" ->
                     receiptObserved(userId, stringValue(params.get("orderId")));
             case "PRODUCT_REVIEW" ->
@@ -149,6 +153,16 @@ public class AgentActionStatusService {
         return order != null
                 && userId.equals(order.getUserId())
                 && OrderStatusEnum.COMPLETED.getStatus().equals(order.getOrderStatus());
+    }
+
+    private boolean cancellationObserved(String userId, String orderId) {
+        if (StringTools.isEmpty(orderId)) {
+            return false;
+        }
+        OrderInfo order = orderInfoService.getOrderInfoByOrderId(orderId);
+        return order != null
+                && userId.equals(order.getUserId())
+                && OrderStatusEnum.CANCELLED.getStatus().equals(order.getOrderStatus());
     }
 
     private boolean reviewObserved(String userId, String orderId, boolean recomment) {
@@ -198,6 +212,7 @@ public class AgentActionStatusService {
     private static String successMessage(String actionType) {
         return switch (actionType) {
             case "REFUND" -> "退款操作已受理";
+            case "CANCEL_ORDER" -> "订单已取消";
             case "CONFIRM_RECEIPT" -> "订单已确认收货";
             case "PRODUCT_REVIEW" -> "订单评价已提交";
             case "RECOMMENT" -> "订单追评已提交";

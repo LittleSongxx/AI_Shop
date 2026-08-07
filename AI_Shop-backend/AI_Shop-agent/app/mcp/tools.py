@@ -34,17 +34,24 @@ class CompareProductsArgs(BaseModel):
 class UserIdOrderArgs(BaseModel):
     userId: str = Field(description="用户Id")
     orderId: str = Field(description="订单Id")
+    runId: str | None = Field(None, description="当前 Agent Episode runId（服务端关联用）")
+
+
+class CancelOrderArgs(UserIdOrderArgs):
+    runId: str | None = Field(None, description="当前 Agent Episode runId（服务端关联用）")
 
 
 class UserIdOrderItemArgs(BaseModel):
     userId: str = Field(description="用户Id")
     orderItemId: str = Field(description="订单项Id")
+    runId: str | None = Field(None, description="当前 Agent Episode runId（服务端关联用）")
 
 
 class RefundStatusArgs(BaseModel):
     userId: str = Field(description="用户Id")
     orderId: str | None = Field(None, description="订单Id")
     orderItemId: str | None = Field(None, description="订单项Id")
+    runId: str | None = Field(None, description="当前 Agent Episode runId（观测关联用）")
 
 
 class ReviewArgs(BaseModel):
@@ -52,12 +59,32 @@ class ReviewArgs(BaseModel):
     orderId: str
     commentContent: str
     star: int = Field(ge=1, le=5)
+    runId: str | None = Field(None, description="当前 Agent Episode runId（服务端关联用）")
 
 
 class RecommentArgs(BaseModel):
     userId: str
     orderId: str
     reCommentContent: str
+    runId: str | None = Field(None, description="当前 Agent Episode runId（服务端关联用）")
+
+
+class SupportCaseArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    category: str = Field(description="工单类别")
+    description: str = Field(description="问题描述")
+    orderId: str | None = Field(None, description="关联订单号")
+    orderItemId: str | None = Field(None, description="关联订单项")
+    imagePath: str | None = Field(None, description="已通过服务端审核的相对图片路径")
+    imageModerationId: int | None = Field(None, description="图片审核记录ID")
+    imageDescription: str | None = Field(None, description="审核通过图片的 VLM 辅助描述")
+    vlmStatus: str | None = Field(None, description="VLM 描述状态")
+    runId: str | None = Field(None, description="当前 Agent Episode runId")
+
+
+class SupportCaseQueryArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    caseId: str | None = Field(None, description="工单ID或工单号")
 
 
 class CouponArgs(BaseModel):
@@ -113,27 +140,28 @@ def build_mcp_tools() -> list[StructuredTool]:
             args_schema=CompareProductsArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderId: _call(
-                "QUERY_LOGISTICS", userId=userId, orderId=orderId
+            coroutine=lambda userId, orderId, runId=None: _call(
+                "QUERY_LOGISTICS", userId=userId, orderId=orderId, runId=runId
             ),
             name="QUERY_LOGISTICS",
             description="[READ] 查询订单物流轨迹（不是查订单列表）",
             args_schema=UserIdOrderArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderId: _call(
-                "QUERY_COMMENT", userId=userId, orderId=orderId
+            coroutine=lambda userId, orderId, runId=None: _call(
+                "QUERY_COMMENT", userId=userId, orderId=orderId, runId=runId
             ),
             name="QUERY_COMMENT",
             description="[READ] 查看订单已提交的评价内容（不是写评价）",
             args_schema=UserIdOrderArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderId=None, orderItemId=None: _call(
+            coroutine=lambda userId, orderId=None, orderItemId=None, runId=None: _call(
                 "QUERY_REFUND_STATUS",
                 userId=userId,
                 orderId=orderId,
                 orderItemId=orderItemId,
+                runId=runId,
             ),
             name="QUERY_REFUND_STATUS",
             description="[READ] 查询当前用户订单或订单项的退款进度",
@@ -161,42 +189,83 @@ def build_mcp_tools() -> list[StructuredTool]:
             args_schema=SearchKnowledgeArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderId: _call(
-                "PROPOSE_CONFIRM_RECEIPT", userId=userId, orderId=orderId
+            coroutine=lambda userId, orderId, runId=None: _call(
+                "PROPOSE_CONFIRM_RECEIPT", userId=userId, orderId=orderId, runId=runId
             ),
             name="PROPOSE_CONFIRM_RECEIPT",
             description="[WRITE] 为系统已验证归属和状态的订单生成确认收货提案",
             args_schema=UserIdOrderArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderItemId: _call(
-                "PROPOSE_REFUND", userId=userId, orderItemId=orderItemId
+            coroutine=lambda userId, orderId, runId=None: _call(
+                "PROPOSE_CANCEL_ORDER",
+                userId=userId,
+                orderId=orderId,
+                runId=runId,
+            ),
+            name="PROPOSE_CANCEL_ORDER",
+            description="[WRITE] 为系统已验证归属且待付款的订单生成取消提案",
+            args_schema=CancelOrderArgs,
+        ),
+        StructuredTool.from_function(
+            coroutine=lambda userId, orderItemId, runId=None: _call(
+                "PROPOSE_REFUND", userId=userId, orderItemId=orderItemId, runId=runId
             ),
             name="PROPOSE_REFUND",
             description="[WRITE] 为系统已验证归属和状态的订单项生成退款提案",
             args_schema=UserIdOrderItemArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderId, commentContent, star: _call(
+            coroutine=lambda userId, orderId, commentContent, star, runId=None: _call(
                 "PROPOSE_PRODUCT_REVIEW",
                 userId=userId,
                 orderId=orderId,
                 commentContent=commentContent,
                 star=star,
+                runId=runId,
             ),
             name="PROPOSE_PRODUCT_REVIEW",
             description="[WRITE] 提交评价提案；用户要写评价/打分时用；缺星级或内容时先追问用户",
             args_schema=ReviewArgs,
         ),
         StructuredTool.from_function(
-            coroutine=lambda userId, orderId, reCommentContent: _call(
+            coroutine=lambda userId, orderId, reCommentContent, runId=None: _call(
                 "PROPOSE_RECOMMENT",
                 userId=userId,
                 orderId=orderId,
                 reCommentContent=reCommentContent,
+                runId=runId,
             ),
             name="PROPOSE_RECOMMENT",
             description="[WRITE] 提交追评提案；不是查评价",
             args_schema=RecommentArgs,
+        ),
+        StructuredTool.from_function(
+            coroutine=lambda userId, category, description, orderId=None, orderItemId=None,
+            imagePath=None, imageModerationId=None, imageDescription=None,
+            vlmStatus=None, runId=None: _call(
+                "PROPOSE_CREATE_SUPPORT_CASE",
+                userId=userId,
+                category=category,
+                description=description,
+                orderId=orderId,
+                orderItemId=orderItemId,
+                imagePath=imagePath,
+                imageModerationId=imageModerationId,
+                imageDescription=imageDescription,
+                vlmStatus=vlmStatus,
+                runId=runId,
+            ),
+            name="PROPOSE_CREATE_SUPPORT_CASE",
+            description="[WRITE] 创建售后工单提案；地址修改和发票也只能走工单",
+            args_schema=SupportCaseArgs,
+        ),
+        StructuredTool.from_function(
+            coroutine=lambda userId, caseId=None: _call(
+                "QUERY_SUPPORT_CASES", userId=userId, caseId=caseId
+            ),
+            name="QUERY_SUPPORT_CASES",
+            description="[READ] 查询当前用户本人近期售后工单或指定工单详情",
+            args_schema=SupportCaseQueryArgs,
         ),
     ]

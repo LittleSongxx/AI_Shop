@@ -45,9 +45,15 @@ TOOL_REQUIRED_INTENTS = frozenset(
         IntentKind.QUERY_COMMENT.value,
         IntentKind.QUERY_COUPON.value,
         IntentKind.REFUND.value,
+        IntentKind.CANCEL_ORDER.value,
         IntentKind.CONFIRM_RECEIPT.value,
         IntentKind.PRODUCT_REVIEW.value,
         IntentKind.RECOMMENT.value,
+        IntentKind.COMPLAINT.value,
+        IntentKind.PAYMENT_ISSUE.value,
+        IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+        IntentKind.INVOICE.value,
+        IntentKind.ADDRESS_CHANGE.value,
     }
 )
 
@@ -139,6 +145,8 @@ async def required_tool_for_intent(
     intent_data: str | None,
     user_text: str,
     user_id: str,
+    *,
+    after_sales_workflow: bool = False,
 ) -> tuple[str, dict] | None:
     """返回该意图必须执行的 (工具名, 参数)；参数不全或无需工具时返回 None。"""
     def order_id() -> str | None:
@@ -156,8 +164,14 @@ async def required_tool_for_intent(
     simple_tools = {
         IntentKind.QUERY_LOGISTICS.value: "QUERY_LOGISTICS",
         IntentKind.QUERY_COMMENT.value: "QUERY_COMMENT",
-        # 取消订单只查订单：客服侧不代客取消，查到后引导用户自己操作。
-        IntentKind.CANCEL_ORDER.value: "QUERY_ORDERS",
+        # A raw cancellation request still needs an order lookup in the
+        # legacy deterministic fallback.  The production graph resolves and
+        # verifies the order first, then emits PROPOSE_CANCEL_ORDER.
+        IntentKind.CANCEL_ORDER.value: (
+            "PROPOSE_CANCEL_ORDER"
+            if after_sales_workflow
+            else "QUERY_ORDERS"
+        ),
         IntentKind.CONFIRM_RECEIPT.value: "PROPOSE_CONFIRM_RECEIPT",
     }
     if intent in simple_tools:
@@ -177,4 +191,17 @@ async def required_tool_for_intent(
         if not oid or not content:
             return None
         return "PROPOSE_RECOMMENT", {"orderId": oid, "reCommentContent": content}
+    if after_sales_workflow and intent in {
+        IntentKind.COMPLAINT.value,
+        IntentKind.PAYMENT_ISSUE.value,
+        IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+        IntentKind.INVOICE.value,
+        IntentKind.ADDRESS_CHANGE.value,
+    }:
+        from app.services.support_case_service import support_case_service
+
+        return "PROPOSE_CREATE_SUPPORT_CASE", {
+            "category": support_case_service.category_for_intent(intent, user_text),
+            "description": (user_text or "售后问题").strip()[:4000],
+        }
     return None

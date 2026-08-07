@@ -36,6 +36,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service("imageModerationService")
@@ -43,6 +44,9 @@ import java.util.stream.Collectors;
 public class ImageModerationServiceImpl implements ImageModerationService {
 
     private static final int TEMP_BAN_HOURS = 2;
+    private static final Pattern SUPPORT_IMAGE_PATH = Pattern.compile(
+            "^[0-9]{6}/[A-Za-z0-9_-]{10,80}\\.(?:jpg|jpeg|png|gif|webp|bmp)$",
+            Pattern.CASE_INSENSITIVE);
 
     @Resource
     private FileUtils fileUtils;
@@ -70,6 +74,14 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         BaiduImageCensorResultDTO result = censorImageBytes(censorBytes, userId, userIp);
         if (result.isPass()) {
             String path = fileUtils.savePreparedImage(prepared, createThumbnail);
+            if (ImageModerationSceneEnum.SUPPORT.equals(sceneEnum)) {
+                ImageModerationRecord record = saveRecord(
+                        userId, userIp, path, sceneEnum.getCode(), orderId, result,
+                        ImageModerationStatusEnum.APPROVED.getStatus());
+                return uploadResult(
+                        path, false, record, ImageModerationStatusEnum.APPROVED,
+                        sceneEnum.getCode());
+            }
             return new ImageUploadResultDTO(path, false);
         }
         return handleCensorResult(userId, userIp, prepared, sceneEnum.getCode(), orderId, result);
@@ -88,8 +100,14 @@ public class ImageModerationServiceImpl implements ImageModerationService {
                                                     String orderId, BaiduImageCensorResultDTO result) {
         if (result.isSuspect()) {
             String quarantinePath = fileUtils.saveModerationQuarantineImage(prepared);
-            saveRecord(userId, userIp, quarantinePath, scene, orderId, result,
+            ImageModerationRecord record = saveRecord(
+                    userId, userIp, quarantinePath, scene, orderId, result,
                     ImageModerationStatusEnum.PENDING.getStatus());
+            if (ImageModerationSceneEnum.SUPPORT.getCode().equals(scene)) {
+                return uploadResult(
+                        quarantinePath, true, record, ImageModerationStatusEnum.PENDING,
+                        scene);
+            }
             if (ImageModerationSceneEnum.COMMENT.getCode().equals(scene)
                     && !StringTools.isEmpty(orderId)) {
                 return new ImageUploadResultDTO(quarantinePath, true);
@@ -111,8 +129,9 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         throw new BusinessException("图片审核未通过，请更换图片后重试");
     }
 
-    private void saveRecord(String userId, String userIp, String imagePath, String scene, String orderId,
-                            BaiduImageCensorResultDTO result, Integer status) {
+    private ImageModerationRecord saveRecord(
+            String userId, String userIp, String imagePath, String scene, String orderId,
+            BaiduImageCensorResultDTO result, Integer status) {
         ImageModerationRecord record = new ImageModerationRecord();
         record.setUserId(userId);
         record.setUserIp(userIp);
@@ -125,6 +144,20 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         record.setStatus(status);
         record.setCreateTime(new Date());
         imageModerationRecordMapper.insert(record);
+        return record;
+    }
+
+    private static ImageUploadResultDTO uploadResult(
+            String path,
+            boolean pendingReview,
+            ImageModerationRecord record,
+            ImageModerationStatusEnum status,
+            String scene) {
+        ImageUploadResultDTO dto = new ImageUploadResultDTO(path, pendingReview);
+        dto.setModerationId(record == null ? null : record.getRecordId());
+        dto.setModerationStatus(status.name());
+        dto.setScene(scene);
+        return dto;
     }
 
     @Override
@@ -148,6 +181,39 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     }
 
     @Override
+    public Map<String, Object> verifySupportImage(
+            String userId, Integer moderationId, String imagePath) {
+        if (StringTools.isEmpty(userId) || moderationId == null || StringTools.isEmpty(imagePath)) {
+            throw new BusinessException("售后图片校验参数不完整");
+        }
+        if (!StringTools.pathIsOK(imagePath)
+                || imagePath.startsWith("/")
+                || imagePath.contains("\\")
+                || imagePath.contains("://")
+                || FileUtils.isModerationQuarantinePath(imagePath)
+                || !SUPPORT_IMAGE_PATH.matcher(imagePath).matches()) {
+            throw new BusinessException("售后图片路径无效");
+        }
+        ImageModerationRecord record = getByRecordId(moderationId);
+        boolean approved = record != null
+                && userId.equals(record.getUserId())
+                && ImageModerationSceneEnum.SUPPORT.getCode().equals(record.getScene())
+                && ImageModerationStatusEnum.APPROVED.getStatus().equals(record.getStatus())
+                && imagePath.equals(record.getImagePath())
+                && !FileUtils.isModerationQuarantinePath(record.getImagePath());
+        if (!approved) {
+            throw new BusinessException("售后图片尚未通过审核或不属于当前用户");
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("approved", true);
+        result.put("path", record.getImagePath());
+        result.put("moderationId", record.getRecordId());
+        result.put("moderationStatus", ImageModerationStatusEnum.APPROVED.name());
+        result.put("scene", record.getScene());
+        return result;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void handleReview(Integer recordId, String action, String handleRemark) {
         ImageModerationRecord record = getByRecordId(recordId);
@@ -160,18 +226,37 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         ImageModerationRecord patch = new ImageModerationRecord();
         patch.setHandleTime(new Date());
         patch.setHandleRemark(handleRemark);
+        String quarantinePathToDelete = null;
+        String copiedNormalPath = null;
         switch (action == null ? "" : action) {
-            case "approve" -> patch.setStatus(ImageModerationStatusEnum.APPROVED.getStatus());
+            case "approve" -> {
+                patch.setStatus(ImageModerationStatusEnum.APPROVED.getStatus());
+                if (ImageModerationSceneEnum.SUPPORT.getCode().equals(record.getScene())
+                        && FileUtils.isModerationQuarantinePath(record.getImagePath())) {
+                    String suffix = StringTools.getFileSuffix(record.getImagePath());
+                    copiedNormalPath = fileUtils.allocateNormalImageRelativePath(suffix);
+                    fileUtils.copyQuarantineToNormal(record.getImagePath(), copiedNormalPath, false);
+                    patch.setImagePath(copiedNormalPath);
+                    quarantinePathToDelete = record.getImagePath();
+                }
+            }
             case "dismiss" -> patch.setStatus(ImageModerationStatusEnum.DISMISSED.getStatus());
             case "ban_temp" -> patch.setStatus(ImageModerationStatusEnum.VIOLATION.getStatus());
             case "ban_perm" -> patch.setStatus(ImageModerationStatusEnum.VIOLATION.getStatus());
             default -> throw new BusinessException("无效的处理动作");
         }
-        int updated = imageModerationRecordMapper.updateByRecordIdIfPending(patch, recordId);
-        if (updated != 1) {
-            throw new BusinessException("该记录已处理");
+        try {
+            int updated = imageModerationRecordMapper.updateByRecordIdIfPending(patch, recordId);
+            if (updated != 1) {
+                throw new BusinessException("该记录已处理");
+            }
+        } catch (RuntimeException ex) {
+            if (copiedNormalPath != null) {
+                fileUtils.deleteStoredFileQuietly(copiedNormalPath);
+            }
+            throw ex;
         }
-        switch (action) {
+        switch (action == null ? "" : action) {
             case "approve" -> onCommentRecordApproved(record);
             case "dismiss" -> onCommentRecordRejected(record, action);
             case "ban_temp" -> {
@@ -183,6 +268,14 @@ public class ImageModerationServiceImpl implements ImageModerationService {
                 onCommentRecordRejected(record, action);
             }
             default -> { }
+        }
+        if (!"approve".equals(action)
+                && ImageModerationSceneEnum.SUPPORT.getCode().equals(record.getScene())
+                && FileUtils.isModerationQuarantinePath(record.getImagePath())) {
+            fileUtils.deleteStoredFileQuietly(record.getImagePath());
+        }
+        if (quarantinePathToDelete != null) {
+            fileUtils.deleteStoredFileQuietly(quarantinePathToDelete);
         }
     }
 

@@ -25,7 +25,6 @@ from app.services.tool_invoke_result import ToolInvokeResult
 
 logger = structlog.get_logger()
 
-_CANCEL_ORDER_GUIDE = "客服侧暂不支持直接取消订单，请到「我的订单」页面自行取消。"
 _TOOL_FAILURE_TEXT = "业务数据查询失败，请稍后重试；当前回复不会猜测订单或操作状态。"
 
 
@@ -139,7 +138,13 @@ async def forced_tool_for_intent(
 ) -> dict | None:
     """意图要求工具但模型没调时，替它调。参数不全则返回 None 交回模型追问。"""
     try:
-        forced = await required_tool_for_intent(intent, intent_data, user_text, user_id)
+        forced = await required_tool_for_intent(
+            intent,
+            intent_data,
+            user_text,
+            user_id,
+            after_sales_workflow=True,
+        )
     except Exception as exc:
         return _finalize_tool_failure(messages, exc, intent=intent)
     if not forced:
@@ -164,9 +169,6 @@ async def forced_tool_for_intent(
 
     # 有卡片时不再输出文本，避免卡片和纯文本重复描述同一批数据。
     chunks = [] if _has_cards(result) else [tool_text or "未查询到相关记录。"]
-    if intent == IntentKind.CANCEL_ORDER.value:
-        chunks = [_CANCEL_ORDER_GUIDE + "\n" + chunks[0]] if chunks else [_CANCEL_ORDER_GUIDE]
-
     return _finalize_with_tool(
         messages=messages,
         tool_name=tool_name,

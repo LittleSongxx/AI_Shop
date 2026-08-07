@@ -51,8 +51,10 @@ from app.utils.biz_payload import (
     is_order_cards_json,
     is_order_selection_json,
     is_product_cards_json,
+    is_support_case_cards_json,
     looks_like_aftersales_or_order_text,
     strip_embedded_product_json,
+    support_case_card_type,
     trim_assistant,
 )
 from app.utils.product_consult import is_product_consult_turn, parse_consult_card
@@ -79,7 +81,7 @@ async def is_cancelled(user_id: str, message_id: int) -> bool:
 
 async def resolve_action_confirm(
     full_text: str, messages: list, user_id: str
-) -> tuple[str, str, str] | None:
+) -> tuple[str, str, str, dict] | None:
     token_ids = collect_act_token_ids(full_text, messages)
     if not token_ids:
         return None
@@ -94,14 +96,14 @@ async def resolve_action_confirm(
             assistant, biz_data = build_action_confirm_unavailable_payload(
                 tid, full_text, reason="wrong_user"
             )
-            return assistant, biz_data, "action_confirm"
+            return assistant, biz_data, "action_confirm", candidate
         pending = candidate
         token_id = tid
         break
 
     if pending and token_id:
         assistant, biz_data = build_action_confirm_payload(pending, full_text)
-        return assistant, biz_data, "action_confirm"
+        return assistant, biz_data, "action_confirm", pending
 
     # Token present but Redis has no pending — usually LLM invented 【act_xxx】
     # without calling PROPOSE_*. Never render a pre-expired confirm card.
@@ -248,7 +250,10 @@ _NON_PRODUCT_TOOLS = frozenset({
     "QUERY_REFUND_STATUS",
     "QUERY_USER_COUPONS",
     "PROPOSE_REFUND",
+    "PROPOSE_CANCEL_ORDER",
     "PROPOSE_CONFIRM_RECEIPT",
+    "PROPOSE_CREATE_SUPPORT_CASE",
+    "QUERY_SUPPORT_CASES",
     "PROPOSE_PRODUCT_REVIEW",
     "PROPOSE_RECOMMENT",
     "GET_PRODUCT_DETAIL",
@@ -256,7 +261,9 @@ _NON_PRODUCT_TOOLS = frozenset({
 
 _WRITE_PROPOSE_TOOLS = frozenset({
     "PROPOSE_REFUND",
+    "PROPOSE_CANCEL_ORDER",
     "PROPOSE_CONFIRM_RECEIPT",
+    "PROPOSE_CREATE_SUPPORT_CASE",
     "PROPOSE_PRODUCT_REVIEW",
     "PROPOSE_RECOMMENT",
 })
@@ -303,11 +310,19 @@ async def finalize_agent_response(
     called = list(tools_called or [])
 
     resolved = await resolve_action_confirm(full_text, messages, user_id)
+    pending_for_verifier: dict | None = None
     if resolved:
-        assistant, biz_data, biz_type = resolved
+        assistant, biz_data, biz_type, pending_for_verifier = resolved
     elif is_order_selection_json(assistant_cards):
         assistant = assistant_cards or ""
         biz_type = "order_selection"
+    elif is_support_case_cards_json(assistant_cards):
+        assistant = assistant_cards or "{}"
+        biz_type = (
+            "support_case_list"
+            if support_case_card_type(assistant_cards) == "SUPPORT_CASE_LIST"
+            else "support_case_detail"
+        )
     else:
         # Drop fabricated act tokens so they never surface as "expired" cards.
         full_text = re.sub(r"【act_[a-f0-9]{32}】", "", full_text or "", flags=re.I).strip()
@@ -456,6 +471,18 @@ async def finalize_agent_response(
                 error=type(exc).__name__,
             )
 
+    support_case_for_verifier = None
+    if (
+        pending_for_verifier
+        and pending_for_verifier.get("actionType") == "CREATE_SUPPORT_CASE"
+    ):
+        try:
+            support_case_for_verifier = json.loads(
+                pending_for_verifier.get("paramsJson") or "{}"
+            )
+        except (TypeError, json.JSONDecodeError):
+            support_case_for_verifier = {}
+
     verification = response_verifier.verify(
         assistant=assistant,
         biz_type=biz_type,
@@ -465,6 +492,7 @@ async def finalize_agent_response(
         order_resolution=order_resolution,
         recommendation_constraints=recommendation_constraints,
         recommendation_candidates=recommendation_candidates,
+        support_case=support_case_for_verifier,
         policy_evidence_required=rag_evidence_required,
     )
     RESPONSE_VERIFIER_TOTAL.labels(

@@ -40,7 +40,12 @@ from app.services.message_service import agent_message_service
 from app.services.product_service import is_similar_or_recommend_request
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.redis_service import redis_service
-from app.utils.biz_payload import is_order_cards_json, is_product_cards_json
+from app.utils.biz_payload import (
+    is_order_cards_json,
+    is_product_cards_json,
+    is_support_case_cards_json,
+    support_case_card_type,
+)
 from app.utils.order_ids import extract_order_id
 from app.utils.product_consult import is_product_consult_turn
 from app.utils.prompt_boundary import isolate_knowledge_text
@@ -277,6 +282,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 unresolved_count=int(state["agent_msg"].get("unresolvedCount") or 0),
                 session_intent=recent_intents[0] if recent_intents else None,
                 recent_intents=recent_intents,
+                after_sales_workflow=True,
             )
     intent = decision.intent
     intent_source = decision.source
@@ -308,9 +314,31 @@ async def build_context_node(state: AgentGraphState) -> dict:
     # the description enriches both the RAG query and the LLM context window.
     image_url = state.get("image_url")
     image_desc: str | None = None
+    image_evidence = dict(state.get("image_evidence") or {}) or None
+    image_vlm_status: str | None = None
     if image_url:
         from app.rag.image_describer import describe_image
         image_desc = await describe_image(image_url)
+        image_vlm_status = (
+            "SUCCESS"
+            if image_desc
+            else "FAILED" if settings.vlm_api_key else "DISABLED"
+        )
+        if image_evidence is not None:
+            image_evidence["vlmStatus"] = image_vlm_status
+            if image_desc:
+                image_evidence["vlmDescription"] = image_desc
+        episode_service.record_step(
+            "IMAGE_EVIDENCE",
+            node_name="build_context",
+            status="OK" if image_desc else "DEGRADED",
+            output_data={
+                "moderationId": (image_evidence or {}).get("moderationId"),
+                "moderationStatus": (image_evidence or {}).get("moderationStatus"),
+                "vlmStatus": image_vlm_status,
+                "hasDescription": bool(image_desc),
+            },
+        )
         if image_desc:
             logger.debug("user_image_described", user_id=user_id, length=len(image_desc))
 
@@ -504,6 +532,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "intent": intent.value,
         "intent_data": intent_data or None,
         "intent_decision": decision.model_dump(mode="json"),
+        "image_evidence": image_evidence,
+        "image_description": image_desc,
         "rag_source_refs": rag_source_refs,
         "rag_trace": rag_trace,
         "rag_mode": rag_mode,
@@ -892,6 +922,26 @@ async def tools_node(state: AgentGraphState) -> dict:
             category_filter = category_map.get(str(state.get("intent") or "")) or None
             if category_filter:
                 tool_args["_categoryFilter"] = category_filter
+        if tc["name"] == "PROPOSE_CREATE_SUPPORT_CASE":
+            evidence = dict(state.get("image_evidence") or {})
+            for key in (
+                "imagePath",
+                "imageModerationId",
+                "imageDescription",
+                "vlmStatus",
+            ):
+                tool_args.pop(key, None)
+            if evidence:
+                tool_args.update(
+                    {
+                        "imagePath": evidence.get("path"),
+                        "imageModerationId": evidence.get("moderationId"),
+                        "imageDescription": evidence.get("vlmDescription"),
+                        "vlmStatus": evidence.get("vlmStatus"),
+                    }
+                )
+            tool_args["sourceMessageId"] = message_id
+            tool_args["runId"] = (state.get("agent_msg") or {}).get("runId")
 
         result = await mcp_tool_router.invoke(
             tc["name"], tool_args, user_id, call_id=tc.get("id")
@@ -972,6 +1022,24 @@ async def tools_node(state: AgentGraphState) -> dict:
             "pending_tool_calls": [],
             "tool_biz": tool_biz or None,
             "biz_type": biz_type or "product_search",
+            "biz_data": biz_data,
+            "assistant_cards": assistant_cards,
+            "search_tool_hint": search_tool_hint,
+            "chunks": [],
+            "route": "finalize",
+        }
+    if is_support_case_cards_json(assistant_cards) and "QUERY_SUPPORT_CASES" in called:
+        return {
+            **rag_update,
+            "llm_messages": messages,
+            "tools_called": called,
+            "pending_tool_calls": [],
+            "tool_biz": tool_biz or None,
+            "biz_type": (
+                "support_case_list"
+                if support_case_card_type(assistant_cards) == "SUPPORT_CASE_LIST"
+                else "support_case_detail"
+            ),
             "biz_data": biz_data,
             "assistant_cards": assistant_cards,
             "search_tool_hint": search_tool_hint,

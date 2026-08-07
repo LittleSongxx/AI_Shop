@@ -184,10 +184,94 @@ class AgentActionStatusServiceTest {
                 "退款操作已受理");
     }
 
+    @Test
+    void completedCancellationLedgerIsAuthoritative() {
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                KEY)).thenReturn(record("COMPLETED"));
+
+        Map<String, Object> result = service.resolve(cancellationBody());
+
+        assertEquals(AgentActionStatusService.STATUS_SUCCESS, result.get("status"));
+        assertEquals("订单已取消", result.get("resultMessage"));
+        verify(orderInfoService, never()).getOrderInfoByOrderId("o1");
+    }
+
+    @Test
+    void cancelledOrderRepairsProcessingCancellationLedger() {
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                KEY)).thenReturn(record("PROCESSING"));
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("o1");
+        order.setUserId(USER);
+        order.setOrderStatus(OrderStatusEnum.CANCELLED.getStatus());
+        when(orderInfoService.getOrderInfoByOrderId("o1")).thenReturn(order);
+
+        Map<String, Object> result = service.resolve(cancellationBody());
+
+        assertEquals(AgentActionStatusService.STATUS_SUCCESS, result.get("status"));
+        verify(idempotencyService).markReconciled(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                KEY,
+                "订单已取消");
+    }
+
+    @Test
+    void cancellationWithoutLedgerOrDomainEvidenceIsUnknown() {
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                KEY)).thenReturn(null);
+        when(orderInfoService.getOrderInfoByOrderId("o1")).thenReturn(null);
+
+        Map<String, Object> result = service.resolve(cancellationBody());
+
+        assertEquals(AgentActionStatusService.STATUS_UNKNOWN, result.get("status"));
+    }
+
+    @Test
+    void cancellationReconciliationStopsAtConfiguredBoundary() {
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                KEY)).thenReturn(record("INCONCLUSIVE"));
+        when(orderInfoService.getOrderInfoByOrderId("o1")).thenReturn(null);
+        OrderRequestIdempotency manual = record("MANUAL_REVIEW");
+        manual.setReconcileAttempts(2);
+        when(idempotencyService.recordInconclusive(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                KEY,
+                2,
+                60,
+                "账本未终结且未观察到领域结果"))
+                .thenReturn(manual);
+        Map<String, Object> body = new java.util.LinkedHashMap<>(cancellationBody());
+        body.put("maxAttempts", 2);
+        body.put("reconcileWindowSeconds", 60);
+
+        Map<String, Object> result = service.resolve(body);
+
+        assertEquals(AgentActionStatusService.STATUS_MANUAL_REVIEW, result.get("status"));
+        assertEquals(2, result.get("reconcileAttempts"));
+    }
+
     private static Map<String, Object> receiptBody() {
         return Map.of(
                 "userId", USER,
                 "actionType", "CONFIRM_RECEIPT",
+                "idempotencyKey", KEY,
+                "params", Map.of("orderId", "o1"));
+    }
+
+    private static Map<String, Object> cancellationBody() {
+        return Map.of(
+                "userId", USER,
+                "actionType", "CANCEL_ORDER",
                 "idempotencyKey", KEY,
                 "params", Map.of("orderId", "o1"));
     }

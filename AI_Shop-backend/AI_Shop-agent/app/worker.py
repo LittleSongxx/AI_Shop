@@ -610,6 +610,7 @@ class AgentWorker:
                 session_intent=recent_intents[0] if recent_intents else None,
                 recent_intents=recent_intents,
                 record_metrics=False,
+                after_sales_workflow=True,
             )
         if decision is None or (
             refined.intent != decision.intent

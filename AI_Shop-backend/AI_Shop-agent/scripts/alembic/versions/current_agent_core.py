@@ -161,6 +161,7 @@ def upgrade() -> None:
             user_id varchar(32) NOT NULL,
             action_type varchar(64) NOT NULL,
             message_id bigint NULL,
+            run_id varchar(64) NULL,
             params_json json NOT NULL,
             business_key varchar(255) NOT NULL,
             args_fingerprint char(64) NOT NULL,
@@ -184,6 +185,7 @@ def upgrade() -> None:
             ) STORED,
             KEY idx_agent_pending_user (user_id, status, expires_at),
             KEY idx_agent_pending_expire (status, expires_at),
+            KEY idx_agent_pending_run (run_id, created_at),
             UNIQUE KEY uk_agent_pending_active_business (active_business_key)
         ) CHARSET = utf8mb4
         """
@@ -516,11 +518,48 @@ def upgrade() -> None:
         ) COMMENT 'human-reviewed Agent regression cases' CHARSET = utf8mb4
         """
     )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS support_case
+        (
+            case_id             bigint AUTO_INCREMENT PRIMARY KEY,
+            case_no             varchar(40) NOT NULL,
+            user_id             varchar(32) NOT NULL,
+            order_id            varchar(64) NULL,
+            order_item_id       varchar(64) NULL,
+            category            varchar(32) NOT NULL,
+            status              varchar(20) NOT NULL DEFAULT 'OPEN',
+            description         varchar(4000) NOT NULL,
+            evidence_json       json NULL,
+            source_message_id   bigint NULL,
+            run_id              varchar(64) NULL,
+            action_token        varchar(80) NULL,
+            idempotency_key     varchar(128) NULL,
+            priority            varchar(16) NOT NULL DEFAULT 'NORMAL',
+            forced_handoff      tinyint(1) NOT NULL DEFAULT 0,
+            support_session_id  varchar(36) NULL,
+            assigned_admin      varchar(100) NULL,
+            resolution_code     varchar(64) NULL,
+            root_cause          varchar(255) NULL,
+            resolution_summary  varchar(2000) NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            resolved_at         datetime(3) NULL,
+            UNIQUE KEY uk_support_case_no (case_no),
+            UNIQUE KEY uk_support_case_idempotency (user_id, idempotency_key),
+            KEY idx_support_case_user_time (user_id, created_at),
+            KEY idx_support_case_status_time (status, priority, created_at),
+            KEY idx_support_case_run (run_id, created_at)
+        ) COMMENT '独立售后业务工单' CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci
+        """
+    )
 
     _reconcile_agent_message()
     _reconcile_episode_tables()
     _reconcile_shopping_profile()
     _reconcile_pending_action()
+    _reconcile_support_case()
     _reconcile_quality_tables()
     _reconcile_indexes()
 
@@ -656,6 +695,7 @@ def _reconcile_pending_action() -> None:
     inspector = sa.inspect(op.get_bind())
     columns = {column["name"] for column in inspector.get_columns("agent_pending_action")}
     definitions = {
+        "run_id": sa.Column("run_id", sa.String(64), nullable=True),
         "business_key": sa.Column("business_key", sa.String(255), nullable=True),
         "args_fingerprint": sa.Column("args_fingerprint", sa.String(64), nullable=True),
         "reconcile_attempts": sa.Column(
@@ -711,6 +751,52 @@ def _reconcile_pending_action() -> None:
             ) STORED
             """
         )
+
+
+def _reconcile_support_case() -> None:
+    """Complete the independent support-case table on legacy databases."""
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "support_case" not in inspector.get_table_names():
+        return
+    definitions = {
+        "case_no": "varchar(40) NULL",
+        "user_id": "varchar(32) NULL",
+        "order_id": "varchar(64) NULL",
+        "order_item_id": "varchar(64) NULL",
+        "category": "varchar(32) NOT NULL DEFAULT 'OTHER'",
+        "status": "varchar(20) NOT NULL DEFAULT 'OPEN'",
+        "description": "varchar(4000) NOT NULL DEFAULT ''",
+        "evidence_json": "json NULL",
+        "source_message_id": "bigint NULL",
+        "run_id": "varchar(64) NULL",
+        "action_token": "varchar(80) NULL",
+        "idempotency_key": "varchar(128) NULL",
+        "priority": "varchar(16) NOT NULL DEFAULT 'NORMAL'",
+        "forced_handoff": "tinyint(1) NOT NULL DEFAULT 0",
+        "support_session_id": "varchar(36) NULL",
+        "assigned_admin": "varchar(100) NULL",
+        "resolution_code": "varchar(64) NULL",
+        "root_cause": "varchar(255) NULL",
+        "resolution_summary": "varchar(2000) NULL",
+        "created_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
+        "updated_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
+        "resolved_at": "datetime(3) NULL",
+    }
+    existing = {column["name"] for column in inspector.get_columns("support_case")}
+    for name, ddl in definitions.items():
+        if name not in existing:
+            op.execute(f"ALTER TABLE support_case ADD COLUMN {name} {ddl}")
+    op.execute(
+        "UPDATE support_case SET case_no=CONCAT('LEGACY-', case_id) "
+        "WHERE case_no IS NULL OR case_no=''"
+    )
+    op.execute(
+        "UPDATE support_case SET user_id='<LEGACY>' "
+        "WHERE user_id IS NULL OR user_id=''"
+    )
+    op.execute("ALTER TABLE support_case MODIFY COLUMN case_no varchar(40) NOT NULL")
+    op.execute("ALTER TABLE support_case MODIFY COLUMN user_id varchar(32) NOT NULL")
 
 
 def _reconcile_quality_tables() -> None:
@@ -790,6 +876,7 @@ def _reconcile_indexes() -> None:
                 False,
             ),
             ("idx_agent_pending_expire", ("status", "expires_at"), False),
+            ("idx_agent_pending_run", ("run_id", "created_at"), False),
             (
                 "uk_agent_pending_active_business",
                 ("active_business_key",),
@@ -844,6 +931,13 @@ def _reconcile_indexes() -> None:
                 False,
             ),
         ),
+        "support_case": (
+            ("uk_support_case_no", ("case_no",), True),
+            ("uk_support_case_idempotency", ("user_id", "idempotency_key"), True),
+            ("idx_support_case_user_time", ("user_id", "created_at"), False),
+            ("idx_support_case_status_time", ("status", "priority", "created_at"), False),
+            ("idx_support_case_run", ("run_id", "created_at"), False),
+        ),
     }
     inspector = sa.inspect(op.get_bind())
     for table_name, definitions in indexes.items():
@@ -865,6 +959,7 @@ def downgrade() -> None:
         "agent_step",
         "agent_run",
         "agent_regression_case",
+        "support_case",
         "ai_badcase_candidate",
         "agent_message_feedback",
         "agent_task",

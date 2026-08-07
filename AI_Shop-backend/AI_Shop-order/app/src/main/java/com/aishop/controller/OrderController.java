@@ -156,17 +156,26 @@ public class OrderController extends ABaseController{
     // 取消订单
     @PostMapping("/cancelOrder")
     @GlobalInterceptor(checkLogin = true)
-    public ResponseVO cancelOrder(@NotEmpty String orderId){
-        // 只能取消待支付的本人的订单
-//        获得当前用户的userId
+    public ResponseVO cancelOrder(
+            @NotEmpty String orderId,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            String idempotencyKey){
         String userId = getTokenUserInfo().getUserId();
-        // 根据orderId查询订单
+        executeIdempotentAction(
+                userId,
+                OrderRequestIdempotencyService.COMMAND_AGENT_CANCEL_ORDER,
+                idempotencyKey,
+                Map.of("orderId", orderId),
+                () -> cancelOrderCommand(userId, orderId));
+        return getSuccessResponseVO(null);
+    }
+
+    private void cancelOrderCommand(String userId, String orderId) {
         OrderInfo orderInfo = orderInfoService.getOrderInfoByOrderId(orderId);
         if (orderInfo == null || !orderInfo.getUserId().equals(userId)){
             throw new BusinessException("订单不存在");
         }
         orderInfoService.cancelOrder(userId,orderId,OrderStatusEnum.WAIT_PAYMENT);
-        return getSuccessResponseVO(null);
     }
 
     // 删除订单（更新数据库的orderStatus，逻辑删除）

@@ -124,6 +124,24 @@ _TOOL_INTENTS = frozenset(
         IntentKind.QUERY_COMMENT,
         IntentKind.REFUND_STATUS,
         IntentKind.CANCEL_ORDER,  # 查到订单后引导用户自行取消；需要工具结果才能响应
+        IntentKind.COMPLAINT,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.INVOICE,
+        IntentKind.ADDRESS_CHANGE,
+    }
+)
+
+# The frozen conversation benchmark predates the independent support-case
+# workflow.  Keep its answer/tool contract stable while the production entry
+# point opts into the newer proposal flow explicitly.
+_AFTER_SALES_WORKFLOW_INTENTS = frozenset(
+    {
+        IntentKind.COMPLAINT,
+        IntentKind.PAYMENT_ISSUE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.INVOICE,
+        IntentKind.ADDRESS_CHANGE,
     }
 )
 
@@ -723,6 +741,7 @@ async def resolve_intent(
     session_intent: str | None = None,
     recent_intents: list[str] | None = None,
     record_metrics: bool = True,
+    after_sales_workflow: bool = False,
 ) -> IntentDecision:
     structural = _structural_intent(
         user_text,
@@ -732,7 +751,11 @@ async def resolve_intent(
     )
     if structural is not None:
         decision = _build_decision(
-            structural, user_text, confidence=0.99, source="structural"
+            structural,
+            user_text,
+            confidence=0.99,
+            source="structural",
+            after_sales_workflow=after_sales_workflow,
         )
         return _record_and_apply(
             decision,
@@ -740,6 +763,7 @@ async def resolve_intent(
             unresolved_count,
             recent_intents=recent_intents,
             record_metrics=record_metrics,
+            after_sales_workflow=after_sales_workflow,
         )
 
     high_intent, high_data = classify_high_confidence_intent(
@@ -752,6 +776,7 @@ async def resolve_intent(
             confidence=0.96,
             source="rule_priority",
             data=high_data,
+            after_sales_workflow=after_sales_workflow,
         )
         return _record_and_apply(
             decision,
@@ -759,6 +784,7 @@ async def resolve_intent(
             unresolved_count,
             recent_intents=recent_intents,
             record_metrics=record_metrics,
+            after_sales_workflow=after_sales_workflow,
         )
 
     settings = get_settings()
@@ -777,6 +803,7 @@ async def resolve_intent(
                 unresolved_count,
                 recent_intents=recent_intents,
                 record_metrics=record_metrics,
+                after_sales_workflow=after_sales_workflow,
             )
 
     if settings.intent_rule_fallback:
@@ -790,7 +817,11 @@ async def resolve_intent(
         if ruled is not None:
             confidence = 0.9 if ruled != IntentKind.AFTERSALES_UNKNOWN else 0.65
             decision = _build_decision(
-                ruled, user_text, confidence=confidence, source="rule"
+                ruled,
+                user_text,
+                confidence=confidence,
+                source="rule",
+                after_sales_workflow=after_sales_workflow,
             )
             return _record_and_apply(
                 decision,
@@ -798,6 +829,7 @@ async def resolve_intent(
                 unresolved_count,
                 recent_intents=recent_intents,
                 record_metrics=record_metrics,
+                after_sales_workflow=after_sales_workflow,
             )
 
     decision = _build_decision(
@@ -806,6 +838,7 @@ async def resolve_intent(
         confidence=0.4,
         source="default",
         next_action=NextAction.ASK_CLARIFICATION,
+        after_sales_workflow=after_sales_workflow,
     )
     return _record_and_apply(
         decision,
@@ -813,6 +846,7 @@ async def resolve_intent(
         unresolved_count,
         recent_intents=recent_intents,
         record_metrics=record_metrics,
+        after_sales_workflow=after_sales_workflow,
     )
 
 
@@ -824,6 +858,7 @@ def _build_decision(
     source: str,
     data: str = "",
     next_action: NextAction | None = None,
+    after_sales_workflow: bool = False,
 ) -> IntentDecision:
     sentiment = analyze_sentiment(user_text)
     risk = RiskLevel.HIGH if any(k in user_text for k in FUND_AT_RISK) else RiskLevel.LOW
@@ -844,7 +879,10 @@ def _build_decision(
         urgency = UrgencyKind.HIGH
 
     if next_action is None:
-        next_action = NextAction.TOOL if intent in _TOOL_INTENTS else NextAction.ANSWER
+        tool_intents = _TOOL_INTENTS
+        if not after_sales_workflow:
+            tool_intents = tool_intents - _AFTER_SALES_WORKFLOW_INTENTS
+        next_action = NextAction.TOOL if intent in tool_intents else NextAction.ANSWER
         if intent == IntentKind.AFTERSALES_UNKNOWN:
             next_action = NextAction.ASK_CLARIFICATION
 
@@ -886,6 +924,7 @@ def _record_and_apply(
     unresolved_count: int,
     recent_intents: list[str] | None = None,
     record_metrics: bool = True,
+    after_sales_workflow: bool = False,
 ) -> IntentDecision:
     entities = {
         **extract_entities(user_text, decision.data),

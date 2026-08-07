@@ -8,6 +8,7 @@ import com.aishop.entity.vo.PaginationResultVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ImageModerationService {
 
@@ -21,6 +22,8 @@ public interface ImageModerationService {
     PaginationResultVO<ImageModerationRecord> findListByPage(ImageModerationRecordQuery param);
 
     ImageModerationRecord getByRecordId(Integer recordId);
+
+    Map<String, Object> verifySupportImage(String userId, Integer moderationId, String imagePath);
 
     void handleReview(Integer recordId, String action, String handleRemark);
 

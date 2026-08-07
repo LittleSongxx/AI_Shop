@@ -224,3 +224,35 @@ async def test_selected_refund_rechecks_latest_status_before_proposing():
     assert update["order_resolution"] == "NO_ELIGIBLE"
     assert "待付款" in update["chunks"][0]
     invoke.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("intent", "text", "expected_category"),
+    [
+        ("ADDRESS_CHANGE", "我想修改收货地址", "ADDRESS_CHANGE"),
+        ("INVOICE", "请开具发票", "INVOICE"),
+        ("DAMAGED_OR_WRONG_ITEM", "收到的商品破损了", "DAMAGED"),
+    ],
+)
+async def test_after_sales_intents_propose_owned_support_case(
+    intent, text, expected_category
+):
+    from app.graph.order_reference_flow import _tool_for_target
+
+    target = {
+        "orderId": "SM202608050002",
+        "orderItemId": "SMITEM202608050002",
+        "productName": "索尼无线降噪耳机",
+    }
+    tool_name, args = _tool_for_target(
+        intent,
+        text,
+        target,
+        {"message_id": 30, "after_sales_workflow": True},
+    )
+
+    assert tool_name == "PROPOSE_CREATE_SUPPORT_CASE"
+    assert args["category"] == expected_category
+    assert args["orderId"] == "SM202608050002"
+    assert args["orderItemId"] == "SMITEM202608050002"

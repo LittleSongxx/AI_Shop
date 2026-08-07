@@ -4,6 +4,7 @@ import com.aishop.annotation.GlobalInterceptor;
 import com.aishop.constants.Constants;
 import com.aishop.entity.config.AppConfig;
 import com.aishop.api.dto.ImageUploadResultDTO;
+import com.aishop.api.enums.ImageModerationSceneEnum;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.biz.ImageModerationService;
 import com.aishop.utils.StringTools;
@@ -45,7 +46,8 @@ public class FileController extends ABaseController{
         ImageUploadResultDTO result = imageModerationService.uploadAndModerate(
                 userId, ip, file, createThumbnail, scene, orderId);
         // 合规直传：data 直接返回路径字符串，避免前端解析对象出错
-        if (!Boolean.TRUE.equals(result.getPendingReview())) {
+        if (!ImageModerationSceneEnum.SUPPORT.getCode().equalsIgnoreCase(scene)
+                && !Boolean.TRUE.equals(result.getPendingReview())) {
             return getSuccessResponseVO(result.getPath());
         }
         return getSuccessResponseVO(result);

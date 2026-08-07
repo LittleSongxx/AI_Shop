@@ -108,6 +108,7 @@ _REQUIRED_COLUMNS = {
         "user_id",
         "action_type",
         "message_id",
+        "run_id",
         "params_json",
         "business_key",
         "args_fingerprint",
@@ -209,6 +210,14 @@ _REQUIRED_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "support_case": {
+        "case_id", "case_no", "user_id", "order_id", "order_item_id", "category",
+        "status", "description", "evidence_json", "source_message_id", "run_id",
+        "action_token", "idempotency_key", "priority", "forced_handoff", "assigned_admin",
+        "support_session_id",
+        "resolution_code", "root_cause", "resolution_summary", "created_at", "updated_at",
+        "resolved_at",
+    },
 }
 
 _REQUIRED_INDEXES = {
@@ -225,6 +234,7 @@ _REQUIRED_INDEXES = {
     ("agent_order_selection", "uk_agent_selection_message"),
     ("agent_pending_action", "idx_agent_pending_user"),
     ("agent_pending_action", "uk_agent_pending_active_business"),
+    ("agent_pending_action", "idx_agent_pending_run"),
     ("agent_recommendation_event", "uk_agent_rec_event"),
     ("agent_recommendation_event", "idx_agent_rec_user_time"),
     ("agent_recommendation_event", "idx_agent_rec_request_type"),
@@ -237,6 +247,11 @@ _REQUIRED_INDEXES = {
     ("ai_badcase_candidate", "idx_badcase_run"),
     ("agent_regression_case", "uk_agent_regression_case_key"),
     ("agent_regression_case", "idx_agent_regression_status"),
+    ("support_case", "uk_support_case_no"),
+    ("support_case", "uk_support_case_idempotency"),
+    ("support_case", "idx_support_case_user_time"),
+    ("support_case", "idx_support_case_status_time"),
+    ("support_case", "idx_support_case_run"),
 }
 
 

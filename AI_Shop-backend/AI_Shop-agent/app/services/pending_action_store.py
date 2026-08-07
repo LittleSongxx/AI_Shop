@@ -54,12 +54,12 @@ class PendingActionStore:
                 await cur.execute(
                     """
                     INSERT INTO agent_pending_action
-                        (action_token, user_id, action_type, message_id, params_json,
+                        (action_token, user_id, action_type, message_id, run_id, params_json,
                          business_key, args_fingerprint, summary, confirm_text, risk_tip,
                          status, result_message, error_message, reconcile_attempts,
                          reconcile_deadline, last_reconcile_at, review_reason,
                          expires_at, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                             %s, NULL, NULL, 0, NULL, NULL, NULL, %s, NOW(), NOW())
                     """,
                     (
@@ -67,6 +67,7 @@ class PendingActionStore:
                         pending["userId"],
                         pending["actionType"],
                         pending.get("messageId"),
+                        pending.get("runId"),
                         pending.get("paramsJson") or "{}",
                         pending["businessKey"],
                         pending["argsFingerprint"],
@@ -96,7 +97,7 @@ class PendingActionStore:
         async with acquire() as cur:
             await cur.execute(
                 """
-                SELECT action_token, user_id, action_type, message_id, params_json,
+                SELECT action_token, user_id, action_type, message_id, run_id, params_json,
                        business_key, args_fingerprint, active_business_key,
                        summary, confirm_text, risk_tip, status, result_message,
                        error_message, reconcile_attempts, reconcile_deadline,
@@ -113,7 +114,7 @@ class PendingActionStore:
         async with acquire() as cur:
             await cur.execute(
                 """
-                SELECT action_token, user_id, action_type, message_id, params_json,
+                SELECT action_token, user_id, action_type, message_id, run_id, params_json,
                        business_key, args_fingerprint, active_business_key,
                        summary, confirm_text, risk_tip, status, result_message,
                        error_message, reconcile_attempts, reconcile_deadline,
@@ -183,7 +184,7 @@ class PendingActionStore:
             )
             await cur.execute(
                 """
-                SELECT action_token, user_id, action_type, message_id, params_json,
+                SELECT action_token, user_id, action_type, message_id, run_id, params_json,
                        business_key, args_fingerprint, active_business_key,
                        summary, confirm_text, risk_tip, status, result_message,
                        error_message, reconcile_attempts, reconcile_deadline,
@@ -214,7 +215,7 @@ class PendingActionStore:
             )
             await cur.execute(
                 """
-                SELECT action_token, user_id, action_type, message_id, params_json,
+                SELECT action_token, user_id, action_type, message_id, run_id, params_json,
                        business_key, args_fingerprint, active_business_key,
                        summary, confirm_text, risk_tip, status, result_message,
                        error_message, reconcile_attempts, reconcile_deadline,
@@ -360,7 +361,7 @@ class PendingActionStore:
             )
             await cur.execute(
                 """
-                SELECT action_token, user_id, action_type, message_id, params_json,
+                SELECT action_token, user_id, action_type, message_id, run_id, params_json,
                        business_key, args_fingerprint, active_business_key,
                        summary, confirm_text, risk_tip, status, result_message,
                        error_message, reconcile_attempts, reconcile_deadline,
@@ -386,6 +387,7 @@ class PendingActionStore:
             "userId": row.get("user_id"),
             "actionType": row.get("action_type"),
             "messageId": row.get("message_id"),
+            "runId": row.get("run_id"),
             "paramsJson": json.dumps(params, ensure_ascii=False),
             "businessKey": row.get("business_key"),
             "argsFingerprint": row.get("args_fingerprint"),

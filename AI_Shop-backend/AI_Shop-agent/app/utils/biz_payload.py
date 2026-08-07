@@ -14,7 +14,13 @@ ACTION_CONFIRM_HINT = "请核对以下信息，确认后将立即执行。"
 
 ACTION_LABELS = {
     "REFUND": ("退款", "确认退款", "退款将原路返回，提交后无法撤销"),
+    "CANCEL_ORDER": ("取消订单", "确认取消订单", "取消后订单将关闭，不能恢复"),
     "CONFIRM_RECEIPT": ("确认收货", "确认收货", "确认后将无法发起退款"),
+    "CREATE_SUPPORT_CASE": (
+        "创建售后工单",
+        "确认创建工单",
+        "工单提交后将进入客服处理流程",
+    ),
     "PRODUCT_REVIEW": ("提交评价", "确认提交评价", "评价提交后不可修改"),
     "RECOMMENT": ("提交追评", "确认提交追评", "追评提交后不可修改"),
 }
@@ -454,6 +460,34 @@ def is_order_selection_json(raw: str | None) -> bool:
     )
 
 
+def support_case_card_type(raw: str | None) -> str | None:
+    """Validate and classify a server-produced support-case card."""
+    if not raw or not isinstance(raw, str):
+        return None
+    try:
+        obj = json.loads(raw.strip())
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(obj, dict):
+        return None
+    card_type = str(obj.get("type") or "").upper()
+    if card_type == "SUPPORT_CASE_LIST":
+        return card_type if isinstance(obj.get("cases"), list) else None
+    if card_type == "SUPPORT_CASE_DETAIL":
+        case = obj.get("case")
+        return (
+            card_type
+            if isinstance(case, dict)
+            and (case.get("caseId") is not None or case.get("caseNo"))
+            else None
+        )
+    return None
+
+
+def is_support_case_cards_json(raw: str | None) -> bool:
+    return support_case_card_type(raw) is not None
+
+
 _AFTERSALES_HINTS = (
     "退款",
     "退货",
@@ -564,6 +598,13 @@ def _build_details(action_type: str, params: dict, summary: str | None) -> list[
         _add(details, "退款金额", f"{params.get('refundAmount')} 元" if params.get("refundAmount") else None)
         if not params.get("orderItems"):
             _add(details, "订单项", params.get("orderItemId"))
+    elif action_type == "CANCEL_ORDER":
+        _add(details, "订单号", params.get("orderId"))
+        _add(
+            details,
+            "实付金额",
+            f"{params.get('orderAmount')} 元" if params.get("orderAmount") else None,
+        )
     elif action_type == "CONFIRM_RECEIPT":
         _add(details, "实付金额", f"{params.get('orderAmount')} 元" if params.get("orderAmount") else None)
         if not params.get("orderItems"):
@@ -576,6 +617,17 @@ def _build_details(action_type: str, params: dict, summary: str | None) -> list[
     elif action_type == "RECOMMENT":
         content = params.get("reCommentContent", "")
         _add(details, "追评内容", content[:60] + "…" if len(content) > 60 else content)
+    elif action_type == "CREATE_SUPPORT_CASE":
+        _add(details, "工单类别", params.get("categoryLabel") or params.get("category"))
+        _add(details, "关联订单", params.get("orderId"))
+        description = str(params.get("description") or "")
+        _add(
+            details,
+            "问题描述",
+            description[:80] + "…" if len(description) > 80 else description,
+        )
+        if params.get("evidence"):
+            _add(details, "图片凭证", "已通过服务端校验")
     if not details and summary:
         _add(details, "操作摘要", summary)
     return details

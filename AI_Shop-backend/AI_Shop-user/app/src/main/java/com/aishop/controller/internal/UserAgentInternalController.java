@@ -1,5 +1,6 @@
 package com.aishop.controller.internal;
 
+import com.aishop.biz.ImageModerationService;
 import com.aishop.controller.ABaseController;
 import com.aishop.entity.po.UserBrowseHistory;
 import com.aishop.entity.query.SimplePage;
@@ -25,6 +26,27 @@ public class UserAgentInternalController extends ABaseController {
 
     @Resource
     private UserBrowseHistoryMapper<UserBrowseHistory, UserBrowseHistoryQuery> userBrowseHistoryMapper;
+
+    @Resource
+    private ImageModerationService imageModerationService;
+
+    @PostMapping("/verifyImage")
+    public ResponseVO<Map<String, Object>> verifyImage(@RequestBody Map<String, Object> body) {
+        String userId = body == null || body.get("userId") == null
+                ? null : String.valueOf(body.get("userId")).trim();
+        String imagePath = body == null || body.get("imagePath") == null
+                ? null : String.valueOf(body.get("imagePath")).trim();
+        Integer moderationId = null;
+        if (body != null && body.get("moderationId") != null) {
+            try {
+                moderationId = Integer.valueOf(String.valueOf(body.get("moderationId")));
+            } catch (NumberFormatException ignored) {
+                moderationId = null;
+            }
+        }
+        return getSuccessResponseVO(
+                imageModerationService.verifySupportImage(userId, moderationId, imagePath));
+    }
 
     @PostMapping("/latestBrowseProductId")
     public ResponseVO<Map<String, String>> latestBrowseProductId(@RequestBody Map<String, Object> body) {

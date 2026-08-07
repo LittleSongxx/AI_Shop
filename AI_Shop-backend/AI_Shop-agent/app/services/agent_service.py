@@ -14,6 +14,7 @@ from app.rag.retriever import rag_retriever
 from app.services.agent_queue_service import agent_queue_service
 from app.services.badcase_service import badcase_service
 from app.services.episode_service import episode_service, new_run_id
+from app.services.java_internal_client import java_internal_client
 from app.services.judge_service import judge_service
 from app.services.message_service import agent_message_service
 from app.services.order_reference_resolver import ORDER_REFERENCE_INTENTS
@@ -27,6 +28,7 @@ from app.services.sensitive_word_service import sensitive_word_service
 from app.services.shopping_need_service import shopping_need_service
 from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
+from app.services.support_case_service import support_case_service
 from app.services.support_service import support_service
 from app.services.task_service import agent_task_service
 from app.utils.product_consult import build_consult_card_message, parse_consult_card
@@ -54,6 +56,15 @@ _EPISODE_FULL_INTENTS = frozenset(
 _SHOPPING_MEMORY_INTENTS = frozenset(
     {IntentKind.PRODUCT_SEARCH, IntentKind.PRODUCT_CONSULT}
 )
+_FORCED_CASE_INTENTS = frozenset(
+    {
+        IntentKind.COMPLAINT.value,
+        IntentKind.PAYMENT_ISSUE.value,
+        IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+        IntentKind.REFUND.value,
+        IntentKind.REFUND_STATUS.value,
+    }
+)
 
 
 class AgentOrchestrator:
@@ -65,6 +76,8 @@ class AgentOrchestrator:
         from_product: bool = False,
         consult_product_id: str | None = None,
         comparison_product_ids: list[str] | None = None,
+        image_path: str | None = None,
+        image_moderation_id: int | None = None,
         rate_limit_scope: str = "sendMessage",
     ) -> dict:
         settings = get_settings()
@@ -92,6 +105,10 @@ class AgentOrchestrator:
             allowed = set(await shopping_need_service.allowed_candidate_ids(user_id))
             if any(product_id not in allowed for product_id in selected_comparison_ids):
                 raise ValueError("只能比较当前或近期推荐列表中的商品")
+
+        image_evidence = await support_case_service.verify_image(
+            user_id, image_path, image_moderation_id
+        )
 
         if from_product and consult_product_id:
             await product_snapshot_service.ensure_consult_snapshot(
@@ -123,6 +140,7 @@ class AgentOrchestrator:
                 allow_llm=False,
                 session_intent=session_intent,
                 recent_intents=recent_intents,
+                after_sales_workflow=True,
             )
 
         if card:
@@ -205,6 +223,11 @@ class AgentOrchestrator:
         agent_msg["fromProduct"] = from_product
         if selected_comparison_ids:
             agent_msg["comparisonProductIds"] = selected_comparison_ids
+        if image_evidence:
+            agent_msg["imageEvidence"] = image_evidence
+            agent_msg["imageUrl"] = java_internal_client.support_image_url(
+                image_evidence["path"]
+            )
 
         if active_support:
             await support_service.route_user_message(
@@ -611,6 +634,40 @@ class AgentOrchestrator:
         safe_message: str,
         decision: dict,
     ) -> dict:
+        support_case = None
+        intent = str(decision.get("intent") or "")
+        if intent in _FORCED_CASE_INTENTS:
+            try:
+                entities = (
+                    decision.get("entities")
+                    if isinstance(decision.get("entities"), dict)
+                    else {}
+                )
+                evidence = dict(agent_msg.get("imageEvidence") or {}) or None
+                if evidence is not None:
+                    evidence.setdefault("vlmStatus", "SKIPPED_HANDOFF")
+                support_case = await support_case_service.create(
+                    agent_msg["userId"],
+                    support_case_service.category_for_intent(intent, safe_message),
+                    safe_message,
+                    order_id=entities.get("orderId"),
+                    order_item_id=entities.get("orderItemId"),
+                    evidence=evidence,
+                    source_message_id=agent_msg.get("messageId"),
+                    run_id=agent_msg.get("runId"),
+                    idempotency_key=(
+                        f"forced:{agent_msg['userId']}:{agent_msg['messageId']}:{intent}"
+                    ),
+                    priority="CRITICAL",
+                    forced_handoff=True,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "forced_support_case_create_failed",
+                    message_id=agent_msg.get("messageId"),
+                    intent=intent,
+                    error=type(exc).__name__,
+                )
         summary = support_service.build_summary(safe_message, decision)
         session = await support_service.create_or_get(
             agent_msg["userId"],
@@ -622,6 +679,18 @@ class AgentOrchestrator:
         await agent_message_service.bind_session(
             agent_msg["messageId"], session["session_id"]
         )
+        if support_case:
+            try:
+                support_case = await support_case_service.link_session(
+                    support_case["caseId"], session["session_id"]
+                )
+            except Exception as exc:
+                logger.warning(
+                    "support_case_session_link_failed",
+                    case_id=support_case.get("caseId"),
+                    session_id=session.get("session_id"),
+                    error=type(exc).__name__,
+                )
         await support_service.route_user_message(
             session,
             agent_msg["userId"],
@@ -656,6 +725,8 @@ class AgentOrchestrator:
         )
         agent_msg["sessionId"] = session["session_id"]
         agent_msg["supportSession"] = support_service.public_session(session)
+        if support_case:
+            agent_msg["supportCase"] = support_case
         agent_msg["deliveryState"] = "HUMAN_SUPPORT"
         agent_msg["assistantMessage"] = SUPPORT_TRANSFER_MESSAGE
         episode_service.record_step(
@@ -665,6 +736,7 @@ class AgentOrchestrator:
             output_data={
                 "reason": decision.get("handoff_reason") or "AI_HANDOFF",
                 "sessionId": session.get("session_id"),
+                "caseId": (support_case or {}).get("caseId"),
             },
         )
         episode_service.finish_run(

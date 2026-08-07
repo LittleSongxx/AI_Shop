@@ -100,7 +100,7 @@ async def test_forced_intent_tool_suppresses_text_when_cards_present(record_invo
     assert out["assistant_cards"] == '[{"orderId":"o1"}]'
 
 
-async def test_cancel_order_prepends_self_service_guide(record_invoke):
+async def test_cancel_order_uses_verified_proposal_result(record_invoke):
     _, box = record_invoke
     box["result"] = ToolInvokeResult(content="订单详情")
 
@@ -112,8 +112,8 @@ async def test_cancel_order_prepends_self_service_guide(record_invoke):
         user_text="帮我取消订单",
     )
 
-    assert "我的订单" in out["chunks"][0]
-    assert "订单详情" in out["chunks"][0]
+    assert out["chunks"] == ["订单详情"]
+    assert out["biz_type"] == "action_confirm"
 
 
 async def test_forced_intent_tool_returns_none_when_args_incomplete(record_invoke):

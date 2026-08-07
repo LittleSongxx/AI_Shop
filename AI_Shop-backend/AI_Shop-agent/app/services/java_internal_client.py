@@ -1,4 +1,5 @@
 from typing import Any
+from urllib.parse import quote
 
 import structlog
 
@@ -237,6 +238,25 @@ class JavaInternalClient:
             return ids
         except Exception:
             return []
+
+    async def verify_support_image(
+        self, user_id: str, image_path: str, moderation_id: int
+    ) -> dict:
+        data = await self.post_json(
+            "/internal/user/agent/verifyImage",
+            {
+                "userId": user_id,
+                "imagePath": image_path,
+                "moderationId": int(moderation_id),
+            },
+        )
+        return normalize_keys(data) if isinstance(data, dict) else {}
+
+    def support_image_url(self, image_path: str) -> str:
+        return (
+            f"{self._base()}/api/file/getResource?sourceName="
+            f"{quote(image_path, safe='')}"
+        )
 
     async def purchase_history_product_ids(self, user_id: str, limit: int = 3) -> list[str]:
         """Return product IDs from the user's recent completed orders.

@@ -8,6 +8,12 @@ public class ImageUploadResultDTO implements Serializable {
 
     private Boolean pendingReview;
 
+    private Integer moderationId;
+
+    private String moderationStatus;
+
+    private String scene;
+
     public ImageUploadResultDTO() {
     }
 
@@ -30,5 +36,29 @@ public class ImageUploadResultDTO implements Serializable {
 
     public void setPendingReview(Boolean pendingReview) {
         this.pendingReview = pendingReview;
+    }
+
+    public Integer getModerationId() {
+        return moderationId;
+    }
+
+    public void setModerationId(Integer moderationId) {
+        this.moderationId = moderationId;
+    }
+
+    public String getModerationStatus() {
+        return moderationStatus;
+    }
+
+    public void setModerationStatus(String moderationStatus) {
+        this.moderationStatus = moderationStatus;
+    }
+
+    public String getScene() {
+        return scene;
+    }
+
+    public void setScene(String scene) {
+        this.scene = scene;
     }
 }

@@ -10,9 +10,11 @@ _DYNAMIC_BIZ_TOOLS = {
     "query_comment": frozenset({"QUERY_COMMENT"}),
     "query_coupon": frozenset({"QUERY_USER_COUPONS"}),
     "product_search": frozenset({"SEARCH_PRODUCTS", "GET_PRODUCT_DETAIL"}),
+    "support_case_list": frozenset({"QUERY_SUPPORT_CASES"}),
+    "support_case_detail": frozenset({"QUERY_SUPPORT_CASES"}),
 }
 _DYNAMIC_FACT_RE = re.compile(
-    r"(?:订单|物流|退款|优惠券|库存|价格).{0,20}"
+    r"(?:订单|物流|退款|优惠券|库存|价格|工单).{0,20}"
     r"(?:待付款|已付款|已发货|已签收|已完成|处理中|成功|失败|剩余|￥|¥|\d+\.\d{2})"
 )
 _POLICY_CLAIM_RE = re.compile(
@@ -222,11 +224,32 @@ def _recommendations_satisfy(constraints: dict, candidates: list[dict]) -> bool:
 
 
 def _valid_support_case(case: dict) -> bool:
-    return bool(
-        str(case.get("category") or "").strip()
-        and str(case.get("description") or "").strip()
-        and case.get("ownedOrderValidated") is True
-    )
+    categories = {
+        "DAMAGED",
+        "WRONG_ITEM",
+        "MISSING_ITEM",
+        "LOGISTICS",
+        "REFUND_DISPUTE",
+        "PAYMENT_DISPUTE",
+        "ADDRESS_CHANGE",
+        "INVOICE",
+        "COMPLAINT",
+        "OTHER",
+    }
+    if str(case.get("category") or "").strip().upper() not in categories:
+        return False
+    description = str(case.get("description") or "").strip()
+    if len(description) < 2 or case.get("ownedOrderValidated") is not True:
+        return False
+    evidence = case.get("evidence")
+    if evidence is not None:
+        return bool(
+            isinstance(evidence, dict)
+            and evidence.get("moderationStatus") == "APPROVED"
+            and evidence.get("moderationId")
+            and str(evidence.get("path") or "").strip()
+        )
+    return True
 
 
 def _issue_priority(issue: VerificationIssue) -> int:

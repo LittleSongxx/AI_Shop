@@ -76,6 +76,14 @@ class JavaBridge:
             return f"订单 {order_id} 已确认收货"
         raise ValueError(result.get("info") or "确认收货失败")
 
+    async def cancel_order(self, token: str, order_id: str, idempotency_key: str) -> str:
+        result = await self._post_form(
+            token, "/order/cancelOrder", {"orderId": order_id}, idempotency_key
+        )
+        if result.get("status") == "success":
+            return f"订单 {order_id} 已取消"
+        raise ValueError(result.get("info") or "取消订单失败")
+
     async def post_comment(
         self, token: str, order_id: str, content: str, star: int, idempotency_key: str
     ) -> str:
@@ -127,6 +135,16 @@ class ActionExecuteService:
             if not order_id:
                 raise ValueError("确认收货参数缺失，请重新发起提案")
             return await self._bridge.confirm_order(token, order_id, idempotency_key)
+        if action_type == "CANCEL_ORDER":
+            order_id = params.get("orderId")
+            if not order_id:
+                raise ValueError("取消订单参数缺失，请重新发起提案")
+            return await self._bridge.cancel_order(token, order_id, idempotency_key)
+        if action_type == "CREATE_SUPPORT_CASE":
+            from app.services.support_case_service import support_case_service
+
+            case = await support_case_service.create_from_pending(pending, params)
+            return f"售后工单 {case['caseNo']} 已创建"
         if action_type == "PRODUCT_REVIEW":
             order_id = params.get("orderId")
             content = params.get("commentContent")

@@ -79,7 +79,10 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
         _policy("SEARCH_KNOWLEDGE", _READ),
         # 写操作一律渲染确认卡片，用户点了才落库。
         _policy("PROPOSE_REFUND", _PROPOSE, "action_confirm"),
+        _policy("PROPOSE_CANCEL_ORDER", _PROPOSE, "action_confirm"),
         _policy("PROPOSE_CONFIRM_RECEIPT", _PROPOSE, "action_confirm"),
+        _policy("PROPOSE_CREATE_SUPPORT_CASE", _PROPOSE, "action_confirm"),
+        _policy("QUERY_SUPPORT_CASES", _READ, "support_case_list"),
         _policy("PROPOSE_PRODUCT_REVIEW", _PROPOSE, "action_confirm"),
         _policy("PROPOSE_RECOMMENT", _PROPOSE, "action_confirm"),
     )

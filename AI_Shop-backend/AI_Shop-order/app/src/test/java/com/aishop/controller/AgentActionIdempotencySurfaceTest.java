@@ -14,6 +14,9 @@ class AgentActionIdempotencySurfaceTest {
     void allAgentWriteRoutesBindIdempotencyKey() throws Exception {
         assertIdempotencyHeader(
                 OrderController.class.getDeclaredMethod(
+                        "cancelOrder", String.class, String.class));
+        assertIdempotencyHeader(
+                OrderController.class.getDeclaredMethod(
                         "confirmOrder", String.class, String.class));
         assertIdempotencyHeader(
                 OrderController.class.getDeclaredMethod(

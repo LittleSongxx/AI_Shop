@@ -10,7 +10,12 @@ import pymysql
 import pytest
 
 from app.config.settings import get_settings
-from app.db.migrations import _REQUIRED_COLUMNS, CURRENT_REVISION, run_migrations
+from app.db.migrations import (
+    _REQUIRED_COLUMNS,
+    _REQUIRED_INDEXES,
+    CURRENT_REVISION,
+    run_migrations,
+)
 from app.db.pool import close_pool, init_pool
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.services.badcase_service import badcase_service
@@ -26,6 +31,35 @@ from app.services.shopping_profile_service import (
 )
 
 pytestmark = pytest.mark.mysql
+
+
+def test_current_schema_contract_includes_support_and_episode_training_gates():
+    """Keep the required-schema inventory in lockstep with the migration DDL.
+
+    The live MySQL tests below are intentionally opt-in, but this cheap contract
+    test catches the common failure where a new column or dedupe index is added to
+    the migration and omitted from the startup gate (or vice versa).
+    """
+    assert {
+        "support_case",
+        "agent_run",
+        "agent_step",
+        "agent_pending_action",
+        "ai_badcase_candidate",
+        "agent_regression_case",
+    }.issubset(_REQUIRED_COLUMNS)
+    assert {
+        "support_session_id",
+        "resolution_code",
+        "root_cause",
+        "resolution_summary",
+        "resolved_at",
+    }.issubset(_REQUIRED_COLUMNS["support_case"])
+    assert {"run_id", "dataset_eligible", "reward_signals_json"}.issubset(
+        _REQUIRED_COLUMNS["agent_run"]
+    )
+    assert ("agent_pending_action", "idx_agent_pending_run") in _REQUIRED_INDEXES
+    assert ("support_case", "uk_support_case_idempotency") in _REQUIRED_INDEXES
 
 
 def _server_connection():

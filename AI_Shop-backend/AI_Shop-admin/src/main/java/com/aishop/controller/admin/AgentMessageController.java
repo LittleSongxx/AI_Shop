@@ -107,6 +107,80 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 		return getSuccessResponseVO(agentMessageService.callSupport("supportHistory", body));
 	}
 
+	@PostMapping("/supportCases")
+	public ResponseVO supportCases(Integer pageNo, Integer pageSize, String status, String userId) {
+		Map<String, Object> body = page(pageNo, pageSize);
+		putIfText(body, "status", status);
+		putIfText(body, "userId", userId);
+		return getSuccessResponseVO(agentMessageService.callSupport("supportCases", body));
+	}
+
+	@PostMapping("/supportCaseDetail")
+	public ResponseVO supportCaseDetail(String caseId) {
+		Map<String, Object> body = new HashMap<>();
+		if (StringTools.isEmpty(caseId)) {
+			throw new BusinessException("caseId不能为空");
+		}
+		body.put("caseId", caseId.trim());
+		return getSuccessResponseVO(agentMessageService.callSupport("supportCaseDetail", body));
+	}
+
+	@PostMapping("/supportCaseClaim")
+	public ResponseVO supportCaseClaim(String caseId, HttpServletRequest request) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"supportCaseClaim", caseBody(caseId, request)));
+	}
+
+	@PostMapping("/supportCaseInProgress")
+	public ResponseVO supportCaseInProgress(String caseId, HttpServletRequest request) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"supportCaseInProgress", caseBody(caseId, request)));
+	}
+
+	@PostMapping("/supportCaseResolve")
+	public ResponseVO supportCaseResolve(
+			String caseId, String supportSessionId, String resolutionCode,
+			String rootCause, String resolutionSummary, HttpServletRequest request) {
+		Map<String, Object> body = caseBody(caseId, request);
+		putIfText(body, "supportSessionId", supportSessionId);
+		putIfText(body, "resolutionCode", resolutionCode);
+		putIfText(body, "rootCause", rootCause);
+		putIfText(body, "resolutionSummary", resolutionSummary);
+		return getSuccessResponseVO(agentMessageService.callSupport("supportCaseResolve", body));
+	}
+
+	@PostMapping("/traceRuns")
+	public ResponseVO traceRuns(Integer pageNo, Integer pageSize, String status,
+			String intent, String userId, String outcome) {
+		Map<String, Object> body = page(pageNo, pageSize);
+		putIfText(body, "status", status);
+		putIfText(body, "intent", intent);
+		putIfText(body, "userId", userId);
+		putIfText(body, "outcome", outcome);
+		return getSuccessResponseVO(agentMessageService.callSupport("traceRuns", body));
+	}
+
+	@PostMapping("/traceDetail")
+	public ResponseVO traceDetail(String runId) {
+		if (StringTools.isEmpty(runId)) {
+			throw new BusinessException("runId不能为空");
+		}
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"traceDetail", Map.of("runId", runId.trim())));
+	}
+
+	private Map<String, Object> caseBody(String caseId, HttpServletRequest request) {
+		if (StringTools.isEmpty(caseId)) {
+			throw new BusinessException("caseId不能为空");
+		}
+		Map<String, Object> body = new HashMap<>();
+		body.put("caseId", caseId.trim());
+		// Never trust an adminId sent by the browser. The authenticated admin
+		// account is the only identity forwarded to the Agent service.
+		body.put("adminId", currentAdmin(request));
+		return body;
+	}
+
 	@PostMapping("/badcases")
 	public ResponseVO badcases(Integer pageNo, Integer pageSize, String status) {
 		Map<String, Object> body = page(pageNo, pageSize);

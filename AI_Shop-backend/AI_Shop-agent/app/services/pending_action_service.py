@@ -9,6 +9,7 @@ import structlog
 
 from app.config.settings import get_settings
 from app.exceptions import PendingActionConflict, PendingActionExpired, RemoteActionRejected
+from app.services.episode_service import current_episode, episode_service
 from app.services.java_internal_client import java_internal_client
 from app.services.pending_action_store import pending_action_store
 from app.services.redis_service import redis_service
@@ -30,9 +31,11 @@ class PendingActionService:
 
     _RESOURCE_FIELDS = {
         "REFUND": "orderItemId",
+        "CANCEL_ORDER": "orderId",
         "CONFIRM_RECEIPT": "orderId",
         "PRODUCT_REVIEW": "orderId",
         "RECOMMENT": "orderId",
+        "CREATE_SUPPORT_CASE": "caseDedupeKey",
     }
 
     async def create_pending(
@@ -41,6 +44,8 @@ class PendingActionService:
         user_id: str,
         params: dict,
         summary: str,
+        *,
+        run_id: str | None = None,
     ) -> dict:
         await redis_service.ensure_connected()
         canonical_params = json.dumps(
@@ -62,11 +67,14 @@ class PendingActionService:
         _label, confirm_text, risk_tip = ACTION_LABELS.get(
             action_type, (action_type, "确认", "")
         )
+        context = current_episode()
+        resolved_run_id = str(run_id or (context.run_id if context else "")).strip() or None
         pending = {
             "token": token,
             "userId": user_id,
             "messageId": await redis_service.get_bound_message_id(user_id),
             "actionType": action_type,
+            "runId": resolved_run_id,
             "paramsJson": canonical_params,
             "businessKey": business_key,
             "argsFingerprint": args_fingerprint,
@@ -96,6 +104,26 @@ class PendingActionService:
                 status=stored.get("statusName"),
             )
         await redis_service.save_pending_action(stored["token"], stored)
+        if resolved_run_id:
+            episode_service.update_run(
+                run_id=resolved_run_id,
+                scenario="ORDER_AFTERSALES",
+                reward_signals={
+                    "actionType": action_type,
+                    "actionProposed": True,
+                    "userConfirmed": False,
+                },
+            )
+            episode_service.record_step(
+                "ACTION_PROPOSED",
+                run_id=resolved_run_id,
+                node_name="pending_action",
+                output_data={
+                    "actionType": action_type,
+                    "created": created,
+                    "status": stored.get("statusName"),
+                },
+            )
         return stored
 
     async def get_by_token(self, token: str) -> dict | None:
@@ -181,6 +209,16 @@ class PendingActionService:
             # claimed=True → claim() 已将 status 写为 EXECUTING，正常向下执行
             if not claimed:
                 raise ValueError("操作处理中，请勿重复点击")
+
+            self._record_action_signal(
+                pending,
+                {
+                    "actionType": pending.get("actionType"),
+                    "actionProposed": True,
+                    "userConfirmed": True,
+                },
+                event_type="ACTION_CONFIRMED_BY_USER",
+            )
 
             # MySQL 已经进入 EXECUTING，Redis 只同步展示态。此后若 HTTP
             # 响应丢失，状态会由 Java 幂等账本/领域数据对账，而不是猜测失败。
@@ -352,10 +390,80 @@ class PendingActionService:
                 else "该操作已处理"
             )
         )
+        self._record_action_signal(
+            final,
+            self._terminal_reward_signals(final),
+            event_type="ACTION_TERMINAL",
+            status=(
+                "OK"
+                if final_status == self.STATUS_CONFIRMED
+                else "ERROR"
+            ),
+        )
         return (
             final.get("actionType") or pending.get("actionType"),
             final_status == self.STATUS_CONFIRMED,
             message,
+        )
+
+    @staticmethod
+    def _terminal_reward_signals(pending: dict) -> dict:
+        action_type = str(pending.get("actionType") or "")
+        status_name = str(pending.get("statusName") or "UNKNOWN")
+        params: dict = {}
+        try:
+            parsed = json.loads(pending.get("paramsJson") or "{}")
+            if isinstance(parsed, dict):
+                params = parsed
+        except (TypeError, json.JSONDecodeError):
+            pass
+        signals: dict = {
+            "actionType": action_type,
+            "actionProposed": True,
+            "userConfirmed": True,
+            "remoteOutcomeKnown": status_name in {"CONFIRMED", "FAILED"},
+            "outcome": status_name,
+        }
+        if action_type == "CANCEL_ORDER":
+            signals.update(
+                {
+                    "orderStatusBefore": params.get("orderStatusBefore"),
+                    "orderStatusAfter": 4 if status_name == "CONFIRMED" else None,
+                }
+            )
+        elif action_type == "CREATE_SUPPORT_CASE":
+            signals.update(
+                {
+                    "caseCreated": status_name == "CONFIRMED",
+                    "caseCategory": params.get("category"),
+                    "caseStatus": "OPEN" if status_name == "CONFIRMED" else None,
+                    "forcedHandoff": bool(params.get("forcedHandoff")),
+                }
+            )
+        return signals
+
+    @staticmethod
+    def _record_action_signal(
+        pending: dict,
+        signals: dict,
+        *,
+        event_type: str,
+        status: str = "OK",
+    ) -> None:
+        run_id = str(pending.get("runId") or "").strip()
+        if not run_id:
+            return
+        episode_service.update_run(
+            run_id=run_id,
+            scenario="ORDER_AFTERSALES",
+            reward_signals=signals,
+        )
+        episode_service.record_step(
+            event_type,
+            run_id=run_id,
+            node_name="pending_action",
+            status=status,
+            output_data=signals,
         )
 
     async def reconcile_stale_executing(self, stale_seconds: int = 600) -> int:
