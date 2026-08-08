@@ -15,6 +15,7 @@ from app.api.websocket import (
     websocket_endpoint,
 )
 from app.config.settings import get_settings
+from app.db.analytics_pool import close_analytics_pool, init_analytics_pool
 from app.db.migrations import run_migrations
 from app.db.pool import close_pool, init_pool
 from app.exceptions import BusinessException
@@ -80,6 +81,11 @@ async def lifespan(app: FastAPI):
     await init_pool()
     if get_settings().agent_auto_migrate:
         await asyncio.to_thread(run_migrations)
+    # The governed views are owned by the Java Admin Flyway migration. When
+    # DataAnalyst is enabled, deployment must migrate Admin first and provision
+    # the view-only reader before Agent startup; this check intentionally fails
+    # closed when that order is violated.
+    await init_analytics_pool()
 
     await episode_service.start()
     await judge_service.start()
@@ -111,6 +117,7 @@ async def lifespan(app: FastAPI):
     await close_http_clients()
     await judge_service.close()
     await episode_service.close()
+    await close_analytics_pool()
     await close_pool()
     await redis_service.close()
     shutdown_telemetry()

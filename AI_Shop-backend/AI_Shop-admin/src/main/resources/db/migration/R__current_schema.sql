@@ -100,6 +100,127 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- Governed, PII-free semantic layer for the admin DataAnalyst. The runtime
+-- identity receives SELECT on these views only, never on their source tables.
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_sales_daily AS
+SELECT d.`date`,
+       COALESCE(p.paid_order_count, 0) AS paid_order_count,
+       COALESCE(p.gross_paid_amount, 0) AS gross_paid_amount,
+       COALESCE(r.completed_refund_count, 0) AS completed_refund_count,
+       COALESCE(r.completed_refund_amount, 0) AS completed_refund_amount,
+       COALESCE(p.gross_paid_amount, 0) - COALESCE(r.completed_refund_amount, 0) AS net_paid_amount
+  FROM (
+        SELECT DATE(order_time) AS `date`
+          FROM aishop_order.order_info
+         WHERE order_status IN (1, 2, 3, 6, 7, 8)
+        UNION
+        SELECT DATE(completed_at) AS `date`
+          FROM aishop_order.refund_request
+         WHERE status = 'COMPLETED' AND completed_at IS NOT NULL
+       ) d
+  LEFT JOIN (
+        SELECT DATE(order_time) AS `date`,
+               COUNT(*) AS paid_order_count,
+               SUM(amount) AS gross_paid_amount
+          FROM aishop_order.order_info
+         WHERE order_status IN (1, 2, 3, 6, 7, 8)
+         GROUP BY DATE(order_time)
+       ) p ON p.`date` = d.`date`
+  LEFT JOIN (
+        SELECT DATE(completed_at) AS `date`,
+               COUNT(*) AS completed_refund_count,
+               SUM(refund_amount) AS completed_refund_amount
+          FROM aishop_order.refund_request
+         WHERE status = 'COMPLETED' AND completed_at IS NOT NULL
+         GROUP BY DATE(completed_at)
+       ) r ON r.`date` = d.`date`;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_product_sales_daily AS
+SELECT k.`date`,
+       k.product_id,
+       COALESCE(s.product_name, r.product_name) AS product_name,
+       COALESCE(s.paid_units, 0) AS paid_units,
+       COALESCE(s.gross_item_amount, 0) AS gross_item_amount,
+       COALESCE(r.refunded_units, 0) AS refunded_units
+  FROM (
+        SELECT DATE(o.order_time) AS `date`,
+               i.product_id COLLATE utf8mb4_general_ci AS product_id
+          FROM aishop_order.order_info o
+          JOIN aishop_order.order_item i ON i.order_id = o.order_id
+         WHERE o.order_status IN (1, 2, 3, 6, 7, 8)
+        UNION
+        SELECT DATE(rr.completed_at) AS `date`,
+               rr.product_id COLLATE utf8mb4_general_ci AS product_id
+          FROM aishop_order.refund_request rr
+         WHERE rr.status = 'COMPLETED' AND rr.completed_at IS NOT NULL
+       ) k
+  LEFT JOIN (
+        SELECT DATE(o.order_time) AS `date`,
+               i.product_id COLLATE utf8mb4_general_ci AS product_id,
+               MAX(i.product_name) AS product_name,
+               SUM(i.buy_count) AS paid_units,
+               SUM(i.item_amount) AS gross_item_amount
+          FROM aishop_order.order_info o
+          JOIN aishop_order.order_item i ON i.order_id = o.order_id
+         WHERE o.order_status IN (1, 2, 3, 6, 7, 8)
+         GROUP BY DATE(o.order_time), i.product_id COLLATE utf8mb4_general_ci
+       ) s ON s.`date` = k.`date` AND s.product_id = k.product_id
+  LEFT JOIN (
+        SELECT DATE(rr.completed_at) AS `date`,
+               rr.product_id COLLATE utf8mb4_general_ci AS product_id,
+               MAX(i.product_name) AS product_name,
+               SUM(rr.buy_count) AS refunded_units
+          FROM aishop_order.refund_request rr
+          LEFT JOIN aishop_order.order_item i
+            ON i.order_item_id COLLATE utf8mb4_general_ci =
+               rr.order_item_id COLLATE utf8mb4_general_ci
+         WHERE rr.status = 'COMPLETED' AND rr.completed_at IS NOT NULL
+         GROUP BY DATE(rr.completed_at), rr.product_id COLLATE utf8mb4_general_ci
+       ) r ON r.`date` = k.`date` AND r.product_id = k.product_id;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_inventory_risk AS
+SELECT CURRENT_DATE AS snapshot_date,
+       s.product_id,
+       p.product_name,
+       s.property_value_id_hash,
+       s.stock,
+       (CASE
+           WHEN s.stock <= 0 THEN 'OUT_OF_STOCK'
+           WHEN s.stock <= 10 THEN 'LOW_STOCK'
+           ELSE 'NORMAL'
+       END) COLLATE utf8mb4_general_ci AS risk_level
+  FROM aishop_stock.sku_stock s
+  JOIN aishop_product.product_info p ON p.product_id = s.product_id
+ WHERE p.status <> -1;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_agent_quality_daily AS
+SELECT DATE(r.started_at) AS `date`,
+       COALESCE(r.agent_id, 'supervisor') AS agent_id,
+       COALESCE(r.intent, 'UNKNOWN') AS intent,
+       COUNT(*) AS run_count,
+       SUM(r.status = 'SUCCEEDED') AS success_count,
+       SUM(r.status IN ('FAILED', 'CANCELLED')) AS failure_count,
+       SUM(r.status = 'HANDOFF' OR r.outcome = 'human_support') AS human_handoff_count,
+       AVG(r.latency_ms) AS avg_latency_ms,
+       SUM(r.input_tokens) AS input_tokens,
+       SUM(r.output_tokens) AS output_tokens,
+       SUM(r.cost_cny) AS cost_cny
+  FROM aishop_agent.agent_run r
+ GROUP BY DATE(r.started_at), COALESCE(r.agent_id, 'supervisor'), COALESCE(r.intent, 'UNKNOWN');
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_tool_quality_daily AS
+SELECT DATE(r.started_at) AS `date`,
+       COALESCE(s.agent_id, r.agent_id, 'supervisor') AS agent_id,
+       s.tool_name,
+       COUNT(*) AS call_count,
+       SUM(s.status IN ('OK', 'SUCCESS')) AS success_count,
+       SUM(s.status NOT IN ('OK', 'SUCCESS')) AS failure_count,
+       AVG(s.latency_ms) AS avg_latency_ms
+  FROM aishop_agent.agent_step s
+  JOIN aishop_agent.agent_run r ON r.run_id = s.run_id
+ WHERE s.event_type = 'TOOL_CALL' AND s.tool_name IS NOT NULL
+ GROUP BY DATE(r.started_at), COALESCE(s.agent_id, r.agent_id, 'supervisor'), s.tool_name;
+
 SET @sql = IF(
     EXISTS (
         SELECT 1

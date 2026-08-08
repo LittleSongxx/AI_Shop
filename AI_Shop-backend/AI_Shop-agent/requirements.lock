@@ -268,6 +268,8 @@ sqlalchemy==2.0.51
     # via
     #   alembic
     #   simlect-agent (pyproject.toml)
+sqlglot==29.0.1
+    # via aishop-agent (pyproject.toml)
 sse-starlette==3.0.3
     # via mcp
 starlette==0.46.2

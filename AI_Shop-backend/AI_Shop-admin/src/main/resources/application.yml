@@ -47,6 +47,11 @@ spring:
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:your-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  # Admin owns cross-schema analytics views. Keep their definer privileges on
+  # a migration-only identity instead of widening the Admin runtime account.
+  flyway:
+    user: ${FLYWAY_USER:${MYSQL_USER:root}}
+    password: ${FLYWAY_PASSWORD:${MYSQL_PASSWORD:your-password}}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -70,6 +75,8 @@ spring:
 aishop:
   agent:
     base-url: ${AGENT_BASE_URL:http://127.0.0.1:7050}
+    connect-timeout-ms: ${AGENT_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${AGENT_READ_TIMEOUT_MS:50000}
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}
     auth-enabled: true

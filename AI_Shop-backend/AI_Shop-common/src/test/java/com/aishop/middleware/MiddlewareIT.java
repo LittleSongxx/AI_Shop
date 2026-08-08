@@ -231,8 +231,21 @@ class MiddlewareIT {
                     .load();
 
             flyway.clean();
+            boolean adminMigration = migration.toString().contains("AI_Shop-admin");
+            if (adminMigration) {
+                // Admin's semantic views intentionally read facts owned by other
+                // services. Prepare those dependencies as already-migrated schemas;
+                // do not replace this with empty placeholder views, because that
+                // would hide broken column contracts and definer privileges.
+                prepareAnalyticsSourceSchemas();
+            }
             flyway.migrate();
             flyway.validate();
+
+            if (adminMigration) {
+                assertAnalyticsViewsCreated();
+                assertAnalyticsReaderBoundary();
+            }
 
             try (Connection connection = DriverManager.getConnection(
                     jdbcUrl, MYSQL.getUsername(), MYSQL.getPassword());
@@ -244,6 +257,170 @@ class MiddlewareIT {
             flyway.migrate();
             flyway.validate();
             flyway.clean();
+        }
+    }
+
+    private static void prepareAnalyticsSourceSchemas() throws Exception {
+        try (Connection connection = rootConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE DATABASE IF NOT EXISTS aishop_order "
+                    + "CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+            statement.execute("CREATE DATABASE IF NOT EXISTS aishop_product "
+                    + "CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+            statement.execute("CREATE DATABASE IF NOT EXISTS aishop_stock "
+                    + "CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+            statement.execute("CREATE DATABASE IF NOT EXISTS aishop_agent "
+                    + "CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_order.order_info (
+                      order_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                      order_time DATETIME NOT NULL,
+                      order_status INT NOT NULL,
+                      amount DECIMAL(18,2) NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_order.order_item (
+                      order_item_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                      order_id VARCHAR(32) NOT NULL,
+                      product_id VARCHAR(32) NOT NULL,
+                      product_name VARCHAR(255) NOT NULL,
+                      buy_count INT NOT NULL,
+                      item_amount DECIMAL(18,2) NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_order.refund_request (
+                      refund_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                      completed_at DATETIME NULL,
+                      status VARCHAR(32) NOT NULL,
+                      refund_amount DECIMAL(18,2) NOT NULL,
+                      product_id VARCHAR(32) NOT NULL,
+                      order_item_id VARCHAR(32) NOT NULL,
+                      buy_count INT NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_product.product_info (
+                      product_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                      product_name VARCHAR(255) NOT NULL,
+                      status INT NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_stock.sku_stock (
+                      product_id VARCHAR(32) NOT NULL,
+                      property_value_id_hash VARCHAR(128) NOT NULL,
+                      stock INT NOT NULL,
+                      PRIMARY KEY (product_id, property_value_id_hash)
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.agent_run (
+                      run_id VARCHAR(64) NOT NULL PRIMARY KEY,
+                      started_at DATETIME NOT NULL,
+                      agent_id VARCHAR(64) NULL,
+                      intent VARCHAR(64) NULL,
+                      status VARCHAR(32) NOT NULL,
+                      outcome VARCHAR(64) NULL,
+                      latency_ms BIGINT NULL,
+                      input_tokens BIGINT NULL,
+                      output_tokens BIGINT NULL,
+                      cost_cny DECIMAL(18,6) NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.agent_step (
+                      step_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      run_id VARCHAR(64) NOT NULL,
+                      event_type VARCHAR(64) NULL,
+                      agent_id VARCHAR(64) NULL,
+                      tool_name VARCHAR(128) NULL,
+                      status VARCHAR(32) NOT NULL,
+                      latency_ms BIGINT NULL
+                    ) ENGINE=InnoDB
+                    """);
+
+            // The migration runs as the application user. A definer view can only
+            // be created when that user has privileges on every source table.
+            statement.execute("GRANT SELECT ON aishop_order.* TO 'aishop'@'%'");
+            statement.execute("GRANT SELECT ON aishop_product.* TO 'aishop'@'%'");
+            statement.execute("GRANT SELECT ON aishop_stock.* TO 'aishop'@'%'");
+            statement.execute("GRANT SELECT ON aishop_agent.* TO 'aishop'@'%'");
+        }
+    }
+
+    private static void assertAnalyticsViewsCreated() throws Exception {
+        try (Connection connection = mysqlConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT COUNT(*)
+                       FROM information_schema.views
+                      WHERE table_schema = DATABASE()
+                        AND table_name IN (
+                          'analytics_sales_daily',
+                          'analytics_product_sales_daily',
+                          'analytics_inventory_risk',
+                          'analytics_agent_quality_daily',
+                          'analytics_tool_quality_daily'
+                        )
+                     """)) {
+            try (ResultSet result = statement.executeQuery()) {
+                assertTrue(result.next());
+                assertEquals(5, result.getInt(1));
+            }
+            try (PreparedStatement collation = connection.prepareStatement("""
+                    SELECT collation_name
+                      FROM information_schema.columns
+                     WHERE table_schema = DATABASE()
+                       AND table_name = 'analytics_inventory_risk'
+                       AND column_name = 'risk_level'
+                    """)) {
+                try (ResultSet result = collation.executeQuery()) {
+                    assertTrue(result.next());
+                    assertEquals("utf8mb4_general_ci", result.getString(1));
+                }
+            }
+        }
+    }
+
+    private static void assertAnalyticsReaderBoundary() throws Exception {
+        String reader = "analytics_reader_it";
+        String password = "reader-it-secret";
+        String database = MYSQL.getDatabaseName();
+        try (Connection root = rootConnection();
+             Statement statement = root.createStatement()) {
+            statement.execute("DROP USER IF EXISTS '" + reader + "'@'%'");
+            statement.execute("CREATE USER '" + reader + "'@'%' IDENTIFIED BY '" + password + "'");
+            statement.execute("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '" + reader + "'@'%'");
+            statement.execute("GRANT SELECT ON `" + database + "`.analytics_sales_daily TO '"
+                    + reader + "'@'%'");
+            statement.execute("GRANT SELECT ON `" + database + "`.analytics_product_sales_daily TO '"
+                    + reader + "'@'%'");
+            statement.execute("GRANT SELECT ON `" + database + "`.analytics_inventory_risk TO '"
+                    + reader + "'@'%'");
+            statement.execute("GRANT SELECT ON `" + database + "`.analytics_agent_quality_daily TO '"
+                    + reader + "'@'%'");
+            statement.execute("GRANT SELECT ON `" + database + "`.analytics_tool_quality_daily TO '"
+                    + reader + "'@'%'");
+        }
+
+        try (Connection connection = DriverManager.getConnection(
+                MYSQL.getJdbcUrl(), reader, password);
+             Statement statement = connection.createStatement()) {
+            try (ResultSet result = statement.executeQuery(
+                    "SELECT COUNT(*) FROM `" + database + "`.analytics_sales_daily")) {
+                assertTrue(result.next());
+            }
+            assertThrows(java.sql.SQLException.class, () -> statement.executeQuery(
+                    "SELECT COUNT(*) FROM aishop_order.order_info"));
+            assertThrows(java.sql.SQLException.class, () -> statement.executeUpdate(
+                    "CREATE TABLE analytics_reader_write_probe (id INT)"));
+        } finally {
+            try (Connection root = rootConnection();
+                 Statement statement = root.createStatement()) {
+                statement.execute("DROP USER IF EXISTS '" + reader + "'@'%'");
+            }
         }
     }
 
@@ -383,6 +560,11 @@ class MiddlewareIT {
     private static Connection mysqlConnection() throws Exception {
         return DriverManager.getConnection(
                 MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
+    }
+
+    private static Connection rootConnection() throws Exception {
+        return DriverManager.getConnection(
+                MYSQL.getJdbcUrl(), "root", MYSQL.getPassword());
     }
 
     private static List<Path> findCurrentJavaMigrations() throws IOException {
