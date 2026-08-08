@@ -4,7 +4,16 @@ from typing import Annotated, Literal
 from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict
 
-RouteKind = Literal["agent_loop", "tools", "finalize", "post_turn", "end"]
+RouteKind = Literal[
+    "agent_loop",
+    "tools",
+    "multi_agent_plan",
+    "multi_agent_fanout",
+    "multi_agent_synthesis",
+    "finalize",
+    "post_turn",
+    "end",
+]
 
 class AgentGraphState(TypedDict, total=False):
 
@@ -59,6 +68,14 @@ class AgentGraphState(TypedDict, total=False):
     pending_order_reference: dict | None
     selected_order_reference: dict | None
 
+    # Root orchestration state. Specialist scratch messages never enter this
+    # schema; parallel branches return validated artifacts only.
+    verified_order_context: dict | None
+    supervisor_plan: dict | None
+    specialist_tasks: list[dict]
+    specialist_artifacts: Annotated[list[dict], operator.add]
+    action_proposal: dict | None
+
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
     return {
@@ -105,6 +122,11 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "order_resolution": None,
         "pending_order_reference": None,
         "selected_order_reference": agent_msg.get("selectedOrderReference"),
+        "verified_order_context": None,
+        "supervisor_plan": None,
+        "specialist_tasks": [],
+        "specialist_artifacts": [],
+        "action_proposal": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

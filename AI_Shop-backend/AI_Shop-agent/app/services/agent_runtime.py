@@ -585,12 +585,21 @@ async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") 
     )
     await stream_service.push_error(user_id, message_id, "服务暂时不可用，请稍后重试", prompt_type)
 
-@lru_cache(maxsize=8)
-def _agent_llm_with_tools(config: ChatLLMConfig):
-    return chat_llm_for_config(config).bind_tools(build_mcp_tools())
+@lru_cache(maxsize=32)
+def _agent_llm_with_tools(
+    config: ChatLLMConfig,
+    tool_scope: tuple[str, ...] | None,
+):
+    allowed = None if tool_scope is None else set(tool_scope)
+    return chat_llm_for_config(config).bind_tools(build_mcp_tools(allowed))
 
 
-def bind_agent_llm(*, fallback: bool = False):
+def bind_agent_llm(
+    *,
+    fallback: bool = False,
+    allowed_tools: set[str] | frozenset[str] | None = None,
+    max_tokens: int | None = None,
+):
     """The tool-bound LLM for one ReAct round.
 
     Both halves of this are pure functions of the settings: building the tool list
@@ -598,7 +607,9 @@ def bind_agent_llm(*, fallback: bool = False):
     work on round 1 and round 6. Keying on the resolved config means a settings
     change still produces a fresh binding.
     """
-    return _agent_llm_with_tools(chat_llm_config(fallback=fallback))
+    scope = None if allowed_tools is None else tuple(sorted(allowed_tools))
+    llm = _agent_llm_with_tools(chat_llm_config(fallback=fallback), scope)
+    return llm.bind(max_tokens=max_tokens) if max_tokens is not None else llm
 
 def parse_agent_message(agent_msg: dict) -> tuple[dict | None, str]:
     return parse_consult_card(agent_msg.get("userMessage") or "")

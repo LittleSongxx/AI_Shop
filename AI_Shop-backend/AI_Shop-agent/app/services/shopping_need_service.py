@@ -212,7 +212,10 @@ def effective_profile_from_need(
     durable_profile: dict[str, Any], need: dict[str, Any] | None
 ) -> dict[str, Any]:
     result = deepcopy(durable_profile)
-    if not shopping_need_is_active(need):
+    # Callers load or gate the active need before merging. Keeping a second
+    # wall-clock check here made deterministic category switches expire while
+    # they were still being processed and restored stale durable preferences.
+    if not isinstance(need, dict):
         return result
     assert need is not None
     budget = need.get("budget") or {}

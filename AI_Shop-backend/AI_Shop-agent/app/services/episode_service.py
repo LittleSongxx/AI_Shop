@@ -32,6 +32,12 @@ logger = structlog.get_logger()
 _PHONE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _LONG_IDENTIFIER_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9_-]{16,}(?![A-Za-z0-9])")
+_SQL_STRING_LITERAL_RE = re.compile(
+    r'''(?:'(?:''|\\.|[^'])*'|"(?:""|\\.|[^"])*")'''
+)
+_SAFE_SQL_LITERAL_RE = re.compile(
+    r"(?:\d{4}-\d{2}-\d{2}|[A-Z][A-Z0-9_]{0,63}|-?\d+(?:\.\d+)?)"
+)
 _SECRET_KEYS = frozenset(
     {
         "authorization",
@@ -69,9 +75,51 @@ _RAW_TEXT_KEYS = frozenset(
         "assistanttext",
         "assistant_text",
         "content",
+        "comment_content",
+        "recomment_content",
+        "description",
+        "image_description",
+        "resolution_summary",
+        "root_cause",
+        "remark",
         "messages",
         "address",
         "query",
+    }
+)
+_STRUCTURED_IDENTIFIER_KEYS = frozenset(
+    {
+        "action_type",
+        "agent_id",
+        "agent_ids",
+        "artifact_type",
+        "columns",
+        "dimensions",
+        "error_code",
+        "event_type",
+        "failure_type",
+        "fallback",
+        "intent",
+        "lineage",
+        "metrics",
+        "model_name",
+        "next_step",
+        "node_name",
+        "planner_source",
+        "reason",
+        "risk_level",
+        "semantic_view",
+        "series",
+        "source_agent",
+        "specialists",
+        "status",
+        "target_agent",
+        "tool",
+        "tool_calls",
+        "tool_name",
+        "tool_scope",
+        "type",
+        "warnings",
     }
 )
 
@@ -146,6 +194,22 @@ def text_fingerprint(value: object) -> dict[str, object]:
     return _text_fingerprint(value)
 
 
+def _sanitize_sql_text(value: object) -> str:
+    text = str(value or "")[:10_000]
+    text = _PHONE_RE.sub("<PHONE>", text)
+    text = _EMAIL_RE.sub("<EMAIL>", text)
+
+    def replace_literal(match: re.Match[str]) -> str:
+        token = match.group(0)
+        quote = token[0]
+        literal = token[1:-1].replace(quote * 2, quote)
+        if _SAFE_SQL_LITERAL_RE.fullmatch(literal):
+            return token
+        return f"{quote}{_stable_placeholder('SQL_LITERAL', literal)}{quote}"
+
+    return _SQL_STRING_LITERAL_RE.sub(replace_literal, text)
+
+
 def sanitize_episode_payload(value: Any, *, key: str = "") -> Any:
     """Keep observable decisions without duplicating raw conversation or credentials."""
     normalized_key = key.lower().replace("-", "_")
@@ -169,6 +233,24 @@ def sanitize_episode_payload(value: Any, *, key: str = "") -> Any:
             chars = sum(len(str(getattr(item, "content", "") or "")) for item in value)
             return {"count": len(value), "roles": roles[:32], "chars": chars}
         return _text_fingerprint(value)
+    if compact_key == "sqlhash" and isinstance(value, str):
+        return value if re.fullmatch(r"[a-fA-F0-9]{64}", value) else "<INVALID_SQL_HASH>"
+    if normalized_key == "sql":
+        return _sanitize_sql_text(value)
+    if normalized_key in _STRUCTURED_IDENTIFIER_KEYS or compact_key in {
+        item.replace("_", "") for item in _STRUCTURED_IDENTIFIER_KEYS
+    }:
+        if isinstance(value, dict):
+            return {
+                str(child_key): sanitize_episode_payload(child, key=str(child_key))
+                for child_key, child in value.items()
+            }
+        if isinstance(value, (list, tuple, set)):
+            return [sanitize_episode_payload(item, key=key) for item in list(value)[:100]]
+        if isinstance(value, str):
+            text = _PHONE_RE.sub("<PHONE>", value)
+            return _EMAIL_RE.sub("<EMAIL>", text)[:500]
+        return value
     if isinstance(value, dict):
         return {
             str(child_key): sanitize_episode_payload(child, key=str(child_key))
@@ -275,6 +357,13 @@ class EpisodeService:
             )
             await cur.execute(
                 """
+                DELETE FROM agent_handoff
+                WHERE created_at < DATE_SUB(NOW(), INTERVAL %s DAY)
+                """,
+                (days,),
+            )
+            await cur.execute(
+                """
                 DELETE FROM agent_run
                 WHERE started_at < DATE_SUB(NOW(), INTERVAL %s DAY)
                   AND dataset_eligible <> 'APPROVED'
@@ -286,13 +375,18 @@ class EpisodeService:
         self,
         *,
         run_id: str,
-        message_id: int,
+        message_id: int | None,
         user_id: str,
         session_id: str | None,
         intent: str | None,
         queue_name: str | None,
         force_keep: bool,
         experiment: dict | None = None,
+        agent_id: str = "supervisor",
+        agent_version: str = "v1",
+        parent_run_id: str | None = None,
+        handoff_id: str | None = None,
+        actor_type: str = "USER",
     ) -> bool:
         rate = self._effective_success_sample_rate()
         sampled = force_keep or self._sample(run_id, rate)
@@ -301,6 +395,11 @@ class EpisodeService:
                 "op": "start",
                 "run_id": run_id,
                 "message_id": message_id,
+                "agent_id": agent_id,
+                "agent_version": agent_version,
+                "parent_run_id": parent_run_id,
+                "handoff_id": handoff_id,
+                "actor_type": actor_type,
                 "user_id": user_id,
                 "session_id": session_id,
                 "trace_id": current_trace_id(),
@@ -314,6 +413,52 @@ class EpisodeService:
             }
         )
         return sampled
+
+    def start_child_run(self, **kwargs: Any) -> bool:
+        """Create a specialist run linked to the current root run."""
+        return self.start_run(
+            run_id=str(kwargs["run_id"]),
+            message_id=kwargs.get("message_id"),
+            user_id=str(kwargs.get("user_id") or ""),
+            session_id=kwargs.get("session_id"),
+            intent=kwargs.get("intent"),
+            queue_name=None,
+            force_keep=True,
+            agent_id=str(kwargs.get("agent_id") or "specialist"),
+            agent_version=str(kwargs.get("agent_version") or "v1"),
+            parent_run_id=kwargs.get("parent_run_id"),
+            handoff_id=kwargs.get("handoff_id"),
+            actor_type=str(kwargs.get("actor_type") or "USER"),
+        )
+
+    def record_handoff(
+        self,
+        *,
+        handoff_id: str,
+        parent_run_id: str | None,
+        child_run_id: str,
+        source_agent: str,
+        target_agent: str,
+        status: str,
+        envelope: dict | None = None,
+        artifact: dict | None = None,
+        latency_ms: int | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        self._enqueue({
+            "op": "handoff",
+            "handoff_id": handoff_id,
+            "parent_run_id": parent_run_id,
+            "child_run_id": child_run_id,
+            "source_agent": source_agent,
+            "target_agent": target_agent,
+            "status": status,
+            "input_summary_json": _json(envelope),
+            "artifact_summary_json": _json(artifact),
+            "latency_ms": latency_ms,
+            "error_code": error_code,
+            "completed_at": _utcnow_sql() if status in {"SUCCEEDED", "FAILED", "FALLBACK"} else None,
+        })
 
     def mark_running(self, run_id: str | None = None) -> None:
         resolved_run_id = self._resolve_run_id(run_id)
@@ -342,6 +487,9 @@ class EpisodeService:
         error_code: str | None = None,
         error_message: str | None = None,
         latency_ms: int | None = None,
+        agent_id: str | None = None,
+        artifact_type: str | None = None,
+        handoff_id: str | None = None,
     ) -> None:
         resolved_run_id = self._resolve_run_id(run_id)
         if not resolved_run_id:
@@ -369,6 +517,9 @@ class EpisodeService:
                     else None
                 ),
                 "latency_ms": max(0, int(latency_ms)) if latency_ms is not None else None,
+                "agent_id": str(agent_id)[:64] if agent_id else None,
+                "artifact_type": str(artifact_type)[:64] if artifact_type else None,
+                "handoff_id": str(handoff_id)[:64] if handoff_id else None,
                 "occurred_at": _utcnow_sql(),
             }
         )
@@ -533,8 +684,9 @@ class EpisodeService:
                         INSERT IGNORE INTO agent_run
                             (run_id, message_id, user_id, session_id, otel_trace_id,
                              status, intent, queue_name, version_json, experiment_json,
-                             capture_level, started_at)
-                        VALUES (%s,%s,%s,%s,%s,'QUEUED',%s,%s,%s,%s,%s,%s)
+                             capture_level, started_at, agent_id, agent_version,
+                             parent_run_id, handoff_id, actor_type)
+                        VALUES (%s,%s,%s,%s,%s,'QUEUED',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """,
                         (
                             event["run_id"],
@@ -548,6 +700,11 @@ class EpisodeService:
                             event["experiment_json"],
                             event["capture_level"],
                             event["started_at"],
+                            event.get("agent_id", "supervisor"),
+                            event.get("agent_version", "v1"),
+                            event.get("parent_run_id"),
+                            event.get("handoff_id"),
+                            event.get("actor_type", "USER"),
                         ),
                     )
                     await cur.execute(
@@ -581,14 +738,34 @@ class EpisodeService:
                         INSERT INTO agent_step
                             (run_id,event_type,node_name,round_no,status,span_id,
                              input_json,output_json,model_name,tool_name,call_id,
-                             error_code,error_message,latency_ms,occurred_at)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                             error_code,error_message,latency_ms,occurred_at,
+                             agent_id,artifact_type,handoff_id)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """,
                         tuple(event[key] for key in (
                             "run_id", "event_type", "node_name", "round_no", "status",
                             "span_id", "input_json", "output_json", "model_name",
                             "tool_name", "call_id", "error_code", "error_message",
-                            "latency_ms", "occurred_at",
+                            "latency_ms", "occurred_at", "agent_id", "artifact_type", "handoff_id",
+                        )),
+                    )
+                elif op == "handoff":
+                    await cur.execute(
+                        """
+                        INSERT INTO agent_handoff
+                            (handoff_id,parent_run_id,child_run_id,source_agent,target_agent,
+                             status,input_summary_json,artifact_summary_json,latency_ms,error_code,completed_at)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON DUPLICATE KEY UPDATE status=VALUES(status),
+                            artifact_summary_json=COALESCE(VALUES(artifact_summary_json),artifact_summary_json),
+                            latency_ms=COALESCE(VALUES(latency_ms),latency_ms),
+                            error_code=COALESCE(VALUES(error_code),error_code),
+                            completed_at=COALESCE(VALUES(completed_at),completed_at)
+                        """,
+                        tuple(event.get(key) for key in (
+                            "handoff_id", "parent_run_id", "child_run_id", "source_agent",
+                            "target_agent", "status", "input_summary_json", "artifact_summary_json",
+                            "latency_ms", "error_code", "completed_at",
                         )),
                     )
                 elif op == "usage":

@@ -50,6 +50,11 @@ def upgrade() -> None:
             user_id                varchar(32) NOT NULL,
             session_id             varchar(36) NULL,
             otel_trace_id          char(32) NULL,
+            agent_id               varchar(64) NOT NULL DEFAULT 'supervisor',
+            agent_version          varchar(32) NOT NULL DEFAULT 'v1',
+            parent_run_id          varchar(64) NULL,
+            handoff_id             varchar(64) NULL,
+            actor_type             varchar(16) NOT NULL DEFAULT 'USER',
             status                 varchar(20) NOT NULL DEFAULT 'QUEUED',
             outcome                varchar(32) NULL,
             scenario               varchar(40) NULL,
@@ -77,7 +82,9 @@ def upgrade() -> None:
             UNIQUE KEY uk_agent_run_message (message_id),
             KEY idx_agent_run_trace (otel_trace_id),
             KEY idx_agent_run_status_time (status, started_at),
-            KEY idx_agent_run_user_time (user_id, started_at)
+            KEY idx_agent_run_user_time (user_id, started_at),
+            KEY idx_agent_run_agent_time (agent_id, started_at),
+            KEY idx_agent_run_parent_time (parent_run_id, started_at)
         ) COMMENT 'durable application-level Agent episode' CHARSET = utf8mb4
         """
     )
@@ -101,6 +108,9 @@ def upgrade() -> None:
             error_message  varchar(512) NULL,
             latency_ms     int NULL,
             occurred_at    datetime(3) NOT NULL,
+            agent_id       varchar(64) NULL,
+            artifact_type  varchar(64) NULL,
+            handoff_id     varchar(64) NULL,
             KEY idx_agent_step_run_time (run_id, occurred_at, step_id),
             KEY idx_agent_step_type_status (event_type, status, occurred_at)
         ) COMMENT 'sanitized observable Agent decisions and actions' CHARSET = utf8mb4
@@ -635,6 +645,11 @@ def _reconcile_episode_tables() -> None:
                 "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) "
                 "ON UPDATE CURRENT_TIMESTAMP(3)"
             ),
+            "agent_id": "varchar(64) NOT NULL DEFAULT 'supervisor'",
+            "agent_version": "varchar(32) NOT NULL DEFAULT 'v1'",
+            "parent_run_id": "varchar(64) NULL",
+            "handoff_id": "varchar(64) NULL",
+            "actor_type": "varchar(16) NOT NULL DEFAULT 'USER'",
         },
         "agent_step": {
             "run_id": "varchar(64) NULL",
@@ -652,6 +667,9 @@ def _reconcile_episode_tables() -> None:
             "error_message": "varchar(512) NULL",
             "latency_ms": "int NULL",
             "occurred_at": "datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)",
+            "agent_id": "varchar(64) NULL",
+            "artifact_type": "varchar(64) NULL",
+            "handoff_id": "varchar(64) NULL",
         },
     }
     inspector = sa.inspect(bind)
@@ -689,8 +707,25 @@ def _reconcile_episode_tables() -> None:
     op.execute(
         "ALTER TABLE agent_step MODIFY COLUMN run_id varchar(64) NOT NULL"
     )
-
-
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS agent_handoff (
+            handoff_id varchar(64) NOT NULL PRIMARY KEY,
+            parent_run_id varchar(64) NULL,
+            child_run_id varchar(64) NOT NULL,
+            source_agent varchar(64) NOT NULL,
+            target_agent varchar(64) NOT NULL,
+            status varchar(20) NOT NULL DEFAULT 'STARTED',
+            input_summary_json json NULL,
+            artifact_summary_json json NULL,
+            latency_ms int NULL,
+            error_code varchar(64) NULL,
+            completed_at datetime(3) NULL,
+            created_at datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_handoff_child (child_run_id),
+            KEY idx_agent_handoff_parent (parent_run_id, created_at),
+            KEY idx_agent_handoff_status (status, created_at)
+        ) CHARSET=utf8mb4
+    """)
 def _reconcile_shopping_profile() -> None:
     columns = {
         column["name"]
@@ -872,6 +907,12 @@ def _reconcile_indexes() -> None:
             ("idx_agent_run_trace", ("otel_trace_id",), False),
             ("idx_agent_run_status_time", ("status", "started_at"), False),
             ("idx_agent_run_user_time", ("user_id", "started_at"), False),
+            ("idx_agent_run_agent_time", ("agent_id", "started_at"), False),
+            (
+                "idx_agent_run_parent_time",
+                ("parent_run_id", "started_at"),
+                False,
+            ),
         ),
         "agent_step": (
             ("idx_agent_step_run_time", ("run_id", "occurred_at", "step_id"), False),
@@ -972,6 +1013,7 @@ def _reconcile_indexes() -> None:
 
 def downgrade() -> None:
     for table_name in (
+        "agent_handoff",
         "agent_step",
         "agent_run",
         "agent_regression_case",

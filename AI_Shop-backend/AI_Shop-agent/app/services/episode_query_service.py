@@ -18,6 +18,7 @@ class EpisodeQueryService:
         intent: str | None = None,
         user_id: str | None = None,
         outcome: str | None = None,
+        agent_id: str | None = None,
     ) -> dict:
         page_no = max(1, int(page_no))
         page_size = min(100, max(1, int(page_size)))
@@ -28,6 +29,7 @@ class EpisodeQueryService:
             ("intent", intent),
             ("user_id", user_id),
             ("outcome", outcome),
+            ("agent_id", agent_id),
         ):
             cleaned = str(value or "").strip()
             if cleaned:
@@ -40,6 +42,9 @@ class EpisodeQueryService:
             await cur.execute(
                 f"""
                 SELECT run_id,message_id,user_id,session_id,otel_trace_id,status,
+                       COALESCE(agent_id, 'supervisor') AS agent_id,
+                       COALESCE(agent_version, 'v1') AS agent_version,
+                       parent_run_id,handoff_id,COALESCE(actor_type, 'USER') AS actor_type,
                        outcome,scenario,intent,queue_name,model_name,input_tokens,
                        output_tokens,cost_cny,latency_ms,capture_level,
                        dataset_eligible,dataset_reviewed_by,dataset_reviewed_at,
@@ -72,7 +77,8 @@ class EpisodeQueryService:
                 """
                 SELECT step_id,event_type,node_name,round_no,status,span_id,
                        input_json,output_json,model_name,tool_name,call_id,
-                       error_code,error_message,latency_ms,occurred_at
+                       error_code,error_message,latency_ms,occurred_at,
+                       agent_id,artifact_type,handoff_id
                 FROM agent_step
                 WHERE run_id=%s
                 ORDER BY occurred_at,step_id
@@ -80,6 +86,24 @@ class EpisodeQueryService:
                 (run_id,),
             )
             steps = list(await cur.fetchall())
+            await cur.execute(
+                """
+                SELECT handoff_id,parent_run_id,child_run_id,source_agent,target_agent,status,
+                       input_summary_json,artifact_summary_json,latency_ms,error_code,completed_at,created_at
+                FROM agent_handoff WHERE parent_run_id=%s OR child_run_id=%s
+                ORDER BY created_at
+                """,
+                (run_id, run_id),
+            )
+            handoffs = list(await cur.fetchall())
+            parent_run_id = run.get("parent_run_id")
+            children: list[dict] = []
+            if not parent_run_id:
+                await cur.execute(
+                    "SELECT * FROM agent_run WHERE parent_run_id=%s ORDER BY started_at,run_id",
+                    (run_id,),
+                )
+                children = [self._public_run(item) for item in await cur.fetchall()]
         public = {
             **self._public_run(run),
             "version": self._decode(run.get("version_json")),
@@ -87,6 +111,8 @@ class EpisodeQueryService:
             "quality": self._decode(run.get("quality_json")),
             "rewardSignals": self._decode(run.get("reward_signals_json")),
             "steps": [self._public_step(row) for row in steps],
+            "handoffs": [self._public_handoff(row) for row in handoffs],
+            "children": children,
         }
         public["episodeEvaluation"] = evaluate_order_aftersales_episode(public)
         return public
@@ -106,6 +132,11 @@ class EpisodeQueryService:
             "scenario": row.get("scenario"),
             "intent": row.get("intent"),
             "queueName": row.get("queue_name"),
+            "agentId": row.get("agent_id") or "supervisor",
+            "agentVersion": row.get("agent_version") or "v1",
+            "parentRunId": row.get("parent_run_id"),
+            "handoffId": row.get("handoff_id"),
+            "actorType": row.get("actor_type") or "USER",
             "modelName": row.get("model_name"),
             "inputTokens": int(row.get("input_tokens") or 0),
             "outputTokens": int(row.get("output_tokens") or 0),
@@ -119,6 +150,22 @@ class EpisodeQueryService:
             ),
             "datasetReviewNote": row.get("dataset_review_note"),
             "startedAt": EpisodeQueryService._format_time(row.get("started_at")),
+            "completedAt": EpisodeQueryService._format_time(row.get("completed_at")),
+        }
+
+    @staticmethod
+    def _public_handoff(row: dict) -> dict:
+        return {
+            "handoffId": row.get("handoff_id"),
+            "parentRunId": row.get("parent_run_id"),
+            "childRunId": row.get("child_run_id"),
+            "sourceAgent": row.get("source_agent"),
+            "targetAgent": row.get("target_agent"),
+            "status": row.get("status"),
+            "inputSummary": EpisodeQueryService._decode(row.get("input_summary_json")),
+            "artifactSummary": EpisodeQueryService._decode(row.get("artifact_summary_json")),
+            "latencyMs": row.get("latency_ms"),
+            "errorCode": row.get("error_code"),
             "completedAt": EpisodeQueryService._format_time(row.get("completed_at")),
         }
 
@@ -140,6 +187,9 @@ class EpisodeQueryService:
             "errorMessage": row.get("error_message"),
             "latencyMs": row.get("latency_ms"),
             "occurredAt": EpisodeQueryService._format_time(row.get("occurred_at")),
+            "agentId": row.get("agent_id"),
+            "artifactType": row.get("artifact_type"),
+            "handoffId": row.get("handoff_id"),
         }
 
     @staticmethod

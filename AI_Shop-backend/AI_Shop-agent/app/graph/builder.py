@@ -3,7 +3,14 @@ from functools import lru_cache
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 
+from app.config.settings import get_settings
 from app.graph.checkpoint.redis_saver import get_checkpointer
+from app.graph.multi_agent import (
+    prepare_specialist_sends,
+    specialist_runner_node,
+    supervisor_plan_node,
+    supervisor_synthesis_node,
+)
 from app.graph.nodes import (
     agent_loop_node,
     build_context_node,
@@ -40,7 +47,18 @@ def _after_agent_loop(state: AgentGraphState) -> str:
 def _after_order_reference(state: AgentGraphState) -> str:
     if state.get("cancelled"):
         return "cleanup"
-    return "finalize" if state.get("route") == "finalize" else "agent_loop"
+    if state.get("route") == "multi_agent_plan":
+        return "multi_agent_plan"
+    if state.get("route") == "finalize":
+        return "finalize"
+    if get_settings().multi_agent_enabled:
+        return "multi_agent_plan"
+    return "agent_loop"
+
+
+def _after_supervisor_plan(state: AgentGraphState):
+    return prepare_specialist_sends(state)
+
 
 def _after_tools(state: AgentGraphState) -> str:
 
@@ -64,6 +82,9 @@ def build_agent_graph():
     graph.add_node("entry", traced_node("entry", entry_guard))
     graph.add_node("build_context", traced_node("build_context", build_context_node))
     graph.add_node("order_reference", traced_node("order_reference", order_reference_node))
+    graph.add_node("multi_agent_plan", traced_node("multi_agent_plan", supervisor_plan_node))
+    graph.add_node("specialist_runner", traced_node("specialist_runner", specialist_runner_node))
+    graph.add_node("multi_agent_synthesis", traced_node("multi_agent_synthesis", supervisor_synthesis_node))
     graph.add_node("agent_loop", traced_node("agent_loop", agent_loop_node))
     graph.add_node("tools", traced_node("tools", tools_node))
     graph.add_node("finalize", traced_node("finalize", finalize_node))
@@ -77,8 +98,23 @@ def build_agent_graph():
     graph.add_conditional_edges(
         "order_reference",
         _after_order_reference,
-        {"agent_loop": "agent_loop", "finalize": "finalize", "cleanup": "cleanup"},
+        {
+            "agent_loop": "agent_loop",
+            "multi_agent_plan": "multi_agent_plan",
+            "finalize": "finalize",
+            "cleanup": "cleanup",
+        },
     )
+    graph.add_conditional_edges(
+        "multi_agent_plan",
+        _after_supervisor_plan,
+        {
+            "specialist_runner": "specialist_runner",
+            "multi_agent_synthesis": "multi_agent_synthesis",
+        },
+    )
+    graph.add_edge("specialist_runner", "multi_agent_synthesis")
+    graph.add_edge("multi_agent_synthesis", "finalize")
     graph.add_conditional_edges(
         "agent_loop",
         _after_agent_loop,

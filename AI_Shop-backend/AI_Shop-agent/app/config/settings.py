@@ -140,6 +140,11 @@ class Settings(BaseSettings):
     mysql_user: str = "root"
     mysql_password: str = "123456"
     mysql_database: str = "aishop_agent"
+    analytics_mysql_host: str = "localhost"
+    analytics_mysql_port: int = 3306
+    analytics_mysql_user: str = ""
+    analytics_mysql_password: str = ""
+    analytics_mysql_database: str = "aishop_admin"
     agent_auto_migrate: bool = True
 
     redis_host: str = "127.0.0.1"
@@ -272,6 +277,15 @@ class Settings(BaseSettings):
     circuit_llm_recovery_timeout: int = 60
 
     graph_max_react_rounds: int = 5
+    # Multi-Agent Harness v1. Disabled by default to preserve legacy behavior.
+    multi_agent_enabled: bool = False
+    data_analyst_enabled: bool = False
+    multi_agent_specialist_max_rounds: int = 2
+    analytics_max_rows: int = 200
+    analytics_max_days: int = 90
+    analytics_query_timeout_ms: int = 3000
+    analytics_model_timeout_seconds: int = 10
+    analytics_request_timeout_seconds: int = 45
     graph_checkpoint_ttl: int = 3600
     graph_checkpoint_prefix: str = "mall:agent:graph:ckpt"
 
@@ -297,6 +311,20 @@ class Settings(BaseSettings):
             raise ValueError(
                 "COMPRESS_TOKEN_THRESHOLD must be less than WORKING_TOKEN_BUDGET"
             )
+        if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
+            raise ValueError("ANALYTICS_MAX_ROWS must be between 1 and 200")
+        if self.analytics_max_days < 1 or self.analytics_max_days > 90:
+            raise ValueError("ANALYTICS_MAX_DAYS must be between 1 and 90")
+        if self.analytics_query_timeout_ms < 100 or self.analytics_query_timeout_ms > 10_000:
+            raise ValueError("ANALYTICS_QUERY_TIMEOUT_MS must be between 100 and 10000")
+        if self.analytics_model_timeout_seconds < 1 or self.analytics_model_timeout_seconds > 30:
+            raise ValueError("ANALYTICS_MODEL_TIMEOUT_SECONDS must be between 1 and 30")
+        if self.analytics_request_timeout_seconds < self.analytics_model_timeout_seconds:
+            raise ValueError(
+                "ANALYTICS_REQUEST_TIMEOUT_SECONDS must cover at least one model stage"
+            )
+        if self.analytics_request_timeout_seconds > 180:
+            raise ValueError("ANALYTICS_REQUEST_TIMEOUT_SECONDS must not exceed 180")
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
         for model, pricing in self.llm_pricing_cny_per_million_json.items():
@@ -390,6 +418,12 @@ class Settings(BaseSettings):
 
     def validate_runtime(self) -> None:
         if self.app_env.lower() != "production":
+            if self.data_analyst_enabled and (
+                not self.analytics_mysql_user.strip() or not self.analytics_mysql_password.strip()
+            ):
+                raise ValueError(
+                    "ANALYTICS_MYSQL_USER and ANALYTICS_MYSQL_PASSWORD are required when DataAnalyst is enabled"
+                )
             return
 
         errors: list[str] = []
@@ -401,6 +435,13 @@ class Settings(BaseSettings):
             errors.append("EMBEDDING_API_KEY must be configured")
         if self.rerank_required and not self.rerank_api_key.strip():
             errors.append("RERANK_API_KEY must be configured (RERANK_REQUIRED=true)")
+        if self.data_analyst_enabled:
+            if not self.analytics_mysql_user.strip() or not self.analytics_mysql_password.strip():
+                errors.append("ANALYTICS_MYSQL_USER and ANALYTICS_MYSQL_PASSWORD are required")
+            if self.analytics_mysql_user.strip().lower() in {"root", self.mysql_user.strip().lower()}:
+                errors.append("DataAnalyst must use a dedicated read-only MySQL identity")
+            if self.analytics_mysql_database.strip().lower() != "aishop_admin":
+                errors.append("ANALYTICS_MYSQL_DATABASE must be aishop_admin")
         if self.allow_development_auth_bypass:
             errors.append("ALLOW_DEVELOPMENT_AUTH_BYPASS must be false")
         if errors:

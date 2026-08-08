@@ -102,8 +102,13 @@ async def _call(name: str, **kwargs) -> str:
     return (await mcp_streamable_client.call_tool(name, args)).to_tool_message()
 
 
-def build_mcp_tools() -> list[StructuredTool]:
-    return [
+def build_mcp_tools(allowed_tools: set[str] | frozenset[str] | None = None) -> list[StructuredTool]:
+    """Build a tool set scoped to one AgentSpec.
+
+    ``None`` deliberately keeps the legacy full set so feature-flagged rollout
+    cannot change the existing single-agent behaviour.
+    """
+    tools = [
         StructuredTool.from_function(
             coroutine=lambda userId, keyword, excludeProductId=None: _call(
                 "SEARCH_PRODUCTS",
@@ -269,3 +274,7 @@ def build_mcp_tools() -> list[StructuredTool]:
             args_schema=SupportCaseQueryArgs,
         ),
     ]
+    if allowed_tools is None:
+        return tools
+    allowed = frozenset(allowed_tools)
+    return [tool for tool in tools if tool.name in allowed]

@@ -999,6 +999,8 @@ class ShoppingProfileService:
             parts.append(f"类别{profile['category']}")
         if profile.get("scenarios"):
             parts.append("场景" + "、".join(profile["scenarios"][:2]))
+        if profile.get("features"):
+            parts.append("关注" + "、".join(profile["features"][:3]))
         if profile.get("acceptSubstitute") is True:
             parts.append("可接受同类替代")
         elif profile.get("acceptSubstitute") is False:

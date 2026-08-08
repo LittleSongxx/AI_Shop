@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from langchain_core.messages import ToolMessage
 
+from app.config.settings import get_settings
 from app.constants import (
     ORDER_STATUS_PAID,
     ORDER_STATUS_SHIPPED,
@@ -70,10 +71,6 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         }
 
     target = resolution.target
-    direct = await _direct_response(state, intent, target)
-    if direct is not None:
-        return {**base, **direct}
-
     tool = _tool_for_target(intent, user_text, target, state)
     if tool is None:
         await _remember_reference(state, intent, target)
@@ -85,6 +82,21 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         }
 
     tool_name, args = tool
+    # In the multi-agent graph this node is an identity and ownership boundary:
+    # it verifies the target, but every read is delegated to a specialist and
+    # every proposal is created by the single root action executor after join.
+    if get_settings().multi_agent_enabled:
+        await _clear_reference(state)
+        return {
+            **base,
+            "verified_order_context": dict(target),
+            "route": "multi_agent_plan",
+        }
+
+    direct = await _direct_response(state, intent, target)
+    if direct is not None:
+        return {**base, **direct}
+
     result = await mcp_tool_router.invoke(tool_name, args, state["user_id"])
     messages = list(state.get("llm_messages") or [])
     messages.append(

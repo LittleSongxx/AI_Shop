@@ -991,7 +991,6 @@ async def tools_node(state: AgentGraphState) -> dict:
             if product_id:
                 await product_snapshot_service.ensure_consult_snapshot(user_id, str(product_id))
 
-    settings = get_settings()
     rag_update = {
         "rag_mode": rag_mode,
         "rag_queries": rag_queries,
@@ -1047,7 +1046,11 @@ async def tools_node(state: AgentGraphState) -> dict:
             "route": "finalize",
         }
 
-    next_route = "agent_loop" if state.get("react_round", 0) < settings.graph_max_react_rounds else "finalize"
+    next_route = (
+        "agent_loop"
+        if state.get("react_round", 0) < get_settings().graph_max_react_rounds
+        else "finalize"
+    )
     return {
         **rag_update,
         "llm_messages": messages,
