@@ -52,9 +52,7 @@ def test_registry_has_narrow_customer_agents_and_separate_admin_agent():
     assert "SEARCH_KNOWLEDGE" not in AGENT_SPECS["order_fulfillment_specialist"].tool_allowlist
     assert "SEARCH_KNOWLEDGE" in AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist
     assert not any(
-        tool.startswith("PROPOSE_")
-        for spec in AGENT_SPECS.values()
-        for tool in spec.tool_allowlist
+        tool.startswith("PROPOSE_") for spec in AGENT_SPECS.values() for tool in spec.tool_allowlist
     )
 
 
@@ -74,6 +72,20 @@ def test_supervisor_plan_rejects_duplicate_specialists():
                 "order_fulfillment_specialist",
             ]
         )
+
+
+@pytest.mark.parametrize("intent", ["COMPLAINT", "PAYMENT_ISSUE"])
+def test_complaint_and_payment_route_to_after_sales_only(intent):
+    plan = build_supervisor_plan(
+        {
+            "intent": intent,
+            "user_text": "这笔交易有问题，请帮我处理",
+        }
+    )
+
+    assert plan.specialists == ["after_sales_policy_specialist"]
+    assert plan.requires_action
+    assert plan.action_type == "PROPOSE_CREATE_SUPPORT_CASE"
 
 
 def test_supervisor_adaptively_fans_out_for_cross_domain_refund():
@@ -201,6 +213,54 @@ def test_artifact_validator_does_not_accept_arbitrary_evidence_dict():
     assert "UNVERIFIED_FACTS_DROPPED" in artifact.warnings
 
 
+@pytest.mark.parametrize(
+    "agent_id,evidence",
+    [
+        ("shopping_advisor", {"type": "product", "productId": "forged-product"}),
+        ("order_fulfillment_specialist", {"type": "order", "orderId": "forged-order"}),
+        (
+            "after_sales_policy_specialist",
+            {"type": "knowledge", "documentId": "forged-policy"},
+        ),
+    ],
+)
+def test_source_shaped_ref_without_tool_result_is_not_evidence(agent_id, evidence):
+    artifact = _validate_artifact(
+        AgentArtifact(
+            status="SUCCESS",
+            agent_id=agent_id,
+            draft_answer="这是一个未经工具核验的结论",
+            evidence=[evidence],
+        ).model_dump(mode="json")
+    )
+
+    assert "UNTRUSTED_EVIDENCE_DROPPED" in artifact.warnings
+    if agent_id == "after_sales_policy_specialist":
+        assert artifact.next_step == "HUMAN_HANDOFF"
+    else:
+        assert artifact.status == "BLOCKED"
+        assert artifact.draft_answer == ""
+
+
+def test_artifact_validator_rejects_source_type_from_unrelated_tool():
+    artifact = _validate_artifact(
+        AgentArtifact(
+            status="SUCCESS",
+            agent_id="after_sales_policy_specialist",
+            draft_answer="退款政策允许申请",
+            evidence=[
+                {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                {"type": "knowledge", "documentId": "forged-policy"},
+            ],
+        ).model_dump(mode="json")
+    )
+
+    assert artifact.evidence == [{"type": "tool_result", "tool": "QUERY_ORDERS", "success": True}]
+    assert artifact.next_step == "HUMAN_HANDOFF"
+    assert "UNTRUSTED_EVIDENCE_DROPPED" in artifact.warnings
+    assert "POLICY_EVIDENCE_MISSING" in artifact.warnings
+
+
 def test_failed_tool_cannot_make_following_policy_ref_verified():
     artifact = _validate_artifact(
         AgentArtifact(
@@ -225,9 +285,7 @@ def test_policy_artifact_without_knowledge_source_is_human_handoff():
             agent_id="after_sales_policy_specialist",
             tool_calls=["QUERY_ORDERS"],
             draft_answer="订单符合七天无理由退款政策",
-            evidence=[
-                {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True}
-            ],
+            evidence=[{"type": "tool_result", "tool": "QUERY_ORDERS", "success": True}],
         ).model_dump(mode="json")
     )
 
@@ -252,7 +310,9 @@ async def test_specialist_rejects_write_tool_before_router(monkeypatch):
     monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_invoke)
     monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", forbidden_router)
     for name in ("record_step", "record_handoff", "finish_run"):
-        monkeypatch.setattr(f"app.graph.multi_agent.episode_service.{name}", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            f"app.graph.multi_agent.episode_service.{name}", lambda *args, **kwargs: None
+        )
 
     result = await specialist_runner_node(
         {
@@ -264,9 +324,7 @@ async def test_specialist_rejects_write_tool_before_router(monkeypatch):
                 "goal": "核对退款政策",
                 "user_id": "u1",
                 "user_text": "我要退款",
-                "tool_scope": sorted(
-                    AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist
-                ),
+                "tool_scope": sorted(AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist),
                 "max_rounds": 1,
                 "timeout_seconds": 2,
             },
@@ -300,9 +358,7 @@ async def test_specialist_timeout_returns_traceable_failed_artifact(monkeypatch)
                 "goal": "查询政策",
                 "user_id": "u1",
                 "user_text": "退款政策是什么",
-                "tool_scope": sorted(
-                    AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist
-                ),
+                "tool_scope": sorted(AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist),
                 "max_rounds": 1,
                 "timeout_seconds": 1,
             }
@@ -407,11 +463,7 @@ async def test_send_workers_really_run_in_parallel_and_join_once():
         if len(started) == 2:
             both_started.set()
         await asyncio.wait_for(both_started.wait(), timeout=0.5)
-        return {
-            "specialist_artifacts": [
-                {"status": "SUCCESS", "agent_id": task.agent_id}
-            ]
-        }
+        return {"specialist_artifacts": [{"status": "SUCCESS", "agent_id": task.agent_id}]}
 
     async def synthesize(state: _FanoutState):
         agent_ids = sorted(item["agent_id"] for item in state["specialist_artifacts"])
@@ -505,13 +557,23 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
                 status="SUCCESS",
                 agent_id="order_fulfillment_specialist",
                 draft_answer="订单属于用户且状态允许申请",
-                evidence=[{"type": "order", "id": "masked"}],
+                evidence=[
+                    {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                    {"type": "order", "id": "masked"},
+                ],
             ).model_dump(mode="json"),
             AgentArtifact(
                 status="SUCCESS",
                 agent_id="after_sales_policy_specialist",
                 draft_answer="政策要求用户确认后提交",
-                evidence=[{"type": "knowledge", "id": "policy-1"}],
+                evidence=[
+                    {
+                        "type": "tool_result",
+                        "tool": "SEARCH_KNOWLEDGE",
+                        "success": True,
+                    },
+                    {"type": "knowledge", "id": "policy-1"},
+                ],
             ).model_dump(mode="json"),
         ],
         "llm_messages": [],
@@ -519,9 +581,7 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
 
     result = await supervisor_synthesis_node(state)
 
-    assert calls == [
-        ("PROPOSE_REFUND", {"orderItemId": "i1", "runId": "root-1"}, "u1")
-    ]
+    assert calls == [("PROPOSE_REFUND", {"orderItemId": "i1", "runId": "root-1"}, "u1")]
     assert result["tools_called"] == ["PROPOSE_REFUND"]
     assert "act_0123456789abcdef0123456789abcdef" in result["llm_messages"][-1].content
 
@@ -536,9 +596,7 @@ async def test_supervisor_synthesis_orders_artifacts_by_plan_not_completion(monk
         return AIMessage(content="已按计划汇总。")
 
     monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
-    monkeypatch.setattr(
-        "app.graph.multi_agent.invoke_llm_with_metrics", capture_synthesis
-    )
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", capture_synthesis)
     monkeypatch.setattr(
         "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
     )
@@ -558,13 +616,23 @@ async def test_supervisor_synthesis_orders_artifacts_by_plan_not_completion(monk
                 AgentArtifact(
                     status="SUCCESS",
                     agent_id="after_sales_policy_specialist",
-                    evidence=[{"type": "knowledge", "documentId": "policy-1"}],
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_KNOWLEDGE",
+                            "success": True,
+                        },
+                        {"type": "knowledge", "documentId": "policy-1"},
+                    ],
                     draft_answer="政策证据",
                 ).model_dump(mode="json"),
                 AgentArtifact(
                     status="SUCCESS",
                     agent_id="order_fulfillment_specialist",
-                    evidence=[{"type": "order", "orderId": "masked"}],
+                    evidence=[
+                        {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                        {"type": "order", "orderId": "masked"},
+                    ],
                     draft_answer="订单事实",
                 ).model_dump(mode="json"),
             ],
@@ -613,7 +681,10 @@ async def test_failed_root_proposal_never_exposes_confirmation_ui(monkeypatch):
                 AgentArtifact(
                     status="SUCCESS",
                     agent_id="order_fulfillment_specialist",
-                    evidence=[{"type": "order", "orderId": "masked"}],
+                    evidence=[
+                        {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                        {"type": "order", "orderId": "masked"},
+                    ],
                     draft_answer="订单已核验",
                 ).model_dump(mode="json")
             ],
@@ -674,9 +745,7 @@ async def test_shopping_handoff_only_contains_allowlisted_profile_context(monkey
             "revision": 9,
         }
 
-    monkeypatch.setattr(
-        "app.graph.multi_agent._structured_supervisor_plan", deterministic_plan
-    )
+    monkeypatch.setattr("app.graph.multi_agent._structured_supervisor_plan", deterministic_plan)
     monkeypatch.setattr(
         "app.graph.multi_agent.shopping_profile_service.get_effective_profile",
         profile_with_private_metadata,
@@ -698,7 +767,10 @@ async def test_shopping_handoff_only_contains_allowlisted_profile_context(monkey
     )
 
     task = SpecialistTask.model_validate(result["specialist_tasks"][0])
-    assert task.session_summary == "预算不超过3000元、偏好华为、类别手机、场景办公、关注续航、可接受同类替代"
+    assert (
+        task.session_summary
+        == "预算不超过3000元、偏好华为、类别手机、场景办公、关注续航、可接受同类替代"
+    )
     assert task.verified_context["shoppingProfile"] == {
         "category": "手机",
         "budgetMax": 3000,
@@ -718,9 +790,7 @@ async def test_specialist_handoff_redacts_pii_and_drops_raw_intent_data(monkeypa
     async def deterministic_plan(_state, fallback):
         return fallback
 
-    monkeypatch.setattr(
-        "app.graph.multi_agent._structured_supervisor_plan", deterministic_plan
-    )
+    monkeypatch.setattr("app.graph.multi_agent._structured_supervisor_plan", deterministic_plan)
     for name in ("start_child_run", "record_handoff", "record_step"):
         monkeypatch.setattr(
             f"app.graph.multi_agent.episode_service.{name}", lambda *args, **kwargs: None
@@ -789,7 +859,10 @@ async def test_action_executor_fails_closed_when_required_policy_evidence_is_mis
                 status="SUCCESS",
                 agent_id="order_fulfillment_specialist",
                 draft_answer="订单已核验",
-                evidence=[{"type": "order", "id": "masked"}],
+                evidence=[
+                    {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                    {"type": "order", "id": "masked"},
+                ],
             ).model_dump(mode="json"),
             AgentArtifact(
                 status="DEGRADED",
@@ -846,6 +919,53 @@ async def test_action_executor_rejects_failed_order_tool_even_with_source_ref(mo
     }
 
     result = await supervisor_synthesis_node(state)
+
+    router.assert_not_awaited()
+    assert result["action_proposal"]["reason"] == "ORDER_EVIDENCE_INSUFFICIENT"
+
+
+@pytest.mark.asyncio
+async def test_action_executor_requires_an_order_scoped_read_result(monkeypatch):
+    async def fake_llm(*_args, **_kwargs):
+        return AIMessage(content="优惠券查询已完成。")
+
+    router = AsyncMock()
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_llm)
+    monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", router)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-unrelated-read"},
+            "user_id": "u1",
+            "user_text": "取消订单",
+            "verified_order_context": {"orderId": "o1"},
+            "supervisor_plan": SupervisorPlan(
+                intent="CANCEL_ORDER",
+                specialists=["order_fulfillment_specialist"],
+                requires_action=True,
+                action_type="PROPOSE_CANCEL_ORDER",
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="order_fulfillment_specialist",
+                    draft_answer="优惠券已查询",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "QUERY_USER_COUPONS",
+                            "success": True,
+                        },
+                        {"type": "order", "orderId": "forged-after-coupon"},
+                    ],
+                ).model_dump(mode="json")
+            ],
+        }
+    )
 
     router.assert_not_awaited()
     assert result["action_proposal"]["reason"] == "ORDER_EVIDENCE_INSUFFICIENT"
@@ -934,12 +1054,8 @@ async def test_production_harness_fans_out_joins_and_proposes_once(monkeypatch):
             assistant_cards='{"type":"ACTION_CONFIRM"}',
         )
 
-    monkeypatch.setattr(
-        "app.graph.multi_agent._structured_supervisor_plan", deterministic_plan
-    )
-    monkeypatch.setattr(
-        "app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object()
-    )
+    monkeypatch.setattr("app.graph.multi_agent._structured_supervisor_plan", deterministic_plan)
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
     monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_llm)
     monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", fake_tool)
     for name in ("start_child_run", "record_handoff", "finish_run"):

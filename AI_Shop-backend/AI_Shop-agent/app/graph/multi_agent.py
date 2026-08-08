@@ -114,6 +114,18 @@ _EVIDENCE_ID_KEYS = (
     "questionId",
     "knowledgeVersion",
 )
+_TOOL_EVIDENCE_TYPES = {
+    "SEARCH_PRODUCTS": frozenset({"product", "product_detail"}),
+    "GET_PRODUCT_DETAIL": frozenset({"product", "product_detail"}),
+    "COMPARE_PRODUCTS": frozenset({"product", "product_detail"}),
+    "QUERY_ORDERS": frozenset({"order", "order_item"}),
+    "QUERY_LOGISTICS": frozenset({"logistics", "order"}),
+    "QUERY_COMMENT": frozenset({"comment", "order"}),
+    "QUERY_REFUND_STATUS": frozenset({"refund", "order", "order_item"}),
+    "QUERY_USER_COUPONS": frozenset({"coupon"}),
+    "QUERY_SUPPORT_CASES": frozenset({"support_case"}),
+    "SEARCH_KNOWLEDGE": frozenset({"knowledge", "knowledge_chunk", "faq", "rag", "policy"}),
+}
 
 
 def _contains(text: str, *terms: str) -> bool:
@@ -128,15 +140,18 @@ def _is_trusted_evidence_ref(item: dict[str, Any]) -> bool:
     return any(item.get(key) not in (None, "", []) for key in _EVIDENCE_ID_KEYS)
 
 
+def _evidence_type_matches_tool(item: dict[str, Any], tool_name: str) -> bool:
+    evidence_type = str(item.get("type") or "").strip().lower()
+    return evidence_type in _TOOL_EVIDENCE_TYPES.get(tool_name, frozenset())
+
+
 def _has_verified_evidence(evidence: list[dict[str, Any]]) -> bool:
     tool_results = [item for item in evidence if item.get("type") == "tool_result"]
     if any(item.get("success") is True for item in tool_results):
         return True
     # A failed tool result invalidates the unproven refs that may have been
     # placed after it by a model or a malformed integration response.
-    if tool_results:
-        return False
-    return any(_is_trusted_evidence_ref(item) for item in evidence)
+    return False
 
 
 def _has_policy_evidence(evidence: list[dict[str, Any]]) -> bool:
@@ -152,15 +167,12 @@ def _has_policy_evidence(evidence: list[dict[str, Any]]) -> bool:
     knowledge_results = [
         item
         for item in evidence
-        if item.get("type") == "tool_result"
-        and str(item.get("tool") or "") == "SEARCH_KNOWLEDGE"
+        if item.get("type") == "tool_result" and str(item.get("tool") or "") == "SEARCH_KNOWLEDGE"
     ]
     # If the specialist used the knowledge tool, a policy ref is valid only
     # when that specific call succeeded. A successful order lookup must not
     # launder a failed policy lookup into a policy conclusion.
-    if knowledge_results:
-        return any(item.get("success") is True for item in knowledge_results)
-    return not any(item.get("type") == "tool_result" for item in evidence)
+    return any(item.get("success") is True for item in knowledge_results)
 
 
 def _is_write_card(value: str | None) -> bool:
@@ -180,7 +192,14 @@ def _is_write_card(value: str | None) -> bool:
         if str(candidate.get("type") or "").upper() == "ACTION_CONFIRM":
             return True
         action_type = str(candidate.get("actionType") or "").upper()
-        if action_type in {"REFUND", "CANCEL_ORDER", "CONFIRM_RECEIPT", "PRODUCT_REVIEW", "RECOMMENT", "CREATE_SUPPORT_CASE"}:
+        if action_type in {
+            "REFUND",
+            "CANCEL_ORDER",
+            "CONFIRM_RECEIPT",
+            "PRODUCT_REVIEW",
+            "RECOMMENT",
+            "CREATE_SUPPORT_CASE",
+        }:
             return True
     return False
 
@@ -191,9 +210,7 @@ def _sanitize_specialist_text(value: Any, *, max_length: int) -> str:
     text = _MOBILE_PATTERN.sub("[PHONE_REDACTED]", text)
     text = _LANDLINE_PATTERN.sub("[PHONE_REDACTED]", text)
     text = _ID_CARD_PATTERN.sub("[ID_REDACTED]", text)
-    return _ADDRESS_PATTERN.sub(
-        lambda match: f"{match.group('label')}[ADDRESS_REDACTED]", text
-    )
+    return _ADDRESS_PATTERN.sub(lambda match: f"{match.group('label')}[ADDRESS_REDACTED]", text)
 
 
 def _sanitize_context_value(value: Any) -> Any:
@@ -242,8 +259,7 @@ def _specialist_verified_context(
             context["comparisonProductIds"] = product_ids
         if shopping_profile:
             context["shoppingProfile"] = {
-                field: _sanitize_context_value(value)
-                for field, value in shopping_profile.items()
+                field: _sanitize_context_value(value) for field, value in shopping_profile.items()
             }
     return context
 
@@ -268,6 +284,12 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
     }:
         specialists = ["shopping_advisor"]
         goals["shopping_advisor"] = "检索商品事实、价格库存与适配性，只返回可验证商品信息。"
+    elif intent in {
+        IntentKind.COMPLAINT.value,
+        IntentKind.PAYMENT_ISSUE.value,
+    }:
+        specialists = ["after_sales_policy_specialist"]
+        goals["after_sales_policy_specialist"] = "核对售后政策、工单路径和所需材料，不执行写操作。"
     elif intent in _ACTION_INTENTS or intent in {
         IntentKind.REFUND_STATUS.value,
         IntentKind.QUERY_ORDER.value,
@@ -283,15 +305,6 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
             goals["after_sales_policy_specialist"] = (
                 "核对售后政策和资格条件，只输出政策证据与风险，不执行写操作。"
             )
-    elif intent in {
-        IntentKind.COMPLAINT.value,
-        IntentKind.PAYMENT_ISSUE.value,
-    }:
-        specialists = ["after_sales_policy_specialist"]
-        goals["after_sales_policy_specialist"] = (
-            "核对售后政策、工单路径和所需材料，不执行写操作。"
-        )
-
     if (
         state.get("rag_evidence_required")
         and "after_sales_policy_specialist" not in specialists
@@ -306,10 +319,7 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
     action_type = _ACTION_TO_TOOL.get(intent)
     requires_action = bool(
         action_type
-        and (
-            state.get("verified_order_context")
-            or action_type == "PROPOSE_CREATE_SUPPORT_CASE"
-        )
+        and (state.get("verified_order_context") or action_type == "PROPOSE_CREATE_SUPPORT_CASE")
     )
     return SupervisorPlan(
         intent=intent or None,
@@ -368,7 +378,9 @@ async def _structured_supervisor_plan(
     plan.action_type = fallback.action_type
     plan.planner_source = "LLM_STRUCTURED"
     plan.goals = {
-        agent_id: str(plan.goals.get(agent_id) or fallback.goals.get(agent_id) or "完成只读事实核对")[:500]
+        agent_id: str(
+            plan.goals.get(agent_id) or fallback.goals.get(agent_id) or "完成只读事实核对"
+        )[:500]
         for agent_id in plan.specialists
     }
     return plan
@@ -381,7 +393,10 @@ def prepare_specialist_sends(state: dict[str, Any]) -> list[Send] | str:
     tasks = [SpecialistTask.model_validate(task) for task in state.get("specialist_tasks") or []]
     if [task.agent_id for task in tasks] != plan.specialists:
         return "multi_agent_synthesis"
-    return [Send("specialist_runner", {"specialist_task": task.model_dump(mode="json")}) for task in tasks]
+    return [
+        Send("specialist_runner", {"specialist_task": task.model_dump(mode="json")})
+        for task in tasks
+    ]
 
 
 _ORDER_CONTEXT_TOOLS = frozenset(
@@ -402,10 +417,15 @@ def _tool_args(
 ) -> dict[str, Any]:
     args = dict(raw_args or {})
     verified_order = task.verified_context.get("order")
-    if tool_name in _ORDER_CONTEXT_TOOLS and isinstance(verified_order, dict) and task.agent_id in {
-        "order_fulfillment_specialist",
-        "after_sales_policy_specialist",
-    }:
+    if (
+        tool_name in _ORDER_CONTEXT_TOOLS
+        and isinstance(verified_order, dict)
+        and task.agent_id
+        in {
+            "order_fulfillment_specialist",
+            "after_sales_policy_specialist",
+        }
+    ):
         # A specialist may choose a read operation, but it cannot retarget that
         # operation away from the server-resolved order or item supplied by the
         # Supervisor. Ownership checks in the tool service remain a second gate.
@@ -575,7 +595,11 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     name = str(call.get("name") or "")
                     if name not in spec.tool_allowlist or name.startswith("PROPOSE_"):
                         warnings.append(f"TOOL_SCOPE_DENIED:{name}")
-                        messages.append(ToolMessage(content="工具权限拒绝。", tool_call_id=call.get("id") or "denied"))
+                        messages.append(
+                            ToolMessage(
+                                content="工具权限拒绝。", tool_call_id=call.get("id") or "denied"
+                            )
+                        )
                         continue
                     result = await mcp_tool_router.invoke(
                         name,
@@ -596,7 +620,11 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         evidence.extend(result.source_refs)
                     if result.success and result.assistant_cards:
                         assistant_cards = result.assistant_cards
-                    messages.append(ToolMessage(content=result.to_tool_message(), tool_call_id=call.get("id") or name))
+                    messages.append(
+                        ToolMessage(
+                            content=result.to_tool_message(), tool_call_id=call.get("id") or name
+                        )
+                    )
                     episode_service.record_step(
                         "SPECIALIST_TOOL",
                         node_name="specialist_runner",
@@ -661,7 +689,9 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
         latency_ms=artifact.latency_ms,
         error_code=error_code,
     )
-    outcome = "ok" if status == "SUCCESS" else "degraded" if status == "DEGRADED" else "specialist_failed"
+    outcome = (
+        "ok" if status == "SUCCESS" else "degraded" if status == "DEGRADED" else "specialist_failed"
+    )
     episode_service.finish_run(
         outcome,
         run_id=child_run_id,
@@ -734,22 +764,24 @@ def _validate_artifact(raw: dict[str, Any]) -> AgentArtifact:
     raw_evidence = [item for item in artifact.evidence if isinstance(item, dict)]
     artifact.evidence = []
     saw_tool_result = False
+    last_tool_name = ""
     last_tool_succeeded = False
     for item in raw_evidence[:20]:
         if item.get("type") == "tool_result":
             tool_name = str(item.get("tool") or "")
-            if (
-                tool_name in spec.tool_allowlist
-                and isinstance(item.get("success"), bool)
-            ):
+            if tool_name in spec.tool_allowlist and isinstance(item.get("success"), bool):
                 artifact.evidence.append(item)
                 saw_tool_result = True
+                last_tool_name = tool_name
                 last_tool_succeeded = item["success"] is True
             else:
                 warnings.append("UNTRUSTED_EVIDENCE_DROPPED")
             continue
-        if _is_trusted_evidence_ref(item) and (
-            not saw_tool_result or last_tool_succeeded
+        if (
+            _is_trusted_evidence_ref(item)
+            and saw_tool_result
+            and last_tool_succeeded
+            and _evidence_type_matches_tool(item, last_tool_name)
         ):
             artifact.evidence.append(item)
         else:
@@ -787,36 +819,22 @@ def _action_evidence_failure(
     if plan.action_type == "PROPOSE_CREATE_SUPPORT_CASE":
         return None
     order_artifact = next(
-        (
-            artifact
-            for artifact in artifacts
-            if artifact.agent_id == "order_fulfillment_specialist"
-        ),
+        (artifact for artifact in artifacts if artifact.agent_id == "order_fulfillment_specialist"),
         None,
     )
-    order_tool_results = [
-        item
-        for item in (order_artifact.evidence if order_artifact else [])
-        if item.get("type") == "tool_result"
-    ]
     order_result_verified = bool(
         order_artifact
-        and order_artifact.evidence
-        and (
-            not order_tool_results
-            or any(item.get("success") is True for item in order_tool_results)
+        and _has_verified_evidence(order_artifact.evidence)
+        and any(
+            item.get("type") == "tool_result"
+            and item.get("success") is True
+            and str(item.get("tool") or "") in _ORDER_CONTEXT_TOOLS
+            for item in order_artifact.evidence
         )
     )
-    if (
-        order_artifact is None
-        or order_artifact.status != "SUCCESS"
-        or not order_result_verified
-    ):
+    if order_artifact is None or order_artifact.status != "SUCCESS" or not order_result_verified:
         return "ORDER_EVIDENCE_INSUFFICIENT"
-    if (
-        plan.action_type == "PROPOSE_REFUND"
-        and "after_sales_policy_specialist" in plan.specialists
-    ):
+    if plan.action_type == "PROPOSE_REFUND" and "after_sales_policy_specialist" in plan.specialists:
         policy_artifact = next(
             (
                 artifact
@@ -828,26 +846,7 @@ def _action_evidence_failure(
         has_policy_source = bool(
             policy_artifact
             and policy_artifact.status == "SUCCESS"
-            and (
-                not any(
-                    item.get("type") == "tool_result"
-                    for item in policy_artifact.evidence
-                )
-                or any(
-                    item.get("type") == "tool_result"
-                    and item.get("success") is True
-                    for item in policy_artifact.evidence
-                )
-            )
-            and any(
-                str(item.get("type") or "").lower()
-                in {"knowledge", "faq", "rag", "policy"}
-                or any(
-                    item.get(key)
-                    for key in ("documentId", "chunkId", "knowledgeVersion")
-                )
-                for item in policy_artifact.evidence
-            )
+            and _has_policy_evidence(policy_artifact.evidence)
         )
         if not has_policy_source:
             return "POLICY_EVIDENCE_INSUFFICIENT"
@@ -863,9 +862,7 @@ def _action_failure_answer(answer: str) -> str:
 async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
     plan = SupervisorPlan.model_validate(state.get("supervisor_plan") or {})
     artifacts: list[AgentArtifact] = []
-    specialist_rank = {
-        agent_id: index for index, agent_id in enumerate(plan.specialists)
-    }
+    specialist_rank = {agent_id: index for index, agent_id in enumerate(plan.specialists)}
     raw_artifacts = list(state.get("specialist_artifacts") or [])
     raw_artifacts.sort(
         key=lambda raw: (
@@ -903,15 +900,10 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         item
         for item in artifacts
         if item.status in {"DEGRADED", "FAILED", "BLOCKED"}
-        or any(
-            warning.startswith(("SPECIALIST_", "POLICY_EVIDENCE_"))
-            for warning in item.warnings
-        )
+        or any(warning.startswith(("SPECIALIST_", "POLICY_EVIDENCE_")) for warning in item.warnings)
     ]
     timeout_artifacts = [
-        item
-        for item in degraded_artifacts
-        if "SPECIALIST_TIMEOUT" in item.warnings
+        item for item in degraded_artifacts if "SPECIALIST_TIMEOUT" in item.warnings
     ]
     if timeout_artifacts:
         episode_service.record_step(
@@ -934,11 +926,7 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                 "completedArtifacts": len(artifacts),
                 "degradedArtifacts": len(degraded_artifacts),
                 "warnings": sorted(
-                    {
-                        warning
-                        for item in degraded_artifacts
-                        for warning in item.warnings
-                    }
+                    {warning for item in degraded_artifacts for warning in item.warnings}
                 )[:20],
             },
             agent_id="supervisor",
@@ -946,7 +934,11 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         )
     artifact_payload = [item.model_dump(mode="json") for item in artifacts]
     prompt = json.dumps(
-        {"question": state.get("user_text"), "plan": plan.model_dump(mode="json"), "artifacts": artifact_payload},
+        {
+            "question": state.get("user_text"),
+            "plan": plan.model_dump(mode="json"),
+            "artifacts": artifact_payload,
+        },
         ensure_ascii=False,
     )
     answer = ""
@@ -981,12 +973,15 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             evidence
             for artifact in artifacts
             for evidence in artifact.evidence
+            if evidence.get("type") != "tool_result"
         ][:30],
         "route": "finalize",
         "supervisor_plan": plan.model_dump(mode="json"),
     }
     if artifacts:
-        first_cards = next((item.assistant_cards for item in artifacts if item.assistant_cards), None)
+        first_cards = next(
+            (item.assistant_cards for item in artifacts if item.assistant_cards), None
+        )
         if first_cards:
             result["assistant_cards"] = first_cards
 
