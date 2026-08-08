@@ -1,4 +1,5 @@
 from app.config.settings import Settings, get_settings
+from app.services import agent_runtime
 from app.services.agent_runtime import bind_agent_llm
 from app.services.llm_factory import (
     _resolve_memory_llm_config,
@@ -98,3 +99,28 @@ def test_agent_llm_reuses_one_tool_binding_per_config(monkeypatch):
         assert bind_agent_llm(fallback=True) is not bind_agent_llm()
     finally:
         get_settings.cache_clear()
+
+
+def test_agent_llm_distinguishes_empty_scope_from_legacy_full_scope(monkeypatch):
+    config = object()
+    captured_scopes = []
+
+    class FakeLLM:
+        def bind_tools(self, tools):
+            return ("bound", tools)
+
+    monkeypatch.setattr(agent_runtime, "chat_llm_config", lambda **_kwargs: config)
+    monkeypatch.setattr(agent_runtime, "chat_llm_for_config", lambda _config: FakeLLM())
+    monkeypatch.setattr(
+        agent_runtime,
+        "build_mcp_tools",
+        lambda allowed: captured_scopes.append(allowed)
+        or (["legacy"] if allowed is None else list(allowed)),
+    )
+    agent_runtime._agent_llm_with_tools.cache_clear()
+    try:
+        assert bind_agent_llm(allowed_tools=frozenset()) == ("bound", [])
+        assert bind_agent_llm() == ("bound", ["legacy"])
+        assert captured_scopes == [set(), None]
+    finally:
+        agent_runtime._agent_llm_with_tools.cache_clear()

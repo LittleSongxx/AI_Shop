@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -184,6 +185,42 @@ async def test_unshipped_order_answers_from_snapshot_without_querying_fake_logis
     assert update["order_resolution"] == "RESOLVED"
     assert "尚未发货" in update["chunks"][0]
     assert "没有物流轨迹" in update["chunks"][0]
+    invoke.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_multi_agent_mode_only_verifies_order_and_never_executes_read_tool():
+    state = {
+        **_state(),
+        "user_text": "没发货的耳机物流到哪了",
+        "intent": "QUERY_LOGISTICS",
+    }
+    order = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "索尼无线降噪耳机",
+        "2026-08-05 21:00:00",
+    )
+    with (
+        patch(
+            "app.services.order_reference_resolver.java_internal_client.list_orders",
+            AsyncMock(return_value=[order]),
+        ),
+        patch(
+            "app.graph.order_reference_flow.get_settings",
+            return_value=SimpleNamespace(multi_agent_enabled=True),
+        ),
+        patch(
+            "app.graph.order_reference_flow.mcp_tool_router.invoke",
+            AsyncMock(),
+        ) as invoke,
+        patch("app.graph.order_reference_flow._clear_reference", AsyncMock()),
+    ):
+        update = await resolve_order_reference_turn(state)
+
+    assert update["order_resolution"] == "RESOLVED"
+    assert update["route"] == "multi_agent_plan"
+    assert update["verified_order_context"]["orderId"] == "SM202608050002"
     invoke.assert_not_awaited()
 
 

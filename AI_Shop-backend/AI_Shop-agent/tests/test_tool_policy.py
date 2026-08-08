@@ -26,6 +26,10 @@ def _registered_tools() -> dict[str, str]:
     return {t.name: t.description for t in build_mcp_tools()}
 
 
+def test_explicit_empty_tool_scope_binds_no_tools():
+    assert build_mcp_tools(frozenset()) == []
+
+
 def test_policy_table_matches_mcp_registry_both_ways():
     registered = set(_registered_tools())
     assert set(TOOL_POLICIES) == registered, (

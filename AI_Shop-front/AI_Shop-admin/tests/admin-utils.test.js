@@ -28,6 +28,8 @@ describe('admin workflow helpers', () => {
   it('keeps mobile and desktop routes aligned', () => {
     expect(resolveDesktopPath('/m/product/edit/p-1')).toBe('/product/updateProduct/p-1')
     expect(resolveDesktopPath('/m/more/agent')).toBe('/setting/agentMessage')
+    expect(resolveDesktopPath('/m/more/agentQuality')).toBe('/setting/agentQuality')
+    expect(resolveDesktopPath('/m/more/dataAnalyst')).toBe('/data/dataAnalyst')
   })
 
   it('renders the brand marker as an accessible image', () => {

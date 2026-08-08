@@ -5,8 +5,10 @@ from fastapi.testclient import TestClient
 
 from app.api.routes import agent
 from app.config.settings import get_settings
+from app.services.data_analyst_service import data_analyst_service
 from app.services.episode_query_service import episode_query_service
 from app.services.episode_review_service import episode_review_service
+from app.services.inventory_ops_service import inventory_ops_service
 
 
 def _app() -> FastAPI:
@@ -64,6 +66,7 @@ def test_trace_admin_list_and_detail_return_sanitized_episode(monkeypatch):
         intent=None,
         user_id=None,
         outcome=None,
+        agent_id=None,
     )
     detail.assert_awaited_once_with("run-1")
 
@@ -94,4 +97,39 @@ def test_episode_review_admin_api_forwards_internal_reviewer(monkeypatch):
         "APPROVED",
         "admin-from-java-session",
         note="完整售后终态",
+    )
+
+
+def test_admin_agents_require_and_forward_java_session_identity(monkeypatch):
+    ask = AsyncMock(return_value={"status": "SUCCEEDED", "runId": "analysis-1"})
+    suggestions = AsyncMock(return_value={"status": "SUCCEEDED", "runId": "inventory-1"})
+    monkeypatch.setattr(data_analyst_service, "ask", ask)
+    monkeypatch.setattr(inventory_ops_service, "suggestions", suggestions)
+    headers = {"X-Internal-Token": get_settings().internal_token}
+
+    with TestClient(_app()) as client:
+        missing_identity = client.post(
+            "/api/agent/admin/dataAnalyst/ask",
+            headers=headers,
+            json={"question": "最近七天销售额"},
+        )
+        analysis = client.post(
+            "/api/agent/admin/dataAnalyst/ask",
+            headers=headers,
+            json={"question": "最近七天销售额", "adminId": "admin-session"},
+        )
+        inventory = client.post(
+            "/api/agent/admin/inventoryOps/suggestions",
+            headers=headers,
+            json={"adminId": "admin-session", "lookbackDays": 30, "limit": 20},
+        )
+
+    assert missing_identity.json()["code"] == 401
+    assert analysis.json()["data"]["runId"] == "analysis-1"
+    assert inventory.json()["data"]["runId"] == "inventory-1"
+    ask.assert_awaited_once_with("最近七天销售额", admin_id="admin-session")
+    suggestions.assert_awaited_once_with(
+        admin_id="admin-session",
+        lookback_days=30,
+        limit=20,
     )

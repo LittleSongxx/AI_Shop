@@ -23,6 +23,10 @@ def test_episode_payload_redacts_raw_text_credentials_and_business_ids():
             "password": "not-for-storage",
             "orderId": "ABCD2026080712345678",
             "nested": {"email": "buyer@example.com"},
+            "arguments": {
+                "description": "请把货送到北京市朝阳区测试路 1 号",
+                "commentContent": "评价正文不应复制到 Episode",
+            },
         }
     )
 
@@ -31,6 +35,10 @@ def test_episode_payload_redacts_raw_text_credentials_and_business_ids():
     assert payload["password"] == "<REDACTED>"
     assert payload["orderId"].startswith("<ORDERID:")
     assert payload["nested"]["email"] == "<EMAIL>"
+    assert payload["arguments"]["description"]["chars"] > 0
+    assert payload["arguments"]["commentContent"]["chars"] > 0
+    assert "北京市朝阳区测试路" not in str(payload)
+    assert "评价正文不应复制" not in str(payload)
     assert "13812345678" not in str(payload)
     assert "ABCD2026080712345678" not in str(payload)
 
@@ -49,6 +57,42 @@ def test_current_otel_ids_only_come_from_an_active_span():
     with trace.use_span(NonRecordingSpan(context)):
         assert current_trace_id() == "1" * 32
         assert current_span_id() == "2" * 16
+
+
+def test_episode_payload_preserves_governed_trace_identifiers_and_sql_structure():
+    sql_hash = "a" * 64
+    payload = sanitize_episode_payload(
+        {
+            "agent_id": "order_fulfillment_specialist",
+            "specialists": [
+                "order_fulfillment_specialist",
+                "after_sales_policy_specialist",
+            ],
+            "action_type": "PROPOSE_CANCEL_ORDER",
+            "tool_calls": ["QUERY_REFUND_STATUS"],
+            "warnings": ["SPECIALIST_TIMEOUT"],
+            "lineage": ["analytics_sales_daily"],
+            "sqlHash": sql_hash,
+            "sql": (
+                "SELECT date, gross_paid_amount FROM analytics_sales_daily "
+                "WHERE date BETWEEN '2026-08-01' AND '2026-08-07' "
+                "AND agent_id='private-admin-value' LIMIT 20"
+            ),
+        }
+    )
+
+    assert payload["agent_id"] == "order_fulfillment_specialist"
+    assert payload["specialists"][1] == "after_sales_policy_specialist"
+    assert payload["action_type"] == "PROPOSE_CANCEL_ORDER"
+    assert payload["tool_calls"] == ["QUERY_REFUND_STATUS"]
+    assert payload["warnings"] == ["SPECIALIST_TIMEOUT"]
+    assert payload["lineage"] == ["analytics_sales_daily"]
+    assert payload["sqlHash"] == sql_hash
+    assert "gross_paid_amount" in payload["sql"]
+    assert "analytics_sales_daily" in payload["sql"]
+    assert "'2026-08-01'" in payload["sql"]
+    assert "private-admin-value" not in payload["sql"]
+    assert "SQL_LITERAL" in payload["sql"]
 
 
 def test_episode_error_message_is_fingerprinted_before_enqueue():
