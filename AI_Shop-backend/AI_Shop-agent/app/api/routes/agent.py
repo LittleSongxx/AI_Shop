@@ -16,8 +16,10 @@ from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
 from app.services.badcase_service import badcase_service
+from app.services.data_analyst_service import data_analyst_service
 from app.services.episode_query_service import episode_query_service
 from app.services.episode_review_service import episode_review_service
+from app.services.inventory_ops_service import inventory_ops_service
 from app.services.message_service import agent_message_service
 from app.services.order_selection_store import (
     OrderSelectionConflict,
@@ -439,8 +441,43 @@ async def admin_trace_runs(
         intent=str(body.get("intent") or "").strip() or None,
         user_id=str(body.get("userId") or "").strip() or None,
         outcome=str(body.get("outcome") or "").strip() or None,
+        agent_id=str(body.get("agentId") or "").strip() or None,
     )
     return success(data)
+
+
+@router.post("/admin/dataAnalyst/ask")
+async def admin_data_analyst_ask(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    # Java extracts this from its authenticated admin session. Do not accept
+    # browser-controlled identity fields such as userId/adminAccount as aliases.
+    admin_id = str(body.get("adminId") or "").strip()
+    if not admin_id:
+        return error(401, "管理员身份缺失")
+    result = await data_analyst_service.ask(
+        str(body.get("question") or ""), admin_id=admin_id
+    )
+    return success(result)
+
+
+@router.post("/admin/inventoryOps/suggestions")
+async def admin_inventory_ops_suggestions(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    admin_id = str(body.get("adminId") or "").strip()
+    if not admin_id:
+        return error(401, "管理员身份缺失")
+    result = await inventory_ops_service.suggestions(
+        admin_id=admin_id,
+        lookback_days=_as_int(body.get("lookbackDays"), 30) or 30,
+        limit=_as_int(body.get("limit"), 50) or 50,
+    )
+    return success(result)
 
 
 @router.post("/admin/traceDetail")

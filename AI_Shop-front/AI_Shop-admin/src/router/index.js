@@ -15,6 +15,7 @@ const DESKTOP_TO_MOBILE = {
   '/user/address': '/m/more/address',
   '/setting/agentMessage': '/m/more/agent',
   '/setting/agentQuality': '/m/more/agentQuality',
+  '/data/dataAnalyst': '/m/more/dataAnalyst',
   '/discountCoupon': '/m/more/coupon',
   '/marketing/searchHot': '/m/more/searchHot',
   '/data/statistics': '/m/more/statistics',
@@ -64,6 +65,7 @@ const router = createRouter({
         { path: 'more', component: () => import('@/views/mobile/MobileMore.vue'), meta: { title: '更多', tab: '/m/more' } },
         { path: 'more/agent', component: () => import('@/views/mobile/MobileAgentMessage.vue'), meta: { title: '客服记录', tab: '/m/more', showBack: true } },
         { path: 'more/agentQuality', component: () => import('@/views/setting/AgentQualityCenter.vue'), meta: { title: 'Agent 质量中心', tab: '/m/more', showBack: true } },
+        { path: 'more/dataAnalyst', component: () => import('@/views/data/DataAnalyst.vue'), meta: { title: 'AI 经营分析', tab: '/m/more', showBack: true } },
         { path: 'more/coupon', component: () => import('@/views/mobile/MobileCoupon.vue'), meta: { title: '优惠券', tab: '/m/more', showBack: true } },
         { path: 'more/searchHot', component: () => import('@/views/mobile/MobileSearchHot.vue'), meta: { title: '热搜词', tab: '/m/more', showBack: true } },
         { path: 'more/statistics', component: () => import('@/views/mobile/MobileStatistics.vue'), meta: { title: '统计明细', tab: '/m/more', showBack: true } },
@@ -247,6 +249,12 @@ const router = createRouter({
           }
         },
         {
+          path: '/data/dataAnalyst',
+          name: 'AI经营分析',
+          component: () => import('@/views/data/DataAnalyst.vue'),
+          meta: { itemList: ["数据中心", "AI经营分析"] }
+        },
+        {
           path: '/data/mqCompensationLog',
           name: 'MQ补偿审查',
           component: () => import('@/views/data/MqCompensationLogList.vue'),
@@ -308,11 +316,11 @@ router.beforeEach((to) => {
 
   if (device.isMobile && !isMobileRoute) {
     const target = resolveMobilePath(to.path)
-    return target || '/m/home'
+    return { path: target || '/m/home', query: to.query }
   }
 
   if (device.isDesktop && isMobileRoute) {
-    return resolveDesktopPath(to.path)
+    return { path: resolveDesktopPath(to.path), query: to.query }
   }
 
   return true

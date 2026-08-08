@@ -78,6 +78,8 @@ export function resolveDesktopPath(mobilePath) {
     '/m/more': '/home',
     '/m/more/address': '/user/address',
     '/m/more/agent': '/setting/agentMessage',
+    '/m/more/agentQuality': '/setting/agentQuality',
+    '/m/more/dataAnalyst': '/data/dataAnalyst',
     '/m/more/coupon': '/discountCoupon',
     '/m/more/searchHot': '/marketing/searchHot',
     '/m/more/statistics': '/data/statistics',

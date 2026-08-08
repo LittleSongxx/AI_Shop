@@ -129,6 +129,8 @@ const Api = {
     agentRunRegressionCases: "/agentMessage/runRegressionCases",
     agentTraceRuns: "/agentMessage/traceRuns",
     agentTraceDetail: "/agentMessage/traceDetail",
+    dataAnalystAsk: "/agentMessage/dataAnalyst/ask",
+    inventoryOpsSuggestions: "/agentMessage/inventoryOps/suggestions",
     agentReviewEpisode: "/agentMessage/reviewEpisode",
     agentSupportCases: "/agentMessage/supportCases",
     agentSupportCaseDetail: "/agentMessage/supportCaseDetail",

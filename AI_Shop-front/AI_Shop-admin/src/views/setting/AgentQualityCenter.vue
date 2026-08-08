@@ -11,6 +11,14 @@
             <el-option label="转人工" value="HANDOFF" />
             <el-option label="已取消" value="CANCELLED" />
           </el-select>
+          <el-select v-model="traceFilters.agentId" clearable placeholder="Agent" class="filter-control">
+            <el-option label="Supervisor" value="supervisor" />
+            <el-option label="Shopping Advisor" value="shopping_advisor" />
+            <el-option label="Order Fulfillment" value="order_fulfillment_specialist" />
+            <el-option label="After Sales Policy" value="after_sales_policy_specialist" />
+            <el-option label="Data Analyst" value="data_analyst" />
+            <el-option label="Inventory Ops" value="inventory_ops" />
+          </el-select>
           <el-input v-model="traceFilters.intent" clearable placeholder="意图" class="filter-control" />
           <el-input v-model="traceFilters.userId" clearable placeholder="用户 ID" class="filter-control" />
           <el-input v-model="traceFilters.outcome" clearable placeholder="终态" class="filter-control" />
@@ -19,6 +27,12 @@
         <div class="table-wrap">
           <el-table :data="tracePage.list" v-loading="traceLoading" stripe @row-dblclick="openTrace">
             <el-table-column label="Run ID" prop="runId" min-width="240" show-overflow-tooltip />
+            <el-table-column label="Agent / 层级" min-width="190">
+              <template #default="{ row }">
+                <b>{{ row.agentId || 'supervisor' }}</b>
+                <small class="block">{{ row.parentRunId ? 'Child Run' : 'Root Run' }}</small>
+              </template>
+            </el-table-column>
             <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="runStatusType(row.status)">{{ row.status || '—' }}</el-tag></template></el-table-column>
             <el-table-column label="场景 / 意图" min-width="190"><template #default="{ row }"><b>{{ row.scenario || '—' }}</b><small class="block">{{ row.intent || '—' }}</small></template></el-table-column>
             <el-table-column label="终态" prop="outcome" width="130" show-overflow-tooltip />
@@ -88,6 +102,8 @@
         <div class="detail-summary">
           <div><span>Run ID</span><b>{{ traceDrawer.detail.runId }}</b></div>
           <div><span>Trace ID</span><b>{{ traceDrawer.detail.traceId || '—' }}</b></div>
+          <div><span>Agent / 层级</span><b>{{ traceDrawer.detail.agentId || 'supervisor' }} · {{ traceDrawer.detail.parentRunId ? 'Child Run' : 'Root Run' }}</b></div>
+          <div><span>父 Run</span><b>{{ traceDrawer.detail.parentRunId || '—' }}</b></div>
           <div><span>终态</span><b>{{ traceDrawer.detail.outcome || traceDrawer.detail.status || '—' }}</b></div>
           <div><span>模型 / Token</span><b>{{ traceDrawer.detail.modelName || '—' }} · {{ tokenTotal(traceDrawer.detail) }}</b></div>
           <div><span>数据审核</span><b>{{ traceDrawer.detail.datasetEligible || 'UNREVIEWED' }} · {{ traceDrawer.detail.datasetReviewedBy || '未审核' }}</b></div>
@@ -95,6 +111,7 @@
         </div>
         <div class="drawer-actions top-actions">
           <a v-if="traceDrawer.detail.tempoTraceUrl" :href="traceDrawer.detail.tempoTraceUrl" target="_blank" rel="noopener noreferrer" class="tempo-link">在 Tempo 查看</a>
+          <el-button v-if="traceDrawer.detail.parentRunId" link type="primary" :icon="Connection" @click="openTrace(traceDrawer.detail.parentRunId)">查看父 Run</el-button>
         </div>
         <section class="episode-review">
           <div class="review-heading"><h3>人工数据审核</h3><el-tag :type="traceDrawer.detail.episodeEvaluation?.reviewEligible ? 'success' : 'warning'">{{ traceDrawer.detail.episodeEvaluation?.reviewEligible ? '事实完整' : '暂不可批准' }}</el-tag></div>
@@ -105,13 +122,45 @@
             <el-button :loading="episodeReviewing" type="success" :disabled="!traceDrawer.detail.episodeEvaluation?.reviewEligible" @click="reviewEpisode('APPROVED')">批准为训练候选</el-button>
           </div>
         </section>
+        <section v-if="hasCollaboration" class="collaboration">
+          <h3>协作链路</h3>
+          <article v-if="supervisorPlan" class="collaboration-stage supervisor-stage">
+            <header>
+              <b>Supervisor 计划</b>
+              <el-tag size="small" type="info">{{ supervisorPlan.planner_source || 'DETERMINISTIC_FALLBACK' }}</el-tag>
+            </header>
+            <p>意图 {{ supervisorPlan.intent || '—' }} · 专家 {{ (supervisorPlan.specialists || []).join(' + ') || 'Supervisor-only' }}</p>
+            <p v-if="supervisorPlan.requires_action">待汇合后评估 {{ supervisorPlan.action_type }}</p>
+          </article>
+          <div v-if="traceDrawer.detail.handoffs?.length" class="handoff-grid">
+            <article v-for="handoff in traceDrawer.detail.handoffs" :key="handoff.handoffId" class="collaboration-stage">
+              <header>
+                <b>{{ handoff.targetAgent }}</b>
+                <el-tag size="small" :type="handoff.status === 'SUCCEEDED' ? 'success' : 'warning'">{{ handoff.status }}</el-tag>
+              </header>
+              <p>{{ handoff.sourceAgent }} → {{ handoff.targetAgent }} · {{ formatDuration(handoff.latencyMs) }}</p>
+              <p v-if="handoff.artifactSummary?.draft_answer">{{ handoff.artifactSummary.draft_answer }}</p>
+              <div v-if="handoff.artifactSummary?.warnings?.length" class="warning-list">
+                <el-tag v-for="warning in handoff.artifactSummary.warnings" :key="warning" size="small" type="warning">{{ warning }}</el-tag>
+              </div>
+              <el-button link type="primary" :icon="Connection" @click="openTrace(handoff.childRunId)">查看 Child Run</el-button>
+            </article>
+          </div>
+          <article v-if="actionDecision" class="collaboration-stage action-stage">
+            <header>
+              <b>行动策略</b>
+              <el-tag size="small" :type="actionDecision.status === 'OK' ? 'success' : 'warning'">{{ actionDecision.status }}</el-tag>
+            </header>
+            <p>{{ actionDecision.toolName || actionDecision.output?.proposal?.tool || '无写操作' }} · {{ actionDecision.output?.reason || actionDecision.output?.proposal?.reason || (actionDecision.output?.success ? '已生成待确认提案' : '未执行提案') }}</p>
+          </article>
+        </section>
         <section class="quality-json"><h3>质量与事实 Reward Signals</h3><pre>{{ pretty({ quality: traceDrawer.detail.quality, rewardSignals: traceDrawer.detail.rewardSignals, experiment: traceDrawer.detail.experiment }) }}</pre></section>
         <section class="waterfall">
           <article v-for="(step, index) in traceDrawer.detail.steps || []" :key="step.stepId || index" class="trace-step">
             <span class="step-line" aria-hidden="true" />
             <span class="step-index">{{ index + 1 }}</span>
             <div class="step-body">
-              <header><b>{{ step.nodeName || step.toolName || step.eventType }}</b><el-tag size="small" :type="step.status === 'ERROR' ? 'danger' : 'info'">{{ step.status || step.eventType }}</el-tag><span>{{ formatDuration(step.latencyMs) }}</span></header>
+              <header><b>{{ step.nodeName || step.toolName || step.eventType }}</b><el-tag v-if="step.agentId" size="small" type="info">{{ step.agentId }}</el-tag><el-tag size="small" :type="step.status === 'ERROR' ? 'danger' : 'info'">{{ step.status || step.eventType }}</el-tag><span>{{ formatDuration(step.latencyMs) }}</span></header>
               <p>{{ step.eventType }} · {{ step.occurredAt || '—' }}<template v-if="step.spanId"> · span {{ step.spanId }}</template></p>
               <details v-if="step.input || step.output || step.errorMessage"><summary>脱敏 observation / action / result</summary><pre>{{ pretty({ input: step.input, output: step.output, errorCode: step.errorCode, errorMessage: step.errorMessage }) }}</pre></details>
             </div>
@@ -180,9 +229,11 @@
 <script setup>
 import { computed, defineComponent, getCurrentInstance, h, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElPagination } from 'element-plus'
-import { VideoPlay } from '@element-plus/icons-vue'
+import { Connection, VideoPlay } from '@element-plus/icons-vue'
+import { useRoute } from 'vue-router'
 
 const { proxy } = getCurrentInstance()
+const route = useRoute()
 const activeTab = ref('trace')
 const drawerSize = computed(() => window.innerWidth < 760 ? '94%' : '720px')
 const emptyPage = () => ({ list: [], totalCount: 0, pageNo: 1, pageSize: 20 })
@@ -204,7 +255,7 @@ const Pagination = defineComponent({
   }
 })
 
-const traceFilters = reactive({ status: '', intent: '', userId: '', outcome: '' })
+const traceFilters = reactive({ status: '', agentId: '', intent: '', userId: '', outcome: '' })
 const tracePage = ref(emptyPage())
 const traceLoading = ref(false)
 const traceDrawer = reactive({ show: false, detail: null })
@@ -215,12 +266,27 @@ const loadTraces = async (pageNo = 1) => {
   try { tracePage.value = normalizePage(await request(proxy.Api.agentTraceRuns, { ...traceFilters, pageNo, pageSize: 20 })) } finally { traceLoading.value = false }
 }
 const openTrace = async (row) => {
-  const detail = await request(proxy.Api.agentTraceDetail, { runId: row.runId })
+  const runId = typeof row === 'string' ? row : row?.runId
+  if (!runId) return
+  const detail = await request(proxy.Api.agentTraceDetail, { runId })
   if (!detail) return
   traceDrawer.detail = detail
   episodeReviewNote.value = detail.datasetReviewNote || ''
   traceDrawer.show = true
 }
+const supervisorPlan = computed(() => {
+  const step = (traceDrawer.detail?.steps || []).find((item) => item.eventType === 'SUPERVISOR_PLAN')
+  return step?.output || null
+})
+const actionDecision = computed(() => (
+  (traceDrawer.detail?.steps || []).find((item) => item.eventType === 'ACTION_POLICY_DECISION') || null
+))
+const hasCollaboration = computed(() => Boolean(
+  supervisorPlan.value ||
+  actionDecision.value ||
+  traceDrawer.detail?.handoffs?.length ||
+  traceDrawer.detail?.children?.length
+))
 const reviewEpisode = async (datasetEligible) => {
   episodeReviewing.value = true
   try {
@@ -339,7 +405,10 @@ const supportStatusText = (value) => ({ OPEN: '待处理', IN_PROGRESS: '处理�
 const supportStatusType = (value) => value === 'RESOLVED' ? 'success' : value === 'OPEN' ? 'danger' : value === 'CANCELLED' ? 'info' : 'warning'
 const supportEvidencePath = computed(() => supportDrawer.detail?.evidence?.path ? `/api/file/getResource?sourceName=${encodeURIComponent(supportDrawer.detail.evidence.path)}` : '')
 
-onMounted(loadTraces)
+onMounted(async () => {
+  await loadTraces()
+  if (route.query.runId) await openTrace(String(route.query.runId))
+})
 </script>
 
 <style lang="scss" scoped>
@@ -361,6 +430,16 @@ onMounted(loadTraces)
 .review-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .review-heading h3 { margin: 0; font-size: 14px; }
 .episode-review > p { margin: 0 0 10px; color: var(--text2); font-size: 12px; }
+.collaboration { margin-top: 16px; padding-top: 2px; border-top: 1px solid var(--border); }
+.collaboration h3 { margin: 14px 0 10px; font-size: 14px; }
+.handoff-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
+.collaboration-stage { min-width: 0; padding: 11px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.collaboration-stage header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.collaboration-stage header b { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.collaboration-stage p { margin: 7px 0; color: var(--text2); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.supervisor-stage { border-left: 3px solid #2563eb; }
+.action-stage { border-left: 3px solid #0f9d73; }
+.warning-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0; }
 .regression-actions { margin: 0 0 12px; }
 .quality-json h3, .waterfall h3 { margin: 16px 0 8px; font-size: 14px; }
 pre { max-width: 100%; margin: 8px 0 0; padding: 10px; overflow: auto; border-radius: 6px; background: #f5f7f8; color: #263238; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -384,6 +463,7 @@ pre { max-width: 100%; margin: 8px 0 0; padding: 10px; overflow: auto; border-ra
 @media (max-width: 720px) {
   .filter-control { width: min(100%, 210px); }
   .detail-summary { grid-template-columns: 1fr; }
+  .handoff-grid { grid-template-columns: 1fr; }
   .quality-center { padding-bottom: 10px; }
   .support-evidence { flex-direction: column; }
 }

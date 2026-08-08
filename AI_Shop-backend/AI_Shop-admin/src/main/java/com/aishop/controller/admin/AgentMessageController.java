@@ -152,13 +152,37 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 
 	@PostMapping("/traceRuns")
 	public ResponseVO traceRuns(Integer pageNo, Integer pageSize, String status,
-			String intent, String userId, String outcome) {
+			String intent, String userId, String outcome, String agentId) {
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
 		putIfText(body, "intent", intent);
 		putIfText(body, "userId", userId);
 		putIfText(body, "outcome", outcome);
+		putIfText(body, "agentId", agentId);
 		return getSuccessResponseVO(agentMessageService.callSupport("traceRuns", body));
+	}
+
+	@PostMapping("/dataAnalyst/ask")
+	public ResponseVO dataAnalystAsk(String question, HttpServletRequest request) {
+		if (StringTools.isEmpty(question) || question.trim().length() > 500) {
+			throw new BusinessException("问题不能为空且不能超过500字");
+		}
+		Map<String, Object> body = new HashMap<>();
+		body.put("question", question.trim());
+		// Authentication is authoritative here; browser payload never supplies adminId.
+		body.put("adminId", currentAdmin(request));
+		return getSuccessResponseVO(agentMessageService.callSupport("dataAnalyst/ask", body));
+	}
+
+	@PostMapping("/inventoryOps/suggestions")
+	public ResponseVO inventoryOpsSuggestions(
+			Integer lookbackDays, Integer limit, HttpServletRequest request) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("adminId", currentAdmin(request));
+		body.put("lookbackDays", lookbackDays == null ? 30 : lookbackDays);
+		body.put("limit", limit == null ? 50 : limit);
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"inventoryOps/suggestions", body));
 	}
 
 	@PostMapping("/traceDetail")
