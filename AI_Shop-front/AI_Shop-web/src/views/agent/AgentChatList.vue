@@ -62,6 +62,7 @@ import AgentChatItem from '@/components/agent/AgentChatItem.vue';
 import AgentUserBubble from '@/components/agent/AgentUserBubble.vue';
 import { useAgentMessageStore } from '@/stores/agentMessage';
 import { useAuthStore } from '@/stores/auth';
+import { usePcAgentPanelStore } from '@/stores/pcAgentPanel';
 import { mitter } from '@/utils/eventBus';
 import { toast } from '@/utils/toast';
 import {
@@ -76,6 +77,7 @@ import {
 
 const composerEmbedded = inject(agentComposerEmbeddedKey, false);
 const agentMessageStore = useAgentMessageStore();
+const pcAgentPanel = usePcAgentPanelStore();
 const listRef = ref<HTMLElement>();
 const loadingHistory = ref(false);
 const historyLoadFailed = ref(false);
@@ -334,7 +336,8 @@ const clearVisibleHistory = async () => {
       {
         confirmButtonText: '确认清除',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'warning',
+        modalClass: composerEmbedded ? 'agent-history-confirm-overlay' : ''
       }
     );
   } catch {
@@ -351,6 +354,9 @@ const clearVisibleHistory = async () => {
     initialLoadDone = true;
     currentMessage.value = null;
     toast.success('会话记录已清除，已有记忆仍会保留');
+    if (composerEmbedded) {
+      pcAgentPanel.close();
+    }
   } catch (error) {
     console.error('清除会话记录失败', error);
     toast.error('清除失败，请稍后重试');
@@ -407,6 +413,10 @@ onUnmounted(() => {
   &.is-embedded-composer {
     padding-bottom: 12px;
   }
+}
+
+:global(.agent-history-confirm-overlay) {
+  z-index: $z-index-float-agent + 1 !important;
 }
 
 .chat-scroll-inner {

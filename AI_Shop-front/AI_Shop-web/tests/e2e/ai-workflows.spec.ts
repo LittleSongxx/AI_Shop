@@ -307,4 +307,69 @@ test('clearing visible conversation preserves agent memory by contract', async (
   await expect(page.getByText('继续按我的预算推荐')).toHaveCount(0);
   await expect(page.getByText('您好，我是智选智能客服小智')).toBeVisible();
   await expect(page.getByText('会话记录已清除，已有记忆仍会保留')).toBeVisible();
+  await expect(page).toHaveURL(/\/ai-assistant\?view=mobile$/);
+});
+
+test('desktop assistant closes after product navigation and successful history clearing', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop floating panel behavior');
+  let clearCalls = 0;
+
+  await installAuthenticatedApi(page, async (route, path) => {
+    if (path === '/api/agent/loadHistoryMessage') {
+      await ok(route, {
+        list: [
+          {
+            messageId: 902,
+            userMessage: '推荐一款桌面耳机',
+            assistantMessage: JSON.stringify({
+              type: 'PRODUCT_SEARCH_RESULT',
+              intro: '为你找到以下商品：',
+              products: [
+                {
+                  productId: 'desktop-product',
+                  productName: '桌面回归耳机',
+                  minPrice: 299
+                }
+              ]
+            }),
+            bizType: 'product_search',
+            status: 2
+          }
+        ],
+        pageNo: 1,
+        pageTotal: 1,
+        totalCount: 1
+      });
+      return true;
+    }
+    if (path === '/api/agent/clearHistoryMessage') {
+      clearCalls += 1;
+      await ok(route, { clearedThroughMessageId: 902, memoryPreserved: true });
+      return true;
+    }
+    return false;
+  });
+  await installWebSocketMock(page);
+
+  await page.goto('/');
+  await page.getByTitle('智能客服').click();
+  const dialog = page.getByRole('dialog', { name: '智能客服' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: /桌面回归耳机/ }).click();
+
+  await expect(page).toHaveURL(/\/product\/desktop-product$/);
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.pc-agent-float-root')).toHaveCount(0);
+
+  await page.getByTitle('智能客服').click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '清除会话记录' }).click();
+  await page.getByRole('button', { name: '确认清除' }).click();
+
+  await expect.poll(() => clearCalls).toBe(1);
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.pc-agent-float-root')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/product\/desktop-product$/);
 });

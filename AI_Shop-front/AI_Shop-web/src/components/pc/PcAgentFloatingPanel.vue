@@ -31,6 +31,7 @@
 
 <script setup lang="ts">
 import { provide, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { agentComposerEmbeddedKey } from '@/composables/agentEmbed';
 import { ChatDotRound, Close } from '@element-plus/icons-vue';
 import AgentChatList from '@/views/agent/AgentChatList.vue';
@@ -41,8 +42,18 @@ import { usePcAgentPanelStore } from '@/stores/pcAgentPanel';
 provide(agentComposerEmbeddedKey, true);
 
 const pcAgentPanel = usePcAgentPanelStore();
+const route = useRoute();
 const { start, stop } = useAgentSession();
 const sessionReady = ref(false);
+
+watch(
+  () => route.fullPath,
+  (currentPath, previousPath) => {
+    if (currentPath !== previousPath && pcAgentPanel.visible) {
+      pcAgentPanel.close();
+    }
+  }
+);
 
 watch(
   () => pcAgentPanel.visible,
