@@ -9,7 +9,7 @@ echo "Ensure env loaded (AISHOP_PRODUCTION_READY, AISHOP_INTERNAL_TOKEN, ...)"
 echo "Migrate order/product/stock services and Agent before Admin creates analytics views."
 echo "Agent schema only: cd $BACKEND/AI_Shop-agent && python scripts/migrate.py"
 echo "Then provision the Flyway identity and start Admin to create the governed views."
-echo "Finally provision analytics_reader, enable DataAnalyst, and restart Agent."
+echo "Finally provision analytics_reader and restart Agent; DataAnalyst is enabled by default."
 echo "Starting gateway..."
 # java $JAVA_OPTS -jar "$BACKEND/AI_Shop-gateway/target/aishop-gateway-1.0.0.jar" &
 echo "Then start: user product stock cart coupon order pay search; migrate Agent; then admin"

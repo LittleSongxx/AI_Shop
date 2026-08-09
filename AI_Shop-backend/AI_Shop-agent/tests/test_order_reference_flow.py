@@ -11,6 +11,15 @@ from app.graph.order_reference_flow import resolve_order_reference_turn
 from app.services.tool_invoke_result import ToolInvokeResult
 
 
+@pytest.fixture(autouse=True)
+def _legacy_direct_order_mode():
+    with patch(
+        "app.graph.order_reference_flow.get_settings",
+        return_value=SimpleNamespace(multi_agent_enabled=False),
+    ):
+        yield
+
+
 def _order(order_id: str, item_id: str, name: str, when: str) -> dict:
     return {
         "order_id": order_id,
@@ -272,9 +281,7 @@ async def test_selected_refund_rechecks_latest_status_before_proposing():
         ("DAMAGED_OR_WRONG_ITEM", "收到的商品破损了", "DAMAGED"),
     ],
 )
-async def test_after_sales_intents_propose_owned_support_case(
-    intent, text, expected_category
-):
+async def test_after_sales_intents_propose_owned_support_case(intent, text, expected_category):
     from app.graph.order_reference_flow import _tool_for_target
 
     target = {

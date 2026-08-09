@@ -27,6 +27,7 @@ die() { echo -e "${RED}[✗]${NC} $*" >&2; exit 1; }
 BUILD=false
 MIDDLEWARE_ONLY=false
 CATALOG_CHANGED=false
+STARTED_SERVICES=()
 for arg in "$@"; do
   case "$arg" in
     --build) BUILD=true ;;
@@ -57,6 +58,30 @@ if [[ -r "$LOCAL_ENV" ]]; then
   source "$LOCAL_ENV"
   set +a
 fi
+
+record_started_service() {
+  local name=$1 existing
+  for existing in "${STARTED_SERVICES[@]}"; do
+    [[ "$existing" == "$name" ]] && return 0
+  done
+  STARTED_SERVICES+=("$name")
+}
+
+rollback_started_services() {
+  local status=$? index name
+  trap - EXIT
+  if ((status != 0)) && ((${#STARTED_SERVICES[@]} > 0)); then
+    warn "启动失败，回滚本次新拉起的 ${#STARTED_SERVICES[@]} 个托管进程；Docker 中间件保持运行"
+    set +e
+    for ((index=${#STARTED_SERVICES[@]} - 1; index >= 0; index--)); do
+      name=${STARTED_SERVICES[$index]}
+      stop_managed_service_for_restart "$name" 20
+    done
+  fi
+  exit "$status"
+}
+
+trap rollback_started_services EXIT
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || die "缺少命令: $1"
@@ -218,15 +243,32 @@ wait_managed_service() {
   echo -n "  等待 $label..."
   while [[ $SECONDS -lt $end ]]; do
     if service_startup_failed "$name"; then
-      local target_bind_failed=false
+      local target_bind_failed=false retry_allowed=false previous_port=$port
       if service_target_port_bind_failed "$name" "$port"; then
         target_bind_failed=true
       fi
       stop_managed_service_for_restart "$name" 10 || true
-      if $target_bind_failed && ((retry_count < retry_limit)) && wait_port_released "$port" 8; then
+      if $target_bind_failed && ((retry_count < retry_limit)); then
+        if [[ "$name" == "web" || "$name" == "admin-web" ]]; then
+          reassign_frontend_port_after_bind_failure "$name" "$port"
+          if [[ "$name" == "web" ]]; then
+            port=$WEB_PORT
+          else
+            port=$ADMIN_WEB_PORT
+          fi
+          retry_allowed=true
+        elif wait_port_released "$port" 8; then
+          retry_allowed=true
+        fi
+      fi
+      if $retry_allowed; then
         retry_count=$((retry_count + 1))
         echo " 端口竞态"
-        warn "$label 的目标端口 $port 已重新空闲，进行第 $retry_count/$retry_limit 次有界重试"
+        if [[ "$port" == "$previous_port" ]]; then
+          warn "$label 的目标端口 $port 已重新空闲，进行第 $retry_count/$retry_limit 次有界重试"
+        else
+          warn "$label 的目标端口 $previous_port 发生占用竞态，改用 $port 进行第 $retry_count/$retry_limit 次有界重试"
+        fi
         sleep $((retry_count * 2))
         restart_managed_service_after_bind_failure "$name" "$port"
         end=$((SECONDS + timeout))
@@ -325,6 +367,28 @@ assign_port() {
   die "$label 没有可用端口"
 }
 
+reassign_frontend_port_after_bind_failure() {
+  local name=$1 previous_port=$2 variable label next_port=$((10#$previous_port + 1))
+  case "$name" in
+    web)
+      variable=WEB_PORT
+      label="商城前端"
+      ;;
+    admin-web)
+      variable=ADMIN_WEB_PORT
+      label="管理前端"
+      ;;
+    *)
+      die "服务 $name 不是可动态重分配端口的前端"
+      ;;
+  esac
+  ((next_port <= 65535)) || die "$label 在端口竞态后没有可用端口"
+  printf -v "$variable" '%s' "$next_port"
+  export "$variable"
+  assign_port "$variable" "$next_port" "$label"
+  write_runtime_env
+}
+
 assign_nacos_ports() {
   local requested candidate grpc expected_grpc
   requested="${NACOS_PORT:-8848}"
@@ -361,10 +425,15 @@ PORT_VARIABLES=(
 RUNTIME_CREDENTIAL_VARIABLES=(
   AISHOP_INTERNAL_TOKEN
   MYSQL_ROOT_PASSWORD MYSQL_USER MYSQL_PASSWORD
+  ANALYTICS_MYSQL_USER ANALYTICS_MYSQL_PASSWORD
   RABBIT_USER RABBIT_PASSWORD RABBIT_VHOST
   SEATA_CONSOLE_USERNAME SEATA_CONSOLE_PASSWORD SEATA_SECURITY_SECRET_KEY
 )
-RUNTIME_SETTING_VARIABLES=(ES_INDEX_REPLICAS)
+RUNTIME_SETTING_VARIABLES=(
+  ES_INDEX_REPLICAS
+  MULTI_AGENT_ENABLED DATA_ANALYST_ENABLED
+  ANALYTICS_MYSQL_HOST ANALYTICS_MYSQL_PORT ANALYTICS_MYSQL_DATABASE
+)
 RUNTIME_VARIABLES=(
   "${PORT_VARIABLES[@]}"
   "${RUNTIME_CREDENTIAL_VARIABLES[@]}"
@@ -426,6 +495,17 @@ random_token() {
   fi
 }
 
+normalize_boolean_setting() {
+  local variable=$1 default_value=$2 value=${!1:-$2}
+  case "${value,,}" in
+    1|true|yes|on) value=true ;;
+    0|false|no|off) value=false ;;
+    *) die "$variable 必须是 true/false，当前值: $value" ;;
+  esac
+  printf -v "$variable" '%s' "$value"
+  export "$variable"
+}
+
 detect_host_ip() {
   local detected=""
   if command -v ip >/dev/null 2>&1; then
@@ -469,6 +549,21 @@ prepare_environment() {
   export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}"
   export MYSQL_USER="${MYSQL_USER:-root}"
   export MYSQL_PASSWORD="${MYSQL_PASSWORD:-$MYSQL_ROOT_PASSWORD}"
+  normalize_boolean_setting MULTI_AGENT_ENABLED true
+  normalize_boolean_setting DATA_ANALYST_ENABLED true
+  if [[ -z "${CALLER_VALUES[ANALYTICS_MYSQL_HOST]+x}" ]]; then
+    ANALYTICS_MYSQL_HOST="$MYSQL_HOST"
+  fi
+  if [[ -z "${CALLER_VALUES[ANALYTICS_MYSQL_PORT]+x}" ]]; then
+    ANALYTICS_MYSQL_PORT="$MYSQL_PORT"
+  fi
+  export ANALYTICS_MYSQL_HOST ANALYTICS_MYSQL_PORT
+  export ANALYTICS_MYSQL_USER="${ANALYTICS_MYSQL_USER:-analytics_reader}"
+  export ANALYTICS_MYSQL_DATABASE="${ANALYTICS_MYSQL_DATABASE:-aishop_admin}"
+  if [[ "$DATA_ANALYST_ENABLED" == "true" && -z "${ANALYTICS_MYSQL_PASSWORD:-}" ]]; then
+    ANALYTICS_MYSQL_PASSWORD=$(random_token)
+  fi
+  export ANALYTICS_MYSQL_PASSWORD="${ANALYTICS_MYSQL_PASSWORD:-}"
   export REDIS_HOST="127.0.0.1"
   export RABBIT_HOST="127.0.0.1"
   export RABBIT_USER="${RABBIT_USER:-aishop}"
@@ -533,6 +628,8 @@ resolve_python() {
   local conda_base=""
   if [[ -n "${AISHOP_PYTHON:-}" ]]; then
     PYTHON="$AISHOP_PYTHON"
+  elif [[ -x "$BACKEND/AI_Shop-agent/.venv/bin/python" ]]; then
+    PYTHON="$BACKEND/AI_Shop-agent/.venv/bin/python"
   else
     if command -v conda >/dev/null 2>&1; then
       conda_base=$(conda info --base 2>/dev/null || true)
@@ -546,7 +643,9 @@ resolve_python() {
     fi
   fi
   [[ -n "$PYTHON" && -x "$PYTHON" ]] \
-    || die "conda 环境 shop 未找到；请用 AISHOP_PYTHON 指定 Python 解释器"
+    || die "Agent Python 环境未找到；请创建 AI_Shop-agent/.venv 或用 AISHOP_PYTHON 指定解释器"
+  export AISHOP_PYTHON="$PYTHON"
+  info "Agent Python: $PYTHON"
 }
 
 validate_agent_config() {
@@ -557,6 +656,8 @@ validate_agent_config() {
 import sys
 
 try:
+    import importlib
+
     from pydantic import ValidationError
     from app.config.settings import Settings
 except Exception as exc:
@@ -567,8 +668,14 @@ except Exception as exc:
     raise SystemExit(1)
 
 try:
+    if not ((3, 11) <= sys.version_info[:2] < (3, 14)):
+        raise RuntimeError(
+            f"Python {sys.version_info.major}.{sys.version_info.minor} is unsupported; expected 3.11-3.13"
+        )
     settings = Settings()
     settings.validate_runtime()
+    for module in ("app.main", "app.worker", "app.mcp_server"):
+        importlib.import_module(module)
 except ValidationError as exc:
     print("Agent 配置校验失败：", file=sys.stderr)
     for item in exc.errors(include_input=False, include_url=False):
@@ -582,9 +689,9 @@ except Exception as exc:
     raise SystemExit(1)
 PY
   ); then
-    die "请修正 AI_Shop-backend/AI_Shop-agent/.env 后重试；未启动任何项目服务"
+    die "请修正 Agent Python 依赖或运行配置后重试；未启动任何项目服务"
   fi
-  info "Agent 配置预检通过"
+  info "Agent 配置与 API/Worker/MCP 入口预检通过"
 }
 
 JAVA_JARS=(
@@ -749,6 +856,7 @@ start_java() {
   fi
   local pid=$!
   write_pid_record "$name" "$pid"
+  record_started_service "$name"
   info "拉起 $name  port=$port  pid=$pid  log: run/logs/$name.log"
 }
 
@@ -768,6 +876,7 @@ start_mcp() {
   ) 9>&- </dev/null >"$LOGS/mcp.log" 2>&1 &
   local pid=$!
   write_pid_record mcp "$pid"
+  record_started_service mcp
   info "拉起 mcp  port=$MCP_PORT  pid=$pid  log: run/logs/mcp.log"
 }
 
@@ -787,6 +896,7 @@ start_agent_api() {
   ) 9>&- </dev/null >"$LOGS/agent.log" 2>&1 &
   local pid=$!
   write_pid_record agent "$pid"
+  record_started_service agent
   info "拉起 agent  port=$AGENT_PORT  pid=$pid  log: run/logs/agent.log"
 }
 
@@ -806,6 +916,7 @@ start_agent_worker() {
   ) 9>&- </dev/null >"$LOGS/agent-worker.log" 2>&1 &
   local pid=$!
   write_pid_record agent-worker "$pid"
+  record_started_service agent-worker
   info "拉起 agent-worker  metrics=$AGENT_WORKER_METRICS_PORT  pid=$pid  log: run/logs/agent-worker.log"
 }
 
@@ -845,6 +956,7 @@ start_storefront() {
   ) 9>&- </dev/null >"$LOGS/web.log" 2>&1 &
   local pid=$!
   write_pid_record web "$pid"
+  record_started_service web
   info "拉起 web  port=$WEB_PORT  pid=$pid  log: run/logs/web.log"
 }
 
@@ -869,6 +981,7 @@ start_admin_web() {
   ) 9>&- </dev/null >"$LOGS/admin-web.log" 2>&1 &
   local pid=$!
   write_pid_record admin-web "$pid"
+  record_started_service admin-web
   info "拉起 admin-web  port=$ADMIN_WEB_PORT  pid=$pid  log: run/logs/admin-web.log"
 }
 
@@ -910,6 +1023,28 @@ stop_managed_service_for_restart() {
   fi
   clear_pid_record "$name"
   info "已停止 $name，等待按新目录重新启动"
+}
+
+provision_analytics_reader() {
+  [[ "$DATA_ANALYST_ENABLED" == "true" ]] || return 0
+  if [[ "$ANALYTICS_MYSQL_HOST" != "127.0.0.1" && "$ANALYTICS_MYSQL_HOST" != "localhost" ]]; then
+    warn "DataAnalyst 使用外部 MySQL $ANALYTICS_MYSQL_HOST，跳过本地 analytics_reader 配置"
+    return 0
+  fi
+  if [[ "$ANALYTICS_MYSQL_PORT" != "$MYSQL_PORT" ]]; then
+    warn "DataAnalyst 使用独立 MySQL 端口 $ANALYTICS_MYSQL_PORT，跳过本地 analytics_reader 配置"
+    return 0
+  fi
+
+  info "配置 DataAnalyst 只读账号与五个治理视图权限..."
+  MYSQL_CONTAINER=aishop-mysql \
+    MYSQL_ADMIN_USER=root \
+    MYSQL_ADMIN_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+    MYSQL_HOST=127.0.0.1 \
+    MYSQL_PORT="$MYSQL_PORT" \
+    ANALYTICS_MYSQL_USER="$ANALYTICS_MYSQL_USER" \
+    ANALYTICS_MYSQL_PASSWORD="$ANALYTICS_MYSQL_PASSWORD" \
+    "$DEPLOY/provision-analytics-reader.sh"
 }
 
 install_catalog_assets() {
@@ -1004,6 +1139,8 @@ print_summary() {
   printf "  %-16s %s\n" "Gateway" "http://127.0.0.1:$GATEWAY_PORT"
   printf "  %-16s %s\n" "Agent" "http://127.0.0.1:$AGENT_PORT/health"
   printf "  %-16s %s\n" "Agent Worker 指标" "http://127.0.0.1:$AGENT_WORKER_METRICS_PORT/metrics"
+  printf "  %-16s %s\n" "Multi-Agent" "$MULTI_AGENT_ENABLED"
+  printf "  %-16s %s\n" "DataAnalyst" "$DATA_ANALYST_ENABLED"
   printf "  %-16s %s\n" "Nacos" "http://127.0.0.1:$NACOS_PORT/nacos/"
   printf "  %-16s %s\n" "RabbitMQ" "http://127.0.0.1:$RABBIT_MANAGEMENT_PORT"
   printf "  %-16s %s\n" "Elasticsearch" "http://127.0.0.1:$ES_PORT"
@@ -1020,6 +1157,7 @@ require_command docker
 require_command curl
 if ! $MIDDLEWARE_ONLY; then
   require_command java
+  require_command node
   require_command nohup
   require_command setsid
 fi
@@ -1089,6 +1227,8 @@ for service_spec in \
   wait_managed_service "$service" "$port" "$service 服务" 300
   wait_http "http://127.0.0.1:$port/actuator/health" "$service 健康检查" 240
 done
+
+provision_analytics_reader
 
 rebuild_catalog_search_index
 

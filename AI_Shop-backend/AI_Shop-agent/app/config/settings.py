@@ -25,13 +25,9 @@ OptionalInt = Annotated[int | None, BeforeValidator(_blank_to_none)]
 
 
 class Settings(BaseSettings):
-
     model_config = SettingsConfigDict(
-
         env_file=".env",
-
         env_file_encoding="utf-8",
-
         env_ignore_empty=True,
         extra="ignore",
         populate_by_name=True,
@@ -277,9 +273,9 @@ class Settings(BaseSettings):
     circuit_llm_recovery_timeout: int = 60
 
     graph_max_react_rounds: int = 5
-    # Multi-Agent Harness v1. Disabled by default to preserve legacy behavior.
-    multi_agent_enabled: bool = False
-    data_analyst_enabled: bool = False
+    # Multi-Agent Harness and governed admin analytics are the primary runtime.
+    multi_agent_enabled: bool = True
+    data_analyst_enabled: bool = True
     multi_agent_specialist_max_rounds: int = 2
     analytics_max_rows: int = 200
     analytics_max_days: int = 90
@@ -300,17 +296,13 @@ class Settings(BaseSettings):
         if "rag_mode" not in self.model_fields_set and "agentic_rag" in self.model_fields_set:
             self.rag_mode = "agentic" if self.agentic_rag else "prefetch"
         if self.embedding_dimensions != self.es_vector_dimensions:
-            raise ValueError(
-                "EMBEDDING_DIMENSIONS and ES_VECTOR_DIMENSIONS must be identical"
-            )
+            raise ValueError("EMBEDDING_DIMENSIONS and ES_VECTOR_DIMENSIONS must be identical")
         if self.es_vector_dimensions != 1024:
             raise ValueError("AI_Shop vector contract requires 1024 dimensions")
         if not self.es_vector_field.strip():
             raise ValueError("VECTOR_FIELD must not be empty")
         if self.compress_token_threshold >= self.working_token_budget:
-            raise ValueError(
-                "COMPRESS_TOKEN_THRESHOLD must be less than WORKING_TOKEN_BUDGET"
-            )
+            raise ValueError("COMPRESS_TOKEN_THRESHOLD must be less than WORKING_TOKEN_BUDGET")
         if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
             raise ValueError("ANALYTICS_MAX_ROWS must be between 1 and 200")
         if self.analytics_max_days < 1 or self.analytics_max_days > 90:
@@ -331,13 +323,9 @@ class Settings(BaseSettings):
             if not str(model).strip() or not isinstance(pricing, dict):
                 raise ValueError("LLM pricing requires a non-empty model and an object price")
             if set(pricing) != {"input", "output"}:
-                raise ValueError(
-                    f"LLM pricing for {model} must contain exactly input and output"
-                )
+                raise ValueError(f"LLM pricing for {model} must contain exactly input and output")
             if any(
-                not isinstance(value, (int, float))
-                or isinstance(value, bool)
-                or value < 0
+                not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0
                 for value in pricing.values()
             ):
                 raise ValueError(f"LLM pricing for {model} must be non-negative numbers")
@@ -348,9 +336,7 @@ class Settings(BaseSettings):
         if self.episode_queue_size < 100:
             raise ValueError("EPISODE_QUEUE_SIZE must be at least 100")
         if not 1 <= self.episode_batch_size <= self.episode_queue_size:
-            raise ValueError(
-                "EPISODE_BATCH_SIZE must be between 1 and EPISODE_QUEUE_SIZE"
-            )
+            raise ValueError("EPISODE_BATCH_SIZE must be between 1 and EPISODE_QUEUE_SIZE")
         if self.episode_flush_interval_ms < 10:
             raise ValueError("EPISODE_FLUSH_INTERVAL_MS must be at least 10")
         if not 0 <= self.episode_success_sample_rate <= 1:
@@ -390,9 +376,7 @@ class Settings(BaseSettings):
         if not 0 <= self.rag_cache_sample_rate <= 1:
             raise ValueError("RAG_CACHE_SAMPLE_RATE must be between 0 and 1")
         if self.agent_task_lease_seconds < 30:
-            raise ValueError(
-                "AGENT_TASK_LEASE_SECONDS must be at least 30"
-            )
+            raise ValueError("AGENT_TASK_LEASE_SECONDS must be at least 30")
         if self.agent_task_lease_seconds >= self.agent_task_deadline_seconds:
             raise ValueError(
                 "AGENT_TASK_LEASE_SECONDS must be less than "
@@ -417,12 +401,24 @@ class Settings(BaseSettings):
         return self
 
     def validate_runtime(self) -> None:
+        analytics_errors: list[str] = []
+        if self.data_analyst_enabled:
+            if not self.analytics_mysql_user.strip() or not self.analytics_mysql_password.strip():
+                analytics_errors.append(
+                    "ANALYTICS_MYSQL_USER and ANALYTICS_MYSQL_PASSWORD are required"
+                )
+            if self.analytics_mysql_user.strip().lower() in {
+                "root",
+                self.mysql_user.strip().lower(),
+            }:
+                analytics_errors.append("DataAnalyst must use a dedicated read-only MySQL identity")
+            if self.analytics_mysql_database.strip().lower() != "aishop_admin":
+                analytics_errors.append("ANALYTICS_MYSQL_DATABASE must be aishop_admin")
+
         if self.app_env.lower() != "production":
-            if self.data_analyst_enabled and (
-                not self.analytics_mysql_user.strip() or not self.analytics_mysql_password.strip()
-            ):
+            if analytics_errors:
                 raise ValueError(
-                    "ANALYTICS_MYSQL_USER and ANALYTICS_MYSQL_PASSWORD are required when DataAnalyst is enabled"
+                    "Invalid DataAnalyst configuration: " + "; ".join(analytics_errors)
                 )
             return
 
@@ -435,13 +431,7 @@ class Settings(BaseSettings):
             errors.append("EMBEDDING_API_KEY must be configured")
         if self.rerank_required and not self.rerank_api_key.strip():
             errors.append("RERANK_API_KEY must be configured (RERANK_REQUIRED=true)")
-        if self.data_analyst_enabled:
-            if not self.analytics_mysql_user.strip() or not self.analytics_mysql_password.strip():
-                errors.append("ANALYTICS_MYSQL_USER and ANALYTICS_MYSQL_PASSWORD are required")
-            if self.analytics_mysql_user.strip().lower() in {"root", self.mysql_user.strip().lower()}:
-                errors.append("DataAnalyst must use a dedicated read-only MySQL identity")
-            if self.analytics_mysql_database.strip().lower() != "aishop_admin":
-                errors.append("ANALYTICS_MYSQL_DATABASE must be aishop_admin")
+        errors.extend(analytics_errors)
         if self.allow_development_auth_bypass:
             errors.append("ALLOW_DEVELOPMENT_AUTH_BYPASS must be false")
         if errors:
@@ -459,6 +449,7 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
 
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
 
 @lru_cache
 def get_settings() -> Settings:

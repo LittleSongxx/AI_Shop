@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.config.settings import Settings
 from app.constants import MSG_STATUS_COMPLETE
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.services.agent_service import AgentOrchestrator
@@ -54,7 +55,9 @@ def _acquire_for(cursor: _Cursor):
 async def test_worker_fails_fast_when_metrics_port_is_already_in_use():
     worker = AgentWorker()
     connect = AsyncMock()
+    settings = Settings(_env_file=None, data_analyst_enabled=False)
     with (
+        patch("app.worker.get_settings", return_value=settings),
         patch("prometheus_client.start_http_server", side_effect=OSError("in use")),
         patch("app.observability.telemetry.configure_worker_telemetry"),
         patch("app.worker.redis_service.connect", connect),
@@ -172,9 +175,7 @@ async def test_lease_guard_cancels_operation_when_lease_is_lost():
         finally:
             operation_cancelled.set()
 
-    guarded = asyncio.create_task(
-        AgentWorker._run_with_lease_guard(operation(), lease_lost)
-    )
+    guarded = asyncio.create_task(AgentWorker._run_with_lease_guard(operation(), lease_lost))
     await asyncio.sleep(0)
     lease_lost.set()
 
@@ -193,9 +194,7 @@ async def test_lease_guard_cancels_operation_when_worker_is_cancelled():
         finally:
             operation_cancelled.set()
 
-    guarded = asyncio.create_task(
-        AgentWorker._run_with_lease_guard(operation(), asyncio.Event())
-    )
+    guarded = asyncio.create_task(AgentWorker._run_with_lease_guard(operation(), asyncio.Event()))
     await asyncio.sleep(0)
     guarded.cancel()
 
@@ -216,9 +215,7 @@ async def test_renew_dependency_error_signals_lease_loss():
             AsyncMock(side_effect=ConnectionError("database unavailable")),
         ),
     ):
-        await worker._renew_lease_loop(
-            7, "owner", 30, "user", "lock", 30, lease_lost
-        )
+        await worker._renew_lease_loop(7, "owner", 30, "user", "lock", 30, lease_lost)
 
     assert lease_lost.is_set()
 
@@ -279,9 +276,7 @@ async def test_worker_refine_recalculates_unresolved_count_from_new_decision():
         ),
         patch("app.worker.resolve_intent", AsyncMock(return_value=refined)),
         patch("app.worker.record_intent_metrics"),
-        patch(
-            "app.worker.agent_message_service.update_decision", AsyncMock()
-        ) as update,
+        patch("app.worker.agent_message_service.update_decision", AsyncMock()) as update,
     ):
         result = await worker._refine_decision(payload)
 
@@ -380,9 +375,7 @@ async def test_terminal_write_cannot_overwrite_a_cancelled_task():
 async def test_worker_close_always_flushes_telemetry():
     worker = AgentWorker()
     with (
-        patch(
-            "app.worker.redis_service.clear_worker_heartbeat", AsyncMock()
-        ),
+        patch("app.worker.redis_service.clear_worker_heartbeat", AsyncMock()),
         patch("app.worker.agent_queue_service.close", AsyncMock()),
         patch("app.worker.mcp_streamable_client.close", AsyncMock()),
         patch("app.worker.close_http_clients", AsyncMock()),
@@ -469,16 +462,12 @@ async def test_cancel_api_transitions_message_before_cancelling_owned_task():
             "app.services.agent_service.rate_limit_service.allow",
             AsyncMock(return_value=True),
         ),
-        patch(
-            "app.services.agent_service.redis_service.set_cancel_flag", AsyncMock()
-        ),
+        patch("app.services.agent_service.redis_service.set_cancel_flag", AsyncMock()),
         patch(
             "app.services.agent_service.agent_message_service.cancel_message",
             AsyncMock(return_value=True),
         ),
-        patch(
-            "app.services.agent_service.agent_task_service.cancel", AsyncMock()
-        ) as cancel_task,
+        patch("app.services.agent_service.agent_task_service.cancel", AsyncMock()) as cancel_task,
     ):
         await orchestrator.cancel_message("u1", 14)
 
