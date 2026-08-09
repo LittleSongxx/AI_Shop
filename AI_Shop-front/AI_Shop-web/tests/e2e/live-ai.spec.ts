@@ -360,4 +360,70 @@ test.describe('explicit local full-stack AI flow', () => {
       form: { orderId }
     }));
   });
+
+  test('conversation clear hides history while preserving the shopping profile', async ({
+    page,
+    context
+  }, testInfo) => {
+    testInfo.setTimeout(150_000);
+    test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
+    await loginDemoUser(context.request);
+
+    const profileBefore = await unwrap(
+      await context.request.get('/api/agent/shoppingProfile')
+    );
+    const query = `请简短回复会话清除功能验收${Date.now()}`;
+    const sent = await unwrap(await context.request.post('/api/agent/sendMessage', {
+      multipart: { message: query, fromProduct: 'false' }
+    }));
+    const messageId = Number(sent?.messageId || 0);
+    expect(messageId).toBeGreaterThan(0);
+
+    await expect.poll(async () => {
+      const history = await unwrap(await context.request.post('/api/agent/loadHistoryMessage', {
+        multipart: { pageNo: '1' }
+      }));
+      const rows = Array.isArray(history?.list) ? history.list : [];
+      const row = rows.find(
+        (item: Record<string, unknown>) => Number(item.messageId) === messageId
+      );
+      return Number(row?.status ?? -1);
+    }, {
+      timeout: 120_000,
+      intervals: [1_000, 2_000, 3_000]
+    }).toBe(2);
+
+    await page.goto('/ai-assistant?view=mobile');
+    const queryText = page.locator('.bubble-row.user .text').filter({ hasText: query });
+    await expect(queryText).toBeVisible();
+
+    const clearResponse = page.waitForResponse(
+      (response) => response.url().includes('/api/agent/clearHistoryMessage')
+        && response.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: '清除会话记录' }).click();
+    await page.getByRole('button', { name: '确认清除' }).click();
+    const clearBody = await (await clearResponse).json();
+    expect(clearBody, JSON.stringify(clearBody)).toMatchObject({
+      code: 200,
+      data: { memoryPreserved: true }
+    });
+    expect(Number(clearBody.data.clearedThroughMessageId)).toBeGreaterThanOrEqual(messageId);
+
+    await expect(queryText).toHaveCount(0);
+    await expect(page.getByText('您好，我是智选智能客服小智')).toBeVisible();
+
+    const historyAfter = await unwrap(
+      await context.request.post('/api/agent/loadHistoryMessage', {
+        multipart: { pageNo: '1' }
+      })
+    );
+    expect(historyAfter?.list || []).toEqual([]);
+    expect(Number(historyAfter?.totalCount || 0)).toBe(0);
+
+    const profileAfter = await unwrap(
+      await context.request.get('/api/agent/shoppingProfile')
+    );
+    expect(profileAfter).toEqual(profileBefore);
+  });
 });

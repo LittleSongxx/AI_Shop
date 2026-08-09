@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 
 from app.graph.multi_agent import (
     _structured_supervisor_plan,
+    _task_tools_for_specialist,
     _validate_artifact,
     build_supervisor_plan,
     prepare_specialist_sends,
@@ -104,8 +105,8 @@ def test_supervisor_adaptively_fans_out_for_cross_domain_refund():
         "order_fulfillment_specialist",
         "after_sales_policy_specialist",
     ]
-    assert plan.requires_action
-    assert plan.action_type == "PROPOSE_REFUND"
+    assert not plan.requires_action
+    assert plan.action_type is None
 
 
 def test_policy_grounding_routes_to_after_sales_even_for_chat_intent():
@@ -119,6 +120,54 @@ def test_policy_grounding_routes_to_after_sales_even_for_chat_intent():
 
     assert plan.specialists == ["after_sales_policy_specialist"]
     assert not plan.requires_action
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_specialists"),
+    [
+        ("退款政策是什么", ["after_sales_policy_specialist"]),
+        ("取消订单怎么操作", ["after_sales_policy_specialist"]),
+        ("我有哪些优惠券", ["order_fulfillment_specialist"]),
+        (
+            "订单为什么延迟，能否退款？",
+            ["order_fulfillment_specialist", "after_sales_policy_specialist"],
+        ),
+    ],
+)
+def test_supervisor_routes_information_and_cross_domain_queries(text, expected_specialists):
+    intent = "QUERY_COUPON" if "优惠券" in text else "CHAT"
+    plan = build_supervisor_plan(
+        {
+            "intent": intent,
+            "user_text": text,
+            "request_mode": "READ_QUERY" if "订单" in text or "优惠券" in text else "INFORMATIONAL",
+            "rag_evidence_required": any(term in text for term in ("政策", "怎么", "能否")),
+        }
+    )
+    assert plan.specialists == expected_specialists
+    assert not plan.requires_action
+
+
+def test_specialist_tool_scope_is_task_specific_and_bounded():
+    composite = {
+        "intent": "REFUND",
+        "user_text": "订单为什么延迟，现在能否退款？",
+        "verified_order_context": {"orderId": "o1", "orderItemId": "i1"},
+    }
+
+    assert _task_tools_for_specialist(
+        composite, "order_fulfillment_specialist"
+    ) == ["QUERY_LOGISTICS", "QUERY_ORDERS"]
+    assert _task_tools_for_specialist(
+        composite, "after_sales_policy_specialist"
+    ) == ["SEARCH_KNOWLEDGE"]
+    assert _task_tools_for_specialist(
+        {
+            "intent": "QUERY_COUPON",
+            "user_text": "我有哪些优惠券",
+        },
+        "order_fulfillment_specialist",
+    ) == ["QUERY_USER_COUPONS"]
 
 
 @pytest.mark.asyncio
@@ -401,6 +450,110 @@ async def test_specialist_timeout_returns_traceable_failed_artifact(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_specialist_timeout_after_required_tool_preserves_verified_evidence(monkeypatch):
+    async def timeout_after_tool(*_args, **_kwargs):
+        raise TimeoutError
+
+    async def verified_policy_tool(*_args, **_kwargs):
+        return ToolInvokeResult(
+            content="【知识证据】退款申请需要核对订单状态。",
+            source_refs=[{"type": "knowledge", "documentId": "policy-1"}],
+        )
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", timeout_after_tool)
+    monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", verified_policy_tool)
+    for name in ("record_step", "record_handoff", "finish_run"):
+        monkeypatch.setattr(
+            f"app.graph.multi_agent.episode_service.{name}", lambda *args, **kwargs: None
+        )
+
+    result = await specialist_runner_node(
+        {
+            "specialist_task": {
+                "handoff_id": "handoff-evidence-timeout",
+                "child_run_id": "child-evidence-timeout",
+                "parent_run_id": "root-1",
+                "agent_id": "after_sales_policy_specialist",
+                "goal": "查询政策",
+                "user_id": "u1",
+                "user_text": "退款政策是什么",
+                "tool_scope": sorted(
+                    AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist
+                ),
+                "required_tools": ["SEARCH_KNOWLEDGE"],
+                "max_rounds": 1,
+                "timeout_seconds": 2,
+            }
+        }
+    )
+
+    artifact = _validate_artifact(result["specialist_artifacts"][0])
+    assert artifact.status == "DEGRADED"
+    assert artifact.next_step == "FINALIZE"
+    assert artifact.draft_answer.startswith("SEARCH_KNOWLEDGE:")
+    assert "SPECIALIST_TIMEOUT" in artifact.warnings
+    assert artifact.evidence == [
+        {
+            "type": "tool_result",
+            "tool": "SEARCH_KNOWLEDGE",
+            "success": True,
+            "errorCode": None,
+        },
+        {"type": "knowledge", "documentId": "policy-1"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_specialist_rejects_unparsed_tool_protocol_as_artifact_text(monkeypatch):
+    async def protocol_text(*_args, **_kwargs):
+        return AIMessage(
+            content=(
+                '<｜DSML｜tool_calls><｜DSML｜invoke name="SEARCH_KNOWLEDGE">'
+                '</｜DSML｜invoke></｜DSML｜tool_calls>'
+            )
+        )
+
+    async def verified_policy_tool(*_args, **_kwargs):
+        return ToolInvokeResult(
+            content="【知识证据】退款申请需在订单详情发起。",
+            source_refs=[{"type": "knowledge", "documentId": "policy-1"}],
+        )
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", protocol_text)
+    monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", verified_policy_tool)
+    for name in ("record_step", "record_handoff", "finish_run"):
+        monkeypatch.setattr(
+            f"app.graph.multi_agent.episode_service.{name}", lambda *args, **kwargs: None
+        )
+
+    result = await specialist_runner_node(
+        {
+            "specialist_task": {
+                "handoff_id": "handoff-protocol",
+                "child_run_id": "child-protocol",
+                "parent_run_id": "root-1",
+                "agent_id": "after_sales_policy_specialist",
+                "goal": "查询退款政策",
+                "user_id": "u1",
+                "user_text": "退款政策是什么",
+                "tool_scope": ["SEARCH_KNOWLEDGE"],
+                "required_tools": ["SEARCH_KNOWLEDGE"],
+                "max_rounds": 1,
+                "timeout_seconds": 2,
+            }
+        }
+    )
+
+    artifact = _validate_artifact(result["specialist_artifacts"][0])
+    assert artifact.status == "DEGRADED"
+    assert artifact.draft_answer == "SEARCH_KNOWLEDGE: 【知识证据】退款申请需在订单详情发起。"
+    assert "SPECIALIST_TOOL_PROTOCOL_REJECTED" in artifact.warnings
+    assert "DSML" not in artifact.draft_answer
+
+
+@pytest.mark.asyncio
 async def test_specialist_reserves_final_artifact_turn_after_tool_rounds(monkeypatch):
     responses = [
         AIMessage(
@@ -450,8 +603,15 @@ async def test_specialist_reserves_final_artifact_turn_after_tool_rounds(monkeyp
                 "goal": "核对物流和退款状态",
                 "user_id": "u1",
                 "user_text": "查物流和退款状态",
-                "verified_context": {"order": {"orderId": "o1", "orderItemId": "i1"}},
-                "tool_scope": sorted(AGENT_SPECS["order_fulfillment_specialist"].tool_allowlist),
+                "verified_context": {
+                    "order": {
+                        "orderId": "o1",
+                        "orderItemId": "i1",
+                        "orderStatus": 0,
+                        "orderStatusName": "待付款",
+                    }
+                },
+                "tool_scope": ["QUERY_LOGISTICS", "QUERY_REFUND_STATUS"],
                 "max_rounds": 2,
                 "timeout_seconds": 2,
             }
@@ -463,8 +623,18 @@ async def test_specialist_reserves_final_artifact_turn_after_tool_rounds(monkeyp
     assert artifact["status"] == "SUCCESS"
     assert artifact["draft_answer"] == "物流状态与退款状态均已核验。"
     assert artifact["tool_calls"] == ["QUERY_LOGISTICS", "QUERY_REFUND_STATUS"]
+    assert any(
+        item.get("type") == "order"
+        and item.get("orderStatus") == 0
+        and item.get("orderStatusName") == "待付款"
+        for item in artifact["evidence"]
+    )
     assert "SPECIALIST_ROUND_LIMIT" not in artifact["warnings"]
-    assert bound_scopes[-1] == frozenset()
+    assert bound_scopes == [
+        frozenset({"QUERY_LOGISTICS", "QUERY_REFUND_STATUS"}),
+        frozenset({"QUERY_REFUND_STATUS"}),
+        frozenset(),
+    ]
 
 
 @pytest.mark.asyncio
@@ -610,6 +780,65 @@ async def test_logistics_synthesis_does_not_replace_answer_with_order_cards(monk
 
     assert result["chunks"] == ["订单正在派送；未找到政策证据，无法确认退款资格。"]
     assert "assistant_cards" not in result
+
+
+@pytest.mark.asyncio
+async def test_product_search_artifact_reaches_root_with_cards_and_tool_context(monkeypatch):
+    async def fake_llm(*_args, **_kwargs):
+        return AIMessage(content="已按预算筛选出一款手机，请查看商品卡片。")
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_llm)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    cards = '[{"productId":"p1","productName":"测试手机","price":"1499.00"}]'
+    hint = "SEARCH_PRODUCTS: 测试手机，售价 1499 元"
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-product-search"},
+            "user_text": "推荐一款 1500 元左右的手机",
+            "supervisor_plan": SupervisorPlan(
+                intent="PRODUCT_SEARCH",
+                request_mode="READ_QUERY",
+                specialists=["shopping_advisor"],
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="shopping_advisor",
+                    draft_answer="测试手机符合预算。",
+                    assistant_cards=cards,
+                    tool_biz={
+                        "productIds": ["p1"],
+                        "productNames": ["测试手机"],
+                    },
+                    biz_type="product_search",
+                    biz_data='{"query":"1500 元手机"}',
+                    search_tool_hint=hint,
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_PRODUCTS",
+                            "success": True,
+                        },
+                        {"type": "product", "productId": "p1"},
+                    ],
+                    tool_calls=["SEARCH_PRODUCTS"],
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    assert result["tools_called"] == ["SEARCH_PRODUCTS"]
+    assert result["biz_type"] == "product_search"
+    assert result["assistant_cards"] == cards
+    assert result["tool_biz"] == {
+        "productIds": ["p1"],
+        "productNames": ["测试手机"],
+    }
+    assert result["search_tool_hint"] == hint
+    assert result["rag_source_refs"] == [{"type": "product", "productId": "p1"}]
 
 
 @pytest.mark.asyncio
@@ -780,6 +1009,7 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
                     {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
                     {"type": "order", "id": "masked"},
                 ],
+                tool_calls=["QUERY_ORDERS"],
             ).model_dump(mode="json"),
             AgentArtifact(
                 status="SUCCESS",
@@ -793,6 +1023,7 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
                     },
                     {"type": "knowledge", "id": "policy-1"},
                 ],
+                tool_calls=["SEARCH_KNOWLEDGE"],
             ).model_dump(mode="json"),
         ],
         "llm_messages": [],
@@ -801,7 +1032,11 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
     result = await supervisor_synthesis_node(state)
 
     assert calls == [("PROPOSE_REFUND", {"orderItemId": "i1", "runId": "root-1"}, "u1")]
-    assert result["tools_called"] == ["PROPOSE_REFUND"]
+    assert result["tools_called"] == [
+        "QUERY_ORDERS",
+        "SEARCH_KNOWLEDGE",
+        "PROPOSE_REFUND",
+    ]
     assert "act_0123456789abcdef0123456789abcdef" in result["llm_messages"][-1].content
 
 
@@ -1333,7 +1568,11 @@ async def test_production_harness_fans_out_joins_and_proposes_once(monkeypatch):
         "after_sales_policy_specialist",
         "order_fulfillment_specialist",
     ]
-    assert result["tools_called"] == ["PROPOSE_REFUND"]
+    assert result["tools_called"] == [
+        "QUERY_LOGISTICS",
+        "SEARCH_KNOWLEDGE",
+        "PROPOSE_REFUND",
+    ]
     proposal = result["action_proposal"]
     assert proposal["tool"] == "PROPOSE_REFUND"
     assert proposal["arguments"] == {"orderItemId": "i1", "runId": "root-production"}

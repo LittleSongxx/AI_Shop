@@ -12,6 +12,7 @@ from app.domain.intent.types import (
     IntentDecision,
     IntentKind,
     NextAction,
+    RequestMode,
     RiskLevel,
     SentimentKind,
     UrgencyKind,
@@ -144,6 +145,143 @@ _AFTER_SALES_WORKFLOW_INTENTS = frozenset(
         IntentKind.ADDRESS_CHANGE,
     }
 )
+
+_READ_QUERY_INTENTS = frozenset(
+    {
+        IntentKind.PRODUCT_CONSULT,
+        IntentKind.PRODUCT_SEARCH,
+        IntentKind.QUERY_ORDER,
+        IntentKind.QUERY_LOGISTICS,
+        IntentKind.QUERY_FULFILLMENT,
+        IntentKind.QUERY_COUPON,
+        IntentKind.QUERY_COMMENT,
+        IntentKind.REFUND_STATUS,
+    }
+)
+_INFORMATIONAL_MARKERS = (
+    "政策",
+    "规则",
+    "条件",
+    "流程",
+    "教程",
+    "如何",
+    "怎么",
+    "怎样",
+    "是否",
+    "能不能",
+    "能否",
+    "可不可以",
+    "可以吗",
+    "是什么",
+    "什么意思",
+    "在哪",
+    "哪里",
+    "多久",
+    "几天",
+    "以后",
+    "假如",
+    "如果",
+)
+_PERSONAL_READ_MARKERS = (
+    "我的订单",
+    "我的退款",
+    "我的物流",
+    "我的优惠券",
+    "我的评价",
+    "这笔",
+    "那笔",
+    "这个订单",
+    "那个订单",
+    "这单",
+    "那单",
+    "订单号",
+    "到哪了",
+    "状态",
+    "进度",
+    "延迟",
+    "没发货",
+    "未发货",
+    "不更新",
+    "有哪些优惠券",
+    "有什么优惠券",
+    "优惠券有哪些",
+)
+_ACTION_CUES: dict[IntentKind, tuple[str, ...]] = {
+    IntentKind.REFUND: (
+        "我要退款", "我想退款", "帮我退款", "帮我退", "给我退", "申请退款",
+        "直接退款", "立即退款", "退款吧", "退了吧", "退掉", "退一下",
+        "继续退款",
+    ),
+    IntentKind.CANCEL_ORDER: (
+        "我要取消", "我想取消", "帮我取消", "给我取消", "取消这个订单",
+        "取消订单吧", "取消一下", "申请取消", "不要这个订单", "继续取消",
+    ),
+    IntentKind.CONFIRM_RECEIPT: (
+        "确认收货", "已经收到", "我已收到", "收货确认", "继续确认收货",
+    ),
+    IntentKind.PRODUCT_REVIEW: (
+        "我要评价", "我想评价", "评价一下", "提交评价", "写个评价", "给个好评",
+        "给个差评", "继续评价",
+    ),
+    IntentKind.RECOMMENT: (
+        "我要追评", "我想追评", "追评一下", "追加评价", "继续追评",
+    ),
+    IntentKind.ADDRESS_CHANGE: (
+        "修改收货地址", "帮我改地址", "我要改地址", "换个地址", "地址填错",
+    ),
+    IntentKind.INVOICE: ("我要发票", "开发票", "开具发票", "申请发票", "帮我开票"),
+    IntentKind.DAMAGED_OR_WRONG_ITEM: (
+        "收到的商品", "我收到", "我买的", "给我处理", "帮我处理", "申请售后",
+    ),
+    IntentKind.AFTERSALES_UNKNOWN: ("申请售后", "帮我处理售后", "我要售后"),
+    IntentKind.COMPLAINT: (
+        "我要投诉", "帮我投诉", "提交投诉", "投诉商家", "帮我处理",
+    ),
+    IntentKind.PAYMENT_ISSUE: ("帮我处理", "提交工单", "申请处理"),
+}
+
+
+def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
+    """Deterministically separate information, reads, and proposed writes."""
+
+    text = str(user_text or "").strip()
+    if intent == IntentKind.HUMAN_REQUEST or any(hint in text for hint in _HUMAN_HINTS):
+        return RequestMode.HUMAN_SUPPORT
+
+    action_cues = _ACTION_CUES.get(intent, ())
+    strong_action = any(cue in text for cue in action_cues)
+    asks_information = any(marker in text for marker in _INFORMATIONAL_MARKERS)
+    explicitly_delegates = any(
+        marker in text for marker in ("帮我", "给我", "直接", "立即", "提交", "申请")
+    )
+    if strong_action and (not asks_information or explicitly_delegates):
+        return RequestMode.ACTION_PROPOSAL
+
+    # A selected order can turn the next message into an argument-only write
+    # continuation.  The user normally supplies just the missing rating/content
+    # instead of repeating "我要评价".  Keep this narrow and intent-bound so a
+    # generic product question mentioning "五星" cannot become a write proposal.
+    if (
+        intent == IntentKind.PRODUCT_REVIEW
+        and not asks_information
+        and re.search(r"(?:[1-5一二三四五]|[壹贰叁肆伍])\s*(?:星|分)", text)
+    ):
+        return RequestMode.ACTION_PROPOSAL
+    if (
+        intent == IntentKind.RECOMMENT
+        and not asks_information
+        and any(marker in text for marker in ("补充", "追加", "追评"))
+    ):
+        return RequestMode.ACTION_PROPOSAL
+
+    personal_read = any(marker in text for marker in _PERSONAL_READ_MARKERS)
+    if personal_read:
+        return RequestMode.READ_QUERY
+    if asks_information:
+        return RequestMode.INFORMATIONAL
+    if intent in _READ_QUERY_INTENTS:
+        return RequestMode.READ_QUERY
+    return RequestMode.INFORMATIONAL
 
 
 def _structural_intent(
@@ -373,7 +511,10 @@ def classify_intent_by_rules(
         k in text for k in ("订单", "给", "写", "提交")
     ):
         return IntentKind.PRODUCT_REVIEW
-    if any(k in text for k in ("我的优惠券", "查优惠券", "有哪些券", "还有几张券", "可用券", "未使用券", "这张券", "那张券")):
+    if any(k in text for k in (
+        "我的优惠券", "查优惠券", "有哪些券", "有哪些优惠券", "有什么优惠券",
+        "优惠券有哪些", "还有几张券", "可用券", "未使用券", "这张券", "那张券",
+    )):
         return IntentKind.QUERY_COUPON
     # 含「订单」的复合句（如「帮我看看订单，顺便查一下优惠券」）主意图是 QUERY_ORDER，
     # 不应被「优惠券 + 看看」触发的宽泛规则抢走。
@@ -926,6 +1067,9 @@ def _record_and_apply(
     record_metrics: bool = True,
     after_sales_workflow: bool = False,
 ) -> IntentDecision:
+    request_mode = classify_request_mode(user_text, decision.intent)
+    if decision.request_mode != request_mode:
+        decision = decision.model_copy(update={"request_mode": request_mode})
     entities = {
         **extract_entities(user_text, decision.data),
         **decision.entities,
@@ -949,6 +1093,8 @@ def _record_and_apply(
     decision = _apply_handoff_policy(
         decision, user_text, unresolved_count, recent_intents=recent_intents
     )
+    if decision.next_action == NextAction.HANDOFF:
+        decision = decision.model_copy(update={"request_mode": RequestMode.HUMAN_SUPPORT})
     if record_metrics:
         record_intent_metrics(decision)
     return decision

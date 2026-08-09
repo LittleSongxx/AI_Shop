@@ -95,6 +95,7 @@ _REQUIRED_COLUMNS = {
         "summary_json",
         "state_json",
         "turn_count",
+        "history_cleared_through_message_id",
         "updated_at",
     },
     "agent_order_selection": {

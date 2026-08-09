@@ -21,12 +21,21 @@ _UPPER_RE = re.compile(
     rf"(?:预算|价格|价位)?\s*(?:不超过|不高于|最多|低于|小于)\s*{_AMOUNT}\s*(?:元|块)?"
 )
 _SUFFIX_UPPER_RE = re.compile(
-    rf"(?:预算|价格|价位)?\s*{_AMOUNT}\s*(?:以内|以下|封顶|左右以内)"
+    rf"(?:预算|价格|价位)?\s*{_AMOUNT}\s*(?:元|块)?\s*"
+    r"(?:以内|以下|封顶|左右以内)"
 )
 _LOWER_RE = re.compile(
     rf"(?:预算|价格|价位)?\s*(?:至少|不低于|不少于|最低)\s*{_AMOUNT}\s*(?:元|块)?"
 )
 _PLAIN_BUDGET_RE = re.compile(rf"(?:预算|价格|价位)\s*{_AMOUNT}\s*(?:元|块)?")
+_APPROX_BUDGET_RE = re.compile(
+    rf"(?:预算|价格|价位)?\s*(?:大约|大概|约)?\s*{_AMOUNT}\s*"
+    r"(?:元|块)?\s*(?:左右|上下)"
+)
+_PREFIX_APPROX_BUDGET_RE = re.compile(
+    rf"(?:预算|价格|价位)\s*(?:大约|大概|约)\s*{_AMOUNT}\s*(?:元|块)?"
+)
+_APPROX_BUDGET_TOLERANCE = 0.2
 
 _BRAND_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("红米", ("红米", "redmi")),
@@ -240,6 +249,14 @@ def _parse_budget(text: str) -> tuple[float | None, float | None]:
     match = _LOWER_RE.search(text)
     if match:
         return _budget_from_match(match), None
+
+    match = _APPROX_BUDGET_RE.search(text) or _PREFIX_APPROX_BUDGET_RE.search(text)
+    if match:
+        target = _budget_from_match(match)
+        return (
+            round(target * (1 - _APPROX_BUDGET_TOLERANCE), 2),
+            round(target * (1 + _APPROX_BUDGET_TOLERANCE), 2),
+        )
 
     match = _PLAIN_BUDGET_RE.search(text)
     if match:
@@ -913,14 +930,7 @@ class ShoppingProfileService:
         if not profile:
             return True
 
-        minimum, maximum = self._product_price_range(product)
-        budget_min = profile.get("budgetMin")
-        budget_max = profile.get("budgetMax")
-        if (budget_min is not None or budget_max is not None) and minimum is None:
-            return False
-        if budget_max is not None and minimum is not None and minimum > float(budget_max):
-            return False
-        if budget_min is not None and maximum is not None and maximum < float(budget_min):
+        if not self.matches_budget(product, profile):
             return False
 
         product_text = self._product_text(product).lower()
@@ -946,6 +956,26 @@ class ShoppingProfileService:
                 for brand in preferred
             ):
                 return False
+        return True
+
+    def matches_budget(
+        self,
+        product: dict[str, Any],
+        profile: dict[str, Any] | None,
+    ) -> bool:
+        if not profile:
+            return True
+        budget_min = profile.get("budgetMin")
+        budget_max = profile.get("budgetMax")
+        if budget_min is None and budget_max is None:
+            return True
+        minimum, maximum = self._product_price_range(product)
+        if minimum is None:
+            return False
+        if budget_max is not None and minimum > float(budget_max):
+            return False
+        if budget_min is not None and maximum is not None and maximum < float(budget_min):
+            return False
         return True
 
     @staticmethod
@@ -1016,7 +1046,10 @@ class ShoppingProfileService:
         if not profile:
             return "根据你的搜索条件推荐"
         reasons: list[str] = []
-        if profile.get("budgetMin") is not None or profile.get("budgetMax") is not None:
+        if (
+            profile.get("budgetMin") is not None
+            or profile.get("budgetMax") is not None
+        ) and self.matches_budget(product, profile):
             reasons.append("符合预算")
         product_text = self._product_text(product).lower()
         matched_brands = [

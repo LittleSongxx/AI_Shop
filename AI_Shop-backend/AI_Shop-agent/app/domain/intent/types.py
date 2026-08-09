@@ -55,6 +55,20 @@ class NextAction(str, Enum):
     HANDOFF_SUGGESTED = "HANDOFF_SUGGESTED"
 
 
+class RequestMode(str, Enum):
+    """How the user expects the domain request to be handled.
+
+    Intent answers "which business domain?" while request mode answers
+    "read, explain, or mutate?". Keeping the two axes separate prevents a
+    policy question such as "退款政策是什么" from becoming a refund action.
+    """
+
+    INFORMATIONAL = "INFORMATIONAL"
+    READ_QUERY = "READ_QUERY"
+    ACTION_PROPOSAL = "ACTION_PROPOSAL"
+    HUMAN_SUPPORT = "HUMAN_SUPPORT"
+
+
 class IntentDecision(BaseModel):
     intent: IntentKind
     confidence: float = Field(ge=0, le=1)
@@ -64,6 +78,7 @@ class IntentDecision(BaseModel):
     risk_level: RiskLevel = RiskLevel.LOW
     next_action: NextAction = NextAction.ANSWER
     handoff_reason: str | None = None
+    request_mode: RequestMode = RequestMode.READ_QUERY
     source: str = "default"
     data: str = ""
 

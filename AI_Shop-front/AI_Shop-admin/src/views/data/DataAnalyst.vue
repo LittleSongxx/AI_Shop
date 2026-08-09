@@ -44,7 +44,7 @@
     />
     <el-alert
       v-else-if="result?.warnings?.length"
-      :title="result.warnings.join('；')"
+      :title="warningText(result.warnings)"
       type="warning"
       show-icon
       :closable="false"
@@ -63,24 +63,24 @@
             :icon="Connection"
             @click="openTrace"
           >
-            查看 Trace
+            查看运行追踪
           </el-button>
         </div>
         <p>{{ failureText(result.status) }}</p>
-        <small v-if="result.runId">Run {{ result.runId }}</small>
+        <small v-if="result.runId">运行编号 {{ result.runId }}</small>
       </section>
     </template>
 
     <template v-else-if="result && mode === 'inventory'">
       <div class="run-meta">
-        <span>Run {{ result.runId || '—' }}</span>
+        <span>运行编号 {{ result.runId || '—' }}</span>
         <span>{{ result.lookbackDays || lookbackDays }} 天需求信号</span>
         <span>{{ result.latencyMs == null ? '—' : `${result.latencyMs} ms` }}</span>
         <el-tag v-for="view in result.lineage || []" :key="view" size="small" type="info">
           {{ view }}
         </el-tag>
         <el-button v-if="result.runId" link type="primary" :icon="Connection" @click="openTrace">
-          查看 Trace
+          查看运行追踪
         </el-button>
       </div>
       <div class="metric-grid inventory-summary">
@@ -184,7 +184,7 @@
                 v-for="column in result.columns"
                 :key="column"
                 :prop="column"
-                :label="column"
+                :label="columnLabel(column)"
                 min-width="150"
                 show-overflow-tooltip
               >
@@ -207,7 +207,7 @@
               </template>
             </dl>
             <details v-if="result.explain?.length">
-              <summary>EXPLAIN</summary>
+              <summary>数据库执行计划（EXPLAIN）</summary>
               <pre>{{ pretty(result.explain) }}</pre>
             </details>
           </el-collapse-item>
@@ -224,6 +224,7 @@ import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref
 import { Connection, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
+import { reasonLabel } from '@/utils/agentDisplay.js'
 
 const { proxy } = getCurrentInstance()
 const mode = ref('analysis')
@@ -243,6 +244,19 @@ const chartRef = ref(null)
 let chart
 
 const clarificationMetrics = ['销售金额', '销售件数', '订单数']
+const columnLabels = {
+  stat_date: '日期', product_id: '商品 ID', product_name: '商品名称',
+  paid_order_count: '已支付订单数', paid_amount: '支付金额',
+  completed_refund_count: '已完成退款数', completed_refund_amount: '退款金额',
+  net_paid_amount: '净支付金额', sold_quantity: '销售件数',
+  order_item_amount: '订单商品金额', refunded_quantity: '退款件数',
+  sku_id: 'SKU ID', stock: '当前库存', risk_status: '库存风险',
+  run_count: '运行次数', success_count: '成功次数', failure_count: '失败次数',
+  handoff_count: '转人工次数', avg_latency_ms: '平均耗时（毫秒）',
+  input_tokens: '输入 Token', output_tokens: '输出 Token', cost_cny: '成本（元）',
+}
+const columnLabel = (value) => columnLabels[value] || value
+const warningText = (warnings) => (warnings || []).map(reasonLabel).join('；')
 const metricCards = computed(() => {
   const rows = result.value?.rows || []
   const row = rows[rows.length - 1] || {}

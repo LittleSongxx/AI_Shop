@@ -230,14 +230,23 @@ class AgentMessageService:
         max_message_id: int | None = None,
         page_size: int = 15,
     ) -> dict:
-
         offset = (max(page_no, 1) - 1) * page_size
-        where = "user_id=%s"
-        params: list = [user_id]
-        if max_message_id:
-            where += " AND message_id < %s"
-            params.append(max_message_id)
         async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT history_cleared_through_message_id AS cleared_through
+                FROM agent_session_memory
+                WHERE user_id=%s
+                """,
+                (user_id,),
+            )
+            visibility = await cur.fetchone() or {}
+            cleared_through = int(visibility.get("cleared_through") or 0)
+            where = "user_id=%s AND message_id>%s"
+            params: list = [user_id, cleared_through]
+            if max_message_id:
+                where += " AND message_id < %s"
+                params.append(max_message_id)
             await cur.execute(f"SELECT COUNT(*) AS cnt FROM agent_message WHERE {where}", params)
             count_row = await cur.fetchone()
             total = count_row["cnt"] if count_row else 0
@@ -254,6 +263,53 @@ class AgentMessageService:
             "pageNo": page_no,
             "pageTotal": page_total,
             "list": [_row_to_dict(r) for r in rows],
+        }
+
+    async def clear_visible_history(self, user_id: str) -> dict:
+        """Hide completed chat turns without deleting memory or audit data."""
+
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT
+                    COALESCE(MAX(message_id), 0) AS max_message_id,
+                    SUM(CASE WHEN status=%s THEN 1 ELSE 0 END) AS active_count
+                FROM agent_message
+                WHERE user_id=%s
+                """,
+                (MSG_STATUS_NORMAL, user_id),
+            )
+            row = await cur.fetchone() or {}
+            if int(row.get("active_count") or 0) > 0:
+                raise ValueError("当前回复尚未结束，请等待完成或先停止回答")
+
+            requested_cursor = int(row.get("max_message_id") or 0)
+            await cur.execute(
+                """
+                INSERT INTO agent_session_memory
+                    (user_id, history_cleared_through_message_id)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE
+                    history_cleared_through_message_id=GREATEST(
+                        history_cleared_through_message_id,
+                        VALUES(history_cleared_through_message_id)
+                    )
+                """,
+                (user_id, requested_cursor),
+            )
+            await cur.execute(
+                """
+                SELECT history_cleared_through_message_id AS cleared_through
+                FROM agent_session_memory
+                WHERE user_id=%s
+                """,
+                (user_id,),
+            )
+            visibility = await cur.fetchone() or {}
+            cleared_through = int(visibility.get("cleared_through") or 0)
+        return {
+            "clearedThroughMessageId": cleared_through,
+            "memoryPreserved": True,
         }
 
     async def load_recent_history(self, user_id: str, limit: int = 15) -> list[dict]:
@@ -500,6 +556,7 @@ def _decision_to_public_fields(decision: IntentDecision) -> dict:
         "urgency": decision.urgency.value,
         "riskLevel": decision.risk_level.value,
         "nextAction": decision.next_action.value,
+        "requestMode": decision.request_mode.value,
         "handoffReason": decision.handoff_reason,
         "entities": decision.entities,
     }

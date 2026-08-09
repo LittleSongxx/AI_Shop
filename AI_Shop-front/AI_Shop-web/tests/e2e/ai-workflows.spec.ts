@@ -256,3 +256,55 @@ test('validated recommendation attribution survives refresh and reaches checkout
     aiAttributedAt: occurredAt
   });
 });
+
+test('clearing visible conversation preserves agent memory by contract', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'the conversation toolbar is covered on mobile here');
+  let clearCalls = 0;
+
+  await installAuthenticatedApi(page, async (route, path) => {
+    if (path === '/api/agent/loadHistoryMessage') {
+      await ok(route, {
+        list: [
+          {
+            messageId: 901,
+            userMessage: '继续按我的预算推荐',
+            assistantMessage: '已沿用你的预算偏好。',
+            status: 2
+          }
+        ],
+        pageNo: 1,
+        pageTotal: 1,
+        totalCount: 1
+      });
+      return true;
+    }
+    if (path === '/api/agent/clearHistoryMessage') {
+      clearCalls += 1;
+      await ok(route, { clearedThroughMessageId: 901, memoryPreserved: true });
+      return true;
+    }
+    return false;
+  });
+  await installWebSocketMock(page);
+
+  await page.goto('/ai-assistant?view=mobile');
+  await expect(page.getByText('继续按我的预算推荐')).toBeVisible();
+
+  const clearButton = page.getByRole('button', { name: '清除会话记录' });
+  await expect(clearButton).toBeVisible();
+  const box = await clearButton.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+
+  await clearButton.click();
+  await expect(page.getByText('购物偏好、长期记忆和待确认操作都会保留')).toBeVisible();
+  await page.getByRole('button', { name: '确认清除' }).click();
+
+  await expect.poll(() => clearCalls).toBe(1);
+  await expect(page.getByText('继续按我的预算推荐')).toHaveCount(0);
+  await expect(page.getByText('您好，我是智选智能客服小智')).toBeVisible();
+  await expect(page.getByText('会话记录已清除，已有记忆仍会保留')).toBeVisible();
+});

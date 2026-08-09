@@ -1,8 +1,9 @@
 <template>
   <div class="quality-center">
     <el-tabs v-model="activeTab" class="quality-tabs" @tab-change="onTabChange">
-      <el-tab-pane label="Trace" name="trace">
+      <el-tab-pane label="运行追踪" name="trace">
         <div class="filter-row">
+          <el-segmented v-model="traceFilters.runScope" :options="runScopeOptions" />
           <el-select v-model="traceFilters.status" clearable placeholder="运行状态" class="filter-control">
             <el-option label="运行中" value="RUNNING" />
             <el-option label="成功" value="SUCCEEDED" />
@@ -11,34 +12,35 @@
             <el-option label="转人工" value="HANDOFF" />
             <el-option label="已取消" value="CANCELLED" />
           </el-select>
-          <el-select v-model="traceFilters.agentId" clearable placeholder="Agent" class="filter-control">
-            <el-option label="Supervisor" value="supervisor" />
-            <el-option label="Shopping Advisor" value="shopping_advisor" />
-            <el-option label="Order Fulfillment" value="order_fulfillment_specialist" />
-            <el-option label="After Sales Policy" value="after_sales_policy_specialist" />
-            <el-option label="Data Analyst" value="data_analyst" />
-            <el-option label="Inventory Ops" value="inventory_ops" />
+          <el-select v-model="traceFilters.agentId" clearable placeholder="智能体" class="filter-control">
+            <el-option label="协调主管" value="supervisor" />
+            <el-option label="智能导购专家" value="shopping_advisor" />
+            <el-option label="订单履约专家" value="order_fulfillment_specialist" />
+            <el-option label="售后政策专家" value="after_sales_policy_specialist" />
+            <el-option label="经营分析专家" value="data_analyst" />
+            <el-option label="库存运营助手" value="inventory_ops" />
           </el-select>
-          <el-input v-model="traceFilters.intent" clearable placeholder="意图" class="filter-control" />
+          <el-select v-model="traceFilters.intent" clearable filterable placeholder="业务意图" class="filter-control">
+            <el-option v-for="item in intentOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
           <el-input v-model="traceFilters.userId" clearable placeholder="用户 ID" class="filter-control" />
-          <el-input v-model="traceFilters.outcome" clearable placeholder="终态" class="filter-control" />
           <el-button type="primary" :loading="traceLoading" @click="loadTraces(1)">查询</el-button>
         </div>
         <div class="table-wrap">
           <el-table :data="tracePage.list" v-loading="traceLoading" stripe @row-dblclick="openTrace">
-            <el-table-column label="Run ID" prop="runId" min-width="240" show-overflow-tooltip />
-            <el-table-column label="Agent / 层级" min-width="190">
+            <el-table-column label="运行" min-width="175">
               <template #default="{ row }">
-                <b>{{ row.agentId || 'supervisor' }}</b>
-                <small class="block">{{ row.parentRunId ? 'Child Run' : 'Root Run' }}</small>
+                <b>{{ agentLabel(row.agentId || 'supervisor') }}</b>
+                <small class="block">{{ row.parentRunId ? '专家子运行' : '根运行' }} · {{ shortRunId(row.runId) }}</small>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="runStatusType(row.status)">{{ row.status || '—' }}</el-tag></template></el-table-column>
-            <el-table-column label="场景 / 意图" min-width="190"><template #default="{ row }"><b>{{ row.scenario || '—' }}</b><small class="block">{{ row.intent || '—' }}</small></template></el-table-column>
-            <el-table-column label="终态" prop="outcome" width="130" show-overflow-tooltip />
+            <el-table-column label="用户问题 / 意图" min-width="260">
+              <template #default="{ row }"><b class="question-cell">{{ row.userMessage || '内部智能体任务' }}</b><small class="block">{{ intentLabel(row.intent) }}<span class="raw-code">{{ row.intent || '' }}</span></small></template>
+            </el-table-column>
+            <el-table-column label="结果" width="145"><template #default="{ row }"><el-tag :type="runStatusType(row.status)">{{ statusLabel(row.status) }}</el-tag><small class="block">{{ outcomeLabel(row.outcome || row.status) }}</small></template></el-table-column>
             <el-table-column label="耗时" width="100"><template #default="{ row }">{{ formatDuration(row.latencyMs) }}</template></el-table-column>
-            <el-table-column label="Token" width="105"><template #default="{ row }">{{ Number(row.inputTokens || 0) + Number(row.outputTokens || 0) }}</template></el-table-column>
-            <el-table-column label="数据审核" width="120"><template #default="{ row }"><el-tag size="small" :type="datasetType(row.datasetEligible)">{{ row.datasetEligible || 'UNREVIEWED' }}</el-tag></template></el-table-column>
+            <el-table-column label="模型用量" width="110"><template #default="{ row }">{{ tokenTotal(row) }} Token</template></el-table-column>
+            <el-table-column label="数据审核" width="105"><template #default="{ row }"><el-tag size="small" :type="datasetType(row.datasetEligible)">{{ statusLabel(row.datasetEligible || 'UNREVIEWED') }}</el-tag></template></el-table-column>
             <el-table-column label="开始时间" prop="startedAt" min-width="180" />
             <el-table-column label="操作" width="90" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openTrace(row)">详情</el-button></template></el-table-column>
           </el-table>
@@ -46,23 +48,23 @@
         <Pagination :page="tracePage" @change="loadTraces" />
       </el-tab-pane>
 
-      <el-tab-pane label="Badcase" name="badcase">
+      <el-tab-pane label="问题样本" name="badcase">
         <div class="filter-row">
           <el-select v-model="badcaseStatus" clearable placeholder="全部状态" class="filter-control">
-            <el-option v-for="status in badcaseStatuses" :key="status" :label="status" :value="status" />
+            <el-option v-for="status in badcaseStatuses" :key="status" :label="statusLabel(status)" :value="status" />
           </el-select>
           <el-button type="primary" :loading="badcaseLoading" @click="loadBadcases(1)">查询</el-button>
-          <el-button @click="openRegressions">回归 Case</el-button>
+          <el-button @click="openRegressions">回归用例</el-button>
         </div>
         <div class="table-wrap">
           <el-table :data="badcasePage.list" v-loading="badcaseLoading" stripe>
             <el-table-column label="ID" prop="candidateId" width="80" />
-            <el-table-column label="状态" width="135"><template #default="{ row }"><el-tag :type="badcaseStatusType(row.status)">{{ row.status }}</el-tag></template></el-table-column>
-            <el-table-column label="来源 / 严重度" width="150"><template #default="{ row }">{{ row.source || '—' }}<small class="block">{{ row.severity || '—' }} · {{ row.occurrenceCount || 1 }} 次</small></template></el-table-column>
-            <el-table-column label="原因" prop="reason" min-width="190" show-overflow-tooltip />
+            <el-table-column label="状态" width="135"><template #default="{ row }"><el-tag :type="badcaseStatusType(row.status)">{{ statusLabel(row.status) }}</el-tag></template></el-table-column>
+            <el-table-column label="来源 / 严重度" width="150"><template #default="{ row }">{{ badcaseSourceLabel(row.source) }}<small class="block">{{ severityLabel(row.severity) }} · {{ row.occurrenceCount || 1 }} 次</small></template></el-table-column>
+            <el-table-column label="原因" min-width="210" show-overflow-tooltip><template #default="{ row }">{{ reasonLabel(row.reason) }}</template></el-table-column>
             <el-table-column label="用户问题" prop="userMessage" min-width="220" show-overflow-tooltip />
             <el-table-column label="标签" min-width="150"><template #default="{ row }"><el-tag v-for="label in row.labels || []" :key="label" size="small" class="label-tag">{{ label }}</el-tag><span v-if="!(row.labels || []).length">—</span></template></el-table-column>
-            <el-table-column label="Owner / 版本" width="150"><template #default="{ row }">{{ row.owner || '—' }}<small class="block">{{ row.fixVersion || '—' }}</small></template></el-table-column>
+            <el-table-column label="负责人 / 版本" width="150"><template #default="{ row }">{{ row.owner || '—' }}<small class="block">{{ row.fixVersion || '—' }}</small></template></el-table-column>
             <el-table-column label="操作" width="90" fixed="right"><template #default="{ row }"><el-button link type="primary" :disabled="terminalBadcase(row.status)" @click="openBadcase(row)">处理</el-button></template></el-table-column>
           </el-table>
         </div>
@@ -97,25 +99,27 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-drawer v-model="traceDrawer.show" title="Episode Trace" :size="drawerSize" destroy-on-close>
+    <el-drawer v-model="traceDrawer.show" title="智能体运行详情" :size="drawerSize" destroy-on-close>
       <template v-if="traceDrawer.detail">
+        <section v-if="traceDrawer.detail.conversation" class="conversation-summary">
+          <div><span>用户问题</span><p>{{ traceDrawer.detail.conversation.userMessage || '—' }}</p></div>
+          <div><span>最终回复</span><p>{{ formatAgentReply(traceDrawer.detail.conversation.assistantMessage) }}</p></div>
+        </section>
         <div class="detail-summary">
-          <div><span>Run ID</span><b>{{ traceDrawer.detail.runId }}</b></div>
-          <div><span>Trace ID</span><b>{{ traceDrawer.detail.traceId || '—' }}</b></div>
-          <div><span>Agent / 层级</span><b>{{ traceDrawer.detail.agentId || 'supervisor' }} · {{ traceDrawer.detail.parentRunId ? 'Child Run' : 'Root Run' }}</b></div>
-          <div><span>父 Run</span><b>{{ traceDrawer.detail.parentRunId || '—' }}</b></div>
-          <div><span>终态</span><b>{{ traceDrawer.detail.outcome || traceDrawer.detail.status || '—' }}</b></div>
-          <div><span>模型 / Token</span><b>{{ traceDrawer.detail.modelName || '—' }} · {{ tokenTotal(traceDrawer.detail) }}</b></div>
-          <div><span>数据审核</span><b>{{ traceDrawer.detail.datasetEligible || 'UNREVIEWED' }} · {{ traceDrawer.detail.datasetReviewedBy || '未审核' }}</b></div>
-          <div><span>训练资格判定</span><b>{{ traceDrawer.detail.episodeEvaluation?.verdict || '—' }}</b></div>
+          <div><span>执行智能体</span><b>{{ agentLabel(traceDrawer.detail.agentId || 'supervisor') }} · {{ traceDrawer.detail.parentRunId ? '专家子运行' : '根运行' }}</b></div>
+          <div><span>业务意图</span><b>{{ intentLabel(traceDrawer.detail.intent) }}</b></div>
+          <div><span>最终状态</span><b>{{ statusLabel(traceDrawer.detail.status) }} · {{ outcomeLabel(traceDrawer.detail.outcome) }}</b></div>
+          <div><span>耗时 / 模型用量</span><b>{{ formatDuration(traceDrawer.detail.latencyMs) }} · {{ tokenTotal(traceDrawer.detail) }} Token</b></div>
+          <div><span>数据审核</span><b>{{ statusLabel(traceDrawer.detail.datasetEligible || 'UNREVIEWED') }} · {{ traceDrawer.detail.datasetReviewedBy || '未审核' }}</b></div>
+          <div><span>训练资格判定</span><b>{{ episodeVerdictLabel(traceDrawer.detail.episodeEvaluation?.verdict) }}</b></div>
         </div>
         <div class="drawer-actions top-actions">
           <a v-if="traceDrawer.detail.tempoTraceUrl" :href="traceDrawer.detail.tempoTraceUrl" target="_blank" rel="noopener noreferrer" class="tempo-link">在 Tempo 查看</a>
-          <el-button v-if="traceDrawer.detail.parentRunId" link type="primary" :icon="Connection" @click="openTrace(traceDrawer.detail.parentRunId)">查看父 Run</el-button>
+          <el-button v-if="traceDrawer.detail.parentRunId" link type="primary" :icon="Connection" @click="openTrace(traceDrawer.detail.parentRunId)">查看根运行</el-button>
         </div>
         <section class="episode-review">
           <div class="review-heading"><h3>人工数据审核</h3><el-tag :type="traceDrawer.detail.episodeEvaluation?.reviewEligible ? 'success' : 'warning'">{{ traceDrawer.detail.episodeEvaluation?.reviewEligible ? '事实完整' : '暂不可批准' }}</el-tag></div>
-          <p>{{ traceDrawer.detail.episodeEvaluation?.verdict || '尚无资格判定' }}<template v-if="traceDrawer.detail.datasetReviewedAt"> · {{ traceDrawer.detail.datasetReviewedAt }}</template></p>
+          <p>{{ episodeVerdictLabel(traceDrawer.detail.episodeEvaluation?.verdict) }}<template v-if="traceDrawer.detail.datasetReviewedAt"> · {{ traceDrawer.detail.datasetReviewedAt }}</template></p>
           <el-input v-model="episodeReviewNote" type="textarea" :rows="2" maxlength="1000" placeholder="审核备注" />
           <div class="drawer-actions">
             <el-button :loading="episodeReviewing" type="danger" plain @click="reviewEpisode('REJECTED')">拒绝</el-button>
@@ -126,55 +130,62 @@
           <h3>协作链路</h3>
           <article v-if="supervisorPlan" class="collaboration-stage supervisor-stage">
             <header>
-              <b>Supervisor 计划</b>
-              <el-tag size="small" type="info">{{ supervisorPlan.planner_source || 'DETERMINISTIC_FALLBACK' }}</el-tag>
+              <b>协调主管计划</b>
+              <el-tag size="small" type="info">{{ plannerSourceLabel(supervisorPlan.planner_source) }}</el-tag>
             </header>
-            <p>意图 {{ supervisorPlan.intent || '—' }} · 专家 {{ (supervisorPlan.specialists || []).join(' + ') || 'Supervisor-only' }}</p>
-            <p v-if="supervisorPlan.requires_action">待汇合后评估 {{ supervisorPlan.action_type }}</p>
+            <p>{{ intentLabel(supervisorPlan.intent) }} · {{ requestModeLabel(supervisorPlan.request_mode) }}</p>
+            <p>参与专家：{{ (supervisorPlan.specialists || []).map(agentLabel).join('、') || '由协调主管直接回答' }}</p>
+            <p v-if="supervisorPlan.requires_action">专家汇合后评估：{{ toolLabel(supervisorPlan.action_type) }}</p>
           </article>
           <div v-if="traceDrawer.detail.handoffs?.length" class="handoff-grid">
             <article v-for="handoff in traceDrawer.detail.handoffs" :key="handoff.handoffId" class="collaboration-stage">
               <header>
-                <b>{{ handoff.targetAgent }}</b>
-                <el-tag size="small" :type="handoff.status === 'SUCCEEDED' ? 'success' : 'warning'">{{ handoff.status }}</el-tag>
+                <b>{{ agentLabel(handoff.targetAgent) }}</b>
+                <el-tag size="small" :type="handoff.status === 'SUCCEEDED' ? 'success' : 'warning'">{{ statusLabel(handoff.status) }}</el-tag>
               </header>
-              <p>{{ handoff.sourceAgent }} → {{ handoff.targetAgent }} · {{ formatDuration(handoff.latencyMs) }}</p>
-              <p v-if="handoff.artifactSummary?.draft_answer">{{ handoff.artifactSummary.draft_answer }}</p>
+              <p>由{{ agentLabel(handoff.sourceAgent) }}委派 · {{ formatDuration(handoff.latencyMs) }}</p>
+              <p v-if="handoff.artifactSummary?.draft_answer">{{ artifactSummaryText(handoff.artifactSummary) }}</p>
               <div v-if="handoff.artifactSummary?.warnings?.length" class="warning-list">
-                <el-tag v-for="warning in handoff.artifactSummary.warnings" :key="warning" size="small" type="warning">{{ warning }}</el-tag>
+                <el-tag v-for="warning in handoff.artifactSummary.warnings" :key="warning" size="small" type="warning">{{ reasonLabel(warning) }}</el-tag>
               </div>
-              <el-button link type="primary" :icon="Connection" @click="openTrace(handoff.childRunId)">查看 Child Run</el-button>
+              <el-button link type="primary" :icon="Connection" @click="openTrace(handoff.childRunId)">查看专家运行</el-button>
             </article>
           </div>
           <article v-if="actionDecision" class="collaboration-stage action-stage">
             <header>
               <b>行动策略</b>
-              <el-tag size="small" :type="actionDecision.status === 'OK' ? 'success' : 'warning'">{{ actionDecision.status }}</el-tag>
+              <el-tag size="small" :type="actionDecision.status === 'OK' ? 'success' : 'warning'">{{ statusLabel(actionDecision.status) }}</el-tag>
             </header>
-            <p>{{ actionDecision.toolName || actionDecision.output?.proposal?.tool || '无写操作' }} · {{ actionDecision.output?.reason || actionDecision.output?.proposal?.reason || (actionDecision.output?.success ? '已生成待确认提案' : '未执行提案') }}</p>
+            <p>{{ toolLabel(actionDecision.toolName || actionDecision.output?.proposal?.tool) }} · {{ actionDecisionReason(actionDecision) }}</p>
           </article>
         </section>
-        <section class="quality-json"><h3>质量与事实 Reward Signals</h3><pre>{{ pretty({ quality: traceDrawer.detail.quality, rewardSignals: traceDrawer.detail.rewardSignals, experiment: traceDrawer.detail.experiment }) }}</pre></section>
         <section class="waterfall">
-          <article v-for="(step, index) in traceDrawer.detail.steps || []" :key="step.stepId || index" class="trace-step">
+          <h3>关键业务过程</h3>
+          <article v-for="(step, index) in businessSteps" :key="step.stepId || index" class="trace-step">
             <span class="step-line" aria-hidden="true" />
             <span class="step-index">{{ index + 1 }}</span>
             <div class="step-body">
-              <header><b>{{ step.nodeName || step.toolName || step.eventType }}</b><el-tag v-if="step.agentId" size="small" type="info">{{ step.agentId }}</el-tag><el-tag size="small" :type="step.status === 'ERROR' ? 'danger' : 'info'">{{ step.status || step.eventType }}</el-tag><span>{{ formatDuration(step.latencyMs) }}</span></header>
-              <p>{{ step.eventType }} · {{ step.occurredAt || '—' }}<template v-if="step.spanId"> · span {{ step.spanId }}</template></p>
-              <details v-if="step.input || step.output || step.errorMessage"><summary>脱敏 observation / action / result</summary><pre>{{ pretty({ input: step.input, output: step.output, errorCode: step.errorCode, errorMessage: step.errorMessage }) }}</pre></details>
+              <header><b>{{ eventLabel(step.eventType) }}</b><el-tag v-if="step.agentId" size="small" type="info">{{ agentLabel(step.agentId) }}</el-tag><el-tag size="small" :type="step.status === 'ERROR' ? 'danger' : 'info'">{{ statusLabel(step.status) }}</el-tag><span>{{ formatDuration(step.latencyMs) }}</span></header>
+              <p>{{ stepSummary(step) }}</p>
+              <small class="technical-code">{{ nodeLabel(step.nodeName) }} · {{ step.occurredAt || '—' }}</small>
             </div>
           </article>
+          <el-empty v-if="!businessSteps.length" description="暂无可展示的关键业务事件" :image-size="64" />
         </section>
+        <details class="developer-details">
+          <summary>开发者详情（原始标识、节点流转与脱敏 JSON）</summary>
+          <div class="developer-identifiers"><code>Run {{ traceDrawer.detail.runId }}</code><code>Trace {{ traceDrawer.detail.traceId || '—' }}</code></div>
+          <pre>{{ pretty({ technicalSteps, quality: traceDrawer.detail.quality, rewardSignals: traceDrawer.detail.rewardSignals, experiment: traceDrawer.detail.experiment }) }}</pre>
+        </details>
       </template>
     </el-drawer>
 
-    <el-drawer v-model="badcaseDrawer.show" title="Badcase 处理" :size="drawerSize" destroy-on-close>
+    <el-drawer v-model="badcaseDrawer.show" title="问题样本处理" :size="drawerSize" destroy-on-close>
       <el-form v-if="badcaseDrawer.row" label-position="top" :model="badcaseReview">
         <div class="case-context"><b>用户问题</b><p>{{ badcaseDrawer.row.userMessage || '—' }}</p><b>AI 回复</b><p>{{ badcaseDrawer.row.assistantMessage || '—' }}</p><b>原因</b><p>{{ badcaseDrawer.row.reason || '—' }}</p></div>
-        <el-form-item label="目标状态" required><el-select v-model="badcaseReview.status" class="full"><el-option v-for="status in availableBadcaseTransitions" :key="status" :label="status" :value="status" /></el-select></el-form-item>
+        <el-form-item label="目标状态" required><el-select v-model="badcaseReview.status" class="full"><el-option v-for="status in availableBadcaseTransitions" :key="status" :label="statusLabel(status)" :value="status" /></el-select></el-form-item>
         <el-form-item label="标签（逗号分隔）"><el-input v-model="badcaseReview.labels" placeholder="grounding, tool_error" /></el-form-item>
-        <el-form-item label="Owner"><el-input v-model="badcaseReview.owner" placeholder="进入 FIXING 前必填" /></el-form-item>
+        <el-form-item label="负责人"><el-input v-model="badcaseReview.owner" placeholder="进入修复中状态前必填" /></el-form-item>
         <el-form-item label="修复版本"><el-input v-model="badcaseReview.fixVersion" placeholder="例如 v1.8.0" /></el-form-item>
         <el-form-item label="审核备注"><el-input v-model="badcaseReview.remark" type="textarea" :rows="3" maxlength="500" /></el-form-item>
         <template v-if="badcaseReview.status === 'REGRESSION_ADDED'">
@@ -231,11 +242,24 @@ import { computed, defineComponent, getCurrentInstance, h, onMounted, reactive, 
 import { ElMessage, ElPagination } from 'element-plus'
 import { Connection, VideoPlay } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
+import {
+  agentLabel,
+  episodeVerdictLabel,
+  eventLabel,
+  formatAgentReply,
+  intentLabel,
+  nodeLabel,
+  outcomeLabel,
+  reasonLabel,
+  requestModeLabel,
+  statusLabel,
+  toolLabel,
+} from '@/utils/agentDisplay.js'
 
 const { proxy } = getCurrentInstance()
 const route = useRoute()
 const activeTab = ref('trace')
-const drawerSize = computed(() => window.innerWidth < 760 ? '94%' : '720px')
+const drawerSize = computed(() => window.innerWidth < 760 ? '96%' : '860px')
 const emptyPage = () => ({ list: [], totalCount: 0, pageNo: 1, pageSize: 20 })
 const normalizePage = (data) => ({ ...emptyPage(), ...(data || {}), list: Array.isArray(data?.list) ? data.list : [] })
 const request = async (url, params = {}) => {
@@ -255,7 +279,25 @@ const Pagination = defineComponent({
   }
 })
 
-const traceFilters = reactive({ status: '', agentId: '', intent: '', userId: '', outcome: '' })
+const runScopeOptions = [
+  { label: '根运行', value: 'ROOT' },
+  { label: '专家子运行', value: 'CHILD' },
+  { label: '全部', value: 'ALL' },
+]
+const intentOptions = [
+  'PRODUCT_CONSULT', 'PRODUCT_SEARCH', 'QUERY_ORDER', 'QUERY_LOGISTICS',
+  'QUERY_FULFILLMENT', 'QUERY_COUPON', 'QUERY_COMMENT', 'REFUND',
+  'REFUND_STATUS', 'CANCEL_ORDER', 'CONFIRM_RECEIPT', 'PRODUCT_REVIEW',
+  'RECOMMENT', 'DAMAGED_OR_WRONG_ITEM', 'ADDRESS_CHANGE', 'INVOICE',
+  'COMPLAINT', 'PAYMENT_ISSUE', 'AFTERSALES_UNKNOWN', 'HUMAN_REQUEST', 'CHAT',
+].map((value) => ({ value, label: intentLabel(value) }))
+const traceFilters = reactive({
+  runScope: 'ROOT',
+  status: '',
+  agentId: '',
+  intent: '',
+  userId: '',
+})
 const tracePage = ref(emptyPage())
 const traceLoading = ref(false)
 const traceDrawer = reactive({ show: false, detail: null })
@@ -287,6 +329,78 @@ const hasCollaboration = computed(() => Boolean(
   traceDrawer.detail?.handoffs?.length ||
   traceDrawer.detail?.children?.length
 ))
+const technicalEventTypes = new Set(['NODE_TRANSITION', 'LLM_CALL'])
+const businessSteps = computed(() => (
+  (traceDrawer.detail?.steps || []).filter((step) => !technicalEventTypes.has(step.eventType))
+))
+const technicalSteps = computed(() => (
+  (traceDrawer.detail?.steps || []).filter((step) => technicalEventTypes.has(step.eventType))
+))
+const shortRunId = (value) => {
+  const text = String(value || '')
+  return text.length > 12 ? `${text.slice(0, 8)}…${text.slice(-4)}` : text || '—'
+}
+const plannerSourceLabel = (value) => (
+  value === 'LLM_STRUCTURED' ? '模型结构化规划' : '确定性安全路由'
+)
+const badcaseSourceLabel = (value) => ({
+  VERIFIER: '答复核验器',
+  USER_FEEDBACK: '用户反馈',
+  JUDGE: '质量评审器',
+  TOOL: '业务工具',
+  SYSTEM: '系统检测',
+}[value] || value || '未知来源')
+const severityLabel = (value) => ({
+  LOW: '低风险', MEDIUM: '中风险', HIGH: '高风险', CRITICAL: '严重',
+}[value] || value || '未分级')
+const actionDecisionReason = (step) => {
+  const output = step?.output || {}
+  const reason = output.reason || output.proposal?.reason
+  if (reason) return reasonLabel(reason)
+  return output.success ? '已生成待用户确认的操作提案' : '本轮未创建业务操作提案'
+}
+const artifactSummaryText = (artifact) => String(artifact?.draft_answer || '').replace(
+  /^([A-Z][A-Z0-9_]+):\s*/,
+  (_, tool) => `${toolLabel(tool)}：`,
+)
+const stepSummary = (step) => {
+  const output = step?.output || {}
+  if (step.eventType === 'INTENT_DECISION') {
+    return `识别为“${intentLabel(output.intent)}”，按“${requestModeLabel(output.requestMode)}”处理。`
+  }
+  if (step.eventType === 'RAG_RETRIEVAL') {
+    const sourceCount = Number(output.sourceRefs?.length || output.trace?.sourceCount || 0)
+    return output.hasEvidence
+      ? `检索到 ${sourceCount} 条通过证据门禁的知识来源。`
+      : '未检索到通过证据门禁的知识来源。'
+  }
+  if (step.eventType === 'SUPERVISOR_PLAN') {
+    const specialists = (output.specialists || []).map(agentLabel).join('、')
+    return specialists
+      ? `按“${requestModeLabel(output.request_mode)}”处理，并委派给${specialists}。`
+      : '本轮由协调主管直接生成答复。'
+  }
+  if (step.eventType === 'SPECIALIST_TOOL') {
+    return `${agentLabel(step.agentId)}${output.required ? '按计划必查' : '按需调用'}“${toolLabel(output.tool || step.toolName)}”，${output.success === false ? '调用失败' : '调用成功'}。`
+  }
+  if (step.eventType === 'ARTIFACT_VALIDATION') {
+    return output.reason
+      ? `专家产物未通过校验：${reasonLabel(output.reason)}`
+      : `已通过${agentLabel(output.agentId)}的事实与证据校验。`
+  }
+  if (step.eventType === 'ACTION_POLICY_DECISION') return actionDecisionReason(step)
+  if (step.eventType === 'RESPONSE_VERIFIER') {
+    const issues = output.issueCodes || output.issues || []
+    return issues.length
+      ? `最终答复未通过核验：${issues.map(reasonLabel).join('；')}`
+      : '最终答复已通过事实、工具与政策证据核验。'
+  }
+  if (step.errorCode || step.errorMessage) {
+    return `执行异常：${reasonLabel(step.errorCode || step.errorMessage)}`
+  }
+  if (output.warnings?.length) return output.warnings.map(reasonLabel).join('；')
+  return `${eventLabel(step.eventType)}已完成。`
+}
 const reviewEpisode = async (datasetEligible) => {
   episodeReviewing.value = true
   try {
@@ -418,8 +532,15 @@ onMounted(async () => {
 .filter-control { width: 170px; }
 .table-wrap { width: 100%; min-width: 0; overflow-x: auto; }
 .block { display: block; margin-top: 3px; color: var(--text3); font-size: 11px; }
+.raw-code { margin-left: 6px; color: var(--text3); font-family: monospace; font-size: 10px; }
+.question-cell { display: block; max-width: 100%; overflow: hidden; color: var(--text); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .label-tag { margin: 2px 4px 2px 0; }
 :deep(.pagination-row) { display: flex; justify-content: flex-end; padding-top: 14px; }
+.conversation-summary { margin-bottom: 14px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.conversation-summary div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; padding: 12px 2px; }
+.conversation-summary div + div { border-top: 1px solid var(--border); }
+.conversation-summary span { color: var(--text3); font-size: 12px; }
+.conversation-summary p { max-height: 150px; margin: 0; overflow: auto; color: var(--text); font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .detail-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .detail-summary div { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); }
 .detail-summary span { color: var(--text3); font-size: 11px; }
@@ -452,7 +573,12 @@ pre { max-width: 100%; margin: 8px 0 0; padding: 10px; overflow: auto; border-ra
 .step-body header b { min-width: 0; margin-right: auto; overflow-wrap: anywhere; }
 .step-body header > span { color: var(--text3); font-size: 11px; }
 .step-body p, .case-context p, .support-evidence p { margin: 6px 0; color: var(--text2); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.technical-code { display: block; margin-top: 6px; color: var(--text3); font-family: monospace; font-size: 10px; }
 .step-body summary { margin-top: 8px; color: var(--primary); font-size: 12px; cursor: pointer; }
+.developer-details { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
+.developer-details > summary { color: var(--text2); font-size: 12px; cursor: pointer; }
+.developer-identifiers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.developer-identifiers code { padding: 4px 6px; background: var(--surface2); color: var(--text2); font-size: 10px; overflow-wrap: anywhere; }
 .case-context { margin: 14px 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); }
 .case-context b { font-size: 12px; }
 .full { width: 100%; }

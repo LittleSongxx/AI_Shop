@@ -1061,6 +1061,20 @@ stop_managed_service_for_restart() {
   info "已停止 $name，等待按新目录重新启动"
 }
 
+refresh_dynamic_runtime_services() {
+  local name
+  # Python imports application modules once and Vite captures proxy targets at
+  # process start. A healthy old process can therefore serve stale Agent code
+  # or proxy to ports from a previous runtime.env. Reconcile these lightweight
+  # services on every full start after Java ports and indexes are final.
+  for name in admin-web web agent-worker agent mcp; do
+    if is_running "$name"; then
+      warn "刷新动态运行层，重启 $name 以加载当前代码与运行配置"
+      stop_managed_service_for_restart "$name" 30
+    fi
+  done
+}
+
 provision_analytics_reader() {
   [[ "$DATA_ANALYST_ENABLED" == "true" ]] || return 0
   if [[ "$ANALYTICS_MYSQL_HOST" != "127.0.0.1" && "$ANALYTICS_MYSQL_HOST" != "localhost" ]]; then
@@ -1269,6 +1283,8 @@ done
 provision_analytics_reader
 
 rebuild_catalog_search_index
+
+refresh_dynamic_runtime_services
 
 info "启动 MCP 与 Python Agent..."
 start_mcp

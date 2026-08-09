@@ -103,6 +103,16 @@ async def load_history_message(
     data = await agent_message_service.load_history(user.user_id, pageNo, maxMessageId)
     return success(data)
 
+
+@router.post("/clearHistoryMessage")
+async def clear_history_message(
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        return success(await agent_message_service.clear_visible_history(user.user_id))
+    except ValueError as exc:
+        return error(409, str(exc))
+
 @router.post("/sendMessage")
 async def send_message(
     message: str = Form(...),
@@ -442,6 +452,7 @@ async def admin_trace_runs(
         user_id=str(body.get("userId") or "").strip() or None,
         outcome=str(body.get("outcome") or "").strip() or None,
         agent_id=str(body.get("agentId") or "").strip() or None,
+        run_scope=str(body.get("runScope") or "ROOT").strip() or "ROOT",
     )
     return success(data)
 

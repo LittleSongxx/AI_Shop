@@ -152,13 +152,14 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 
 	@PostMapping("/traceRuns")
 	public ResponseVO traceRuns(Integer pageNo, Integer pageSize, String status,
-			String intent, String userId, String outcome, String agentId) {
+			String intent, String userId, String outcome, String agentId, String runScope) {
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
 		putIfText(body, "intent", intent);
 		putIfText(body, "userId", userId);
 		putIfText(body, "outcome", outcome);
 		putIfText(body, "agentId", agentId);
+		putIfText(body, "runScope", runScope);
 		return getSuccessResponseVO(agentMessageService.callSupport("traceRuns", body));
 	}
 

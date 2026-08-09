@@ -167,6 +167,11 @@ const reportAgentProductClick = async (
 
 export const agentApi = {
   loadHistoryMessage: (params: Record<string, unknown>) => request.postForm('/agent/loadHistoryMessage', params),
+  clearHistoryMessage: () =>
+    request.postForm<{ clearedThroughMessageId: number; memoryPreserved: boolean }>(
+      '/agent/clearHistoryMessage',
+      {}
+    ),
   sendMessage: (
     message: string,
     fromProduct?: boolean,

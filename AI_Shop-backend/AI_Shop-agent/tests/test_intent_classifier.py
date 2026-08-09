@@ -7,15 +7,42 @@ from app.domain.intent.classifier import (
     _parse_intent_json,
     classify_intent_by_llm,
     classify_intent_by_rules,
+    classify_request_mode,
     resolve_intent,
 )
 from app.domain.intent.types import (
     IntentDecision,
     IntentKind,
     NextAction,
+    RequestMode,
     RiskLevel,
     SentimentKind,
 )
+
+
+@pytest.mark.parametrize(
+    ("text", "intent", "expected"),
+    [
+        ("退款政策是什么", IntentKind.REFUND, RequestMode.INFORMATIONAL),
+        ("退款需要什么条件", IntentKind.REFUND, RequestMode.INFORMATIONAL),
+        ("退款怎么申请", IntentKind.CHAT, RequestMode.INFORMATIONAL),
+        ("我要退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
+        ("选择耳机订单继续退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
+        ("取消订单怎么操作", IntentKind.CHAT, RequestMode.INFORMATIONAL),
+        ("五星，音质很好", IntentKind.PRODUCT_REVIEW, RequestMode.ACTION_PROPOSAL),
+        ("五星评价怎么写", IntentKind.PRODUCT_REVIEW, RequestMode.INFORMATIONAL),
+        ("补充一下，降噪和续航都不错", IntentKind.RECOMMENT, RequestMode.ACTION_PROPOSAL),
+        ("我有哪些优惠券", IntentKind.QUERY_COUPON, RequestMode.READ_QUERY),
+        ("收到的商品坏了，帮我处理", IntentKind.DAMAGED_OR_WRONG_ITEM, RequestMode.ACTION_PROPOSAL),
+        ("坏了以后怎么处理", IntentKind.DAMAGED_OR_WRONG_ITEM, RequestMode.INFORMATIONAL),
+    ],
+)
+def test_request_mode_is_independent_from_business_intent(text, intent, expected):
+    assert classify_request_mode(text, intent) == expected
+
+
+def test_coupon_word_order_is_classified_as_personal_query():
+    assert classify_intent_by_rules("我有哪些优惠券") == IntentKind.QUERY_COUPON
 
 
 def test_parse_intent_json():

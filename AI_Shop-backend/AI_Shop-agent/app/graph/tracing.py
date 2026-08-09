@@ -71,6 +71,7 @@ def _state_summary(state: AgentGraphState) -> dict[str, Any]:
         "messageId": state.get("message_id"),
         "route": state.get("route"),
         "intent": state.get("intent"),
+        "requestMode": state.get("request_mode"),
         "round": state.get("react_round"),
         "toolsCalled": list(state.get("tools_called") or []),
         "hasRagEvidence": bool(state.get("rag_source_refs")),

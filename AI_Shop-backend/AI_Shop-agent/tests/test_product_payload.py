@@ -9,7 +9,7 @@ from app.services.product_service import (
     filter_known_available_products,
     format_search_tool_message,
 )
-from app.utils.biz_payload import build_product_payload
+from app.utils.biz_payload import build_order_payload, build_product_payload
 
 
 def test_filter_known_available_products_keeps_unknown_stock():
@@ -98,6 +98,26 @@ def test_product_payload_contains_guidance_and_stock_fields():
         "availability": "ON_SALE",
         "reason": "符合预算、适合办公",
     }
+
+
+def test_order_payload_preserves_zero_valued_wait_payment_status():
+    assistant, biz_data = build_order_payload(
+        [
+            {
+                "order_id": "SM1",
+                "order_status": 0,
+                "amount": 24,
+                "pay_scene": 0,
+            }
+        ],
+        {"SM1": []},
+    )
+
+    card = json.loads(assistant or "[]")[0]
+    assert json.loads(biz_data or "[]") == ["SM1"]
+    assert card["orderStatus"] == 0
+    assert card["orderStatusName"] == "待付款"
+    assert card["payScene"] == 0
 
 
 def test_out_of_stock_message_does_not_fall_back_to_hot_sale_claim():

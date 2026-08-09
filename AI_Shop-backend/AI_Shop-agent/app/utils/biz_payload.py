@@ -529,13 +529,18 @@ def build_order_payload(orders: list[dict], items_map: dict[str, list[dict]]) ->
         if not oid:
             continue
         ids.append(str(oid))
-        status = o.get("order_status") or o.get("orderStatus")
+        status = o.get("order_status")
+        if status is None:
+            status = o.get("orderStatus")
+        pay_scene = o.get("pay_scene")
+        if pay_scene is None:
+            pay_scene = o.get("payScene")
         cards.append({
             "orderId": str(oid),
             "orderStatus": status,
             "orderStatusName": ORDER_STATUS_NAMES.get(status, "订单"),
             "amount": _to_number(o.get("amount")),
-            "payScene": o.get("pay_scene") or o.get("payScene"),
+            "payScene": pay_scene,
             "orderItemList": _order_item_cards(items_map.get(str(oid), [])),
         })
     return trim_assistant(_json_dumps(cards)), _json_dumps(ids) if ids else None

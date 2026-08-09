@@ -32,6 +32,10 @@
             <template #slotUser="{ row }">
               <p class="msg-line user">{{ row.userMessage || '—' }}</p>
             </template>
+            <template #slotBiz="{ row }">
+              <span>{{ bizTypeLabel(row.bizType) }}</span>
+              <small v-if="row.bizType" class="code-hint">{{ row.bizType }}</small>
+            </template>
             <template #slotAi="{ row }">
               <p class="msg-line ai">{{ clipText(row.assistantMessage) }}</p>
             </template>
@@ -88,6 +92,9 @@
             <template #slotSummary="{ row }">
               <p class="msg-line ai">{{ clipText(row.summary, 180) }}</p>
             </template>
+            <template #slotIntent="{ row }">{{ intentLabel(row.intent) }}</template>
+            <template #slotSentiment="{ row }">{{ sentimentLabel(row.sentiment) }}</template>
+            <template #slotUrgency="{ row }">{{ urgencyLabel(row.urgency) }}</template>
             <template #slotSupportOp="{ row }">
               <div class="support-op">
                 <el-button size="small" @click="openSupport(row)">查看/回复</el-button>
@@ -128,6 +135,9 @@
             <template #slotBadcaseAi="{ row }">
               <p class="msg-line ai">{{ clipText(row.assistantMessage, 180) }}</p>
             </template>
+            <template #slotBadcaseType="{ row }">{{ badcaseTypeLabel(row.candidateType) }}</template>
+            <template #slotBadcaseReason="{ row }">{{ reasonLabel(row.reason) }}</template>
+            <template #slotBadcaseStatus="{ row }">{{ statusLabel(row.status) }}</template>
             <template #slotBadcaseOp="{ row }">
               <div class="support-op">
                 <el-button
@@ -191,6 +201,15 @@ import { ElMessageBox } from 'element-plus'
 import { getCurrentInstance, ref } from 'vue'
 
 import {
+  bizTypeLabel,
+  intentLabel,
+  reasonLabel,
+  sentimentLabel,
+  statusLabel,
+  urgencyLabel,
+} from '@/utils/agentDisplay.js'
+
+import {
   canActivateSupport,
   canClaimSupport,
   canHandleSupport,
@@ -221,12 +240,20 @@ const clipText = (text, len = 120) => {
   const s = String(text)
   return s.length > len ? `${s.slice(0, len)}…` : s
 }
+const badcaseTypeLabel = (value) => ({
+  VERIFIER_FAILURE: '答复核验失败',
+  RAG_NO_EVIDENCE: '知识证据不足',
+  RAG_QUERY_REJECTED: '知识检索被拒绝',
+  GUARD_BLOCK: '安全规则拦截',
+  TOOL_FAILURE: '业务工具失败',
+  USER_NEGATIVE_FEEDBACK: '用户负反馈',
+}[value] || value || '未分类问题')
 
 const messageColumns = [
   { label: 'ID', prop: 'messageId', width: 80 },
   { label: '用户ID', prop: 'userId', width: 120 },
   { label: '状态', prop: 'status', width: 90, scopedSlots: 'slotStatus' },
-  { label: '业务类型', prop: 'bizType', width: 140 },
+  { label: '业务类型', prop: 'bizType', width: 160, scopedSlots: 'slotBiz' },
   { label: '用户消息', prop: 'userMessage', scopedSlots: 'slotUser' },
   { label: 'AI回复', prop: 'assistantMessage', scopedSlots: 'slotAi' },
   { label: '时间', prop: 'sendTime', width: 170 },
@@ -237,9 +264,9 @@ const supportColumns = [
   { label: '会话ID', prop: 'sessionId', width: 270 },
   { label: '用户ID', prop: 'userId', width: 120 },
   { label: '状态', prop: 'status', width: 90, scopedSlots: 'slotSupportStatus' },
-  { label: '意图', prop: 'intent', width: 130 },
-  { label: '情绪', prop: 'sentiment', width: 100 },
-  { label: '紧急度', prop: 'urgency', width: 100 },
+  { label: '意图', prop: 'intent', width: 140, scopedSlots: 'slotIntent' },
+  { label: '情绪', prop: 'sentiment', width: 100, scopedSlots: 'slotSentiment' },
+  { label: '紧急度', prop: 'urgency', width: 100, scopedSlots: 'slotUrgency' },
   { label: '摘要', prop: 'summary', scopedSlots: 'slotSummary' },
   { label: '创建时间', prop: 'createdAt', width: 170 },
   { label: '操作', prop: 'op', width: 300, scopedSlots: 'slotSupportOp' },
@@ -247,9 +274,9 @@ const supportColumns = [
 
 const badcaseColumns = [
   { label: 'ID', prop: 'candidateId', width: 90 },
-  { label: '类型', prop: 'candidateType', width: 150 },
-  { label: '原因', prop: 'reason', width: 180 },
-  { label: '状态', prop: 'status', width: 100 },
+  { label: '类型', prop: 'candidateType', width: 160, scopedSlots: 'slotBadcaseType' },
+  { label: '原因', prop: 'reason', width: 220, scopedSlots: 'slotBadcaseReason' },
+  { label: '状态', prop: 'status', width: 100, scopedSlots: 'slotBadcaseStatus' },
   { label: '用户消息', prop: 'userMessage', scopedSlots: 'slotBadcaseUser' },
   { label: 'AI回复', prop: 'assistantMessage', scopedSlots: 'slotBadcaseAi' },
   { label: '创建时间', prop: 'createdAt', width: 170 },
@@ -525,6 +552,14 @@ const delRow = (row) => {
   &.ai {
     color: #666;
   }
+}
+
+.code-hint {
+  display: block;
+  margin-top: 2px;
+  color: #909399;
+  font-family: monospace;
+  font-size: 10px;
 }
 
 .list-op-panel,

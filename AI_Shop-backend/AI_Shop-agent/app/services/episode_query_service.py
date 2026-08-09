@@ -19,11 +19,20 @@ class EpisodeQueryService:
         user_id: str | None = None,
         outcome: str | None = None,
         agent_id: str | None = None,
+        run_scope: str = "ROOT",
     ) -> dict:
         page_no = max(1, int(page_no))
         page_size = min(100, max(1, int(page_size)))
         clauses = ["1=1"]
         params: list[object] = []
+        normalized_scope = str(run_scope or "ROOT").strip().upper()
+        if normalized_scope == "ROOT":
+            clauses.append("parent_run_id IS NULL")
+        elif normalized_scope == "CHILD":
+            clauses.append("parent_run_id IS NOT NULL")
+        elif normalized_scope != "ALL":
+            normalized_scope = "ROOT"
+            clauses.append("parent_run_id IS NULL")
         for column, value in (
             ("status", status),
             ("intent", intent),
@@ -48,7 +57,9 @@ class EpisodeQueryService:
                        outcome,scenario,intent,queue_name,model_name,input_tokens,
                        output_tokens,cost_cny,latency_ms,capture_level,
                        dataset_eligible,dataset_reviewed_by,dataset_reviewed_at,
-                       dataset_review_note,started_at,completed_at
+                       dataset_review_note,started_at,completed_at,
+                       (SELECT user_message FROM agent_message
+                        WHERE message_id=agent_run.message_id) AS user_message
                 FROM agent_run
                 WHERE {where}
                 ORDER BY started_at DESC, run_id DESC
@@ -62,6 +73,7 @@ class EpisodeQueryService:
             "totalCount": total,
             "pageNo": page_no,
             "pageSize": page_size,
+            "runScope": normalized_scope,
         }
 
     async def detail(self, run_id: str) -> dict | None:
@@ -97,6 +109,32 @@ class EpisodeQueryService:
             )
             handoffs = list(await cur.fetchall())
             parent_run_id = run.get("parent_run_id")
+            message_id = run.get("message_id")
+            if not message_id and parent_run_id:
+                await cur.execute(
+                    "SELECT message_id FROM agent_run WHERE run_id=%s",
+                    (parent_run_id,),
+                )
+                parent = await cur.fetchone() or {}
+                message_id = parent.get("message_id")
+            conversation = None
+            if message_id:
+                await cur.execute(
+                    """
+                    SELECT message_id,user_message,assistant_message,biz_type,source_refs
+                    FROM agent_message WHERE message_id=%s
+                    """,
+                    (message_id,),
+                )
+                message = await cur.fetchone()
+                if message:
+                    conversation = {
+                        "messageId": message.get("message_id"),
+                        "userMessage": message.get("user_message") or "",
+                        "assistantMessage": message.get("assistant_message") or "",
+                        "bizType": message.get("biz_type"),
+                        "sourceRefs": self._decode(message.get("source_refs")) or [],
+                    }
             children: list[dict] = []
             if not parent_run_id:
                 await cur.execute(
@@ -113,6 +151,7 @@ class EpisodeQueryService:
             "steps": [self._public_step(row) for row in steps],
             "handoffs": [self._public_handoff(row) for row in handoffs],
             "children": children,
+            "conversation": conversation,
         }
         public["episodeEvaluation"] = evaluate_order_aftersales_episode(public)
         return public
@@ -151,6 +190,7 @@ class EpisodeQueryService:
             "datasetReviewNote": row.get("dataset_review_note"),
             "startedAt": EpisodeQueryService._format_time(row.get("started_at")),
             "completedAt": EpisodeQueryService._format_time(row.get("completed_at")),
+            "userMessage": row.get("user_message") or "",
         }
 
     @staticmethod

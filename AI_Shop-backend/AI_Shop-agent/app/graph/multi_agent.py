@@ -14,11 +14,12 @@ import time
 import uuid
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.types import Send
 
 from app.config.settings import get_settings
-from app.domain.intent.types import IntentKind
+from app.domain.intent.classifier import classify_request_mode
+from app.domain.intent.types import IntentKind, RequestMode
 from app.domain.intent.write_args import extract_review_content, extract_review_star
 from app.harness.agents.contracts import (
     ActionProposal,
@@ -29,6 +30,7 @@ from app.harness.agents.contracts import (
 from app.harness.agents.registry import AGENT_SPECS
 from app.harness.guardrails.output_guard import strip_emojis
 from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.rag.query_rewriter import normalize_policy_query
 from app.services import agent_runtime as rt
 from app.services.episode_service import bind_episode, episode_service
 from app.services.llm_factory import create_memory_llm
@@ -37,6 +39,7 @@ from app.services.shopping_profile_service import shopping_profile_service
 from app.utils.biz_payload import (
     is_action_confirm_json,
     is_order_cards_json,
+    is_product_cards_json,
     is_support_case_cards_json,
 )
 
@@ -54,6 +57,73 @@ _ACTION_TO_TOOL = {
     IntentKind.PAYMENT_ISSUE.value: "PROPOSE_CREATE_SUPPORT_CASE",
 }
 _ACTION_INTENTS = frozenset(_ACTION_TO_TOOL)
+_ORDER_READ_INTENTS = frozenset(
+    {
+        IntentKind.QUERY_ORDER.value,
+        IntentKind.QUERY_LOGISTICS.value,
+        IntentKind.QUERY_FULFILLMENT.value,
+        IntentKind.QUERY_COUPON.value,
+        IntentKind.QUERY_COMMENT.value,
+        IntentKind.REFUND_STATUS.value,
+    }
+)
+_ORDER_FACT_MARKERS = (
+    "我的订单",
+    "这个订单",
+    "那个订单",
+    "这单",
+    "那单",
+    "订单号",
+    "物流",
+    "快递",
+    "包裹",
+    "发货",
+    "延迟",
+    "退款进度",
+    "退款状态",
+    "我的优惠券",
+    "有哪些优惠券",
+    "可用券",
+    "我的评价",
+)
+_POLICY_MARKERS = (
+    "政策",
+    "规则",
+    "条件",
+    "流程",
+    "怎么申请",
+    "如何申请",
+    "能不能退",
+    "能否退",
+    "可以退吗",
+    "能退吗",
+    "无理由",
+    "运费",
+    "保修",
+    "售后",
+    "发票",
+    "破损",
+    "损坏",
+    "坏了",
+    "错发",
+    "漏发",
+    "投诉",
+    "取消订单",
+    "支付异常",
+)
+_ORDER_BOUND_ACTION_INTENTS = frozenset(
+    {
+        IntentKind.REFUND.value,
+        IntentKind.CANCEL_ORDER.value,
+        IntentKind.CONFIRM_RECEIPT.value,
+        IntentKind.PRODUCT_REVIEW.value,
+        IntentKind.RECOMMENT.value,
+        IntentKind.ADDRESS_CHANGE.value,
+        IntentKind.INVOICE.value,
+        IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+        IntentKind.AFTERSALES_UNKNOWN.value,
+    }
+)
 _SHOPPING_PROFILE_FIELDS = (
     "category",
     "budgetMin",
@@ -154,7 +224,10 @@ def _contains(text: str, *terms: str) -> bool:
 
 
 def _contains_tool_protocol(text: str) -> bool:
-    return any(marker in text for marker in _TOOL_PROTOCOL_MARKERS)
+    lowered = str(text or "").lower()
+    return any(marker in text for marker in _TOOL_PROTOCOL_MARKERS) or (
+        "dsml" in lowered and ("tool_calls" in lowered or "invoke" in lowered)
+    )
 
 
 def _is_trusted_evidence_ref(item: dict[str, Any]) -> bool:
@@ -298,6 +371,19 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
 
     intent = str(state.get("intent") or "")
     text = str(state.get("user_text") or "")
+    try:
+        resolved_intent = IntentKind(intent)
+    except ValueError:
+        resolved_intent = IntentKind.CHAT
+    raw_mode = state.get("request_mode") or (state.get("intent_decision") or {}).get(
+        "request_mode"
+    )
+    try:
+        request_mode = (
+            raw_mode if isinstance(raw_mode, RequestMode) else RequestMode(str(raw_mode))
+        )
+    except ValueError:
+        request_mode = classify_request_mode(text, resolved_intent)
     specialists: list[str] = []
     goals: dict[str, str] = {}
     if intent == IntentKind.QUERY_ORDER.value and _contains(text, "再买一次", "再买", "复购"):
@@ -309,27 +395,41 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
     }:
         specialists = ["shopping_advisor"]
         goals["shopping_advisor"] = "检索商品事实、价格库存与适配性，只返回可验证商品信息。"
-    elif intent in {
-        IntentKind.COMPLAINT.value,
-        IntentKind.PAYMENT_ISSUE.value,
-    }:
-        specialists = ["after_sales_policy_specialist"]
-        goals["after_sales_policy_specialist"] = "核对售后政策、工单路径和所需材料，不执行写操作。"
-    elif intent in _ACTION_INTENTS or intent in {
-        IntentKind.REFUND_STATUS.value,
-        IntentKind.QUERY_ORDER.value,
-        IntentKind.QUERY_LOGISTICS.value,
-        IntentKind.QUERY_FULFILLMENT.value,
-        IntentKind.QUERY_COMMENT.value,
-        IntentKind.QUERY_COUPON.value,
-    }:
-        specialists = ["order_fulfillment_specialist"]
-        goals["order_fulfillment_specialist"] = "查询订单、物流和售后状态，输出已验证的订单事实。"
-        if intent in _ACTION_INTENTS or _contains(text, "政策", "规则", "能不能退", "符合"):
-            specialists.append("after_sales_policy_specialist")
-            goals["after_sales_policy_specialist"] = (
-                "核对售后政策和资格条件，只输出政策证据与风险，不执行写操作。"
+    else:
+        needs_order = (
+            intent in _ORDER_READ_INTENTS
+            or (
+                request_mode == RequestMode.ACTION_PROPOSAL
+                and intent in _ORDER_BOUND_ACTION_INTENTS
             )
+            or _contains(text, *_ORDER_FACT_MARKERS)
+        )
+        needs_policy = (
+            bool(state.get("rag_evidence_required"))
+            or _contains(text, *_POLICY_MARKERS)
+            or intent
+            in {
+                IntentKind.REFUND.value,
+                IntentKind.CANCEL_ORDER.value,
+                IntentKind.COMPLAINT.value,
+                IntentKind.PAYMENT_ISSUE.value,
+                IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+                IntentKind.AFTERSALES_UNKNOWN.value,
+                IntentKind.ADDRESS_CHANGE.value,
+                IntentKind.INVOICE.value,
+            }
+        )
+        if needs_order:
+            specialists.append("order_fulfillment_specialist")
+        if needs_policy and len(specialists) < 2:
+            specialists.append("after_sales_policy_specialist")
+
+    if "order_fulfillment_specialist" in specialists:
+        goals["order_fulfillment_specialist"] = "查询订单、物流和售后状态，输出已验证的订单事实。"
+    if "after_sales_policy_specialist" in specialists:
+        goals["after_sales_policy_specialist"] = (
+            "核对售后政策和资格条件，只输出政策证据与风险，不执行写操作。"
+        )
     if (
         state.get("rag_evidence_required")
         and "after_sales_policy_specialist" not in specialists
@@ -343,11 +443,14 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
     specialists = specialists[:2]
     action_type = _ACTION_TO_TOOL.get(intent)
     requires_action = bool(
+        request_mode == RequestMode.ACTION_PROPOSAL
+        and
         action_type
         and (state.get("verified_order_context") or action_type == "PROPOSE_CREATE_SUPPORT_CASE")
     )
     return SupervisorPlan(
         intent=intent or None,
+        request_mode=request_mode,
         specialists=specialists,
         goals=goals,
         requires_action=requires_action,
@@ -382,6 +485,7 @@ async def _structured_supervisor_plan(
                         {
                             "question": state.get("user_text"),
                             "classifiedIntent": state.get("intent"),
+                            "requestMode": fallback.request_mode.value,
                             "verifiedOrderAvailable": bool(state.get("verified_order_context")),
                             "deterministicSafetyFallback": fallback.model_dump(mode="json"),
                         },
@@ -401,6 +505,7 @@ async def _structured_supervisor_plan(
     if not set(fallback.specialists).issubset(plan.specialists):
         raise ValueError("SUPERVISOR_PLAN_REQUIRED_AGENT_MISSING")
     plan.intent = fallback.intent
+    plan.request_mode = fallback.request_mode
     plan.requires_action = fallback.requires_action
     plan.action_type = fallback.action_type
     plan.planner_source = "LLM_STRUCTURED"
@@ -443,6 +548,8 @@ def _tool_args(
     tool_name: str | None = None,
 ) -> dict[str, Any]:
     args = dict(raw_args or {})
+    if tool_name == "SEARCH_KNOWLEDGE":
+        args["query"] = normalize_policy_query(task.user_text)
     verified_order = task.verified_context.get("order")
     if (
         tool_name in _ORDER_CONTEXT_TOOLS
@@ -469,6 +576,100 @@ def _tool_args(
     return args
 
 
+def _required_tools_for_specialist(
+    state: dict[str, Any], agent_id: str
+) -> list[str]:
+    scoped = _task_tools_for_specialist(state, agent_id)
+    return scoped[:1]
+
+
+def _task_tools_for_specialist(
+    state: dict[str, Any], agent_id: str
+) -> list[str]:
+    """Narrow a specialist's registry capabilities to this handoff only."""
+
+    intent = str(state.get("intent") or "")
+    if agent_id == "shopping_advisor":
+        if state.get("comparison_product_ids"):
+            return ["COMPARE_PRODUCTS"]
+        if intent == IntentKind.PRODUCT_CONSULT.value and (state.get("card") or {}).get(
+            "productId"
+        ):
+            return ["GET_PRODUCT_DETAIL"]
+        return ["SEARCH_PRODUCTS", "GET_PRODUCT_DETAIL"]
+    if agent_id == "after_sales_policy_specialist":
+        tools = ["SEARCH_KNOWLEDGE"]
+        if _contains(
+            str(state.get("user_text") or ""),
+            "工单",
+            "售后进度",
+            "投诉进度",
+            "客服记录",
+        ):
+            tools.append("QUERY_SUPPORT_CASES")
+        return tools
+    if agent_id != "order_fulfillment_specialist":
+        return []
+    user_text = str(state.get("user_text") or "")
+    if intent == IntentKind.QUERY_COUPON.value:
+        return ["QUERY_USER_COUPONS"]
+
+    primary = "QUERY_ORDERS"
+    if intent == IntentKind.REFUND_STATUS.value:
+        primary = "QUERY_REFUND_STATUS"
+    elif intent == IntentKind.QUERY_COMMENT.value:
+        primary = "QUERY_COMMENT"
+    elif _contains(user_text, "工单", "售后进度", "投诉进度", "客服记录"):
+        primary = "QUERY_SUPPORT_CASES"
+    elif intent in {
+        IntentKind.QUERY_LOGISTICS.value,
+        IntentKind.QUERY_FULFILLMENT.value,
+    } or _contains(user_text, "物流", "快递", "包裹", "延迟", "不更新", "发货"):
+        primary = "QUERY_LOGISTICS"
+
+    tools = [primary]
+    if primary != "QUERY_ORDERS" and state.get("verified_order_context"):
+        tools.append("QUERY_ORDERS")
+    return tools[:2]
+
+
+def _required_tool_args(task: SpecialistTask, tool_name: str) -> dict[str, Any]:
+    order = task.verified_context.get("order") or {}
+    product = task.verified_context.get("product") or {}
+    if tool_name == "SEARCH_PRODUCTS":
+        return {"keyword": task.user_text}
+    if tool_name == "GET_PRODUCT_DETAIL":
+        return {"productId": product.get("productId")}
+    if tool_name == "COMPARE_PRODUCTS":
+        return {
+            "productIds": task.verified_context.get("comparisonProductIds") or []
+        }
+    if tool_name == "SEARCH_KNOWLEDGE":
+        return {"query": normalize_policy_query(task.user_text)}
+    if tool_name == "QUERY_REFUND_STATUS":
+        return {
+            "orderItemId": order.get("orderItemId"),
+            "orderId": order.get("orderId"),
+        }
+    if tool_name in {"QUERY_ORDERS", "QUERY_LOGISTICS", "QUERY_COMMENT"}:
+        return {"orderId": order.get("orderId")}
+    return {}
+
+
+def _verified_order_evidence(task: SpecialistTask) -> dict[str, Any] | None:
+    order = task.verified_context.get("order")
+    if not isinstance(order, dict) or not order.get("orderId"):
+        return None
+    return {
+        "type": "order",
+        **{
+            field: order[field]
+            for field in _ORDER_CONTEXT_FIELDS
+            if order.get(field) not in (None, "", [])
+        },
+    }
+
+
 async def specialist_runner_node(state: dict[str, Any]) -> dict[str, Any]:
     raw_task = state.get("specialist_task") or {}
     try:
@@ -476,8 +677,10 @@ async def specialist_runner_node(state: dict[str, Any]) -> dict[str, Any]:
         spec = AGENT_SPECS.get(task.agent_id)
         if spec is None:
             raise ValueError("SPECIALIST_AGENT_UNKNOWN")
-        if frozenset(task.tool_scope) != spec.tool_allowlist:
+        if not task.tool_scope or not set(task.tool_scope).issubset(spec.tool_allowlist):
             raise ValueError("SPECIALIST_TASK_TOOL_SCOPE_INVALID")
+        if not set(task.required_tools).issubset(task.tool_scope):
+            raise ValueError("SPECIALIST_TASK_REQUIRED_TOOL_INVALID")
     except Exception:
         # The task was normally created and persisted by supervisor_plan_node.
         # Keep the graph contract total even if a handoff is tampered with or
@@ -557,8 +760,10 @@ def _failed_specialist_result(raw_task: Any, *, error_code: str) -> dict[str, An
 async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
     child_run_id = task.child_run_id
     spec = AGENT_SPECS[task.agent_id]
-    if frozenset(task.tool_scope) != spec.tool_allowlist:
+    if not task.tool_scope or not set(task.tool_scope).issubset(spec.tool_allowlist):
         raise ValueError("SPECIALIST_TASK_TOOL_SCOPE_INVALID")
+    if not set(task.required_tools).issubset(task.tool_scope):
+        raise ValueError("SPECIALIST_TASK_REQUIRED_TOOL_INVALID")
     episode_service.record_step(
         "SPECIALIST_STARTED",
         node_name="specialist_runner",
@@ -566,6 +771,7 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
         output_data={
             "goal": task.goal,
             "toolScope": sorted(task.tool_scope),
+            "requiredTools": task.required_tools,
             "maxRounds": task.max_rounds,
             "timeoutSeconds": task.timeout_seconds,
         },
@@ -579,7 +785,7 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
             content=(
                 f"你是电商内部专家 {task.agent_id}。只处理目标：{task.goal}\n"
                 f"职责：{spec.instructions}\n"
-                f"允许的只读工具：{', '.join(sorted(task.tool_scope)) or '无'}。\n"
+                f"本任务获准的只读工具：{', '.join(sorted(task.tool_scope)) or '无'}。\n"
                 "不得执行写操作，不得编造订单或政策事实。最终只返回内部事实摘要，"
                 "不得使用 markdown 表格，不得输出用户确认卡片。"
             )
@@ -600,17 +806,107 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
     evidence: list[dict] = []
     verified_tool_outputs: list[str] = []
     assistant_cards: str | None = None
+    tool_biz: dict[str, Any] = {}
+    biz_type: str | None = None
+    biz_data: str | None = None
+    search_tool_hint: str | None = None
+    retrieval_trace: dict | None = None
     warnings: list[str] = []
     draft = ""
     status = "SUCCESS"
     error_code: str | None = None
     try:
         async with asyncio.timeout(task.timeout_seconds):
+            for required_tool in task.required_tools:
+                required_result = await mcp_tool_router.invoke(
+                    required_tool,
+                    _tool_args(
+                        task,
+                        _required_tool_args(task, required_tool),
+                        child_run_id,
+                        required_tool,
+                    ),
+                    task.user_id,
+                    call_id=f"required-{required_tool.lower()}",
+                )
+                called.append(required_tool)
+                evidence.append(
+                    {
+                        "type": "tool_result",
+                        "tool": required_tool,
+                        "success": required_result.success,
+                        "errorCode": required_result.error_code,
+                    }
+                )
+                if required_result.success and required_result.source_refs:
+                    evidence.extend(required_result.source_refs)
+                if required_result.success and required_tool in _ORDER_CONTEXT_TOOLS:
+                    order_evidence = _verified_order_evidence(task)
+                    if order_evidence:
+                        evidence.append(order_evidence)
+                if required_result.success and required_result.assistant_cards:
+                    assistant_cards = required_result.assistant_cards
+                if required_result.success:
+                    required_text = required_result.to_tool_message()
+                    verified_tool_outputs.append(
+                        f"{required_tool}: {required_text}"[:3000]
+                    )
+                    required_call_id = f"required-{required_tool.lower()}"
+                    messages.append(
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "id": required_call_id,
+                                    "name": required_tool,
+                                    "args": _required_tool_args(task, required_tool),
+                                }
+                            ],
+                        )
+                    )
+                    messages.append(
+                        ToolMessage(
+                            content=required_text,
+                            tool_call_id=required_call_id,
+                        )
+                    )
+                required_biz = required_result.to_biz_dict() or {}
+                for key in ("productIds", "productNames", "orderIds"):
+                    values = [
+                        str(value)
+                        for value in required_biz.get(key) or []
+                        if str(value or "").strip()
+                    ]
+                    if values:
+                        tool_biz[key] = list(
+                            dict.fromkeys([*(tool_biz.get(key) or []), *values])
+                        )[:50]
+                biz_type = required_result.biz_type or biz_type
+                biz_data = required_result.biz_data or biz_data
+                retrieval_trace = required_result.retrieval_trace or retrieval_trace
+                if required_tool == "SEARCH_PRODUCTS":
+                    search_tool_hint = required_result.to_tool_message()
+                episode_service.record_step(
+                    "SPECIALIST_TOOL",
+                    node_name="specialist_runner",
+                    status="OK" if required_result.success else "ERROR",
+                    output_data={
+                        "tool": required_tool,
+                        "required": True,
+                        "success": required_result.success,
+                        "sourceCount": len(required_result.source_refs or []),
+                    },
+                    agent_id=task.agent_id,
+                    handoff_id=task.handoff_id,
+                    run_id=child_run_id,
+                )
             for round_no in range(task.max_rounds):
+                remaining_tools = frozenset(task.tool_scope) - frozenset(called)
                 llm = rt.bind_agent_llm(
-                    allowed_tools=spec.tool_allowlist,
+                    allowed_tools=remaining_tools,
                     max_tokens=task.max_tokens,
                     disable_thinking=True,
+                    tools_enabled=bool(remaining_tools),
                 )
                 response = await invoke_llm_with_metrics(
                     llm, messages, model=getattr(llm, "model_name", None)
@@ -618,11 +914,28 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                 messages.append(response)
                 tool_calls = list(getattr(response, "tool_calls", None) or [])
                 if not tool_calls:
-                    draft = strip_emojis(rt.chunk_text(getattr(response, "content", "") or ""))
+                    candidate = strip_emojis(
+                        rt.chunk_text(getattr(response, "content", "") or "")
+                    )
+                    if _contains_tool_protocol(candidate):
+                        warnings.append("SPECIALIST_TOOL_PROTOCOL_REJECTED")
+                        status = "DEGRADED"
+                        draft = "\n".join(verified_tool_outputs)[-4000:]
+                    else:
+                        draft = candidate
                     break
                 for call in tool_calls:
                     name = str(call.get("name") or "")
-                    if name not in spec.tool_allowlist or name.startswith("PROPOSE_"):
+                    if name in called:
+                        warnings.append(f"TOOL_DUPLICATE_DENIED:{name}")
+                        messages.append(
+                            ToolMessage(
+                                content="该工具本任务已调用，不允许重复调用。",
+                                tool_call_id=call.get("id") or "duplicate",
+                            )
+                        )
+                        continue
+                    if name not in task.tool_scope or name.startswith("PROPOSE_"):
                         warnings.append(f"TOOL_SCOPE_DENIED:{name}")
                         messages.append(
                             ToolMessage(
@@ -647,8 +960,28 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     )
                     if result.success and result.source_refs:
                         evidence.extend(result.source_refs)
+                    if result.success and name in _ORDER_CONTEXT_TOOLS:
+                        order_evidence = _verified_order_evidence(task)
+                        if order_evidence:
+                            evidence.append(order_evidence)
                     if result.success and result.assistant_cards:
                         assistant_cards = result.assistant_cards
+                    result_biz = result.to_biz_dict() or {}
+                    for key in ("productIds", "productNames", "orderIds"):
+                        values = [
+                            str(value)
+                            for value in result_biz.get(key) or []
+                            if str(value or "").strip()
+                        ]
+                        if values:
+                            tool_biz[key] = list(
+                                dict.fromkeys([*(tool_biz.get(key) or []), *values])
+                            )[:50]
+                    biz_type = result.biz_type or biz_type
+                    biz_data = result.biz_data or biz_data
+                    retrieval_trace = result.retrieval_trace or retrieval_trace
+                    if name == "SEARCH_PRODUCTS":
+                        search_tool_hint = result.to_tool_message()
                     tool_message = result.to_tool_message()
                     if result.success:
                         verified_tool_outputs.append(f"{name}: {tool_message}"[:3000])
@@ -702,9 +1035,15 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                 else:
                     draft = final_text
     except TimeoutError:
-        status = "FAILED"
         error_code = "SPECIALIST_TIMEOUT"
-        warnings.extend(["SPECIALIST_TIMEOUT", "专家超时，已使用其他可用证据降级回答。"])
+        warnings.append("SPECIALIST_TIMEOUT")
+        if verified_tool_outputs:
+            status = "DEGRADED"
+            draft = "\n".join(verified_tool_outputs)[-4000:]
+            warnings.append("专家总结超时，已保留超时前取得的可信工具证据。")
+        else:
+            status = "FAILED"
+            warnings.append("专家在取得可信证据前超时，Supervisor 将使用其他分支降级回答。")
     except Exception as exc:
         status = "FAILED"
         error_code = type(exc).__name__
@@ -720,6 +1059,11 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
         evidence=evidence[:20],
         draft_answer=draft[:4000],
         assistant_cards=assistant_cards,
+        tool_biz=tool_biz,
+        biz_type=biz_type,
+        biz_data=biz_data,
+        search_tool_hint=search_tool_hint,
+        retrieval_trace=retrieval_trace,
         confidence=0.75 if draft and evidence else 0.35 if draft else 0.0,
         next_step="FINALIZE" if draft else "FALLBACK",
         warnings=warnings,
@@ -850,6 +1194,44 @@ def _validate_artifact(raw: dict[str, Any]) -> AgentArtifact:
         artifact.assistant_cards = None
         warnings.append("SPECIALIST_ACTION_CARD_DROPPED")
     has_verified_result = _has_verified_evidence(artifact.evidence)
+    successful_tools = {
+        str(item.get("tool") or "")
+        for item in artifact.evidence
+        if item.get("type") == "tool_result" and item.get("success") is True
+    }
+    clean_tool_biz: dict[str, list[str]] = {}
+    for key in ("productIds", "productNames", "orderIds"):
+        values = [
+            str(value)[:500]
+            for value in artifact.tool_biz.get(key) or []
+            if str(value or "").strip()
+        ]
+        if values:
+            clean_tool_biz[key] = list(dict.fromkeys(values))[:50]
+    artifact.tool_biz = clean_tool_biz if has_verified_result else {}
+    if artifact.assistant_cards:
+        card_has_matching_tool = (
+            is_product_cards_json(artifact.assistant_cards)
+            and bool(successful_tools & {"SEARCH_PRODUCTS", "COMPARE_PRODUCTS"})
+            or is_order_cards_json(artifact.assistant_cards)
+            and "QUERY_ORDERS" in successful_tools
+            or is_support_case_cards_json(artifact.assistant_cards)
+            and "QUERY_SUPPORT_CASES" in successful_tools
+        )
+        if not card_has_matching_tool:
+            artifact.assistant_cards = None
+            warnings.append("UNVERIFIED_ASSISTANT_CARD_DROPPED")
+    if not has_verified_result:
+        artifact.biz_type = None
+        artifact.biz_data = None
+    elif artifact.biz_data:
+        artifact.biz_data = artifact.biz_data[:20_000]
+    if "SEARCH_PRODUCTS" not in successful_tools:
+        artifact.search_tool_hint = None
+    elif artifact.search_tool_hint:
+        artifact.search_tool_hint = artifact.search_tool_hint[:4000]
+    if "SEARCH_KNOWLEDGE" not in successful_tools:
+        artifact.retrieval_trace = None
     if artifact.draft_answer and not has_verified_result:
         artifact.status = "BLOCKED"
         artifact.facts = []
@@ -1062,15 +1444,77 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
     if not answer:
         answer = "暂时没有足够的已验证信息，请补充订单信息或转人工处理。"
 
-    result: dict[str, Any] = {
-        "chunks": [answer],
-        "tools_called": [],
-        "rag_source_refs": [
+    readonly_tools = list(
+        dict.fromkeys(tool for artifact in artifacts for tool in artifact.tool_calls)
+    )
+    merged_tool_biz: dict[str, list[str]] = {}
+    for artifact in artifacts:
+        for key in ("productIds", "productNames", "orderIds"):
+            values = [
+                str(value)
+                for value in artifact.tool_biz.get(key) or []
+                if str(value or "").strip()
+            ]
+            if values:
+                merged_tool_biz[key] = list(
+                    dict.fromkeys([*(merged_tool_biz.get(key) or []), *values])
+                )[:50]
+    source_candidates = [
+        *(state.get("rag_source_refs") or []),
+        *[
             evidence
             for artifact in artifacts
             for evidence in artifact.evidence
             if evidence.get("type") != "tool_result"
-        ][:30],
+        ],
+    ]
+    source_refs: list[dict[str, Any]] = []
+    source_keys: set[tuple[str, str]] = set()
+    for evidence in source_candidates:
+        if not isinstance(evidence, dict):
+            continue
+        identity = str(
+            evidence.get("chunkId")
+            or evidence.get("documentId")
+            or evidence.get("questionId")
+            or evidence.get("productId")
+            or evidence.get("orderId")
+            or evidence.get("id")
+            or ""
+        )
+        key = (str(evidence.get("type") or ""), identity)
+        if not identity or key in source_keys:
+            continue
+        source_keys.add(key)
+        source_refs.append(evidence)
+    artifact_with_cards = next(
+        (artifact for artifact in artifacts if artifact.assistant_cards), None
+    )
+    primary_artifact = artifact_with_cards or next(
+        (artifact for artifact in artifacts if artifact.biz_type), None
+    )
+    rag_traces = [
+        artifact.retrieval_trace
+        for artifact in artifacts
+        if artifact.retrieval_trace
+    ]
+
+    result: dict[str, Any] = {
+        "chunks": [answer],
+        "tools_called": readonly_tools,
+        "tool_biz": merged_tool_biz or None,
+        "biz_type": primary_artifact.biz_type if primary_artifact else None,
+        "biz_data": primary_artifact.biz_data if primary_artifact else None,
+        "search_tool_hint": next(
+            (artifact.search_tool_hint for artifact in artifacts if artifact.search_tool_hint),
+            None,
+        ),
+        "rag_source_refs": source_refs[:30],
+        "rag_trace": (
+            {"ragMode": state.get("rag_mode"), "retrievals": rag_traces}
+            if rag_traces
+            else state.get("rag_trace")
+        ),
         "route": "finalize",
         "supervisor_plan": plan.model_dump(mode="json"),
     }
@@ -1159,7 +1603,9 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                     run_id=(state.get("agent_msg") or {}).get("runId"),
                 )
             else:
-                result["tools_called"] = [plan.action_type]
+                result["tools_called"] = list(
+                    dict.fromkeys([*readonly_tools, plan.action_type])
+                )
                 proposal_contract = ActionProposal(
                     tool=plan.action_type,
                     arguments=args,
@@ -1267,6 +1713,7 @@ async def supervisor_plan_node(state: dict[str, Any]) -> dict[str, Any]:
             agent_id=agent_id,
             shopping_profile=shopping_profile,
         )
+        task_tool_scope = _task_tools_for_specialist(state, agent_id)
         task = SpecialistTask(
             handoff_id=handoff_id,
             child_run_id=child_run_id,
@@ -1285,7 +1732,8 @@ async def supervisor_plan_node(state: dict[str, Any]) -> dict[str, Any]:
                 else ""
             ),
             verified_context=verified_context,
-            tool_scope=sorted(spec.tool_allowlist),
+            tool_scope=task_tool_scope,
+            required_tools=_required_tools_for_specialist(state, agent_id),
             max_rounds=min(get_settings().multi_agent_specialist_max_rounds, spec.max_rounds),
             max_tokens=spec.token_budget,
             timeout_seconds=min(

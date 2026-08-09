@@ -5,6 +5,19 @@
     :class="{ 'is-embedded-composer': composerEmbedded }"
     @scroll="onListScroll"
   >
+    <div v-if="messageList.length" class="history-toolbar">
+      <el-tooltip content="清除当前会话记录" placement="bottom">
+        <button
+          type="button"
+          class="history-clear"
+          aria-label="清除会话记录"
+          :disabled="answering || clearingHistory"
+          @click="clearVisibleHistory"
+        >
+          <el-icon :size="17"><Delete /></el-icon>
+        </button>
+      </el-tooltip>
+    </div>
     <div class="chat-scroll-inner">
       <p v-if="loadingHistory && !messageList.length" class="history-loading">历史消息加载中…</p>
       <button
@@ -40,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import { Delete } from '@element-plus/icons-vue';
+import { ElMessageBox } from 'element-plus';
 import { inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { agentApi } from '@/api/modules';
 import { agentComposerEmbeddedKey } from '@/composables/agentEmbed';
@@ -64,6 +79,7 @@ const agentMessageStore = useAgentMessageStore();
 const listRef = ref<HTMLElement>();
 const loadingHistory = ref(false);
 const historyLoadFailed = ref(false);
+const clearingHistory = ref(false);
 const answering = ref(false);
 const streamWaiting = ref(false);
 const currentMessage = ref<AgentHistoryMessage | null>(null);
@@ -309,6 +325,40 @@ const reloadHistory = () => {
   void loadHistoryMessage();
 };
 
+const clearVisibleHistory = async () => {
+  if (answering.value || clearingHistory.value || !messageList.value.length) return;
+  try {
+    await ElMessageBox.confirm(
+      '仅清除当前会话中的聊天记录；购物偏好、长期记忆和待确认操作都会保留。',
+      '清除会话记录',
+      {
+        confirmButtonText: '确认清除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    );
+  } catch {
+    return;
+  }
+
+  clearingHistory.value = true;
+  try {
+    await agentApi.clearHistoryMessage();
+    messageList.value = [];
+    pageNo.value = 0;
+    pageTotal.value = 0;
+    maxMessageId = null;
+    initialLoadDone = true;
+    currentMessage.value = null;
+    toast.success('会话记录已清除，已有记忆仍会保留');
+  } catch (error) {
+    console.error('清除会话记录失败', error);
+    toast.error('清除失败，请稍后重试');
+  } finally {
+    clearingHistory.value = false;
+  }
+};
+
 const onComposerReady = () => {
   if (stickToBottom.value) void scrollBottom(true);
 };
@@ -364,6 +414,41 @@ onUnmounted(() => {
   min-height: 100%;
   padding: 12px 14px;
   box-sizing: border-box;
+}
+
+.history-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  height: 40px;
+  padding: 6px 12px 0;
+  box-sizing: border-box;
+  background: rgba(250, 250, 250, 0.96);
+}
+
+.history-clear {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid $color-border-gray;
+  border-radius: $radius-sm;
+  background: $color-card;
+  color: $color-text-muted;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: $color-primary;
+    color: $color-primary;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
 }
 
 .msg-group {

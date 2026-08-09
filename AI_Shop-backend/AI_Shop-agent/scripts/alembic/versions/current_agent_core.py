@@ -124,6 +124,7 @@ def upgrade() -> None:
             summary_json json NULL,
             state_json json NULL,
             turn_count int DEFAULT 0 NOT NULL,
+            history_cleared_through_message_id bigint DEFAULT 0 NOT NULL,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL
                 ON UPDATE CURRENT_TIMESTAMP
         ) CHARSET = utf8mb4
@@ -569,6 +570,7 @@ def upgrade() -> None:
     )
 
     _reconcile_agent_message()
+    _reconcile_session_memory()
     _reconcile_episode_tables()
     _reconcile_shopping_profile()
     _reconcile_pending_action()
@@ -608,6 +610,34 @@ def _reconcile_agent_message() -> None:
         "ALTER TABLE agent_message MODIFY COLUMN user_message varchar(4000) NULL"
     )
     op.execute("ALTER TABLE agent_message MODIFY COLUMN biz_data mediumtext NULL")
+
+
+def _reconcile_session_memory() -> None:
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns("agent_session_memory")
+    }
+    if "history_cleared_through_message_id" not in columns:
+        op.execute(
+            "ALTER TABLE agent_session_memory "
+            "ADD COLUMN history_cleared_through_message_id "
+            "bigint NOT NULL DEFAULT 0 AFTER turn_count"
+        )
+    op.execute(
+        """
+        UPDATE agent_session_memory
+        SET history_cleared_through_message_id=GREATEST(
+            history_cleared_through_message_id,
+            COALESCE(
+                CAST(JSON_UNQUOTE(JSON_EXTRACT(
+                    state_json,
+                    '$.historyClearedThroughMessageId'
+                )) AS UNSIGNED),
+                0
+            )
+        )
+        """
+    )
 
 
 def _reconcile_episode_tables() -> None:

@@ -67,6 +67,7 @@ def test_trace_admin_list_and_detail_return_sanitized_episode(monkeypatch):
         user_id=None,
         outcome=None,
         agent_id=None,
+        run_scope="ROOT",
     )
     detail.assert_awaited_once_with("run-1")
 

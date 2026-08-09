@@ -152,6 +152,16 @@ def _create_original_schema(database: str) -> None:
         )
         cursor.execute(
             """
+            INSERT INTO agent_session_memory
+                (user_id, summary_json, state_json, turn_count)
+            VALUES
+                ('u1', '{"narrative":"preserve summary"}',
+                 '{"historyClearedThroughMessageId":17,"shoppingNeed":{"category":"笔记本"}}',
+                 3)
+            """
+        )
+        cursor.execute(
+            """
             INSERT INTO agent_message
                 (user_message, user_id, status, biz_data)
             VALUES ('preserve me', 'u1', 2, '{"ok":true}')
@@ -252,6 +262,15 @@ def test_current_schema_migrates_fresh_original_and_incomplete_databases():
                 "SELECT user_message, biz_data FROM agent_message WHERE user_id='u1'"
             )
             assert cursor.fetchone() == ("preserve me", '{"ok":true}')
+            cursor.execute(
+                """
+                SELECT history_cleared_through_message_id,
+                       JSON_UNQUOTE(JSON_EXTRACT(summary_json, '$.narrative')),
+                       JSON_UNQUOTE(JSON_EXTRACT(state_json, '$.shoppingNeed.category'))
+                FROM agent_session_memory WHERE user_id='u1'
+                """
+            )
+            assert cursor.fetchone() == (17, "preserve summary", "笔记本")
 
         _migrate(incomplete)
         with _database_connection(incomplete) as connection, connection.cursor() as cursor:

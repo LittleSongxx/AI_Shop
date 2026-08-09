@@ -133,6 +133,7 @@ class OrderReferenceResolver:
         entities: dict[str, str] | None = None,
         consult_card: dict[str, Any] | None = None,
         pending_reference: dict[str, Any] | None = None,
+        enforce_action_eligibility: bool = True,
     ) -> OrderReferenceResolution:
         started = time.perf_counter()
         try:
@@ -143,6 +144,7 @@ class OrderReferenceResolver:
                 entities=entities or {},
                 consult_card=consult_card,
                 pending_reference=pending_reference or {},
+                enforce_action_eligibility=enforce_action_eligibility,
             )
         except Exception as exc:
             logger.exception(
@@ -172,6 +174,7 @@ class OrderReferenceResolver:
         entities: dict[str, str],
         consult_card: dict[str, Any] | None,
         pending_reference: dict[str, Any],
+        enforce_action_eligibility: bool,
     ) -> OrderReferenceResolution:
         pending_valid = self._pending_reference_valid(pending_reference, intent)
         pending_item = pending_reference.get("orderItemId") if pending_valid else None
@@ -209,7 +212,11 @@ class OrderReferenceResolver:
                 clues=clues,
             )
 
-        eligible = [row for row in all_candidates if self._is_eligible(row, intent)]
+        eligible = [
+            row
+            for row in all_candidates
+            if not enforce_action_eligibility or self._is_eligible(row, intent)
+        ]
         working = list(eligible)
 
         if not eligible and all_candidates:

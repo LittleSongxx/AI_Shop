@@ -57,6 +57,7 @@ class AgentGraphState(TypedDict, total=False):
     intent: str | None
     intent_data: str | None
     intent_decision: dict | None
+    request_mode: str | None
     rag_source_refs: list[dict] | None
     rag_trace: dict | None
     rag_mode: str
@@ -113,6 +114,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "intent": None,
         "intent_data": None,
         "intent_decision": None,
+        "request_mode": None,
         "rag_source_refs": [],
         "rag_trace": None,
         "rag_mode": "conditional",

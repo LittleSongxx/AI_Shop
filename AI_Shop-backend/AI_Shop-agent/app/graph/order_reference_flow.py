@@ -11,7 +11,8 @@ from app.constants import (
     ORDER_STATUS_SHIPPED,
     ORDER_STATUS_WAIT_PAYMENT,
 )
-from app.domain.intent.types import IntentKind
+from app.domain.intent.classifier import classify_request_mode
+from app.domain.intent.types import IntentKind, RequestMode
 from app.domain.intent.write_args import extract_review_content, extract_review_star
 from app.graph.state import AgentGraphState
 from app.memory.session_memory_service import session_memory_service
@@ -30,6 +31,17 @@ from app.utils.order_ids import extract_order_id
 async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
     intent = str(state.get("intent") or "")
     user_text = str(state.get("user_text") or "")
+    request_mode = str(state.get("request_mode") or "")
+    if not request_mode:
+        try:
+            request_mode = classify_request_mode(user_text, IntentKind(intent)).value
+        except ValueError:
+            request_mode = RequestMode.READ_QUERY.value
+    if request_mode in {
+        RequestMode.INFORMATIONAL.value,
+        RequestMode.HUMAN_SUPPORT.value,
+    }:
+        return {"route": "agent_loop"}
     if intent not in ORDER_REFERENCE_INTENTS:
         return {"route": "agent_loop"}
     if intent == IntentKind.QUERY_ORDER.value and not _has_specific_order_clue(user_text):
@@ -43,6 +55,7 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         entities=decision.get("entities") or {},
         consult_card=state.get("card"),
         pending_reference=state.get("pending_order_reference"),
+        enforce_action_eligibility=request_mode == RequestMode.ACTION_PROPOSAL.value,
     )
     base = {"order_resolution": resolution.outcome.value}
 

@@ -221,6 +221,40 @@ def test_filter_products_applies_budget_and_brand_constraints():
     assert "符合预算" in service.recommend_reason(kept[0], profile, "hybrid")
 
 
+@pytest.mark.parametrize(
+    ("text", "expected_min", "expected_max"),
+    [
+        ("推荐一款1500元左右的手机", 1200.0, 1800.0),
+        ("预算大约1500元的手机", 1200.0, 1800.0),
+        ("1500元以内的手机", None, 1500.0),
+    ],
+)
+def test_extract_profile_understands_common_budget_phrases(
+    text: str,
+    expected_min: float | None,
+    expected_max: float,
+):
+    profile = extract_profile(text)
+
+    assert profile["budgetMin"] == expected_min
+    assert profile["budgetMax"] == expected_max
+
+
+def test_recommend_reason_never_claims_an_over_budget_product_matches():
+    service = ShoppingProfileService()
+    profile = extract_profile("预算1500元以内的手机")
+    product = {
+        "product_id": "expensive",
+        "product_name": "旗舰手机",
+        "min_price": 6379,
+        "max_price": 8999,
+        "status": 1,
+    }
+
+    assert not service.matches_budget(product, profile)
+    assert "符合预算" not in service.recommend_reason(product, profile, "hybrid")
+
+
 def test_accept_substitute_turns_brand_into_soft_preference():
     service = ShoppingProfileService()
     profile = extract_profile("预算3000以内的华为手机，其他品牌也可以")

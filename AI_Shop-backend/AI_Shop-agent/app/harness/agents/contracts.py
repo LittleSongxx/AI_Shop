@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.domain.intent.types import RequestMode
+
 
 class HandoffEnvelope(BaseModel):
     """The minimum, typed context a specialist may receive from Supervisor."""
@@ -34,6 +36,7 @@ class SpecialistTask(BaseModel):
     session_summary: str = Field(default="", max_length=1000)
     verified_context: dict = Field(default_factory=dict)
     tool_scope: list[str] = Field(default_factory=list)
+    required_tools: list[str] = Field(default_factory=list, max_length=2)
     max_rounds: int = Field(default=2, ge=1, le=5)
     max_tokens: int = Field(default=2400, ge=256, le=16_000)
     timeout_seconds: int = Field(default=8, ge=1, le=30)
@@ -43,6 +46,7 @@ class SupervisorPlan(BaseModel):
     """Validated routing output. It is never accepted directly from an LLM."""
 
     intent: str | None = None
+    request_mode: RequestMode = RequestMode.READ_QUERY
     specialists: list[str] = Field(default_factory=list, max_length=2)
     goals: dict[str, str] = Field(default_factory=dict)
     requires_action: bool = False
@@ -80,6 +84,11 @@ class AgentArtifact(BaseModel):
     evidence: list[dict] = Field(default_factory=list)
     draft_answer: str = ""
     assistant_cards: str | None = None
+    tool_biz: dict = Field(default_factory=dict)
+    biz_type: str | None = None
+    biz_data: str | None = None
+    search_tool_hint: str | None = None
+    retrieval_trace: dict | None = None
     proposed_action: dict | None = None
     confidence: float = Field(default=0.0, ge=0, le=1)
     next_step: Literal["FINALIZE", "ASK_CLARIFICATION", "HUMAN_HANDOFF", "FALLBACK"] = "FINALIZE"

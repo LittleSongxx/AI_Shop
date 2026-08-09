@@ -17,6 +17,10 @@ import {
   canHandleSupport,
   supportStatusText,
 } from '@/utils/supportStatus.js'
+import {
+  episodeVerdictLabel,
+  formatAgentReply,
+} from '@/utils/agentDisplay.js'
 
 describe('admin workflow helpers', () => {
   it('blocks unsafe product state transitions', () => {
@@ -57,5 +61,20 @@ describe('admin workflow helpers', () => {
     expect(canHandleSupport('ACTIVE')).toBe(true)
     expect(canClaimSupport('RESOLVED')).toBe(false)
     expect(canHandleSupport('CANCELLED')).toBe(false)
+  })
+
+  it('renders trace business payloads and episode verdicts in readable Chinese', () => {
+    const reply = formatAgentReply(JSON.stringify({
+      type: 'PRODUCT_SEARCH_RESULT',
+      intro: '**根据通勤需求推荐：**\n---',
+      products: [{ productName: '降噪耳机', minPrice: 399, reason: '适合地铁通勤' }],
+    }))
+    expect(reply).toContain('根据通勤需求推荐')
+    expect(reply).toContain('1. 降噪耳机，价格 ¥399，推荐理由：适合地铁通勤')
+    expect(reply).not.toContain('PRODUCT_SEARCH_RESULT')
+    expect(reply).not.toContain('**')
+    expect(episodeVerdictLabel('NOT_ORDER_AFTERSALES')).toBe(
+      '非订单售后场景，无需按售后数据集审核'
+    )
   })
 })

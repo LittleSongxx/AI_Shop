@@ -110,13 +110,17 @@ _RAG_POLICY_MARKERS = (
     "流程",
     "怎么办",
     "如何",
+    "怎么",
+    "申请",
     "是否支持",
     "能不能",
+    "能否",
     "可不可以",
     "无理由",
     "运费",
     "保修",
     "发票",
+    "取消",
     "在哪用",
 )
 _RAG_COMPLEX_MARKERS = ("同时", "另外", "以及", "并且", "还想", "区别", "分别")
@@ -308,6 +312,17 @@ async def build_context_node(state: AgentGraphState) -> dict:
         intent=intent.value,
         scenario=intent.value.lower(),
         experiment={"bucket": ab_bucket, "ragMode": rag_mode},
+    )
+    episode_service.record_step(
+        "INTENT_DECISION",
+        node_name="build_context",
+        output_data={
+            "intent": intent.value,
+            "requestMode": decision.request_mode.value,
+            "confidence": decision.confidence,
+            "source": decision.source,
+            "nextAction": decision.next_action.value,
+        },
     )
 
     # P3-2: describe the user's image (if any) before the retrieval step so
@@ -532,6 +547,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "intent": intent.value,
         "intent_data": intent_data or None,
         "intent_decision": decision.model_dump(mode="json"),
+        "request_mode": decision.request_mode.value,
         "image_evidence": image_evidence,
         "image_description": image_desc,
         "rag_source_refs": rag_source_refs,

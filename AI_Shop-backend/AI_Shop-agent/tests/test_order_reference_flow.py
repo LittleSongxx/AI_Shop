@@ -234,6 +234,43 @@ async def test_multi_agent_mode_only_verifies_order_and_never_executes_read_tool
 
 
 @pytest.mark.asyncio
+async def test_read_only_refund_question_does_not_apply_action_eligibility_filter():
+    order = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "索尼无线降噪耳机",
+        "2026-08-05 21:00:00",
+    )
+    order["order_status"] = 3
+    state = {
+        **_state(),
+        "user_text": "订单号SM202608050002为什么延迟，现在能否退款？",
+        "request_mode": "READ_QUERY",
+    }
+    with (
+        patch(
+            "app.services.order_reference_resolver.java_internal_client.list_orders",
+            AsyncMock(return_value=[order]),
+        ),
+        patch(
+            "app.graph.order_reference_flow.get_settings",
+            return_value=SimpleNamespace(multi_agent_enabled=True),
+        ),
+        patch(
+            "app.graph.order_reference_flow.mcp_tool_router.invoke",
+            AsyncMock(),
+        ) as invoke,
+        patch("app.graph.order_reference_flow._clear_reference", AsyncMock()),
+    ):
+        update = await resolve_order_reference_turn(state)
+
+    assert update["order_resolution"] == "RESOLVED"
+    assert update["route"] == "multi_agent_plan"
+    assert update["verified_order_context"]["orderId"] == "SM202608050002"
+    invoke.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_selected_refund_rechecks_latest_status_before_proposing():
     state = {
         **_state(),
