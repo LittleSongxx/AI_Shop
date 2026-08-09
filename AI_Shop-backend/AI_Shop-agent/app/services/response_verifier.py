@@ -19,8 +19,21 @@ _DYNAMIC_FACT_RE = re.compile(
 )
 _POLICY_CLAIM_RE = re.compile(
     r"(?:\d+|七|十五|三十)天(?:内|无理由)|无理由退货|运费由.{0,12}承担|"
-    r"政策规定|平台规定|仅限.{0,16}(?:退款|退货|换货)|必须.{0,16}(?:凭证|条件)"
+    r"政策规定|平台规定|仅限.{0,16}(?:退款|退货|换货)|必须.{0,16}(?:凭证|条件)|"
+    r"(?:符合|满足|具备|不符合|不满足).{0,8}(?:退款|退货|换货)(?:条件|资格)?|"
+    r"(?:可以|能够|不能|不可).{0,10}(?:退款|退货|换货)"
 )
+_POLICY_ABSTENTION_RE = re.compile(
+    r"(?:未找到|没有|缺少).{0,20}(?:政策|规则|依据|证据)|"
+    r"(?:无法|不能|暂不能).{0,12}(?:确认|判断|核实).{0,16}(?:政策|条件|资格|是否)|"
+    r"(?:政策|条件|资格).{0,16}(?:无法|不能|暂不能).{0,12}(?:确认|判断|核实)|"
+    r"(?:不能|不会|不).{0,12}(?:给出|作出).{0,12}(?:确定|明确).{0,8}(?:政策|资格|结论)"
+)
+_POLICY_CLAUSE_RE = re.compile(r"[^。！？!?；;，,\n]+")
+_POLICY_UNCERTAINTY_PREFIX_RE = re.compile(
+    r"(?:无法|暂时无法|暂无法|不能|暂不能).{0,12}(?:确认|判断|核实)"
+)
+_POLICY_ADVERSATIVE_RE = re.compile(r"(?:但|但是|不过|然而|可是|仍然|最终|其实)")
 _FALLBACKS = {
     "WRITE_WITHOUT_PENDING_ACTION": (
         "未能生成可执行的确认卡片。请核对订单信息后重试，或回复“转人工”。"
@@ -80,6 +93,7 @@ class ResponseVerifier:
         recommendation_candidates: list[dict] | None = None,
         support_case: dict | None = None,
         policy_evidence_required: bool = False,
+        safe_fallback: str | None = None,
     ) -> VerificationResult:
         text = str(assistant or "").strip()
         called = frozenset(str(tool) for tool in tools_called or [])
@@ -122,9 +136,11 @@ class ResponseVerifier:
                 )
             )
 
-        if (
-            policy_evidence_required or _POLICY_CLAIM_RE.search(text)
-        ) and not _has_sources(source_refs):
+        unsupported_policy_claim = _has_unsupported_policy_claim(text)
+        policy_abstained = bool(_POLICY_ABSTENTION_RE.search(text))
+        if not _has_sources(source_refs) and (
+            unsupported_policy_claim or (policy_evidence_required and not policy_abstained)
+        ):
             issues.append(
                 VerificationIssue(
                     "POLICY_WITHOUT_CITATION",
@@ -158,10 +174,27 @@ class ResponseVerifier:
         action = "HANDOFF" if primary.severity == "CRITICAL" else "DEGRADE"
         if primary.code == "RECOMMENDATION_CONSTRAINT_VIOLATION":
             action = "CLARIFY"
+        fallback_assistant = _FALLBACKS[primary.code]
+        candidate = str(safe_fallback or "").strip()
+        if candidate:
+            fallback_check = self.verify(
+                assistant=candidate,
+                biz_type=biz_type,
+                tools_called=tools_called,
+                source_refs=source_refs,
+                has_pending_action=has_pending_action,
+                order_resolution=order_resolution,
+                recommendation_constraints=recommendation_constraints,
+                recommendation_candidates=recommendation_candidates,
+                support_case=support_case,
+                policy_evidence_required=policy_evidence_required,
+            )
+            if fallback_check.passed:
+                fallback_assistant = fallback_check.assistant
         return VerificationResult(
             False,
             action,
-            _FALLBACKS[primary.code],
+            fallback_assistant,
             tuple(issues),
         )
 
@@ -174,6 +207,28 @@ def _has_sources(source_refs: list[dict] | dict | None) -> bool:
         return isinstance(sources, list) and any(
             isinstance(item, dict) and item for item in sources
         )
+    return False
+
+
+def _has_unsupported_policy_claim(text: str) -> bool:
+    """Reject deterministic claims even when another clause contains an abstention."""
+
+    for clause_match in _POLICY_CLAUSE_RE.finditer(text):
+        clause = clause_match.group(0)
+        abstentions = tuple(_POLICY_ABSTENTION_RE.finditer(clause))
+        for claim in _POLICY_CLAIM_RE.finditer(clause):
+            if any(
+                claim.start() < abstention.end() and claim.end() > abstention.start()
+                for abstention in abstentions
+            ):
+                continue
+            prefix = clause[: claim.start()]
+            uncertainty = tuple(_POLICY_UNCERTAINTY_PREFIX_RE.finditer(prefix))
+            if uncertainty:
+                scope_tail = prefix[uncertainty[-1].end() :]
+                if len(scope_tail) <= 16 and not _POLICY_ADVERSATIVE_RE.search(scope_tail):
+                    continue
+            return True
     return False
 
 

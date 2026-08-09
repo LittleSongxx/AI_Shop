@@ -297,6 +297,7 @@ async def finalize_agent_response(
     message_card: dict | None = None,
     order_resolution: str | None = None,
     rag_evidence_required: bool = False,
+    verifier_fallback: str | None = None,
 ) -> None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
@@ -494,6 +495,12 @@ async def finalize_agent_response(
         recommendation_candidates=recommendation_candidates,
         support_case=support_case_for_verifier,
         policy_evidence_required=rag_evidence_required,
+        safe_fallback=verifier_fallback,
+    )
+    verifier_fallback_applied = bool(
+        not verification.passed
+        and verifier_fallback
+        and verification.assistant == verifier_fallback.strip()
     )
     RESPONSE_VERIFIER_TOTAL.labels(
         result="pass" if verification.passed else verification.action.lower(),
@@ -519,7 +526,10 @@ async def finalize_agent_response(
             "hasPendingAction": resolved is not None,
             "hasSources": bool(source_refs),
         },
-        output_data=verification.quality(),
+        output_data={
+            **verification.quality(),
+            "safeFallbackApplied": verifier_fallback_applied,
+        },
     )
     if not verification.passed:
         assistant = verification.assistant
@@ -599,6 +609,8 @@ def bind_agent_llm(
     fallback: bool = False,
     allowed_tools: set[str] | frozenset[str] | None = None,
     max_tokens: int | None = None,
+    disable_thinking: bool = False,
+    tools_enabled: bool = True,
 ):
     """The tool-bound LLM for one ReAct round.
 
@@ -607,8 +619,14 @@ def bind_agent_llm(
     work on round 1 and round 6. Keying on the resolved config means a settings
     change still produces a fresh binding.
     """
-    scope = None if allowed_tools is None else tuple(sorted(allowed_tools))
-    llm = _agent_llm_with_tools(chat_llm_config(fallback=fallback), scope)
+    config = chat_llm_config(
+        fallback=fallback, disable_thinking=disable_thinking
+    )
+    if tools_enabled:
+        scope = None if allowed_tools is None else tuple(sorted(allowed_tools))
+        llm = _agent_llm_with_tools(config, scope)
+    else:
+        llm = chat_llm_for_config(config)
     return llm.bind(max_tokens=max_tokens) if max_tokens is not None else llm
 
 def parse_agent_message(agent_msg: dict) -> tuple[dict | None, str]:

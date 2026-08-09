@@ -34,7 +34,11 @@ from app.services.episode_service import bind_episode, episode_service
 from app.services.llm_factory import create_memory_llm
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.shopping_profile_service import shopping_profile_service
-from app.utils.biz_payload import is_action_confirm_json
+from app.utils.biz_payload import (
+    is_action_confirm_json,
+    is_order_cards_json,
+    is_support_case_cards_json,
+)
 
 _ACTION_TO_TOOL = {
     IntentKind.REFUND.value: "PROPOSE_REFUND",
@@ -126,10 +130,31 @@ _TOOL_EVIDENCE_TYPES = {
     "QUERY_SUPPORT_CASES": frozenset({"support_case"}),
     "SEARCH_KNOWLEDGE": frozenset({"knowledge", "knowledge_chunk", "faq", "rag", "policy"}),
 }
+_SUPPORT_CASE_CARD_TERMS = (
+    "工单",
+    "售后申请",
+    "客服记录",
+    "人工客服",
+    "投诉进度",
+)
+_TOOL_PROTOCOL_MARKERS = (
+    "<｜｜DSML｜｜tool_calls>",
+    "<tool_call>",
+    '"tool_calls":',
+)
+_POLICY_FALLBACK_LINE_RE = re.compile(
+    r"政策|平台规则|售后规则|(?:退款|退货|换货)(?:条件|资格)|"
+    r"(?:可以|能够|不能|不可|支持|不支持).{0,10}(?:退款|退货|换货)|"
+    r"(?:符合|满足|具备|不符合|不满足).{0,10}(?:退款|退货|换货)"
+)
 
 
 def _contains(text: str, *terms: str) -> bool:
     return any(term in text for term in terms)
+
+
+def _contains_tool_protocol(text: str) -> bool:
+    return any(marker in text for marker in _TOOL_PROTOCOL_MARKERS)
 
 
 def _is_trusted_evidence_ref(item: dict[str, Any]) -> bool:
@@ -335,8 +360,8 @@ async def _structured_supervisor_plan(
     state: dict[str, Any], fallback: SupervisorPlan
 ) -> SupervisorPlan:
     allowed = set(AGENT_SPECS) - {"supervisor"}
-    llm = create_memory_llm()
-    structured = llm.with_structured_output(SupervisorPlan, include_raw=True)
+    llm = create_memory_llm(disable_thinking=True)
+    structured = llm.with_structured_output(SupervisorPlan, method="json_mode", include_raw=True)
     response = await asyncio.wait_for(
         invoke_llm_with_metrics(
             structured,
@@ -348,6 +373,8 @@ async def _structured_supervisor_plan(
                         "可用专家：shopping_advisor（商品）、"
                         "order_fulfillment_specialist（订单物流事实）、"
                         "after_sales_policy_specialist（售后政策证据）。"
+                        "严格只返回一个符合下方 JSON Schema 的 JSON 对象，不得输出 Markdown。"
+                        f"JSON Schema：{json.dumps(SupervisorPlan.model_json_schema(), ensure_ascii=False, separators=(',', ':'))}"
                     )
                 ),
                 HumanMessage(
@@ -571,6 +598,7 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
     ]
     called: list[str] = []
     evidence: list[dict] = []
+    verified_tool_outputs: list[str] = []
     assistant_cards: str | None = None
     warnings: list[str] = []
     draft = ""
@@ -582,6 +610,7 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                 llm = rt.bind_agent_llm(
                     allowed_tools=spec.tool_allowlist,
                     max_tokens=task.max_tokens,
+                    disable_thinking=True,
                 )
                 response = await invoke_llm_with_metrics(
                     llm, messages, model=getattr(llm, "model_name", None)
@@ -620,9 +649,12 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         evidence.extend(result.source_refs)
                     if result.success and result.assistant_cards:
                         assistant_cards = result.assistant_cards
+                    tool_message = result.to_tool_message()
+                    if result.success:
+                        verified_tool_outputs.append(f"{name}: {tool_message}"[:3000])
                     messages.append(
                         ToolMessage(
-                            content=result.to_tool_message(), tool_call_id=call.get("id") or name
+                            content=tool_message, tool_call_id=call.get("id") or name
                         )
                     )
                     episode_service.record_step(
@@ -638,9 +670,37 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         handoff_id=task.handoff_id,
                         run_id=child_run_id,
                     )
-            else:
-                warnings.append("SPECIALIST_ROUND_LIMIT")
-                status = "DEGRADED"
+            if not draft:
+                # Tool rounds and the artifact turn are separate budgets. The
+                # final model call has no tools, so it can only summarize the
+                # verified results already present in this isolated branch.
+                llm = rt.bind_agent_llm(
+                    allowed_tools=frozenset(),
+                    max_tokens=task.max_tokens,
+                    disable_thinking=True,
+                    tools_enabled=False,
+                )
+                messages.append(
+                    SystemMessage(
+                        content=(
+                            "工具阶段已结束。只根据上方工具结果输出内部事实摘要；"
+                            "不得继续调用工具，不得输出 DSML、XML、JSON 工具协议。"
+                        )
+                    )
+                )
+                response = await invoke_llm_with_metrics(
+                    llm, messages, model=getattr(llm, "model_name", None)
+                )
+                final_tool_calls = list(getattr(response, "tool_calls", None) or [])
+                final_text = strip_emojis(
+                    rt.chunk_text(getattr(response, "content", "") or "")
+                )
+                if final_tool_calls or _contains_tool_protocol(final_text):
+                    warnings.append("SPECIALIST_ROUND_LIMIT")
+                    status = "DEGRADED"
+                    draft = "\n".join(verified_tool_outputs)[-4000:]
+                else:
+                    draft = final_text
     except TimeoutError:
         status = "FAILED"
         error_code = "SPECIALIST_TIMEOUT"
@@ -859,6 +919,26 @@ def _action_failure_answer(answer: str) -> str:
     return f"{base}。{suffix}" if base else suffix
 
 
+def _policy_safe_fallback(artifacts: list[AgentArtifact]) -> str:
+    lines: list[str] = []
+    for artifact in artifacts:
+        if artifact.agent_id == "after_sales_policy_specialist":
+            continue
+        if artifact.status != "SUCCESS" or not _has_verified_evidence(artifact.evidence):
+            continue
+        text = artifact.draft_answer or "\n".join(artifact.facts)
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if line and not _POLICY_FALLBACK_LINE_RE.search(line):
+                lines.append(raw_line.rstrip())
+    grounded = "\n".join(lines).strip()[:3500]
+    abstention = (
+        "未找到可引用的售后政策证据，因此无法确认具体售后资格；"
+        "本次未执行任何业务操作。"
+    )
+    return f"{grounded}\n\n{abstention}" if grounded else abstention
+
+
 async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
     plan = SupervisorPlan.model_validate(state.get("supervisor_plan") or {})
     artifacts: list[AgentArtifact] = []
@@ -933,6 +1013,17 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             run_id=(state.get("agent_msg") or {}).get("runId"),
         )
     artifact_payload = [item.model_dump(mode="json") for item in artifacts]
+    policy_evidence_missing = any(
+        item.agent_id == "after_sales_policy_specialist"
+        and not _has_policy_evidence(item.evidence)
+        for item in artifacts
+    )
+    policy_instruction = (
+        "售后政策专家没有提供可引用证据。必须明确说明未找到政策证据、无法确认资格；"
+        "保留其他专家已经核实的订单和物流事实，但不得推断可以或不可以退款。"
+        if policy_evidence_missing
+        else "政策结论只能来自 artifact 中可引用的已发布知识证据。"
+    )
     prompt = json.dumps(
         {
             "question": state.get("user_text"),
@@ -943,7 +1034,11 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
     )
     answer = ""
     try:
-        llm = rt.bind_agent_llm(allowed_tools=frozenset())
+        llm = rt.bind_agent_llm(
+            allowed_tools=frozenset(),
+            disable_thinking=True,
+            tools_enabled=False,
+        )
         response = await asyncio.wait_for(
             invoke_llm_with_metrics(
                 llm,
@@ -952,6 +1047,7 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                         content=(
                             "你是电商 Supervisor。根据已验证的内部专家 artifact 回答用户。"
                             "不得补造 artifact 中不存在的事实；冲突时明确说明并建议人工。"
+                            f"{policy_instruction}"
                             "只返回最终面向用户的简洁中文答复，不要输出内部规划或 SQL。"
                         )
                     ),
@@ -978,11 +1074,20 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         "route": "finalize",
         "supervisor_plan": plan.model_dump(mode="json"),
     }
+    if policy_evidence_missing:
+        result["verifier_fallback"] = _policy_safe_fallback(artifacts)
     if artifacts:
         first_cards = next(
             (item.assistant_cards for item in artifacts if item.assistant_cards), None
         )
-        if first_cards:
+        support_cards_unrequested = is_support_case_cards_json(first_cards) and not _contains(
+            str(state.get("user_text") or ""), *_SUPPORT_CASE_CARD_TERMS
+        )
+        order_cards_unrequested = (
+            is_order_cards_json(first_cards)
+            and plan.intent != IntentKind.QUERY_ORDER.value
+        )
+        if first_cards and not support_cards_unrequested and not order_cards_unrequested:
             result["assistant_cards"] = first_cards
 
     # The only write-capable step in the multi-agent path. It runs after all
@@ -1183,7 +1288,10 @@ async def supervisor_plan_node(state: dict[str, Any]) -> dict[str, Any]:
             tool_scope=sorted(spec.tool_allowlist),
             max_rounds=min(get_settings().multi_agent_specialist_max_rounds, spec.max_rounds),
             max_tokens=spec.token_budget,
-            timeout_seconds=min(spec.timeout_seconds, 8),
+            timeout_seconds=min(
+                spec.timeout_seconds,
+                get_settings().multi_agent_specialist_timeout_seconds,
+            ),
         )
         task_data = task.model_dump(mode="json")
         tasks.append(task_data)

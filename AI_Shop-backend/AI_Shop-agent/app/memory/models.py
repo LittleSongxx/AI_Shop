@@ -18,6 +18,7 @@ def empty_summary() -> dict[str, Any]:
         },
     }
 
+
 def empty_state() -> dict[str, Any]:
     return {
         "consultProduct": None,
@@ -34,6 +35,7 @@ def empty_state() -> dict[str, Any]:
         "estimatedTokens": 0,
     }
 
+
 @dataclass
 class SessionMemory:
     user_id: str
@@ -48,6 +50,14 @@ class SessionMemory:
         if state:
             mem.state = state
         return mem
+
+    @property
+    def turn_count(self) -> int:
+        return int(self.state.get("turnCount") or 0)
+
+    @turn_count.setter
+    def turn_count(self, value: int) -> None:
+        self.state["turnCount"] = int(value)
 
     @property
     def summary_last_message_id(self) -> int:

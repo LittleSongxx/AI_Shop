@@ -277,6 +277,7 @@ class Settings(BaseSettings):
     multi_agent_enabled: bool = True
     data_analyst_enabled: bool = True
     multi_agent_specialist_max_rounds: int = 2
+    multi_agent_specialist_timeout_seconds: int = 12
     analytics_max_rows: int = 200
     analytics_max_days: int = 90
     analytics_query_timeout_ms: int = 3000
@@ -317,6 +318,10 @@ class Settings(BaseSettings):
             )
         if self.analytics_request_timeout_seconds > 180:
             raise ValueError("ANALYTICS_REQUEST_TIMEOUT_SECONDS must not exceed 180")
+        if not 3 <= self.multi_agent_specialist_timeout_seconds <= 30:
+            raise ValueError(
+                "MULTI_AGENT_SPECIALIST_TIMEOUT_SECONDS must be between 3 and 30"
+            )
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
         for model, pricing in self.llm_pricing_cny_per_million_json.items():

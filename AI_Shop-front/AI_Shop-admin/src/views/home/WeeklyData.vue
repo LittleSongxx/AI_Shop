@@ -221,7 +221,9 @@ onUnmounted(() => {
 }
 
 .trend-section {
-  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .section-head {
@@ -266,6 +268,10 @@ onUnmounted(() => {
 }
 
 .chart-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   padding: 10px 12px 6px;
 }
 
@@ -307,8 +313,9 @@ onUnmounted(() => {
 }
 
 .chart-canvas {
+  flex: 1;
   width: 100%;
-  height: 158px;
+  min-height: 158px;
 }
 
 @media (max-width: 720px) {

@@ -40,7 +40,9 @@ import ShippedOrder from './ShippedOrder.vue'
 }
 
 .ops-section {
-  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .section-head {
@@ -56,14 +58,17 @@ import ShippedOrder from './ShippedOrder.vue'
 
 .ops-layout {
   display: grid;
+  flex: 1;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
   gap: 10px;
+  min-height: 0;
 }
 
 .ops-panel {
   display: flex;
   flex-direction: column;
-  height: 196px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 
   .panel-head {
@@ -102,9 +107,14 @@ import ShippedOrder from './ShippedOrder.vue'
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1200px) {
+  .ops-section {
+    min-height: 460px;
+  }
+
   .ops-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(210px, 1fr));
   }
 }
 </style>

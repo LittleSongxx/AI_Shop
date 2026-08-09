@@ -75,6 +75,7 @@ class AgentGraphState(TypedDict, total=False):
     specialist_tasks: list[dict]
     specialist_artifacts: Annotated[list[dict], operator.add]
     action_proposal: dict | None
+    verifier_fallback: str | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -127,6 +128,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "specialist_tasks": [],
         "specialist_artifacts": [],
         "action_proposal": None,
+        "verifier_fallback": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

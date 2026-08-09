@@ -532,7 +532,8 @@ const switchToMobile = () => {
         background: transparent;
         border-color: transparent;
         box-shadow: none;
-        padding: 8px 4px 20px 0;
+        margin: 14px 20px 16px;
+        padding: 0;
       }
     }
   }

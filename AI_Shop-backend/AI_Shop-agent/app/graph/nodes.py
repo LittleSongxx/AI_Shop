@@ -1147,6 +1147,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
             message_card=state.get("message_card"),
             order_resolution=state.get("order_resolution"),
             rag_evidence_required=bool(state.get("rag_evidence_required")),
+            verifier_fallback=state.get("verifier_fallback"),
         )
     except Exception as e:
         logger.exception("graph_finalize_failed", error=str(e))

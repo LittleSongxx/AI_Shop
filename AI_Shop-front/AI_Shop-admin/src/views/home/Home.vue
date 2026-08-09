@@ -14,9 +14,19 @@ import WeeklyData from './WeeklyData.vue'
 
 <style lang="scss" scoped>
 .home-dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  display: grid;
+  grid-template-rows: auto minmax(230px, 0.9fr) minmax(240px, 1.1fr);
+  gap: 12px;
+  width: 100%;
+  min-height: 100%;
   max-width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .home-dashboard {
+    display: flex;
+    flex-direction: column;
+    min-height: auto;
+  }
 }
 </style>

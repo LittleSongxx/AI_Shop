@@ -249,13 +249,9 @@ wait_managed_service() {
       fi
       stop_managed_service_for_restart "$name" 10 || true
       if $target_bind_failed && ((retry_count < retry_limit)); then
-        if [[ "$name" == "web" || "$name" == "admin-web" ]]; then
-          reassign_frontend_port_after_bind_failure "$name" "$port"
-          if [[ "$name" == "web" ]]; then
-            port=$WEB_PORT
-          else
-            port=$ADMIN_WEB_PORT
-          fi
+        if managed_service_supports_port_reassignment "$name"; then
+          reassign_managed_port_after_bind_failure "$name" "$port"
+          port=$(managed_service_port "$name")
           retry_allowed=true
         elif wait_port_released "$port" 8; then
           retry_allowed=true
@@ -271,6 +267,9 @@ wait_managed_service() {
         fi
         sleep $((retry_count * 2))
         restart_managed_service_after_bind_failure "$name" "$port"
+        if managed_service_supports_port_reassignment "$name"; then
+          port=$(managed_service_port "$name")
+        fi
         end=$((SECONDS + timeout))
         identity_end=$((SECONDS + 5))
         echo -n "  等待 $label..."
@@ -367,25 +366,52 @@ assign_port() {
   die "$label 没有可用端口"
 }
 
-reassign_frontend_port_after_bind_failure() {
-  local name=$1 previous_port=$2 variable label next_port=$((10#$previous_port + 1))
+managed_service_port_binding() {
+  case "$1" in
+    gateway)   printf '%s|%s\n' GATEWAY_PORT "Gateway" ;;
+    user)      printf '%s|%s\n' USER_PORT "User 服务" ;;
+    product)   printf '%s|%s\n' PRODUCT_PORT "Product 服务" ;;
+    stock)     printf '%s|%s\n' STOCK_PORT "Stock 服务" ;;
+    cart)      printf '%s|%s\n' CART_PORT "Cart 服务" ;;
+    order)     printf '%s|%s\n' ORDER_PORT "Order 服务" ;;
+    pay)       printf '%s|%s\n' PAY_PORT "Pay 服务" ;;
+    coupon)    printf '%s|%s\n' COUPON_PORT "Coupon 服务" ;;
+    search)    printf '%s|%s\n' SEARCH_PORT "Search 服务" ;;
+    admin)     printf '%s|%s\n' ADMIN_PORT "Admin 服务" ;;
+    web)       printf '%s|%s\n' WEB_PORT "商城前端" ;;
+    admin-web) printf '%s|%s\n' ADMIN_WEB_PORT "管理前端" ;;
+    *) return 1 ;;
+  esac
+}
+
+managed_service_supports_port_reassignment() {
+  managed_service_port_binding "$1" >/dev/null
+}
+
+managed_service_port() {
+  local binding variable
+  binding=$(managed_service_port_binding "$1") || return 1
+  IFS='|' read -r variable _ <<<"$binding"
+  printf '%s\n' "${!variable}"
+}
+
+reassign_managed_port_after_bind_failure() {
+  local name=$1 previous_port=$2 binding variable label
+  local next_port=$((10#$previous_port + 1))
+  binding=$(managed_service_port_binding "$name") \
+    || die "服务 $name 不支持动态重分配端口"
+  IFS='|' read -r variable label <<<"$binding"
   case "$name" in
-    web)
-      variable=WEB_PORT
-      label="商城前端"
-      ;;
-    admin-web)
-      variable=ADMIN_WEB_PORT
-      label="管理前端"
-      ;;
-    *)
-      die "服务 $name 不是可动态重分配端口的前端"
-      ;;
+    gateway|user|product|stock|cart|order|pay|coupon|search|admin|web|admin-web) ;;
+    *) die "服务 $name 不支持动态重分配端口" ;;
   esac
   ((next_port <= 65535)) || die "$label 在端口竞态后没有可用端口"
   printf -v "$variable" '%s' "$next_port"
   export "$variable"
   assign_port "$variable" "$next_port" "$label"
+  if [[ "$name" == "gateway" ]]; then
+    export JAVA_WEB_URL="http://127.0.0.1:$GATEWAY_PORT"
+  fi
   write_runtime_env
 }
 
@@ -836,7 +862,11 @@ start_java() {
     return 0
   fi
   ensure_memory_headroom "$name"
-  ensure_port_free "$port" "$name"
+  if port_is_listening "$port"; then
+    reassign_managed_port_after_bind_failure "$name" "$port"
+    port=$(managed_service_port "$name")
+    warn "$name 的目标端口在分配后被占用，启动端口调整为 $port"
+  fi
   [[ -f "$jar" ]] || die "JAR 不存在: $jar；请使用 ./start.sh --build"
   local -a java_opts
   read -r -a java_opts <<<"$JAVA_OPTS"
@@ -943,7 +973,10 @@ start_storefront() {
   ensure_memory_headroom "商城前端"
   [[ -f "$FRONT/AI_Shop-web/node_modules/vite/bin/vite.js" ]] \
     || die "商城前端依赖未安装：cd AI_Shop-front/AI_Shop-web && npm ci"
-  ensure_port_free "$WEB_PORT" "商城前端"
+  if port_is_listening "$WEB_PORT"; then
+    reassign_managed_port_after_bind_failure web "$WEB_PORT"
+    warn "商城前端的目标端口在分配后被占用，启动端口调整为 $WEB_PORT"
+  fi
   reset_service_log web
   (
     cd "$FRONT/AI_Shop-web"
@@ -969,7 +1002,10 @@ start_admin_web() {
   ensure_memory_headroom "管理前端"
   [[ -f "$FRONT/AI_Shop-admin/node_modules/vite/bin/vite.js" ]] \
     || die "管理前端依赖未安装：cd AI_Shop-front/AI_Shop-admin && npm ci"
-  ensure_port_free "$ADMIN_WEB_PORT" "管理前端"
+  if port_is_listening "$ADMIN_WEB_PORT"; then
+    reassign_managed_port_after_bind_failure admin-web "$ADMIN_WEB_PORT"
+    warn "管理前端的目标端口在分配后被占用，启动端口调整为 $ADMIN_WEB_PORT"
+  fi
   reset_service_log admin-web
   (
     cd "$FRONT/AI_Shop-admin"
@@ -1224,7 +1260,9 @@ for service_spec in \
   "admin|$BACKEND/AI_Shop-admin/target/aishop-admin-1.0.0.jar|$ADMIN_PORT"; do
   IFS='|' read -r service jar port <<<"$service_spec"
   start_java "$service" "$jar" "$port"
+  port=$(managed_service_port "$service")
   wait_managed_service "$service" "$port" "$service 服务" 300
+  port=$(managed_service_port "$service")
   wait_http "http://127.0.0.1:$port/actuator/health" "$service 健康检查" 240
 done
 

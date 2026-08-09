@@ -46,10 +46,6 @@ ORDER_TOOLS = frozenset(
 )
 AFTER_SALES_TOOLS = frozenset(
     {
-        "QUERY_ORDERS",
-        "QUERY_LOGISTICS",
-        "QUERY_COMMENT",
-        "QUERY_REFUND_STATUS",
         "QUERY_SUPPORT_CASES",
         "SEARCH_KNOWLEDGE",
     }

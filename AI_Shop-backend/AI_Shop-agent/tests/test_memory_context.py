@@ -21,6 +21,17 @@ def test_estimate_chinese_tokens():
     assert estimate_text_tokens("你好") == 4
     assert estimate_text_tokens("hello") >= 1
 
+
+def test_session_memory_exposes_turn_count_from_structured_state():
+    memory = SessionMemory(user_id="u1")
+    assert memory.turn_count == 0
+
+    memory.turn_count = 3
+
+    assert memory.turn_count == 3
+    assert memory.state["turnCount"] == 3
+
+
 def test_select_working_turns_respects_boundary():
     turns = [
         {"message_id": 1, "user_message": "a", "assistant_message": "b"},
@@ -31,6 +42,7 @@ def test_select_working_turns_respects_boundary():
     assert len(selected) == 2
     assert oldest == 2
     assert all(int(t["message_id"]) > 1 for t in selected)
+
 
 def test_select_working_turns_drops_oldest_pairs_when_over_budget():
     turns = [
@@ -53,6 +65,7 @@ def test_select_working_turns_drops_oldest_pairs_when_over_budget():
     assert selected[0]["message_id"] == 3
     assert oldest == 3
 
+
 def test_select_working_turns_skips_incomplete_pairs():
     turns = [
         {
@@ -74,6 +87,7 @@ def test_select_working_turns_skips_incomplete_pairs():
     assert len(selected) == 1
     assert selected[0]["message_id"] == 3
 
+
 def test_select_working_turns_skips_oversized_pair_instead_of_truncating():
     huge = "超长回复" * 8000
     turns = [
@@ -88,6 +102,7 @@ def test_select_working_turns_skips_oversized_pair_instead_of_truncating():
     assert selected == []
     assert oldest is None
 
+
 def test_build_context_block():
     mem = SessionMemory(user_id="u1")
     mem.summary["narrative"] = "用户想买零食"
@@ -96,6 +111,7 @@ def test_build_context_block():
     block = build_context_block(mem)
     assert "旺旺雪饼" in block
     assert "买礼物" in block
+
 
 def test_build_context_block_renders_shopping_profile_section():
     """Profile with signal → ## 购物偏好 section appears in the block."""
@@ -155,8 +171,10 @@ def test_build_context_block_hides_last_search_names():
     assert "旺旺雪饼" not in block
     assert "SEARCH_PRODUCTS" in block
 
+
 def test_is_vague_similar_intent():
     assert is_vague_search_keyword("有没有类似的")
+
 
 def test_is_similar_or_recommend_request():
     assert is_similar_or_recommend_request("有什么类似的推荐吗")
@@ -164,11 +182,13 @@ def test_is_similar_or_recommend_request():
     assert not is_similar_or_recommend_request("你是谁")
     assert not is_similar_or_recommend_request("怎么查看会员等级")
 
+
 def test_derive_search_keyword_from_consult():
     consult = {"productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食"}
     assert is_vague_search_keyword("有什么类似的吗")
     kw = derive_search_keyword("有什么类似的吗", consult)
     assert "旺旺" in kw or "雪饼" in kw
+
 
 def test_format_search_tool_message_alternative():
     consult = {"productName": "酷态科10号超级车充"}
@@ -196,6 +216,7 @@ def test_format_search_tool_message_no_product_names_in_hint():
     msg = format_search_tool_message("有没有类似的推荐", consult, products, "category")
     assert "项链" not in msg
     assert "下方卡片" in msg
+
 
 def test_products_match_consult_category():
     consult = {"categoryId": "10"}

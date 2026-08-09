@@ -59,9 +59,7 @@ class JudgeService:
             logger.warning("judge_disabled_missing_api_key")
             return
         self._queue = asyncio.Queue(maxsize=settings.judge_queue_size)
-        self._worker = asyncio.create_task(
-            self._worker_loop(), name="agent-shadow-judge"
-        )
+        self._worker = asyncio.create_task(self._worker_loop(), name="agent-shadow-judge")
 
     async def close(self) -> None:
         queue = self._queue
@@ -223,6 +221,7 @@ def _judge_llm():
             timeout=settings.judge_timeout,
             max_retries=0,
             streaming=False,
+            disable_thinking=False,
         )
     )
 
@@ -257,8 +256,7 @@ def _judge_input(request: JudgeRequest) -> str:
 def _parse_result(content: Any) -> dict[str, Any]:
     if isinstance(content, list):
         content = "".join(
-            str(item.get("text") or "") if isinstance(item, dict) else str(item)
-            for item in content
+            str(item.get("text") or "") if isinstance(item, dict) else str(item) for item in content
         )
     match = _JSON_RE.search(str(content or ""))
     if not match:

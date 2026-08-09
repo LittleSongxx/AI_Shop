@@ -90,6 +90,23 @@ def _function_name(function: exp.Func) -> str:
     return str(function.sql_name()).lower()
 
 
+def _source_column_names(tree: exp.Select) -> tuple[str, ...]:
+    projection_aliases = {
+        str(expression.alias).lower()
+        for expression in tree.expressions
+        if isinstance(expression, exp.Alias) and expression.alias
+    }
+    names: set[str] = set()
+    for column in tree.find_all(exp.Column):
+        name = str(column.name).lower()
+        # MySQL permits a SELECT alias in ORDER BY. Such a reference names the
+        # projected value, not another source column from the semantic view.
+        if name in projection_aliases and column.find_ancestor(exp.Order) is not None:
+            continue
+        names.add(name)
+    return tuple(sorted(names))
+
+
 def validate_sql(
     sql: str,
     *,
@@ -148,9 +165,7 @@ def validate_sql(
         return _reject(text, "SQL_CROSS_DATABASE_FORBIDDEN")
 
     cte_names = {
-        str(cte.alias_or_name).lower()
-        for cte in tree.find_all(exp.CTE)
-        if cte.alias_or_name
+        str(cte.alias_or_name).lower() for cte in tree.find_all(exp.CTE) if cte.alias_or_name
     }
     tables = tuple(
         sorted(
@@ -179,7 +194,7 @@ def validate_sql(
     if any(len(select.expressions) > max_columns for select in selects):
         return _reject(text, "SQL_COLUMN_LIMIT_EXCEEDED", tables=tables)
     view_columns = allowed_columns(tables[0])
-    columns = tuple(sorted({str(column.name).lower() for column in tree.find_all(exp.Column)}))
+    columns = _source_column_names(tree)
     # Projection aliases are output labels, never proof that a source column is
     # part of the semantic contract. Subtracting aliases here allowed
     # ``SELECT 1 AS email, email`` to smuggle an unknown source column through.

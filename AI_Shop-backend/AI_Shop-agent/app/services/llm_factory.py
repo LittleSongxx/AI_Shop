@@ -13,6 +13,7 @@ process, which is how the API and the worker both run.
 
 from functools import lru_cache
 from typing import NamedTuple
+from urllib.parse import urlparse
 
 from langchain_openai import ChatOpenAI
 
@@ -26,9 +27,10 @@ class ChatLLMConfig(NamedTuple):
     timeout: int
     max_retries: int
     streaming: bool
+    disable_thinking: bool
 
 
-def chat_llm_config(*, fallback: bool = False) -> ChatLLMConfig:
+def chat_llm_config(*, fallback: bool = False, disable_thinking: bool = False) -> ChatLLMConfig:
 
     s = get_settings()
     _require_api_key(s.llm_api_key, "LLM_API_KEY")
@@ -40,6 +42,7 @@ def chat_llm_config(*, fallback: bool = False) -> ChatLLMConfig:
         timeout=s.llm_timeout,
         max_retries=s.llm_max_retries,
         streaming=True,
+        disable_thinking=disable_thinking and _is_deepseek_endpoint(s.llm_base_url),
     )
 
 
@@ -53,6 +56,7 @@ def chat_llm_for_config(config: ChatLLMConfig) -> ChatOpenAI:
         timeout=config.timeout,
         max_retries=config.max_retries,
         streaming=config.streaming,
+        extra_body={"thinking": {"type": "disabled"}} if config.disable_thinking else None,
     )
 
 
@@ -64,11 +68,11 @@ def create_chat_llm(*, fallback: bool = False) -> ChatOpenAI:
 def has_fallback_chat_llm() -> bool:
     s = get_settings()
     return bool(
-        s.llm_fallback_model.strip()
-        and s.llm_fallback_model.strip() != s.llm_model.strip()
+        s.llm_fallback_model.strip() and s.llm_fallback_model.strip() != s.llm_model.strip()
     )
 
-def create_memory_llm() -> ChatOpenAI:
+
+def create_memory_llm(*, disable_thinking: bool = False) -> ChatOpenAI:
 
     s = get_settings()
     api_key, base_url, model, timeout = _resolve_memory_llm_config(s)
@@ -81,8 +85,10 @@ def create_memory_llm() -> ChatOpenAI:
             timeout=timeout,
             max_retries=s.llm_max_retries,
             streaming=False,
+            disable_thinking=disable_thinking and _is_deepseek_endpoint(base_url),
         )
     )
+
 
 def _resolve_memory_llm_config(s: Settings) -> tuple[str, str, str, int]:
 
@@ -92,6 +98,12 @@ def _resolve_memory_llm_config(s: Settings) -> tuple[str, str, str, int]:
 
     timeout = s.memory_llm_timeout if s.memory_llm_timeout is not None else s.llm_timeout
     return api_key, base_url, model, timeout
+
+
+def _is_deepseek_endpoint(base_url: str) -> bool:
+    host = (urlparse(base_url).hostname or "").lower()
+    return host == "deepseek.com" or host.endswith(".deepseek.com")
+
 
 def create_llm() -> ChatOpenAI:
 

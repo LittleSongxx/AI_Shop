@@ -71,6 +71,95 @@ def test_policy_evidence_gate_rejects_uncited_answer_without_keyword_match():
     assert result.issues[0].code == "POLICY_WITHOUT_CITATION"
 
 
+def test_policy_evidence_gate_preserves_grounded_facts_when_answer_abstains():
+    assistant = (
+        "订单 SM1 当前已发货，物流正在派送。"
+        "未找到可引用的售后政策证据，因此无法确认是否符合退款条件。"
+    )
+
+    result = response_verifier.verify(
+        assistant=assistant,
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        order_resolution="RESOLVED",
+        policy_evidence_required=True,
+    )
+
+    assert result.passed is True
+    assert result.action == "PASS"
+    assert result.assistant == assistant
+
+
+def test_policy_evidence_gate_rejects_uncited_eligibility_claim():
+    result = response_verifier.verify(
+        assistant="该订单符合退款条件，可以退款。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        order_resolution="RESOLVED",
+        policy_evidence_required=True,
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "POLICY_WITHOUT_CITATION"
+
+
+def test_policy_abstention_cannot_mask_an_uncited_eligibility_claim():
+    result = response_verifier.verify(
+        assistant="该订单可以退款，但我无法确认具体售后资格。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        order_resolution="RESOLVED",
+        policy_evidence_required=True,
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "POLICY_WITHOUT_CITATION"
+
+
+def test_policy_violation_uses_a_separately_verified_safe_fallback():
+    fallback = (
+        "订单 SM1 当前已发货，最新物流为派送中。"
+        "未找到可引用的售后政策证据，因此无法确认具体售后资格。"
+    )
+
+    result = response_verifier.verify(
+        assistant="该订单符合退款条件，可以退款。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        order_resolution="RESOLVED",
+        policy_evidence_required=True,
+        safe_fallback=fallback,
+    )
+
+    assert result.passed is False
+    assert result.action == "DEGRADE"
+    assert result.assistant == fallback
+
+
+def test_policy_violation_rejects_an_unsafe_custom_fallback():
+    result = response_verifier.verify(
+        assistant="该订单符合退款条件。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        order_resolution="RESOLVED",
+        policy_evidence_required=True,
+        safe_fallback="可以退款。",
+    )
+
+    assert result.passed is False
+    assert result.assistant.startswith("当前没有检索到足够的已发布规则依据")
+
+
 def test_recommendation_hard_constraints_are_deterministic():
     result = response_verifier.verify(
         assistant="为你找到了两款",

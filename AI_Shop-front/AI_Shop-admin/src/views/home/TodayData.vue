@@ -119,7 +119,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .dashboard-overview {
-  margin-bottom: 4px;
+  min-width: 0;
 }
 
 .overview-head {
@@ -281,9 +281,8 @@ onMounted(() => {
   .metric-bento {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
-      'hero hero'
-      'order user'
-      'refund refund';
+      'hero order'
+      'user refund';
   }
 }
 

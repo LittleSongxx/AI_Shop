@@ -12,6 +12,7 @@ from app.services.data_analyst_service import (
     DataAnalysisPlan,
     DataAnalystService,
     DataNarrative,
+    _structured_json_llm,
 )
 
 
@@ -62,6 +63,36 @@ def _stub_episode(monkeypatch) -> list[str]:
     return events
 
 
+def test_data_analyst_uses_non_thinking_json_mode(monkeypatch):
+    llm = Mock()
+    structured = object()
+    llm.with_structured_output.return_value = structured
+    factory = Mock(return_value=llm)
+    monkeypatch.setattr("app.services.data_analyst_service.create_memory_llm", factory)
+
+    assert _structured_json_llm(DataAnalysisPlan) is structured
+    factory.assert_called_once_with(disable_thinking=True)
+    llm.with_structured_output.assert_called_once_with(
+        DataAnalysisPlan,
+        method="json_mode",
+        include_raw=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_data_analyst_clarifies_natural_best_selling_wording_without_model_call(
+    monkeypatch,
+):
+    factory = Mock(side_effect=AssertionError("ambiguous metric must not call the model"))
+    monkeypatch.setattr("app.services.data_analyst_service.create_memory_llm", factory)
+
+    plan = await DataAnalystService()._plan("近期什么产品卖的最好")
+
+    assert plan.status == "NEEDS_CLARIFICATION"
+    assert "销售金额" in str(plan.clarification_question)
+    factory.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_data_analyst_success_is_grounded_and_traceable(monkeypatch):
     service = DataAnalystService()
@@ -71,7 +102,11 @@ async def test_data_analyst_success_is_grounded_and_traceable(monkeypatch):
     monkeypatch.setattr(
         service,
         "_narrative",
-        AsyncMock(return_value=DataNarrative(answer="支付额上升，退款额保持为零。", highlights=["支付额上升"])),
+        AsyncMock(
+            return_value=DataNarrative(
+                answer="支付额上升，退款额保持为零。", highlights=["支付额上升"]
+            )
+        ),
     )
     monkeypatch.setattr(
         "app.services.data_analyst_service._explain_sql",
@@ -128,13 +163,15 @@ async def test_data_analyst_repairs_sql_at_most_once(monkeypatch):
     monkeypatch.setattr(service, "_plan", AsyncMock(return_value=_plan()))
     monkeypatch.setattr(service, "_draft_sql", draft)
     monkeypatch.setattr(service, "_narrative", AsyncMock(return_value=DataNarrative(answer="完成")))
-    monkeypatch.setattr("app.services.data_analyst_service._explain_sql", AsyncMock(return_value=[]))
-    monkeypatch.setattr("app.services.data_analyst_service._execute_sql", AsyncMock(return_value=[]))
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._explain_sql", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._execute_sql", AsyncMock(return_value=[])
+    )
     _stub_episode(monkeypatch)
     finish = Mock()
-    monkeypatch.setattr(
-        "app.services.data_analyst_service.episode_service.finish_run", finish
-    )
+    monkeypatch.setattr("app.services.data_analyst_service.episode_service.finish_run", finish)
 
     result = await service.ask("最近七天销售额", admin_id="admin")
 
@@ -195,7 +232,9 @@ async def test_data_analyst_query_timeout_is_normalized(monkeypatch):
     )
     monkeypatch.setattr(service, "_plan", AsyncMock(return_value=_plan()))
     monkeypatch.setattr(service, "_draft_sql", AsyncMock(return_value=_sql()))
-    monkeypatch.setattr("app.services.data_analyst_service._explain_sql", AsyncMock(return_value=[]))
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._explain_sql", AsyncMock(return_value=[])
+    )
     monkeypatch.setattr("app.services.data_analyst_service._execute_sql", slow_query)
     events = _stub_episode(monkeypatch)
 
@@ -219,9 +258,7 @@ async def test_data_analyst_request_budget_cancels_workflow_and_finishes_run(mon
     monkeypatch.setattr(service, "_plan", slow_plan)
     events = _stub_episode(monkeypatch)
     finish = Mock()
-    monkeypatch.setattr(
-        "app.services.data_analyst_service.episode_service.finish_run", finish
-    )
+    monkeypatch.setattr("app.services.data_analyst_service.episode_service.finish_run", finish)
 
     result = await service.ask("最近七天销售额", admin_id="admin")
 
@@ -257,8 +294,6 @@ async def test_data_analyst_does_not_expand_reader_privileges_for_explain(monkey
 
     assert result["status"] == "SUCCEEDED"
     assert result["warnings"] == ["EXPLAIN_SKIPPED_VIEW_PRIVILEGE"]
-    assert result["explain"] == [
-        {"status": "SKIPPED", "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY"}
-    ]
+    assert result["explain"] == [{"status": "SKIPPED", "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY"}]
     execute.assert_awaited_once()
     assert events.count("DATA_ANALYST_EXPLAIN") == 1

@@ -51,6 +51,10 @@ def test_registry_has_narrow_customer_agents_and_separate_admin_agent():
     assert "SEARCH_KNOWLEDGE" not in AGENT_SPECS["shopping_advisor"].tool_allowlist
     assert "SEARCH_KNOWLEDGE" not in AGENT_SPECS["order_fulfillment_specialist"].tool_allowlist
     assert "SEARCH_KNOWLEDGE" in AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist
+    assert AGENT_SPECS["after_sales_policy_specialist"].tool_allowlist == {
+        "QUERY_SUPPORT_CASES",
+        "SEARCH_KNOWLEDGE",
+    }
     assert not any(
         tool.startswith("PROPOSE_") for spec in AGENT_SPECS.values() for tool in spec.tool_allowlist
     )
@@ -120,7 +124,11 @@ def test_policy_grounding_routes_to_after_sales_even_for_chat_intent():
 @pytest.mark.asyncio
 async def test_structured_supervisor_cannot_drop_required_specialist(monkeypatch):
     class FakeStructuredLlm:
-        def with_structured_output(self, *_args, **_kwargs):
+        def __init__(self):
+            self.structured_call = None
+
+        def with_structured_output(self, *args, **kwargs):
+            self.structured_call = (args, kwargs)
             return self
 
     async def fake_invoke(*_args, **_kwargs):
@@ -139,11 +147,21 @@ async def test_structured_supervisor_cannot_drop_required_specialist(monkeypatch
             "verified_order_context": {"orderId": "o1", "orderItemId": "i1"},
         }
     )
-    monkeypatch.setattr("app.graph.multi_agent.create_memory_llm", FakeStructuredLlm)
+    fake_llm = FakeStructuredLlm()
+    factory_calls = []
+    monkeypatch.setattr(
+        "app.graph.multi_agent.create_memory_llm",
+        lambda **kwargs: factory_calls.append(kwargs) or fake_llm,
+    )
     monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_invoke)
 
     with pytest.raises(ValueError, match="REQUIRED_AGENT_MISSING"):
         await _structured_supervisor_plan({}, fallback)
+    assert factory_calls == [{"disable_thinking": True}]
+    assert fake_llm.structured_call == (
+        (SupervisorPlan,),
+        {"method": "json_mode", "include_raw": True},
+    )
 
 
 def test_handoff_and_artifact_contracts_do_not_contain_root_history():
@@ -249,13 +267,19 @@ def test_artifact_validator_rejects_source_type_from_unrelated_tool():
             agent_id="after_sales_policy_specialist",
             draft_answer="退款政策允许申请",
             evidence=[
-                {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                {
+                    "type": "tool_result",
+                    "tool": "QUERY_SUPPORT_CASES",
+                    "success": True,
+                },
                 {"type": "knowledge", "documentId": "forged-policy"},
             ],
         ).model_dump(mode="json")
     )
 
-    assert artifact.evidence == [{"type": "tool_result", "tool": "QUERY_ORDERS", "success": True}]
+    assert artifact.evidence == [
+        {"type": "tool_result", "tool": "QUERY_SUPPORT_CASES", "success": True}
+    ]
     assert artifact.next_step == "HUMAN_HANDOFF"
     assert "UNTRUSTED_EVIDENCE_DROPPED" in artifact.warnings
     assert "POLICY_EVIDENCE_MISSING" in artifact.warnings
@@ -283,9 +307,15 @@ def test_policy_artifact_without_knowledge_source_is_human_handoff():
         AgentArtifact(
             status="SUCCESS",
             agent_id="after_sales_policy_specialist",
-            tool_calls=["QUERY_ORDERS"],
+            tool_calls=["QUERY_SUPPORT_CASES"],
             draft_answer="订单符合七天无理由退款政策",
-            evidence=[{"type": "tool_result", "tool": "QUERY_ORDERS", "success": True}],
+            evidence=[
+                {
+                    "type": "tool_result",
+                    "tool": "QUERY_SUPPORT_CASES",
+                    "success": True,
+                }
+            ],
         ).model_dump(mode="json")
     )
 
@@ -371,6 +401,73 @@ async def test_specialist_timeout_returns_traceable_failed_artifact(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_specialist_reserves_final_artifact_turn_after_tool_rounds(monkeypatch):
+    responses = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {"id": "logistics", "name": "QUERY_LOGISTICS", "args": {"orderId": "o1"}}
+            ],
+        ),
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "id": "refund-status",
+                    "name": "QUERY_REFUND_STATUS",
+                    "args": {"orderItemId": "i1"},
+                }
+            ],
+        ),
+        AIMessage(content="物流状态与退款状态均已核验。"),
+    ]
+    bound_scopes = []
+
+    async def fake_invoke(*_args, **_kwargs):
+        return responses.pop(0)
+
+    async def fake_tool(name, *_args, **_kwargs):
+        return ToolInvokeResult(content=f"{name} 已核验")
+
+    monkeypatch.setattr(
+        "app.graph.multi_agent.rt.bind_agent_llm",
+        lambda **kwargs: bound_scopes.append(kwargs["allowed_tools"]) or object(),
+    )
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_invoke)
+    monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", fake_tool)
+    for name in ("record_step", "record_handoff", "finish_run"):
+        monkeypatch.setattr(
+            f"app.graph.multi_agent.episode_service.{name}", lambda *args, **kwargs: None
+        )
+
+    result = await specialist_runner_node(
+        {
+            "specialist_task": {
+                "handoff_id": "handoff-final-turn",
+                "child_run_id": "child-final-turn",
+                "parent_run_id": "root-final-turn",
+                "agent_id": "order_fulfillment_specialist",
+                "goal": "核对物流和退款状态",
+                "user_id": "u1",
+                "user_text": "查物流和退款状态",
+                "verified_context": {"order": {"orderId": "o1", "orderItemId": "i1"}},
+                "tool_scope": sorted(AGENT_SPECS["order_fulfillment_specialist"].tool_allowlist),
+                "max_rounds": 2,
+                "timeout_seconds": 2,
+            }
+        }
+    )
+
+    artifact = result["specialist_artifacts"][0]
+    assert responses == []
+    assert artifact["status"] == "SUCCESS"
+    assert artifact["draft_answer"] == "物流状态与退款状态均已核验。"
+    assert artifact["tool_calls"] == ["QUERY_LOGISTICS", "QUERY_REFUND_STATUS"]
+    assert "SPECIALIST_ROUND_LIMIT" not in artifact["warnings"]
+    assert bound_scopes[-1] == frozenset()
+
+
+@pytest.mark.asyncio
 async def test_invalid_child_task_closes_child_run_and_handoff(monkeypatch):
     handoffs: list[dict] = []
     finished: list[dict] = []
@@ -442,6 +539,128 @@ async def test_synthesis_records_generic_fanout_degradation(monkeypatch):
     )
 
     assert "FANOUT_DEGRADED" in events
+
+
+@pytest.mark.asyncio
+async def test_synthesis_does_not_replace_answer_with_unrequested_support_cards(monkeypatch):
+    async def fake_llm(*_args, **_kwargs):
+        return AIMessage(content="订单正在派送，未查到明确的延迟退款政策。")
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_llm)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    artifact = AgentArtifact(
+        status="SUCCESS",
+        agent_id="order_fulfillment_specialist",
+        draft_answer="订单正在派送。",
+        assistant_cards='{"type":"SUPPORT_CASE_LIST","cases":[]}',
+        evidence=[
+            {"type": "tool_result", "tool": "QUERY_LOGISTICS", "success": True}
+        ],
+    ).model_dump(mode="json")
+
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-card-gate"},
+            "user_text": "订单物流到哪了，延迟能否退款？",
+            "supervisor_plan": SupervisorPlan(
+                specialists=["order_fulfillment_specialist"]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [artifact],
+        }
+    )
+
+    assert result["chunks"] == ["订单正在派送，未查到明确的延迟退款政策。"]
+    assert "assistant_cards" not in result
+
+
+@pytest.mark.asyncio
+async def test_logistics_synthesis_does_not_replace_answer_with_order_cards(monkeypatch):
+    async def fake_llm(*_args, **_kwargs):
+        return AIMessage(content="订单正在派送；未找到政策证据，无法确认退款资格。")
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_llm)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    artifact = AgentArtifact(
+        status="SUCCESS",
+        agent_id="order_fulfillment_specialist",
+        draft_answer="订单正在派送。",
+        assistant_cards='[{"orderId":"SM1","orderStatus":2,"orderItemList":[]}]',
+        evidence=[
+            {"type": "tool_result", "tool": "QUERY_LOGISTICS", "success": True}
+        ],
+    ).model_dump(mode="json")
+
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-order-card-gate"},
+            "user_text": "订单物流到哪了？",
+            "supervisor_plan": SupervisorPlan(
+                intent="QUERY_LOGISTICS",
+                specialists=["order_fulfillment_specialist"],
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [artifact],
+        }
+    )
+
+    assert result["chunks"] == ["订单正在派送；未找到政策证据，无法确认退款资格。"]
+    assert "assistant_cards" not in result
+
+
+@pytest.mark.asyncio
+async def test_synthesis_builds_policy_safe_fact_preserving_fallback(monkeypatch):
+    async def fake_llm(*_args, **_kwargs):
+        return AIMessage(content="该订单符合退款条件，可以退款。")
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", fake_llm)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-safe-fallback"},
+            "user_text": "订单到哪了，是否符合退款条件？",
+            "supervisor_plan": SupervisorPlan(
+                specialists=[
+                    "order_fulfillment_specialist",
+                    "after_sales_policy_specialist",
+                ]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="order_fulfillment_specialist",
+                    draft_answer=(
+                        "订单 SM1 已发货，最新物流为派送中。\n"
+                        "退款条件说明：该订单可以退款。"
+                    ),
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "QUERY_LOGISTICS",
+                            "success": True,
+                        }
+                    ],
+                ).model_dump(mode="json"),
+                AgentArtifact(
+                    status="DEGRADED",
+                    agent_id="after_sales_policy_specialist",
+                    draft_answer="没有政策证据。",
+                ).model_dump(mode="json"),
+            ],
+        }
+    )
+
+    fallback = result["verifier_fallback"]
+    assert "订单 SM1 已发货，最新物流为派送中" in fallback
+    assert "该订单可以退款" not in fallback
+    assert "无法确认具体售后资格" in fallback
 
 
 class _FanoutState(TypedDict, total=False):
@@ -1221,6 +1440,23 @@ def test_sql_guard_accepts_catalog_query_and_rejects_escape_attempts():
     )
     assert not alias_collision.allowed
     assert alias_collision.reason == "SQL_COLUMN_NOT_ALLOWLISTED"
+
+    aggregate_alias_ordering = validate_sql(
+        "SELECT product_name, SUM(paid_units) AS total_paid_units "
+        "FROM analytics_product_sales_daily "
+        "WHERE date BETWEEN '2026-08-01' AND '2026-08-07' "
+        "GROUP BY product_name ORDER BY total_paid_units DESC LIMIT 10"
+    )
+    assert aggregate_alias_ordering.allowed
+    assert aggregate_alias_ordering.columns == ("date", "paid_units", "product_name")
+
+    alias_must_not_hide_unknown_projection_column = validate_sql(
+        "SELECT email AS paid_units FROM analytics_product_sales_daily "
+        "WHERE date BETWEEN '2026-08-01' AND '2026-08-07' "
+        "ORDER BY paid_units LIMIT 10"
+    )
+    assert not alias_must_not_hide_unknown_projection_column.allowed
+    assert alias_must_not_hide_unknown_projection_column.reason == "SQL_COLUMN_NOT_ALLOWLISTED"
 
     escaped_cte_alias = validate_sql(
         "WITH scoped AS (SELECT gross_paid_amount AS email "

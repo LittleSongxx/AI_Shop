@@ -2,7 +2,9 @@ from app.config.settings import Settings, get_settings
 from app.services import agent_runtime
 from app.services.agent_runtime import bind_agent_llm
 from app.services.llm_factory import (
+    _is_deepseek_endpoint,
     _resolve_memory_llm_config,
+    chat_llm_config,
     create_chat_llm,
     create_memory_llm,
     has_fallback_chat_llm,
@@ -22,6 +24,7 @@ def test_memory_llm_falls_back_to_chat_config(monkeypatch):
     assert model == "chat-model"
     assert timeout == 60
 
+
 def test_memory_llm_uses_dedicated_config(monkeypatch):
     s = Settings(
         llm_api_key="chat-key",
@@ -38,6 +41,7 @@ def test_memory_llm_uses_dedicated_config(monkeypatch):
     assert model == "mem-model"
     assert timeout == 90
 
+
 def test_chat_and_memory_llm_streaming_flag(monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     get_settings.cache_clear()
@@ -46,6 +50,45 @@ def test_chat_and_memory_llm_streaming_flag(monkeypatch):
     assert chat.streaming is True
     assert memory.streaming is False
     get_settings.cache_clear()
+
+
+def test_bounded_deepseek_memory_work_can_disable_thinking(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.deepseek.com")
+    monkeypatch.setenv("LLM_MODEL", "deepseek-v4-flash")
+    get_settings.cache_clear()
+    try:
+        regular = create_memory_llm()
+        extraction = create_memory_llm(disable_thinking=True)
+
+        assert regular.extra_body is None
+        assert extraction.extra_body == {"thinking": {"type": "disabled"}}
+        assert extraction.streaming is False
+    finally:
+        get_settings.cache_clear()
+
+
+def test_bounded_deepseek_agent_work_can_disable_thinking(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.deepseek.com")
+    monkeypatch.setenv("LLM_MODEL", "deepseek-v4-flash")
+    get_settings.cache_clear()
+    try:
+        regular = chat_llm_config()
+        bounded = chat_llm_config(disable_thinking=True)
+
+        assert regular.disable_thinking is False
+        assert bounded.disable_thinking is True
+        assert bind_agent_llm(disable_thinking=True) is not bind_agent_llm()
+    finally:
+        agent_runtime._agent_llm_with_tools.cache_clear()
+        get_settings.cache_clear()
+
+
+def test_thinking_toggle_is_only_sent_to_deepseek_compatible_endpoints():
+    assert _is_deepseek_endpoint("https://api.deepseek.com") is True
+    assert _is_deepseek_endpoint("https://deepseek.com/v1") is True
+    assert _is_deepseek_endpoint("https://api.openai.com/v1") is False
 
 
 def test_chat_llm_can_switch_to_distinct_fallback_model(monkeypatch):
@@ -114,8 +157,9 @@ def test_agent_llm_distinguishes_empty_scope_from_legacy_full_scope(monkeypatch)
     monkeypatch.setattr(
         agent_runtime,
         "build_mcp_tools",
-        lambda allowed: captured_scopes.append(allowed)
-        or (["legacy"] if allowed is None else list(allowed)),
+        lambda allowed: (
+            captured_scopes.append(allowed) or (["legacy"] if allowed is None else list(allowed))
+        ),
     )
     agent_runtime._agent_llm_with_tools.cache_clear()
     try:
@@ -124,3 +168,20 @@ def test_agent_llm_distinguishes_empty_scope_from_legacy_full_scope(monkeypatch)
         assert captured_scopes == [set(), None]
     finally:
         agent_runtime._agent_llm_with_tools.cache_clear()
+
+
+def test_agent_llm_can_skip_tool_binding_for_final_artifact(monkeypatch):
+    config = object()
+    llm = object()
+    build_tools = []
+
+    monkeypatch.setattr(agent_runtime, "chat_llm_config", lambda **_kwargs: config)
+    monkeypatch.setattr(agent_runtime, "chat_llm_for_config", lambda _config: llm)
+    monkeypatch.setattr(
+        agent_runtime,
+        "build_mcp_tools",
+        lambda allowed: build_tools.append(allowed) or [],
+    )
+
+    assert bind_agent_llm(tools_enabled=False) is llm
+    assert build_tools == []

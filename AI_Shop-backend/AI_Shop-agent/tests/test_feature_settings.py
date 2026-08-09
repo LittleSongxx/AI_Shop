@@ -11,6 +11,13 @@ def test_multi_agent_and_data_analyst_are_enabled_by_default(monkeypatch):
 
     assert settings.multi_agent_enabled is True
     assert settings.data_analyst_enabled is True
+    assert settings.multi_agent_specialist_timeout_seconds == 12
+
+
+@pytest.mark.parametrize("timeout", [2, 31])
+def test_multi_agent_specialist_timeout_is_bounded(timeout):
+    with pytest.raises(ValueError, match="MULTI_AGENT_SPECIALIST_TIMEOUT_SECONDS"):
+        Settings(_env_file=None, multi_agent_specialist_timeout_seconds=timeout)
 
 
 def test_enabled_data_analyst_requires_dedicated_credentials():
