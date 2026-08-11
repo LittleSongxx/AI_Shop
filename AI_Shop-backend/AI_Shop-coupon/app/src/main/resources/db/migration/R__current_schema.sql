@@ -29,6 +29,18 @@ create table if not exists user_coupon
     order_id       varchar(32)          null comment '核销订单号 order_info.order_id',
     status         tinyint(1) default 0 null comment '状态 0:未使用 1:已使用 2:已过期 3:已作废'
 ) comment '用户优惠券关联表' collate = utf8mb4_general_ci row_format = DYNAMIC;
+
+-- A coupon without rows is GLOBAL. Scoped rows make recommendation quotes
+-- conservative for category/product/SKU promotions without changing the
+-- checkout authority; checkout still performs its own final validation.
+create table if not exists coupon_scope
+(
+    coupon_id   varchar(20)  not null comment '优惠券ID',
+    scope_type  varchar(16)  not null comment 'GLOBAL/CATEGORY/PRODUCT/SKU',
+    scope_value varchar(64)  not null default '' comment 'categoryId/productId/sku hash',
+    primary key (coupon_id, scope_type, scope_value),
+    key idx_coupon_scope_lookup (coupon_id, scope_type)
+) comment '优惠券适用范围' collate = utf8mb4_general_ci row_format = DYNAMIC;
 -- Coupon schema has no post-baseline DDL. Keep an explicit migration marker
 -- so deployment tooling can verify every Java domain has an upgrade track.
 SELECT 1;

@@ -29,6 +29,7 @@ import com.aishop.mappers.OrderCouponRelMapper;
 import com.aishop.mappers.OrderInfoMapper;
 import com.aishop.mappers.OrderItemMapper;
 import com.aishop.mappers.OrderLogisticsInfoMapper;
+import com.aishop.integration.CommerceOutcomeClient;
 import com.aishop.support.MqIdempotencyKeys;
 import com.aishop.utils.OrderListPayAmountHelper;
 import com.aishop.utils.OrderPayAmountUtil;
@@ -97,6 +98,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	private OrderRequestIdempotencyService orderRequestIdempotencyService;
 	@Resource
 	private CouponRushOrderService couponRushOrderService;
+	@Resource
+	private CommerceOutcomeClient commerceOutcomeClient;
 
 	@Override
 	public List<OrderInfo> findListByParam(OrderInfoQuery param) {
@@ -619,10 +622,12 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		restoreStockForPayOrderId(orderInfo.getPayOrderId());
 		if (StringTools.isEmpty(orderInfo.getChannelOrderId())) {
 			releaseCouponIfNeeded(orderInfo.getPayOrderId());
+			recordCancellationOutcomes(List.of(orderInfo), "USER_CANCEL", "CANCELLED");
 			return;
 		}
 		cancelOrder4Channel(orderInfo);
 		releaseCouponIfNeeded(orderInfo.getPayOrderId());
+		recordCancellationOutcomes(List.of(orderInfo), "USER_CANCEL", "CANCELLED");
 	}
 
 	private boolean isPaidOrBeyond(Integer status) {
@@ -673,6 +678,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			cancelOrder4Channel(channelRef);
 		}
 		releaseCouponIfNeeded(payOrderId);
+		recordCancellationOutcomes(orderList, "PAYMENT_TIMEOUT", "CLOSED");
 	}
 
 	private void restoreStockForPayOrderId(String payOrderId) {
@@ -819,6 +825,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 
 		useCouponIfNeeded(orderInfoList);
 		payFeignSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
+		recordPaymentOutcomes(orderInfoList, payOrderId);
 	}
 
 	private PayChannelEnum resolveWaitPayChannel(OrderInfo orderInfo) {
@@ -1367,6 +1374,101 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				log.warn("确认收货加销量跳过 productId={}, msg={}", entry.getKey(), e.getMessage());
 			}
 		}
+	}
+
+	private void recordPaymentOutcomes(List<OrderInfo> orders, String payOrderId) {
+		if (orders == null || orders.isEmpty()) {
+			return;
+		}
+		Date occurredAt = new Date();
+		for (OrderInfo order : orders) {
+			List<OrderItem> items = loadOrderItems(order.getOrderId());
+			if (items.isEmpty()) {
+				continue;
+			}
+			BigDecimal grossTotal = sumItemAmount(items, false);
+			BigDecimal remaining = normalizeMoney(order.getAmount());
+			for (int index = 0; index < items.size(); index++) {
+				OrderItem item = items.get(index);
+				BigDecimal paidAmount = allocateLineAmount(
+						remaining, item.getItemAmount(), grossTotal, index == items.size() - 1);
+				remaining = remaining.subtract(paidAmount).max(BigDecimal.ZERO);
+				Map<String, Object> payload = new LinkedHashMap<>();
+				if (item.getBuyCount() != null) {
+					payload.put("quantity", item.getBuyCount());
+				}
+				payload.put("paidAmount", paidAmount);
+				payload.put("currency", "CNY");
+				payload.put("payStatus", "PAID");
+				commerceOutcomeClient.recordAfterCommit(CommerceOutcomeClient.fromVerifiedCarrier(
+						CommerceOutcomeClient.stableEventId(
+								"payment", payOrderId, order.getOrderId(), item.getOrderItemId()),
+						"PAYMENT",
+						CommerceOutcomeClient.stableIdempotencyKey(
+								"payment", payOrderId, order.getOrderId(), item.getOrderItemId()),
+						"PAYMENT",
+						order.getUserId(),
+						item,
+						item.getPropertyValueIdHash(),
+						order.getOrderId(),
+						payload,
+						occurredAt));
+			}
+		}
+	}
+
+	private void recordCancellationOutcomes(
+			List<OrderInfo> orders, String reasonCode, String orderStatus) {
+		if (orders == null || orders.isEmpty()) {
+			return;
+		}
+		Date occurredAt = new Date();
+		for (OrderInfo order : orders) {
+			for (OrderItem item : loadOrderItems(order.getOrderId())) {
+				Map<String, Object> payload = new LinkedHashMap<>();
+				payload.put("reasonCode", reasonCode);
+				payload.put("orderStatus", orderStatus);
+				commerceOutcomeClient.recordAfterCommit(CommerceOutcomeClient.fromVerifiedCarrier(
+						CommerceOutcomeClient.stableEventId(
+								"cancel", order.getOrderId(), item.getOrderItemId()),
+						"ORDER",
+						CommerceOutcomeClient.stableIdempotencyKey(
+								"cancel", order.getOrderId(), item.getOrderItemId()),
+						"CANCEL",
+						order.getUserId(),
+						item,
+						item.getPropertyValueIdHash(),
+						order.getOrderId(),
+						payload,
+						occurredAt));
+			}
+		}
+	}
+
+	private List<OrderItem> loadOrderItems(String orderId) {
+		if (StringTools.isEmpty(orderId)) {
+			return Collections.emptyList();
+		}
+		OrderItemQuery query = new OrderItemQuery();
+		query.setOrderId(orderId);
+		List<OrderItem> items = orderItemMapper.selectList(query);
+		return items == null ? Collections.emptyList() : items;
+	}
+
+	private BigDecimal allocateLineAmount(
+			BigDecimal remaining, BigDecimal lineGross, BigDecimal grossTotal, boolean last) {
+		if (last || grossTotal.signum() <= 0 || lineGross == null || lineGross.signum() <= 0) {
+			return remaining.setScale(2, RoundingMode.HALF_UP).max(BigDecimal.ZERO);
+		}
+		return remaining
+				.multiply(lineGross)
+				.divide(grossTotal, 2, RoundingMode.HALF_UP)
+				.min(remaining)
+				.max(BigDecimal.ZERO);
+	}
+
+	private BigDecimal normalizeMoney(BigDecimal amount) {
+		return (amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.HALF_UP);
 	}
 
 	// 关闭订单（支付系统官方）

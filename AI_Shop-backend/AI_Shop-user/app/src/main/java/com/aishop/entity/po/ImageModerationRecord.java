@@ -12,6 +12,12 @@ public class ImageModerationRecord implements Serializable {
     private String userId;
     private String userIp;
     private String imagePath;
+    private String assetId;
+    private String contentSha256;
+    private String mimeType;
+    private Integer imageWidth;
+    private Integer imageHeight;
+    private String retentionClass;
     private String scene;
     private String orderId;
     private Integer conclusionType;
@@ -26,6 +32,14 @@ public class ImageModerationRecord implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date handleTime;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date expiresAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date purgedAt;
 
     private String handleRemark;
 
@@ -59,6 +73,54 @@ public class ImageModerationRecord implements Serializable {
 
     public void setImagePath(String imagePath) {
         this.imagePath = imagePath;
+    }
+
+    public String getAssetId() {
+        return assetId;
+    }
+
+    public void setAssetId(String assetId) {
+        this.assetId = assetId;
+    }
+
+    public String getContentSha256() {
+        return contentSha256;
+    }
+
+    public void setContentSha256(String contentSha256) {
+        this.contentSha256 = contentSha256;
+    }
+
+    public String getMimeType() {
+        return mimeType;
+    }
+
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
+    }
+
+    public Integer getImageWidth() {
+        return imageWidth;
+    }
+
+    public void setImageWidth(Integer imageWidth) {
+        this.imageWidth = imageWidth;
+    }
+
+    public Integer getImageHeight() {
+        return imageHeight;
+    }
+
+    public void setImageHeight(Integer imageHeight) {
+        this.imageHeight = imageHeight;
+    }
+
+    public String getRetentionClass() {
+        return retentionClass;
+    }
+
+    public void setRetentionClass(String retentionClass) {
+        this.retentionClass = retentionClass;
     }
 
     public String getScene() {
@@ -123,6 +185,22 @@ public class ImageModerationRecord implements Serializable {
 
     public void setHandleTime(Date handleTime) {
         this.handleTime = handleTime;
+    }
+
+    public Date getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Date expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public Date getPurgedAt() {
+        return purgedAt;
+    }
+
+    public void setPurgedAt(Date purgedAt) {
+        this.purgedAt = purgedAt;
     }
 
     public String getHandleRemark() {

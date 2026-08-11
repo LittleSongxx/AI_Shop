@@ -221,6 +221,225 @@ SELECT DATE(r.started_at) AS `date`,
  WHERE s.event_type = 'TOOL_CALL' AND s.tool_name IS NOT NULL
  GROUP BY DATE(r.started_at), COALESCE(s.agent_id, r.agent_id, 'supervisor'), s.tool_name;
 
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_recommendation_funnel_daily AS
+SELECT e.`date`,
+       e.retrieval_mode,
+       SUM(e.event_type = 'IMPRESSION') AS impression_count,
+       SUM(e.event_type = 'CLICK') AS click_count,
+       SUM(e.event_type = 'ADD_TO_CART') AS add_to_cart_count,
+       SUM(e.event_type = 'PAYMENT') AS payment_count,
+       ROUND(SUM(e.event_type = 'CLICK') / GREATEST(SUM(e.event_type = 'IMPRESSION'), 1), 4)
+           AS click_through_rate,
+       ROUND(SUM(e.event_type = 'ADD_TO_CART') / GREATEST(SUM(e.event_type = 'IMPRESSION'), 1), 4)
+           AS cart_rate,
+       ROUND(SUM(e.event_type = 'PAYMENT') / GREATEST(SUM(e.event_type = 'IMPRESSION'), 1), 4)
+           AS payment_rate
+  FROM (
+        SELECT DATE(r.occurred_at) AS `date`,
+               COALESCE(r.retrieval_mode, 'text') AS retrieval_mode,
+               r.event_type
+          FROM aishop_agent.agent_recommendation_event r
+         WHERE r.event_type IN ('IMPRESSION', 'CLICK')
+        UNION ALL
+        SELECT DATE(o.occurred_at) AS `date`,
+               COALESCE(
+                   JSON_UNQUOTE(JSON_EXTRACT(o.payload_json, '$.attribution.retrievalMode')),
+                   'text'
+               ) AS retrieval_mode,
+               o.event_type
+          FROM aishop_agent.commerce_outcome_ledger o
+         WHERE o.event_type IN ('ADD_TO_CART', 'PAYMENT')
+           AND JSON_UNQUOTE(JSON_EXTRACT(o.payload_json, '$.attributionStatus')) = 'VERIFIED'
+       ) e
+ GROUP BY e.`date`, e.retrieval_mode;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_recommendation_quality_daily AS
+SELECT DATE(o.occurred_at) AS `date`,
+       o.product_id,
+       SUM(o.event_type = 'PAYMENT') AS payment_count,
+       SUM(o.event_type = 'REFUND') AS refund_count,
+       SUM(o.event_type = 'RETURN') AS return_count,
+       SUM(
+           o.event_type = 'REVIEW'
+           AND CAST(JSON_UNQUOTE(JSON_EXTRACT(o.payload_json, '$.rating')) AS UNSIGNED) <= 2
+       ) AS negative_review_count,
+       SUM(o.event_type = 'SUPPORT_CONTACT') AS support_contact_count,
+       SUM(o.event_type = 'REPEAT_PURCHASE') AS repeat_purchase_count
+  FROM aishop_agent.commerce_outcome_ledger o
+ WHERE o.event_type IN (
+           'PAYMENT', 'REFUND', 'RETURN', 'REVIEW', 'SUPPORT_CONTACT', 'REPEAT_PURCHASE'
+       )
+   AND JSON_UNQUOTE(JSON_EXTRACT(o.payload_json, '$.attributionStatus')) = 'VERIFIED'
+ GROUP BY DATE(o.occurred_at), o.product_id;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_offer_quality_daily AS
+SELECT DATE(s.created_at) AS `date`,
+       s.product_id,
+       COUNT(*) AS quote_count,
+       SUM(JSON_UNQUOTE(JSON_EXTRACT(s.offer_json, '$.couponStatus')) = 'AVAILABLE')
+           AS coupon_available_count,
+       AVG(CAST(JSON_UNQUOTE(JSON_EXTRACT(s.offer_json, '$.basePrice')) AS DECIMAL(18, 2)))
+           AS avg_base_price,
+       AVG(CAST(JSON_UNQUOTE(JSON_EXTRACT(s.offer_json, '$.estimatedPayable')) AS DECIMAL(18, 2)))
+           AS avg_estimated_payable,
+       SUM(JSON_UNQUOTE(JSON_EXTRACT(s.offer_json, '$.inStock')) = 'true')
+           AS in_stock_quote_count
+  FROM aishop_agent.agent_final_offer_snapshot s
+ GROUP BY DATE(s.created_at), s.product_id;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_fulfillment_after_sales_daily AS
+SELECT d.`date`,
+       COALESCE(o.paid_order_count, 0) AS paid_order_count,
+       COALESCE(o.shipped_order_count, 0) AS shipped_order_count,
+       COALESCE(o.completed_order_count, 0) AS completed_order_count,
+       COALESCE(o.cancelled_order_count, 0) AS cancelled_order_count,
+       COALESCE(rr.refund_request_count, 0) AS refund_request_count,
+       COALESCE(rc.refund_completed_count, 0) AS refund_completed_count,
+       COALESCE(rc.refund_completed_amount, 0) AS refund_completed_amount
+  FROM (
+        SELECT DATE(order_time) AS `date` FROM aishop_order.order_info
+        UNION
+        SELECT DATE(created_at) AS `date` FROM aishop_order.refund_request
+        UNION
+        SELECT DATE(completed_at) AS `date`
+          FROM aishop_order.refund_request
+         WHERE status = 'COMPLETED' AND completed_at IS NOT NULL
+       ) d
+  LEFT JOIN (
+        SELECT DATE(order_time) AS `date`,
+               SUM(order_status IN (1, 2, 3, 6, 7, 8)) AS paid_order_count,
+               SUM(order_status = 2) AS shipped_order_count,
+               SUM(order_status IN (3, 8)) AS completed_order_count,
+               SUM(order_status IN (4, 5)) AS cancelled_order_count
+          FROM aishop_order.order_info
+         GROUP BY DATE(order_time)
+       ) o ON o.`date` = d.`date`
+  LEFT JOIN (
+        SELECT DATE(created_at) AS `date`,
+               COUNT(*) AS refund_request_count
+          FROM aishop_order.refund_request
+         GROUP BY DATE(created_at)
+       ) rr ON rr.`date` = d.`date`
+  LEFT JOIN (
+        SELECT DATE(completed_at) AS `date`,
+               COUNT(*) AS refund_completed_count,
+               SUM(refund_amount) AS refund_completed_amount
+          FROM aishop_order.refund_request
+         WHERE status = 'COMPLETED' AND completed_at IS NOT NULL
+         GROUP BY DATE(completed_at)
+       ) rc ON rc.`date` = d.`date`;
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW analytics_inventory_forecast AS
+WITH RECURSIVE calendar AS (
+    SELECT CURRENT_DATE - INTERVAL 27 DAY AS day_date
+    UNION ALL
+    SELECT day_date + INTERVAL 1 DAY
+      FROM calendar
+     WHERE day_date < CURRENT_DATE
+),
+demand_events AS (
+    SELECT DATE(o.order_time) AS day_date,
+           oi.product_id COLLATE utf8mb4_general_ci AS product_id,
+           oi.property_value_id_hash COLLATE utf8mb4_general_ci AS sku_key,
+           SUM(oi.buy_count) AS net_units
+      FROM aishop_order.order_info o
+      JOIN aishop_order.order_item oi
+        ON oi.order_id COLLATE utf8mb4_general_ci = o.order_id COLLATE utf8mb4_general_ci
+     WHERE o.order_status IN (1, 2, 3, 6, 7, 8)
+       AND o.order_time >= DATE_SUB(CURRENT_DATE, INTERVAL 27 DAY)
+     GROUP BY DATE(o.order_time), oi.product_id, oi.property_value_id_hash
+    UNION ALL
+    SELECT DATE(rr.completed_at) AS day_date,
+           rr.product_id COLLATE utf8mb4_general_ci AS product_id,
+           oi.property_value_id_hash COLLATE utf8mb4_general_ci AS sku_key,
+           -SUM(rr.buy_count) AS net_units
+      FROM aishop_order.refund_request rr
+      JOIN aishop_order.order_item oi
+        ON oi.order_item_id COLLATE utf8mb4_general_ci =
+           rr.order_item_id COLLATE utf8mb4_general_ci
+     WHERE rr.status = 'COMPLETED'
+       AND rr.completed_at >= DATE_SUB(CURRENT_DATE, INTERVAL 27 DAY)
+     GROUP BY DATE(rr.completed_at), rr.product_id, oi.property_value_id_hash
+),
+daily_demand AS (
+    SELECT i.product_id COLLATE utf8mb4_general_ci AS product_id,
+           i.property_value_id_hash COLLATE utf8mb4_general_ci AS sku_key,
+           c.day_date,
+           COALESCE(SUM(e.net_units), 0) AS net_units,
+           CASE WHEN COUNT(e.product_id) = 0 THEN 0 ELSE 1 END AS observed
+      FROM analytics_inventory_risk i
+      CROSS JOIN calendar c
+      LEFT JOIN demand_events e
+        ON e.product_id = i.product_id COLLATE utf8mb4_general_ci
+       AND e.sku_key = i.property_value_id_hash COLLATE utf8mb4_general_ci
+       AND e.day_date = c.day_date
+     GROUP BY i.product_id, i.property_value_id_hash, c.day_date
+),
+demand AS (
+    SELECT product_id,
+           sku_key,
+           GREATEST(
+               SUM(net_units * POW(0.90, DATEDIFF(CURRENT_DATE, day_date)))
+                   / NULLIF(SUM(POW(0.90, DATEDIFF(CURRENT_DATE, day_date))), 0),
+               0
+           ) AS ewma_daily_demand,
+           SUM(observed) AS observed_days
+      FROM daily_demand
+     GROUP BY product_id, sku_key
+)
+SELECT CURRENT_DATE AS snapshot_date,
+       i.product_id,
+       i.product_name,
+       i.property_value_id_hash AS sku_key,
+       i.risk_level,
+       i.stock AS current_stock,
+       COALESCE(b.inbound_quantity, 0) AS inbound_quantity,
+       ROUND(COALESCE(d.ewma_daily_demand, 0), 4) AS ewma_daily_demand,
+       COALESCE(p.lead_time_days, 7) AS lead_time_days,
+       COALESCE(p.safety_stock, 0) AS safety_stock,
+       COALESCE(p.review_period_days, 14) AS review_period_days,
+       GREATEST(COALESCE(p.min_order_quantity, 1), 1) AS min_order_quantity,
+       ROUND(
+           COALESCE(d.ewma_daily_demand, 0) * COALESCE(p.lead_time_days, 7)
+           + COALESCE(p.safety_stock, 0),
+           2
+       ) AS reorder_point,
+       CEIL(
+           GREATEST(
+               0,
+               COALESCE(d.ewma_daily_demand, 0)
+                   * (COALESCE(p.lead_time_days, 7) + COALESCE(p.review_period_days, 14))
+                   + COALESCE(p.safety_stock, 0)
+                   - i.stock
+                   - COALESCE(b.inbound_quantity, 0)
+           ) / GREATEST(COALESCE(p.min_order_quantity, 1), 1)
+       ) * GREATEST(COALESCE(p.min_order_quantity, 1), 1)
+           AS suggested_replenish_quantity,
+       CASE
+           WHEN COALESCE(d.ewma_daily_demand, 0) <= 0 THEN NULL
+           ELSE ROUND((i.stock + COALESCE(b.inbound_quantity, 0)) / d.ewma_daily_demand, 2)
+       END AS coverage_days,
+       ROUND(LEAST(COALESCE(d.observed_days, 0) / 28, 1), 4) AS confidence
+  FROM analytics_inventory_risk i
+  LEFT JOIN aishop_agent.agent_inventory_supply_parameter p
+    ON p.product_id COLLATE utf8mb4_general_ci = i.product_id COLLATE utf8mb4_general_ci
+   AND p.sku_key COLLATE utf8mb4_general_ci =
+       i.property_value_id_hash COLLATE utf8mb4_general_ci
+   AND p.enabled = 1
+  LEFT JOIN (
+        SELECT product_id, sku_key, SUM(quantity) AS inbound_quantity
+          FROM aishop_agent.agent_inventory_inbound
+         WHERE status IN ('PLANNED', 'IN_TRANSIT')
+           AND (eta_date IS NULL OR eta_date >= CURRENT_DATE)
+         GROUP BY product_id, sku_key
+       ) b ON b.product_id COLLATE utf8mb4_general_ci = i.product_id COLLATE utf8mb4_general_ci
+          AND b.sku_key COLLATE utf8mb4_general_ci =
+              i.property_value_id_hash COLLATE utf8mb4_general_ci
+  LEFT JOIN demand d
+    ON d.product_id COLLATE utf8mb4_general_ci = i.product_id COLLATE utf8mb4_general_ci
+   AND d.sku_key COLLATE utf8mb4_general_ci =
+       i.property_value_id_hash COLLATE utf8mb4_general_ci;
+
 SET @sql = IF(
     EXISTS (
         SELECT 1

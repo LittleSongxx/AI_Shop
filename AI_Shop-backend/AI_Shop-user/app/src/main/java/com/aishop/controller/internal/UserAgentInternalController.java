@@ -1,6 +1,8 @@
 package com.aishop.controller.internal;
 
 import com.aishop.biz.ImageModerationService;
+import com.aishop.api.dto.AgentImageAssetRequestDTO;
+import com.aishop.api.dto.VerifiedImageAssetDTO;
 import com.aishop.controller.ABaseController;
 import com.aishop.entity.po.UserBrowseHistory;
 import com.aishop.entity.query.SimplePage;
@@ -13,6 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,21 +36,37 @@ public class UserAgentInternalController extends ABaseController {
     private ImageModerationService imageModerationService;
 
     @PostMapping("/verifyImage")
-    public ResponseVO<Map<String, Object>> verifyImage(@RequestBody Map<String, Object> body) {
-        String userId = body == null || body.get("userId") == null
-                ? null : String.valueOf(body.get("userId")).trim();
-        String imagePath = body == null || body.get("imagePath") == null
-                ? null : String.valueOf(body.get("imagePath")).trim();
-        Integer moderationId = null;
-        if (body != null && body.get("moderationId") != null) {
-            try {
-                moderationId = Integer.valueOf(String.valueOf(body.get("moderationId")));
-            } catch (NumberFormatException ignored) {
-                moderationId = null;
-            }
-        }
+    public ResponseVO<VerifiedImageAssetDTO> verifyImage(
+            @RequestBody AgentImageAssetRequestDTO body) {
         return getSuccessResponseVO(
-                imageModerationService.verifySupportImage(userId, moderationId, imagePath));
+                imageModerationService.verifyAgentImage(
+                        body == null ? null : body.getUserId(),
+                        body == null ? null : body.getImageAssetId()));
+    }
+
+    @PostMapping("/imageContent")
+    public ResponseEntity<byte[]> imageContent(@RequestBody AgentImageAssetRequestDTO body) {
+        String userId = body == null ? null : body.getUserId();
+        String imageAssetId = body == null ? null : body.getImageAssetId();
+        VerifiedImageAssetDTO verified = imageModerationService.verifyAgentImage(
+                userId, imageAssetId);
+        byte[] content = imageModerationService.readAgentImage(userId, imageAssetId);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("X-Content-Type-Options", "nosniff")
+                .header("X-Content-Sha256", verified.getContentSha256())
+                .contentType(MediaType.parseMediaType(verified.getMimeType()))
+                .contentLength(content.length)
+                .body(content);
+    }
+
+    @PostMapping("/retainImageAsSupportEvidence")
+    public ResponseVO<Void> retainImageAsSupportEvidence(
+            @RequestBody AgentImageAssetRequestDTO body) {
+        imageModerationService.retainAgentImageAsSupportEvidence(
+                body == null ? null : body.getUserId(),
+                body == null ? null : body.getImageAssetId());
+        return getSuccessResponseVO(null);
     }
 
     @PostMapping("/latestBrowseProductId")

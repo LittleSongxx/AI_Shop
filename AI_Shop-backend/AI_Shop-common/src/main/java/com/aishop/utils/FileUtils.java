@@ -202,6 +202,29 @@ public class FileUtils {
         }
     }
 
+    public byte[] readStoredFile(String relativePath) {
+        if (StringTools.isEmpty(relativePath)
+                || !StringTools.pathIsOK(relativePath)
+                || FileUtils.isModerationQuarantinePath(relativePath)) {
+            throw new BusinessException("图片资源路径无效");
+        }
+        File file = resolveStoredFile(relativePath);
+        if (!file.isFile()) {
+            throw new BusinessException("图片资源不存在或已清理");
+        }
+        try {
+            return java.nio.file.Files.readAllBytes(file.toPath());
+        } catch (IOException e) {
+            throw new BusinessException("读取图片资源失败");
+        }
+    }
+
+    public boolean storedFileExists(String relativePath) {
+        return !StringTools.isEmpty(relativePath)
+                && StringTools.pathIsOK(relativePath)
+                && resolveStoredFile(relativePath).isFile();
+    }
+
     public static String toThumbnailRelativePath(String relativePath) {
         if (StringTools.isEmpty(relativePath)) {
             return null;

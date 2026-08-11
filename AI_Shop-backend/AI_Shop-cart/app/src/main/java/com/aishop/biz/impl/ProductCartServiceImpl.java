@@ -129,7 +129,7 @@ public class ProductCartServiceImpl implements ProductCartService {
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	public void add2Cart(ProductCart productCart) {
+	public ProductCart add2Cart(ProductCart productCart) {
 		// 获取当前时间
 		Date now = StringTools.getCurrentDate();
 		String propertyValueIds = resolvePropertyValueIds(productCart.getProductId(), productCart.getPropertyValueIds());
@@ -165,6 +165,12 @@ public class ProductCartServiceImpl implements ProductCartService {
 			productCart.setCartId(cartId);
 			this.add(productCart);
 		}
+		ProductCart persisted = getProductCartByProductIdAndPropertyValueIdHashAndUserId(
+				productCart.getProductId(), propertyValueIdHash, productCart.getUserId());
+		if (persisted == null) {
+			throw new BusinessException("购物车写入失败");
+		}
+		return persisted;
 	}
 
 	// 获取购物车列表

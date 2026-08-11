@@ -3,8 +3,10 @@ package com.aishop.biz;
 import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.enums.OrderItemStatusEnum;
 import com.aishop.api.enums.OrderStatusEnum;
+import com.aishop.api.support.UserFeignSupport;
 import com.aishop.constants.RabbitMQConfig;
 import com.aishop.constants.TransactionalMqSender;
+import com.aishop.integration.CommerceOutcomeClient;
 import com.aishop.entity.enums.MessageReliabilityLevelEnum;
 import com.aishop.entity.enums.RefundSagaStatus;
 import com.aishop.entity.po.OrderInfo;
@@ -36,6 +38,10 @@ public class RefundSagaTransactionService {
     private OrderItemMapper<OrderItem, ?> orderItemMapper;
     @Resource
     private TransactionalMqSender transactionalMqSender;
+    @Resource
+    private CommerceOutcomeClient commerceOutcomeClient;
+    @Resource
+    private UserFeignSupport userFeignSupport;
 
     @Value("${refund.saga.retry-seconds:60}")
     private int retrySeconds;
@@ -167,7 +173,45 @@ public class RefundSagaTransactionService {
 
     @Transactional(rollbackFor = Exception.class)
     public void markCompleted(String refundRequestId) {
+        RefundRequest request = refundRequestMapper.selectById(refundRequestId);
+        if (request == null) {
+            return;
+        }
+        boolean newlyCompleted = !RefundSagaStatus.COMPLETED.name().equals(request.getStatus());
         refundRequestMapper.markCompleted(refundRequestId);
+        if (!newlyCompleted) {
+            return;
+        }
+        transactionalMqSender.sendAfterCommit(() -> userFeignSupport.sendNotifyAsync(
+                request.getUserId(),
+                "退款已完成",
+                "订单 " + request.getOrderId() + " 的退款已完成，款项将按支付渠道到账。",
+                "refund_complete",
+                request.getRefundRequestId()));
+        OrderItem item = orderItemMapper.selectByOrderItemId(request.getOrderItemId());
+        if (item == null) {
+            return;
+        }
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        if (request.getRefundAmount() != null) {
+            payload.put("refundAmount", request.getRefundAmount());
+        }
+        if (request.getBuyCount() != null) {
+            payload.put("quantity", request.getBuyCount());
+        }
+        payload.put("currency", "CNY");
+        payload.put("refundStatus", "COMPLETED");
+        commerceOutcomeClient.recordAfterCommit(CommerceOutcomeClient.fromVerifiedCarrier(
+                CommerceOutcomeClient.stableEventId("refund", request.getRefundRequestId()),
+                "AFTER_SALES",
+                CommerceOutcomeClient.stableIdempotencyKey("refund", request.getRefundRequestId()),
+                "REFUND",
+                request.getUserId(),
+                item,
+                item.getPropertyValueIdHash(),
+                request.getOrderId(),
+                payload,
+                request.getCompletedAt() == null ? new Date() : request.getCompletedAt()));
     }
 
     private void finalizeOrderRefund(RefundRequest request) {

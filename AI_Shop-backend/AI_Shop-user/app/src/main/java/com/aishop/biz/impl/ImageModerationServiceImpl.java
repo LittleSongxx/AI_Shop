@@ -6,6 +6,7 @@ import com.aishop.component.UserTempBanService;
 import com.aishop.constants.Constants;
 import com.aishop.entity.dto.BaiduImageCensorResultDTO;
 import com.aishop.api.dto.ImageUploadResultDTO;
+import com.aishop.api.dto.VerifiedImageAssetDTO;
 import com.aishop.api.OrderFeignClient;
 import com.aishop.api.dto.OrderIdDTO;
 import com.aishop.api.support.FeignResponseSupport;
@@ -20,6 +21,7 @@ import com.aishop.entity.vo.PaginationResultVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.mappers.ImageModerationRecordMapper;
 import com.aishop.biz.ImageModerationService;
+import com.aishop.storage.ImageAssetStore;
 import com.aishop.utils.FileUtils;
 import com.aishop.utils.ImageCompressUtils;
 import com.aishop.utils.StringTools;
@@ -30,12 +32,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -44,12 +55,16 @@ import java.util.stream.Collectors;
 public class ImageModerationServiceImpl implements ImageModerationService {
 
     private static final int TEMP_BAN_HOURS = 2;
-    private static final Pattern SUPPORT_IMAGE_PATH = Pattern.compile(
-            "^[0-9]{6}/[A-Za-z0-9_-]{10,80}\\.(?:jpg|jpeg|png|gif|webp|bmp)$",
-            Pattern.CASE_INSENSITIVE);
+    private static final Pattern AGENT_ASSET_ID = Pattern.compile("^img_[a-f0-9]{32}$");
+    private static final String RETENTION_QUERY_30D = "QUERY_30D";
+    private static final String RETENTION_SUPPORT_EVIDENCE = "SUPPORT_EVIDENCE";
+    private static final int QUERY_RETENTION_DAYS = 30;
+    private static final int CLEANUP_BATCH_SIZE = 200;
 
     @Resource
     private FileUtils fileUtils;
+    @Resource
+    private ImageAssetStore imageAssetStore;
     @Resource
     private BaiduImageCensorComponent baiduImageCensorComponent;
     @Resource
@@ -69,22 +84,55 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     public ImageUploadResultDTO uploadAndModerate(String userId, String userIp, MultipartFile file,
                                                   Boolean createThumbnail, String scene, String orderId) {
         ImageModerationSceneEnum sceneEnum = ImageModerationSceneEnum.getByCode(scene);
-        ImageCompressUtils.PreparedImage prepared = fileUtils.prepareUploadImage(file);
+        if (sceneEnum == null) {
+            throw new BusinessException(600, "不支持的图片使用场景");
+        }
+        ImageCompressUtils.PreparedImage prepared = prepareForScene(file, sceneEnum);
+        AssetMetadata assetMetadata = ImageModerationSceneEnum.AGENT.equals(sceneEnum)
+                ? inspectAgentAsset(prepared) : null;
+        String assetId = ImageModerationSceneEnum.AGENT.equals(sceneEnum)
+                ? "img_" + UUID.randomUUID().toString().replace("-", "") : null;
+        Date expiresAt = ImageModerationSceneEnum.AGENT.equals(sceneEnum)
+                ? Date.from(Instant.now().plus(QUERY_RETENTION_DAYS, ChronoUnit.DAYS)) : null;
         byte[] censorBytes = ImageCompressUtils.prepareForBaiduCensor(prepared.getData());
         BaiduImageCensorResultDTO result = censorImageBytes(censorBytes, userId, userIp);
         if (result.isPass()) {
-            String path = fileUtils.savePreparedImage(prepared, createThumbnail);
-            if (ImageModerationSceneEnum.SUPPORT.equals(sceneEnum)) {
-                ImageModerationRecord record = saveRecord(
-                        userId, userIp, path, sceneEnum.getCode(), orderId, result,
-                        ImageModerationStatusEnum.APPROVED.getStatus());
-                return uploadResult(
-                        path, false, record, ImageModerationStatusEnum.APPROVED,
-                        sceneEnum.getCode());
+            if (ImageModerationSceneEnum.AGENT.equals(sceneEnum)) {
+                String storageKey = imageAssetStore.save(prepared, true);
+                try {
+                    ImageModerationRecord record = saveRecord(
+                            userId, userIp, storageKey, sceneEnum.getCode(), null, result,
+                            ImageModerationStatusEnum.APPROVED.getStatus(), assetId,
+                            assetMetadata, RETENTION_QUERY_30D, expiresAt);
+                    return uploadResult(
+                            null, false, record, ImageModerationStatusEnum.APPROVED,
+                            sceneEnum.getCode());
+                } catch (RuntimeException exception) {
+                    imageAssetStore.deleteWithThumbnail(storageKey);
+                    throw exception;
+                }
             }
+            String path = fileUtils.savePreparedImage(prepared, createThumbnail);
             return new ImageUploadResultDTO(path, false);
         }
-        return handleCensorResult(userId, userIp, prepared, sceneEnum.getCode(), orderId, result);
+        return handleCensorResult(
+                userId, userIp, prepared, sceneEnum, orderId, result,
+                assetId, assetMetadata, expiresAt);
+    }
+
+    private ImageCompressUtils.PreparedImage prepareForScene(
+            MultipartFile file, ImageModerationSceneEnum scene) {
+        if (!ImageModerationSceneEnum.AGENT.equals(scene)) {
+            return fileUtils.prepareUploadImage(file);
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(600, "请选择要上传的图片");
+        }
+        try {
+            return ImageCompressUtils.prepareAgentImage(file.getBytes(), file.getOriginalFilename());
+        } catch (IOException exception) {
+            throw new BusinessException(600, "读取图片失败，请重试");
+        }
     }
 
     @Override
@@ -95,20 +143,32 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         return baiduImageCensorComponent.censorImage(imageBytes);
     }
 
-    private ImageUploadResultDTO handleCensorResult(String userId, String userIp,
-                                                    ImageCompressUtils.PreparedImage prepared, String scene,
-                                                    String orderId, BaiduImageCensorResultDTO result) {
+    private ImageUploadResultDTO handleCensorResult(
+            String userId, String userIp, ImageCompressUtils.PreparedImage prepared,
+            ImageModerationSceneEnum scene, String orderId, BaiduImageCensorResultDTO result,
+            String assetId, AssetMetadata assetMetadata, Date expiresAt) {
         if (result.isSuspect()) {
-            String quarantinePath = fileUtils.saveModerationQuarantineImage(prepared);
-            ImageModerationRecord record = saveRecord(
-                    userId, userIp, quarantinePath, scene, orderId, result,
-                    ImageModerationStatusEnum.PENDING.getStatus());
-            if (ImageModerationSceneEnum.SUPPORT.getCode().equals(scene)) {
-                return uploadResult(
-                        quarantinePath, true, record, ImageModerationStatusEnum.PENDING,
-                        scene);
+            String quarantinePath = ImageModerationSceneEnum.AGENT.equals(scene)
+                    ? imageAssetStore.saveQuarantine(prepared)
+                    : fileUtils.saveModerationQuarantineImage(prepared);
+            ImageModerationRecord record;
+            try {
+                record = saveRecord(
+                        userId, userIp, quarantinePath, scene.getCode(), orderId, result,
+                        ImageModerationStatusEnum.PENDING.getStatus(), assetId,
+                        assetMetadata,
+                        ImageModerationSceneEnum.AGENT.equals(scene) ? RETENTION_QUERY_30D : null,
+                        expiresAt);
+            } catch (RuntimeException exception) {
+                imageAssetStore.deleteWithThumbnail(quarantinePath);
+                throw exception;
             }
-            if (ImageModerationSceneEnum.COMMENT.getCode().equals(scene)
+            if (ImageModerationSceneEnum.AGENT.equals(scene)) {
+                return uploadResult(
+                        null, true, record, ImageModerationStatusEnum.PENDING,
+                        scene.getCode());
+            }
+            if (ImageModerationSceneEnum.COMMENT.equals(scene)
                     && !StringTools.isEmpty(orderId)) {
                 return new ImageUploadResultDTO(quarantinePath, true);
             }
@@ -117,8 +177,11 @@ public class ImageModerationServiceImpl implements ImageModerationService {
             throw new BusinessException(600, "图片存在违规风险，已提交人工审核，请更换图片后再试", data);
         }
         if (result.isReject()) {
-            saveRecord(userId, userIp, "", scene, orderId, result,
-                    ImageModerationStatusEnum.VIOLATION.getStatus());
+            saveRecord(userId, userIp, null, scene.getCode(), orderId, result,
+                    ImageModerationStatusEnum.VIOLATION.getStatus(), assetId,
+                    assetMetadata,
+                    ImageModerationSceneEnum.AGENT.equals(scene) ? RETENTION_QUERY_30D : null,
+                    expiresAt);
             long unbanAt = userTempBanService.banUserHours(userId, TEMP_BAN_HOURS);
             Map<String, Object> data = new HashMap<>();
             data.put("errorType", "IMAGE_REJECT_BANNED");
@@ -131,11 +194,20 @@ public class ImageModerationServiceImpl implements ImageModerationService {
 
     private ImageModerationRecord saveRecord(
             String userId, String userIp, String imagePath, String scene, String orderId,
-            BaiduImageCensorResultDTO result, Integer status) {
+            BaiduImageCensorResultDTO result, Integer status, String assetId,
+            AssetMetadata assetMetadata, String retentionClass, Date expiresAt) {
         ImageModerationRecord record = new ImageModerationRecord();
         record.setUserId(userId);
         record.setUserIp(userIp);
         record.setImagePath(imagePath);
+        record.setAssetId(assetId);
+        if (assetMetadata != null) {
+            record.setContentSha256(assetMetadata.sha256());
+            record.setMimeType(assetMetadata.mimeType());
+            record.setImageWidth(assetMetadata.width());
+            record.setImageHeight(assetMetadata.height());
+        }
+        record.setRetentionClass(retentionClass);
         record.setScene(scene);
         record.setOrderId(orderId);
         record.setConclusionType(result.getConclusionType());
@@ -143,8 +215,17 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         record.setBaiduResponse(result.getRawResponse());
         record.setStatus(status);
         record.setCreateTime(new Date());
+        record.setExpiresAt(expiresAt);
         imageModerationRecordMapper.insert(record);
         return record;
+    }
+
+    private ImageModerationRecord saveRecord(
+            String userId, String userIp, String imagePath, String scene, String orderId,
+            BaiduImageCensorResultDTO result, Integer status) {
+        return saveRecord(
+                userId, userIp, imagePath, scene, orderId, result, status,
+                null, null, null, null);
     }
 
     private static ImageUploadResultDTO uploadResult(
@@ -157,6 +238,14 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         dto.setModerationId(record == null ? null : record.getRecordId());
         dto.setModerationStatus(status.name());
         dto.setScene(scene);
+        if (record != null && record.getAssetId() != null) {
+            dto.setAssetId(record.getAssetId());
+            dto.setContentSha256(record.getContentSha256());
+            dto.setMimeType(record.getMimeType());
+            dto.setWidth(record.getImageWidth());
+            dto.setHeight(record.getImageHeight());
+            dto.setExpiresAt(toIsoInstant(record.getExpiresAt()));
+        }
         return dto;
     }
 
@@ -181,36 +270,65 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     }
 
     @Override
-    public Map<String, Object> verifySupportImage(
-            String userId, Integer moderationId, String imagePath) {
-        if (StringTools.isEmpty(userId) || moderationId == null || StringTools.isEmpty(imagePath)) {
-            throw new BusinessException("售后图片校验参数不完整");
+    public VerifiedImageAssetDTO verifyAgentImage(String userId, String imageAssetId) {
+        return toVerifiedAsset(requireReadableAgentAsset(userId, imageAssetId));
+    }
+
+    @Override
+    public byte[] readAgentImage(String userId, String imageAssetId) {
+        ImageModerationRecord record = requireReadableAgentAsset(userId, imageAssetId);
+        return imageAssetStore.read(record.getImagePath());
+    }
+
+    @Override
+    public void retainAgentImageAsSupportEvidence(String userId, String imageAssetId) {
+        requireReadableAgentAsset(userId, imageAssetId);
+        int updated = imageModerationRecordMapper.retainAsset(
+                imageAssetId, RETENTION_SUPPORT_EVIDENCE);
+        if (updated != 1) {
+            throw new BusinessException("图片资产已过期或已被清理");
         }
-        if (!StringTools.pathIsOK(imagePath)
-                || imagePath.startsWith("/")
-                || imagePath.contains("\\")
-                || imagePath.contains("://")
-                || FileUtils.isModerationQuarantinePath(imagePath)
-                || !SUPPORT_IMAGE_PATH.matcher(imagePath).matches()) {
-            throw new BusinessException("售后图片路径无效");
+    }
+
+    private ImageModerationRecord requireReadableAgentAsset(String userId, String imageAssetId) {
+        if (StringTools.isEmpty(userId)
+                || StringTools.isEmpty(imageAssetId)
+                || !AGENT_ASSET_ID.matcher(imageAssetId).matches()) {
+            throw new BusinessException("图片资产校验参数无效");
         }
-        ImageModerationRecord record = getByRecordId(moderationId);
-        boolean approved = record != null
+        ImageModerationRecord record = imageModerationRecordMapper.selectByAssetId(imageAssetId);
+        boolean expired = record != null
+                && RETENTION_QUERY_30D.equals(record.getRetentionClass())
+                && record.getExpiresAt() != null
+                && !record.getExpiresAt().after(new Date());
+        boolean readable = record != null
                 && userId.equals(record.getUserId())
-                && ImageModerationSceneEnum.SUPPORT.getCode().equals(record.getScene())
+                && ImageModerationSceneEnum.AGENT.getCode().equals(record.getScene())
                 && ImageModerationStatusEnum.APPROVED.getStatus().equals(record.getStatus())
-                && imagePath.equals(record.getImagePath())
-                && !FileUtils.isModerationQuarantinePath(record.getImagePath());
-        if (!approved) {
-            throw new BusinessException("售后图片尚未通过审核或不属于当前用户");
+                && record.getPurgedAt() == null
+                && !expired
+                && !StringTools.isEmpty(record.getImagePath())
+                && !FileUtils.isModerationQuarantinePath(record.getImagePath())
+                && imageAssetStore.exists(record.getImagePath());
+        if (!readable) {
+            throw new BusinessException("图片资产不可用、尚未通过审核或不属于当前用户");
         }
-        Map<String, Object> result = new HashMap<>();
-        result.put("approved", true);
-        result.put("path", record.getImagePath());
-        result.put("moderationId", record.getRecordId());
-        result.put("moderationStatus", ImageModerationStatusEnum.APPROVED.name());
-        result.put("scene", record.getScene());
-        return result;
+        return record;
+    }
+
+    private static VerifiedImageAssetDTO toVerifiedAsset(ImageModerationRecord record) {
+        VerifiedImageAssetDTO dto = new VerifiedImageAssetDTO();
+        dto.setApproved(true);
+        dto.setAssetId(record.getAssetId());
+        dto.setContentSha256(record.getContentSha256());
+        dto.setMimeType(record.getMimeType());
+        dto.setWidth(record.getImageWidth());
+        dto.setHeight(record.getImageHeight());
+        dto.setScene(record.getScene());
+        dto.setModerationStatus(ImageModerationStatusEnum.APPROVED.name());
+        dto.setRetentionClass(record.getRetentionClass());
+        dto.setExpiresAt(toIsoInstant(record.getExpiresAt()));
+        return dto;
     }
 
     @Override
@@ -223,6 +341,11 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         if (!ImageModerationStatusEnum.PENDING.getStatus().equals(record.getStatus())) {
             throw new BusinessException("该记录已处理");
         }
+        if (ImageModerationSceneEnum.AGENT.getCode().equals(record.getScene())
+                && (record.getPurgedAt() != null
+                || (record.getExpiresAt() != null && !record.getExpiresAt().after(new Date())))) {
+            throw new BusinessException("该图片资产已过期，无法继续审核");
+        }
         ImageModerationRecord patch = new ImageModerationRecord();
         patch.setHandleTime(new Date());
         patch.setHandleRemark(handleRemark);
@@ -231,11 +354,10 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         switch (action == null ? "" : action) {
             case "approve" -> {
                 patch.setStatus(ImageModerationStatusEnum.APPROVED.getStatus());
-                if (ImageModerationSceneEnum.SUPPORT.getCode().equals(record.getScene())
+                if (ImageModerationSceneEnum.AGENT.getCode().equals(record.getScene())
                         && FileUtils.isModerationQuarantinePath(record.getImagePath())) {
-                    String suffix = StringTools.getFileSuffix(record.getImagePath());
-                    copiedNormalPath = fileUtils.allocateNormalImageRelativePath(suffix);
-                    fileUtils.copyQuarantineToNormal(record.getImagePath(), copiedNormalPath, false);
+                    copiedNormalPath = imageAssetStore.copyQuarantineToApproved(
+                            record.getImagePath(), true);
                     patch.setImagePath(copiedNormalPath);
                     quarantinePathToDelete = record.getImagePath();
                 }
@@ -252,7 +374,7 @@ public class ImageModerationServiceImpl implements ImageModerationService {
             }
         } catch (RuntimeException ex) {
             if (copiedNormalPath != null) {
-                fileUtils.deleteStoredFileQuietly(copiedNormalPath);
+                imageAssetStore.deleteWithThumbnail(copiedNormalPath);
             }
             throw ex;
         }
@@ -270,12 +392,12 @@ public class ImageModerationServiceImpl implements ImageModerationService {
             default -> { }
         }
         if (!"approve".equals(action)
-                && ImageModerationSceneEnum.SUPPORT.getCode().equals(record.getScene())
+                && ImageModerationSceneEnum.AGENT.getCode().equals(record.getScene())
                 && FileUtils.isModerationQuarantinePath(record.getImagePath())) {
-            fileUtils.deleteStoredFileQuietly(record.getImagePath());
+            imageAssetStore.deleteWithThumbnail(record.getImagePath());
         }
         if (quarantinePathToDelete != null) {
-            fileUtils.deleteStoredFileQuietly(quarantinePathToDelete);
+            imageAssetStore.deleteWithThumbnail(quarantinePathToDelete);
         }
     }
 
@@ -381,6 +503,27 @@ public class ImageModerationServiceImpl implements ImageModerationService {
         return cleaned;
     }
 
+    @Override
+    public int cleanupExpiredAgentAssets() {
+        List<ImageModerationRecord> expired = imageModerationRecordMapper
+                .selectExpiredAgentAssets(CLEANUP_BATCH_SIZE);
+        int cleaned = 0;
+        Date purgedAt = new Date();
+        for (ImageModerationRecord record : expired) {
+            int claimed = imageModerationRecordMapper.markAssetPurged(
+                    record.getRecordId(), purgedAt);
+            if (claimed != 1) {
+                continue;
+            }
+            imageAssetStore.deleteWithThumbnail(record.getImagePath());
+            cleaned++;
+        }
+        if (cleaned > 0) {
+            log.info("清理到期 Agent 查询图片 {} 条", cleaned);
+        }
+        return cleaned;
+    }
+
     private boolean isOrphanCommentUpload(ImageModerationRecord record) {
         String orderId = record.getOrderId();
         if (StringTools.isEmpty(orderId)) {
@@ -433,5 +576,37 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     @Override
     public boolean containsQuarantinePath(String commentImages) {
         return splitImagePaths(commentImages).stream().anyMatch(FileUtils::isModerationQuarantinePath);
+    }
+
+    private static AssetMetadata inspectAgentAsset(ImageCompressUtils.PreparedImage prepared) {
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(prepared.getData()));
+            if (image == null) {
+                throw new BusinessException(600, "规范化图片无法解析");
+            }
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String sha256 = HexFormat.of().formatHex(digest.digest(prepared.getData()));
+            String suffix = prepared.getSuffix() == null
+                    ? "" : prepared.getSuffix().toLowerCase();
+            String mimeType = switch (suffix) {
+                case ".png" -> "image/png";
+                case ".gif" -> "image/gif";
+                case ".webp" -> "image/webp";
+                case ".bmp" -> "image/bmp";
+                default -> "image/jpeg";
+            };
+            return new AssetMetadata(sha256, mimeType, image.getWidth(), image.getHeight());
+        } catch (IOException exception) {
+            throw new BusinessException(600, "规范化图片无法解析");
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    private static String toIsoInstant(Date date) {
+        return date == null ? null : date.toInstant().toString();
+    }
+
+    private record AssetMetadata(String sha256, String mimeType, int width, int height) {
     }
 }

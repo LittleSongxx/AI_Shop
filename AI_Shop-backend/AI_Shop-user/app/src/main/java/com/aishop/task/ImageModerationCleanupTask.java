@@ -23,5 +23,13 @@ public class ImageModerationCleanupTask {
         } catch (Exception e) {
             log.error("定时清理孤立评论疑似图片失败", e);
         }
+        try {
+            int cleaned = imageModerationService.cleanupExpiredAgentAssets();
+            if (cleaned > 0) {
+                log.info("定时清理到期 Agent 查询图片完成，共 {} 条", cleaned);
+            }
+        } catch (Exception e) {
+            log.error("定时清理到期 Agent 查询图片失败", e);
+        }
     }
 }

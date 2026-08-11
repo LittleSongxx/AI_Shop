@@ -2,6 +2,7 @@ package com.aishop.biz.impl;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +19,7 @@ import com.aishop.entity.query.OrderInfoQuery;
 import com.aishop.exception.BusinessException;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.mappers.OrderItemMapper;
+import com.aishop.integration.CommerceOutcomeClient;
 import jakarta.annotation.Resource;
 
 import org.springframework.stereotype.Service;
@@ -55,6 +57,9 @@ public class OrderCommentServiceImpl implements OrderCommentService {
 
 	@Resource
 	private SensitiveWordFilter sensitiveWordFilter;
+
+	@Resource
+	private CommerceOutcomeClient commerceOutcomeClient;
 
 	@Override
 	public List<OrderComment> findListByParam(OrderCommentQuery param) {
@@ -183,6 +188,23 @@ public class OrderCommentServiceImpl implements OrderCommentService {
 		if (count != 1) {
 			throw new BusinessException("该订单已评价");
 		}
+		OrderItem reviewedItem = orderInfo.getOrderItemList().get(0);
+		Map<String, Object> outcomePayload = new LinkedHashMap<>();
+		outcomePayload.put("rating", star);
+		outcomePayload.put("sentiment", star >= 4 ? "POSITIVE" : star <= 2 ? "NEGATIVE" : "NEUTRAL");
+		outcomePayload.put("hasMedia", !StringTools.isEmpty(commentImages));
+		commerceOutcomeClient.recordAfterCommit(CommerceOutcomeClient.fromVerifiedCarrier(
+				CommerceOutcomeClient.stableEventId("review", orderId, reviewedItem.getProductId()),
+				"REVIEW",
+				CommerceOutcomeClient.stableIdempotencyKey(
+						"review", orderId, reviewedItem.getProductId()),
+				"REVIEW",
+				userId,
+				reviewedItem,
+				reviewedItem.getPropertyValueIdHash(),
+				orderId,
+				outcomePayload,
+				commentTime));
 		return pendingImageReview;
 	}
 

@@ -1,8 +1,10 @@
 package com.aishop.controller.internal;
 
 import com.aishop.controller.ABaseController;
+import com.aishop.constants.Constants;
 import com.aishop.api.enums.ProductStatusEnum;
 import com.aishop.api.support.StockFeignSupport;
+import com.aishop.entity.config.AppConfig;
 import com.aishop.entity.po.ProductInfo;
 import com.aishop.entity.po.ProductPropertyValue;
 import com.aishop.entity.po.ProductSku;
@@ -11,17 +13,25 @@ import com.aishop.entity.query.ProductPropertyValueQuery;
 import com.aishop.entity.query.ProductSkuQuery;
 import com.aishop.entity.query.SimplePage;
 import com.aishop.entity.vo.ResponseVO;
+import com.aishop.api.dto.SkuStockQueryDTO;
 import com.aishop.mappers.ProductInfoMapper;
 import com.aishop.mappers.ProductPropertyValueMapper;
 import com.aishop.mappers.ProductSkuMapper;
+import com.aishop.exception.BusinessException;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -40,6 +50,8 @@ public class ProductAgentInternalController extends ABaseController {
     private ProductPropertyValueMapper<ProductPropertyValue, ProductPropertyValueQuery> productPropertyValueMapper;
     @Resource
     private StockFeignSupport stockFeignSupport;
+    @Resource
+    private AppConfig appConfig;
 
     @PostMapping("/searchOnSale")
     public ResponseVO<List<Map<String, Object>>> searchOnSale(@RequestBody Map<String, Object> body) {
@@ -159,6 +171,114 @@ public class ProductAgentInternalController extends ABaseController {
         return getSuccessResponseVO(m);
     }
 
+    /**
+     * Authoritative SKU offer facts for the Agent.  This endpoint deliberately
+     * returns a selected in-stock SKU and its base price; user coupons are
+     * estimated by the Coupon service in a separate internal call.  The Agent
+     * never reads product or stock tables directly.
+     */
+    @PostMapping("/offerSnapshots")
+    public ResponseVO<Map<String, Object>> offerSnapshots(@RequestBody Map<String, Object> body) {
+        Object rawIds = body == null ? null : body.get("productIds");
+        if (!(rawIds instanceof List<?> ids) || ids.isEmpty()) {
+            return getSuccessResponseVO(Map.of("products", List.of()));
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        int processed = 0;
+        for (Object rawId : ids) {
+            if (processed++ >= 20 || rawId == null) {
+                break;
+            }
+            String productId = String.valueOf(rawId).trim();
+            if (StringTools.isEmpty(productId)) {
+                continue;
+            }
+            ProductInfo product = productInfoMapper.selectByProductId(productId);
+            if (product == null) {
+                continue;
+            }
+            ProductSkuQuery skuQuery = new ProductSkuQuery();
+            skuQuery.setProductId(productId);
+            skuQuery.setOrderBy(com.aishop.entity.query.SafeSort.of("sort asc"));
+            List<ProductSku> skus = productSkuMapper.selectList(skuQuery);
+            Map<String, Object> row = toAgentProductCard(product);
+            row.put("status", product.getStatus());
+            row.put("categoryId", product.getCategoryId());
+            row.put("cover", product.getCover());
+            int totalStock = 0;
+            Map<String, Object> selected = null;
+            if (skus != null) {
+                for (ProductSku sku : skus) {
+                    if (sku == null || StringTools.isEmpty(sku.getPropertyValueIdHash())
+                            || sku.getPrice() == null) {
+                        continue;
+                    }
+                    int stock = Math.max(0, stockFeignSupport.getAvailable(
+                            productId, sku.getPropertyValueIdHash()));
+                    totalStock += stock;
+                    if (stock <= 0 || !ProductStatusEnum.ON_SALE.getStatus().equals(product.getStatus())) {
+                        continue;
+                    }
+                    if (selected == null || sku.getPrice().compareTo(
+                            (java.math.BigDecimal) selected.get("price")) < 0) {
+                        selected = new LinkedHashMap<>();
+                        selected.put("propertyValueIdHash", sku.getPropertyValueIdHash());
+                        selected.put("propertyValueIds", sku.getPropertyValueIds());
+                        selected.put("price", sku.getPrice());
+                        selected.put("stock", stock);
+                    }
+                }
+            }
+            row.put("totalStock", totalStock);
+            row.put("inStock", selected != null);
+            row.put("selectedSku", selected);
+            result.add(row);
+        }
+        return getSuccessResponseVO(Map.of("products", result));
+    }
+
+    @PostMapping("/imageContent")
+    public void imageContent(@RequestBody Map<String, Object> body, HttpServletResponse response)
+            throws IOException {
+        String productId = str(body, "productId");
+        int coverIndex = intVal(body == null ? null : body.get("coverIndex"), 0);
+        if (StringTools.isEmpty(productId) || coverIndex < 0 || coverIndex >= 5) {
+            throw new BusinessException("商品图片参数不合法");
+        }
+        ProductInfo product = productInfoMapper.selectByProductId(productId);
+        if (product == null || StringTools.isEmpty(product.getCover())) {
+            throw new BusinessException("商品图片不存在");
+        }
+        List<String> covers = Arrays.stream(product.getCover().split(","))
+                .map(String::trim)
+                .filter(value -> !StringTools.isEmpty(value))
+                .limit(5)
+                .toList();
+        if (coverIndex >= covers.size()) {
+            throw new BusinessException("商品图片不存在");
+        }
+        String sourceName = covers.get(coverIndex);
+        if (!StringTools.pathIsOK(sourceName)) {
+            throw new BusinessException("商品图片路径不合法");
+        }
+
+        File baseFolder = new File(
+                appConfig.getProjectFolder() + Constants.FILE_FOLDER_FILE).getCanonicalFile();
+        File image = new File(baseFolder, sourceName).getCanonicalFile();
+        if (!image.toPath().startsWith(baseFolder.toPath())
+                || !image.isFile() || image.length() <= 0 || image.length() > 20L * 1024 * 1024) {
+            throw new BusinessException("商品图片不可读取");
+        }
+        response.setContentType(resolveImageContentType(sourceName));
+        response.setHeader("Cache-Control", "private, max-age=300");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setContentLengthLong(image.length());
+        try (FileInputStream input = new FileInputStream(image);
+             OutputStream output = response.getOutputStream()) {
+            input.transferTo(output);
+        }
+    }
+
     /** Agent 侧商品卡片的唯一销量字段。 */
     private static Map<String, Object> toAgentProductCard(ProductInfo p) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -170,6 +290,7 @@ public class ProductAgentInternalController extends ABaseController {
         m.put("maxPrice", p.getMaxPrice());
         m.put("categoryId", p.getCategoryId());
         m.put("totalSale", p.getTotalSale());
+        m.put("commendType", p.getCommendType());
         return m;
     }
 
@@ -190,5 +311,22 @@ public class ProductAgentInternalController extends ABaseController {
         } catch (Exception e) {
             return def;
         }
+    }
+
+    private static String resolveImageContentType(String sourceName) {
+        String normalized = sourceName == null ? "" : sourceName.toLowerCase();
+        if (normalized.endsWith(".png")) {
+            return "image/png";
+        }
+        if (normalized.endsWith(".webp")) {
+            return "image/webp";
+        }
+        if (normalized.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (normalized.endsWith(".bmp")) {
+            return "image/bmp";
+        }
+        return "image/jpeg";
     }
 }

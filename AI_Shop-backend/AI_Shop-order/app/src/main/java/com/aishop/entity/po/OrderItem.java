@@ -1,11 +1,12 @@
 package com.aishop.entity.po;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.aishop.entity.dto.RecommendationAttributionCarrier;
 import java.math.BigDecimal;
 import java.io.Serializable;
 import java.util.Date;
 
-public class OrderItem implements Serializable {
+public class OrderItem implements Serializable, RecommendationAttributionCarrier {
 
 	private String orderItemId;
 

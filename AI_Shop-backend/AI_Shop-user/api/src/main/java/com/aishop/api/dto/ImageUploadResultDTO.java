@@ -14,6 +14,18 @@ public class ImageUploadResultDTO implements Serializable {
 
     private String scene;
 
+    private String assetId;
+
+    private String contentSha256;
+
+    private String mimeType;
+
+    private Integer width;
+
+    private Integer height;
+
+    private String expiresAt;
+
     public ImageUploadResultDTO() {
     }
 
@@ -60,5 +72,53 @@ public class ImageUploadResultDTO implements Serializable {
 
     public void setScene(String scene) {
         this.scene = scene;
+    }
+
+    public String getAssetId() {
+        return assetId;
+    }
+
+    public void setAssetId(String assetId) {
+        this.assetId = assetId;
+    }
+
+    public String getContentSha256() {
+        return contentSha256;
+    }
+
+    public void setContentSha256(String contentSha256) {
+        this.contentSha256 = contentSha256;
+    }
+
+    public String getMimeType() {
+        return mimeType;
+    }
+
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
+    }
+
+    public Integer getWidth() {
+        return width;
+    }
+
+    public void setWidth(Integer width) {
+        this.width = width;
+    }
+
+    public Integer getHeight() {
+        return height;
+    }
+
+    public void setHeight(Integer height) {
+        this.height = height;
+    }
+
+    public String getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(String expiresAt) {
+        this.expiresAt = expiresAt;
     }
 }

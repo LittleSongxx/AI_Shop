@@ -8,6 +8,12 @@
 		<result column="user_id" property="userId" />
 		<result column="user_ip" property="userIp" />
 		<result column="image_path" property="imagePath" />
+		<result column="asset_id" property="assetId" />
+		<result column="content_sha256" property="contentSha256" />
+		<result column="mime_type" property="mimeType" />
+		<result column="image_width" property="imageWidth" />
+		<result column="image_height" property="imageHeight" />
+		<result column="retention_class" property="retentionClass" />
 		<result column="scene" property="scene" />
 		<result column="order_id" property="orderId" />
 		<result column="conclusion_type" property="conclusionType" />
@@ -17,11 +23,14 @@
 		<result column="create_time" property="createTime" />
 		<result column="handle_time" property="handleTime" />
 		<result column="handle_remark" property="handleRemark" />
+		<result column="expires_at" property="expiresAt" />
+		<result column="purged_at" property="purgedAt" />
 	</resultMap>
 
 	<sql id="base_column_list">
-		r.record_id,r.user_id,r.user_ip,r.image_path,r.scene,r.order_id,r.conclusion_type,r.conclusion,
-		r.baidu_response,r.status,r.create_time,r.handle_time,r.handle_remark
+		r.record_id,r.user_id,r.user_ip,r.image_path,r.asset_id,r.content_sha256,r.mime_type,
+		r.image_width,r.image_height,r.retention_class,r.scene,r.order_id,r.conclusion_type,r.conclusion,
+		r.baidu_response,r.status,r.create_time,r.handle_time,r.handle_remark,r.expires_at,r.purged_at
 	</sql>
 
 	<sql id="base_condition_filed">
@@ -80,6 +89,22 @@
 		where r.record_id = #{recordId}
 	</select>
 
+	<select id="selectByAssetId" resultMap="base_result_map">
+		SELECT <include refid="base_column_list" /> FROM image_moderation_record r
+		where r.asset_id = #{assetId}
+	</select>
+
+	<select id="selectExpiredAgentAssets" resultMap="base_result_map">
+		SELECT <include refid="base_column_list" /> FROM image_moderation_record r
+		WHERE r.scene = 'agent'
+		  AND r.retention_class = 'QUERY_30D'
+		  AND r.expires_at IS NOT NULL
+		  AND r.expires_at &lt;= NOW()
+		  AND r.purged_at IS NULL
+		ORDER BY r.expires_at ASC
+		LIMIT #{limit}
+	</select>
+
 	<insert id="insert" parameterType="com.aishop.entity.po.ImageModerationRecord">
 		<selectKey keyProperty="bean.recordId" resultType="Integer" order="AFTER">
 			SELECT LAST_INSERT_ID()
@@ -89,6 +114,12 @@
 			<if test="bean.userId != null">user_id,</if>
 			<if test="bean.userIp != null">user_ip,</if>
 			<if test="bean.imagePath != null">image_path,</if>
+			<if test="bean.assetId != null">asset_id,</if>
+			<if test="bean.contentSha256 != null">content_sha256,</if>
+			<if test="bean.mimeType != null">mime_type,</if>
+			<if test="bean.imageWidth != null">image_width,</if>
+			<if test="bean.imageHeight != null">image_height,</if>
+			<if test="bean.retentionClass != null">retention_class,</if>
 			<if test="bean.scene != null">scene,</if>
 			<if test="bean.orderId != null">order_id,</if>
 			<if test="bean.conclusionType != null">conclusion_type,</if>
@@ -98,11 +129,19 @@
 			<if test="bean.createTime != null">create_time,</if>
 			<if test="bean.handleTime != null">handle_time,</if>
 			<if test="bean.handleRemark != null">handle_remark,</if>
+			<if test="bean.expiresAt != null">expires_at,</if>
+			<if test="bean.purgedAt != null">purged_at,</if>
 		</trim>
 		<trim prefix="values (" suffix=")" suffixOverrides=",">
 			<if test="bean.userId != null">#{bean.userId},</if>
 			<if test="bean.userIp != null">#{bean.userIp},</if>
 			<if test="bean.imagePath != null">#{bean.imagePath},</if>
+			<if test="bean.assetId != null">#{bean.assetId},</if>
+			<if test="bean.contentSha256 != null">#{bean.contentSha256},</if>
+			<if test="bean.mimeType != null">#{bean.mimeType},</if>
+			<if test="bean.imageWidth != null">#{bean.imageWidth},</if>
+			<if test="bean.imageHeight != null">#{bean.imageHeight},</if>
+			<if test="bean.retentionClass != null">#{bean.retentionClass},</if>
 			<if test="bean.scene != null">#{bean.scene},</if>
 			<if test="bean.orderId != null">#{bean.orderId},</if>
 			<if test="bean.conclusionType != null">#{bean.conclusionType},</if>
@@ -112,6 +151,8 @@
 			<if test="bean.createTime != null">#{bean.createTime},</if>
 			<if test="bean.handleTime != null">#{bean.handleTime},</if>
 			<if test="bean.handleRemark != null">#{bean.handleRemark},</if>
+			<if test="bean.expiresAt != null">#{bean.expiresAt},</if>
+			<if test="bean.purgedAt != null">#{bean.purgedAt},</if>
 		</trim>
 	</insert>
 
@@ -121,6 +162,12 @@
 			<if test="bean.userId != null">user_id = #{bean.userId},</if>
 			<if test="bean.userIp != null">user_ip = #{bean.userIp},</if>
 			<if test="bean.imagePath != null">image_path = #{bean.imagePath},</if>
+			<if test="bean.assetId != null">asset_id = #{bean.assetId},</if>
+			<if test="bean.contentSha256 != null">content_sha256 = #{bean.contentSha256},</if>
+			<if test="bean.mimeType != null">mime_type = #{bean.mimeType},</if>
+			<if test="bean.imageWidth != null">image_width = #{bean.imageWidth},</if>
+			<if test="bean.imageHeight != null">image_height = #{bean.imageHeight},</if>
+			<if test="bean.retentionClass != null">retention_class = #{bean.retentionClass},</if>
 			<if test="bean.scene != null">scene = #{bean.scene},</if>
 			<if test="bean.orderId != null">order_id = #{bean.orderId},</if>
 			<if test="bean.conclusionType != null">conclusion_type = #{bean.conclusionType},</if>
@@ -130,6 +177,8 @@
 			<if test="bean.createTime != null">create_time = #{bean.createTime},</if>
 			<if test="bean.handleTime != null">handle_time = #{bean.handleTime},</if>
 			<if test="bean.handleRemark != null">handle_remark = #{bean.handleRemark},</if>
+			<if test="bean.expiresAt != null">expires_at = #{bean.expiresAt},</if>
+			<if test="bean.purgedAt != null">purged_at = #{bean.purgedAt},</if>
 		</set>
 		where record_id = #{recordId}
 	</update>
@@ -140,6 +189,12 @@
 			<if test="bean.userId != null">user_id = #{bean.userId},</if>
 			<if test="bean.userIp != null">user_ip = #{bean.userIp},</if>
 			<if test="bean.imagePath != null">image_path = #{bean.imagePath},</if>
+			<if test="bean.assetId != null">asset_id = #{bean.assetId},</if>
+			<if test="bean.contentSha256 != null">content_sha256 = #{bean.contentSha256},</if>
+			<if test="bean.mimeType != null">mime_type = #{bean.mimeType},</if>
+			<if test="bean.imageWidth != null">image_width = #{bean.imageWidth},</if>
+			<if test="bean.imageHeight != null">image_height = #{bean.imageHeight},</if>
+			<if test="bean.retentionClass != null">retention_class = #{bean.retentionClass},</if>
 			<if test="bean.scene != null">scene = #{bean.scene},</if>
 			<if test="bean.orderId != null">order_id = #{bean.orderId},</if>
 			<if test="bean.conclusionType != null">conclusion_type = #{bean.conclusionType},</if>
@@ -149,9 +204,27 @@
 			<if test="bean.createTime != null">create_time = #{bean.createTime},</if>
 			<if test="bean.handleTime != null">handle_time = #{bean.handleTime},</if>
 			<if test="bean.handleRemark != null">handle_remark = #{bean.handleRemark},</if>
+			<if test="bean.expiresAt != null">expires_at = #{bean.expiresAt},</if>
+			<if test="bean.purgedAt != null">purged_at = #{bean.purgedAt},</if>
 		</set>
 		where record_id = #{recordId}
 		  and status = 0
+	</update>
+
+	<update id="markAssetPurged">
+		UPDATE image_moderation_record
+		SET image_path = NULL, purged_at = #{purgedAt}
+		WHERE record_id = #{recordId}
+		  AND retention_class = 'QUERY_30D'
+		  AND expires_at IS NOT NULL
+		  AND expires_at &lt;= NOW()
+		  AND purged_at IS NULL
+	</update>
+
+	<update id="retainAsset">
+		UPDATE image_moderation_record
+		SET retention_class = #{retentionClass}, expires_at = NULL
+		WHERE asset_id = #{assetId} AND purged_at IS NULL
 	</update>
 
 	<delete id="deleteByRecordId">

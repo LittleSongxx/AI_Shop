@@ -122,8 +122,14 @@ create table if not exists image_moderation_record
     record_id       int auto_increment comment '记录ID' primary key,
     user_id         varchar(32)   not null comment '上传用户ID',
     user_ip         varchar(64)   null comment '上传IP',
-    image_path      varchar(512)  not null comment '图片相对路径',
-    scene           varchar(32)   not null comment '场景：avatar/comment',
+    image_path      varchar(512)  null comment '存储键；清理后置空',
+    asset_id        varchar(64)   null comment '对外不透明图片资产ID',
+    content_sha256  char(64)      null comment '规范化图片SHA-256',
+    mime_type       varchar(64)   null comment '规范化媒体类型',
+    image_width     int           null comment '规范化图片宽度',
+    image_height    int           null comment '规范化图片高度',
+    retention_class varchar(32) default 'STANDARD' not null comment 'STANDARD/QUERY_30D/SUPPORT_EVIDENCE',
+    scene           varchar(32)   not null comment '场景：avatar/comment/agent',
     order_id        varchar(32)   null comment '关联订单ID（评论场景）',
     conclusion_type int           null comment '百度结论类型 1合规 2不合规 3疑似 4失败',
     conclusion      varchar(128)  null comment '百度结论文案',
@@ -131,8 +137,60 @@ create table if not exists image_moderation_record
     status          int default 0 not null comment '0待人工复核 1已通过 2确认违规 3误报驳回',
     create_time     datetime      not null comment '创建时间',
     handle_time     datetime      null comment '处理时间',
-    handle_remark   varchar(512)  null comment '处理备注'
+    handle_remark   varchar(512)  null comment '处理备注',
+    expires_at      datetime      null comment '原图过期时间',
+    purged_at       datetime      null comment '原图实际清理时间',
+    constraint uk_image_asset_id unique (asset_id),
+    key idx_image_asset_expiry (scene, retention_class, expires_at, purged_at)
 ) comment '图像内容审核记录' charset = utf8mb4;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE()
+            AND table_name = 'image_moderation_record' AND column_name = 'asset_id'),
+    'SELECT 1',
+    'ALTER TABLE image_moderation_record ADD COLUMN asset_id varchar(64) NULL COMMENT ''opaque image asset id'' AFTER image_path'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE()
+            AND table_name = 'image_moderation_record' AND column_name = 'image_path'
+            AND is_nullable = 'YES'),
+    'SELECT 1',
+    'ALTER TABLE image_moderation_record MODIFY COLUMN image_path varchar(512) NULL COMMENT ''storage key; null after retention purge'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE()
+            AND table_name = 'image_moderation_record' AND column_name = 'content_sha256'),
+    'SELECT 1',
+    'ALTER TABLE image_moderation_record ADD COLUMN content_sha256 char(64) NULL AFTER asset_id, ADD COLUMN mime_type varchar(64) NULL AFTER content_sha256, ADD COLUMN image_width int NULL AFTER mime_type, ADD COLUMN image_height int NULL AFTER image_width, ADD COLUMN retention_class varchar(32) NOT NULL DEFAULT ''STANDARD'' AFTER image_height, ADD COLUMN expires_at datetime NULL AFTER handle_remark, ADD COLUMN purged_at datetime NULL AFTER expires_at'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE()
+            AND table_name = 'image_moderation_record' AND index_name = 'uk_image_asset_id'),
+    'SELECT 1',
+    'ALTER TABLE image_moderation_record ADD UNIQUE KEY uk_image_asset_id (asset_id), ADD KEY idx_image_asset_expiry (scene, retention_class, expires_at, purged_at)'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE image_moderation_record
+SET scene = 'agent',
+    asset_id = COALESCE(asset_id, LOWER(REPLACE(UUID(), '-', ''))),
+    retention_class = 'QUERY_30D',
+    expires_at = COALESCE(expires_at, DATE_ADD(create_time, INTERVAL 30 DAY))
+WHERE scene = 'support';
 -- Complete indexes that were historically created outside CREATE TABLE.
 SET @sql = IF(
     EXISTS (

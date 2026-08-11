@@ -2,13 +2,13 @@ package com.aishop.biz;
 
 import com.aishop.entity.dto.BaiduImageCensorResultDTO;
 import com.aishop.api.dto.ImageUploadResultDTO;
+import com.aishop.api.dto.VerifiedImageAssetDTO;
 import com.aishop.entity.po.ImageModerationRecord;
 import com.aishop.entity.query.ImageModerationRecordQuery;
 import com.aishop.entity.vo.PaginationResultVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Map;
 
 public interface ImageModerationService {
 
@@ -23,7 +23,11 @@ public interface ImageModerationService {
 
     ImageModerationRecord getByRecordId(Integer recordId);
 
-    Map<String, Object> verifySupportImage(String userId, Integer moderationId, String imagePath);
+    VerifiedImageAssetDTO verifyAgentImage(String userId, String imageAssetId);
+
+    byte[] readAgentImage(String userId, String imageAssetId);
+
+    void retainAgentImageAsSupportEvidence(String userId, String imageAssetId);
 
     void handleReview(Integer recordId, String action, String handleRemark);
 
@@ -32,4 +36,6 @@ public interface ImageModerationService {
     boolean containsQuarantinePath(String commentImages);
 
     int cleanupOrphanedCommentUploads();
+
+    int cleanupExpiredAgentAssets();
 }

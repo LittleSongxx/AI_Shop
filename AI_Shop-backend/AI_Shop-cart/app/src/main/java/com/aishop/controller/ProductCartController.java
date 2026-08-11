@@ -12,6 +12,7 @@ import com.aishop.entity.vo.ResponseVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.biz.ProductCartService;
 import com.aishop.integration.RecommendationAttributionClient;
+import com.aishop.integration.CommerceOutcomeClient;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RequestMapping("/productCart")
 @RestController
@@ -31,6 +34,9 @@ public class ProductCartController extends ABaseController{
 
     @Resource
     private RecommendationAttributionClient recommendationAttributionClient;
+
+    @Resource
+    private CommerceOutcomeClient commerceOutcomeClient;
     // 加入购物车
     @PostMapping("/add2Cart")
     @GlobalInterceptor(checkLogin = true)
@@ -42,7 +48,30 @@ public class ProductCartController extends ABaseController{
         String userId = tokenUserInfo.getUserId();
         productCart.setUserId(userId);
         recommendationAttributionClient.validateAndApply(userId, List.of(productCart));
-        productCartService.add2Cart(productCart);
+        int requestedQuantity = productCart.getBuyCount();
+        ProductCart persisted = productCartService.add2Cart(productCart);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("quantity", requestedQuantity);
+        if (persisted.getAddPrice() != null) {
+            payload.put("unitPrice", persisted.getAddPrice());
+        }
+        payload.put("currency", "CNY");
+        payload.put("cartItemId", persisted.getCartId());
+        commerceOutcomeClient.recordAfterCommit(CommerceOutcomeClient.fromVerifiedCarrier(
+                CommerceOutcomeClient.stableEventId(
+                        "cart-add", userId, persisted.getCartId(), persisted.getLastUpdateTime(),
+                        persisted.getBuyCount()),
+                "CART",
+                CommerceOutcomeClient.stableIdempotencyKey(
+                        "cart-add", userId, persisted.getCartId(), persisted.getLastUpdateTime(),
+                        persisted.getBuyCount()),
+                "ADD_TO_CART",
+                userId,
+                productCart,
+                persisted.getPropertyValueIdHash(),
+                null,
+                payload,
+                persisted.getLastUpdateTime()));
         return getSuccessResponseVO(null);
     }
 

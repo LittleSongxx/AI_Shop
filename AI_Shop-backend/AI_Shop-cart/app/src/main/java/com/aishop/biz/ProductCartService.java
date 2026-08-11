@@ -38,7 +38,7 @@ public interface ProductCartService {
 
 	Integer deleteProductCartByProductIdAndPropertyValueIdHashAndUserId(String productId,String propertyValueIdHash,String userId);
 
-    void add2Cart(@NotEmpty ProductCart productCart);
+    ProductCart add2Cart(@NotEmpty ProductCart productCart);
 
 	PaginationResultVO<ProductCartVO> findListByPageAndUserId(@NotEmpty ProductCartQuery param, @NotEmpty String userId);
 }

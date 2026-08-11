@@ -4,6 +4,7 @@ import com.aishop.annotation.GlobalInterceptor;
 import com.aishop.constants.Constants;
 import com.aishop.entity.config.AppConfig;
 import com.aishop.api.dto.ImageUploadResultDTO;
+import com.aishop.api.dto.VerifiedImageAssetDTO;
 import com.aishop.api.enums.ImageModerationSceneEnum;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.biz.ImageModerationService;
@@ -46,11 +47,30 @@ public class FileController extends ABaseController{
         ImageUploadResultDTO result = imageModerationService.uploadAndModerate(
                 userId, ip, file, createThumbnail, scene, orderId);
         // 合规直传：data 直接返回路径字符串，避免前端解析对象出错
-        if (!ImageModerationSceneEnum.SUPPORT.getCode().equalsIgnoreCase(scene)
+        if (!ImageModerationSceneEnum.AGENT.getCode().equalsIgnoreCase(scene)
                 && !Boolean.TRUE.equals(result.getPendingReview())) {
             return getSuccessResponseVO(result.getPath());
         }
         return getSuccessResponseVO(result);
+    }
+
+    @GlobalInterceptor(checkLogin = true)
+    @GetMapping("/getAgentImage")
+    public void getAgentImage(HttpServletResponse response, @NotNull String imageAssetId)
+            throws IOException {
+        String userId = getTokenUserInfo().getUserId();
+        VerifiedImageAssetDTO verified = imageModerationService.verifyAgentImage(userId, imageAssetId);
+        byte[] content = imageModerationService.readAgentImage(userId, imageAssetId);
+        response.setContentType(verified.getMimeType());
+        response.setHeader("Cache-Control", "private, max-age=300");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        if (!StringTools.isEmpty(verified.getContentSha256())) {
+            response.setHeader("ETag", "\"" + verified.getContentSha256() + "\"");
+        }
+        response.setContentLength(content.length);
+        try (OutputStream output = response.getOutputStream()) {
+            output.write(content);
+        }
     }
 
     @GetMapping("/getResource")

@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.coobird.thumbnailator.Thumbnails;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -16,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Iterator;
 import java.util.Set;
 
 @Slf4j
@@ -82,6 +85,81 @@ public final class ImageCompressUtils {
             log.error("ffmpeg 图片压缩失败: {}", ffmpegEx.getMessage());
             throw compressFailed();
         }
+    }
+
+    /** Normalize Agent images before moderation/storage and strip embedded metadata. */
+    public static PreparedImage prepareAgentImage(byte[] source, String originalFilename) {
+        if (source == null || source.length == 0) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "请选择要上传的图片");
+        }
+        if (source.length > 10L * 1024 * 1024) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "图片不能超过10MB");
+        }
+        if (detectImageMime(source) == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "仅支持 JPEG、PNG、GIF、WebP 或 BMP 图片");
+        }
+        try {
+            int[] dimensions = readImageDimensions(source);
+            long pixels = (long) dimensions[0] * dimensions[1];
+            if (dimensions[0] < 16 || dimensions[1] < 16 || pixels > 25_000_000L) {
+                throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "图片尺寸不符合要求");
+            }
+            return compressWithThumbnailator(source);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "图像无法解析，请更换图片");
+        }
+    }
+
+    private static int[] readImageDimensions(byte[] source) throws IOException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(source))) {
+            if (input == null) {
+                throw new IOException("无法创建图像输入流");
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new IOException("没有可用的图像解码器");
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input, true, true);
+                return new int[]{reader.getWidth(0), reader.getHeight(0)};
+            } finally {
+                reader.dispose();
+            }
+        }
+    }
+
+    private static String detectImageMime(byte[] source) {
+        if (source.length >= 3
+                && (source[0] & 0xff) == 0xff
+                && (source[1] & 0xff) == 0xd8
+                && (source[2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        if (source.length >= 8
+                && (source[0] & 0xff) == 0x89
+                && source[1] == 0x50 && source[2] == 0x4e && source[3] == 0x47
+                && source[4] == 0x0d && source[5] == 0x0a
+                && source[6] == 0x1a && source[7] == 0x0a) {
+            return "image/png";
+        }
+        if (source.length >= 6) {
+            String signature = new String(source, 0, 6, java.nio.charset.StandardCharsets.US_ASCII);
+            if ("GIF87a".equals(signature) || "GIF89a".equals(signature)) {
+                return "image/gif";
+            }
+        }
+        if (source.length >= 12
+                && source[0] == 'R' && source[1] == 'I' && source[2] == 'F' && source[3] == 'F'
+                && source[8] == 'W' && source[9] == 'E' && source[10] == 'B' && source[11] == 'P') {
+            return "image/webp";
+        }
+        if (source.length >= 2 && source[0] == 'B' && source[1] == 'M') {
+            return "image/bmp";
+        }
+        return null;
     }
 
     private static boolean needsTranscodeToJpeg(String suffix, byte[] source) {
