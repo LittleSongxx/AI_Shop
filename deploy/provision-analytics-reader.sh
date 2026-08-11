@@ -49,11 +49,16 @@ view_count=$(run_mysql --batch --skip-column-names --execute="
          'analytics_product_sales_daily',
          'analytics_inventory_risk',
          'analytics_agent_quality_daily',
-         'analytics_tool_quality_daily'
+         'analytics_tool_quality_daily',
+         'analytics_recommendation_funnel_daily',
+         'analytics_recommendation_quality_daily',
+         'analytics_offer_quality_daily',
+         'analytics_fulfillment_after_sales_daily',
+         'analytics_inventory_forecast'
        );
   ")
-if [[ "$view_count" != "5" ]]; then
-  echo "five governed analytics views must exist before provisioning the reader" >&2
+if [[ "$view_count" != "10" ]]; then
+  echo "ten governed analytics views must exist before provisioning the reader" >&2
   exit 3
 fi
 
@@ -67,6 +72,11 @@ run_mysql --execute="
     GRANT SELECT ON aishop_admin.analytics_inventory_risk TO '${analytics_user}'@'${analytics_host}';
     GRANT SELECT ON aishop_admin.analytics_agent_quality_daily TO '${analytics_user}'@'${analytics_host}';
     GRANT SELECT ON aishop_admin.analytics_tool_quality_daily TO '${analytics_user}'@'${analytics_host}';
+    GRANT SELECT ON aishop_admin.analytics_recommendation_funnel_daily TO '${analytics_user}'@'${analytics_host}';
+    GRANT SELECT ON aishop_admin.analytics_recommendation_quality_daily TO '${analytics_user}'@'${analytics_host}';
+    GRANT SELECT ON aishop_admin.analytics_offer_quality_daily TO '${analytics_user}'@'${analytics_host}';
+    GRANT SELECT ON aishop_admin.analytics_fulfillment_after_sales_daily TO '${analytics_user}'@'${analytics_host}';
+    GRANT SELECT ON aishop_admin.analytics_inventory_forecast TO '${analytics_user}'@'${analytics_host}';
   "
 
 echo "${analytics_user} provisioned with SELECT on governed views only"

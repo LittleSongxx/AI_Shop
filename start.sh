@@ -104,6 +104,34 @@ port_is_listening() {
   fi
 }
 
+# WSL can reject a bind because the Windows host still owns a forwarded port
+# even though the listener is invisible to Linux ss(8).  Probe the same IPv4
+# wildcard bind used by the local Java processes when netcat is available.
+port_is_bindable() {
+  local port=$1 status
+  if ! command -v nc >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
+    return 0
+  fi
+  if timeout --signal=TERM 0.25s nc -4 -l "$port" </dev/null >/dev/null 2>&1; then
+    status=0
+  else
+    status=$?
+  fi
+  [[ $status -eq 0 || $status -eq 124 ]]
+}
+
+report_port_bind_failure() {
+  local port=$1 listeners
+  listeners=$(ss -H -ltnp "sport = :$port" 2>/dev/null || true)
+  if [[ -n "$listeners" ]]; then
+    warn "端口 $port 的 Linux 监听者: $listeners"
+  elif ! port_is_bindable "$port"; then
+    warn "端口 $port 没有 Linux 监听者但仍无法绑定；可能由 WSL/宿主端口转发占用"
+  else
+    warn "端口 $port 的冲突已在服务退出前后消失，将按有界策略更换端口重试"
+  fi
+}
+
 show_service_log() {
   local name=$1 log="$LOGS/$1.log"
   [[ -f "$log" ]] || return 0
@@ -238,7 +266,7 @@ ensure_host_ports() {
 
 wait_managed_service() {
   local name=$1 port=$2 label=$3 timeout=${4:-150}
-  local retry_limit=${AISHOP_START_BIND_RETRIES:-2} retry_count=0
+  local retry_limit=${AISHOP_START_BIND_RETRIES:-4} retry_count=0
   local end=$((SECONDS + timeout)) identity_end=$((SECONDS + 5))
   echo -n "  等待 $label..."
   while [[ $SECONDS -lt $end ]]; do
@@ -246,6 +274,7 @@ wait_managed_service() {
       local target_bind_failed=false retry_allowed=false previous_port=$port
       if service_target_port_bind_failed "$name" "$port"; then
         target_bind_failed=true
+        report_port_bind_failure "$port"
       fi
       stop_managed_service_for_restart "$name" 10 || true
       if $target_bind_failed && ((retry_count < retry_limit)); then
@@ -341,7 +370,8 @@ port_can_be_used() {
   local port=$1
   [[ -z "${RESERVED_PORTS[$port]+x}" ]] || return 1
   if ! port_is_listening "$port"; then
-    return 0
+    port_is_bindable "$port"
+    return
   fi
   project_container_uses_port "$port" || managed_service_uses_port "$port"
 }
@@ -378,6 +408,9 @@ managed_service_port_binding() {
     coupon)    printf '%s|%s\n' COUPON_PORT "Coupon 服务" ;;
     search)    printf '%s|%s\n' SEARCH_PORT "Search 服务" ;;
     admin)     printf '%s|%s\n' ADMIN_PORT "Admin 服务" ;;
+    mcp)       printf '%s|%s\n' MCP_PORT "MCP Server" ;;
+    agent)     printf '%s|%s\n' AGENT_PORT "Agent API" ;;
+    agent-worker) printf '%s|%s\n' AGENT_WORKER_METRICS_PORT "Agent Worker 指标" ;;
     web)       printf '%s|%s\n' WEB_PORT "商城前端" ;;
     admin-web) printf '%s|%s\n' ADMIN_WEB_PORT "管理前端" ;;
     *) return 1 ;;
@@ -402,7 +435,7 @@ reassign_managed_port_after_bind_failure() {
     || die "服务 $name 不支持动态重分配端口"
   IFS='|' read -r variable label <<<"$binding"
   case "$name" in
-    gateway|user|product|stock|cart|order|pay|coupon|search|admin|web|admin-web) ;;
+    gateway|user|product|stock|cart|order|pay|coupon|search|admin|mcp|agent|agent-worker|web|admin-web) ;;
     *) die "服务 $name 不支持动态重分配端口" ;;
   esac
   ((next_port <= 65535)) || die "$label 在端口竞态后没有可用端口"
@@ -411,6 +444,14 @@ reassign_managed_port_after_bind_failure() {
   assign_port "$variable" "$next_port" "$label"
   if [[ "$name" == "gateway" ]]; then
     export JAVA_WEB_URL="http://127.0.0.1:$GATEWAY_PORT"
+  elif [[ "$name" == "mcp" ]]; then
+    export FASTMCP_PORT="$MCP_PORT"
+    export MCP_SERVER_URL="http://127.0.0.1:$MCP_PORT"
+  elif [[ "$name" == "agent" ]]; then
+    export APP_PORT="$AGENT_PORT"
+    export AGENT_BASE_URL="http://127.0.0.1:$AGENT_PORT"
+  elif [[ "$name" == "agent-worker" ]]; then
+    export WORKER_METRICS_PORT="$AGENT_WORKER_METRICS_PORT"
   fi
   write_runtime_env
 }
@@ -458,6 +499,9 @@ RUNTIME_CREDENTIAL_VARIABLES=(
 RUNTIME_SETTING_VARIABLES=(
   ES_INDEX_REPLICAS
   MULTI_AGENT_ENABLED DATA_ANALYST_ENABLED
+  SHOPPING_DECISION_V2_ENABLED OUTCOME_LEDGER_ENABLED
+  AFTER_SALES_POLICY_ENGINE_ENABLED INVENTORY_OPS_ENABLED
+  VISUAL_SEARCH_ENABLED VISUAL_INDEX_CONSUMER_ENABLED VISUAL_INDEX_BACKFILL_ON_START
   ANALYTICS_MYSQL_HOST ANALYTICS_MYSQL_PORT ANALYTICS_MYSQL_DATABASE
 )
 RUNTIME_VARIABLES=(
@@ -484,6 +528,17 @@ for variable in "${!CALLER_VALUES[@]}"; do
   printf -v "$variable" '%s' "${CALLER_VALUES[$variable]}"
   export "$variable"
 done
+
+# runtime.env stores the ports that happened to be assigned on the previous
+# run. A transient frontend collision must not turn an automatically selected
+# fallback into the permanent preference for later clean starts. Explicit
+# values from the caller or .env.local still win.
+if [[ -z "${CALLER_VALUES[WEB_PORT]+x}" ]]; then
+  unset WEB_PORT
+fi
+if [[ -z "${CALLER_VALUES[ADMIN_WEB_PORT]+x}" ]]; then
+  unset ADMIN_WEB_PORT
+fi
 
 prepare_ports() {
   assign_port MYSQL_PORT 3306 "MySQL"
@@ -558,9 +613,9 @@ write_runtime_env() {
 }
 
 prepare_environment() {
-  AISHOP_START_BIND_RETRIES="${AISHOP_START_BIND_RETRIES:-2}"
-  [[ "$AISHOP_START_BIND_RETRIES" =~ ^[0-3]$ ]] \
-    || die "AISHOP_START_BIND_RETRIES 必须是 0..3 的整数，当前值: $AISHOP_START_BIND_RETRIES"
+  AISHOP_START_BIND_RETRIES="${AISHOP_START_BIND_RETRIES:-4}"
+  [[ "$AISHOP_START_BIND_RETRIES" =~ ^[0-5]$ ]] \
+    || die "AISHOP_START_BIND_RETRIES 必须是 0..5 的整数，当前值: $AISHOP_START_BIND_RETRIES"
   export AISHOP_START_BIND_RETRIES
   prepare_ports
   # Java Search and the Python Agent share AI provider settings. The Agent
@@ -577,6 +632,13 @@ prepare_environment() {
   export MYSQL_PASSWORD="${MYSQL_PASSWORD:-$MYSQL_ROOT_PASSWORD}"
   normalize_boolean_setting MULTI_AGENT_ENABLED true
   normalize_boolean_setting DATA_ANALYST_ENABLED true
+  normalize_boolean_setting SHOPPING_DECISION_V2_ENABLED true
+  normalize_boolean_setting OUTCOME_LEDGER_ENABLED true
+  normalize_boolean_setting AFTER_SALES_POLICY_ENGINE_ENABLED true
+  normalize_boolean_setting INVENTORY_OPS_ENABLED true
+  normalize_boolean_setting VISUAL_SEARCH_ENABLED true
+  normalize_boolean_setting VISUAL_INDEX_CONSUMER_ENABLED true
+  normalize_boolean_setting VISUAL_INDEX_BACKFILL_ON_START true
   if [[ -z "${CALLER_VALUES[ANALYTICS_MYSQL_HOST]+x}" ]]; then
     ANALYTICS_MYSQL_HOST="$MYSQL_HOST"
   fi
@@ -642,6 +704,12 @@ prepare_environment() {
   # Ten Spring Boot processes share the WSL VM with existing user workloads.
   # Keep the local default conservative; callers may override JAVA_OPTS when RAM is available.
   export JAVA_OPTS="${JAVA_OPTS:--Xms64m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:MaxDirectMemorySize=96m -Xss512k -XX:TieredStopAtLevel=1}"
+  if [[ "$JAVA_OPTS" != *"-Djava.net.preferIPv4Stack="* ]]; then
+    # Nacos and all local service URLs are IPv4. Avoid WSL's intermittent
+    # dual-stack wildcard collision while preserving an explicit caller choice.
+    JAVA_OPTS="$JAVA_OPTS -Djava.net.preferIPv4Stack=true"
+    export JAVA_OPTS
+  fi
 
   if [[ -z "${AISHOP_INTERNAL_TOKEN:-}" || "$AISHOP_INTERNAL_TOKEN" == "your-token" ]]; then
     AISHOP_INTERNAL_TOKEN=$(random_token)
@@ -654,22 +722,18 @@ resolve_python() {
   local conda_base=""
   if [[ -n "${AISHOP_PYTHON:-}" ]]; then
     PYTHON="$AISHOP_PYTHON"
-  elif [[ -x "$BACKEND/AI_Shop-agent/.venv/bin/python" ]]; then
-    PYTHON="$BACKEND/AI_Shop-agent/.venv/bin/python"
   else
     if command -v conda >/dev/null 2>&1; then
       conda_base=$(conda info --base 2>/dev/null || true)
     fi
     if [[ -n "$conda_base" && -x "$conda_base/envs/shop/bin/python" ]]; then
       PYTHON="$conda_base/envs/shop/bin/python"
-    elif [[ -x "$HOME/anaconda3/envs/shop/bin/python" ]]; then
-      PYTHON="$HOME/anaconda3/envs/shop/bin/python"
     else
       PYTHON=""
     fi
   fi
   [[ -n "$PYTHON" && -x "$PYTHON" ]] \
-    || die "Agent Python 环境未找到；请创建 AI_Shop-agent/.venv 或用 AISHOP_PYTHON 指定解释器"
+    || die "未找到 Conda shop 环境；请先创建该环境，或用 AISHOP_PYTHON 显式指定解释器"
   export AISHOP_PYTHON="$PYTHON"
   info "Agent Python: $PYTHON"
 }
@@ -837,7 +901,7 @@ start_middleware() {
 
 ensure_port_free() {
   local port=$1 label=$2
-  if port_is_listening "$port"; then
+  if port_is_listening "$port" || ! port_is_bindable "$port"; then
     die "$label 无法启动：端口 $port 在端口分配后又被其他进程占用"
   fi
 }
@@ -862,7 +926,7 @@ start_java() {
     return 0
   fi
   ensure_memory_headroom "$name"
-  if port_is_listening "$port"; then
+  if port_is_listening "$port" || ! port_is_bindable "$port"; then
     reassign_managed_port_after_bind_failure "$name" "$port"
     port=$(managed_service_port "$name")
     warn "$name 的目标端口在分配后被占用，启动端口调整为 $port"
@@ -897,7 +961,10 @@ start_mcp() {
     return 0
   fi
   ensure_memory_headroom "MCP"
-  ensure_port_free "$MCP_PORT" "MCP"
+  if port_is_listening "$MCP_PORT" || ! port_is_bindable "$MCP_PORT"; then
+    reassign_managed_port_after_bind_failure mcp "$MCP_PORT"
+    warn "MCP 的目标端口在分配后被占用，启动端口调整为 $MCP_PORT"
+  fi
   reset_service_log mcp
   (
     cd "$BACKEND/AI_Shop-agent"
@@ -917,7 +984,10 @@ start_agent_api() {
     return 0
   fi
   ensure_memory_headroom "Agent API"
-  ensure_port_free "$AGENT_PORT" "Agent API"
+  if port_is_listening "$AGENT_PORT" || ! port_is_bindable "$AGENT_PORT"; then
+    reassign_managed_port_after_bind_failure agent "$AGENT_PORT"
+    warn "Agent API 的目标端口在分配后被占用，启动端口调整为 $AGENT_PORT"
+  fi
   reset_service_log agent
   (
     cd "$BACKEND/AI_Shop-agent"
@@ -937,7 +1007,11 @@ start_agent_worker() {
     return 0
   fi
   ensure_memory_headroom "Agent Worker"
-  ensure_port_free "$AGENT_WORKER_METRICS_PORT" "Agent Worker"
+  if port_is_listening "$AGENT_WORKER_METRICS_PORT" \
+    || ! port_is_bindable "$AGENT_WORKER_METRICS_PORT"; then
+    reassign_managed_port_after_bind_failure agent-worker "$AGENT_WORKER_METRICS_PORT"
+    warn "Agent Worker 指标端口在分配后被占用，启动端口调整为 $AGENT_WORKER_METRICS_PORT"
+  fi
   reset_service_log agent-worker
   (
     cd "$BACKEND/AI_Shop-agent"
@@ -948,6 +1022,21 @@ start_agent_worker() {
   write_pid_record agent-worker "$pid"
   record_started_service agent-worker
   info "拉起 agent-worker  metrics=$AGENT_WORKER_METRICS_PORT  pid=$pid  log: run/logs/agent-worker.log"
+}
+
+migrate_agent_schema() {
+  info "在 Admin 创建治理视图前迁移 Agent 数据库..."
+  (
+    cd "$BACKEND/AI_Shop-agent"
+    "$PYTHON" scripts/migrate.py
+  ) || die "Agent 数据库迁移失败"
+  local schema_count
+  schema_count=$(mysql_query aishop_agent -e \
+    "SELECT COUNT(DISTINCT schema_key) FROM agent_category_need_schema WHERE status='PUBLISHED';" \
+    | tr -d '[:space:]')
+  [[ "$schema_count" =~ ^[0-9]+$ && "$schema_count" -ge 7 ]] \
+    || die "类目需求 schema 种子不完整：当前仅有 ${schema_count:-0} 个已发布 schema"
+  info "已发布 $schema_count 个类目需求 schema"
 }
 
 bootstrap_demo_data() {
@@ -973,7 +1062,7 @@ start_storefront() {
   ensure_memory_headroom "商城前端"
   [[ -f "$FRONT/AI_Shop-web/node_modules/vite/bin/vite.js" ]] \
     || die "商城前端依赖未安装：cd AI_Shop-front/AI_Shop-web && npm ci"
-  if port_is_listening "$WEB_PORT"; then
+  if port_is_listening "$WEB_PORT" || ! port_is_bindable "$WEB_PORT"; then
     reassign_managed_port_after_bind_failure web "$WEB_PORT"
     warn "商城前端的目标端口在分配后被占用，启动端口调整为 $WEB_PORT"
   fi
@@ -1002,7 +1091,7 @@ start_admin_web() {
   ensure_memory_headroom "管理前端"
   [[ -f "$FRONT/AI_Shop-admin/node_modules/vite/bin/vite.js" ]] \
     || die "管理前端依赖未安装：cd AI_Shop-front/AI_Shop-admin && npm ci"
-  if port_is_listening "$ADMIN_WEB_PORT"; then
+  if port_is_listening "$ADMIN_WEB_PORT" || ! port_is_bindable "$ADMIN_WEB_PORT"; then
     reassign_managed_port_after_bind_failure admin-web "$ADMIN_WEB_PORT"
     warn "管理前端的目标端口在分配后被占用，启动端口调整为 $ADMIN_WEB_PORT"
   fi
@@ -1073,6 +1162,32 @@ refresh_dynamic_runtime_services() {
       stop_managed_service_for_restart "$name" 30
     fi
   done
+
+  # Frontend ports are initially reserved before stale Vite processes are
+  # refreshed. Re-run only these two assignments after the listeners have
+  # actually stopped so a normal restart can reclaim 6001/6002 instead of
+  # persisting a transient fallback such as 6002/6003.
+  local previous_web_port=$WEB_PORT previous_admin_web_port=$ADMIN_WEB_PORT
+  unset 'RESERVED_PORTS[$previous_web_port]'
+  unset 'RESERVED_PORTS[$previous_admin_web_port]'
+  if [[ -n "${CALLER_VALUES[WEB_PORT]+x}" ]]; then
+    WEB_PORT=${CALLER_VALUES[WEB_PORT]}
+    export WEB_PORT
+  else
+    unset WEB_PORT
+  fi
+  if [[ -n "${CALLER_VALUES[ADMIN_WEB_PORT]+x}" ]]; then
+    ADMIN_WEB_PORT=${CALLER_VALUES[ADMIN_WEB_PORT]}
+    export ADMIN_WEB_PORT
+  else
+    unset ADMIN_WEB_PORT
+  fi
+  assign_port WEB_PORT 6001 "商城前端"
+  assign_port ADMIN_WEB_PORT 6002 "管理前端"
+  if [[ "$WEB_PORT" != "$previous_web_port" || "$ADMIN_WEB_PORT" != "$previous_admin_web_port" ]]; then
+    info "动态前端端口已重新协调为 $WEB_PORT/$ADMIN_WEB_PORT"
+  fi
+  write_runtime_env
 }
 
 provision_analytics_reader() {
@@ -1086,7 +1201,7 @@ provision_analytics_reader() {
     return 0
   fi
 
-  info "配置 DataAnalyst 只读账号与五个治理视图权限..."
+  info "配置 DataAnalyst 只读账号与十个治理视图权限..."
   MYSQL_CONTAINER=aishop-mysql \
     MYSQL_ADMIN_USER=root \
     MYSQL_ADMIN_PASSWORD="$MYSQL_ROOT_PASSWORD" \
@@ -1180,6 +1295,17 @@ rebuild_catalog_search_index() {
   die "商品关键词索引数量不一致：数据库=$expected Elasticsearch=$actual"
 }
 
+check_visual_index_runtime() {
+  [[ "$VISUAL_SEARCH_ENABLED" == "true" ]] || return 0
+  info "检查视觉商品索引与独立消费队列..."
+  if ! (
+    cd "$BACKEND/AI_Shop-agent"
+    "$PYTHON" scripts/check_visual_index.py
+  ); then
+    warn "视觉商品搜索处于降级状态；商城和其他 Agent 能力将继续启动"
+  fi
+}
+
 print_summary() {
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -1191,6 +1317,11 @@ print_summary() {
   printf "  %-16s %s\n" "Agent Worker 指标" "http://127.0.0.1:$AGENT_WORKER_METRICS_PORT/metrics"
   printf "  %-16s %s\n" "Multi-Agent" "$MULTI_AGENT_ENABLED"
   printf "  %-16s %s\n" "DataAnalyst" "$DATA_ANALYST_ENABLED"
+  printf "  %-16s %s\n" "导购决策 v2" "$SHOPPING_DECISION_V2_ENABLED"
+  printf "  %-16s %s\n" "结果账本" "$OUTCOME_LEDGER_ENABLED"
+  printf "  %-16s %s\n" "售后规则引擎" "$AFTER_SALES_POLICY_ENGINE_ENABLED"
+  printf "  %-16s %s\n" "InventoryOps" "$INVENTORY_OPS_ENABLED"
+  printf "  %-16s %s\n" "视觉商品搜索" "$VISUAL_SEARCH_ENABLED"
   printf "  %-16s %s\n" "Nacos" "http://127.0.0.1:$NACOS_PORT/nacos/"
   printf "  %-16s %s\n" "RabbitMQ" "http://127.0.0.1:$RABBIT_MANAGEMENT_PORT"
   printf "  %-16s %s\n" "Elasticsearch" "http://127.0.0.1:$ES_PORT"
@@ -1235,6 +1366,10 @@ if $MIDDLEWARE_ONLY; then
 fi
 
 install_catalog_assets
+
+# Admin owns cross-database analytics views that reference Agent decision
+# artifacts. Create the Agent schema before Admin Flyway validates those views.
+migrate_agent_schema
 
 info "启动 Java 微服务..."
 start_java gateway "$BACKEND/AI_Shop-gateway/target/aishop-gateway-1.0.0.jar" "$GATEWAY_PORT"
@@ -1295,6 +1430,7 @@ wait_http "http://127.0.0.1:$AGENT_PORT/health/live" "Agent 存活检查" 120
 start_agent_worker
 wait_managed_service agent-worker "$AGENT_WORKER_METRICS_PORT" "Agent Worker"
 wait_http "http://127.0.0.1:$AGENT_PORT/health/ready" "Agent 就绪检查" 180
+check_visual_index_runtime
 
 bootstrap_demo_data
 
