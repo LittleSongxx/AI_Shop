@@ -5,6 +5,9 @@ import type { AgentSourceRef } from '@/utils/agentHistory';
 export interface AgentWsMessage {
   messageId?: number | string;
   userMessage?: string;
+  imageAssetId?: string;
+  imageSnapshot?: Record<string, unknown>;
+  selectedVisualSubject?: Record<string, unknown>;
   assistantMessage?: string;
   bizType?: string;
   outPutType?: number;

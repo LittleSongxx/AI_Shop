@@ -23,19 +23,41 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">价格</th>
+            <th scope="row">到手估算</th>
             <td v-for="product in products" :key="`${product.productId}-price`">
-              <strong>¥{{ money(product.minPrice) }}</strong>
-              <span v-if="product.maxPrice && Number(product.maxPrice) > Number(product.minPrice)">
-                - ¥{{ money(product.maxPrice) }}
-              </span>
-              <small v-if="product.priceChanged" class="changed">价格已变化</small>
+              <strong>¥{{ money(product.estimatedPayable ?? product.minPrice) }}</strong>
+              <small v-if="hasBasePriceDifference(product)" class="secondary-value">
+                商品价 ¥{{ money(product.basePrice) }}
+              </small>
+              <small v-if="product.priceChanged" class="changed">价格已刷新</small>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">优惠</th>
+            <td v-for="product in products" :key="`${product.productId}-coupon`">
+              {{ couponText(product) }}
+              <small class="secondary-value">{{ quoteText(product.quoteExpiresAt) }}</small>
             </td>
           </tr>
           <tr>
             <th scope="row">库存</th>
             <td v-for="product in products" :key="`${product.productId}-stock`">
               <span :class="availabilityClass(product.availability)">{{ availabilityText(product) }}</span>
+              <small v-if="product.deliveryPromise" class="secondary-value">
+                {{ product.deliveryPromise }}
+              </small>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">适合谁</th>
+            <td v-for="product in products" :key="`${product.productId}-best-for`">
+              {{ product.recommendation?.bestFor || '当前缺少足够的已核验用途证据' }}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">取舍</th>
+            <td v-for="product in products" :key="`${product.productId}-tradeoff`">
+              {{ product.recommendation?.tradeoff || '请在详情页核对关键 SKU 规格' }}
             </td>
           </tr>
           <tr v-for="dimension in dimensions" :key="dimension">
@@ -72,9 +94,10 @@ const products = computed<ComparisonProduct[]>(() =>
 
 const dimensions = computed(() => {
   const values = Array.isArray(props.card?.dimensions) ? props.card.dimensions : [];
+  const fixed = new Set(['价格', '到手估算', '优惠', '库存', '适合谁', '取舍']);
   return values.filter((value: unknown) => {
     const text = String(value || '');
-    return text && text !== '价格' && text !== '库存';
+    return text && !fixed.has(text);
   }).slice(0, 10);
 });
 
@@ -84,10 +107,40 @@ const money = (value: unknown) => {
 };
 
 const propertyValue = (product: ComparisonProduct, dimension: string) => {
+  if (dimension.startsWith('已核验:')) {
+    const key = dimension.slice('已核验:'.length);
+    const feature = (product.verifiedFeatures || []).find(
+      (item: any) => String(item?.key || '') === key
+    );
+    return feature?.value || '';
+  }
   const property = (product.properties || []).find(
     (item: any) => String(item?.name || '') === dimension
   );
   return property?.value || '';
+};
+
+const hasBasePriceDifference = (product: ComparisonProduct) => {
+  const base = Number(product.basePrice);
+  const payable = Number(product.estimatedPayable ?? product.minPrice);
+  return Number.isFinite(base) && Number.isFinite(payable) && base > payable;
+};
+
+const couponText = (product: ComparisonProduct) => {
+  if (product.couponStatus !== 'AVAILABLE' || !product.coupon) return '暂无可核验优惠';
+  const name = String(product.coupon.couponName || '可用优惠');
+  const discount = Number(product.coupon.estimatedDiscount);
+  return Number.isFinite(discount) && discount > 0
+    ? `${name}，预计减 ¥${discount.toFixed(2)}`
+    : name;
+};
+
+const quoteText = (value: unknown) => {
+  if (!value) return '报价有效期未知';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '报价有效期未知';
+  if (date.getTime() <= Date.now()) return '报价已过期，请重新查询';
+  return `报价有效至 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
 };
 
 const availabilityText = (product: ComparisonProduct) => {
@@ -222,6 +275,14 @@ const openProduct = (productId: unknown) => {
   margin-top: 3px;
   color: $color-warning;
   font-size: 10px;
+}
+
+.secondary-value {
+  display: block;
+  margin-top: 3px;
+  color: $color-text-muted;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .comparison-foot {

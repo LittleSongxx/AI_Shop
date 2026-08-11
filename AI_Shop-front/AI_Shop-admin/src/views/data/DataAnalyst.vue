@@ -24,12 +24,7 @@
       </el-button>
     </div>
     <div v-else class="inventory-toolbar">
-      <el-select v-model="lookbackDays" class="lookback-select">
-        <el-option label="近 14 天" :value="14" />
-        <el-option label="近 30 天" :value="30" />
-        <el-option label="近 60 天" :value="60" />
-        <el-option label="近 90 天" :value="90" />
-      </el-select>
+      <el-tag type="info" effect="plain">固定 28 天 EWMA · 14 天复核周期</el-tag>
       <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadInventory">
         刷新建议
       </el-button>
@@ -87,7 +82,7 @@
         <article class="metric-cell"><span>风险 SKU</span><strong>{{ result.summary?.riskSkuCount || 0 }}</strong></article>
         <article class="metric-cell"><span>紧急</span><strong>{{ result.summary?.criticalCount || 0 }}</strong></article>
         <article class="metric-cell"><span>高优先级</span><strong>{{ result.summary?.highCount || 0 }}</strong></article>
-        <article class="metric-cell"><span>执行方式</span><strong class="manual-label">人工待办</strong></article>
+        <article class="metric-cell"><span>建议补货总量</span><strong>{{ result.summary?.suggestedReplenishQuantity || 0 }}</strong></article>
       </div>
       <section class="data-section">
         <header><h3>补货优先级</h3></header>
@@ -100,9 +95,22 @@
               <template #default="{ row }"><b>{{ row.productName || row.productId }}</b><small class="sku-line">{{ row.skuHash }}</small></template>
             </el-table-column>
             <el-table-column label="库存" prop="stock" width="90" />
-            <el-table-column label="风险" prop="riskLevel" width="125" />
-            <el-table-column label="商品净销量" prop="productNetUnits" width="120" />
-            <el-table-column label="建议人工动作" prop="suggestedAction" min-width="280" />
+            <el-table-column label="在途" prop="inboundQuantity" width="90" />
+            <el-table-column label="EWMA 日需求" width="120">
+              <template #default="{ row }">{{ formatValue(row.ewmaDailyDemand) }}</template>
+            </el-table-column>
+            <el-table-column label="覆盖天数" width="105">
+              <template #default="{ row }">{{ formatValue(row.coverageDays) }}</template>
+            </el-table-column>
+            <el-table-column label="再订货点" width="105">
+              <template #default="{ row }">{{ formatValue(row.reorderPoint) }}</template>
+            </el-table-column>
+            <el-table-column label="MOQ" prop="minOrderQuantity" width="80" />
+            <el-table-column label="建议补货" prop="suggestedReplenishQuantity" width="105" />
+            <el-table-column label="置信度" width="95">
+              <template #default="{ row }">{{ formatPercent(row.confidence) }}</template>
+            </el-table-column>
+            <el-table-column label="建议人工动作" prop="suggestedAction" min-width="300" />
           </el-table>
         </div>
       </section>
@@ -194,6 +202,36 @@
           </div>
         </section>
 
+        <el-alert
+          v-if="result.causalCaution"
+          class="causal-caution"
+          :title="result.causalCaution"
+          type="warning"
+          show-icon
+          :closable="false"
+        />
+
+        <section v-if="result.diagnosisTree?.length" class="data-section diagnosis-section">
+          <header>
+            <h3>指标树与诊断分支</h3>
+            <span class="section-note">各分支相互独立执行，单支失败不会覆盖已完成结果</span>
+          </header>
+          <el-table :data="result.diagnosisTree" stripe>
+            <el-table-column label="分支" prop="branchId" width="150" />
+            <el-table-column label="验证目标" prop="purpose" min-width="240" show-overflow-tooltip />
+            <el-table-column label="状态" width="130">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'SUCCEEDED' ? 'success' : row.status === 'EMPTY_RESULT' ? 'warning' : 'danger'">
+                  {{ statusText(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="数据血缘" min-width="260">
+              <template #default="{ row }">{{ (row.lineage || []).join('、') || '—' }}</template>
+            </el-table-column>
+          </el-table>
+        </section>
+
         <el-collapse class="technical-details">
           <el-collapse-item title="SQL、指标口径与执行计划" name="sql">
             <div v-if="result.interpretation" class="interpretation">
@@ -203,13 +241,36 @@
             <dl v-if="result.metricDefinitions?.length" class="definitions">
               <template v-for="item in result.metricDefinitions" :key="item.name">
                 <dt>{{ item.name }}</dt>
-                <dd>{{ item.definition }}</dd>
+                <dd>
+                  {{ item.definition }}
+                  <small v-if="item.semanticView" class="definition-source">
+                    {{ item.semanticView }} / {{ item.branchId }}
+                  </small>
+                </dd>
               </template>
             </dl>
             <details v-if="result.explain?.length">
               <summary>数据库执行计划（EXPLAIN）</summary>
               <pre>{{ pretty(result.explain) }}</pre>
             </details>
+            <div v-if="result.queries?.length" class="branch-queries">
+              <h4>各分支 SQL 与执行计划</h4>
+              <el-collapse>
+                <el-collapse-item
+                  v-for="query in result.queries"
+                  :key="query.branchId"
+                  :name="query.branchId"
+                  :title="`${query.branchId} · ${query.purpose || '指标分支'} · ${statusText(query.status)}`"
+                >
+                  <div class="query-source">血缘：{{ (query.lineage || []).join('、') || '—' }}</div>
+                  <pre v-if="query.sql">{{ query.sql }}</pre>
+                  <details v-if="query.explain?.length">
+                    <summary>EXPLAIN 摘要</summary>
+                    <pre>{{ pretty(query.explain) }}</pre>
+                  </details>
+                </el-collapse-item>
+              </el-collapse>
+            </div>
           </el-collapse-item>
         </el-collapse>
       </template>
@@ -234,7 +295,7 @@ const modeOptions = [
 ]
 const question = ref('')
 const lastQuestion = ref('')
-const lookbackDays = ref(30)
+const lookbackDays = ref(28)
 const loading = ref(false)
 const analysisResult = ref(null)
 const inventoryResult = ref(null)
@@ -254,6 +315,21 @@ const columnLabels = {
   run_count: '运行次数', success_count: '成功次数', failure_count: '失败次数',
   handoff_count: '转人工次数', avg_latency_ms: '平均耗时（毫秒）',
   input_tokens: '输入 Token', output_tokens: '输出 Token', cost_cny: '成本（元）',
+  retrieval_mode: '检索模式', impression_count: '曝光数', click_count: '点击数',
+  add_to_cart_count: '加购数', payment_count: '支付数', click_through_rate: '点击率',
+  cart_rate: '加购率', payment_rate: '支付率', refund_count: '退款数',
+  return_count: '退货数', negative_review_count: '低分评价数',
+  support_contact_count: '售后联系数', repeat_purchase_count: '复购数',
+  quote_count: '报价快照数', coupon_available_count: '可用优惠数',
+  avg_base_price: '平均基础价', avg_estimated_payable: '平均估算到手价',
+  in_stock_quote_count: '可购买报价数', paid_order_count: '已支付订单数',
+  shipped_order_count: '已发货订单数', completed_order_count: '已完成订单数',
+  cancelled_order_count: '已取消订单数', refund_request_count: '退款申请数',
+  refund_completed_count: '退款完成数', refund_completed_amount: '退款完成金额',
+  sku_key: 'SKU', current_stock: '当前库存', inbound_quantity: '在途量',
+  ewma_daily_demand: 'EWMA 日需求', lead_time_days: '交期（天）', safety_stock: '安全库存',
+  review_period_days: '复核周期（天）', min_order_quantity: 'MOQ', reorder_point: '再订货点',
+  suggested_replenish_quantity: '建议补货量', coverage_days: '库存覆盖天数', confidence: '预测置信度',
 }
 const columnLabel = (value) => columnLabels[value] || value
 const warningText = (warnings) => (warnings || []).map(reasonLabel).join('；')
@@ -368,18 +444,30 @@ const formatValue = (value) => {
   if (typeof value !== 'number') return value
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
 }
+const formatPercent = (value) => {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(Number(value) * 100)}%`
+}
 const pretty = (value) => JSON.stringify(value || [], null, 2)
 const statusText = (status) => ({
   SUCCEEDED: '查询成功',
   EMPTY_RESULT: '暂无数据',
+  PARTIAL_METRIC_TREE: '部分指标完成',
   NEEDS_CLARIFICATION: '待确认口径',
   DISABLED: '未启用',
   DATA_ANALYST_REQUEST_TIMEOUT: '超时',
+  DATA_ANALYST_BRANCH_FAILED: '指标分支失败',
+  DATA_ANALYST_BRANCH_ERROR: '指标分支异常',
+  DATA_ANALYST_MODEL_UNAVAILABLE: '分析模型不可用',
+  DATA_ANALYST_PLAN_TIMEOUT: '计划生成超时',
+  DATA_ANALYST_PLAN_PARSE_FAILED: '计划解析失败',
+  DATA_ANALYST_SQL_PARSE_FAILED: 'SQL 解析失败',
+  DATA_ANALYST_SQL_TIMEOUT: 'SQL 生成超时',
   QUERY_TIMEOUT: '查询超时',
   DATABASE_UNAVAILABLE: '分析库不可用',
   ANALYTICS_POOL_UNAVAILABLE: '分析库未就绪',
 }[status] || status || '未知状态')
-const isFailureResult = (value) => !['SUCCEEDED', 'EMPTY_RESULT', 'NEEDS_CLARIFICATION'].includes(value?.status)
+const isFailureResult = (value) => !['SUCCEEDED', 'EMPTY_RESULT', 'PARTIAL_METRIC_TREE', 'NEEDS_CLARIFICATION'].includes(value?.status)
 const failureText = (status) => {
   if (status === 'DISABLED') return 'AI 经营分析当前未启用。'
   if (status === 'DATA_ANALYST_REQUEST_TIMEOUT' || status === 'QUERY_TIMEOUT') return '本次分析超过执行预算，请缩小时间范围或问题范围后重试。'
@@ -390,7 +478,7 @@ const failureText = (status) => {
 }
 const statusType = (status) => {
   if (status === 'SUCCEEDED') return 'success'
-  if (status === 'NEEDS_CLARIFICATION' || status === 'EMPTY_RESULT') return 'warning'
+  if (status === 'NEEDS_CLARIFICATION' || status === 'EMPTY_RESULT' || status === 'PARTIAL_METRIC_TREE') return 'warning'
   return 'danger'
 }
 const priorityType = (priority) => ({
@@ -440,6 +528,14 @@ onBeforeUnmount(() => {
 }
 .page-heading h2 { font-size: 20px; }
 .data-section h3 { font-size: 14px; }
+.data-section > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.section-note, .query-source, .definition-source { color: var(--text3); font-size: 12px; }
+.definition-source { display: block; margin-top: 3px; }
+.causal-caution { margin-top: 2px; }
+.branch-queries { display: grid; gap: 8px; margin-top: 16px; }
+.branch-queries h4 { margin: 0; color: var(--text); font-size: 13px; }
+.branch-queries :deep(.el-collapse-item__header) { font-size: 13px; }
+.query-source { margin-bottom: 8px; }
 .heading-actions { display: flex; align-items: center; gap: 10px; }
 .query-bar {
   display: grid;
@@ -449,7 +545,6 @@ onBeforeUnmount(() => {
 }
 .query-bar :deep(.el-button) { min-height: 32px; }
 .inventory-toolbar { display: flex; align-items: center; gap: 10px; }
-.lookback-select { width: 140px; }
 .clarification-band,
 .answer-band,
 .failure-band {

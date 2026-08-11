@@ -90,6 +90,30 @@
             </div>
           </section>
 
+          <section class="form-section">
+            <div class="section-heading-row">
+              <h2>个性化控制</h2>
+              <el-switch
+                v-model="profile.personalizationEnabled"
+                :loading="personalizationSaving"
+                active-text="开启"
+                inactive-text="关闭"
+                @change="togglePersonalization"
+              />
+            </div>
+            <p class="section-note">关闭后不再使用行为推断；你当前明确说出的需求仍然有效。</p>
+            <div v-if="profile.implicitSignals?.length" class="signal-list">
+              <div v-for="signal in profile.implicitSignals" :key="signal.signalId" class="signal-row">
+                <span class="signal-label">{{ signal.kind === 'negativeProduct' ? '不喜欢商品' : '关注商品' }}</span>
+                <span class="signal-value">{{ signal.value }}</span>
+                <span class="signal-meta">{{ signal.count || 1 }} 次行为</span>
+                <el-button text type="danger" :icon="Delete" aria-label="删除该行为信号" @click="removeSignal(signal.signalId)" />
+              </div>
+              <el-button text type="danger" @click="clearSignals">清除全部行为信号</el-button>
+            </div>
+            <span v-else class="muted">暂无行为信号</span>
+          </section>
+
           <footer class="form-actions">
             <el-button type="danger" plain :loading="saving" @click="clearAll">清空偏好</el-button>
             <span class="action-spacer" />
@@ -104,6 +128,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { Delete } from '@element-plus/icons-vue';
 import { agentApi, type ShoppingProfile } from '@/api/modules';
 import { toast } from '@/utils/toast';
 
@@ -116,12 +141,15 @@ const emptyProfile = (): ShoppingProfile => ({
   excludedBrands: [],
   scenarios: [],
   features: [],
-  acceptSubstitute: null
+  acceptSubstitute: null,
+  personalizationEnabled: true,
+  implicitSignals: []
 });
 
 const profile = reactive<ShoppingProfile>(emptyProfile());
 const loading = ref(false);
 const saving = ref(false);
+const personalizationSaving = ref(false);
 const brandInput = ref('');
 const excludedBrandInput = ref('');
 const scenarioInput = ref('');
@@ -139,7 +167,9 @@ const applyProfile = (value: Partial<ShoppingProfile> | null | undefined) => {
     brands: Array.isArray(next.brands) ? [...next.brands] : [],
     excludedBrands: Array.isArray(next.excludedBrands) ? [...next.excludedBrands] : [],
     scenarios: Array.isArray(next.scenarios) ? [...next.scenarios] : [],
-    features: Array.isArray(next.features) ? [...next.features] : []
+    features: Array.isArray(next.features) ? [...next.features] : [],
+    personalizationEnabled: next.personalizationEnabled !== false,
+    implicitSignals: Array.isArray(next.implicitSignals) ? next.implicitSignals.map((item) => ({ ...item })) : []
   });
 };
 
@@ -218,6 +248,44 @@ const clearAll = async () => {
   }
 };
 
+const togglePersonalization = async (value: string | number | boolean) => {
+  const enabled = Boolean(value);
+  personalizationSaving.value = true;
+  try {
+    applyProfile(await agentApi.setShoppingPersonalization(profile.revision, enabled));
+  } catch (error: any) {
+    profile.personalizationEnabled = !enabled;
+    if (Number(error?.code) === 409 && error?.data) applyProfile(error.data);
+    else toast.error(error?.info || '个性化设置保存失败');
+  } finally {
+    personalizationSaving.value = false;
+  }
+};
+
+const removeSignal = async (signalId: string) => {
+  saving.value = true;
+  try {
+    applyProfile(await agentApi.deleteShoppingSignal(profile.revision, signalId));
+  } catch (error: any) {
+    if (Number(error?.code) === 409 && error?.data) applyProfile(error.data);
+    else toast.error(error?.info || '行为信号删除失败');
+  } finally {
+    saving.value = false;
+  }
+};
+
+const clearSignals = async () => {
+  saving.value = true;
+  try {
+    applyProfile(await agentApi.clearShoppingSignals(profile.revision));
+  } catch (error: any) {
+    if (Number(error?.code) === 409 && error?.data) applyProfile(error.data);
+    else toast.error(error?.info || '行为信号清除失败');
+  } finally {
+    saving.value = false;
+  }
+};
+
 onMounted(load);
 </script>
 
@@ -232,6 +300,14 @@ h1 { margin: 5px 0 7px; color: $color-text-title; font-size: 24px; }
 .profile-form { display: flex; flex-direction: column; gap: 12px; }
 .form-section { padding: 16px; border: 1px solid $color-border; border-radius: $radius-card; background: $color-card; }
 .form-section h2 { margin: 0 0 14px; color: $color-text-title; font-size: 15px; }
+.section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-heading-row h2 { margin-bottom: 0; }
+.section-note { margin: -4px 0 12px; color: $color-text-muted; font-size: 12px; line-height: 1.5; }
+.signal-list { display: flex; flex-direction: column; gap: 8px; }
+.signal-row { display: flex; align-items: center; gap: 9px; min-height: 30px; padding: 4px 8px; border: 1px solid $color-border; border-radius: 6px; }
+.signal-label { color: $color-text-muted; font-size: 12px; }
+.signal-value { flex: 1; min-width: 0; overflow: hidden; color: $color-text-body; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.signal-meta { color: $color-text-muted; font-size: 11px; }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; color: $color-text-body; font-size: 12px; }
 .budget-row { display: flex; align-items: center; gap: 8px; }

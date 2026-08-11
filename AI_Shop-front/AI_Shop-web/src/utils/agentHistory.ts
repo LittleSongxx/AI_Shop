@@ -18,6 +18,9 @@ export interface AgentSourceRef {
 export interface AgentHistoryMessage {
   messageId: number;
   userMessage?: string;
+  imageAssetId?: string;
+  imageSnapshot?: Record<string, unknown>;
+  selectedVisualSubject?: Record<string, unknown>;
   assistantMessage: string;
   status: number;
   bizType?: string;
@@ -87,10 +90,24 @@ export const normalizeAgentHistoryMessage = (raw: Record<string, unknown>): Agen
   const statusRaw = pickField(raw, 'status');
   const sourceRefs = normalizeSourceRefs(pickField(raw, 'sourceRefs', 'source_refs'));
   const messageTypeRaw = pickField(raw, 'messageType', 'message_type');
+  const imageAssetIdRaw = pickField(raw, 'imageAssetId', 'image_asset_id');
+  const imageSnapshotRaw = pickField(raw, 'imageSnapshot', 'image_snapshot_json');
+  const selectedVisualSubjectRaw = pickField(
+    raw,
+    'selectedVisualSubject',
+    'selected_visual_subject_json'
+  );
 
   return {
     messageId: Number.isFinite(parsedId) && parsedId > 0 ? parsedId : 0,
     userMessage: userRaw != null ? String(userRaw) : undefined,
+    imageAssetId: imageAssetIdRaw != null ? String(imageAssetIdRaw) : undefined,
+    imageSnapshot: imageSnapshotRaw && typeof imageSnapshotRaw === 'object'
+      ? imageSnapshotRaw as Record<string, unknown>
+      : undefined,
+    selectedVisualSubject: selectedVisualSubjectRaw && typeof selectedVisualSubjectRaw === 'object'
+      ? selectedVisualSubjectRaw as Record<string, unknown>
+      : undefined,
     assistantMessage: assistantRaw != null ? String(assistantRaw) : '',
     status: statusRaw != null ? Number(statusRaw) : 2,
     bizType: bizTypeRaw != null ? String(bizTypeRaw) : undefined,
@@ -104,6 +121,9 @@ export const normalizeAgentHistoryMessage = (raw: Record<string, unknown>): Agen
 export interface AgentStreamPayload {
   messageId?: number | string;
   userMessage?: string;
+  imageAssetId?: string;
+  imageSnapshot?: Record<string, unknown>;
+  selectedVisualSubject?: Record<string, unknown>;
   assistantMessage?: string;
   bizType?: string;
   bizData?: string | null;
@@ -142,6 +162,13 @@ export const upsertAgentStreamMessage = (
   if (payload.userMessage != null && payload.userMessage !== '') {
     message.userMessage = String(payload.userMessage);
   }
+  if (payload.imageAssetId) message.imageAssetId = String(payload.imageAssetId);
+  if (payload.imageSnapshot && typeof payload.imageSnapshot === 'object') {
+    message.imageSnapshot = payload.imageSnapshot;
+  }
+  if (payload.selectedVisualSubject && typeof payload.selectedVisualSubject === 'object') {
+    message.selectedVisualSubject = payload.selectedVisualSubject;
+  }
   if (payload.bizType) message.bizType = payload.bizType;
   if (payload.bizData != null) message.bizData = payload.bizData;
   if (payload.sendTime) message.sendTime = payload.sendTime;
@@ -177,6 +204,9 @@ export const upsertAgentHttpMessage = (
     return incoming;
   }
   if (incoming.userMessage) existing.userMessage = incoming.userMessage;
+  if (incoming.imageAssetId) existing.imageAssetId = incoming.imageAssetId;
+  if (incoming.imageSnapshot) existing.imageSnapshot = incoming.imageSnapshot;
+  if (incoming.selectedVisualSubject) existing.selectedVisualSubject = incoming.selectedVisualSubject;
   if (incoming.bizType) existing.bizType = incoming.bizType;
   if (incoming.bizData != null) existing.bizData = incoming.bizData;
   if (incoming.sendTime) existing.sendTime = incoming.sendTime;

@@ -177,8 +177,7 @@ export const agentApi = {
     fromProduct?: boolean,
     consultProductId?: string,
     options?: {
-      imagePath?: string;
-      imageModerationId?: number;
+      imageAssetId?: string;
       comparisonProductIds?: string[];
     }
   ) =>
@@ -186,8 +185,7 @@ export const agentApi = {
       message,
       fromProduct,
       consultProductId,
-      imagePath: options?.imagePath,
-      imageModerationId: options?.imageModerationId,
+      imageAssetId: options?.imageAssetId,
       comparisonProductIds: options?.comparisonProductIds?.length
         ? JSON.stringify(options.comparisonProductIds)
         : undefined
@@ -197,11 +195,19 @@ export const agentApi = {
     request.post<ShoppingProfile>('/agent/shoppingProfile/update', { expectedRevision, profile }),
   clearShoppingProfile: (expectedRevision: number) =>
     request.post<ShoppingProfile>('/agent/shoppingProfile/clear', { expectedRevision }),
+  setShoppingPersonalization: (expectedRevision: number, enabled: boolean) =>
+    request.post<ShoppingProfile>('/agent/shoppingProfile/personalization', { expectedRevision, enabled }),
+  deleteShoppingSignal: (expectedRevision: number, signalId: string) =>
+    request.post<ShoppingProfile>('/agent/shoppingProfile/signals/delete', { expectedRevision, signalId }),
+  clearShoppingSignals: (expectedRevision: number) =>
+    request.post<ShoppingProfile>('/agent/shoppingProfile/signals/clear', { expectedRevision }),
   listSupportCases: (limit = 20) => request.get<SupportCase[]>('/agent/supportCases', { params: { limit } }),
   getSupportCase: (caseId: string) =>
     request.get<SupportCase>('/agent/supportCaseDetail', { params: { caseId } }),
   selectOrderCandidate: (selectionId: string, targetType: 'ORDER' | 'ORDER_ITEM', targetId: string) =>
     request.postForm('/agent/selectOrderCandidate', { selectionId, targetType, targetId }),
+  selectVisualSubject: (selectionId: string, subjectId: string) =>
+    request.postForm('/agent/selectVisualSubject', { selectionId, subjectId }),
   cancelMessage: (messageId: number, assistantMessage?: string) =>
     request.postForm('/agent/cancelMessage', { messageId, assistantMessage }),
   reportClick: reportAgentProductClick,
@@ -275,6 +281,12 @@ export const payTradeApi = {
 
 export interface ImageUploadResult {
   path: string;
+  assetId?: string;
+  contentSha256?: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  expiresAt?: string;
   pendingReview?: boolean;
   moderationId?: number;
   moderationStatus?: string;
@@ -290,7 +302,7 @@ export const fileApi = {
   uploadImage: async (
     file: Blob,
     createThumbnail = true,
-    scene?: 'avatar' | 'comment' | 'support',
+    scene?: 'avatar' | 'comment' | 'agent',
     orderId?: string,
     options?: ImageUploadOptions
   ): Promise<ImageUploadResult> => {
@@ -322,8 +334,15 @@ export const fileApi = {
     }
     const data = result.data;
     const { normalizeCommentImagePath } = await import('@/utils/commentImagePaths');
-    const path = normalizeCommentImagePath(data);
-    if (!path) {
+    const path = normalizeCommentImagePath(data) || '';
+    const assetId =
+      typeof data === 'object' && data !== null && (data as { assetId?: unknown }).assetId
+        ? String((data as { assetId?: unknown }).assetId)
+        : undefined;
+    if (scene === 'agent' && !assetId) {
+      throw new Error('上传响应缺少图片资产ID');
+    }
+    if (scene !== 'agent' && !path) {
       throw new Error('上传响应缺少图片路径');
     }
     const pendingReview =
@@ -342,8 +361,34 @@ export const fileApi = {
       typeof data === 'object' && data !== null && (data as { scene?: unknown }).scene
         ? String((data as { scene?: unknown }).scene)
         : undefined;
+    const contentSha256 =
+      typeof data === 'object' && data !== null && (data as { contentSha256?: unknown }).contentSha256
+        ? String((data as { contentSha256?: unknown }).contentSha256)
+        : undefined;
+    const mimeType =
+      typeof data === 'object' && data !== null && (data as { mimeType?: unknown }).mimeType
+        ? String((data as { mimeType?: unknown }).mimeType)
+        : undefined;
+    const width =
+      typeof data === 'object' && data !== null && Number.isFinite(Number((data as { width?: unknown }).width))
+        ? Number((data as { width?: unknown }).width)
+        : undefined;
+    const height =
+      typeof data === 'object' && data !== null && Number.isFinite(Number((data as { height?: unknown }).height))
+        ? Number((data as { height?: unknown }).height)
+        : undefined;
+    const expiresAt =
+      typeof data === 'object' && data !== null && (data as { expiresAt?: unknown }).expiresAt
+        ? String((data as { expiresAt?: unknown }).expiresAt)
+        : undefined;
     return {
       path,
+      assetId,
+      contentSha256,
+      mimeType,
+      width,
+      height,
+      expiresAt,
       pendingReview,
       moderationId: Number.isFinite(moderationId) ? moderationId : undefined,
       moderationStatus,
@@ -363,6 +408,16 @@ export interface ShoppingProfile {
   scenarios: string[];
   features: string[];
   acceptSubstitute?: boolean | null;
+  personalizationEnabled?: boolean;
+  implicitSignals?: Array<{
+    signalId: string;
+    kind: string;
+    value: string;
+    effectiveWeight?: number;
+    count?: number;
+    source?: string;
+    observedAt?: string;
+  }>;
   fieldMeta?: Record<string, unknown>;
 }
 

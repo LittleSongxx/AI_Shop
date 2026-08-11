@@ -39,12 +39,17 @@
       </p>
       <p v-else-if="loadingHistory && messageList.length" class="history-top-tip">加载更早的消息…</p>
       <div v-for="(item, index) in messageList" :key="item.messageId || `msg-${index}`" class="msg-group">
-        <AgentUserBubble v-if="item.userMessage" :user-message="item.userMessage" />
+        <AgentUserBubble
+          v-if="item.userMessage || item.imageAssetId"
+          :user-message="item.userMessage"
+          :image-asset-id="item.imageAssetId"
+        />
         <AgentChatItem
           v-if="shouldShowAi(item)"
           :data="item"
           :waiting="Number(item.status) === 1 && streamWaiting && item === currentMessage"
           @select-order="onSelectOrder"
+          @select-visual="onSelectVisualSubject"
           @compare-products="onCompareProducts"
         />
       </div>
@@ -225,6 +230,35 @@ const onSelectOrder = async (payload: unknown) => {
   } catch (error: any) {
     data.done?.(false);
     toast.error(error?.info || error?.message || '订单候选处理失败，请重试');
+  }
+};
+
+const onSelectVisualSubject = async (payload: unknown) => {
+  const data = payload as {
+    card?: { selectionId?: string };
+    subject?: { subjectId?: string };
+    done?: (success: boolean) => void;
+  };
+  const selectionId = data.card?.selectionId;
+  const subjectId = data.subject?.subjectId;
+  if (!selectionId || !subjectId) {
+    data.done?.(false);
+    toast.error('图片主体选择参数无效');
+    return;
+  }
+  if (answering.value) {
+    data.done?.(false);
+    toast.info('请等待当前回复完成');
+    return;
+  }
+  try {
+    const message = await agentApi.selectVisualSubject(selectionId, subjectId);
+    if (!message?.messageId) throw new Error('图片主体处理失败');
+    data.done?.(true);
+    mitter.emit('sendMessage', { ...message });
+  } catch (error: any) {
+    data.done?.(false);
+    toast.error(error?.info || error?.message || '图片主体处理失败，请重试');
   }
 };
 

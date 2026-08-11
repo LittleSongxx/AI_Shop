@@ -6,7 +6,18 @@
     <div class="bubble ai-bubble" :class="{ 'is-wide': isWideBubble }">
       <div v-if="messageStatus === 0 && !hasRenderableContent" class="cancel-tip">已取消回复</div>
       <template v-else>
-      <template v-if="productList?.length">
+      <template v-if="shoppingClarificationCard">
+        <section class="shopping-clarification" aria-label="导购需求澄清">
+          <p class="clarification-title">为了更准确推荐</p>
+          <p class="clarification-question">{{ shoppingClarificationCard.question }}</p>
+          <div v-if="shoppingClarificationCard.options?.length" class="clarification-options">
+            <span v-for="option in shoppingClarificationCard.options" :key="option" class="clarification-option">
+              {{ option }}
+            </span>
+          </div>
+        </section>
+      </template>
+      <template v-else-if="productList?.length">
         <MarkdownContent
           v-if="productIntro"
           class="product-intro"
@@ -37,6 +48,13 @@
           :card="orderSelectionCard"
           :disabled="isStreaming"
           @select="(payload) => emit('select-order', payload)"
+        />
+      </template>
+      <template v-else-if="visualSubjectSelectionCard">
+        <AgentVisualSubjectSelectionCard
+          :card="visualSubjectSelectionCard"
+          :disabled="isStreaming"
+          @select="(payload) => emit('select-visual', payload)"
         />
       </template>
       <template v-else-if="isOrderSearchEmpty">
@@ -109,6 +127,9 @@ import AgentConfirmCard, { type ActionConfirmCardData } from '@/components/agent
 import AgentOrderSelectionCard, {
   type OrderSelectionCardData
 } from '@/components/agent/AgentOrderSelectionCard.vue';
+import AgentVisualSubjectSelectionCard, {
+  type VisualSubjectSelectionCardData
+} from '@/components/agent/AgentVisualSubjectSelectionCard.vue';
 import { agentApi } from '@/api/modules';
 import { cleanAgentActionStreamText, containsAgentTable, stripEmbeddedProductJson } from '@/utils/agentMessageRender';
 import { toast } from '@/utils/toast';
@@ -121,6 +142,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'select-order': [payload: unknown];
+  'select-visual': [payload: unknown];
   'compare-products': [productIds: string[]];
 }>();
 
@@ -178,7 +200,9 @@ const isEmptyJsonList = (raw?: string | null) => {
 const isProductBiz = (bizType?: string | null) =>
   bizType === 'product_search' ||
   bizType === 'product_search.txt' ||
-  bizType === 'BROWSE_RECOMMEND';
+  bizType === 'BROWSE_RECOMMEND' ||
+  bizType === 'visual_product_search' ||
+  bizType === 'shopping_decision_v2';
 
 const isOrderBiz = (bizType?: string | null) =>
   bizType === 'query_order' || bizType === 'query_order.txt';
@@ -214,6 +238,18 @@ const orderSelectionCard = computed<OrderSelectionCardData | null>(() => {
   return parsed as unknown as OrderSelectionCardData;
 });
 
+const visualSubjectSelectionCard = computed<VisualSubjectSelectionCardData | null>(() => {
+  if (isStreaming.value) return null;
+  const parsed = parseJsonObject(props.data.assistantMessage);
+  if (
+    parsed?.type !== 'VISUAL_SUBJECT_SELECTION'
+    || !parsed.selectionId
+    || !parsed.imageAssetId
+    || !Array.isArray(parsed.subjects)
+  ) return null;
+  return parsed as unknown as VisualSubjectSelectionCardData;
+});
+
 const structuredCard = computed<Record<string, any> | null>(() => {
   if (isStreaming.value) return null;
   const parsed = parseJsonObject(props.data.assistantMessage);
@@ -230,6 +266,20 @@ const supportCaseCard = computed<Record<string, any> | null>(() => {
   if (card?.type === 'SUPPORT_CASE_LIST' && Array.isArray(card.cases)) return card;
   if (card?.type === 'SUPPORT_CASE_DETAIL' && card.case && typeof card.case === 'object') return card;
   return null;
+});
+
+const shoppingClarificationCard = computed<{
+  question: string;
+  options: string[];
+} | null>(() => {
+  const card = structuredCard.value;
+  if (card?.type !== 'SHOPPING_CLARIFICATION' || !card.question) return null;
+  return {
+    question: String(card.question),
+    options: Array.isArray(card.options)
+      ? card.options.map((option: unknown) => String(option).trim()).filter(Boolean).slice(0, 4)
+      : []
+  };
 });
 
 const syncActionConfirmCard = () => {
@@ -326,13 +376,16 @@ const streamText = computed(() => cleanAgentActionStreamText(props.data.assistan
 
 const displayText = computed(() => {
   if (productList.value?.length || orderList.value?.length || comparisonCard.value || supportCaseCard.value) return '';
+  if (shoppingClarificationCard.value) return '';
   if (actionConfirmCard.value) return '';
-  if (orderSelectionCard.value) return '';
+  if (orderSelectionCard.value || visualSubjectSelectionCard.value) return '';
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return '';
   const parsed = parseJsonObject(props.data.assistantMessage);
   if (parsed?.type === 'ACTION_CONFIRM') return '';
   if (parsed?.type === 'PRODUCT_SEARCH_RESULT') return '';
   if (parsed?.type === 'ORDER_SELECTION') return '';
+  if (parsed?.type === 'VISUAL_SUBJECT_SELECTION') return '';
+  if (parsed?.type === 'SHOPPING_CLARIFICATION') return '';
   if (parsed?.type === 'PRODUCT_COMPARISON' || parsed?.type === 'SUPPORT_CASE_LIST' || parsed?.type === 'SUPPORT_CASE_DETAIL') return '';
   let text = (props.data.assistantMessage || '').trim();
   if (text === '[]') return '';
@@ -361,8 +414,9 @@ const showAi = computed(() => {
   if (isStreaming.value) return true;
   if (messageStatus.value === 3) return hasRenderableContent.value;
   if (productList.value?.length || orderList.value?.length || comparisonCard.value || supportCaseCard.value) return true;
+  if (shoppingClarificationCard.value) return true;
   if (actionConfirmCard.value) return true;
-  if (orderSelectionCard.value) return true;
+  if (orderSelectionCard.value || visualSubjectSelectionCard.value) return true;
   if (isProductSearchEmpty.value || isOrderSearchEmpty.value) return true;
   if (displayText.value) return true;
   return false;
@@ -374,8 +428,10 @@ const hasRenderableContent = computed(
       orderList.value?.length ||
       comparisonCard.value ||
       supportCaseCard.value ||
+      shoppingClarificationCard.value ||
       actionConfirmCard.value ||
       orderSelectionCard.value ||
+      visualSubjectSelectionCard.value ||
       isProductSearchEmpty.value ||
       isOrderSearchEmpty.value ||
       displayText.value ||
@@ -391,8 +447,10 @@ const isWideBubble = computed(
       orderList.value?.length ||
       comparisonCard.value ||
       supportCaseCard.value ||
+      shoppingClarificationCard.value ||
       actionConfirmCard.value ||
       orderSelectionCard.value ||
+      visualSubjectSelectionCard.value ||
       isProductSearchEmpty.value ||
       isOrderSearchEmpty.value ||
       agentRich.value
@@ -547,6 +605,39 @@ const submitFeedback = async (rating: 1 | -1) => {
 
   small {
     color: $color-text-muted;
+  }
+}
+
+.shopping-clarification {
+  padding: 2px 0;
+
+  .clarification-title {
+    margin: 0 0 5px;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .clarification-question {
+    margin: 0;
+    color: var(--color-text-title, #1f2937);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .clarification-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .clarification-option {
+    padding: 4px 8px;
+    border: 1px solid #dbe3ec;
+    border-radius: 4px;
+    color: #526173;
+    background: #f8fafc;
+    font-size: 11px;
   }
 }
 

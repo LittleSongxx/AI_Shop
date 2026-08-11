@@ -75,11 +75,11 @@
         ref="imageInputRef"
         class="image-input"
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/bmp"
         @change="onImageSelected"
       />
       <div v-if="imageAttachment" class="attachment-strip">
-        <img :src="imageAttachment.previewUrl" alt="售后图片预览" class="attachment-preview" />
+        <img :src="imageAttachment.previewUrl" alt="商品图片预览" class="attachment-preview" />
         <div class="attachment-meta">
           <span>{{ imageAttachment.statusText }}</span>
           <small v-if="imageAttachment.moderationStatus">审核：{{ imageAttachment.moderationStatus }}</small>
@@ -90,8 +90,8 @@
         <button
           type="button"
           class="image-attach-btn"
-          aria-label="添加售后图片"
-          title="添加售后图片"
+          aria-label="添加商品图片"
+          title="添加商品图片"
           :disabled="answering || uploadingImage"
           @click="openImagePicker"
         >
@@ -107,7 +107,7 @@
         enterkeyhint="send"
         autocomplete="off"
         autocorrect="on"
-        placeholder="输入你想咨询的问题"
+        placeholder="输入问题，或上传图片找同款"
         :disabled="answering"
         :readonly="!isDesktop"
         @focus="onTextareaFocus"
@@ -163,7 +163,6 @@ import { mitter } from '@/utils/eventBus';
 import { lockViewportAfterInput, recoverIosViewportZoom } from '@/utils/mobileViewport';
 import { toast } from '@/utils/toast';
 import { showTopAlert } from '@/utils/topAlert';
-import { resolveImageUrl } from '@/utils/image';
 
 const TIP_POOL = [
   '帮我推荐热销商品',
@@ -302,12 +301,12 @@ const comparisonProductIds = ref<string[]>([]);
 
 const attachmentReady = computed(() =>
   !imageAttachment.value || (
-    imageAttachment.value.moderationStatus === 'APPROVED' && !!imageAttachment.value.moderationId
+    imageAttachment.value.moderationStatus === 'APPROVED' && !!imageAttachment.value.assetId
   )
 );
 
 const canSubmitMessage = computed(() => {
-  if (!input.value.trim() || answering.value || uploadingImage.value) return false;
+  if ((!input.value.trim() && !imageAttachment.value?.assetId) || answering.value || uploadingImage.value) return false;
   return attachmentReady.value;
 });
 
@@ -388,6 +387,9 @@ const openImagePicker = () => {
 };
 
 const removeAttachment = () => {
+  if (imageAttachment.value?.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(imageAttachment.value.previewUrl);
+  }
   imageAttachment.value = null;
   imageUploadError.value = '';
   if (imageInputRef.value) imageInputRef.value.value = '';
@@ -407,20 +409,20 @@ const onImageSelected = async (event: Event) => {
     inputEl.value = '';
     return;
   }
+  removeAttachment();
   uploadingImage.value = true;
   imageUploadError.value = '';
   const localPreview = URL.createObjectURL(file);
   try {
-    const uploaded = await fileApi.uploadImage(file, true, 'support');
+    const uploaded = await fileApi.uploadImage(file, true, 'agent');
     const moderationStatus = String(uploaded.moderationStatus || (uploaded.pendingReview ? 'PENDING' : 'APPROVED')).toUpperCase();
     imageAttachment.value = {
       ...uploaded,
       moderationStatus,
-      previewUrl: resolveImageUrl(uploaded.path, { useThumbnail: true }) || localPreview,
+      previewUrl: localPreview,
       statusText: moderationStatus === 'APPROVED' ? '图片已通过审核，可以发送' : '图片待审核，暂不能发送'
     };
-    URL.revokeObjectURL(localPreview);
-    if (moderationStatus !== 'APPROVED') toast.warning('图片正在审核，通过后才能提交售后问题');
+    if (moderationStatus !== 'APPROVED') toast.warning('图片正在审核，通过后才能发送');
   } catch (error: any) {
     URL.revokeObjectURL(localPreview);
     imageUploadError.value = error?.info || error?.message || '图片上传失败';
@@ -442,7 +444,8 @@ const onCompareProducts = (payload?: unknown) => {
 };
 
 const dispatchSend = async (text: string, options?: { comparisonProductIds?: string[] }) => {
-  if (!text || answering.value) return false;
+  const imageAssetId = imageAttachment.value?.assetId;
+  if ((!text && !imageAssetId) || answering.value) return false;
   if (!attachmentReady.value) {
     toast.warning('请等待图片审核通过后再发送');
     return false;
@@ -456,8 +459,7 @@ const dispatchSend = async (text: string, options?: { comparisonProductIds?: str
     const fromProduct = pendingProduct.value !== null || isProductPage;
     const consultProductId = fromProduct ? resolveConsultProductId() : undefined;
     const data = await agentApi.sendMessage(text, fromProduct, consultProductId, {
-      imagePath: imageAttachment.value?.path,
-      imageModerationId: imageAttachment.value?.moderationId,
+      imageAssetId,
       comparisonProductIds: options?.comparisonProductIds || comparisonProductIds.value
     });
     if (!data?.messageId) {
@@ -484,7 +486,7 @@ const dispatchSend = async (text: string, options?: { comparisonProductIds?: str
 
 const sendMessage = async () => {
   const text = input.value.trim();
-  if (!text || answering.value) return;
+  if ((!text && !imageAttachment.value?.assetId) || answering.value) return;
   const ok = await dispatchSend(text);
   if (ok) {
     input.value = '';

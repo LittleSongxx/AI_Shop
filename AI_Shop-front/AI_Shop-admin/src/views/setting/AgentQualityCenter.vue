@@ -285,7 +285,7 @@ const runScopeOptions = [
   { label: '全部', value: 'ALL' },
 ]
 const intentOptions = [
-  'PRODUCT_CONSULT', 'PRODUCT_SEARCH', 'QUERY_ORDER', 'QUERY_LOGISTICS',
+  'PRODUCT_CONSULT', 'PRODUCT_SEARCH', 'VISUAL_PRODUCT_SEARCH', 'QUERY_ORDER', 'QUERY_LOGISTICS',
   'QUERY_FULFILLMENT', 'QUERY_COUPON', 'QUERY_COMMENT', 'REFUND',
   'REFUND_STATUS', 'CANCEL_ORDER', 'CONFIRM_RECEIPT', 'PRODUCT_REVIEW',
   'RECOMMENT', 'DAMAGED_OR_WRONG_ITEM', 'ADDRESS_CHANGE', 'INVOICE',
@@ -363,6 +363,21 @@ const artifactSummaryText = (artifact) => String(artifact?.draft_answer || '').r
   /^([A-Z][A-Z0-9_]+):\s*/,
   (_, tool) => `${toolLabel(tool)}：`,
 )
+const visualCapabilityLabel = (value) => ({
+  grounding: '商品主体定位',
+  embedding: '视觉向量化',
+  rerank: '视觉精排',
+  index: '视觉商品索引',
+}[value] || value || '视觉依赖')
+const bboxText = (bbox) => Array.isArray(bbox) && bbox.length === 4
+  ? `[${bbox.join(', ')}]`
+  : '整张图片'
+const visualSubjectsText = (subjects) => {
+  if (!Array.isArray(subjects) || !subjects.length) return '未定位到独立主体，后续使用整张图片。'
+  return subjects
+    .map((subject) => `${subject.label || '商品'} ${bboxText(subject.bbox)}`)
+    .join('；')
+}
 const stepSummary = (step) => {
   const output = step?.output || {}
   if (step.eventType === 'INTENT_DECISION') {
@@ -373,6 +388,174 @@ const stepSummary = (step) => {
     return output.hasEvidence
       ? `检索到 ${sourceCount} 条通过证据门禁的知识来源。`
       : '未检索到通过证据门禁的知识来源。'
+  }
+  if (step.eventType === 'IMAGE_ASSET_VERIFIED') {
+    const dimensions = output.width && output.height ? `${output.width} x ${output.height}` : '尺寸未知'
+    const digest = output.contentSha256 ? `，SHA-256 ${String(output.contentSha256).slice(0, 12)}…` : ''
+    return `已重新校验用户归属、审核状态和有效期；${output.mimeType || '图片'}，${dimensions}${digest}。`
+  }
+  if (step.eventType === 'VISUAL_SUBJECTS_GROUNDED') {
+    return `定位到 ${Number(output.subjectCount ?? output.subjects?.length ?? 0)} 个可购买主体：${visualSubjectsText(output.subjects)}`
+  }
+  if (step.eventType === 'VISUAL_SUBJECT_SELECTION_REQUIRED') {
+    return `检测到 ${Number(output.subjectCount || 0)} 个主体，已暂停检索并等待用户点选；选择凭证有效至 ${output.expiresAt || '30 分钟后'}。`
+  }
+  if (step.eventType === 'VISUAL_SUBJECT_SELECTED') {
+    return `用户选择“${output.label || output.subjectLabel || '商品主体'}” ${bboxText(output.bbox)}，服务端已按选择凭证恢复真实坐标并创建新运行。`
+  }
+  if (step.eventType === 'VISUAL_QUERY_EMBEDDED') {
+    return `已使用 ${output.model || '视觉向量模型'} 生成查询向量${output.fused ? '，并融合有效文字约束' : ''}；外部 API 共尝试 ${Number(output.attempts || 1)} 次。`
+  }
+  if (step.eventType === 'VISUAL_CANDIDATES_RECALLED') {
+    return `候选召回：同图哈希 ${Number(output.exact || 0)}、图片向量 ${Number(output.image || 0)}、商品融合向量 ${Number(output.fused || 0)}、文字约束 ${Number(output.text || 0)}。`
+  }
+  if (step.eventType === 'VISUAL_RESULTS_FUSED') {
+    const cosine = output.cosine
+    const range = cosine
+      ? `；候选 cosine ${cosine.min} - ${cosine.max}，均值 ${cosine.mean}`
+      : ''
+    return `加权 RRF 合并 ${Number(output.mergedProducts || 0)} 个商品，${Number(output.acceptedProducts || 0)} 个达到 ${output.minCosineThreshold ?? '标定'} 门槛，过滤 ${Number(output.rejectedByCosine || 0)} 个低置信候选${range}。`
+  }
+  if (step.eventType === 'VISUAL_CANDIDATES_RERANKED') {
+    if (output.degraded) {
+      return `视觉精排不可用（${reasonLabel(output.code)}），已按确定性融合顺序降级返回；候选 ${Number(output.candidateCount || 0)} 个。`
+    }
+    const scores = Array.isArray(output.relativeScores) && output.relativeScores.length
+      ? `；本次请求内相对分 ${output.relativeScores.join('、')}`
+      : ''
+    return `使用 ${output.model || '视觉精排模型'} 对 ${Number(output.rerankedCount || 0)}/${Number(output.candidateCount || 0)} 个候选完成排序${scores}。`
+  }
+  if (step.eventType === 'VISUAL_PRODUCT_SNAPSHOTS_VERIFIED') {
+    return `向商品服务校验 ${Number(output.requested || 0)} 个候选，保留 ${Number(output.available || 0)} 个商品；过滤下架/缺货 ${Number(output.filteredByAuthority || 0)} 个，过滤不符合品类、品牌或预算约束 ${Number(output.filteredByConstraints || 0)} 个。`
+  }
+  if (step.eventType === 'VISUAL_NO_CONFIDENT_MATCH') {
+    const trace = output.trace || {}
+    const threshold = trace.fusion?.minCosineThreshold
+    return threshold == null
+      ? '没有可用商品通过视觉可靠性和权威快照校验，已明确返回无可靠匹配。'
+      : `没有候选达到离线标定的 cosine 门槛 ${threshold}，已明确返回无可靠匹配。`
+  }
+  if (step.eventType === 'VISUAL_CAPABILITY_DEGRADED') {
+    return `${visualCapabilityLabel(output.capability)}异常：${reasonLabel(output.code)}。本次请求继续执行已定义的降级路径。`
+  }
+  if (step.eventType === 'VISUAL_INDEX_UPDATED') {
+    return `商品 ${output.productId || '—'} 的 ${Number(output.documentCount || 0)} 个视觉文档已更新至 ${output.modelVersion || output.indexName || '当前索引版本'}。`
+  }
+  if (step.eventType === 'TOOL_CALL' && step.toolName === 'SEARCH_PRODUCTS_BY_IMAGE') {
+    const trace = output.retrievalTrace || {}
+    const recommendation = trace.recommendation || {}
+    const productIds = output.productIds || recommendation.productIds || []
+    if (output.success === false) {
+      return `识图工具未完成：${reasonLabel(output.errorCode || step.errorCode || 'TOOL_ERROR')}。`
+    }
+    if (trace.outcome === 'NEEDS_SUBJECT_SELECTION') {
+      return '识图工具已暂停，等待用户从图片中选择一个商品主体。'
+    }
+    if (trace.outcome === 'NO_CONFIDENT_MATCH') {
+      return '识图工具已完成，但没有候选通过离线标定的可靠性门槛。'
+    }
+    const request = recommendation.requestId ? `，归因请求 ${recommendation.requestId}` : ''
+    return `识图工具返回 ${productIds.length} 个商品（${productIds.join('、') || '无商品'}）${request}；检索模式 ${recommendation.retrievalMode || trace.mode || 'visual'}。`
+  }
+  if (step.eventType === 'SHOPPING_MISSION_UPDATE') {
+    if (!output.hasMission) return '本轮没有形成新的导购任务，未写入长期购买约束。'
+    const hard = output.hardConstraints || {}
+    const budget = hard.budgetMin != null || hard.budgetMax != null
+      ? `预算 ¥${hard.budgetMin ?? '不限'} - ¥${hard.budgetMax ?? '不限'}`
+      : '预算待确认'
+    const useCases = (output.useCases || []).join('、') || '用途待确认'
+    const brands = (hard.requiredBrands || []).length
+      ? `；明确品牌 ${hard.requiredBrands.join('、')}`
+      : ''
+    const unknown = (output.unknownSlots || []).length
+      ? `；待补信息 ${output.unknownSlots.join('、')}`
+      : ''
+    return `导购任务已更新：${output.category || '品类待确认'}，${useCases}，${budget}${brands}${unknown}。`
+  }
+  if (step.eventType === 'SHOPPING_CLARIFICATION_DECISION') {
+    const options = (output.options || []).length ? ` 可选：${output.options.join('、')}。` : ''
+    return `第 ${Number(output.clarificationCount || 1)}/${Number(output.maxClarifications || 2)} 轮只追问“${output.question || output.slot || '关键需求'}”；依据：${output.reason || '预计能最大幅度缩小候选范围'}。${options}`
+  }
+  if (step.eventType === 'PRODUCT_FACTS_VERIFIED') {
+    return `已为 ${Number(output.candidateCount || 0)} 个召回候选核验 ${Number(output.verifiedFeatureCount || 0)} 项结构化商品特征；未审核的模型抽取特征不会用于硬筛选。`
+  }
+  if (step.eventType === 'OFFER_SNAPSHOT_CREATED') {
+    const offers = output.offers || []
+    const prices = offers.slice(0, 4).map((offer) => `${offer.productId || '商品'} ¥${offer.estimatedPayable ?? '—'}`)
+    return `商品服务生成 ${Number(output.verifiedOfferCount || 0)} 份用户绑定的单 SKU 实时报价，其中 ${Number(output.couponVerifiedCount || 0)} 份核验到可用优惠${prices.length ? `：${prices.join('；')}` : ''}。`
+  }
+  if (step.eventType === 'OFFER_SNAPSHOT_UNAVAILABLE') {
+    return `无法核验 ${Number(output.candidateCount || 0)} 个候选的实时价格、库存或优惠，本轮停止展示“可购买”推荐。`
+  }
+  if (step.eventType === 'RANKING_POLICY_DECISION') {
+    const selected = output.selected || []
+    const roles = selected.map((item) => `${item.position || '—'}. ${item.role || '综合匹配'}${item.operationRecommended ? '（运营推荐，已披露）' : ''}`)
+    const rejected = Object.entries(output.rejectedReasons || {})
+      .map(([reason, count]) => `${reasonLabel(reason)} ${count} 个`)
+    return `按 ${output.policyVersion || '用户效用策略'} 从可购买候选中选择 ${Number(output.selectedCount || 0)} 个；${roles.join('；') || '无可展示商品'}${rejected.length ? `。硬约束过滤：${rejected.join('、')}` : ''}。`
+  }
+  if (step.eventType === 'COMMERCE_OUTCOME_RECORDED') {
+    return `长期结果账本记录“${output.eventType || '未知事件'}”，来源 ${output.source || '未知'}，归因状态 ${output.attributionStatus || 'UNATTRIBUTED'}，写入结果 ${statusLabel(output.status)}。`
+  }
+  if (step.eventType === 'AFTER_SALES_ELIGIBILITY_DECISION') {
+    const decisions = {
+      ELIGIBLE: '满足业务前置条件',
+      INELIGIBLE: '不满足业务前置条件',
+      NEEDS_EVIDENCE: '需要补充凭证',
+      POLICY_UNAVAILABLE: '没有可用规则',
+      CONFLICT: '规则或事实存在冲突',
+    }
+    const missing = (output.missingEvidence || []).length
+      ? `；待补凭证 ${output.missingEvidence.join('、')}`
+      : ''
+    return `资格结论：${decisions[output.decision] || output.decision || '核验未完成'}；规则 ${output.policyId || '未匹配'} ${output.policyVersion || ''}${output.reason ? `；原因 ${output.reason}` : ''}${missing}。`
+  }
+  if (step.eventType === 'DATA_ANALYST_PLAN') {
+    if (output.status === 'NEEDS_CLARIFICATION') return `经营口径存在歧义，需要管理员确认：${output.clarification_question || output.clarificationQuestion || '请明确指标口径'}。`
+    const branches = Array.isArray(output.branches) ? output.branches : []
+    if (branches.length > 1) {
+      const branchText = branches.map((branch) => (
+        `${branch.branch_id || branch.branchId || '未命名分支'}：${branch.purpose || '独立指标验证'}（${branch.semantic_view || branch.semanticView || '视图待定'}）`
+      )).join('；')
+      return `已拆分 ${branches.length} 个相互独立的指标分支并行执行：${branchText}。任一分支失败不会取消其他分支。`
+    }
+    return `选择语义视图 ${output.semantic_view || '—'}，指标 ${(output.metrics || []).join('、') || '—'}，维度 ${(output.dimensions || []).join('、') || '无'}，时间 ${output.start_date || '—'} 至 ${output.end_date || '—'}。`
+  }
+  if (step.eventType === 'DATA_ANALYST_BRANCH_ERROR') {
+    return `指标分支“${output.branchId || '未命名'}”执行失败（${output.errorType || '执行异常'}）；该分支已隔离，其他独立分支继续执行。`
+  }
+  if (step.eventType === 'DATA_ANALYST_SQL_GUARD') {
+    return output.reason
+      ? `第 ${Number(output.attempt || 1)} 次 SQL 未通过：${reasonLabel(output.reason)}。`
+      : `第 ${Number(output.attempt || 1)} 次 SQL 已通过 AST、视图、字段、日期和行数门禁；血缘 ${(output.lineage || []).join('、') || '—'}。`
+  }
+  if (step.eventType === 'DATA_ANALYST_EXPLAIN') {
+    return step.status === 'DEGRADED'
+      ? `受视图 definer 权限边界影响，EXPLAIN 已跳过，但查询仍使用独立只读账号。`
+      : `数据库执行计划已检查，共 ${Number(output.rows?.length || 0)} 项。`
+  }
+  if (step.eventType === 'DATA_ANALYST_QUERY') {
+    return output.rowCount != null
+      ? `只读分析查询返回 ${Number(output.rowCount)} 行，未读取原始 PII 表。`
+      : `只读分析查询未完成：${reasonLabel(step.errorCode || 'DATABASE_UNAVAILABLE')}。`
+  }
+  if (step.eventType === 'DATA_ANALYST_RESULT') {
+    return `经营分析已生成，返回 ${Number(output.rowCount || 0)} 行；血缘 ${(output.lineage || []).join('、') || '—'}，答案版本 ${output.answerVersion || 'v1'}。`
+  }
+  if (step.eventType === 'INVENTORY_OPS_PLAN') {
+    const requested = Number(output.requestedLookbackDays || output.lookbackDays || 0)
+    const fixed = Number(output.lookbackDays || 28)
+    const requestNote = requested && requested !== fixed
+      ? `（请求 ${requested} 天，治理口径固定为 ${fixed} 天）`
+      : ''
+    return `使用 ${(output.lineage || []).join('、')} 的近 ${fixed} 天补零净需求计算 EWMA${requestNote}；${output.formula || 'ROP = EWMA 日需求 × 交期 + 安全库存，建议量按 MOQ 向上取整'}。最多生成 ${Number(output.limit || 0)} 条人工待办，不会修改库存或创建采购单。`
+  }
+  if (step.eventType === 'INVENTORY_OPS_RESULT') {
+    const persisted = Number(output.persistedForecastCount || 0)
+    const persistText = step.status === 'DEGRADED'
+      ? `预测审计留痕失败（${reasonLabel(step.errorCode || output.persistErrorType || 'INVENTORY_FORECAST_PERSIST_DEGRADED')}），分析结果仍可人工查看`
+      : `已持久化 ${persisted} 条可回放预测快照`
+    return `生成 ${Number(output.suggestionCount || 0)} 条 SKU 级人工建议，其中紧急 ${Number(output.criticalCount || 0)} 条、需补货 ${Number(output.replenishmentCount || 0)} 条，建议总量 ${Number(output.suggestedReplenishQuantity || 0)}；平均 EWMA 日需求 ${Number(output.averageEwmaDailyDemand || 0)}，${Number(output.moqGovernedCount || 0)} 条按 MOQ 对齐；${persistText}。执行方式保持“仅人工复核”。`
   }
   if (step.eventType === 'SUPERVISOR_PLAN') {
     const specialists = (output.specialists || []).map(agentLabel).join('、')

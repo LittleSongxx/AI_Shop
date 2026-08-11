@@ -7,15 +7,32 @@
     >
       <button type="button" class="product-link" @click="onProductClick(item, index)">
         <ProductImage :product="item" :width="52" :height="52" />
-        <p class="name">{{ item.productName }}</p>
+        <div class="title-row">
+          <p class="name">{{ item.productName }}</p>
+          <span v-if="item.operationRecommended" class="operation-tag">运营推荐</span>
+        </div>
         <p class="price">{{ formatPriceRange(item) }}</p>
+        <p v-if="hasOffer(item)" class="offer-meta">
+          <span v-if="hasEstimatedPayable(item)">单件到手估算</span>
+          <span v-if="item.basePrice != null && Number(item.basePrice) !== Number(item.estimatedPayable)">
+            标价 ¥{{ formatPrice(item.basePrice) }}
+          </span>
+          <span v-if="item.coupon?.couponName">{{ item.coupon.couponName }}</span>
+        </p>
         <p v-if="item.brand || item.inStock != null" class="meta">
           <span v-if="item.brand">{{ item.brand }}</span>
           <span v-if="item.inStock != null" :class="{ unavailable: item.inStock === false }">
             {{ item.inStock === false ? '暂时缺货' : '有货' }}
           </span>
         </p>
-        <p v-if="item.reason" class="reason">{{ item.reason }}</p>
+        <p v-if="visualMatchLabel(item)" class="visual-match">{{ visualMatchLabel(item) }}</p>
+        <p v-if="recommendationRole(item)" class="recommendation-role">{{ recommendationRole(item) }}</p>
+        <p v-if="recommendationBestFor(item)" class="recommendation-copy">适合：{{ recommendationBestFor(item) }}</p>
+        <p v-if="recommendationTradeoff(item)" class="recommendation-copy muted">取舍：{{ recommendationTradeoff(item) }}</p>
+        <p v-if="featureText(item)" class="feature-copy">已核验：{{ featureText(item) }}</p>
+        <p v-if="item.deliveryPromise" class="delivery-copy">{{ item.deliveryPromise }}</p>
+        <p v-if="item.quoteExpiresAt" class="quote-copy">报价有效至 {{ formatQuoteExpiry(item.quoteExpiresAt) }}</p>
+        <p v-else-if="item.reason" class="reason">{{ item.reason }}</p>
       </button>
       <button
         type="button"
@@ -107,13 +124,49 @@ const clearCompare = () => {
 const formatPrice = (val: unknown) => Number(val ?? 0).toFixed(2);
 
 const formatPriceRange = (item: Record<string, any>) => {
-  const min = Number(item.minPrice ?? item.price ?? 0);
+  const min = Number(item.estimatedPayable ?? item.minPrice ?? item.price ?? 0);
   const max = item.maxPrice == null ? null : Number(item.maxPrice);
   if (max != null && Number.isFinite(max) && max > min) {
     return `¥${formatPrice(min)} - ¥${formatPrice(max)}`;
   }
   return `¥${formatPrice(min)}`;
 };
+
+const hasEstimatedPayable = (item: Record<string, any>) =>
+  item?.estimatedPayable != null && Number.isFinite(Number(item.estimatedPayable));
+
+const hasOffer = (item: Record<string, any>) =>
+  Boolean(item?.offerSnapshotId || hasEstimatedPayable(item));
+
+const recommendationRole = (item: Record<string, any>) =>
+  String(item?.recommendation?.role || '').trim();
+
+const recommendationBestFor = (item: Record<string, any>) =>
+  String(item?.recommendation?.bestFor || item?.reason || '').trim();
+
+const recommendationTradeoff = (item: Record<string, any>) =>
+  String(item?.recommendation?.tradeoff || '').trim();
+
+const featureText = (item: Record<string, any>) =>
+  (Array.isArray(item?.verifiedFeatures) ? item.verifiedFeatures : [])
+    .slice(0, 3)
+    .map((feature: Record<string, any>) => `${feature.key}：${feature.value}`)
+    .filter(Boolean)
+    .join('；');
+
+const formatQuoteExpiry = (value: unknown) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw.slice(0, 16).replace('T', ' ');
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+};
+
+const visualMatchLabel = (item: Record<string, any>) => ({
+  EXACT_IMAGE: '同图商品',
+  VISUALLY_SIMILAR: '视觉相似',
+  IMAGE_UNDERSTANDING: '按图片内容理解推荐'
+}[String(item?.matchType || '')] || '');
 </script>
 
 <style scoped lang="scss">
@@ -168,11 +221,76 @@ const formatPriceRange = (item: Record<string, any>) => {
     overflow: hidden;
   }
 
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+
+    .name {
+      flex: 1;
+    }
+  }
+
+  .operation-tag,
+  .recommendation-role {
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+    padding: 2px 5px;
+    border: 1px solid rgba($color-warning, 0.42);
+    border-radius: 3px;
+    color: #8a5200;
+    background: rgba($color-warning, 0.10);
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .operation-tag {
+    flex: 0 0 auto;
+  }
+
   .price {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
     color: $color-price;
+  }
+
+  .offer-meta,
+  .recommendation-copy,
+  .feature-copy,
+  .delivery-copy,
+  .quote-copy {
+    margin: 0;
+    color: $color-text-muted;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .offer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    color: $color-price;
+  }
+
+  .recommendation-copy,
+  .feature-copy,
+  .delivery-copy,
+  .quote-copy {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .recommendation-copy.muted {
+    color: $color-text-secondary;
+  }
+
+  .feature-copy {
+    color: $color-text-secondary;
   }
 
   .meta {
@@ -194,6 +312,21 @@ const formatPriceRange = (item: Record<string, any>) => {
     color: $color-text-secondary;
     font-size: 11px;
     line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .visual-match {
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+    padding: 2px 5px;
+    overflow: hidden;
+    border: 1px solid rgba($color-primary, 0.28);
+    border-radius: 3px;
+    color: $color-primary;
+    font-size: 10px;
+    line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
