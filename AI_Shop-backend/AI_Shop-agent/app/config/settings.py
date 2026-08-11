@@ -131,6 +131,65 @@ class Settings(BaseSettings):
     # _rerank() 缺失时静默降级为 RRF；该标志让降级在生产环境变得显式可见。
     rerank_required: bool = False
 
+    # Governed visual product search. Missing cloud credentials degrade only
+    # this capability; the rest of the mall must remain available.
+    visual_search_enabled: bool = True
+    visual_index_consumer_enabled: bool = True
+    visual_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "VISUAL_API_KEY",
+            "EMBEDDING_API_KEY",
+            "DASHSCOPE_API_KEY",
+            "visual_api_key",
+        ),
+    )
+    visual_grounding_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    visual_grounding_model: str = "qwen3-vl-plus"
+    visual_grounding_timeout_seconds: float = 8.0
+    visual_embedding_url: str = (
+        "https://dashscope.aliyuncs.com/api/v1/services/embeddings/"
+        "multimodal-embedding/multimodal-embedding"
+    )
+    visual_embedding_model: str = "qwen3-vl-embedding"
+    visual_embedding_dimensions: int = 1024
+    visual_embedding_timeout_seconds: float = 10.0
+    visual_rerank_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "VISUAL_RERANK_API_KEY",
+            "RERANK_API_KEY",
+            "DASHSCOPE_API_KEY",
+            "visual_rerank_api_key",
+        ),
+    )
+    # Empty means: derive the native VL endpoint from RERANK_BASE_URL's
+    # Workspace host. Text and VL rerank use different paths on the same host.
+    visual_rerank_base_url: str = ""
+    visual_rerank_model: str = "qwen3-vl-rerank"
+    visual_rerank_timeout_seconds: float = 12.0
+    visual_provider_deadline_seconds: float = 20.0
+    visual_index_alias: str = "aishop_visual_products"
+    visual_index_prefix: str = "aishop_visual_products_v"
+    visual_index_model_version: str = "qwen3-vl-embedding-1024-v1"
+    visual_embedding_min_cosine: float = 0.45
+    visual_image_recall_size: int = 60
+    visual_fused_recall_size: int = 40
+    visual_text_recall_size: int = 20
+    visual_rerank_candidate_size: int = 12
+    visual_result_size: int = 6
+    visual_max_subjects: int = 5
+    visual_query_max_dimension: int = 1536
+    visual_query_max_bytes: int = 10 * 1024 * 1024
+    visual_index_exchange: str = "rag.exchange"
+    visual_index_queue: str = "visual.index.queue"
+    visual_index_dead_letter_queue: str = "visual.index.dlq"
+    visual_index_routing_key: str = "rag.queue"
+    visual_index_consumer_concurrency: int = 1
+    visual_index_max_retries: int = 3
+    visual_index_retry_backoff_seconds: float = 2.0
+    visual_index_backfill_on_start: bool = True
+
     mysql_host: str = "localhost"
     mysql_port: int = 3306
     mysql_user: str = "root"
@@ -276,6 +335,20 @@ class Settings(BaseSettings):
     # Multi-Agent Harness and governed admin analytics are the primary runtime.
     multi_agent_enabled: bool = True
     data_analyst_enabled: bool = True
+    # Agentic Commerce v2 is deliberately a single serving path. These switches
+    # exist for an operational kill switch, not to keep a second recommendation
+    # implementation alive indefinitely.
+    shopping_decision_v2_enabled: bool = True
+    outcome_ledger_enabled: bool = True
+    after_sales_policy_engine_enabled: bool = True
+    inventory_ops_enabled: bool = True
+    operational_recommendations_enabled: bool = True
+    shopping_mission_active_hours: int = 24
+    shopping_mission_max_clarifications: int = 2
+    shopping_offer_ttl_seconds: int = 300
+    shopping_decision_max_results: int = 6
+    commerce_outcome_retention_days: int = 180
+    commerce_outcome_attribution_days: int = 30
     multi_agent_specialist_max_rounds: int = 2
     multi_agent_specialist_timeout_seconds: int = 12
     analytics_max_rows: int = 200
@@ -322,6 +395,16 @@ class Settings(BaseSettings):
             raise ValueError(
                 "MULTI_AGENT_SPECIALIST_TIMEOUT_SECONDS must be between 3 and 30"
             )
+        if not 1 <= self.shopping_mission_active_hours <= 72:
+            raise ValueError("SHOPPING_MISSION_ACTIVE_HOURS must be between 1 and 72")
+        if not 0 <= self.shopping_mission_max_clarifications <= 3:
+            raise ValueError("SHOPPING_MISSION_MAX_CLARIFICATIONS must be between 0 and 3")
+        if not 60 <= self.shopping_offer_ttl_seconds <= 900:
+            raise ValueError("SHOPPING_OFFER_TTL_SECONDS must be between 60 and 900")
+        if not 1 <= self.shopping_decision_max_results <= 6:
+            raise ValueError("SHOPPING_DECISION_MAX_RESULTS must be between 1 and 6")
+        if not 30 <= self.commerce_outcome_retention_days <= 730:
+            raise ValueError("COMMERCE_OUTCOME_RETENTION_DAYS must be between 30 and 730")
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
         for model, pricing in self.llm_pricing_cny_per_million_json.items():
@@ -360,6 +443,24 @@ class Settings(BaseSettings):
             raise ValueError("RERANK_TIMEOUT must be positive")
         if self.rerank_top_n < 1:
             raise ValueError("RERANK_TOP_N must be positive")
+        if self.visual_embedding_dimensions != 1024:
+            raise ValueError("VISUAL_EMBEDDING_DIMENSIONS must be 1024")
+        if not 0 <= self.visual_embedding_min_cosine <= 1:
+            raise ValueError("VISUAL_EMBEDDING_MIN_COSINE must be between 0 and 1")
+        if not 1 <= self.visual_max_subjects <= 5:
+            raise ValueError("VISUAL_MAX_SUBJECTS must be between 1 and 5")
+        if not 256 <= self.visual_query_max_dimension <= 4096:
+            raise ValueError("VISUAL_QUERY_MAX_DIMENSION must be between 256 and 4096")
+        if not 1 <= self.visual_result_size <= self.visual_rerank_candidate_size <= 40:
+            raise ValueError(
+                "visual result size must be <= rerank candidate size and at most 40"
+            )
+        if self.visual_provider_deadline_seconds < max(
+            self.visual_grounding_timeout_seconds,
+            self.visual_embedding_timeout_seconds,
+            self.visual_rerank_timeout_seconds,
+        ):
+            raise ValueError("VISUAL_PROVIDER_DEADLINE_SECONDS must cover each provider timeout")
         if self.rerank_api_key.strip():
             base_url = self.rerank_base_url.strip()
             if not self.rerank_model.strip():
@@ -403,6 +504,12 @@ class Settings(BaseSettings):
             raise ValueError("PENDING_ACTION_RECONCILE_DEADLINE_SECONDS must be positive")
         if self.agent_worker_heartbeat_ttl_seconds < 5:
             raise ValueError("AGENT_WORKER_HEARTBEAT_TTL_SECONDS must be at least 5")
+        if self.visual_index_consumer_concurrency < 1 or self.visual_index_consumer_concurrency > 4:
+            raise ValueError("VISUAL_INDEX_CONSUMER_CONCURRENCY must be between 1 and 4")
+        if self.visual_index_max_retries < 0 or self.visual_index_max_retries > 10:
+            raise ValueError("VISUAL_INDEX_MAX_RETRIES must be between 0 and 10")
+        if self.visual_index_retry_backoff_seconds < 0 or self.visual_index_retry_backoff_seconds > 60:
+            raise ValueError("VISUAL_INDEX_RETRY_BACKOFF_SECONDS must be between 0 and 60")
         return self
 
     def validate_runtime(self) -> None:

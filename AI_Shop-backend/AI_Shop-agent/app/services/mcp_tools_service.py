@@ -500,10 +500,9 @@ async def propose_create_support_case(
     description: str,
     order_id: str | None = None,
     order_item_id: str | None = None,
-    image_path: str | None = None,
-    image_moderation_id: int | None = None,
-    image_description: str | None = None,
-    vlm_status: str | None = None,
+    image_asset_id: str | None = None,
+    image_understanding: str | None = None,
+    image_understanding_status: str | None = None,
     run_id: str | None = None,
     source_message_id: int | None = None,
     forced_handoff: bool = False,
@@ -518,10 +517,9 @@ async def propose_create_support_case(
             description,
             order_id=order_id,
             order_item_id=order_item_id,
-            image_path=image_path,
-            image_moderation_id=image_moderation_id,
-            image_description=image_description,
-            vlm_status=vlm_status,
+            image_asset_id=image_asset_id,
+            image_understanding=image_understanding,
+            image_understanding_status=image_understanding_status,
             run_id=run_id,
             source_message_id=source_message_id,
             forced_handoff=forced_handoff,
@@ -603,17 +601,24 @@ async def tool_search_products(
         exclude_product_id=exclude_product_id,
     )
     from app.services.product_service import format_search_tool_message
+    from app.services.shopping_mission_service import shopping_mission_service
     from app.services.shopping_profile_service import shopping_profile_service
 
+    mission = await shopping_mission_service.load(user_id)
     content = format_search_tool_message(
         keyword,
         consult,
         products,
         source,
         profile=await shopping_profile_service.get_effective_profile(user_id),
+        mission=mission,
     )
     if not products:
-        return ToolInvokeResult(content=content, biz_type=biz_type)
+        return ToolInvokeResult(
+            content=content,
+            biz_type=biz_type,
+            assistant_cards=assistant if assistant and assistant != "[]" else None,
+        )
 
     names = [str(p.get("product_name") or p.get("productName") or "") for p in products]
     ids = [str(p.get("product_id") or p.get("productId") or "") for p in products if p.get("product_id") or p.get("productId")]

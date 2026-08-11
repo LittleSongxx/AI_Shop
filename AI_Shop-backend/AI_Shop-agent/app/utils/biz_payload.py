@@ -82,6 +82,41 @@ def _dedupe_product_cards(cards: list[dict]) -> list[dict]:
         out.append(card)
     return out
 
+
+def _public_coupon(raw: Any) -> dict[str, Any] | None:
+    """Expose an estimate, never a user coupon identity or checkout authority."""
+    if not isinstance(raw, dict):
+        return None
+    coupon = {
+        "couponName": raw.get("couponName") or raw.get("coupon_name"),
+        "estimatedDiscount": _to_number(
+            raw.get("estimatedDiscount")
+            if raw.get("estimatedDiscount") is not None
+            else raw.get("estimated_discount")
+        ),
+        "validEndTime": raw.get("validEndTime") or raw.get("valid_end_time"),
+    }
+    return {key: value for key, value in coupon.items() if value not in (None, "")}
+
+
+def _verified_feature_cards(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    features: list[dict[str, Any]] = []
+    for item in raw[:8]:
+        if not isinstance(item, dict) or str(item.get("reviewStatus") or "") != "VERIFIED":
+            continue
+        key = str(item.get("key") or "").strip()[:64]
+        value = str(item.get("value") or "").strip()[:160]
+        if not key or not value:
+            continue
+        feature = {"key": key, "value": value, "reviewStatus": "VERIFIED"}
+        if isinstance(item.get("evidence"), dict):
+            feature["evidence"] = item["evidence"]
+        features.append(feature)
+    return features
+
+
 def build_product_payload(products: list[dict], request_id: str | None = None) -> tuple[str, str | None]:
 
     if not products:
@@ -141,6 +176,73 @@ def build_product_payload(products: list[dict], request_id: str | None = None) -
         reason = p.get("_recommend_reason") or p.get("recommend_reason")
         if reason:
             card["reason"] = str(reason)[:80]
+        offer_snapshot_id = p.get("offer_snapshot_id") or p.get("offerSnapshotId")
+        if offer_snapshot_id:
+            card["offerSnapshotId"] = str(offer_snapshot_id)[:80]
+        sku_key = p.get("sku_key") or p.get("skuKey")
+        if sku_key:
+            card["skuKey"] = str(sku_key)[:128]
+        base_price = p.get("base_price") if p.get("base_price") is not None else p.get("basePrice")
+        if base_price is not None:
+            card["basePrice"] = _to_number(base_price)
+        payable = (
+            p.get("estimated_payable")
+            if p.get("estimated_payable") is not None
+            else p.get("estimatedPayable")
+        )
+        if payable is not None:
+            card["estimatedPayable"] = _to_number(payable)
+        coupon_status = p.get("coupon_status") or p.get("couponStatus")
+        if coupon_status:
+            card["couponStatus"] = str(coupon_status)[:32]
+        coupon = _public_coupon(p.get("coupon"))
+        if coupon:
+            card["coupon"] = coupon
+        quote_expires_at = p.get("quote_expires_at") or p.get("quoteExpiresAt")
+        if quote_expires_at:
+            card["quoteExpiresAt"] = str(quote_expires_at)[:64]
+        delivery_promise = p.get("delivery_promise") or p.get("deliveryPromise")
+        if delivery_promise:
+            card["deliveryPromise"] = str(delivery_promise)[:240]
+        recommendation = p.get("recommendation")
+        if isinstance(recommendation, dict):
+            card["recommendation"] = {
+                key: value
+                for key, value in recommendation.items()
+                if key in {"role", "summary", "bestFor", "notIdealFor", "tradeoff", "evidence", "offerSnapshotId", "quoteExpiresAt"}
+            }
+        ranking = p.get("ranking")
+        if isinstance(ranking, dict):
+            card["ranking"] = ranking
+        position = p.get("position")
+        if position is not None:
+            card["position"] = _to_number(position)
+        if p.get("operation_recommended") or p.get("operationRecommended"):
+            card["operationRecommended"] = True
+            card["commercialDisclosure"] = "运营推荐"
+        disclosure = p.get("commercialDisclosure")
+        if disclosure:
+            card["commercialDisclosure"] = str(disclosure)[:48]
+        decision_id = p.get("ranking_decision_id") or p.get("rankingDecisionId")
+        if decision_id:
+            card["rankingDecisionId"] = str(decision_id)[:80]
+        features = _verified_feature_cards(p.get("decisionFeatures"))
+        if features:
+            card["verifiedFeatures"] = features
+        optional_visual_fields = {
+            "retrievalMode": p.get("retrieval_mode") or p.get("retrievalMode"),
+            "matchType": p.get("match_type") or p.get("matchType"),
+            "subjectLabel": p.get("subject_label") or p.get("subjectLabel"),
+            "recallSource": p.get("recall_source") or p.get("recallSource"),
+            "modelVersion": p.get("model_version") or p.get("modelVersion"),
+        }
+        card.update(
+            {
+                key: str(value)[:100]
+                for key, value in optional_visual_fields.items()
+                if value not in (None, "")
+            }
+        )
         cards.append(card)
     cards = _dedupe_product_cards(cards)
     return _json_dumps(cards), _json_dumps(ids) if ids else None
@@ -429,6 +531,21 @@ def is_product_cards_json(raw: str | None) -> bool:
     has_id = bool(first.get("productId") or first.get("product_id"))
     has_name = bool(first.get("productName") or first.get("product_name"))
     return has_id and has_name
+
+
+def is_visual_subject_selection_json(raw: str | None) -> bool:
+    if not raw or not isinstance(raw, str):
+        return False
+    try:
+        parsed = json.loads(raw.strip())
+    except json.JSONDecodeError:
+        return False
+    return bool(
+        isinstance(parsed, dict)
+        and parsed.get("type") == "VISUAL_SUBJECT_SELECTION"
+        and parsed.get("selectionId")
+        and isinstance(parsed.get("subjects"), list)
+    )
 
 
 def is_action_confirm_json(raw: str | None) -> bool:

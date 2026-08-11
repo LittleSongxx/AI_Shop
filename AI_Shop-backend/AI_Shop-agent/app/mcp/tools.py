@@ -12,6 +12,22 @@ class SearchProductsArgs(BaseModel):
     excludeProductId: str | None = Field(None, description="排除的商品Id，如当前咨询商品")
 
 
+class SearchProductsByImageArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    imageAssetId: str | None = Field(
+        None,
+        description="服务端已审核的图片资产ID；系统会以当前任务中的可信资产为准",
+    )
+    queryText: str | None = Field(
+        None,
+        description="图片搜索的文字约束，如预算、品牌、颜色或品类",
+    )
+    selectedSubjectId: str | None = Field(
+        None,
+        description="已由服务端主体选择流程确认的主体ID",
+    )
+
+
 class QueryOrdersArgs(BaseModel):
     userId: str = Field(description="用户Id")
     orderId: str | None = Field(None, description="订单号，空则查最近订单")
@@ -54,6 +70,15 @@ class RefundStatusArgs(BaseModel):
     runId: str | None = Field(None, description="当前 Agent Episode runId（观测关联用）")
 
 
+class AfterSalesEligibilityArgs(BaseModel):
+    userId: str = Field(description="用户Id")
+    action: str = Field(description="售后动作，例如 REFUND 或 RETURN")
+    orderId: str | None = Field(None, description="订单Id")
+    orderItemId: str | None = Field(None, description="订单项Id")
+    evidence: list[str] = Field(default_factory=list, description="已提供的凭证类型")
+    runId: str | None = Field(None, description="当前 Agent Episode runId")
+
+
 class ReviewArgs(BaseModel):
     userId: str
     orderId: str
@@ -75,10 +100,9 @@ class SupportCaseArgs(BaseModel):
     description: str = Field(description="问题描述")
     orderId: str | None = Field(None, description="关联订单号")
     orderItemId: str | None = Field(None, description="关联订单项")
-    imagePath: str | None = Field(None, description="已通过服务端审核的相对图片路径")
-    imageModerationId: int | None = Field(None, description="图片审核记录ID")
-    imageDescription: str | None = Field(None, description="审核通过图片的 VLM 辅助描述")
-    vlmStatus: str | None = Field(None, description="VLM 描述状态")
+    imageAssetId: str | None = Field(None, description="已通过服务端审核的图片资产ID")
+    imageUnderstanding: str | None = Field(None, description="图片内容的受限辅助描述")
+    imageUnderstandingStatus: str | None = Field(None, description="图片理解状态")
     runId: str | None = Field(None, description="当前 Agent Episode runId")
 
 
@@ -119,6 +143,21 @@ def build_mcp_tools(allowed_tools: set[str] | frozenset[str] | None = None) -> l
             name="SEARCH_PRODUCTS",
             description="[READ] 搜索/推荐商品",
             args_schema=SearchProductsArgs,
+        ),
+        StructuredTool.from_function(
+            coroutine=lambda userId, imageAssetId=None, queryText=None, selectedSubjectId=None: _call(
+                "SEARCH_PRODUCTS_BY_IMAGE",
+                userId=userId,
+                imageAssetId=imageAssetId,
+                queryText=queryText,
+                selectedSubjectId=selectedSubjectId,
+            ),
+            name="SEARCH_PRODUCTS_BY_IMAGE",
+            description=(
+                "[READ] 基于当前已审核图片查找同图或视觉相似商品；"
+                "图片资产和主体由服务端任务上下文校验，不能使用 URL、路径或模型自造框"
+            ),
+            args_schema=SearchProductsByImageArgs,
         ),
         StructuredTool.from_function(
             coroutine=lambda userId, orderId=None: _call(
@@ -171,6 +210,21 @@ def build_mcp_tools(allowed_tools: set[str] | frozenset[str] | None = None) -> l
             name="QUERY_REFUND_STATUS",
             description="[READ] 查询当前用户订单或订单项的退款进度",
             args_schema=RefundStatusArgs,
+        ),
+        StructuredTool.from_function(
+            coroutine=lambda userId, action, orderId=None, orderItemId=None,
+            evidence=None, runId=None: _call(
+                "CHECK_AFTER_SALES_ELIGIBILITY",
+                userId=userId,
+                action=action,
+                orderId=orderId,
+                orderItemId=orderItemId,
+                evidence=evidence or [],
+                runId=runId,
+            ),
+            name="CHECK_AFTER_SALES_ELIGIBILITY",
+            description="[READ] 使用已发布规则和权威订单事实核验退款/退货资格；不执行写操作",
+            args_schema=AfterSalesEligibilityArgs,
         ),
         StructuredTool.from_function(
             coroutine=lambda userId, status=None: _call(
@@ -247,18 +301,17 @@ def build_mcp_tools(allowed_tools: set[str] | frozenset[str] | None = None) -> l
         ),
         StructuredTool.from_function(
             coroutine=lambda userId, category, description, orderId=None, orderItemId=None,
-            imagePath=None, imageModerationId=None, imageDescription=None,
-            vlmStatus=None, runId=None: _call(
+            imageAssetId=None, imageUnderstanding=None,
+            imageUnderstandingStatus=None, runId=None: _call(
                 "PROPOSE_CREATE_SUPPORT_CASE",
                 userId=userId,
                 category=category,
                 description=description,
                 orderId=orderId,
                 orderItemId=orderItemId,
-                imagePath=imagePath,
-                imageModerationId=imageModerationId,
-                imageDescription=imageDescription,
-                vlmStatus=vlmStatus,
+                imageAssetId=imageAssetId,
+                imageUnderstanding=imageUnderstanding,
+                imageUnderstandingStatus=imageUnderstandingStatus,
                 runId=runId,
             ),
             name="PROPOSE_CREATE_SUPPORT_CASE",

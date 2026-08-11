@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "datasetSha256": "2dc3ca76e473686c0643a8ffa67ca4407c9409e468cd14506cd0542e874c08db",
+  "catalogSha256": "fd40ec1288682e508ab4a6c325d67e00186960f16a006c30bc7238370e40cbc3",
+  "catalogVersion": "simlect-mirror-a7d6063f05a397a6",
+  "caseCount": 25,
+  "subsetCounts": {
+    "exact_image": 5,
+    "compressed_or_cropped": 5,
+    "alternate_view": 5,
+    "category_similarity": 5,
+    "no_match": 5
+  },
+  "thresholds": {
+    "exactTop1": 1.0,
+    "robustnessRecallAt5": 0.9,
+    "alternateViewRecallAt5": 0.8,
+    "mrr": 0.8,
+    "ndcgAt5": 0.75,
+    "rejectionAccuracy": 0.8,
+    "crossCategoryFalsePositiveRate": 0.05,
+    "unavailableProductRate": 0.0,
+    "fallbackSuccessRate": 1.0
+  }
+}

@@ -35,12 +35,16 @@ from app.services import agent_runtime as rt
 from app.services.episode_service import bind_episode, episode_service
 from app.services.llm_factory import create_memory_llm
 from app.services.mcp_tool_router import mcp_tool_router
-from app.services.shopping_profile_service import shopping_profile_service
+from app.services.shopping_mission_service import (
+    mission_summary,
+    shopping_mission_service,
+)
 from app.utils.biz_payload import (
     is_action_confirm_json,
     is_order_cards_json,
     is_product_cards_json,
     is_support_case_cards_json,
+    is_visual_subject_selection_json,
 )
 
 _ACTION_TO_TOOL = {
@@ -124,15 +128,12 @@ _ORDER_BOUND_ACTION_INTENTS = frozenset(
         IntentKind.AFTERSALES_UNKNOWN.value,
     }
 )
-_SHOPPING_PROFILE_FIELDS = (
-    "category",
-    "budgetMin",
-    "budgetMax",
-    "brands",
-    "excludedBrands",
-    "scenarios",
-    "features",
-    "acceptSubstitute",
+
+_OFFER_TIME_CLAIM_RE = re.compile(
+    r"报价(?:有效期|截止时间?)\s*(?:至|到|为|是)?\s*\*{0,2}"
+    r"20\d{2}(?:-|年)\d{1,2}(?:-|月)\d{1,2}日?"
+    r"(?:[T\s]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?"
+    r"\*{0,2}"
 )
 _ORDER_CONTEXT_FIELDS = (
     "targetType",
@@ -170,6 +171,7 @@ _TRUSTED_EVIDENCE_TYPES = frozenset(
         "support_case",
         "product",
         "product_detail",
+        "visual_product",
         "knowledge",
         "knowledge_chunk",
         "faq",
@@ -187,16 +189,22 @@ _EVIDENCE_ID_KEYS = (
     "chunkId",
     "questionId",
     "knowledgeVersion",
+    "decisionId",
+    "policyId",
 )
 _TOOL_EVIDENCE_TYPES = {
     "SEARCH_PRODUCTS": frozenset({"product", "product_detail"}),
     "GET_PRODUCT_DETAIL": frozenset({"product", "product_detail"}),
     "COMPARE_PRODUCTS": frozenset({"product", "product_detail"}),
+    "SEARCH_PRODUCTS_BY_IMAGE": frozenset(
+        {"product", "product_detail", "visual_product"}
+    ),
     "QUERY_ORDERS": frozenset({"order", "order_item"}),
     "QUERY_LOGISTICS": frozenset({"logistics", "order"}),
     "QUERY_COMMENT": frozenset({"comment", "order"}),
     "QUERY_REFUND_STATUS": frozenset({"refund", "order", "order_item"}),
     "QUERY_USER_COUPONS": frozenset({"coupon"}),
+    "CHECK_AFTER_SALES_ELIGIBILITY": frozenset({"policy", "order", "order_item"}),
     "QUERY_SUPPORT_CASES": frozenset({"support_case"}),
     "SEARCH_KNOWLEDGE": frozenset({"knowledge", "knowledge_chunk", "faq", "rag", "policy"}),
 }
@@ -273,6 +281,23 @@ def _has_policy_evidence(evidence: list[dict[str, Any]]) -> bool:
     return any(item.get("success") is True for item in knowledge_results)
 
 
+def _has_eligibility_evidence(evidence: list[dict[str, Any]]) -> bool:
+    """Require both the rule-tool success and its server-issued decision ref."""
+    tool_succeeded = any(
+        item.get("type") == "tool_result"
+        and str(item.get("tool") or "") == "CHECK_AFTER_SALES_ELIGIBILITY"
+        and item.get("success") is True
+        for item in evidence
+    )
+    decision_ref = any(
+        _is_trusted_evidence_ref(item)
+        and str(item.get("type") or "").lower() == "policy"
+        and bool(item.get("decisionId"))
+        for item in evidence
+    )
+    return tool_succeeded and decision_ref
+
+
 def _is_write_card(value: str | None) -> bool:
     """Specialists may return read cards, but never a confirmation/write card."""
     if not value or not isinstance(value, str):
@@ -335,7 +360,6 @@ def _specialist_verified_context(
     state: dict[str, Any],
     *,
     agent_id: str,
-    shopping_profile: dict[str, Any],
 ) -> dict[str, Any]:
     context: dict[str, Any] = {"intent": str(state.get("intent") or "")[:64]}
     resolution = str(state.get("order_resolution") or "")[:64]
@@ -355,10 +379,6 @@ def _specialist_verified_context(
         ][:10]
         if product_ids:
             context["comparisonProductIds"] = product_ids
-        if shopping_profile:
-            context["shoppingProfile"] = {
-                field: _sanitize_context_value(value) for field, value in shopping_profile.items()
-            }
     return context
 
 
@@ -392,9 +412,14 @@ def build_supervisor_plan(state: dict[str, Any]) -> SupervisorPlan:
     elif intent in {
         IntentKind.PRODUCT_SEARCH.value,
         IntentKind.PRODUCT_CONSULT.value,
+        IntentKind.VISUAL_PRODUCT_SEARCH.value,
     }:
         specialists = ["shopping_advisor"]
-        goals["shopping_advisor"] = "检索商品事实、价格库存与适配性，只返回可验证商品信息。"
+        goals["shopping_advisor"] = (
+            "使用已验证图片检索同图或视觉相似商品，并核对价格库存。"
+            if intent == IntentKind.VISUAL_PRODUCT_SEARCH.value
+            else "检索商品事实、价格库存与适配性，只返回可验证商品信息。"
+        )
     else:
         needs_order = (
             intent in _ORDER_READ_INTENTS
@@ -537,8 +562,22 @@ _ORDER_CONTEXT_TOOLS = frozenset(
         "QUERY_LOGISTICS",
         "QUERY_COMMENT",
         "QUERY_REFUND_STATUS",
+        "CHECK_AFTER_SALES_ELIGIBILITY",
     }
 )
+
+_ORDER_FACT_TOOLS = _ORDER_CONTEXT_TOOLS - {"CHECK_AFTER_SALES_ELIGIBILITY"}
+
+
+def _after_sales_action(task: SpecialistTask) -> str:
+    """Derive the rule action from the classified task, never from model text."""
+    text = str(task.user_text or "")
+    intent = str(task.verified_context.get("intent") or "")
+    if intent == IntentKind.DAMAGED_OR_WRONG_ITEM.value or _contains(
+        text, "退货", "退回", "退掉", "寄回"
+    ):
+        return "RETURN"
+    return "REFUND"
 
 
 def _tool_args(
@@ -548,8 +587,57 @@ def _tool_args(
     tool_name: str | None = None,
 ) -> dict[str, Any]:
     args = dict(raw_args or {})
+    if tool_name == "SEARCH_PRODUCTS_BY_IMAGE":
+        # The model may suggest a query constraint but must never choose an
+        # asset, a filesystem location or a detection box. All three values
+        # below are bound to this durable specialist task by the Supervisor.
+        for key in (
+            "imageAssetId",
+            "image_asset_id",
+            "selectedSubjectId",
+            "selected_subject_id",
+            "queryText",
+            "query_text",
+            "bbox",
+            "boundingBox",
+            "bounding_box",
+            "selectedSubject",
+            "selected_subject",
+            "imageUrl",
+            "image_url",
+            "imagePath",
+            "image_path",
+            "imageModerationId",
+            "image_moderation_id",
+        ):
+            args.pop(key, None)
+        image_context = task.verified_image_context
+        if image_context is not None:
+            args["imageAssetId"] = image_context.asset_id
+            args["selectedSubjectId"] = (
+                image_context.selected_subject.subject_id
+                if image_context.selected_subject
+                else None
+            )
+        args["queryText"] = task.user_text
     if tool_name == "SEARCH_KNOWLEDGE":
         args["query"] = normalize_policy_query(task.user_text)
+    if tool_name == "CHECK_AFTER_SALES_ELIGIBILITY":
+        # Action, order references and evidence are all server-bound. A model
+        # cannot switch REFUND to RETURN, target another order, or invent a
+        # proof type by editing a tool-call JSON payload.
+        for key in (
+            "action",
+            "orderId",
+            "order_id",
+            "orderItemId",
+            "order_item_id",
+            "evidence",
+        ):
+            args.pop(key, None)
+        args["action"] = _after_sales_action(task)
+        verified_image = task.verified_image_context
+        args["evidence"] = ["IMAGE"] if verified_image is not None else []
     verified_order = task.verified_context.get("order")
     if (
         tool_name in _ORDER_CONTEXT_TOOLS
@@ -571,6 +659,11 @@ def _tool_args(
             args["orderId"] = verified_order["orderId"]
         if not args.get("orderItemId") and verified_order.get("orderItemId"):
             args["orderItemId"] = verified_order["orderItemId"]
+        if tool_name == "CHECK_AFTER_SALES_ELIGIBILITY":
+            # The eligibility tool must always receive the complete verified
+            # reference, even when the model omitted optional fields.
+            args["orderId"] = verified_order.get("orderId")
+            args["orderItemId"] = verified_order.get("orderItemId")
     args["userId"] = task.user_id
     args["runId"] = run_id
     return args
@@ -580,6 +673,10 @@ def _required_tools_for_specialist(
     state: dict[str, Any], agent_id: str
 ) -> list[str]:
     scoped = _task_tools_for_specialist(state, agent_id)
+    if agent_id == "after_sales_policy_specialist":
+        # Eligibility is intentionally executed before policy retrieval. Both
+        # calls are deterministic and leave the model only a summarisation job.
+        return scoped[:2]
     return scoped[:1]
 
 
@@ -590,6 +687,8 @@ def _task_tools_for_specialist(
 
     intent = str(state.get("intent") or "")
     if agent_id == "shopping_advisor":
+        if intent == IntentKind.VISUAL_PRODUCT_SEARCH.value:
+            return ["SEARCH_PRODUCTS_BY_IMAGE"]
         if state.get("comparison_product_ids"):
             return ["COMPARE_PRODUCTS"]
         if intent == IntentKind.PRODUCT_CONSULT.value and (state.get("card") or {}).get(
@@ -598,16 +697,40 @@ def _task_tools_for_specialist(
             return ["GET_PRODUCT_DETAIL"]
         return ["SEARCH_PRODUCTS", "GET_PRODUCT_DETAIL"]
     if agent_id == "after_sales_policy_specialist":
-        tools = ["SEARCH_KNOWLEDGE"]
-        if _contains(
-            str(state.get("user_text") or ""),
+        user_text = str(state.get("user_text") or "")
+        eligibility_intents = {
+            IntentKind.REFUND.value,
+            IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+            IntentKind.AFTERSALES_UNKNOWN.value,
+        }
+        asks_refund_eligibility = _contains(
+            user_text,
+            "能退款吗",
+            "能否退款",
+            "是否退款",
+            "是否可以退款",
+            "可以退款吗",
+            "可不可以退款",
+            "能退吗",
+            "能不能退",
+            "是否能退",
+            "可以退吗",
+        )
+        tools: list[str] = []
+        if state.get("verified_order_context") and (
+            intent in eligibility_intents or asks_refund_eligibility
+        ):
+            tools.append("CHECK_AFTER_SALES_ELIGIBILITY")
+        tools.append("SEARCH_KNOWLEDGE")
+        if len(tools) < 2 and _contains(
+            user_text,
             "工单",
             "售后进度",
             "投诉进度",
             "客服记录",
         ):
             tools.append("QUERY_SUPPORT_CASES")
-        return tools
+        return tools[:2]
     if agent_id != "order_fulfillment_specialist":
         return []
     user_text = str(state.get("user_text") or "")
@@ -638,6 +761,8 @@ def _required_tool_args(task: SpecialistTask, tool_name: str) -> dict[str, Any]:
     product = task.verified_context.get("product") or {}
     if tool_name == "SEARCH_PRODUCTS":
         return {"keyword": task.user_text}
+    if tool_name == "SEARCH_PRODUCTS_BY_IMAGE":
+        return {}
     if tool_name == "GET_PRODUCT_DETAIL":
         return {"productId": product.get("productId")}
     if tool_name == "COMPARE_PRODUCTS":
@@ -646,6 +771,13 @@ def _required_tool_args(task: SpecialistTask, tool_name: str) -> dict[str, Any]:
         }
     if tool_name == "SEARCH_KNOWLEDGE":
         return {"query": normalize_policy_query(task.user_text)}
+    if tool_name == "CHECK_AFTER_SALES_ELIGIBILITY":
+        return {
+            "action": _after_sales_action(task),
+            "orderId": order.get("orderId"),
+            "orderItemId": order.get("orderItemId"),
+            "evidence": ["IMAGE"] if task.verified_image_context is not None else [],
+        }
     if tool_name == "QUERY_REFUND_STATUS":
         return {
             "orderItemId": order.get("orderItemId"),
@@ -757,6 +889,43 @@ def _failed_specialist_result(raw_task: Any, *, error_code: str) -> dict[str, An
     return {"specialist_artifacts": [artifact]}
 
 
+def _record_eligibility_trace(
+    *, task: SpecialistTask, result: Any, run_id: str
+) -> None:
+    """Emit a compact Chinese-readable rule decision without raw order data."""
+    if getattr(result, "biz_type", None) != "after_sales_eligibility":
+        return
+    payload: dict[str, Any] = {}
+    try:
+        decoded = json.loads(result.biz_data or "{}")
+        if isinstance(decoded, dict):
+            payload = decoded
+    except (TypeError, json.JSONDecodeError):
+        pass
+    output = {
+        "label": "售后资格已核验" if result.success else "售后资格核验降级",
+        "decision": payload.get("decision"),
+        "decisionId": payload.get("decisionId"),
+        "policyId": payload.get("policyId"),
+        "policyVersion": payload.get("policyVersion"),
+        "specificity": payload.get("specificity"),
+        "missingEvidence": list(payload.get("missingEvidence") or [])[:10],
+        "reason": str(payload.get("reason") or result.error_code or "")[:300],
+        "nextStep": payload.get("nextStep"),
+    }
+    episode_service.record_step(
+        "AFTER_SALES_ELIGIBILITY_DECISION",
+        node_name="after_sales_policy_specialist",
+        status="OK" if result.success else "DEGRADED",
+        output_data=output,
+        tool_name="CHECK_AFTER_SALES_ELIGIBILITY",
+        agent_id=task.agent_id,
+        handoff_id=task.handoff_id,
+        run_id=run_id,
+        error_code=None if result.success else result.error_code,
+    )
+
+
 async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
     child_run_id = task.child_run_id
     spec = AGENT_SPECS[task.agent_id]
@@ -796,6 +965,7 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     "goal": task.goal,
                     "userQuestion": task.user_text,
                     "sessionSummary": task.session_summary,
+                    "shoppingMission": task.shopping_mission,
                     "verifiedContext": task.verified_context,
                 },
                 ensure_ascii=False,
@@ -828,8 +998,21 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     ),
                     task.user_id,
                     call_id=f"required-{required_tool.lower()}",
+                    verified_image_context=(
+                        task.verified_image_context
+                        if required_tool == "SEARCH_PRODUCTS_BY_IMAGE"
+                        else None
+                    ),
+                    source_message_id=(
+                        task.source_message_id
+                        if required_tool == "SEARCH_PRODUCTS_BY_IMAGE"
+                        else None
+                    ),
                 )
                 called.append(required_tool)
+                _record_eligibility_trace(
+                    task=task, result=required_result, run_id=child_run_id
+                )
                 evidence.append(
                     {
                         "type": "tool_result",
@@ -918,8 +1101,29 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         rt.chunk_text(getattr(response, "content", "") or "")
                     )
                     if _contains_tool_protocol(candidate):
-                        warnings.append("SPECIALIST_TOOL_PROTOCOL_REJECTED")
-                        status = "DEGRADED"
+                        successful_required_tools = {
+                            str(item.get("tool") or "")
+                            for item in evidence
+                            if item.get("type") == "tool_result"
+                            and item.get("success") is True
+                        }
+                        required_tools_complete = bool(task.required_tools) and set(
+                            task.required_tools
+                        ).issubset(successful_required_tools)
+                        if (
+                            required_tools_complete
+                            and not remaining_tools
+                            and verified_tool_outputs
+                        ):
+                            # Some providers may emit their private tool syntax
+                            # even after tools have been disabled. The required
+                            # read-only work is already complete, so keep the
+                            # run successful and build the internal artifact
+                            # only from server-verified tool results.
+                            warnings.append("MODEL_SUMMARY_PROTOCOL_SANITIZED")
+                        else:
+                            warnings.append("SPECIALIST_TOOL_PROTOCOL_REJECTED")
+                            status = "DEGRADED"
                         draft = "\n".join(verified_tool_outputs)[-4000:]
                     else:
                         draft = candidate
@@ -948,8 +1152,19 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         _tool_args(task, call.get("args") or {}, child_run_id, name),
                         task.user_id,
                         call_id=call.get("id"),
+                        verified_image_context=(
+                            task.verified_image_context
+                            if name == "SEARCH_PRODUCTS_BY_IMAGE"
+                            else None
+                        ),
+                        source_message_id=(
+                            task.source_message_id
+                            if name == "SEARCH_PRODUCTS_BY_IMAGE"
+                            else None
+                        ),
                     )
                     called.append(name)
+                    _record_eligibility_trace(task=task, result=result, run_id=child_run_id)
                     evidence.append(
                         {
                             "type": "tool_result",
@@ -1071,6 +1286,11 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
         handoff_id=task.handoff_id,
         latency_ms=round((time.perf_counter() - started) * 1000),
     )
+    # Persist and hand off the same validated artifact that Supervisor will
+    # consume. Otherwise a child Trace can retain an untrusted model draft
+    # even though the root silently rebuilt it from verified business cards.
+    artifact = _validate_artifact(artifact.model_dump(mode="json"))
+    status = artifact.status
     artifact_data = artifact.model_dump(mode="json")
     episode_service.record_step(
         "SPECIALIST_ARTIFACT",
@@ -1142,14 +1362,15 @@ def _action_args(state: dict[str, Any], tool: str) -> dict[str, Any] | None:
             "sourceMessageId": state.get("message_id"),
             "runId": run_id,
         }
-        evidence = dict(state.get("image_evidence") or {})
-        if evidence:
+        image_context = dict(state.get("verified_image_context") or {})
+        if image_context:
             args.update(
                 {
-                    "imagePath": evidence.get("path"),
-                    "imageModerationId": evidence.get("moderationId"),
-                    "imageDescription": evidence.get("vlmDescription"),
-                    "vlmStatus": evidence.get("vlmStatus"),
+                    "imageAssetId": image_context.get("asset_id"),
+                    "imageUnderstanding": state.get("image_understanding"),
+                    "imageUnderstandingStatus": (
+                        "SUCCESS" if state.get("image_understanding") else "NOT_REQUESTED"
+                    ),
                 }
             )
         return args
@@ -1212,7 +1433,12 @@ def _validate_artifact(raw: dict[str, Any]) -> AgentArtifact:
     if artifact.assistant_cards:
         card_has_matching_tool = (
             is_product_cards_json(artifact.assistant_cards)
-            and bool(successful_tools & {"SEARCH_PRODUCTS", "COMPARE_PRODUCTS"})
+            and bool(
+                successful_tools
+                & {"SEARCH_PRODUCTS", "SEARCH_PRODUCTS_BY_IMAGE", "COMPARE_PRODUCTS"}
+            )
+            or is_visual_subject_selection_json(artifact.assistant_cards)
+            and "SEARCH_PRODUCTS_BY_IMAGE" in successful_tools
             or is_order_cards_json(artifact.assistant_cards)
             and "QUERY_ORDERS" in successful_tools
             or is_support_case_cards_json(artifact.assistant_cards)
@@ -1221,16 +1447,24 @@ def _validate_artifact(raw: dict[str, Any]) -> AgentArtifact:
         if not card_has_matching_tool:
             artifact.assistant_cards = None
             warnings.append("UNVERIFIED_ASSISTANT_CARD_DROPPED")
+        elif is_product_cards_json(artifact.assistant_cards):
+            card_facts = _verified_product_card_facts(artifact.assistant_cards)
+            if card_facts:
+                artifact.facts = card_facts
+                artifact.draft_answer = "\n".join(card_facts)[:4000]
+                artifact.confidence = max(artifact.confidence, 0.9)
+                artifact.next_step = "FINALIZE"
+                warnings.append("SHOPPING_FACTS_REBUILT_FROM_VERIFIED_CARDS")
     if not has_verified_result:
         artifact.biz_type = None
         artifact.biz_data = None
     elif artifact.biz_data:
         artifact.biz_data = artifact.biz_data[:20_000]
-    if "SEARCH_PRODUCTS" not in successful_tools:
+    if not successful_tools & {"SEARCH_PRODUCTS", "SEARCH_PRODUCTS_BY_IMAGE"}:
         artifact.search_tool_hint = None
     elif artifact.search_tool_hint:
         artifact.search_tool_hint = artifact.search_tool_hint[:4000]
-    if "SEARCH_KNOWLEDGE" not in successful_tools:
+    if not successful_tools & {"SEARCH_KNOWLEDGE", "SEARCH_PRODUCTS_BY_IMAGE"}:
         artifact.retrieval_trace = None
     if artifact.draft_answer and not has_verified_result:
         artifact.status = "BLOCKED"
@@ -1240,16 +1474,42 @@ def _validate_artifact(raw: dict[str, Any]) -> AgentArtifact:
         artifact.next_step = "FALLBACK"
         warnings.append("UNVERIFIED_FACTS_DROPPED")
     has_knowledge_evidence = _has_policy_evidence(artifact.evidence)
-    if artifact.agent_id == "after_sales_policy_specialist" and not has_knowledge_evidence:
-        # Order/tool facts do not prove a policy. Preserve a safe, useful
-        # handoff signal instead of allowing an unsupported eligibility claim
-        # to reach Supervisor synthesis.
-        artifact.status = "DEGRADED"
-        artifact.facts = []
-        artifact.draft_answer = "未找到可引用的售后政策证据，无法确认资格，建议人工核验。"
-        artifact.confidence = 0.0
-        artifact.next_step = "HUMAN_HANDOFF"
-        warnings.append("POLICY_EVIDENCE_MISSING")
+    has_eligibility = _has_eligibility_evidence(artifact.evidence)
+    if (
+        artifact.agent_id == "after_sales_policy_specialist"
+        and artifact.status != "FAILED"
+    ):
+        if has_eligibility and not has_knowledge_evidence:
+            # A rule decision is still useful as a structured fact, but the
+            # model must not turn it into a broader policy promise without a
+            # citation from the knowledge tool.
+            artifact.status = "DEGRADED"
+            artifact.draft_answer = _eligibility_safe_summary(artifact)
+            artifact.facts = [artifact.draft_answer]
+            artifact.confidence = min(artifact.confidence, 0.65)
+            artifact.next_step = "FINALIZE"
+            warnings.append("POLICY_TEXT_EVIDENCE_MISSING")
+        elif not has_eligibility and not has_knowledge_evidence:
+            # Neither a concrete eligibility decision nor policy text can
+            # support a customer-facing qualification answer.
+            artifact.status = "DEGRADED"
+            artifact.facts = []
+            artifact.draft_answer = "未找到可引用的售后政策证据，也无法完成具体订单资格核验，建议人工核验。"
+            artifact.confidence = 0.0
+            artifact.next_step = "HUMAN_HANDOFF"
+            warnings.extend(("POLICY_EVIDENCE_MISSING", "ELIGIBILITY_EVIDENCE_MISSING"))
+        elif (
+            not has_eligibility
+            and "CHECK_AFTER_SALES_ELIGIBILITY" in artifact.tool_calls
+        ):
+            # Policy text can explain a general rule, but it cannot establish
+            # that this user's order satisfies it.
+            artifact.status = "DEGRADED"
+            artifact.facts = []
+            artifact.draft_answer = "已找到售后政策说明，但缺少当前订单的资格核验结果，暂不能确认是否符合。"
+            artifact.confidence = min(artifact.confidence, 0.35)
+            artifact.next_step = "HUMAN_HANDOFF"
+            warnings.append("ELIGIBILITY_EVIDENCE_MISSING")
     artifact.warnings = list(dict.fromkeys(warnings))
     return artifact
 
@@ -1270,7 +1530,7 @@ def _action_evidence_failure(
         and any(
             item.get("type") == "tool_result"
             and item.get("success") is True
-            and str(item.get("tool") or "") in _ORDER_CONTEXT_TOOLS
+            and str(item.get("tool") or "") in _ORDER_FACT_TOOLS
             for item in order_artifact.evidence
         )
     )
@@ -1289,9 +1549,12 @@ def _action_evidence_failure(
             policy_artifact
             and policy_artifact.status == "SUCCESS"
             and _has_policy_evidence(policy_artifact.evidence)
+            and _has_eligibility_evidence(policy_artifact.evidence)
         )
         if not has_policy_source:
             return "POLICY_EVIDENCE_INSUFFICIENT"
+        if str(_eligibility_payload(policy_artifact).get("decision") or "") != "ELIGIBLE":
+            return "AFTER_SALES_NOT_ELIGIBLE"
     return None
 
 
@@ -1299,6 +1562,98 @@ def _action_failure_answer(answer: str) -> str:
     base = str(answer or "").strip().rstrip("。")
     suffix = "操作确认未创建，请稍后重试或转人工处理。"
     return f"{base}。{suffix}" if base else suffix
+
+
+def _sanitize_offer_time_claims(answer: str) -> str:
+    """Keep exact offer expiry in the structured card, where timezone is explicit."""
+    return _OFFER_TIME_CLAIM_RE.sub(
+        "报价短期有效，具体截止时间以商品卡片为准",
+        str(answer or ""),
+    )
+
+
+def _verified_product_card_facts(cards: str | None) -> list[str]:
+    """Build replayable facts from server-produced cards, never from model prose."""
+    try:
+        payload = json.loads(str(cards or ""))
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if isinstance(payload, dict):
+        payload = payload.get("products")
+    if not isinstance(payload, list):
+        return []
+    facts: list[str] = []
+    for raw in payload[:6]:
+        if not isinstance(raw, dict):
+            continue
+        product_id = str(raw.get("productId") or "").strip()
+        product_name = str(raw.get("productName") or "").strip()
+        if not product_id or not product_name:
+            continue
+        fields = [f"商品={product_name}", f"productId={product_id}"]
+        sku_key = str(raw.get("skuKey") or "").strip()
+        if sku_key:
+            fields.append(f"skuKey={sku_key}")
+        base_price = raw.get("basePrice")
+        payable = raw.get("estimatedPayable")
+        if base_price is not None:
+            fields.append(f"原价={base_price}元")
+        if payable is not None:
+            fields.append(f"预计到手价={payable}元")
+        if raw.get("totalStock") is not None:
+            fields.append(f"库存={raw['totalStock']}")
+        availability = str(raw.get("availability") or "").strip()
+        if availability:
+            fields.append(f"可售状态={availability}")
+        snapshot_id = str(raw.get("offerSnapshotId") or "").strip()
+        if snapshot_id:
+            fields.append(f"报价快照={snapshot_id}")
+        recommendation = raw.get("recommendation")
+        if isinstance(recommendation, dict):
+            for label, key in (
+                ("适合", "bestFor"),
+                ("不适合", "notIdealFor"),
+                ("取舍", "tradeoff"),
+            ):
+                value = str(recommendation.get(key) or "").strip()
+                if value:
+                    fields.append(f"{label}={value[:300]}")
+        facts.append(" | ".join(fields)[:2000])
+    return facts
+
+
+def _eligibility_payload(artifact: AgentArtifact) -> dict[str, Any]:
+    if artifact.biz_type != "after_sales_eligibility" or not artifact.biz_data:
+        return {}
+    try:
+        payload = json.loads(artifact.biz_data)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _eligibility_safe_summary(artifact: AgentArtifact) -> str:
+    """Render only rule-engine fields when policy prose is unavailable."""
+    payload = _eligibility_payload(artifact)
+    decision = str(payload.get("decision") or "POLICY_UNAVAILABLE")
+    labels = {
+        "ELIGIBLE": "规则引擎判定当前订单满足该售后动作的业务前置条件",
+        "INELIGIBLE": "规则引擎判定当前订单不满足该售后动作的业务前置条件",
+        "NEEDS_EVIDENCE": "规则引擎需要补充凭证后才能继续核验",
+        "CONFLICT": "规则或订单事实存在冲突，暂时无法确认资格",
+        "POLICY_UNAVAILABLE": "当前没有可用的已发布售后规则",
+    }
+    text = labels.get(decision, "当前无法确认售后资格")
+    reason = str(payload.get("reason") or "").strip()
+    if reason:
+        text += f"：{reason}"
+    missing = [str(item) for item in payload.get("missingEvidence") or [] if str(item).strip()]
+    if missing:
+        text += f"。待补凭证：{', '.join(missing)}"
+    version = str(payload.get("policyVersion") or "").strip()
+    if version:
+        text += f"（规则版本 {version}）"
+    return text[:2000]
 
 
 def _policy_safe_fallback(artifacts: list[AgentArtifact]) -> str:
@@ -1430,6 +1785,8 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                             "你是电商 Supervisor。根据已验证的内部专家 artifact 回答用户。"
                             "不得补造 artifact 中不存在的事实；冲突时明确说明并建议人工。"
                             f"{policy_instruction}"
+                            "购物报价时间戳不得换算、截断或改成日期；正文只说明报价短期有效，"
+                            "具体截止时间以结构化商品卡片为准。"
                             "只返回最终面向用户的简洁中文答复，不要输出内部规划或 SQL。"
                         )
                     ),
@@ -1443,6 +1800,11 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         answer = "；".join(item.draft_answer for item in artifacts if item.draft_answer)[:4000]
     if not answer:
         answer = "暂时没有足够的已验证信息，请补充订单信息或转人工处理。"
+    if any(
+        artifact.biz_type == "shopping_decision_v2" and artifact.assistant_cards
+        for artifact in artifacts
+    ):
+        answer = _sanitize_offer_time_claims(answer)
 
     readonly_tools = list(
         dict.fromkeys(tool for artifact in artifacts for tool in artifact.tool_calls)
@@ -1679,26 +2041,24 @@ async def supervisor_plan_node(state: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         plan = fallback
     run_id = (state.get("agent_msg") or {}).get("runId")
-    shopping_profile: dict[str, Any] = {}
+    shopping_mission: dict[str, Any] = {}
     shopping_summary = ""
     if "shopping_advisor" in plan.specialists:
         try:
-            effective_profile = await shopping_profile_service.get_effective_profile(
+            current_mission = await shopping_mission_service.load(
                 str(state.get("user_id") or "")
             )
-            shopping_profile = {
-                field: effective_profile.get(field)
-                for field in _SHOPPING_PROFILE_FIELDS
-                if effective_profile.get(field) not in (None, [], "")
-            }
-            shopping_summary = shopping_profile_service.summary(shopping_profile)[:1000]
+            shopping_mission = shopping_mission_service.specialist_context(
+                current_mission
+            )
+            shopping_summary = mission_summary(current_mission)[:1000]
         except Exception as exc:
             episode_service.record_step(
                 "SPECIALIST_CONTEXT",
                 node_name="supervisor_plan",
                 status="DEGRADED",
                 error_code=type(exc).__name__,
-                output_data={"context": "shoppingProfile", "available": False},
+                output_data={"context": "shoppingMission", "available": False},
                 agent_id="supervisor",
                 run_id=run_id,
             )
@@ -1711,7 +2071,6 @@ async def supervisor_plan_node(state: dict[str, Any]) -> dict[str, Any]:
         verified_context = _specialist_verified_context(
             state,
             agent_id=agent_id,
-            shopping_profile=shopping_profile,
         )
         task_tool_scope = _task_tools_for_specialist(state, agent_id)
         task = SpecialistTask(
@@ -1726,12 +2085,23 @@ async def supervisor_plan_node(state: dict[str, Any]) -> dict[str, Any]:
             ),
             user_id=str(state.get("user_id") or ""),
             user_text=_sanitize_specialist_text(state.get("user_text"), max_length=4000),
+            source_message_id=(
+                int(state["message_id"]) if state.get("message_id") is not None else None
+            ),
             session_summary=(
                 _sanitize_specialist_text(shopping_summary, max_length=1000)
                 if agent_id == "shopping_advisor"
                 else ""
             ),
             verified_context=verified_context,
+            shopping_mission=(
+                shopping_mission if agent_id == "shopping_advisor" else {}
+            ),
+            verified_image_context=(
+                state.get("verified_image_context")
+                if agent_id in {"shopping_advisor", "after_sales_policy_specialist"}
+                else None
+            ),
             tool_scope=task_tool_scope,
             required_tools=_required_tools_for_specialist(state, agent_id),
             max_rounds=min(get_settings().multi_agent_specialist_max_rounds, spec.max_rounds),

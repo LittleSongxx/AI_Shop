@@ -66,12 +66,18 @@ async def test_build_proposal_carries_only_verified_image_evidence(monkeypatch):
     verify = AsyncMock(
         return_value={
             "approved": True,
-            "path": "support/u1/ok.jpg",
-            "moderationId": 7,
+            "asset_id": "img_0123456789abcdef0123456789abcdef",
+            "content_sha256": "a" * 64,
+            "mime_type": "image/jpeg",
+            "width": 640,
+            "height": 480,
+            "scene": "agent",
+            "moderation_status": "APPROVED",
+            "expires_at": "2026-09-09T00:00:00",
         }
     )
     monkeypatch.setattr(
-        "app.services.support_case_service.java_internal_client.verify_support_image",
+        "app.services.support_case_service.java_internal_client.verify_agent_image",
         verify,
     )
 
@@ -80,38 +86,47 @@ async def test_build_proposal_carries_only_verified_image_evidence(monkeypatch):
         "DAMAGED",
         "包装破损",
         order_id="o1",
-        image_path="support/u1/ok.jpg",
-        image_moderation_id=7,
-        image_description="包装边角有裂痕",
-        vlm_status="FAILED",
+        image_asset_id="img_0123456789abcdef0123456789abcdef",
+        image_understanding="包装边角有裂痕",
+        image_understanding_status="FAILED",
         source_message_id=9,
         run_id="run-9",
     )
 
     assert proposal["ownedOrderValidated"] is True
     assert proposal["evidence"] == {
-        "path": "support/u1/ok.jpg",
-        "moderationId": 7,
+        "imageAssetId": "img_0123456789abcdef0123456789abcdef",
+        "contentSha256": "a" * 64,
+        "mimeType": "image/jpeg",
+        "width": 640,
+        "height": 480,
         "moderationStatus": "APPROVED",
-        "scene": "support",
-        "vlmStatus": "FAILED",
-        "vlmDescription": "包装边角有裂痕",
+        "scene": "agent",
+        "expiresAt": "2026-09-09T00:00:00",
+        "imageUnderstandingStatus": "FAILED",
+        "imageUnderstanding": "包装边角有裂痕",
     }
-    verify.assert_awaited_once_with("u1", "support/u1/ok.jpg", 7)
+    verify.assert_awaited_once_with("u1", "img_0123456789abcdef0123456789abcdef")
 
 
 @pytest.mark.asyncio
 async def test_unapproved_or_external_image_cannot_enter_case(monkeypatch):
     service = SupportCaseService()
-    with pytest.raises(ValueError, match="相对路径"):
-        await service.verify_image("u1", "https://evil.example/a.jpg", 1)
+    with pytest.raises(ValueError, match="资产标识"):
+        await service.verify_image("u1", "https://evil.example/a.jpg")
 
     monkeypatch.setattr(
-        "app.services.support_case_service.java_internal_client.verify_support_image",
-        AsyncMock(return_value={"approved": False, "path": "support/u1/a.jpg"}),
+        "app.services.support_case_service.java_internal_client.verify_agent_image",
+        AsyncMock(
+            return_value={
+                "approved": False,
+                "asset_id": "img_abcdefabcdefabcdefabcdefabcdefab",
+                "moderation_status": "REJECTED",
+            }
+        ),
     )
     with pytest.raises(ValueError, match="尚未通过审核"):
-        await service.verify_image("u1", "support/u1/a.jpg", 2)
+        await service.verify_image("u1", "img_abcdefabcdefabcdefabcdefabcdefab")
 
 
 @pytest.mark.asyncio

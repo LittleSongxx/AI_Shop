@@ -114,6 +114,7 @@ _UNRESOLVED_HINTS = ("还是没解决", "没有解决", "又不行", "还是不�
 _TOOL_INTENTS = frozenset(
     {
         IntentKind.PRODUCT_SEARCH,
+        IntentKind.VISUAL_PRODUCT_SEARCH,
         IntentKind.QUERY_ORDER,
         IntentKind.REFUND,
         IntentKind.CONFIRM_RECEIPT,
@@ -150,6 +151,7 @@ _READ_QUERY_INTENTS = frozenset(
     {
         IntentKind.PRODUCT_CONSULT,
         IntentKind.PRODUCT_SEARCH,
+        IntentKind.VISUAL_PRODUCT_SEARCH,
         IntentKind.QUERY_ORDER,
         IntentKind.QUERY_LOGISTICS,
         IntentKind.QUERY_FULFILLMENT,
@@ -209,6 +211,7 @@ _PERSONAL_READ_MARKERS = (
 _ACTION_CUES: dict[IntentKind, tuple[str, ...]] = {
     IntentKind.REFUND: (
         "我要退款", "我想退款", "帮我退款", "帮我退", "给我退", "申请退款",
+        "发起退款申请", "发起退款", "办理退款", "代我退款", "替我退款",
         "直接退款", "立即退款", "退款吧", "退了吧", "退掉", "退一下",
         "继续退款",
     ),
@@ -240,6 +243,32 @@ _ACTION_CUES: dict[IntentKind, tuple[str, ...]] = {
     IntentKind.PAYMENT_ISSUE: ("帮我处理", "提交工单", "申请处理"),
 }
 
+_ACTION_NEGATION_MARKERS = (
+    "不要",
+    "不用",
+    "无需",
+    "不需要",
+    "先别",
+    "暂不",
+    "暂时不",
+    "别再",
+)
+
+
+def _has_non_negated_action_cue(text: str, cues: tuple[str, ...]) -> bool:
+    """Recognize explicit writes while failing closed on negated requests."""
+
+    clauses = re.split(r"[，,。！？!?；;\n]+", text)
+    for clause in clauses:
+        for cue in cues:
+            start = clause.find(cue)
+            while start >= 0:
+                prefix = clause[:start]
+                if not any(marker in prefix for marker in _ACTION_NEGATION_MARKERS):
+                    return True
+                start = clause.find(cue, start + len(cue))
+    return False
+
 
 def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     """Deterministically separate information, reads, and proposed writes."""
@@ -249,7 +278,7 @@ def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
         return RequestMode.HUMAN_SUPPORT
 
     action_cues = _ACTION_CUES.get(intent, ())
-    strong_action = any(cue in text for cue in action_cues)
+    strong_action = _has_non_negated_action_cue(text, action_cues)
     asks_information = any(marker in text for marker in _INFORMATIONAL_MARKERS)
     explicitly_delegates = any(
         marker in text for marker in ("帮我", "给我", "直接", "立即", "提交", "申请")

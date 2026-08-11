@@ -143,6 +143,10 @@ topics:
     canonical: 服饰
     aliases: [衣服, 鞋子, 童装]
     terms: [服饰, 衣服, 鞋子, 童装, 儿童]
+  - id: bag
+    canonical: 包
+    aliases: [箱包, 背包, 书包, 双肩包, 手提包, 斜挎包, 旅行包, 健身包]
+    terms: [箱包, 背包, 书包, 双肩包, 手提包, 斜挎包, 旅行包, 健身包, 单肩包]
   - id: beauty
     canonical: 美妆
     aliases: [护肤, 化妆品]

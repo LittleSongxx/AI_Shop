@@ -68,12 +68,14 @@ TOOL_POLICIES: dict[str, ToolPolicy] = {
     for p in (
         # 商品检索/详情不进业务卡片：结果由 biz_payload 单独拼商品卡，不走这里的兜底。
         _policy("SEARCH_PRODUCTS", _READ),
+        _policy("SEARCH_PRODUCTS_BY_IMAGE", _READ, "visual_product_search"),
         _policy("GET_PRODUCT_DETAIL", _READ),
         _policy("COMPARE_PRODUCTS", _READ, "product_comparison"),
         _policy("QUERY_ORDERS", _READ, "query_order"),
         _policy("QUERY_LOGISTICS", _READ, "query_logistics"),
         _policy("QUERY_COMMENT", _READ, "query_comment"),
         _policy("QUERY_REFUND_STATUS", _READ, "query_refund_status"),
+        _policy("CHECK_AFTER_SALES_ELIGIBILITY", _READ, "after_sales_eligibility"),
         _policy("QUERY_USER_COUPONS", _READ, "query_coupon"),
         # P3-1 Agentic RAG: in-process knowledge/FAQ retrieval tool.
         _policy("SEARCH_KNOWLEDGE", _READ),

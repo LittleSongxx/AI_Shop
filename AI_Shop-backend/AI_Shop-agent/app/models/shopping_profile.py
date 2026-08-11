@@ -33,3 +33,17 @@ class ShoppingProfileClearRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expectedRevision: Annotated[int, Field(ge=0)]
+
+
+class ShoppingPersonalizationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expectedRevision: Annotated[int, Field(ge=0)]
+    enabled: bool
+
+
+class ShoppingProfileSignalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expectedRevision: Annotated[int, Field(ge=0)]
+    signalId: Annotated[str, Field(min_length=1, max_length=64)]

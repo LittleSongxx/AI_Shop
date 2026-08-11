@@ -1,5 +1,7 @@
 import re
 
+from app.domain.category_terms import has_bare_bag_category
+
 # 转人工的显式请求。放在 rules 层是因为 classifier 和 product_consult 都要先于
 # 商品咨询分支拦截它：用户在咨询一款商品时要求转人工，不能被 PRODUCT_CONSULT 吃掉。
 HUMAN_HINTS = ("转人工", "人工客服", "找客服", "真人客服", "人工处理", "人工介入", "找你们主管")
@@ -200,7 +202,8 @@ def looks_like_new_product_search(user_text: str) -> bool:
         return True
     if any(v in t for v in _SEARCH_VERBS) and (
         _mentions_any(t, _ALL_PRODUCT_HINTS)
-        or re.search(r"预算\s*\d+", t)
+        or has_bare_bag_category(t)
+        or re.search(r"预算\s*(?:(?:提高|提升|调整|改成|改为|改|提到|放宽)\s*(?:到|至|为|成)?\s*)?\d+", t)
     ):
         return True
 

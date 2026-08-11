@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "agentic-commerce-v2-2026-08-11",
+  "datasetSha256": "0ca1427de9a5ab01de509e605fa90c2e8238c07cfbc5ea2675382d1e7835edda",
+  "caseCount": 27,
+  "subsetCounts": {
+    "after_sales_eligibility": 3,
+    "commercial_ranking": 3,
+    "data_analyst_sql": 3,
+    "inventory_forecast": 3,
+    "mission_clarification": 3,
+    "multi_agent_e2e": 3,
+    "offer_constraints": 3,
+    "outcome_attribution": 3,
+    "visual_mission": 3
+  },
+  "thresholds": {
+    "minimum": {
+      "hardConstraintCompliance": 1.0,
+      "authoritativeOfferAccuracy": 1.0,
+      "operationDisclosureRate": 1.0,
+      "afterSalesDecisionAccuracy": 1.0,
+      "attributionIntegrity": 1.0,
+      "sqlGuardRecall": 1.0,
+      "inventoryFormulaAccuracy": 1.0,
+      "specialistReadOnlyRate": 1.0,
+      "traceCompleteness": 0.95
+    },
+    "maximum": {
+      "unavailableProductRate": 0.0,
+      "operationFirstPositionRate": 0.0,
+      "unverifiedCouponClaimRate": 0.0,
+      "hardConstraintViolationRate": 0.0
+    }
+  }
+}

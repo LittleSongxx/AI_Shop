@@ -22,9 +22,8 @@ class AgentGraphState(TypedDict, total=False):
     message_id: int
     user_message: str
     user_text: str
-    image_url: str | None
-    image_evidence: dict | None
-    image_description: str | None
+    verified_image_context: dict | None
+    image_understanding: str | None
     from_product: bool
     card: dict | None
     message_card: dict | None
@@ -80,15 +79,16 @@ class AgentGraphState(TypedDict, total=False):
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
+    image_context = _verified_image_context(agent_msg)
+
     return {
         "agent_msg": agent_msg,
         "user_id": agent_msg["userId"],
         "message_id": agent_msg["messageId"],
         "user_message": agent_msg.get("userMessage") or "",
         "user_text": user_text,
-        "image_url": None,
-        "image_evidence": agent_msg.get("imageEvidence"),
-        "image_description": None,
+        "verified_image_context": image_context,
+        "image_understanding": None,
         "from_product": bool(agent_msg.get("fromProduct")),
         "card": card,
         "message_card": card,
@@ -136,3 +136,24 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
 def thread_id_for(user_id: str, message_id: int) -> str:
 
     return f"{user_id}:{message_id}"
+
+
+def _verified_image_context(agent_msg: dict) -> dict | None:
+    explicit = agent_msg.get("verifiedImageContext")
+    if isinstance(explicit, dict):
+        return explicit
+    snapshot = agent_msg.get("imageSnapshot")
+    if not isinstance(snapshot, dict) or not snapshot.get("assetId"):
+        return None
+    subject = agent_msg.get("selectedVisualSubject")
+    return {
+        "asset_id": snapshot.get("assetId"),
+        "moderation_status": snapshot.get("moderationStatus") or "APPROVED",
+        "content_sha256": snapshot.get("contentSha256"),
+        "mime_type": snapshot.get("mimeType"),
+        "width": snapshot.get("width"),
+        "height": snapshot.get("height"),
+        "scene": snapshot.get("scene") or "agent",
+        "expires_at": snapshot.get("expiresAt"),
+        "selected_subject": subject,
+    }

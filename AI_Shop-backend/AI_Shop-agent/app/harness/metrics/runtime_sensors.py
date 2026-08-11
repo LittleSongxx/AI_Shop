@@ -123,6 +123,20 @@ ORDER_SELECTION_TOTAL = Counter(
     "订单候选卡选择结果",
     ["intent", "outcome"],
 )
+VISUAL_SELECTION_TOTAL = Counter(
+    "agent_visual_selection_total",
+    "图片商品主体选择结果",
+    ["outcome"],
+)
+VISUAL_INDEX_EVENT_TOTAL = Counter(
+    "agent_visual_index_event_total",
+    "视觉商品索引事件处理结果",
+    ["result"],
+)
+VISUAL_INDEX_DOCUMENT_TOTAL = Counter(
+    "agent_visual_index_documents_total",
+    "视觉商品索引写入文档数",
+)
 
 
 def observe_agent_stage(stage: str, seconds: float) -> None:

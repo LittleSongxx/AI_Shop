@@ -31,6 +31,9 @@ class AgentMessageService:
         session_id: str | None = None,
         run_id: str | None = None,
         trace_id: str | None = None,
+        image_asset_id: str | None = None,
+        image_snapshot: dict | None = None,
+        selected_visual_subject: dict | None = None,
     ) -> dict:
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -44,8 +47,10 @@ class AgentMessageService:
                 INSERT INTO agent_message
                     (user_message, send_time, user_id, status, session_id, intent,
                      intent_confidence, sentiment, urgency, risk_level, run_id, trace_id,
-                     unresolved_count, queue_name)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     unresolved_count, queue_name, image_asset_id, image_snapshot_json,
+                     selected_visual_subject_json)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s)
                 """,
                 (
                     message,
@@ -62,6 +67,9 @@ class AgentMessageService:
                     trace_id,
                     unresolved_count,
                     queue_name,
+                    image_asset_id,
+                    _json_dump(image_snapshot),
+                    _json_dump(selected_visual_subject),
                 ),
             )
             message_id = cur.lastrowid
@@ -77,6 +85,9 @@ class AgentMessageService:
             "traceId": trace_id,
             "queueName": queue_name,
             "unresolvedCount": unresolved_count,
+            "imageAssetId": image_asset_id,
+            "imageSnapshot": image_snapshot,
+            "selectedVisualSubject": selected_visual_subject,
         }
         if decision:
             result["intentDecision"] = decision.model_dump(mode="json")
@@ -523,6 +534,11 @@ def _row_to_dict(row: dict) -> dict:
         "runId": row.get("run_id"),
         "traceId": row.get("trace_id"),
         "sourceRefs": _json_value(row.get("source_refs")),
+        "imageAssetId": row.get("image_asset_id"),
+        "imageSnapshot": _json_value(row.get("image_snapshot_json")),
+        "selectedVisualSubject": _json_value(
+            row.get("selected_visual_subject_json")
+        ),
         "latencyMs": row.get("latency_ms"),
         "unresolvedCount": int(row.get("unresolved_count") or 0),
         "queueName": row.get("queue_name"),
@@ -531,7 +547,8 @@ def _row_to_dict(row: dict) -> dict:
 _MESSAGE_SELECT_COLUMNS = """
     message_id, assistant_message, user_message, send_time, user_id, status,
     biz_type, biz_data, session_id, intent, intent_confidence, sentiment,
-    urgency, risk_level, run_id, trace_id, source_refs, latency_ms, unresolved_count,
+    urgency, risk_level, run_id, trace_id, source_refs, image_asset_id,
+    image_snapshot_json, selected_visual_subject_json, latency_ms, unresolved_count,
     queue_name
 """
 
@@ -569,6 +586,12 @@ def _json_value(value):
         return json.loads(value)
     except (json.JSONDecodeError, TypeError):
         return None
+
+
+def _json_dump(value: dict | list | None) -> str | None:
+    if value is None:
+        return None
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 agent_message_service = AgentMessageService()

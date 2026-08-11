@@ -14,7 +14,7 @@ from app.memory.models import SessionMemory
 from app.memory.session_memory_service import session_memory_service
 from app.services.prompt_service import load_agent_prompt
 from app.services.redis_service import redis_service
-from app.services.shopping_need_service import shopping_need_service
+from app.services.shopping_mission_service import shopping_mission_service
 
 logger = structlog.get_logger()
 
@@ -47,7 +47,7 @@ class PostTurnService:
 
         candidates = self._displayed_product_candidates(assistant_cards)
         if "SEARCH_PRODUCTS" in tools_called and candidates:
-            await shopping_need_service.record_candidates(
+            await shopping_mission_service.record_candidates(
                 user_id, message_id, candidates
             )
 

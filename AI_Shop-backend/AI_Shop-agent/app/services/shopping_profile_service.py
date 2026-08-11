@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -10,6 +11,7 @@ import structlog
 
 from app.constants import CLARIFY_MAX_TEXT_LENGTH, PRODUCT_STATUS_ON_SALE
 from app.db.pool import acquire, transaction
+from app.domain.category_terms import has_bare_bag_category
 from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.redis_service import redis_service
 
@@ -34,6 +36,11 @@ _APPROX_BUDGET_RE = re.compile(
 )
 _PREFIX_APPROX_BUDGET_RE = re.compile(
     rf"(?:预算|价格|价位)\s*(?:大约|大概|约)\s*{_AMOUNT}\s*(?:元|块)?"
+)
+_UPDATED_BUDGET_RE = re.compile(
+    rf"(?:预算|价格|价位)\s*"
+    rf"(?:提高|提升|增加|上调|调整|改成|改为|改|提到|放宽)\s*"
+    rf"(?:到|至|为|成)?\s*{_AMOUNT}\s*(?:元|块)?"
 )
 _APPROX_BUDGET_TOLERANCE = 0.2
 
@@ -61,6 +68,7 @@ _CATEGORY_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("零食", ("零食", "食品", "吃的")),
     ("家电", ("家电", "电器")),
     ("耳机", ("耳机", "降噪耳机")),
+    ("箱包", ("箱包", "背包", "书包", "双肩包", "手提包", "斜挎包", "包包", "包")),
     ("相机", ("相机", "摄影")),
     ("玩具", ("玩具", "公仔")),
     ("乐器", ("乐器", "吉他", "钢琴")),
@@ -79,6 +87,11 @@ _SCENARIO_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("儿童", ("儿童", "孩子", "小孩")),
     ("通勤", ("通勤",)),
     ("旅行", ("旅行", "出差")),
+    ("编程开发", ("编程", "写代码", "程序员", "开发")),
+    ("视频创作", ("视频剪辑", "剪视频", "视频创作", "做视频")),
+    ("户外运动", ("户外", "登山", "徒步", "露营")),
+    ("上学通勤", ("上学", "书包")),
+    ("上班通勤", ("上班通勤", "职场通勤")),
 )
 
 _FEATURE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -87,6 +100,10 @@ _FEATURE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("性价比", ("性价比", "实惠", "划算")),
     ("大屏", ("大屏", "屏幕大")),
     ("高性能", ("高性能", "性能强", "配置高")),
+    ("降噪", ("降噪", "anc")),
+    ("防水", ("防水",)),
+    ("大容量", ("大容量", "能装", "收纳多")),
+    ("轻量", ("轻量", "重量轻")),
 )
 
 _NEGATIVE_BRAND_WORDS = ("不要", "不想要", "排除", "不考虑", "不选", "别买", "避开")
@@ -115,6 +132,9 @@ _PROFILE_FIELDS = (
     "scenarios",
     "features",
     "acceptSubstitute",
+)
+_PERSISTENT_EXPLICIT_FIELDS = frozenset(
+    {"brands", "excludedBrands", "scenarios", "features", "acceptSubstitute"}
 )
 _SHORT_LIVED_FIELDS = frozenset(
     {"category", "budgetMin", "budgetMax", "acceptSubstitute"}
@@ -164,6 +184,8 @@ def empty_profile() -> dict[str, Any]:
         "scenarios": [],
         "features": [],
         "acceptSubstitute": None,
+        "personalizationEnabled": True,
+        "implicitSignals": [],
         "fieldMeta": {},
     }
 
@@ -189,6 +211,44 @@ def prune_expired_profile(
         normalized[field] = [] if field in _LIST_FIELDS else None
         metadata.pop(field, None)
     normalized["fieldMeta"] = metadata
+    normalized["personalizationEnabled"] = bool(
+        normalized.get("personalizationEnabled", True)
+    )
+    signals: list[dict[str, Any]] = []
+    for raw in normalized.get("implicitSignals") or []:
+        if not isinstance(raw, dict):
+            continue
+        expires_at = _parse_time(raw.get("expiresAt"))
+        if expires_at is not None and expires_at <= current:
+            continue
+        signal_id = str(raw.get("signalId") or "").strip()
+        kind = str(raw.get("kind") or "").strip()
+        value = str(raw.get("value") or "").strip()
+        if not signal_id or not kind or not value:
+            continue
+        try:
+            strength = min(1.0, max(0.0, float(raw.get("strength") or raw.get("weight") or 0)))
+        except (TypeError, ValueError):
+            strength = 0.0
+        observed_at = _parse_time(raw.get("observedAt")) or current
+        age_days = max(0.0, (current - observed_at).total_seconds() / 86400)
+        effective_weight = round(strength * max(0.0, 1.0 - age_days / 180.0), 4)
+        if effective_weight <= 0:
+            continue
+        signal = {
+            "signalId": signal_id[:64],
+            "kind": kind[:32],
+            "value": value[:80],
+            "strength": round(strength, 4),
+            "effectiveWeight": effective_weight,
+            "count": min(10_000, max(1, int(raw.get("count") or 1))),
+            "source": str(raw.get("source") or "OUTCOME")[:32],
+            "observedAt": _iso(observed_at),
+        }
+        if expires_at is not None:
+            signal["expiresAt"] = _iso(expires_at)
+        signals.append(signal)
+    normalized["implicitSignals"] = signals[:100]
     return normalized
 
 
@@ -207,12 +267,18 @@ def _stamp_fields(
     for field in _PROFILE_FIELDS:
         if not _field_has_value(incoming, field):
             continue
-        days = ttl_days or _CHAT_TTL_DAYS[field]
+        days = (
+            None
+            if field in _PERSISTENT_EXPLICIT_FIELDS
+            and source in {"EXPLICIT_CHAT", "MANUAL"}
+            else (_CHAT_TTL_DAYS[field] if ttl_days is None else ttl_days)
+        )
         field_meta: dict[str, Any] = {
             "source": source,
             "updatedAt": _iso(current),
-            "expiresAt": _iso(current + timedelta(days=days)),
         }
+        if days is not None:
+            field_meta["expiresAt"] = _iso(current + timedelta(days=days))
         if source_message_id is not None:
             field_meta["sourceMessageId"] = source_message_id
         metadata[field] = field_meta
@@ -250,6 +316,10 @@ def _parse_budget(text: str) -> tuple[float | None, float | None]:
     if match:
         return _budget_from_match(match), None
 
+    match = _UPDATED_BUDGET_RE.search(text)
+    if match:
+        return None, _budget_from_match(match)
+
     match = _APPROX_BUDGET_RE.search(text) or _PREFIX_APPROX_BUDGET_RE.search(text)
     if match:
         target = _budget_from_match(match)
@@ -280,6 +350,12 @@ def _brand_is_excluded(text: str, aliases: tuple[str, ...]) -> bool:
     return False
 
 
+def _category_alias_in_text(text: str, alias: str) -> bool:
+    if alias != "包":
+        return alias.strip().lower() in text.lower()
+    return has_bare_bag_category(text)
+
+
 def extract_profile(text: str | None) -> dict[str, Any]:
     value = (text or "").strip()
     profile = empty_profile()
@@ -299,7 +375,7 @@ def extract_profile(text: str | None) -> dict[str, Any]:
             profile["brands"].append(canonical)
 
     for canonical, aliases in _CATEGORY_HINTS:
-        if any(alias.strip().lower() in value.lower() for alias in aliases):
+        if any(_category_alias_in_text(value, alias) for alias in aliases):
             profile["category"] = canonical
             break
 
@@ -424,17 +500,39 @@ class ShoppingProfileService:
     async def get_effective_profile(self, user_id: str) -> dict[str, Any]:
         durable = await self.get_profile(user_id)
         try:
-            from app.services.shopping_need_service import (
-                effective_profile_from_need,
-                shopping_need_service,
-            )
+            from app.services.shopping_mission_service import shopping_mission_service
 
-            return effective_profile_from_need(
-                durable, await shopping_need_service.load(user_id)
+            mission = await shopping_mission_service.load(user_id)
+            if not isinstance(mission, dict):
+                return durable
+            hard = mission.get("hardConstraints") or {}
+            soft = mission.get("softPreferences") or {}
+            exclusions = mission.get("exclusions") or {}
+            effective = deepcopy(durable)
+            effective.update(
+                {
+                    "category": mission.get("category"),
+                    "budgetMin": hard.get("budgetMin"),
+                    "budgetMax": hard.get("budgetMax"),
+                    "brands": list(soft.get("brands") or []),
+                    "excludedBrands": list(exclusions.get("brands") or []),
+                    "scenarios": list(mission.get("useCases") or []),
+                    "features": list(soft.get("features") or []),
+                    "acceptSubstitute": soft.get("acceptSubstitute"),
+                    "personalizationEnabled": bool(
+                        durable.get("personalizationEnabled", True)
+                    ),
+                    "implicitSignals": (
+                        list(durable.get("implicitSignals") or [])
+                        if durable.get("personalizationEnabled", True)
+                        else []
+                    ),
+                }
             )
+            return effective
         except Exception as exc:
             logger.warning(
-                "shopping_need_read_failed",
+                "shopping_mission_read_failed",
                 user_id=user_id,
                 error=type(exc).__name__,
             )
@@ -659,7 +757,7 @@ class ShoppingProfileService:
             clear=False,
         )
         await self._save_redis(user_id, updated)
-        await self._rebase_session_need(user_id, updated)
+        await self._rebase_session_mission(user_id, updated)
         return updated
 
     async def clear_profile(
@@ -672,20 +770,166 @@ class ShoppingProfileService:
             clear=True,
         )
         await self._save_redis(user_id, updated)
-        await self._rebase_session_need(user_id, updated)
+        await self._rebase_session_mission(user_id, updated)
+        return updated
+
+    async def set_personalization(
+        self, user_id: str, enabled: bool, expected_revision: int
+    ) -> dict[str, Any]:
+        updated = await self._manual_write(
+            user_id,
+            expected_revision=expected_revision,
+            patch={"personalizationEnabled": bool(enabled)},
+            clear=False,
+        )
+        await self._save_redis(user_id, updated)
+        await self._rebase_session_mission(user_id, updated)
+        return updated
+
+    async def record_implicit_signal(
+        self,
+        user_id: str,
+        *,
+        kind: str,
+        value: str,
+        source: str,
+        strength: float,
+    ) -> dict[str, Any] | None:
+        """Upsert one weak behavioural signal with a 180-day linear decay."""
+        normalized_kind = str(kind or "").strip()[:32]
+        normalized_value = str(value or "").strip()[:80]
+        if not user_id or not normalized_kind or not normalized_value:
+            return None
+        try:
+            normalized_strength = min(1.0, max(0.0, float(strength)))
+        except (TypeError, ValueError):
+            return None
+        if normalized_strength <= 0:
+            return None
+
+        async with transaction() as cur:
+            await cur.execute(
+                "SELECT profile_json, revision FROM agent_shopping_profile "
+                "WHERE user_id=%s FOR UPDATE",
+                (user_id,),
+            )
+            current = self._profile_from_row(await cur.fetchone())
+            current = prune_expired_profile(current)
+            if not current.get("personalizationEnabled", True):
+                return current
+            now = _utc_now()
+            signals = list(current.get("implicitSignals") or [])
+            existing = next(
+                (
+                    item
+                    for item in signals
+                    if item.get("kind") == normalized_kind
+                    and item.get("value") == normalized_value
+                ),
+                None,
+            )
+            if existing is None:
+                existing = {
+                    "signalId": f"sig_{uuid.uuid4().hex}",
+                    "kind": normalized_kind,
+                    "value": normalized_value,
+                    "strength": normalized_strength,
+                    "count": 1,
+                }
+                signals.append(existing)
+            else:
+                existing["strength"] = min(
+                    1.0,
+                    float(existing.get("strength") or 0)
+                    + normalized_strength * 0.35,
+                )
+                existing["count"] = min(10_000, int(existing.get("count") or 0) + 1)
+            existing["source"] = str(source or "OUTCOME")[:32]
+            existing["observedAt"] = _iso(now)
+            existing["expiresAt"] = _iso(now + timedelta(days=180))
+            current["implicitSignals"] = signals[:100]
+            current["revision"] = int(current.get("revision") or 0) + 1
+            await cur.execute(
+                "INSERT INTO agent_shopping_profile "
+                "(user_id, profile_json, revision, updated_at) VALUES (%s,%s,%s,NOW()) "
+                "ON DUPLICATE KEY UPDATE profile_json=VALUES(profile_json), "
+                "revision=VALUES(revision), updated_at=NOW()",
+                (
+                    user_id,
+                    json.dumps(current, ensure_ascii=False),
+                    current["revision"],
+                ),
+            )
+        updated = prune_expired_profile(current)
+        await self._save_redis(user_id, updated)
+        return updated
+
+    async def delete_implicit_signal(
+        self, user_id: str, signal_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        return await self._mutate_implicit_signals(
+            user_id,
+            expected_revision,
+            lambda signals: [
+                signal
+                for signal in signals
+                if str(signal.get("signalId") or "") != str(signal_id or "")
+            ],
+        )
+
+    async def clear_implicit_signals(
+        self, user_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        return await self._mutate_implicit_signals(
+            user_id, expected_revision, lambda _signals: []
+        )
+
+    async def _mutate_implicit_signals(
+        self,
+        user_id: str,
+        expected_revision: int,
+        transform: Any,
+    ) -> dict[str, Any]:
+        async with transaction() as cur:
+            await cur.execute(
+                "SELECT profile_json, revision FROM agent_shopping_profile "
+                "WHERE user_id=%s FOR UPDATE",
+                (user_id,),
+            )
+            current = self._profile_from_row(await cur.fetchone())
+            current_revision = int(current.get("revision") or 0)
+            if current_revision != expected_revision:
+                raise ProfileRevisionConflict(prune_expired_profile(current))
+            current["implicitSignals"] = transform(
+                list(prune_expired_profile(current).get("implicitSignals") or [])
+            )
+            current["revision"] = current_revision + 1
+            await cur.execute(
+                "INSERT INTO agent_shopping_profile "
+                "(user_id, profile_json, revision, updated_at) VALUES (%s,%s,%s,NOW()) "
+                "ON DUPLICATE KEY UPDATE profile_json=VALUES(profile_json), "
+                "revision=VALUES(revision), updated_at=NOW()",
+                (
+                    user_id,
+                    json.dumps(current, ensure_ascii=False),
+                    current["revision"],
+                ),
+            )
+        updated = prune_expired_profile(current)
+        await self._save_redis(user_id, updated)
         return updated
 
     @staticmethod
-    async def _rebase_session_need(
+    async def _rebase_session_mission(
         user_id: str, profile: dict[str, Any]
     ) -> None:
         try:
-            from app.services.shopping_need_service import shopping_need_service
+            from app.services.shopping_mission_service import shopping_mission_service
 
-            await shopping_need_service.rebase_profile(user_id, profile)
+            await shopping_mission_service.rebase_profile(user_id, profile)
         except Exception as exc:
             logger.warning(
-                "shopping_need_rebase_failed",
+                "shopping_mission_rebase_failed",
                 user_id=user_id,
                 error=type(exc).__name__,
             )
@@ -715,6 +959,9 @@ class ShoppingProfileService:
             next_revision = current_revision + 1
             if clear:
                 updated = empty_profile()
+                updated["personalizationEnabled"] = bool(
+                    current.get("personalizationEnabled", True)
+                )
                 updated["revision"] = next_revision
             else:
                 updated = prune_expired_profile(current)
@@ -773,6 +1020,11 @@ class ShoppingProfileService:
         if not isinstance(updates, dict):
             raise ValueError("profile 必须是对象")
         result: dict[str, Any] = {}
+        if "personalizationEnabled" in updates:
+            enabled = updates["personalizationEnabled"]
+            if not isinstance(enabled, bool):
+                raise ValueError("personalizationEnabled 必须是布尔值")
+            result["personalizationEnabled"] = enabled
         for field in _PROFILE_FIELDS:
             if field not in updates:
                 continue

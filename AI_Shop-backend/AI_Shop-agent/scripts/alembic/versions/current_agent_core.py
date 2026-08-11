@@ -31,13 +31,17 @@ def upgrade() -> None:
             run_id             varchar(64) NULL,
             trace_id           varchar(64) NULL,
             source_refs        json NULL,
+            image_asset_id     varchar(64) NULL,
+            image_snapshot_json json NULL,
+            selected_visual_subject_json json NULL,
             latency_ms         int NULL,
             unresolved_count   int DEFAULT 0 NOT NULL,
             queue_name         varchar(64) NULL,
             KEY idx_agent_message_user (user_id, message_id),
             KEY idx_agent_message_session (session_id, message_id),
             UNIQUE KEY uk_agent_message_run (run_id),
-            KEY idx_agent_message_quality (intent, sentiment, send_time)
+            KEY idx_agent_message_quality (intent, sentiment, send_time),
+            KEY idx_agent_message_image_asset (image_asset_id, message_id)
         ) COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC
         """
     )
@@ -169,6 +173,31 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        CREATE TABLE IF NOT EXISTS agent_visual_selection
+        (
+            selection_id          varchar(64) NOT NULL PRIMARY KEY,
+            user_id               varchar(32) NOT NULL,
+            source_message_id     bigint NOT NULL,
+            image_asset_id        varchar(64) NOT NULL,
+            original_text         varchar(4000) NOT NULL,
+            subjects_json         json NOT NULL,
+            constraints_json      json NULL,
+            status                varchar(16) NOT NULL DEFAULT 'ACTIVE',
+            expires_at            datetime NOT NULL,
+            selected_subject_id   varchar(64) NULL,
+            selected_message_id   bigint NULL,
+            created_at            datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at            datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_visual_selection_user_status (user_id, status, expires_at),
+            KEY idx_visual_selection_source_message (source_message_id),
+            UNIQUE KEY uk_visual_selection_message (selected_message_id)
+        ) COMMENT 'server-owned visual subject selection' CHARSET = utf8mb4
+          COLLATE = utf8mb4_general_ci
+        """
+    )
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS agent_pending_action
         (
             action_token varchar(80) NOT NULL PRIMARY KEY,
@@ -214,6 +243,12 @@ def upgrade() -> None:
             product_id varchar(64) NOT NULL,
             position smallint unsigned NOT NULL,
             source varchar(40) NOT NULL,
+            retrieval_mode varchar(20) NOT NULL DEFAULT 'text',
+            match_type varchar(32) NULL,
+            subject_label varchar(128) NULL,
+            recall_source varchar(128) NULL,
+            model_version varchar(128) NULL,
+            run_id varchar(64) NULL,
             event_type varchar(16) NOT NULL,
             occurred_at datetime(3) NOT NULL,
             created_at datetime(3) DEFAULT CURRENT_TIMESTAMP(3) NOT NULL,
@@ -569,11 +604,261 @@ def upgrade() -> None:
         """
     )
 
+    # Agentic Commerce v2 keeps its decision artifacts in the Agent domain.
+    # Product/order/stock remain authoritative through authenticated internal
+    # interfaces; these tables retain only the auditable decision projection.
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_shopping_mission
+        (
+            user_id             varchar(32) NOT NULL PRIMARY KEY,
+            mission_id          varchar(64) NOT NULL,
+            status              varchar(20) NOT NULL DEFAULT 'ACTIVE',
+            mission_json        json NOT NULL,
+            source_message_id   bigint NULL,
+            revision            bigint NOT NULL DEFAULT 1,
+            expires_at          datetime(3) NOT NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_shopping_mission_id (mission_id),
+            KEY idx_agent_shopping_mission_active (status, expires_at)
+        ) COMMENT 'current structured shopping mission per user' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_category_need_schema
+        (
+            schema_key          varchar(64) NOT NULL,
+            version             varchar(32) NOT NULL,
+            status              varchar(16) NOT NULL DEFAULT 'PUBLISHED',
+            schema_json         json NOT NULL,
+            created_by          varchar(100) NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (schema_key, version),
+            KEY idx_category_need_schema_status (status, schema_key)
+        ) COMMENT 'versioned category shopping-decision schemas' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_product_decision_feature
+        (
+            feature_id          bigint AUTO_INCREMENT PRIMARY KEY,
+            product_id          varchar(64) NOT NULL,
+            feature_key         varchar(64) NOT NULL,
+            feature_value       varchar(255) NOT NULL,
+            source_type         varchar(32) NOT NULL,
+            evidence_json       json NULL,
+            confidence          decimal(5,4) NOT NULL DEFAULT 0,
+            review_status       varchar(16) NOT NULL DEFAULT 'DRAFT',
+            version             varchar(32) NOT NULL DEFAULT 'v1',
+            valid_from          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            valid_until         datetime(3) NULL,
+            reviewed_by         varchar(100) NULL,
+            reviewed_at         datetime(3) NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_product_feature_version
+                (product_id, feature_key, feature_value, version),
+            KEY idx_agent_product_feature_lookup
+                (product_id, review_status, valid_until)
+        ) COMMENT 'auditable product decision feature projection' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_final_offer_snapshot
+        (
+            snapshot_id         varchar(64) NOT NULL PRIMARY KEY,
+            user_id             varchar(32) NOT NULL,
+            product_id          varchar(64) NOT NULL,
+            sku_key             varchar(64) NOT NULL,
+            offer_json          json NOT NULL,
+            expires_at          datetime(3) NOT NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            KEY idx_agent_offer_user_expiry (user_id, expires_at),
+            KEY idx_agent_offer_product_expiry (product_id, expires_at)
+        ) COMMENT 'user-bound verified single SKU offer snapshots' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_ranking_policy_decision
+        (
+            decision_id         varchar(64) NOT NULL PRIMARY KEY,
+            request_id          varchar(128) NOT NULL,
+            mission_id          varchar(64) NULL,
+            user_id             varchar(32) NOT NULL,
+            policy_version      varchar(32) NOT NULL,
+            decision_json       json NOT NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_ranking_request (request_id),
+            KEY idx_agent_ranking_mission (mission_id, created_at),
+            KEY idx_agent_ranking_user_time (user_id, created_at)
+        ) COMMENT 'auditable relevance and operations ranking decision' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_recommendation_explanation
+        (
+            explanation_id      bigint AUTO_INCREMENT PRIMARY KEY,
+            decision_id         varchar(64) NOT NULL,
+            product_id          varchar(64) NOT NULL,
+            position            smallint unsigned NOT NULL,
+            explanation_json    json NOT NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_rec_explanation (decision_id, product_id),
+            KEY idx_agent_rec_explanation_position (decision_id, position)
+        ) COMMENT 'evidence-backed recommendation explanations' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS commerce_outcome_ledger
+        (
+            ledger_id           bigint AUTO_INCREMENT PRIMARY KEY,
+            event_id            varchar(128) NOT NULL,
+            source              varchar(32) NOT NULL,
+            idempotency_key     varchar(160) NOT NULL,
+            event_type          varchar(32) NOT NULL,
+            user_id             varchar(32) NOT NULL,
+            request_id          varchar(128) NULL,
+            run_id              varchar(64) NULL,
+            product_id          varchar(64) NULL,
+            sku_key             varchar(64) NULL,
+            order_id            varchar(64) NULL,
+            payload_json        json NULL,
+            occurred_at         datetime(3) NOT NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_commerce_outcome_source_key (source, idempotency_key),
+            UNIQUE KEY uk_commerce_outcome_event (event_id),
+            KEY idx_commerce_outcome_request_time (request_id, occurred_at),
+            KEY idx_commerce_outcome_user_time (user_id, occurred_at),
+            KEY idx_commerce_outcome_product_time (product_id, occurred_at)
+        ) COMMENT 'immutable recommendation and commerce outcome ledger' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_after_sales_policy
+        (
+            policy_id           varchar(64) NOT NULL,
+            version             varchar(32) NOT NULL,
+            status              varchar(16) NOT NULL DEFAULT 'DRAFT',
+            priority            int NOT NULL DEFAULT 0,
+            scope_json          json NOT NULL,
+            rule_json           json NOT NULL,
+            effective_start     datetime(3) NOT NULL,
+            effective_end       datetime(3) NULL,
+            created_by          varchar(100) NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (policy_id, version),
+            KEY idx_after_sales_policy_effective
+                (status, effective_start, effective_end, priority)
+        ) COMMENT 'versioned declarative after-sales eligibility rules' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_after_sales_eligibility
+        (
+            decision_id         varchar(64) NOT NULL PRIMARY KEY,
+            user_id             varchar(32) NOT NULL,
+            order_id            varchar(64) NULL,
+            order_item_id       varchar(64) NULL,
+            decision_json       json NOT NULL,
+            expires_at          datetime(3) NOT NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            KEY idx_after_sales_eligibility_order (order_id, order_item_id),
+            KEY idx_after_sales_eligibility_user_expiry (user_id, expires_at)
+        ) COMMENT 'cached deterministic after-sales eligibility decisions' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        INSERT IGNORE INTO agent_after_sales_policy
+            (policy_id, version, status, priority, scope_json, rule_json,
+             effective_start, effective_end, created_by, created_at, updated_at)
+        VALUES
+            ('system-refund-state', 'v1', 'PUBLISHED', 0,
+             JSON_OBJECT('scopeType', 'GLOBAL'),
+             JSON_OBJECT(
+                 'action', 'REFUND',
+                 'orderStatuses', JSON_ARRAY(1, 2, 7),
+                 'itemStatuses', JSON_ARRAY(1),
+                 'requiredEvidence', JSON_ARRAY()
+             ),
+             '2020-01-01 00:00:00.000', NULL, 'SYSTEM_MIGRATION', NOW(3), NOW(3))
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_inventory_supply_parameter
+        (
+            product_id          varchar(64) NOT NULL,
+            sku_key             varchar(64) NOT NULL,
+            supplier_ref        varchar(100) NULL,
+            lead_time_days      int NOT NULL DEFAULT 7,
+            safety_stock        int NOT NULL DEFAULT 0,
+            min_order_quantity  int NOT NULL DEFAULT 1,
+            review_period_days  int NOT NULL DEFAULT 14,
+            enabled             tinyint(1) NOT NULL DEFAULT 1,
+            updated_by          varchar(100) NULL,
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (product_id, sku_key)
+        ) COMMENT 'manual inventory planning inputs; never a purchase order' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_inventory_inbound
+        (
+            inbound_id          varchar(64) NOT NULL PRIMARY KEY,
+            product_id          varchar(64) NOT NULL,
+            sku_key             varchar(64) NOT NULL,
+            quantity            int NOT NULL,
+            eta_date            date NULL,
+            status              varchar(16) NOT NULL DEFAULT 'PLANNED',
+            source_ref          varchar(100) NULL,
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            KEY idx_inventory_inbound_sku (product_id, sku_key, status, eta_date)
+        ) COMMENT 'declared inbound stock used for planning only' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_inventory_forecast
+        (
+            forecast_id         varchar(64) NOT NULL PRIMARY KEY,
+            product_id          varchar(64) NOT NULL,
+            sku_key             varchar(64) NOT NULL,
+            forecast_json       json NOT NULL,
+            status              varchar(16) NOT NULL DEFAULT 'OPEN',
+            generated_at        datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            reviewed_by         varchar(100) NULL,
+            reviewed_at         datetime(3) NULL,
+            KEY idx_inventory_forecast_status (status, generated_at),
+            KEY idx_inventory_forecast_sku (product_id, sku_key, generated_at)
+        ) COMMENT 'manual-only inventory replenishment suggestions' CHARSET = utf8mb4
+        """
+    )
+
     _reconcile_agent_message()
     _reconcile_session_memory()
     _reconcile_episode_tables()
     _reconcile_shopping_profile()
     _reconcile_pending_action()
+    _reconcile_recommendation_event()
     _reconcile_support_case()
     _reconcile_quality_tables()
     _reconcile_indexes()
@@ -601,6 +886,11 @@ def _reconcile_agent_message() -> None:
             server_default=sa.text("0"),
         ),
         "queue_name": sa.Column("queue_name", sa.String(64), nullable=True),
+        "image_asset_id": sa.Column("image_asset_id", sa.String(64), nullable=True),
+        "image_snapshot_json": sa.Column("image_snapshot_json", sa.JSON(), nullable=True),
+        "selected_visual_subject_json": sa.Column(
+            "selected_visual_subject_json", sa.JSON(), nullable=True
+        ),
     }
     for name, column in definitions.items():
         if name not in columns:
@@ -834,6 +1124,28 @@ def _reconcile_pending_action() -> None:
         )
 
 
+def _reconcile_recommendation_event() -> None:
+    columns = {
+        column["name"]
+        for column in sa.inspect(op.get_bind()).get_columns(
+            "agent_recommendation_event"
+        )
+    }
+    definitions = {
+        "retrieval_mode": "varchar(20) NOT NULL DEFAULT 'text'",
+        "match_type": "varchar(32) NULL",
+        "subject_label": "varchar(128) NULL",
+        "recall_source": "varchar(128) NULL",
+        "model_version": "varchar(128) NULL",
+        "run_id": "varchar(64) NULL",
+    }
+    for name, ddl in definitions.items():
+        if name not in columns:
+            op.execute(
+                f"ALTER TABLE agent_recommendation_event ADD COLUMN {name} {ddl}"
+            )
+
+
 def _reconcile_support_case() -> None:
     """Complete the independent support-case table on legacy databases."""
     bind = op.get_bind()
@@ -931,6 +1243,11 @@ def _reconcile_indexes() -> None:
                 ("intent", "sentiment", "send_time"),
                 False,
             ),
+            (
+                "idx_agent_message_image_asset",
+                ("image_asset_id", "message_id"),
+                False,
+            ),
         ),
         "agent_run": (
             ("uk_agent_run_message", ("message_id",), True),
@@ -955,6 +1272,23 @@ def _reconcile_indexes() -> None:
                 False,
             ),
             ("uk_agent_selection_message", ("selected_message_id",), True),
+        ),
+        "agent_visual_selection": (
+            (
+                "idx_visual_selection_user_status",
+                ("user_id", "status", "expires_at"),
+                False,
+            ),
+            (
+                "idx_visual_selection_source_message",
+                ("source_message_id",),
+                False,
+            ),
+            (
+                "uk_visual_selection_message",
+                ("selected_message_id",),
+                True,
+            ),
         ),
         "agent_pending_action": (
             (
@@ -1054,6 +1388,7 @@ def downgrade() -> None:
         "support_message",
         "support_session",
         "agent_recommendation_event",
+        "agent_visual_selection",
         "agent_pending_action",
         "agent_shopping_profile",
         "agent_order_selection",

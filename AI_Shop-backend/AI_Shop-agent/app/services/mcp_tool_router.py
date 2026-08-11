@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 
 import structlog
 
 from app.domain.tool_policy import policy_for
+from app.harness.agents.contracts import VerifiedImageContext
 from app.harness.guardrails.tool_guard import ToolGuardrail
 from app.harness.metrics.runtime_sensors import TOOL_CALL_TOTAL, measure_agent_stage
 from app.observability.telemetry import get_tracer
@@ -31,6 +33,9 @@ class McpToolRouter:
         args: dict,
         user_id: str,
         call_id: str | None = None,
+        *,
+        verified_image_context: VerifiedImageContext | dict | None = None,
+        source_message_id: int | None = None,
     ) -> ToolInvokeResult:
         started = time.perf_counter()
         result: ToolInvokeResult | None = None
@@ -42,7 +47,13 @@ class McpToolRouter:
                 span.set_attribute("agent.tool.call_id", call_id)
             try:
                 with measure_agent_stage("tool"):
-                    result = await self._invoke_unmeasured(tool_name, args, user_id)
+                    result = await self._invoke_unmeasured(
+                        tool_name,
+                        args,
+                        user_id,
+                        verified_image_context=verified_image_context,
+                        source_message_id=source_message_id,
+                    )
                 span.set_attribute("agent.tool.success", bool(result.success))
                 return result
             except Exception as exc:
@@ -65,6 +76,7 @@ class McpToolRouter:
                             "bizType": result.biz_type,
                             "hasCards": bool(result.assistant_cards),
                             "sourceCount": len(result.source_refs),
+                            "productIds": result.product_ids[:20],
                             "retrievalTrace": result.retrieval_trace,
                         }
                         if result
@@ -142,6 +154,17 @@ class McpToolRouter:
                 raw.setdefault("runId", context.run_id)
         if tool_name == "SEARCH_KNOWLEDGE":
             return {"userId": user_id, "query": raw.get("query") or ""}
+        if tool_name == "SEARCH_PRODUCTS_BY_IMAGE":
+            trusted = raw.get("imageAssetId") or raw.get("image_asset_id")
+            return {
+                "userId": user_id,
+                "imageAssetId": str(trusted)[:64] if trusted else None,
+                "queryText": str(raw.get("queryText") or raw.get("query_text") or "")[:500],
+                "selectedSubjectId": str(
+                    raw.get("selectedSubjectId") or raw.get("selected_subject_id") or ""
+                )[:64]
+                or None,
+            }
         try:
             return self._to_mcp_args(tool_name, raw)
         except Exception:
@@ -151,7 +174,13 @@ class McpToolRouter:
             }
 
     async def _invoke_unmeasured(
-        self, tool_name: str, args: dict, user_id: str
+        self,
+        tool_name: str,
+        args: dict,
+        user_id: str,
+        *,
+        verified_image_context: VerifiedImageContext | dict | None = None,
+        source_message_id: int | None = None,
     ) -> ToolInvokeResult:
 
         # 白名单即策略表：表里没有就是未知工具，不放行。
@@ -197,6 +226,13 @@ class McpToolRouter:
 
         # P3-1: in-process tools are handled locally, never forwarded to the
         # MCP Streamable HTTP server.
+        if tool_name == "SEARCH_PRODUCTS_BY_IMAGE":
+            return await self._search_products_by_image(
+                raw,
+                user_id,
+                verified_image_context=verified_image_context,
+                source_message_id=source_message_id,
+            )
         if tool_name == "SEARCH_KNOWLEDGE":
             return await self._search_knowledge(
                 raw.get("query") or "",
@@ -207,6 +243,8 @@ class McpToolRouter:
                     else None
                 ),
             )
+        if tool_name == "CHECK_AFTER_SALES_ELIGIBILITY":
+            return await self._check_after_sales_eligibility(raw, user_id)
 
         try:
             mcp_args = self._to_mcp_args(tool_name, raw)
@@ -290,6 +328,120 @@ class McpToolRouter:
                 error_code="TOOL_ERROR",
             )
 
+    async def _check_after_sales_eligibility(
+        self, args: dict, user_id: str
+    ) -> ToolInvokeResult:
+        from app.services.after_sales_policy_service import (
+            POLICY_UNAVAILABLE,
+            after_sales_policy_service,
+        )
+
+        action = str(args.get("action") or "").strip().upper()
+        if not action:
+            return ToolInvokeResult(
+                content="【售后资格核验失败】缺少售后动作",
+                success=False,
+                error_code="BAD_ARGS",
+            )
+        try:
+            result = await after_sales_policy_service.evaluate(
+                user_id=user_id,
+                action=action,
+                order_id=args.get("orderId") or args.get("order_id"),
+                order_item_id=args.get("orderItemId") or args.get("order_item_id"),
+                evidence=list(args.get("evidence") or []),
+            )
+        except Exception as exc:
+            logger.exception("after_sales_eligibility_tool_failed", error=type(exc).__name__)
+            return ToolInvokeResult(
+                content="【售后资格核验失败】权威订单或规则服务暂不可用，请转人工核验",
+                success=False,
+                error_code="POLICY_UNAVAILABLE",
+            )
+        decision = str(result.get("decision") or POLICY_UNAVAILABLE)
+        if decision == "POLICY_UNAVAILABLE":
+            return ToolInvokeResult(
+                content="【售后资格核验】当前没有可用的已发布规则，请转人工核验",
+                success=False,
+                error_code=decision,
+                biz_type="after_sales_eligibility",
+            )
+        refs = []
+        if result.get("policyId") or result.get("decisionId"):
+            refs.append(
+                {
+                    "type": "policy",
+                    "policyId": result.get("policyId"),
+                    "knowledgeVersion": result.get("policyVersion"),
+                    "decisionId": result.get("decisionId"),
+                }
+            )
+        return ToolInvokeResult(
+            content=json.dumps(result, ensure_ascii=False, separators=(",", ":")),
+            success=True,
+            biz_type="after_sales_eligibility",
+            biz_data=json.dumps(result, ensure_ascii=False, separators=(",", ":")),
+            source_refs=refs,
+            retrieval_trace={"decision": decision, "policyVersion": result.get("policyVersion")},
+        )
+
+    async def _search_products_by_image(
+        self,
+        args: dict,
+        user_id: str,
+        *,
+        verified_image_context: VerifiedImageContext | dict | None,
+        source_message_id: int | None,
+    ) -> ToolInvokeResult:
+        """Run visual retrieval only with server-owned image context.
+
+        The LLM-visible arguments are intentionally advisory. The actual asset,
+        moderation state and selected subject come from the graph task and are
+        validated again here before any bytes are read.
+        """
+        if verified_image_context is None:
+            TOOL_CALL_TOTAL.labels(tool="SEARCH_PRODUCTS_BY_IMAGE", status="missing_context").inc()
+            return ToolInvokeResult(
+                content="【识图找商品失败】当前消息没有可验证的图片资产，请重新上传图片。",
+                success=False,
+                error_code="VISUAL_CONTEXT_REQUIRED",
+            )
+        try:
+            context = (
+                verified_image_context
+                if isinstance(verified_image_context, VerifiedImageContext)
+                else VerifiedImageContext.model_validate(verified_image_context)
+            )
+            query_text = str(args.get("queryText") or args.get("query_text") or "").strip()
+            from app.visual.search_service import visual_product_search_service
+
+            result = await visual_product_search_service.search(
+                user_id=user_id,
+                image_context=context,
+                query_text=query_text or "查找图中同款或相似商品",
+                source_message_id=source_message_id,
+            )
+            TOOL_CALL_TOTAL.labels(
+                tool="SEARCH_PRODUCTS_BY_IMAGE",
+                status="success" if result.success else "business_rejected",
+            ).inc()
+            return result
+        except ValueError:
+            TOOL_CALL_TOTAL.labels(tool="SEARCH_PRODUCTS_BY_IMAGE", status="bad_context").inc()
+            return ToolInvokeResult(
+                content="【识图找商品失败】图片资产上下文无效，请重新上传图片。",
+                success=False,
+                error_code="VISUAL_CONTEXT_INVALID",
+            )
+        except Exception as exc:
+            logger.exception("visual_product_search_failed", error=type(exc).__name__)
+            TOOL_CALL_TOTAL.labels(tool="SEARCH_PRODUCTS_BY_IMAGE", status="error").inc()
+            return ToolInvokeResult(
+                content="【识图找商品失败】视觉检索暂时不可用，请稍后重试。",
+                success=False,
+                error_code="VISUAL_SEARCH_ERROR",
+            )
+
     # ------------------------------------------------------------------
     # Argument normalisation (MCP server tools only)
     # ------------------------------------------------------------------
@@ -309,6 +461,14 @@ class McpToolRouter:
             if ex is not None:
                 out["excludeProductId"] = ex
             return out
+        if tool_name == "SEARCH_PRODUCTS_BY_IMAGE":
+            out = {
+                "userId": uid,
+                "imageAssetId": g("imageAssetId", "image_asset_id"),
+                "queryText": g("queryText", "query_text"),
+                "selectedSubjectId": g("selectedSubjectId", "selected_subject_id"),
+            }
+            return {key: value for key, value in out.items() if value is not None}
         if tool_name == "QUERY_ORDERS":
             out = {"userId": uid}
             oid = g("orderId", "order_id")
@@ -335,6 +495,18 @@ class McpToolRouter:
                 "userId": uid,
                 "orderId": g("orderId", "order_id"),
                 "orderItemId": g("orderItemId", "order_item_id"),
+            }
+            run_id = g("runId", "run_id")
+            if run_id:
+                out["runId"] = run_id
+            return out
+        if tool_name == "CHECK_AFTER_SALES_ELIGIBILITY":
+            out = {
+                "userId": uid,
+                "action": g("action"),
+                "orderId": g("orderId", "order_id"),
+                "orderItemId": g("orderItemId", "order_item_id"),
+                "evidence": list(g("evidence") or []),
             }
             run_id = g("runId", "run_id")
             if run_id:
@@ -385,12 +557,13 @@ class McpToolRouter:
             optional = {
                 "orderId": g("orderId", "order_id"),
                 "orderItemId": g("orderItemId", "order_item_id"),
-                "imagePath": g("imagePath", "image_path"),
-                "imageModerationId": g(
-                    "imageModerationId", "image_moderation_id"
+                "imageAssetId": g("imageAssetId", "image_asset_id"),
+                "imageUnderstanding": g(
+                    "imageUnderstanding", "image_understanding"
                 ),
-                "imageDescription": g("imageDescription", "image_description"),
-                "vlmStatus": g("vlmStatus", "vlm_status"),
+                "imageUnderstandingStatus": g(
+                    "imageUnderstandingStatus", "image_understanding_status"
+                ),
                 "runId": g("runId", "run_id"),
                 "sourceMessageId": g("sourceMessageId", "source_message_id"),
                 "forcedHandoff": g("forcedHandoff", "forced_handoff"),

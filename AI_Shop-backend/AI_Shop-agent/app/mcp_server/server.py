@@ -14,6 +14,7 @@ from app.db.migrations import run_migrations
 from app.db.pool import close_pool, init_pool
 from app.services import mcp_tools_service as tools
 from app.services.redis_service import redis_service
+from app.services.shopping_mission_service import initialize_category_need_schemas
 from app.services.tool_invoke_result import ToolInvokeResult
 
 _MCP_HOST = os.getenv("FASTMCP_HOST", "127.0.0.1")
@@ -27,6 +28,7 @@ async def _mcp_lifespan(_server: FastMCP) -> AsyncIterator[dict]:
     await init_pool()
     if settings.agent_auto_migrate:
         await asyncio.to_thread(run_migrations)
+    await initialize_category_need_schemas()
     try:
         yield {}
     finally:
@@ -148,10 +150,9 @@ async def propose_create_support_case(
     description: str,
     orderId: str | None = None,
     orderItemId: str | None = None,
-    imagePath: str | None = None,
-    imageModerationId: int | None = None,
-    imageDescription: str | None = None,
-    vlmStatus: str | None = None,
+    imageAssetId: str | None = None,
+    imageUnderstanding: str | None = None,
+    imageUnderstandingStatus: str | None = None,
     runId: str | None = None,
     sourceMessageId: int | None = None,
     forcedHandoff: bool = False,
@@ -164,10 +165,9 @@ async def propose_create_support_case(
             description,
             orderId,
             orderItemId,
-            imagePath,
-            imageModerationId,
-            imageDescription,
-            vlmStatus,
+            imageAssetId,
+            imageUnderstanding,
+            imageUnderstandingStatus,
             runId,
             sourceMessageId,
             forcedHandoff,

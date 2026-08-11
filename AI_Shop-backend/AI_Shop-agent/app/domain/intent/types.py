@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class IntentKind(str, Enum):
     PRODUCT_CONSULT = "PRODUCT_CONSULT"
     PRODUCT_SEARCH = "PRODUCT_SEARCH"
+    VISUAL_PRODUCT_SEARCH = "VISUAL_PRODUCT_SEARCH"
     QUERY_ORDER = "QUERY_ORDER"
     REFUND = "REFUND"
     CANCEL_ORDER = "CANCEL_ORDER"
@@ -94,6 +95,7 @@ class IntentDecision(BaseModel):
 INTENT_PROMPT_KEY: dict[IntentKind, str] = {
     IntentKind.PRODUCT_CONSULT: "product_consult",
     IntentKind.PRODUCT_SEARCH: "product_search",
+    IntentKind.VISUAL_PRODUCT_SEARCH: "product_search",
     IntentKind.QUERY_ORDER: "query_order",
     IntentKind.REFUND: "refund",
     IntentKind.CANCEL_ORDER: "cancel_order",

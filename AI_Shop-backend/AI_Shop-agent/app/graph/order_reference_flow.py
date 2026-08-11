@@ -237,7 +237,7 @@ def _tool_for_target(
             return None
         from app.services.support_case_service import support_case_service
 
-        evidence = dict(state.get("image_evidence") or {})
+        image_context = dict(state.get("verified_image_context") or {})
         args = {
             "category": support_case_service.category_for_intent(intent, user_text),
             "description": user_text[:4000],
@@ -246,13 +246,14 @@ def _tool_for_target(
             "sourceMessageId": state.get("message_id"),
             "runId": (state.get("agent_msg") or {}).get("runId"),
         }
-        if evidence:
+        if image_context:
             args.update(
                 {
-                    "imagePath": evidence.get("path"),
-                    "imageModerationId": evidence.get("moderationId"),
-                    "imageDescription": evidence.get("vlmDescription"),
-                    "vlmStatus": evidence.get("vlmStatus"),
+                    "imageAssetId": image_context.get("asset_id"),
+                    "imageUnderstanding": state.get("image_understanding"),
+                    "imageUnderstandingStatus": (
+                        "SUCCESS" if state.get("image_understanding") else "NOT_REQUESTED"
+                    ),
                 }
             )
         return "PROPOSE_CREATE_SUPPORT_CASE", args

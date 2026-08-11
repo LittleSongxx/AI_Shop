@@ -10,6 +10,7 @@ from app.infra.http_client import get_client
 from app.rag.index_contract import vector_index_contract
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.redis_service import redis_service
+from app.visual.index import visual_product_index
 
 logger = structlog.get_logger()
 
@@ -76,12 +77,42 @@ class HealthService:
     async def _check_es_mapping(self) -> dict:
         return await vector_index_contract.check()
 
+    async def _check_visual_search(self) -> dict:
+        settings = get_settings()
+        # Keep diagnostic probes tolerant of narrow test/deployment settings
+        # objects. The real Settings model always has these fields, while a
+        # legacy health integration can intentionally omit optional features.
+        if not getattr(settings, "visual_search_enabled", False):
+            return {"state": "DISABLED"}
+        if not str(getattr(settings, "visual_api_key", "") or "").strip():
+            return {
+                "state": "DEGRADED",
+                "reason": "VISUAL_API_KEY_NOT_CONFIGURED",
+            }
+        try:
+            status = await visual_product_index.status()
+        except Exception as exc:
+            logger.warning("health_visual_index_failed", error=type(exc).__name__)
+            return {"state": "DEGRADED", "reason": "VISUAL_INDEX_UNAVAILABLE"}
+        return {
+            **status,
+            "state": (
+                "READY" if status.get("servingCurrentModel") else "DEGRADED"
+            ),
+            "reason": (
+                None
+                if status.get("servingCurrentModel")
+                else "VISUAL_INDEX_BACKFILL_PENDING"
+            ),
+        }
+
     async def check_dependencies(self) -> dict:
         settings = get_settings()
-        mapping, java_ok, mcp_ok = await asyncio.gather(
+        mapping, java_ok, mcp_ok, visual = await asyncio.gather(
             self._check_es_mapping(),
             self._check_java_gateway(),
             self._check_mcp(),
+            self._check_visual_search(),
         )
         # Model providers are intentionally diagnostic-only. Their outage must
         # not make the process disappear from service discovery.
@@ -90,6 +121,7 @@ class HealthService:
             "embedding": bool(settings.embedding_api_key.strip()),
             "rerank": bool(settings.rerank_api_key.strip()),
             "elasticsearch": mapping,
+            "visualSearch": visual,
             "javaGateway": java_ok,
             "mcp": mcp_ok,
         }

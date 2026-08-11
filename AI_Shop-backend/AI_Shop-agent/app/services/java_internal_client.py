@@ -1,5 +1,4 @@
 from typing import Any
-from urllib.parse import quote
 
 import structlog
 
@@ -65,6 +64,40 @@ class JavaInternalClient:
         if status is None and code not in (200, "200", None):
             raise ValueError(payload.get("info") or f"internal call failed: {url}")
         return payload.get("data")
+
+    async def post_bytes(
+        self, path: str, body: dict | None = None, *, timeout: float | None = None
+    ) -> tuple[bytes, dict[str, str]]:
+        url = f"{self._base()}/{path.lstrip('/')}"
+        request_timeout = timeout or self._timeout
+        try:
+            client = await get_client("java_internal", timeout=request_timeout)
+            response = await client.post(
+                url,
+                json=body or {},
+                headers=self._headers(),
+                timeout=request_timeout,
+            )
+            response.raise_for_status()
+        except Exception as exc:
+            logger.error(
+                "java_internal_binary_http_failed",
+                path=path,
+                error=type(exc).__name__,
+            )
+            raise
+        content_type = response.headers.get("content-type", "")
+        if "application/json" in content_type.lower():
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise ValueError("invalid binary response from Java") from exc
+            raise ValueError(
+                str(payload.get("info") or "Java image asset read was rejected")
+            )
+        if not response.content:
+            raise ValueError("Java image asset response was empty")
+        return response.content, dict(response.headers)
 
     async def list_orders(
         self,
@@ -169,6 +202,26 @@ class JavaInternalClient:
         )
         return normalize_keys(data) if data else None
 
+    async def offer_snapshot_batch(
+        self, user_id: str, product_ids: list[str]
+    ) -> dict | None:
+        """Return Java-owned, SKU-level sellability facts for Agent ranking."""
+        data = await self.post_json(
+            "/internal/product/agent/offerSnapshots",
+            {"userId": user_id, "productIds": product_ids},
+        )
+        return normalize_keys(data) if isinstance(data, dict) else None
+
+    async def estimate_single_sku_offers(
+        self, user_id: str, items: list[dict[str, Any]]
+    ) -> list[dict]:
+        """Ask Coupon service for a single-SKU estimate; never calculate locally."""
+        data = await self.post_json(
+            "/internal/coupon/agent/estimateSingleSkuOffers",
+            {"userId": user_id, "items": items},
+        )
+        return normalize_keys(data or []) if isinstance(data, list) else []
+
     async def search_on_sale(
         self,
         keyword: str | None = None,
@@ -193,6 +246,27 @@ class JavaInternalClient:
             {"productId": product_id},
         )
         return normalize_keys(data) if data else None
+
+    async def list_on_sale_product_ids(self) -> list[str]:
+        data = await self.post_json("/internal/product/listOnSaleProductIds", {})
+        if not isinstance(data, list):
+            return []
+        return [str(product_id) for product_id in data if str(product_id or "").strip()]
+
+    async def get_product_rag_index(self, product_id: str) -> dict | None:
+        data = await self.post_json(
+            "/internal/product/ragIndex", {"productId": product_id}
+        )
+        return normalize_keys(data) if isinstance(data, dict) else None
+
+    async def fetch_product_image(
+        self, product_id: str, cover_index: int, *, timeout: float | None = None
+    ) -> tuple[bytes, dict[str, str]]:
+        return await self.post_bytes(
+            "/internal/product/agent/imageContent",
+            {"productId": product_id, "coverIndex": int(cover_index)},
+            timeout=timeout,
+        )
 
     async def list_user_coupons(self, user_id: str) -> list[dict]:
         data = await self.post_json(
@@ -239,23 +313,52 @@ class JavaInternalClient:
         except Exception:
             return []
 
-    async def verify_support_image(
-        self, user_id: str, image_path: str, moderation_id: int
-    ) -> dict:
+    async def verify_agent_image(self, user_id: str, image_asset_id: str) -> dict:
         data = await self.post_json(
             "/internal/user/agent/verifyImage",
             {
                 "userId": user_id,
-                "imagePath": image_path,
-                "moderationId": int(moderation_id),
+                "imageAssetId": image_asset_id,
             },
         )
         return normalize_keys(data) if isinstance(data, dict) else {}
 
-    def support_image_url(self, image_path: str) -> str:
-        return (
-            f"{self._base()}/api/file/getResource?sourceName="
-            f"{quote(image_path, safe='')}"
+    async def fetch_agent_image(
+        self, user_id: str, image_asset_id: str, *, timeout: float | None = None
+    ) -> tuple[bytes, dict[str, str]]:
+        return await self.post_bytes(
+            "/internal/user/agent/imageContent",
+            {"userId": user_id, "imageAssetId": image_asset_id},
+            timeout=timeout,
+        )
+
+    async def retain_agent_image_as_support_evidence(
+        self, user_id: str, image_asset_id: str
+    ) -> None:
+        await self.post_json(
+            "/internal/user/agent/retainImageAsSupportEvidence",
+            {"userId": user_id, "imageAssetId": image_asset_id},
+        )
+
+    async def send_user_notification(
+        self,
+        user_id: str,
+        *,
+        title: str,
+        content: str,
+        biz_type: str,
+        biz_id: str,
+    ) -> None:
+        """Use the existing Java notification outbox and WebSocket push path."""
+        await self.post_json(
+            "/internal/user/notify/sendAsync",
+            {
+                "userId": user_id,
+                "title": title,
+                "content": content,
+                "bizType": biz_type,
+                "bizId": biz_id,
+            },
         )
 
     async def purchase_history_product_ids(self, user_id: str, limit: int = 3) -> list[str]:

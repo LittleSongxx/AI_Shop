@@ -36,8 +36,31 @@ def test_extract_profile_parses_budget_brand_category_and_preferences():
     assert profile["features"] == ["续航"]
 
 
+def test_extract_profile_recognizes_bare_bag_as_a_product_category():
+    profile = extract_profile(
+        "我想买一个适合上班通勤的包，预算 500 元以内，请推荐"
+    )
+
+    assert profile["category"] == "箱包"
+    assert profile["budgetMax"] == 500
+    assert profile["scenarios"] == ["办公", "通勤", "上班通勤"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "这个商品包括什么配件",
+        "这款商品支持包邮吗",
+        "推荐一个软件安装包",
+        "商品包装破损了",
+    ),
+)
+def test_extract_profile_does_not_treat_package_phrases_as_bags(text):
+    assert extract_profile(text)["category"] is None
+
+
 @pytest.mark.asyncio
-async def test_explicit_profile_fields_get_governed_ttl_and_message_source(monkeypatch):
+async def test_explicit_stable_preferences_persist_until_user_changes_them(monkeypatch):
     service = ShoppingProfileService()
     monkeypatch.setattr(service, "get_profile", AsyncMock(return_value=empty_profile()))
     monkeypatch.setattr(service, "_save_redis", AsyncMock())
@@ -54,12 +77,12 @@ async def test_explicit_profile_fields_get_governed_ttl_and_message_source(monke
     category_expiry = datetime.fromisoformat(
         category_meta["expiresAt"].replace("Z", "+00:00")
     )
-    brand_expiry = datetime.fromisoformat(
-        brand_meta["expiresAt"].replace("Z", "+00:00")
-    )
     assert category_meta["source"] == "EXPLICIT_CHAT"
     assert category_meta["sourceMessageId"] == 77
-    assert timedelta(days=59) < brand_expiry - category_expiry < timedelta(days=61)
+    assert timedelta(days=29) < category_expiry - datetime.now(timezone.utc) < timedelta(days=31)
+    assert brand_meta["source"] == "EXPLICIT_CHAT"
+    assert brand_meta["sourceMessageId"] == 77
+    assert "expiresAt" not in brand_meta
     assert profile["revision"] == 1
 
 
@@ -108,6 +131,30 @@ def test_expired_fields_are_removed_independently():
     assert pruned["category"] is None
     assert pruned["brands"] == ["华为"]
     assert "category" not in pruned["fieldMeta"]
+
+
+def test_implicit_signal_exposes_180_day_decay_without_becoming_a_hard_rule():
+    now = datetime(2026, 8, 7, tzinfo=timezone.utc)
+    profile = {
+        **empty_profile(),
+        "implicitSignals": [
+            {
+                "signalId": "sig-1",
+                "kind": "product",
+                "value": "p1",
+                "strength": 1,
+                "count": 3,
+                "source": "CLICK",
+                "observedAt": (now - timedelta(days=90)).isoformat(),
+                "expiresAt": (now + timedelta(days=90)).isoformat(),
+            }
+        ],
+    }
+
+    pruned = prune_expired_profile(profile, now=now)
+
+    assert pruned["implicitSignals"][0]["effectiveWeight"] == 0.5
+    assert pruned["implicitSignals"][0]["kind"] == "product"
 
 
 def test_partial_manual_patch_is_validated_against_existing_values():
@@ -227,6 +274,7 @@ def test_filter_products_applies_budget_and_brand_constraints():
         ("推荐一款1500元左右的手机", 1200.0, 1800.0),
         ("预算大约1500元的手机", 1200.0, 1800.0),
         ("1500元以内的手机", None, 1500.0),
+        ("预算提高到1000元，请继续推荐", None, 1000.0),
     ],
 )
 def test_extract_profile_understands_common_budget_phrases(

@@ -1,18 +1,22 @@
 import json
 import re
-import uuid
 
 import structlog
 
+from app.config.settings import get_settings
 from app.constants import (
     PRODUCT_CANDIDATE_SIZE,
     PRODUCT_RESULT_SIZE,
     PRODUCT_STATUS_ON_SALE,
     SIMILAR_PRODUCT_SIZE,
 )
-from app.domain.intent.rules import looks_like_browse_recommend
+from app.domain.intent.rules import (
+    looks_like_browse_recommend,
+    looks_like_hot_sale_recommend,
+)
 from app.rag.retriever import rag_retriever
 from app.rag.rrf import rrf_merge
+from app.services.episode_service import episode_service
 from app.services.java_internal_client import java_internal_client
 from app.services.product_search_query import (
     filter_products_by_query_relevance,
@@ -22,6 +26,15 @@ from app.services.recommendation_attribution_service import (
     recommendation_attribution_service,
 )
 from app.services.search_recommend_service import search_recommend_service
+from app.services.shopping_decision_service import shopping_decision_service
+from app.services.shopping_mission_service import (
+    apply_explicit_turn,
+    empty_shopping_mission,
+    mission_is_active,
+    mission_summary,
+    next_clarification,
+    shopping_mission_service,
+)
 from app.services.shopping_profile_service import shopping_profile_service
 from app.utils.biz_payload import build_product_payload, first_cover
 
@@ -93,28 +106,53 @@ class ProductService:
         consult_product: dict | None = None,
         exclude_product_id: str | None = None,
     ) -> tuple[str, str | None, str, list[dict], str]:
-
-        profile = await shopping_profile_service.get_effective_profile(user_id)
-        if shopping_profile_service.should_clarify(
-            user_text,
-            keyword,
-            profile,
-            consult_product,
-        ):
-            assistant, biz_data = build_product_payload([])
-            return assistant, biz_data, "product_search", [], "clarify"
-
         query = derive_search_keyword(keyword, consult_product)
         if not query:
             query = (keyword or "").strip()
+        profile = await shopping_profile_service.get_effective_profile(user_id)
+        mission = await self._mission_for_request(
+            user_id=user_id,
+            user_text=user_text or keyword or "",
+            profile=profile,
+        )
+
+        # A concrete keyword is already enough to identify a shelf.  Otherwise
+        # choose exactly one high-impact decision slot before spending model or
+        # retrieval budget.  The choice is bounded to two turns in the mission.
+        clarification = next_clarification(mission)
+        if clarification and not (
+            clarification.get("slot") == "category"
+            and self._has_concrete_query(query, consult_product)
+        ):
+            episode_service.record_step(
+                "SHOPPING_CLARIFICATION_DECISION",
+                node_name="shopping_mission",
+                status="OK",
+                output_data={
+                    "missionId": clarification.get("missionId"),
+                    "slot": clarification.get("slot"),
+                    "question": clarification.get("question"),
+                    "options": clarification.get("options") or [],
+                    "reason": clarification.get("reason"),
+                    "clarificationCount": int(
+                        (mission or {}).get("clarificationCount") or 0
+                    )
+                    + 1,
+                    "maxClarifications": get_settings().shopping_mission_max_clarifications,
+                },
+                agent_id="shopping_advisor",
+            )
+            await shopping_mission_service.mark_clarification_presented(user_id, mission)
+            assistant = json.dumps(clarification, ensure_ascii=False)
+            return assistant, None, "shopping_decision_v2", [], "clarify"
+
         if is_vague_search_keyword(query):
             query = (
                 derive_search_keyword(None, consult_product)
-                or str(profile.get("category") or "").strip()
+                or str(mission.get("category") or profile.get("category") or "").strip()
                 or query
             )
 
-        biz_type = "product_search"
         product_ids: list[str] = []
         source = "none"
 
@@ -196,15 +234,14 @@ class ProductService:
         if not products and looks_like_browse_recommend(user_text):
             products = await search_recommend_service.load_recommend_products(user_id, 8)
             if products:
-                biz_type = "BROWSE_RECOMMEND"
                 source = "browse"
 
-        if not products:
-            logger.info("hot_sale_fallback", user_id=user_id)
+        # Hot-sale is a valid explicit request, never an undisclosed fallback
+        # for a failed query or a constrained shopping mission.
+        if not products and looks_like_hot_sale_recommend(user_text):
             products = await search_recommend_service.load_hot_sale(8)
             if products:
-                biz_type = "product_search"
-                source = "hot_sale"
+                source = "hot_sale_explicit"
 
         candidates_before_stock_filter = len(products)
         products = filter_known_available_products(products)
@@ -216,49 +253,74 @@ class ProductService:
             )
             source = "out_of_stock"
 
-        if shopping_profile_service.has_hard_constraints(profile):
-            filtered = shopping_profile_service.filter_products(products, profile)
-            if products and not filtered:
-                logger.info(
-                    "shopping_profile_constraint_miss",
-                    user_id=user_id,
-                    profile=shopping_profile_service.summary(profile),
-                    candidates=len(products),
-                )
-                source = "constraint_miss"
-            products = filtered
-            if not products and source != "out_of_stock":
-                source = "constraint_miss"
-        for product in products:
-            resolved_brand = shopping_profile_service.resolve_known_brand(
-                product, profile
-            )
-            if resolved_brand:
-                product["brand"] = resolved_brand
-            product["_recommend_reason"] = shopping_profile_service.recommend_reason(
-                product,
-                profile,
-                source,
-            )
+        if not products:
+            # A search miss is not permission to show unrelated products.  The
+            # user sees the conflict and may revise one constraint explicitly.
+            return "[]", None, "shopping_decision_v2", [], source or "constraint_miss"
 
-        # P0-7：一次 serving 一个归因 requestId，同时进卡片 JSON 和曝光日志，
-        # 前端点击原样回传，离线分析串起 曝光→点击→(后续加购/成交) 全链。
-        request_id = uuid.uuid4().hex
-        assistant, biz_data = build_product_payload(products, request_id=request_id)
-        try:
-            displayed_ids = json.loads(biz_data or "[]")
-        except (TypeError, ValueError):
-            displayed_ids = []
-        if not isinstance(displayed_ids, list):
-            displayed_ids = []
+        if not get_settings().shopping_decision_v2_enabled:
+            # This is an operational escape hatch only. New default traffic
+            # always travels through the v2 decision contract below.
+            assistant, biz_data = build_product_payload(products)
+            return assistant, biz_data, "product_search", products, source
+
+        recall_source = source
+        decision = await shopping_decision_service.decide(
+            user_id=user_id,
+            mission=mission,
+            candidates=products,
+            source=recall_source,
+            user_text=user_text or keyword or "",
+        )
+        products = decision.products
+        if not products:
+            return "[]", None, "shopping_decision_v2", [], decision.source
+
+        for product in products:
+            product.setdefault("decision_recall_source", recall_source)
+        assistant, biz_data = build_product_payload(products, request_id=decision.request_id)
         await recommendation_attribution_service.record_impression(
             user_id,
-            [str(product_id) for product_id in displayed_ids if product_id],
+            [
+                str(product.get("product_id") or product.get("productId") or "")
+                for product in products
+            ],
             query=query,
-            source=source,
-            request_id=request_id,
+            source=recall_source,
+            request_id=decision.request_id,
         )
-        return assistant, biz_data, biz_type, products, source
+        return assistant, biz_data, "shopping_decision_v2", products, decision.source
+
+    async def _mission_for_request(
+        self,
+        *,
+        user_id: str,
+        user_text: str,
+        profile: dict,
+    ) -> dict:
+        """Resolve the single active shopping state without reviving ShoppingNeed.
+
+        Normal requests have already persisted a mission at API ingress.  The
+        small ephemeral fallback keeps direct MCP calls governed as well, while
+        intentionally avoiding a second online state store.
+        """
+        mission = await shopping_mission_service.load(user_id)
+        if mission_is_active(mission):
+            return mission
+        derived = apply_explicit_turn(
+            None,
+            profile=profile,
+            user_text=user_text,
+            message_id=0,
+        )
+        return derived if mission_is_active(derived) else empty_shopping_mission(profile)
+
+    @staticmethod
+    def _has_concrete_query(query: str, consult_product: dict | None) -> bool:
+        if consult_product and is_vague_search_keyword(query):
+            return True
+        normalized = str(query or "").strip()
+        return bool(normalized and not is_vague_search_keyword(normalized))
 
     async def get_product_detail_text(self, product_id: str) -> str:
 
@@ -342,6 +404,10 @@ class ProductService:
             if pid in id_map:
                 ordered.append(id_map[pid])
         return ordered
+
+    async def load_verified_products(self, product_ids: list[str]) -> list[dict]:
+        """Resolve current Java-owned sale/stock snapshots in requested order."""
+        return filter_known_available_products(await self._load_products_by_ids(product_ids))
 
     async def load_similar_products(
         self,
@@ -440,6 +506,7 @@ def format_search_tool_message(
     products: list[dict],
     source: str,
     profile: dict | None = None,
+    mission: dict | None = None,
 ) -> str:
 
     from app.domain.intent.rules import looks_like_browse_recommend, looks_like_hot_sale_recommend
@@ -447,23 +514,23 @@ def format_search_tool_message(
 
     consult_name = (consult or {}).get("productName") or (consult or {}).get("product_name") or "当前商品"
     similar_intent = _similar_intent(keyword, consult)
-    alternative_sources = {"browse", "hot_sale"}
+    alternative_sources = {"browse", "hot_sale", "hot_sale_explicit"}
     kw = (keyword or "").strip()
     kw_display = (normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求"
 
     if source == "clarify":
-        from app.services.shopping_need_service import next_clarification_question
-
-        return "【需求澄清】" + next_clarification_question(
-            profile, user_text=keyword
-        )
-    if source == "constraint_miss":
-        summary = shopping_profile_service.summary(profile)
+        clarification = next_clarification(mission)
+        question = (clarification or {}).get("question") or "你最看重哪一项条件？"
+        return f"【需求澄清】{question}"
+    if source in {"constraint_miss", "no_match", "none"}:
+        summary = mission_summary(mission) or shopping_profile_service.summary(profile)
         detail = f"（{summary}）" if summary else ""
         return (
             f"【筛选结果】暂未找到同时满足你的条件{detail}的在售商品。\n"
             "可以放宽预算或品牌范围，也可以告诉我可接受的替代条件。"
         )
+    if source == "offer_unavailable":
+        return "【报价核验】当前无法核验实时价格、库存或优惠，暂不展示可能无法购买的推荐。请稍后重试。"
     if source == "out_of_stock":
         return (
             f"【库存提示】与「{kw_display}」匹配的商品当前均已售罄。\n"
@@ -486,7 +553,7 @@ def format_search_tool_message(
     # Even if source claims hybrid, never brand irrelevant titles as「找到」.
     # category/similar_i2i are excluded: both are recalled by shelf or embedding
     # rather than by the keyword, so keyword-term matching would wrongly reject them.
-    if products and kw and source not in ("category", "similar_i2i"):
+    if products and kw and source not in ("category", "similar_i2i", "shopping_decision_v2"):
         relevant = filter_products_by_query_relevance(products, kw)
         intentional_alt = looks_like_hot_sale_recommend(kw) or looks_like_browse_recommend(kw)
         if not relevant and not intentional_alt:
@@ -498,7 +565,7 @@ def format_search_tool_message(
     # Keyword search missed → hot-sale / browse backfill: never label as「搜索结果找到」.
     if products and source in alternative_sources:
         intentional_alt = looks_like_hot_sale_recommend(kw) or looks_like_browse_recommend(kw)
-        if intentional_alt and source == "hot_sale":
+        if intentional_alt and source in {"hot_sale", "hot_sale_explicit"}:
             return f"【热销推荐】为您推荐 {len(products)} 个热销商品（请查看下方卡片）。"
         if intentional_alt and source == "browse":
             return f"【浏览推荐】根据你的浏览为你推荐 {len(products)} 个商品（请查看下方卡片）。"
@@ -517,4 +584,8 @@ def format_search_tool_message(
         if kw:
             return f"【搜索结果】暂未找到与「{kw_display}」相关的商品。"
         return "【搜索结果】未找到相关商品。"
+    if source == "shopping_decision_v2":
+        summary = mission_summary(mission)
+        suffix = f"，已按{summary}筛选" if summary else ""
+        return f"【可信导购】已核验指定 SKU 的实时价格、库存和可用优惠{suffix}，请查看下方对比卡片。"
     return f"【搜索结果】找到 {len(products)} 个商品（请查看下方卡片）。"

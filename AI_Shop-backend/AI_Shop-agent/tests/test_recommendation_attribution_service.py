@@ -18,6 +18,9 @@ async def test_impression_persists_before_cache(monkeypatch):
     async def cache(*_args, **_kwargs):
         calls.append("redis")
 
+    async def ledger(*_args, **_kwargs):
+        calls.append("ledger")
+
     monkeypatch.setattr(
         "app.services.recommendation_attribution_service."
         "recommendation_event_store.record_impressions",
@@ -27,12 +30,17 @@ async def test_impression_persists_before_cache(monkeypatch):
         "app.services.recommendation_attribution_service.redis_service.log_impression",
         cache,
     )
+    monkeypatch.setattr(
+        "app.services.recommendation_attribution_service."
+        "commerce_outcome_ledger_service.record_impressions",
+        ledger,
+    )
 
     await service.record_impression(
         "u1", ["p1", "p2"], request_id="request-1", source="hybrid"
     )
 
-    assert calls == ["database", "redis"]
+    assert calls == ["database", "ledger", "redis"]
 
 
 @pytest.mark.asyncio
@@ -50,10 +58,17 @@ async def test_missing_durable_impression_never_becomes_click(monkeypatch):
         "redis_service.log_attributed_click",
         redis_click,
     )
+    ledger_click = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.recommendation_attribution_service."
+        "commerce_outcome_ledger_service.record_click",
+        ledger_click,
+    )
 
     result = await service.record_click("u1", "request-1", "p1", 1)
 
     assert result is None
+    ledger_click.assert_not_awaited()
     redis_click.assert_not_awaited()
 
 
@@ -77,5 +92,12 @@ async def test_redis_failure_cannot_erase_persistent_click(monkeypatch):
         "redis_service.log_attributed_click",
         AsyncMock(return_value=None),
     )
+    ledger_click = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.services.recommendation_attribution_service."
+        "commerce_outcome_ledger_service.record_click",
+        ledger_click,
+    )
 
     assert await service.record_click("u1", "request-1", "p1", 1) == expected
+    ledger_click.assert_awaited_once_with(expected, "u1")

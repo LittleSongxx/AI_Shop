@@ -5,9 +5,12 @@
 放行了再靠下游校验就已经晚了。
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
 import structlog
 
+from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.services import mcp_tool_router as router_module
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.tool_invoke_result import ToolInvokeResult
@@ -107,6 +110,61 @@ async def test_read_tool_leaves_no_audit_log(sent_to_mcp):
         await mcp_tool_router.invoke("QUERY_ORDERS", {"orderId": "O1"}, "u1")
 
     assert [e for e in logs if e["event"] == "write_tool_invoked"] == []
+
+
+async def test_visual_tool_requires_server_verified_image_context(sent_to_mcp):
+    result = await mcp_tool_router.invoke(
+        "SEARCH_PRODUCTS_BY_IMAGE",
+        {"imageAssetId": "img_0123456789abcdef0123456789abcdef"},
+        "u1",
+    )
+
+    assert result.success is False
+    assert result.error_code == "VISUAL_CONTEXT_REQUIRED"
+    assert sent_to_mcp == []
+
+
+async def test_visual_tool_ignores_model_forged_asset_subject_and_bbox(
+    monkeypatch, sent_to_mcp
+):
+    trusted_subject = VisualSubject(
+        subject_id="subject_1", label="可信主体", bbox=(10, 20, 800, 900)
+    )
+    trusted = VerifiedImageContext(
+        asset_id="img_0123456789abcdef0123456789abcdef",
+        content_sha256="a" * 64,
+        mime_type="image/jpeg",
+        width=640,
+        height=480,
+        selected_subject=trusted_subject,
+    )
+    expected = ToolInvokeResult(content="ok", product_ids=["P1"])
+    search = AsyncMock(return_value=expected)
+    monkeypatch.setattr(
+        "app.visual.search_service.visual_product_search_service.search", search
+    )
+
+    result = await mcp_tool_router.invoke(
+        "SEARCH_PRODUCTS_BY_IMAGE",
+        {
+            "imageAssetId": "img_ffffffffffffffffffffffffffffffff",
+            "selectedSubjectId": "subject_attacker",
+            "bbox": [0, 0, 999, 999],
+            "queryText": "红色，500 元以内",
+        },
+        "u1",
+        verified_image_context=trusted,
+        source_message_id=42,
+    )
+
+    assert result is expected
+    search.assert_awaited_once_with(
+        user_id="u1",
+        image_context=trusted,
+        query_text="红色，500 元以内",
+        source_message_id=42,
+    )
+    assert sent_to_mcp == []
 
 
 async def test_tool_result_records_factual_episode_reward_signal(monkeypatch):

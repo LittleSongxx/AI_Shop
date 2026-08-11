@@ -87,3 +87,34 @@ def test_profile_clear_requires_expected_revision(monkeypatch):
     assert invalid.status_code == 422
     assert valid.json()["data"]["revision"] == 2
     clear_profile.assert_awaited_once_with("u1", 1)
+
+
+def test_personalization_and_signal_controls_use_authenticated_identity(monkeypatch):
+    current = {**empty_profile(), "revision": 4, "implicitSignals": []}
+    set_personalization = AsyncMock(return_value={**current, "revision": 5, "personalizationEnabled": False})
+    delete_signal = AsyncMock(return_value={**current, "revision": 6})
+    clear_signals = AsyncMock(return_value={**current, "revision": 7})
+    monkeypatch.setattr(shopping_profile_service, "set_personalization", set_personalization)
+    monkeypatch.setattr(shopping_profile_service, "delete_implicit_signal", delete_signal)
+    monkeypatch.setattr(shopping_profile_service, "clear_implicit_signals", clear_signals)
+
+    with TestClient(_app()) as client:
+        toggled = client.post(
+            "/api/agent/shoppingProfile/personalization",
+            json={"expectedRevision": 4, "enabled": False},
+        )
+        deleted = client.post(
+            "/api/agent/shoppingProfile/signals/delete",
+            json={"expectedRevision": 5, "signalId": "sig-1"},
+        )
+        cleared = client.post(
+            "/api/agent/shoppingProfile/signals/clear",
+            json={"expectedRevision": 6},
+        )
+
+    assert toggled.json()["data"]["personalizationEnabled"] is False
+    assert deleted.json()["data"]["revision"] == 6
+    assert cleared.json()["data"]["revision"] == 7
+    set_personalization.assert_awaited_once_with("u1", False, 4)
+    delete_signal.assert_awaited_once_with("u1", "sig-1", 5)
+    clear_signals.assert_awaited_once_with("u1", 6)

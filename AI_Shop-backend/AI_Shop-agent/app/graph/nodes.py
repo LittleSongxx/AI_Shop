@@ -200,14 +200,22 @@ async def entry_guard(state: AgentGraphState) -> dict:
         )
         return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
     card, user_text = rt.parse_agent_message(state["agent_msg"])
-    # P3-2: optional image URL forwarded by the frontend alongside the text message.
-    image_url: str | None = state["agent_msg"].get("imageUrl") or None
+    image_context = state.get("verified_image_context")
     episode_service.record_step(
         "GUARD",
         node_name="entry",
-        output_data={"guard": "cancellation", "decision": "PASS", "hasImage": bool(image_url)},
+        output_data={
+            "guard": "cancellation",
+            "decision": "PASS",
+            "hasImage": bool(image_context),
+        },
     )
-    return {"card": card, "message_card": card, "user_text": user_text, "image_url": image_url, "cancelled": False}
+    return {
+        "card": card,
+        "message_card": card,
+        "user_text": user_text,
+        "cancelled": False,
+    }
 
 async def build_context_node(state: AgentGraphState) -> dict:
     if state.get("cancelled"):
@@ -325,37 +333,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
         },
     )
 
-    # P3-2: describe the user's image (if any) before the retrieval step so
-    # the description enriches both the RAG query and the LLM context window.
-    image_url = state.get("image_url")
-    image_desc: str | None = None
-    image_evidence = dict(state.get("image_evidence") or {}) or None
-    image_vlm_status: str | None = None
-    if image_url:
-        from app.rag.image_describer import describe_image
-        image_desc = await describe_image(image_url)
-        image_vlm_status = (
-            "SUCCESS"
-            if image_desc
-            else "FAILED" if settings.vlm_api_key else "DISABLED"
-        )
-        if image_evidence is not None:
-            image_evidence["vlmStatus"] = image_vlm_status
-            if image_desc:
-                image_evidence["vlmDescription"] = image_desc
-        episode_service.record_step(
-            "IMAGE_EVIDENCE",
-            node_name="build_context",
-            status="OK" if image_desc else "DEGRADED",
-            output_data={
-                "moderationId": (image_evidence or {}).get("moderationId"),
-                "moderationStatus": (image_evidence or {}).get("moderationStatus"),
-                "vlmStatus": image_vlm_status,
-                "hasDescription": bool(image_desc),
-            },
-        )
-        if image_desc:
-            logger.debug("user_image_described", user_id=user_id, length=len(image_desc))
+    image_context = dict(state.get("verified_image_context") or {}) or None
+    image_understanding = state.get("image_understanding")
 
     faq_text = ""
     knowledge_text = ""
@@ -373,9 +352,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
             span.set_attribute("agent.rag.bucket", ab_bucket)
             with measure_agent_stage("rag"):
                 rag_query = await rewrite_for_rag(user_text, memory)
-                # P3-2: prepend image description to retrieval query when available.
-                if image_desc:
-                    rag_query = f"{image_desc} {rag_query}".strip()
+                if image_understanding:
+                    rag_query = f"{image_understanding} {rag_query}".strip()
                 _cat_map = get_settings().rag_intent_category_map
                 category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
                 rag_result = await rag_retriever.search_faq_with_trace(
@@ -434,17 +412,6 @@ async def build_context_node(state: AgentGraphState) -> dict:
         intent_data=intent_data or None,
         ab_bucket=ab_bucket,
     )
-
-    # P3-2: inject VLM image description so the LLM understands visual context.
-    if image_desc:
-        messages.append(
-            SystemMessage(
-                content=(
-                    "## 用户发送了图片\n"
-                    f"图片描述（内部参考，勿直接引用原文）：{image_desc}"
-                )
-            )
-        )
 
     remaining_retrievals = max(0, 2 - rag_retrieval_count)
     if rag_agentic_allowed and remaining_retrievals:
@@ -548,8 +515,8 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "intent_data": intent_data or None,
         "intent_decision": decision.model_dump(mode="json"),
         "request_mode": decision.request_mode.value,
-        "image_evidence": image_evidence,
-        "image_description": image_desc,
+        "verified_image_context": image_context,
+        "image_understanding": image_understanding,
         "rag_source_refs": rag_source_refs,
         "rag_trace": rag_trace,
         "rag_mode": rag_mode,
@@ -939,28 +906,53 @@ async def tools_node(state: AgentGraphState) -> dict:
             if category_filter:
                 tool_args["_categoryFilter"] = category_filter
         if tc["name"] == "PROPOSE_CREATE_SUPPORT_CASE":
-            evidence = dict(state.get("image_evidence") or {})
+            image_context = dict(state.get("verified_image_context") or {})
             for key in (
-                "imagePath",
-                "imageModerationId",
-                "imageDescription",
-                "vlmStatus",
+                "imageAssetId",
+                "imageUnderstanding",
+                "imageUnderstandingStatus",
             ):
                 tool_args.pop(key, None)
-            if evidence:
+            if image_context:
                 tool_args.update(
                     {
-                        "imagePath": evidence.get("path"),
-                        "imageModerationId": evidence.get("moderationId"),
-                        "imageDescription": evidence.get("vlmDescription"),
-                        "vlmStatus": evidence.get("vlmStatus"),
+                        "imageAssetId": image_context.get("asset_id"),
+                        "imageUnderstanding": state.get("image_understanding"),
+                        "imageUnderstandingStatus": (
+                            "SUCCESS" if state.get("image_understanding") else "NOT_REQUESTED"
+                        ),
                     }
                 )
             tool_args["sourceMessageId"] = message_id
             tool_args["runId"] = (state.get("agent_msg") or {}).get("runId")
 
+        verified_image_context = None
+        source_message_id = None
+        if tc["name"] == "SEARCH_PRODUCTS_BY_IMAGE":
+            # Tool-call arguments are model controlled. The verified asset and
+            # optional selected subject are taken only from the persisted
+            # message state created by the upload/selection endpoints.
+            image_context = dict(state.get("verified_image_context") or {})
+            for key in (
+                "imageAssetId",
+                "image_asset_id",
+                "selectedSubjectId",
+                "selected_subject_id",
+                "queryText",
+                "query_text",
+            ):
+                tool_args.pop(key, None)
+            tool_args["queryText"] = str(state.get("user_text") or "")
+            verified_image_context = image_context or None
+            source_message_id = message_id
+
         result = await mcp_tool_router.invoke(
-            tc["name"], tool_args, user_id, call_id=tc.get("id")
+            tc["name"],
+            tool_args,
+            user_id,
+            call_id=tc.get("id"),
+            verified_image_context=verified_image_context,
+            source_message_id=source_message_id,
         )
         called.append(tc["name"])
         messages.append(ToolMessage(content=result.to_tool_message(), tool_call_id=tc["id"]))

@@ -6,10 +6,15 @@ from app.api.deps import TokenUserInfo, get_request_token, require_login
 from app.config.settings import get_settings
 from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
 from app.exceptions import PendingActionExpired
-from app.harness.metrics.runtime_sensors import ORDER_SELECTION_TOTAL
+from app.harness.metrics.runtime_sensors import (
+    ORDER_SELECTION_TOTAL,
+    VISUAL_SELECTION_TOTAL,
+)
 from app.models.response import ResponseVO, error, success
 from app.models.shopping_profile import (
+    ShoppingPersonalizationRequest,
     ShoppingProfileClearRequest,
+    ShoppingProfileSignalRequest,
     ShoppingProfileUpdateRequest,
 )
 from app.observability.telemetry import get_tracer
@@ -38,6 +43,10 @@ from app.services.shopping_profile_service import (
 )
 from app.services.support_case_service import support_case_service
 from app.services.support_service import support_service
+from app.services.visual_selection_store import (
+    VisualSelectionConflict,
+    VisualSelectionExpired,
+)
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 tracer = get_tracer()
@@ -115,12 +124,11 @@ async def clear_history_message(
 
 @router.post("/sendMessage")
 async def send_message(
-    message: str = Form(...),
+    message: str = Form(""),
     fromProduct: str | None = Form(None),
     consultProductId: str | None = Form(None),
     comparisonProductIds: str | None = Form(None),
-    imagePath: str | None = Form(None),
-    imageModerationId: int | None = Form(None),
+    imageAssetId: str | None = Form(None),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
     try:
@@ -133,8 +141,7 @@ async def send_message(
                 _form_bool(fromProduct),
                 consultProductId,
                 _form_string_list(comparisonProductIds),
-                imagePath,
-                imageModerationId,
+                imageAssetId,
             )
         return success(data)
     except PendingActionExpired as e:
@@ -201,6 +208,42 @@ async def select_order_candidate(
         return error(600, str(exc))
     except Exception:
         ORDER_SELECTION_TOTAL.labels(intent=metric_intent, outcome="error").inc()
+        raise
+
+
+@router.post("/selectVisualSubject")
+async def select_visual_subject(
+    selectionId: str = Form(...),
+    subjectId: str = Form(...),
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    """Continue a server-rendered visual selection without accepting a bbox."""
+    selection_id = selectionId.strip()
+    subject_id = subjectId.strip()
+    if not selection_id or not subject_id:
+        VISUAL_SELECTION_TOTAL.labels(outcome="invalid").inc()
+        return error(600, "图片主体选择参数无效")
+    try:
+        result = await agent_orchestrator.send_selected_visual_subject(
+            user.user_id,
+            selection_id,
+            subject_id,
+        )
+        VISUAL_SELECTION_TOTAL.labels(
+            outcome="selected" if result.get("selectionId") else "idempotent"
+        ).inc()
+        return success(result)
+    except VisualSelectionExpired as exc:
+        VISUAL_SELECTION_TOTAL.labels(outcome="expired").inc()
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except VisualSelectionConflict as exc:
+        VISUAL_SELECTION_TOTAL.labels(outcome="conflict").inc()
+        return error(409, str(exc))
+    except ValueError as exc:
+        VISUAL_SELECTION_TOTAL.labels(outcome="invalid").inc()
+        return error(600, str(exc))
+    except Exception:
+        VISUAL_SELECTION_TOTAL.labels(outcome="error").inc()
         raise
 
 @router.post("/cancelMessage")
@@ -303,6 +346,63 @@ async def clear_shopping_profile(
 ) -> ResponseVO:
     try:
         updated = await shopping_profile_service.clear_profile(
+            user.user_id, payload.expectedRevision
+        )
+        return success(updated)
+    except ProfileRevisionConflict as exc:
+        return ResponseVO(
+            status="error",
+            code=409,
+            info="购物偏好已更新，请基于当前版本重试",
+            data=exc.current,
+        )
+
+
+@router.post("/shoppingProfile/personalization")
+async def set_shopping_personalization(
+    payload: ShoppingPersonalizationRequest,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        updated = await shopping_profile_service.set_personalization(
+            user.user_id, payload.enabled, payload.expectedRevision
+        )
+        return success(updated)
+    except ProfileRevisionConflict as exc:
+        return ResponseVO(
+            status="error",
+            code=409,
+            info="购物偏好已更新，请基于当前版本重试",
+            data=exc.current,
+        )
+
+
+@router.post("/shoppingProfile/signals/delete")
+async def delete_shopping_signal(
+    payload: ShoppingProfileSignalRequest,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        updated = await shopping_profile_service.delete_implicit_signal(
+            user.user_id, payload.signalId, payload.expectedRevision
+        )
+        return success(updated)
+    except ProfileRevisionConflict as exc:
+        return ResponseVO(
+            status="error",
+            code=409,
+            info="购物偏好已更新，请基于当前版本重试",
+            data=exc.current,
+        )
+
+
+@router.post("/shoppingProfile/signals/clear")
+async def clear_shopping_signals(
+    payload: ShoppingProfileClearRequest,
+    user: TokenUserInfo = Depends(require_login),
+) -> ResponseVO:
+    try:
+        updated = await shopping_profile_service.clear_implicit_signals(
             user.user_id, payload.expectedRevision
         )
         return success(updated)

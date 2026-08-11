@@ -18,6 +18,7 @@ from app.domain.intent.types import (
     RiskLevel,
     SentimentKind,
 )
+from app.services.agent_service import AgentOrchestrator
 
 
 @pytest.mark.parametrize(
@@ -27,6 +28,16 @@ from app.domain.intent.types import (
         ("退款需要什么条件", IntentKind.REFUND, RequestMode.INFORMATIONAL),
         ("退款怎么申请", IntentKind.CHAT, RequestMode.INFORMATIONAL),
         ("我要退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
+        (
+            "请为订单 SM202608050002 发起退款申请。",
+            IntentKind.REFUND,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "请不要为订单 SM202608050002 发起退款申请。",
+            IntentKind.REFUND,
+            RequestMode.INFORMATIONAL,
+        ),
         ("选择耳机订单继续退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
         ("取消订单怎么操作", IntentKind.CHAT, RequestMode.INFORMATIONAL),
         ("五星，音质很好", IntentKind.PRODUCT_REVIEW, RequestMode.ACTION_PROPOSAL),
@@ -56,6 +67,51 @@ def test_rule_fallback_refund():
 
 def test_rule_chat_returns_none_without_keywords():
     assert classify_intent_by_rules("你好呀") is None
+
+
+def test_bag_budget_revision_continues_product_search():
+    assert (
+        classify_intent_by_rules(
+            "预算提高到 1000 元，请继续推荐适合上班通勤的包，并说明适合谁、不适合谁和主要取舍。",
+            session_intent=IntentKind.PRODUCT_SEARCH.value,
+        )
+        == IntentKind.PRODUCT_SEARCH
+    )
+
+
+def test_verified_shopping_image_routes_deterministically_to_visual_search():
+    decision = IntentDecision(
+        intent=IntentKind.CHAT,
+        confidence=0.4,
+        next_action=NextAction.ANSWER,
+    )
+
+    routed = AgentOrchestrator._route_verified_image(
+        decision, "帮我找图中红色商品的同款"
+    )
+
+    assert routed.intent == IntentKind.VISUAL_PRODUCT_SEARCH
+    assert routed.next_action == NextAction.TOOL
+    assert routed.request_mode == RequestMode.READ_QUERY
+    assert routed.source == "verified_image_route"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "收到的商品破损了，怎么退货",
+        "这是物流面单，快递为什么不更新",
+        "订单里的商品发错了",
+    ],
+)
+def test_after_sales_images_are_not_misrouted_to_visual_search(text):
+    decision = IntentDecision(
+        intent=IntentKind.DAMAGED_OR_WRONG_ITEM,
+        confidence=0.9,
+        next_action=NextAction.TOOL,
+    )
+
+    assert AgentOrchestrator._route_verified_image(decision, text) is decision
 
 
 def test_review_details_continue_the_selected_order_review_flow():

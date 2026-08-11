@@ -7,6 +7,38 @@ from pydantic import BaseModel, Field, field_validator
 from app.domain.intent.types import RequestMode
 
 
+class VisualSubject(BaseModel):
+    subject_id: str = Field(min_length=1, max_length=64)
+    label: str = Field(min_length=1, max_length=128)
+    bbox: tuple[int, int, int, int]
+
+    @field_validator("bbox")
+    @classmethod
+    def bbox_must_be_normalized(
+        cls, value: tuple[int, int, int, int]
+    ) -> tuple[int, int, int, int]:
+        x1, y1, x2, y2 = value
+        if any(coordinate < 0 or coordinate > 999 for coordinate in value):
+            raise ValueError("VISUAL_BBOX_OUT_OF_RANGE")
+        if x2 <= x1 or y2 <= y1:
+            raise ValueError("VISUAL_BBOX_EMPTY")
+        return value
+
+
+class VerifiedImageContext(BaseModel):
+    asset_id: str = Field(pattern=r"^img_[a-f0-9]{32}$")
+    moderation_status: Literal["APPROVED"] = "APPROVED"
+    content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    mime_type: Literal[
+        "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"
+    ]
+    width: int = Field(ge=16, le=10_000)
+    height: int = Field(ge=16, le=10_000)
+    scene: Literal["agent"] = "agent"
+    expires_at: str | None = None
+    selected_subject: VisualSubject | None = None
+
+
 class HandoffEnvelope(BaseModel):
     """The minimum, typed context a specialist may receive from Supervisor."""
 
@@ -17,6 +49,10 @@ class HandoffEnvelope(BaseModel):
     user_id: str
     session_summary: str = Field(default="", max_length=1000)
     verified_context: dict = Field(default_factory=dict)
+    # ShoppingMission is an explicit, redacted decision contract. It is not
+    # hidden in generic context and never contains raw session history.
+    shopping_mission: dict[str, Any] = Field(default_factory=dict)
+    verified_image_context: VerifiedImageContext | None = None
     tool_scope: list[str] = Field(default_factory=list)
     max_rounds: int = Field(default=2, ge=1, le=5)
     max_tokens: int = Field(default=2400, ge=256, le=16_000)
@@ -33,8 +69,11 @@ class SpecialistTask(BaseModel):
     goal: str
     user_id: str
     user_text: str
+    source_message_id: int | None = Field(default=None, ge=1)
     session_summary: str = Field(default="", max_length=1000)
     verified_context: dict = Field(default_factory=dict)
+    shopping_mission: dict[str, Any] = Field(default_factory=dict)
+    verified_image_context: VerifiedImageContext | None = None
     tool_scope: list[str] = Field(default_factory=list)
     required_tools: list[str] = Field(default_factory=list, max_length=2)
     max_rounds: int = Field(default=2, ge=1, le=5)
@@ -69,6 +108,8 @@ class SpecialistState(BaseModel):
     agent_id: str
     goal: str
     verified_context: dict = Field(default_factory=dict)
+    shopping_mission: dict[str, Any] = Field(default_factory=dict)
+    verified_image_context: VerifiedImageContext | None = None
     facts: list[str] = Field(default_factory=list)
     evidence: list[dict] = Field(default_factory=list)
     tool_calls: list[str] = Field(default_factory=list)

@@ -5,7 +5,8 @@ import structlog
 from app.config.settings import get_settings
 from app.constants import AGENT_QUEUE_LOW
 from app.domain.intent.classifier import resolve_intent
-from app.domain.intent.types import IntentDecision, IntentKind, NextAction
+from app.domain.intent.types import IntentDecision, IntentKind, NextAction, RequestMode
+from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.harness.guardrails.input_guard import InputGuardrail
 from app.harness.metrics.runtime_sensors import RESPONSE_VERIFIER_TOTAL, measure_agent_stage
 from app.memory.session_memory_service import session_memory_service
@@ -25,12 +26,17 @@ from app.services.rate_limit_service import rate_limit_service
 from app.services.redis_service import redis_service
 from app.services.response_verifier import response_verifier
 from app.services.sensitive_word_service import sensitive_word_service
-from app.services.shopping_need_service import shopping_need_service
+from app.services.shopping_mission_service import shopping_mission_service
 from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
 from app.services.support_case_service import support_case_service
 from app.services.support_service import support_service
 from app.services.task_service import agent_task_service
+from app.services.visual_selection_store import (
+    VisualSelectionConflict,
+    VisualSelectionExpired,
+    visual_selection_store,
+)
 from app.utils.product_consult import build_consult_card_message, parse_consult_card
 
 logger = structlog.get_logger()
@@ -54,7 +60,16 @@ _EPISODE_FULL_INTENTS = frozenset(
     }
 )
 _SHOPPING_MEMORY_INTENTS = frozenset(
-    {IntentKind.PRODUCT_SEARCH, IntentKind.PRODUCT_CONSULT}
+    {
+        IntentKind.PRODUCT_SEARCH,
+        IntentKind.PRODUCT_CONSULT,
+        IntentKind.VISUAL_PRODUCT_SEARCH,
+    }
+)
+_IMAGE_AFTER_SALES_MARKERS = (
+    "退款", "退货", "售后", "破损", "损坏", "坏了", "碎了", "错发", "漏发",
+    "少发", "缺件", "物流", "快递", "订单", "发票", "地址", "投诉", "支付",
+    "付款", "评价", "追评", "确认收货", "取消订单",
 )
 _FORCED_CASE_INTENTS = frozenset(
     {
@@ -76,16 +91,20 @@ class AgentOrchestrator:
         from_product: bool = False,
         consult_product_id: str | None = None,
         comparison_product_ids: list[str] | None = None,
-        image_path: str | None = None,
-        image_moderation_id: int | None = None,
+        image_asset_id: str | None = None,
         rate_limit_scope: str = "sendMessage",
     ) -> dict:
         settings = get_settings()
         # 一次 inspect 同时完成归一化、注入判定和净化，避免同一段文本归一化两遍。
-        verdict = input_guard.inspect(message)
+        submitted_text = str(message or "").strip()
+        image_asset_id = str(image_asset_id or "").strip() or None
+        if not submitted_text and not image_asset_id:
+            raise ValueError("请输入咨询内容或上传一张商品图片")
+        task_text = submitted_text or "查找图中同款或相似商品"
+        verdict = input_guard.inspect(task_text)
         message = verdict.text
         if not message:
-            raise ValueError("请输入咨询内容")
+            raise ValueError("请输入咨询内容或上传一张商品图片")
 
         if not await rate_limit_service.allow(user_id, rate_limit_scope, 1, 1):
             raise ValueError("发送消息过于频繁，请稍后再试")
@@ -102,12 +121,12 @@ class AgentOrchestrator:
         selected_comparison_ids: list[str] | None = None
         if comparison_product_ids:
             selected_comparison_ids = normalize_comparison_ids(comparison_product_ids)
-            allowed = set(await shopping_need_service.allowed_candidate_ids(user_id))
+            allowed = set(await shopping_mission_service.allowed_candidate_ids(user_id))
             if any(product_id not in allowed for product_id in selected_comparison_ids):
                 raise ValueError("只能比较当前或近期推荐列表中的商品")
 
-        image_evidence = await support_case_service.verify_image(
-            user_id, image_path, image_moderation_id
+        verified_image_context = await self._verify_image_context(
+            user_id, image_asset_id
         )
 
         if from_product and consult_product_id:
@@ -142,6 +161,8 @@ class AgentOrchestrator:
                 recent_intents=recent_intents,
                 after_sales_workflow=True,
             )
+        if verified_image_context is not None:
+            decision = self._route_verified_image(decision, original_user_text)
 
         if card:
             filtered_text = await sensitive_word_service.replace(original_user_text)
@@ -162,6 +183,14 @@ class AgentOrchestrator:
             session_id=active_support.get("session_id") if active_support else None,
             run_id=run_id,
             trace_id=trace_id,
+            image_asset_id=(
+                verified_image_context.asset_id if verified_image_context else None
+            ),
+            image_snapshot=(
+                self._public_image_snapshot(verified_image_context)
+                if verified_image_context
+                else None
+            ),
         )
         episode_keep = episode_service.start_run(
             run_id=run_id,
@@ -170,7 +199,11 @@ class AgentOrchestrator:
             session_id=agent_msg.get("sessionId"),
             intent=decision.intent.value,
             queue_name=queue_name,
-            force_keep=decision.should_handoff or decision.intent in _EPISODE_FULL_INTENTS,
+            force_keep=(
+                decision.should_handoff
+                or decision.intent in _EPISODE_FULL_INTENTS
+                or verified_image_context is not None
+            ),
         )
         agent_msg["episodeKeep"] = episode_keep
         episode_service.record_step(
@@ -180,6 +213,20 @@ class AgentOrchestrator:
             input_data={"message": original_user_text},
             output_data=decision.model_dump(mode="json"),
         )
+        if verified_image_context is not None:
+            episode_service.record_step(
+                "IMAGE_ASSET_VERIFIED",
+                run_id=run_id,
+                node_name="api",
+                output_data={
+                    "assetId": verified_image_context.asset_id,
+                    "contentSha256": verified_image_context.content_sha256,
+                    "mimeType": verified_image_context.mime_type,
+                    "width": verified_image_context.width,
+                    "height": verified_image_context.height,
+                    "expiresAt": verified_image_context.expires_at,
+                },
+            )
         if decision.intent in _SHOPPING_MEMORY_INTENTS:
             try:
                 durable_profile = await shopping_profile_service.update_profile(
@@ -187,19 +234,27 @@ class AgentOrchestrator:
                     original_user_text,
                     source_message_id=int(agent_msg["messageId"]),
                 )
-                need = await shopping_need_service.capture_user_turn(
+                mission = await shopping_mission_service.capture_user_turn(
                     user_id,
                     int(agent_msg["messageId"]),
                     original_user_text,
                     durable_profile,
                 )
                 episode_service.record_step(
-                    "SHOPPING_NEED_UPDATE",
+                    "SHOPPING_MISSION_UPDATE",
                     run_id=run_id,
                     node_name="api",
                     output_data={
-                        "hasNeed": bool(need),
-                        "missingSlots": (need or {}).get("missingSlots") or [],
+                        "hasMission": bool(mission),
+                        "missionId": (mission or {}).get("missionId"),
+                        "category": (mission or {}).get("category"),
+                        "useCases": list((mission or {}).get("useCases") or [])[:4],
+                        "hardConstraints": (mission or {}).get("hardConstraints") or {},
+                        "softPreferences": (mission or {}).get("softPreferences") or {},
+                        "unknownSlots": (mission or {}).get("unknownSlots") or [],
+                        "clarificationCount": int(
+                            (mission or {}).get("clarificationCount") or 0
+                        ),
                     },
                 )
             except Exception as exc:
@@ -223,10 +278,9 @@ class AgentOrchestrator:
         agent_msg["fromProduct"] = from_product
         if selected_comparison_ids:
             agent_msg["comparisonProductIds"] = selected_comparison_ids
-        if image_evidence:
-            agent_msg["imageEvidence"] = image_evidence
-            agent_msg["imageUrl"] = java_internal_client.support_image_url(
-                image_evidence["path"]
+        if verified_image_context:
+            agent_msg["verifiedImageContext"] = verified_image_context.model_dump(
+                mode="json"
             )
 
         if active_support:
@@ -619,6 +673,142 @@ class AgentOrchestrator:
             )
         return agent_msg
 
+    async def send_selected_visual_subject(
+        self,
+        user_id: str,
+        selection_id: str,
+        subject_id: str,
+    ) -> dict:
+        """Resume one server-rendered visual subject selection exactly once."""
+        preview = await visual_selection_store.preview(
+            selection_id=selection_id,
+            subject_id=subject_id,
+            user_id=user_id,
+        )
+        if preview.get("alreadyConsumed"):
+            existing = await visual_selection_store.selected_message(selection_id, user_id)
+            if existing:
+                return existing
+            raise VisualSelectionConflict("该图片主体选择正在恢复，请稍后重试")
+
+        settings = get_settings()
+        if settings.ai_chat_limit > 0:
+            total = await agent_message_service.count_user_messages(user_id)
+            if total >= settings.ai_chat_limit:
+                raise ValueError("AI购物体验已经结束")
+        if await support_service.get_active(user_id):
+            raise ValueError("当前会话已转人工，请直接告诉客服需要查找的商品")
+
+        try:
+            selected_subject = VisualSubject.model_validate(preview.get("subject") or {})
+        except ValueError as exc:
+            raise VisualSelectionExpired("图片主体不存在或已失效") from exc
+        image_context = await self._verify_image_context(
+            user_id, str(preview.get("imageAssetId") or "")
+        )
+        if image_context is None:
+            raise VisualSelectionExpired("图片资产已失效，请重新上传图片")
+        image_context = image_context.model_copy(
+            update={"selected_subject": selected_subject}
+        )
+
+        original_text = str(preview.get("originalText") or "").strip()
+        task_text = original_text or "查找图中同款或相似商品"
+        verdict = input_guard.inspect(task_text)
+        if verdict.blocked or not verdict.text:
+            raise ValueError("图片搜索请求校验失败，请重新上传图片")
+        safe_message = await sensitive_word_service.replace(verdict.text)
+        decision = IntentDecision(
+            intent=IntentKind.VISUAL_PRODUCT_SEARCH,
+            confidence=1.0,
+            next_action=NextAction.TOOL,
+            request_mode=RequestMode.READ_QUERY,
+            source="visual_subject_selection",
+        )
+
+        await redis_service.pause_consult(user_id)
+        previous_unresolved = await agent_message_service.get_unresolved_count(user_id)
+        queue_name, priority = agent_queue_service.queue_for_decision(decision)
+        if (
+            queue_name == AGENT_QUEUE_LOW
+            and await agent_task_service.count_pending() >= settings.task_queue_max
+        ):
+            raise ValueError(AGENT_BUSY_MESSAGE)
+
+        run_id = new_run_id()
+        trace_id = current_trace_id()
+        image_snapshot = self._public_image_snapshot(image_context)
+        agent_msg, created = await visual_selection_store.consume_with_message_and_task(
+            selection_id=selection_id,
+            user_id=user_id,
+            subject_id=subject_id,
+            message=safe_message,
+            decision=decision,
+            previous_unresolved_count=previous_unresolved,
+            queue_name=queue_name,
+            priority=priority,
+            trace_id=trace_id,
+            run_id=run_id,
+            image_snapshot=image_snapshot,
+            verified_image_context=image_context.model_dump(mode="json"),
+        )
+        if not created:
+            return agent_msg
+
+        episode_keep = episode_service.start_run(
+            run_id=run_id,
+            message_id=int(agent_msg["messageId"]),
+            user_id=user_id,
+            session_id=None,
+            intent=decision.intent.value,
+            queue_name=queue_name,
+            force_keep=True,
+        )
+        agent_msg["episodeKeep"] = episode_keep
+        episode_service.record_step(
+            "VISUAL_SUBJECT_SELECTED",
+            run_id=run_id,
+            node_name="api",
+            output_data={
+                "selectionId": selection_id,
+                "subjectId": selected_subject.subject_id,
+                "subjectLabel": selected_subject.label,
+                "sourceMessageId": preview.get("sourceMessageId"),
+            },
+        )
+        try:
+            if not await agent_task_service.mark_dispatching(agent_msg["messageId"]):
+                agent_msg["deliveryState"] = "DUPLICATE"
+                return agent_msg
+            await agent_queue_service.publish(queue_name, agent_msg)
+            await agent_task_service.mark_queued(agent_msg["messageId"])
+            agent_msg["deliveryState"] = "QUEUED"
+            episode_service.record_step(
+                "MQ_PUBLISH",
+                run_id=run_id,
+                node_name="api",
+                output_data={"queue": queue_name, "status": "QUEUED"},
+            )
+        except Exception as exc:
+            logger.warning(
+                "agent_visual_selection_publish_deferred",
+                selection_id=selection_id,
+                message_id=agent_msg["messageId"],
+                queue_name=queue_name,
+                error=str(exc),
+            )
+            agent_msg["deliveryState"] = "PENDING_RECOVERY"
+            episode_service.record_step(
+                "MQ_PUBLISH",
+                run_id=run_id,
+                node_name="api",
+                status="ERROR",
+                error_code=type(exc).__name__,
+                error_message=str(exc),
+                output_data={"queue": queue_name, "status": "PENDING_RECOVERY"},
+            )
+        return agent_msg
+
     async def _resolve_consult_card_for_routing(self, user_id: str) -> dict | None:
         """Resolve the active consult card for pre-classification.
 
@@ -652,9 +842,13 @@ class AgentOrchestrator:
                     if isinstance(decision.get("entities"), dict)
                     else {}
                 )
-                evidence = dict(agent_msg.get("imageEvidence") or {}) or None
-                if evidence is not None:
-                    evidence.setdefault("vlmStatus", "SKIPPED_HANDOFF")
+                image_context = agent_msg.get("verifiedImageContext")
+                evidence = None
+                if isinstance(image_context, dict) and image_context.get("asset_id"):
+                    evidence = {
+                        "imageAssetId": image_context["asset_id"],
+                        "imageUnderstandingStatus": "SKIPPED_HANDOFF",
+                    }
                 support_case = await support_case_service.create(
                     agent_msg["userId"],
                     support_case_service.category_for_intent(intent, safe_message),
@@ -752,6 +946,64 @@ class AgentOrchestrator:
             "handoff", run_id=agent_msg.get("runId"), force_keep=True
         )
         return agent_msg
+
+    async def _verify_image_context(
+        self, user_id: str, image_asset_id: str | None
+    ) -> VerifiedImageContext | None:
+        if not image_asset_id:
+            return None
+        try:
+            verified = await java_internal_client.verify_agent_image(
+                user_id, image_asset_id
+            )
+            return VerifiedImageContext.model_validate(
+                {
+                    "asset_id": verified.get("asset_id"),
+                    "moderation_status": verified.get("moderation_status"),
+                    "content_sha256": verified.get("content_sha256"),
+                    "mime_type": verified.get("mime_type"),
+                    "width": verified.get("width"),
+                    "height": verified.get("height"),
+                    "scene": verified.get("scene"),
+                    "expires_at": verified.get("expires_at"),
+                }
+            )
+        except Exception as exc:
+            logger.warning(
+                "agent_image_verify_failed",
+                user_id=user_id,
+                error=type(exc).__name__,
+            )
+            raise ValueError("图片资产不可用、尚未通过审核或已过期，请重新上传") from exc
+
+    @staticmethod
+    def _route_verified_image(
+        decision: IntentDecision, user_text: str
+    ) -> IntentDecision:
+        if not any(marker in user_text for marker in _IMAGE_AFTER_SALES_MARKERS):
+            return decision.model_copy(
+                update={
+                    "intent": IntentKind.VISUAL_PRODUCT_SEARCH,
+                    "confidence": 0.99,
+                    "next_action": NextAction.TOOL,
+                    "request_mode": RequestMode.READ_QUERY,
+                    "source": "verified_image_route",
+                }
+            )
+        return decision
+
+    @staticmethod
+    def _public_image_snapshot(context: VerifiedImageContext) -> dict:
+        return {
+            "assetId": context.asset_id,
+            "contentSha256": context.content_sha256,
+            "mimeType": context.mime_type,
+            "width": context.width,
+            "height": context.height,
+            "scene": context.scene,
+            "moderationStatus": context.moderation_status,
+            "expiresAt": context.expires_at,
+        }
 
     async def request_human(
         self,

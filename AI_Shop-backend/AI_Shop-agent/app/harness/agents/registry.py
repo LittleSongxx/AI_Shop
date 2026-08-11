@@ -32,6 +32,7 @@ SHOPPING_TOOLS = frozenset(
         "SEARCH_PRODUCTS",
         "GET_PRODUCT_DETAIL",
         "COMPARE_PRODUCTS",
+        "SEARCH_PRODUCTS_BY_IMAGE",
     }
 )
 ORDER_TOOLS = frozenset(
@@ -47,6 +48,7 @@ ORDER_TOOLS = frozenset(
 AFTER_SALES_TOOLS = frozenset(
     {
         "QUERY_SUPPORT_CASES",
+        "CHECK_AFTER_SALES_ELIGIBILITY",
         "SEARCH_KNOWLEDGE",
     }
 )
@@ -85,7 +87,8 @@ AGENT_SPECS: dict[str, AgentSpec] = {
         2,
         2400,
         instructions=(
-            "只检索售后政策证据、资格条件、工单路径和风险。政策结论必须有知识来源；"
+            "先调用规则引擎核验具体订单资格，再检索售后政策证据解释条件；"
+            "资格结论必须带规则版本和事实引用，政策证据不足时保守答复；"
             "证据不足时保守答复或建议人工，永远不创建退款、取消、评价或工单提案。"
         ),
     ),
@@ -99,7 +102,11 @@ INVENTORY_OPS_SPEC = AgentSpec(
 )
 CUSTOMER_AGENT_IDS = frozenset(AGENT_SPECS)
 
-_SHOPPING_INTENTS = {IntentKind.PRODUCT_CONSULT, IntentKind.PRODUCT_SEARCH}
+_SHOPPING_INTENTS = {
+    IntentKind.PRODUCT_CONSULT,
+    IntentKind.PRODUCT_SEARCH,
+    IntentKind.VISUAL_PRODUCT_SEARCH,
+}
 _ORDER_INTENTS = {
     IntentKind.QUERY_ORDER,
     IntentKind.QUERY_LOGISTICS,

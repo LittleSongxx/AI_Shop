@@ -4,6 +4,7 @@ from datetime import datetime
 
 from app.constants import IMPRESSION_ATTRIBUTION_TTL
 from app.db.pool import acquire
+from app.services.episode_service import current_episode
 
 
 class RecommendationEventStore:
@@ -17,11 +18,18 @@ class RecommendationEventStore:
         product_ids: list[str],
         source: str,
         *,
+        retrieval_mode: str = "text",
+        match_type: str | None = None,
+        subject_label: str | None = None,
+        recall_source: str | None = None,
+        model_version: str | None = None,
         occurred_at: datetime | None = None,
     ) -> None:
         if not product_ids:
             return
         event_time = occurred_at or datetime.now()
+        episode = current_episode()
+        run_id = episode.run_id if episode else None
         rows = [
             (
                 user_id,
@@ -29,6 +37,12 @@ class RecommendationEventStore:
                 product_id,
                 position,
                 source,
+                retrieval_mode,
+                match_type,
+                subject_label,
+                recall_source,
+                model_version,
+                run_id,
                 self.IMPRESSION,
                 event_time,
             )
@@ -39,8 +53,9 @@ class RecommendationEventStore:
                 """
                 INSERT INTO agent_recommendation_event
                     (user_id, request_id, product_id, position, source,
-                     event_type, occurred_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                     retrieval_mode, match_type, subject_label, recall_source,
+                     model_version, run_id, event_type, occurred_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE event_id=event_id
                 """,
                 rows,
@@ -58,10 +73,15 @@ class RecommendationEventStore:
                 """
                 INSERT INTO agent_recommendation_event
                     (user_id, request_id, product_id, position, source,
-                     event_type, occurred_at)
+                     retrieval_mode, match_type, subject_label, recall_source,
+                     model_version, run_id, event_type, occurred_at)
                 SELECT impression.user_id, impression.request_id,
                        impression.product_id, impression.position,
                        impression.source,
+                       impression.retrieval_mode, impression.match_type,
+                       impression.subject_label, impression.recall_source,
+                       impression.model_version,
+                       impression.run_id,
                        %s, NOW(3)
                 FROM agent_recommendation_event AS impression
                 WHERE impression.user_id=%s AND impression.request_id=%s
@@ -85,7 +105,9 @@ class RecommendationEventStore:
             )
             await cur.execute(
                 """
-                SELECT request_id, product_id, position, source, occurred_at
+                SELECT request_id, product_id, position, source,
+                       retrieval_mode, match_type, subject_label, recall_source,
+                       model_version, occurred_at
                 FROM agent_recommendation_event
                 WHERE user_id=%s AND request_id=%s AND product_id=%s
                   AND position=%s AND event_type=%s
@@ -130,7 +152,9 @@ class RecommendationEventStore:
             await cur.execute(
                 f"""
                 SELECT click.request_id, click.product_id, click.position,
-                       click.source, click.occurred_at
+                       click.source, click.retrieval_mode, click.match_type,
+                       click.subject_label, click.recall_source,
+                       click.model_version, click.occurred_at
                 FROM agent_recommendation_event click
                 JOIN agent_recommendation_event impression
                   ON impression.user_id=click.user_id
@@ -158,6 +182,11 @@ class RecommendationEventStore:
             "productId": str(row.get("product_id") or ""),
             "position": int(row.get("position") or 0),
             "source": str(row.get("source") or "")[:40],
+            "retrievalMode": str(row.get("retrieval_mode") or "text")[:20],
+            "matchType": row.get("match_type"),
+            "subjectLabel": row.get("subject_label"),
+            "recallSource": row.get("recall_source"),
+            "modelVersion": row.get("model_version"),
             "occurredAt": (
                 occurred_at.isoformat(timespec="milliseconds")
                 if isinstance(occurred_at, datetime)

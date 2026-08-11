@@ -38,6 +38,7 @@ CASE_STATUSES = frozenset({"OPEN", "IN_PROGRESS", "RESOLVED", "CANCELLED"})
 # New cases use the sortable SC timestamp format. ``LEGACY-<case_id>`` is
 # intentionally accepted for rows backfilled by the idempotent migration.
 _CASE_NO_RE = re.compile(r"^(?:SC\d{8}[A-Z0-9]{6}|LEGACY-\d+)$")
+_IMAGE_ASSET_ID_RE = re.compile(r"^img_[a-f0-9]{32}$")
 CASE_CATEGORY_LABELS = {
     "DAMAGED": "商品破损",
     "WRONG_ITEM": "商品错发",
@@ -140,33 +141,29 @@ class SupportCaseService:
     async def verify_image(
         self,
         user_id: str,
-        image_path: str | None,
-        moderation_id: int | None,
+        image_asset_id: str | None,
     ) -> dict | None:
-        if not image_path and moderation_id is None:
+        asset_id = str(image_asset_id or "").strip()
+        if not asset_id:
             return None
-        if not image_path or moderation_id is None:
-            raise ValueError("售后图片必须同时提供路径和审核记录")
-        if image_path.startswith(("http://", "https://", "//")) or ".." in image_path:
-            raise ValueError("售后图片必须是服务端生成的相对路径")
+        if not _IMAGE_ASSET_ID_RE.fullmatch(asset_id):
+            raise ValueError("售后图片资产标识无效，请重新上传")
         try:
-            verified = await java_internal_client.verify_support_image(
-                user_id, image_path, int(moderation_id)
-            )
+            verified = await java_internal_client.verify_agent_image(user_id, asset_id)
         except Exception as exc:
             logger.warning("support_image_verify_failed", error=type(exc).__name__)
             raise ValueError("售后图片审核状态暂不可确认，请重新上传") from exc
         if not isinstance(verified, dict) or not verified.get("approved"):
             raise ValueError("售后图片尚未通过审核，不能提交工单")
         return {
-            "path": str(verified.get("path") or image_path),
-            "moderationId": int(
-                verified.get("moderation_id")
-                or verified.get("moderationId")
-                or moderation_id
-            ),
+            "imageAssetId": str(verified.get("asset_id") or asset_id),
+            "contentSha256": str(verified.get("content_sha256") or ""),
+            "mimeType": str(verified.get("mime_type") or ""),
+            "width": int(verified.get("width") or 0),
+            "height": int(verified.get("height") or 0),
             "moderationStatus": "APPROVED",
-            "scene": "support",
+            "scene": "agent",
+            "expiresAt": verified.get("expires_at"),
         }
 
     async def build_proposal(
@@ -177,10 +174,9 @@ class SupportCaseService:
         *,
         order_id: str | None = None,
         order_item_id: str | None = None,
-        image_path: str | None = None,
-        image_moderation_id: int | None = None,
-        image_description: str | None = None,
-        vlm_status: str | None = None,
+        image_asset_id: str | None = None,
+        image_understanding: str | None = None,
+        image_understanding_status: str | None = None,
         run_id: str | None = None,
         source_message_id: int | None = None,
         forced_handoff: bool = False,
@@ -195,13 +191,13 @@ class SupportCaseService:
         order, item, order_id = await self._verify_order_owner(
             user_id, order_id, order_item_id
         )
-        evidence = await self.verify_image(user_id, image_path, image_moderation_id)
+        evidence = await self.verify_image(user_id, image_asset_id)
         if evidence:
-            evidence["vlmStatus"] = (
-                str(vlm_status or "DISABLED").strip().upper()[:16]
+            evidence["imageUnderstandingStatus"] = (
+                str(image_understanding_status or "DISABLED").strip().upper()[:16]
             )
-            if image_description:
-                evidence["vlmDescription"] = str(image_description).strip()[:1000]
+            if image_understanding:
+                evidence["imageUnderstanding"] = str(image_understanding).strip()[:1000]
         description_hash = hashlib.sha256(description.encode("utf-8")).hexdigest()[:16]
         dedupe = (
             f"{user_id}:CASE:MESSAGE:{source_message_id}:{normalized}"
@@ -278,6 +274,7 @@ class SupportCaseService:
             existing = await self.get_by_idempotency(user_id, idempotency_key)
             if existing:
                 return existing
+        evidence = await self._retain_case_evidence(user_id, evidence)
         _order, _item, order_id = await self._verify_order_owner(
             user_id, order_id, order_item_id
         )
@@ -342,6 +339,27 @@ class SupportCaseService:
         )
         await self._publish("support_case.created", result)
         return result
+
+    async def _retain_case_evidence(
+        self, user_id: str, evidence: dict | None
+    ) -> dict | None:
+        if not evidence:
+            return None
+        asset_id = str(evidence.get("imageAssetId") or "").strip()
+        if not asset_id:
+            raise ValueError("工单图片证据缺少图片资产标识")
+        refreshed = await self.verify_image(user_id, asset_id)
+        if refreshed is None:
+            raise ValueError("工单图片证据不可用")
+        for key in ("imageUnderstandingStatus", "imageUnderstanding"):
+            if evidence.get(key):
+                refreshed[key] = evidence[key]
+        await java_internal_client.retain_agent_image_as_support_evidence(
+            user_id, asset_id
+        )
+        refreshed["retentionClass"] = "SUPPORT_EVIDENCE"
+        refreshed["expiresAt"] = None
+        return refreshed
 
     async def get_by_idempotency(self, user_id: str, key: str) -> dict | None:
         async with acquire() as cur:

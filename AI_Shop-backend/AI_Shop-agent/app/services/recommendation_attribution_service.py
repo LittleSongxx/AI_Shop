@@ -5,6 +5,9 @@ import asyncio
 import structlog
 
 from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
+from app.services.commerce_outcome_ledger_service import (
+    commerce_outcome_ledger_service,
+)
 from app.services.recommendation_event_store import recommendation_event_store
 from app.services.redis_service import redis_service
 
@@ -20,6 +23,11 @@ class RecommendationAttributionService:
         query: str = "",
         source: str = "",
         request_id: str = "",
+        retrieval_mode: str = "text",
+        match_type: str | None = None,
+        subject_label: str | None = None,
+        recall_source: str | None = None,
+        model_version: str | None = None,
     ) -> None:
         shown = [str(pid) for pid in product_ids if pid][
             :IMPRESSION_LOG_MAX_PRODUCTS
@@ -33,6 +41,11 @@ class RecommendationAttributionService:
                 request_id,
                 shown,
                 canonical_source,
+                retrieval_mode=(retrieval_mode or "text")[:20],
+                match_type=(match_type or "")[:32] or None,
+                subject_label=(subject_label or "")[:128] or None,
+                recall_source=(recall_source or "")[:64] or None,
+                model_version=(model_version or "")[:64] or None,
             )
         except Exception as exc:
             # Recommendations remain available, but a missing durable impression
@@ -43,6 +56,25 @@ class RecommendationAttributionService:
                 product_count=len(shown),
                 error=type(exc).__name__,
             )
+        else:
+            try:
+                await commerce_outcome_ledger_service.record_impressions(
+                    user_id=user_id,
+                    request_id=request_id,
+                    product_ids=shown,
+                    recommendation_source=canonical_source,
+                    retrieval_mode=(retrieval_mode or "text")[:20],
+                    match_type=(match_type or "")[:32] or None,
+                    subject_label=(subject_label or "")[:128] or None,
+                    recall_source=(recall_source or "")[:64] or None,
+                    model_version=(model_version or "")[:64] or None,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "commerce_impression_ledger_failed",
+                    request_id=request_id,
+                    error=type(exc).__name__,
+                )
         await redis_service.log_impression(
             user_id,
             shown,
@@ -71,6 +103,14 @@ class RecommendationAttributionService:
             return None
         if attribution is None:
             return None
+        try:
+            await commerce_outcome_ledger_service.record_click(attribution, user_id)
+        except Exception as exc:
+            logger.warning(
+                "commerce_click_ledger_failed",
+                request_id=request_id,
+                error=type(exc).__name__,
+            )
         # Redis is a short-lived analytics/cache copy only. Database validation
         # already succeeded, so cache failure must not rewrite the durable truth.
         try:

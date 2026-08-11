@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.graph.nodes import tools_node
+from app.services.final_offer_snapshot_service import final_offer_snapshot_service
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.product_comparison_service import (
     ComparisonCandidateDenied,
@@ -12,8 +13,9 @@ from app.services.product_comparison_service import (
     normalize_comparison_ids,
     product_comparison_service,
 )
-from app.services.product_snapshot_service import product_snapshot_service
-from app.services.shopping_need_service import shopping_need_service
+from app.services.product_decision_feature_service import product_decision_feature_service
+from app.services.product_service import product_service
+from app.services.shopping_mission_service import shopping_mission_service
 
 
 def test_comparison_requires_two_to_four_unique_products():
@@ -26,78 +28,107 @@ def test_comparison_requires_two_to_four_unique_products():
 
 @pytest.mark.asyncio
 async def test_comparison_rejects_product_outside_recent_candidates(monkeypatch):
-    monkeypatch.setattr(shopping_need_service, "load", AsyncMock(return_value={}))
+    monkeypatch.setattr(shopping_mission_service, "load", AsyncMock(return_value={}))
     monkeypatch.setattr(
-        shopping_need_service,
+        shopping_mission_service,
         "allowed_candidate_ids",
         AsyncMock(return_value=["p1", "p2"]),
     )
-    snapshot = AsyncMock()
-    monkeypatch.setattr(product_snapshot_service, "build_snapshot_json", snapshot)
+    load_products = AsyncMock()
+    monkeypatch.setattr(product_service, "_load_products_by_ids", load_products)
 
     with pytest.raises(ComparisonCandidateDenied):
         await product_comparison_service.compare("u1", ["p1", "other"])
 
-    snapshot.assert_not_awaited()
+    load_products.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_comparison_uses_live_price_stock_and_property_snapshots(monkeypatch):
-    need = {
+async def test_comparison_uses_user_bound_final_offers_and_verified_features(monkeypatch):
+    mission = {
         "candidateProducts": [
             {
                 "productId": "p1",
-                "minPrice": 100,
+                "estimatedPayable": 100,
+                "recommendation": {"bestFor": "通勤降噪", "tradeoff": "不适合高强度运动"},
                 "sourceMessageId": 10,
             },
             {
                 "productId": "p2",
-                "minPrice": 200,
+                "estimatedPayable": 200,
                 "sourceMessageId": 10,
             },
         ]
     }
-    monkeypatch.setattr(shopping_need_service, "load", AsyncMock(return_value=need))
+    monkeypatch.setattr(shopping_mission_service, "load", AsyncMock(return_value=mission))
     monkeypatch.setattr(
-        shopping_need_service,
+        shopping_mission_service,
         "allowed_candidate_ids",
         AsyncMock(return_value=["p1", "p2"]),
     )
-    snapshots = AsyncMock(
-        side_effect=[
-            json.dumps(
-                {
-                    "productId": "p1",
-                    "productName": "耳机 A",
-                    "minPrice": 120,
-                    "maxPrice": 150,
-                    "status": 1,
-                    "inStock": True,
-                    "totalStock": 8,
-                    "properties": [
-                        {
-                            "propertyName": "降噪",
-                            "propertyValues": [{"propertyValue": "支持"}],
-                        }
-                    ],
-                },
-                ensure_ascii=False,
-            ),
-            json.dumps(
-                {
-                    "productId": "p2",
-                    "productName": "耳机 B",
-                    "minPrice": 200,
-                    "status": 1,
-                    "inStock": False,
-                    "totalStock": 0,
-                    "properties": [],
-                },
-                ensure_ascii=False,
-            ),
-        ]
+    products = [
+        {
+            "product_id": "p1",
+            "product_name": "耳机 A",
+            "cover": "a.jpg",
+            "properties": [{"propertyName": "降噪", "propertyValues": [{"propertyValue": "支持"}]}],
+        },
+        {
+            "product_id": "p2",
+            "product_name": "耳机 B",
+            "cover": "b.jpg",
+            "properties": [],
+        },
+    ]
+    monkeypatch.setattr(
+        product_service,
+        "_load_products_by_ids",
+        AsyncMock(return_value=products),
     )
-    monkeypatch.setattr(product_snapshot_service, "build_snapshot_json", snapshots)
+    annotated = [
+        {
+            **products[0],
+            "decisionFeatures": [
+                {"key": "noise_cancellation", "value": "支持", "reviewStatus": "VERIFIED"}
+            ],
+        },
+        {**products[1], "decisionFeatures": []},
+    ]
+    monkeypatch.setattr(
+        product_decision_feature_service,
+        "annotate_candidates",
+        AsyncMock(return_value=annotated),
+    )
+    offers = [
+        {
+            **annotated[0],
+            "status": "1",
+            "in_stock": True,
+            "total_stock": 8,
+            "base_price": 150,
+            "estimated_payable": 120,
+            "offer_snapshot_id": "offer-p1",
+            "sku_key": "sku-p1",
+            "coupon_status": "AVAILABLE",
+            "coupon": {"couponName": "满减券", "estimatedDiscount": 30},
+            "quote_expires_at": "2026-08-10T12:00:00Z",
+            "delivery_promise": "明日送达",
+        },
+        {
+            **annotated[1],
+            "status": "1",
+            "in_stock": True,
+            "total_stock": 3,
+            "base_price": 260,
+            "estimated_payable": 200,
+            "offer_snapshot_id": "offer-p2",
+            "sku_key": "sku-p2",
+            "coupon_status": "UNAVAILABLE",
+            "coupon": None,
+            "quote_expires_at": "2026-08-10T12:00:00Z",
+        },
+    ]
+    monkeypatch.setattr(final_offer_snapshot_service, "build", AsyncMock(return_value=offers))
 
     result = await product_comparison_service.compare("u1", ["p1", "p2"])
     card = json.loads(result.assistant_cards or "{}")
@@ -107,14 +138,16 @@ async def test_comparison_uses_live_price_stock_and_property_snapshots(monkeypat
     assert card["snapshotType"] == "REAL_TIME"
     assert card["products"][0]["minPrice"] == 120
     assert card["products"][0]["priceChanged"] is True
-    assert card["products"][1]["availability"] == "OUT_OF_STOCK"
+    assert card["products"][0]["offerSnapshotId"] == "offer-p1"
+    assert card["products"][0]["coupon"]["couponName"] == "满减券"
+    assert card["products"][1]["availability"] == "ON_SALE"
     assert "降噪" in card["dimensions"]
 
 
 @pytest.mark.asyncio
 async def test_comparison_fails_when_any_live_snapshot_is_missing(monkeypatch):
     monkeypatch.setattr(
-        shopping_need_service,
+        shopping_mission_service,
         "load",
         AsyncMock(
             return_value={
@@ -126,14 +159,46 @@ async def test_comparison_fails_when_any_live_snapshot_is_missing(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        shopping_need_service,
+        shopping_mission_service,
         "allowed_candidate_ids",
         AsyncMock(return_value=["p1", "p2"]),
     )
     monkeypatch.setattr(
-        product_snapshot_service,
-        "build_snapshot_json",
-        AsyncMock(side_effect=["{}", None]),
+        product_service,
+        "_load_products_by_ids",
+        AsyncMock(
+            return_value=[
+                {"product_id": "p1", "product_name": "A"},
+                {"product_id": "p2", "product_name": "B"},
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        product_decision_feature_service,
+        "annotate_candidates",
+        AsyncMock(
+            return_value=[
+                {"product_id": "p1", "product_name": "A"},
+                {"product_id": "p2", "product_name": "B"},
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        final_offer_snapshot_service,
+        "build",
+        AsyncMock(
+            return_value=[
+                {
+                    "product_id": "p1",
+                    "product_name": "A",
+                    "status": "1",
+                    "in_stock": True,
+                    "estimated_payable": 100,
+                    "offer_snapshot_id": "offer-p1",
+                    "sku_key": "sku-p1",
+                }
+            ]
+        ),
     )
 
     with pytest.raises(ComparisonSnapshotMissing):

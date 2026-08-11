@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+import signal
 import time
 import uuid
 from datetime import datetime
@@ -33,9 +34,11 @@ from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.message_service import agent_message_service, next_unresolved_count
 from app.services.pending_action_service import pending_action_service
 from app.services.redis_service import redis_service
+from app.services.shopping_mission_service import initialize_category_need_schemas
 from app.services.stream_service import stream_service
 from app.services.task_service import agent_task_service
 from app.utils.product_consult import parse_consult_card
+from app.visual.consumer import visual_index_consumer
 
 logger = structlog.get_logger()
 TERMINAL_ERROR = "服务暂时不可用，已为您保留本次咨询记录，请稍后重试或转人工客服。"
@@ -66,6 +69,7 @@ class AgentWorker:
     def __init__(self) -> None:
         self._channels: list[aio_pika.abc.AbstractChannel] = []
         self._consumers: list[tuple[aio_pika.abc.AbstractQueue, str]] = []
+        self._background_tasks: list[asyncio.Task] = []
         self._worker_id = f"worker-{uuid.uuid4().hex}"
 
     async def run(self) -> None:
@@ -97,6 +101,7 @@ class AgentWorker:
             ) from exc
         await redis_service.connect()
         await init_pool()
+        await initialize_category_need_schemas()
         await episode_service.start()
         await judge_service.start()
         try:
@@ -110,6 +115,25 @@ class AgentWorker:
             await self._start_consumer(
                 AGENT_QUEUE_LOW, settings.agent_worker_low_concurrency
             )
+            if settings.visual_index_consumer_enabled:
+                try:
+                    channel, queue, consumer_tag = await visual_index_consumer.start()
+                except Exception as exc:
+                    # A visual queue/topology issue degrades only image search;
+                    # customer text/after-sales Agent queues must remain alive.
+                    logger.warning(
+                        "visual_index_consumer_degraded",
+                        error=type(exc).__name__,
+                    )
+                else:
+                    self._channels.append(channel)
+                    self._consumers.append((queue, consumer_tag))
+                    bootstrap_task = asyncio.create_task(
+                        visual_index_consumer.bootstrap_if_needed(),
+                        name="visual-index-bootstrap",
+                    )
+                    bootstrap_task.add_done_callback(self._log_background_task_result)
+                    self._background_tasks.append(bootstrap_task)
             await redis_service.set_worker_heartbeat(
                 self._worker_id,
                 settings.agent_worker_heartbeat_ttl_seconds,
@@ -206,6 +230,12 @@ class AgentWorker:
 
     async def close(self) -> None:
         try:
+            for task in self._background_tasks:
+                if not task.done():
+                    task.cancel()
+            if self._background_tasks:
+                await asyncio.gather(*self._background_tasks, return_exceptions=True)
+            self._background_tasks.clear()
             for queue, consumer_tag in self._consumers:
                 try:
                     await queue.cancel(consumer_tag)
@@ -232,6 +262,18 @@ class AgentWorker:
             # its final task/LLM spans just like the API process does.
             shutdown_telemetry()
             logger.info("agent_worker_stopped")
+
+    @staticmethod
+    def _log_background_task_result(task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error is not None:
+            logger.warning(
+                "agent_worker_background_task_failed",
+                task=task.get_name(),
+                error=type(error).__name__,
+            )
 
     async def recover_pending(self) -> None:
         rows = await agent_task_service.load_pending()
@@ -746,7 +788,30 @@ class AgentWorker:
 
 
 async def run_worker() -> None:
-    await AgentWorker().run()
+    loop = asyncio.get_running_loop()
+    current_task = asyncio.current_task()
+    signal_installed = False
+
+    def request_shutdown() -> None:
+        logger.info("agent_worker_shutdown_requested", signal="SIGTERM")
+        if current_task is not None and not current_task.done():
+            current_task.cancel()
+
+    try:
+        loop.add_signal_handler(signal.SIGTERM, request_shutdown)
+        signal_installed = True
+    except (NotImplementedError, RuntimeError):
+        # add_signal_handler is unavailable on Windows and non-main threads.
+        # Production and the bundled start/stop scripts run the Worker on Linux.
+        pass
+
+    try:
+        await AgentWorker().run()
+    except asyncio.CancelledError:
+        logger.info("agent_worker_shutdown_completed", signal="SIGTERM")
+    finally:
+        if signal_installed:
+            loop.remove_signal_handler(signal.SIGTERM)
 
 
 def main() -> None:

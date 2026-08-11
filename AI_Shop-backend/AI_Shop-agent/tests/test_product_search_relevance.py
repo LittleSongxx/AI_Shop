@@ -18,6 +18,25 @@ def test_unknown_category_is_preserved_for_generic_search():
     assert match_terms_for_query("帮我找露营天幕")[0] == "露营天幕"
 
 
+def test_bag_mission_query_normalizes_to_catalog_search_term():
+    query = "预算提高到1000元，请继续推荐适合上班通勤的包"
+
+    assert normalize_product_search_query(query) == "包"
+    assert derive_search_keyword(query, None) == "包"
+    assert "旅行包" in match_terms_for_query(query)
+
+
+def test_bag_topic_keeps_a_real_travel_bag_and_drops_unrelated_packages():
+    products = [
+        {"product_name": "Walker Shop 大容量手提单肩旅行包"},
+        {"product_name": "SolidWorks 软件安装包正版激活服务"},
+    ]
+
+    assert filter_products_by_query_relevance(products, "上班通勤的包") == [
+        products[0]
+    ]
+
+
 def test_filter_drops_unrelated_hybrid_hits():
     products = [
         {"product_name": "名创优品小猪B-BO趴姿公仔"},

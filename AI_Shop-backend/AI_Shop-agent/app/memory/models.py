@@ -23,7 +23,7 @@ def empty_state() -> dict[str, Any]:
     return {
         "consultProduct": None,
         "pendingAction": None,
-        "shoppingNeed": None,
+        "shoppingMission": None,
         "lastToolResults": {
             "searchedProducts": [],
             "searchedProductNames": [],

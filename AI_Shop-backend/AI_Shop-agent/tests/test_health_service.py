@@ -52,5 +52,6 @@ async def test_model_provider_health_is_diagnostic_only(monkeypatch):
     assert dependencies["embedding"] is False
     assert dependencies["rerank"] is False
     assert dependencies["elasticsearch"]["ok"] is True
+    assert dependencies["visualSearch"] == {"state": "DISABLED"}
     assert dependencies["javaGateway"] is True
     assert dependencies["mcp"] is True
