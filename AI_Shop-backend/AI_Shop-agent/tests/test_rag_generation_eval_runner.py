@@ -116,10 +116,9 @@ def test_no_answer_requires_the_exact_refusal_without_citation():
     case = {"noAnswer": True, "relevantRefs": [], "answerKeywords": []}
 
     assert runner._answer_metrics(case, runner.REFUSAL_TEXT, [])["success"] is True
-    assert (
-        runner._answer_metrics(case, runner.REFUSAL_TEXT + " [1]", [])["success"]
-        is False
-    )
+    cited_refusal = runner._answer_metrics(case, runner.REFUSAL_TEXT + " [1]", [])
+    assert cited_refusal["predictedNoAnswer"] is True
+    assert cited_refusal["success"] is False
     assert runner._answer_metrics(case, "我不知道。", [])["success"] is False
 
 
