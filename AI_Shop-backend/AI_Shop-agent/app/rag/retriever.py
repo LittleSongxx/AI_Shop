@@ -1,8 +1,11 @@
 import asyncio
+import contextvars
 import hashlib
 import json
 import time
-from typing import Any
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Any, Iterator
 
 import structlog
 
@@ -43,6 +46,47 @@ ES_MAX_NUM_CANDIDATES = 10_000
 # 之后传什么都被忽略。原来 BM25/向量/商品关键词三处各传各的（3/30 vs 默认 5/60），
 # 并发下谁先创建谁的阈值就生效，熔断行为不确定。收敛成一份参数。
 ES_BREAKER_ARGS = {"failure_threshold": 3, "recovery_timeout": 30}
+
+
+@dataclass
+class RerankEvaluationStats:
+    """Provider/fallback accounting enabled only inside live evaluations."""
+
+    eligible_requests: int = 0
+    provider_requests: int = 0
+    provider_successes: int = 0
+    provider_failures: int = 0
+    fallback_count: int = 0
+    fallback_reasons: dict[str, int] = field(default_factory=dict)
+
+    def fallback(self, reason: str) -> None:
+        self.fallback_count += 1
+        self.fallback_reasons[reason] = self.fallback_reasons.get(reason, 0) + 1
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "eligibleRequests": self.eligible_requests,
+            "providerRequests": self.provider_requests,
+            "providerSuccesses": self.provider_successes,
+            "providerFailures": self.provider_failures,
+            "fallbackCount": self.fallback_count,
+            "fallbackReasons": dict(sorted(self.fallback_reasons.items())),
+        }
+
+
+_RERANK_EVALUATION_STATS: contextvars.ContextVar[RerankEvaluationStats | None] = (
+    contextvars.ContextVar("rerank_evaluation_stats", default=None)
+)
+
+
+@contextmanager
+def rerank_evaluation_scope() -> Iterator[RerankEvaluationStats]:
+    stats = RerankEvaluationStats()
+    token = _RERANK_EVALUATION_STATS.set(stats)
+    try:
+        yield stats
+    finally:
+        _RERANK_EVALUATION_STATS.reset(token)
 
 
 class KnowledgeCatalogUnavailable(RuntimeError):
@@ -632,13 +676,22 @@ class RagRetriever:
         settings = get_settings()
         if not docs or limit <= 0:
             return []
+        evaluation = _RERANK_EVALUATION_STATS.get()
+        if evaluation is not None:
+            evaluation.eligible_requests += 1
         fallback = docs[:limit]
         if not settings.rerank_api_key.strip():
+            if evaluation is not None:
+                evaluation.fallback("unconfigured")
             return fallback
         breaker = circuit_registry.get_or_create("rerank", failure_threshold=3, recovery_timeout=30)
         if not breaker.allow_request():
+            if evaluation is not None:
+                evaluation.fallback("breaker_open")
             return fallback
         try:
+            if evaluation is not None:
+                evaluation.provider_requests += 1
             candidates = [self._doc_text(doc)[:4000] for doc in docs]
             top_n = min(limit, len(candidates))
             if settings.rerank_api_format == "compatible":
@@ -709,9 +762,14 @@ class RagRetriever:
             if not reranked:
                 raise ValueError("rerank response contains no valid results")
             breaker.record_success()
+            if evaluation is not None:
+                evaluation.provider_successes += 1
             return reranked
         except Exception as exc:
             breaker.record_failure()
+            if evaluation is not None:
+                evaluation.provider_failures += 1
+                evaluation.fallback("provider_error")
             logger.warning("rerank_failed_fallback_rrf", error=str(exc))
             return fallback
 

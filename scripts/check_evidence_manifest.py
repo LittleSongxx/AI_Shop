@@ -132,6 +132,56 @@ def _check_result(evidence: dict[str, Any], path: Path, errors: list[str]) -> No
             errors.append(f"ablation isolation contract failed: {path.relative_to(REPO_ROOT)}")
 
 
+def _check_ai_review(
+    evidence: dict[str, Any], result: dict[str, Any], path: Path, errors: list[str]
+) -> None:
+    try:
+        review = _json(path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(f"invalid AI-assisted review {path.relative_to(REPO_ROOT)}: {exc}")
+        return
+    if review.get("schemaVersion") != 1:
+        errors.append(f"AI-assisted review has wrong schema: {path.relative_to(REPO_ROOT)}")
+    if review.get("reviewerType") != "AI_ASSISTED_INITIAL_REVIEW":
+        errors.append(f"AI-assisted review has wrong reviewer type: {path.relative_to(REPO_ROOT)}")
+    if review.get("status") != "COMPLETED":
+        errors.append(f"AI-assisted review is not completed: {path.relative_to(REPO_ROOT)}")
+    result_run_id = (result.get("metadata") or {}).get("runId")
+    if review.get("runId") != result_run_id:
+        errors.append(f"AI-assisted review runId mismatch: {path.relative_to(REPO_ROOT)}")
+    rows = review.get("cases")
+    expected_count = int(evidence.get("reviewCaseCount") or 10)
+    if not isinstance(rows, list) or len(rows) != expected_count:
+        errors.append(
+            f"AI-assisted review must contain {expected_count} cases: {path.relative_to(REPO_ROOT)}"
+        )
+        return
+    case_ids = [str(row.get("caseId") or "") for row in rows if isinstance(row, dict)]
+    if len(case_ids) != len(rows) or "" in case_ids or len(case_ids) != len(set(case_ids)):
+        errors.append(f"AI-assisted review case IDs are invalid: {path.relative_to(REPO_ROOT)}")
+    result_case_ids = {
+        str(row.get("caseId") or "")
+        for row in result.get("cases") or []
+        if isinstance(row, dict)
+    }
+    if set(case_ids) != result_case_ids:
+        errors.append(f"AI-assisted review cases differ from result: {path.relative_to(REPO_ROOT)}")
+    rubric_fields = ("grounded", "complete", "citationAligned", "safe")
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        case_id = str(row.get("caseId") or "unknown")
+        values = [row.get(field) for field in rubric_fields]
+        if any(not isinstance(value, bool) for value in values):
+            errors.append(f"AI-assisted review rubric is incomplete for {case_id}")
+            continue
+        expected_verdict = "PASS" if all(values) else "FAIL"
+        if row.get("verdict") != expected_verdict:
+            errors.append(f"AI-assisted review verdict is inconsistent for {case_id}")
+        if not str(row.get("reason") or "").strip():
+            errors.append(f"AI-assisted review reason is missing for {case_id}")
+
+
 def _check_markdown_links(relative: str, errors: list[str]) -> None:
     path = _resolve(relative)
     if not path.is_file():
@@ -206,9 +256,29 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                 errors.append(f"local result missing: {result_path}")
             else:
                 _check_result(row, path, errors)
+                review_relative = row.get("reviewPath")
+                if review_relative is not None:
+                    if not isinstance(review_relative, str) or not review_relative:
+                        errors.append(f"{evidence_id}.reviewPath is invalid")
+                    else:
+                        review_path = _resolve(review_relative)
+                        if not review_path.is_file():
+                            errors.append(f"AI-assisted review missing: {review_relative}")
+                        else:
+                            expected_review_sha = row.get("reviewSha256")
+                            if expected_review_sha and _sha256(review_path) != expected_review_sha:
+                                errors.append(f"AI-assisted review hash mismatch: {review_relative}")
+                            try:
+                                result_payload = _json(path)
+                            except (OSError, json.JSONDecodeError, ValueError):
+                                result_payload = {}
+                            _check_ai_review(row, result_payload, review_path, errors)
         result_sha = row.get("resultSha256")
         if result_sha is not None and not HEX64.fullmatch(str(result_sha)):
             errors.append(f"{evidence_id}.resultSha256 must be SHA-256")
+        review_sha = row.get("reviewSha256")
+        if review_sha is not None and not HEX64.fullmatch(str(review_sha)):
+            errors.append(f"{evidence_id}.reviewSha256 must be SHA-256")
         for lock in row.get("datasetLocks") or []:
             _check_dataset_lock(lock, errors)
 

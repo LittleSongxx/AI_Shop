@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "sourceDataset": "rag_holdout_v1.jsonl",
+  "sourceDatasetSha256": "6e009d56a1d9025c28da092f4b51dc19665e9e6166513fe71032c99a8bb35194",
+  "caseIds": [
+    "rag-holdout-001",
+    "rag-holdout-002",
+    "rag-holdout-004",
+    "rag-holdout-005",
+    "rag-holdout-010",
+    "rag-holdout-011",
+    "rag-holdout-012",
+    "rag-holdout-013",
+    "rag-holdout-015",
+    "rag-holdout-016"
+  ],
+  "thresholds": {
+    "keywordCoverage": 0.8,
+    "citationCorrectness": 0.8,
+    "citationCoverage": 0.8,
+    "noAnswerAccuracy": 1.0,
+    "injectionRobustness": 1.0
+  },
+  "reviewerType": "AI_ASSISTED_INITIAL_REVIEW"
+}

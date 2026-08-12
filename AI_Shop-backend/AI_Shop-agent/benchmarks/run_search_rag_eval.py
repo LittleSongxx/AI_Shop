@@ -352,6 +352,15 @@ def _live_search_cases(
     return results
 
 
+def _labelled_search_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        case
+        for case in cases
+        if isinstance(case.get("relevantProductIds"), list)
+        and bool(case["relevantProductIds"])
+    ]
+
+
 def _live_rag_cases(
     cases: list[dict[str, Any]],
     metrics: dict[str, Any],
@@ -362,9 +371,24 @@ def _live_rag_cases(
     results: list[EvaluationCaseResult] = []
     for case, row in zip(cases, metrics["perCase"]):
         passed = bool(row.get("passed"))
+        retrieval_modes = sorted(
+            {
+                str(ref.get("retrieval") or "unknown")
+                for ref in row.get("retrievedRefs") or []
+                if isinstance(ref, dict)
+            }
+        )
+        rerank_fallback = "rrf" in retrieval_modes
         assertions = [
             _assertion("rag_case_passed", passed, expected=True, actual=passed),
+            _assertion(
+                "rerank_completed_or_not_applicable",
+                not rerank_fallback,
+                expected="rerank, exact_faq, or no candidates",
+                actual=retrieval_modes or ["no_candidates"],
+            ),
         ]
+        passed = passed and not rerank_fallback
         if case.get("injection"):
             robust = bool(row.get("injectionRobust"))
             assertions.append(
@@ -407,6 +431,8 @@ def _live_rag_cases(
                     "citationCoverage": row.get("citationCoverage"),
                     "predictedNoAnswer": row.get("predictedNoAnswer"),
                     "injectionRobust": row.get("injectionRobust"),
+                    "retrievalModes": retrieval_modes,
+                    "rerankFallback": rerank_fallback,
                 },
             )
         )
@@ -446,9 +472,10 @@ async def _run_live_search(
     cases: list[dict[str, Any]], *, run_id: str, split: str, top_k: int
 ) -> tuple[list[EvaluationCaseResult], dict[str, Any]]:
     await _require_live_product_index(47)
-    graded = await evaluate_graded_relevance(cases, top_k)
+    labelled = _labelled_search_cases(cases)
+    graded = await evaluate_graded_relevance(labelled, top_k)
     return (
-        _live_search_cases(cases, graded, run_id=run_id, split=split, k=top_k),
+        _live_search_cases(labelled, graded, run_id=run_id, split=split, k=top_k),
         graded,
     )
 
@@ -517,6 +544,7 @@ async def run(
     live: bool = False,
     top_k: int = 10,
     accept_baseline: bool = False,
+    allow_embedding_cache: bool = False,
 ) -> tuple[EvaluationRun, Path, list[str]]:
     resolved_run_id = run_id or datetime.now(timezone.utc).strftime(
         "%Y%m%dT%H%M%SZ"
@@ -552,67 +580,101 @@ async def run(
     failures: list[str] = []
     live_metrics: dict[str, Any] = {}
 
+    provider_facts: dict[str, Any] = {}
     if live:
-        live_jobs = [
-            ("search-public", public_search_cases, public_search_contract, "public"),
-            ("search-holdout", search_holdout["cases"], search_holdout["lock"], "holdout"),
-        ]
-        for name, rows, contract, split in live_jobs:
-            try:
-                result_cases, metrics = await _run_live_search(
-                    rows, run_id=resolved_run_id, split=split, top_k=top_k
-                )
-                cases.extend(result_cases)
-                live_metrics[name] = metrics
-                failures.extend(
-                    f"{name}: {failure}"
-                    for failure in _metric_gate_failures(
-                        metrics, contract.get("thresholds") or {}, k=top_k
-                    )
-                )
-            except Exception as exc:
-                cases.append(
-                    _error_case(
-                        run_id=resolved_run_id,
-                        case_id=f"{name}:runtime",
-                        subset="search_relevance",
-                        split=split,
-                        exc=exc,
-                    )
-                )
-                failures.append(f"{name} live execution failed: {type(exc).__name__}")
+        from app.rag.embedding import embedding_evaluation_scope
+        from app.rag.retriever import rerank_evaluation_scope
 
-        for name, rows, contract, split in (
-            ("rag-public", public_rag_cases, public_rag_contract["lock"], "public"),
-            ("rag-holdout", rag_holdout["cases"], rag_holdout["lock"], "holdout"),
-        ):
-            try:
-                result_cases, report = await _run_live_rag(
-                    rows,
-                    contract,
-                    run_id=resolved_run_id,
-                    split=split,
-                    top_k=top_k,
-                )
-                cases.extend(result_cases)
-                live_metrics[name] = report
-                failures.extend(
-                    f"{name}: {failure}"
-                    for failure in _metric_gate_failures(
-                        report["metrics"], contract.get("thresholds") or {}, k=top_k
+        with embedding_evaluation_scope(
+            bypass_cache=not allow_embedding_cache
+        ) as embedding_stats, rerank_evaluation_scope() as rerank_stats:
+            live_jobs = [
+                ("search-public", public_search_cases, public_search_contract, "public"),
+                ("search-holdout", search_holdout["cases"], search_holdout["lock"], "holdout"),
+            ]
+            for name, rows, contract, split in live_jobs:
+                try:
+                    result_cases, metrics = await _run_live_search(
+                        rows, run_id=resolved_run_id, split=split, top_k=top_k
                     )
-                )
-            except Exception as exc:
-                cases.append(
-                    _error_case(
+                    cases.extend(result_cases)
+                    live_metrics[name] = metrics
+                    failures.extend(
+                        f"{name}: {failure}"
+                        for failure in _metric_gate_failures(
+                            metrics, contract.get("thresholds") or {}, k=top_k
+                        )
+                    )
+                except Exception as exc:
+                    cases.append(
+                        _error_case(
+                            run_id=resolved_run_id,
+                            case_id=f"{name}:runtime",
+                            subset="search_relevance",
+                            split=split,
+                            exc=exc,
+                        )
+                    )
+                    failures.append(
+                        f"{name} live execution failed: {type(exc).__name__}"
+                    )
+
+            for name, rows, contract, split in (
+                ("rag-public", public_rag_cases, public_rag_contract["lock"], "public"),
+                ("rag-holdout", rag_holdout["cases"], rag_holdout["lock"], "holdout"),
+            ):
+                try:
+                    result_cases, report = await _run_live_rag(
+                        rows,
+                        contract,
                         run_id=resolved_run_id,
-                        case_id=f"{name}:runtime",
-                        subset="rag_retrieval",
                         split=split,
-                        exc=exc,
+                        top_k=top_k,
                     )
-                )
-                failures.append(f"{name} live execution failed: {type(exc).__name__}")
+                    cases.extend(result_cases)
+                    live_metrics[name] = report
+                    failures.extend(
+                        f"{name}: {failure}"
+                        for failure in _metric_gate_failures(
+                            report["metrics"], contract.get("thresholds") or {}, k=top_k
+                        )
+                    )
+                except Exception as exc:
+                    cases.append(
+                        _error_case(
+                            run_id=resolved_run_id,
+                            case_id=f"{name}:runtime",
+                            subset="rag_retrieval",
+                            split=split,
+                            exc=exc,
+                        )
+                    )
+                    failures.append(
+                        f"{name} live execution failed: {type(exc).__name__}"
+                    )
+
+            provider_facts = {
+                "embedding": embedding_stats.snapshot(),
+                "rerank": rerank_stats.snapshot(),
+            }
+
+        embedding = provider_facts["embedding"]
+        rerank = provider_facts["rerank"]
+        if not allow_embedding_cache and int(embedding["cacheHits"]) != 0:
+            failures.append("embedding cache was used despite live cache bypass")
+        if int(embedding["providerSuccesses"]) <= 0:
+            failures.append("embedding provider produced no successful request")
+        if int(embedding["providerFailures"]) != 0:
+            failures.append(
+                f"embedding provider failures: {embedding['providerFailures']}"
+            )
+        if int(rerank["providerSuccesses"]) <= 0:
+            failures.append("rerank provider produced no successful request")
+        if int(rerank["providerFailures"]) != 0 or int(rerank["fallbackCount"]) != 0:
+            failures.append(
+                "rerank provider fallback detected: "
+                f"failures={rerank['providerFailures']}, fallbacks={rerank['fallbackCount']}"
+            )
 
     summary = aggregate_case_results(cases)
     deterministic_failures = [case.case_id for case in cases if case.status != "PASSED"]
@@ -643,6 +705,24 @@ async def run(
         "publicRagCases": len(public_rag_cases),
         "holdoutRagCases": len(rag_holdout["cases"]),
     }
+    live_search_count = sum(
+        len((live_metrics.get(name) or {}).get("perCase") or [])
+        for name in ("search-public", "search-holdout")
+    )
+    live_rag_count = sum(
+        int(((live_metrics.get(name) or {}).get("metrics") or {}).get("cases") or 0)
+        for name in ("rag-public", "rag-holdout")
+    )
+    summary["caseLayers"] = {
+        "deterministicCaseCount": len(public_query_results)
+        + len(holdout_query_results)
+        + len(public_rag_cases)
+        + len(rag_holdout["cases"]),
+        "liveSearchCaseCount": live_search_count,
+        "liveRagCaseCount": live_rag_count,
+        "liveCaseCount": live_search_count + live_rag_count,
+    }
+    summary["providerFacts"] = provider_facts
     summary["qualityGate"] = {
         "passed": not failures,
         "liveRequired": live,
@@ -675,6 +755,7 @@ async def run(
         parameters={
             "topK": top_k,
             "live": live,
+            "allowEmbeddingCache": allow_embedding_cache,
             "publicAndHoldoutReportedSeparately": True,
         },
     )
@@ -692,6 +773,11 @@ def main() -> None:
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--accept-baseline", action="store_true")
+    parser.add_argument(
+        "--allow-embedding-cache",
+        action="store_true",
+        help="allow cached query embeddings (debug only; omitted for live evidence)",
+    )
     args = parser.parse_args()
     try:
         evaluation, result_dir, failures = asyncio.run(
@@ -700,6 +786,7 @@ def main() -> None:
                 live=args.live,
                 top_k=args.top_k,
                 accept_baseline=args.accept_baseline,
+                allow_embedding_cache=args.allow_embedding_cache,
             )
         )
     except (ValueError, AssertionError) as exc:

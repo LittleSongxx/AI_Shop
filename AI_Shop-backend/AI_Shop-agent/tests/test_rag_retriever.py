@@ -14,6 +14,7 @@ from app.rag.retriever import (
     RagRetriever,
     cosine_to_es_score,
     knn_num_candidates,
+    rerank_evaluation_scope,
 )
 from app.rag.rrf import rrf_score_at_rank
 from app.services.java_internal_client import java_internal_client
@@ -534,9 +535,18 @@ async def test_invalid_rerank_results_fall_back_to_original_order(monkeypatch):
         {"id": "second", "content": "B", "score": 0.01, "source": "rrf"},
     ]
 
-    result = await retriever._rerank("query", docs, 1)
+    with rerank_evaluation_scope() as stats:
+        result = await retriever._rerank("query", docs, 1)
 
     assert result == docs[:1]
+    assert stats.snapshot() == {
+        "eligibleRequests": 1,
+        "providerRequests": 1,
+        "providerSuccesses": 0,
+        "providerFailures": 1,
+        "fallbackCount": 1,
+        "fallbackReasons": {"provider_error": 1},
+    }
     breaker.record_success.assert_not_called()
     breaker.record_failure.assert_called_once_with()
 

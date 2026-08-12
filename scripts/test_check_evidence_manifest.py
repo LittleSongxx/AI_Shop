@@ -48,7 +48,9 @@ def _manifest(tmp_path: Path) -> dict:
 
 class EvidenceManifestTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = tempfile.TemporaryDirectory(
+            dir=Path(__file__).resolve().parents[1]
+        )
         self.root = Path(self.temporary.name)
 
     def tearDown(self):
@@ -77,6 +79,81 @@ class EvidenceManifestTest(unittest.TestCase):
         manifest["evidence"].append(dict(manifest["evidence"][0]))
         errors = validate_manifest(manifest, check_local_results=False)
         self.assertTrue(any("duplicate evidence id" in error for error in errors))
+
+    def test_ai_assisted_review_requires_complete_consistent_rubric(self):
+        manifest = _manifest(self.root)
+        result_dir = self.root / "local-result"
+        result_dir.mkdir()
+        result = result_dir / "summary.json"
+        result.write_text(
+            json.dumps(
+                {
+                    "metadata": {
+                        "schemaVersion": "aishop-eval/v1",
+                        "suite": "rag-generation-live-v1",
+                        "runId": "run-1",
+                    },
+                    "summary": {
+                        "caseCount": 1,
+                        "executedCount": 1,
+                        "criticalSafetyViolationCount": 0,
+                    },
+                    "cases": [{"caseId": "case-1"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        review = result_dir / "ai-review.json"
+        review.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "runId": "run-1",
+                    "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+                    "status": "COMPLETED",
+                    "cases": [
+                        {
+                            "caseId": "case-1",
+                            "grounded": True,
+                            "complete": True,
+                            "citationAligned": True,
+                            "safe": True,
+                            "verdict": "PASS",
+                            "reason": "证据、答案与引用一致。",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        relative_result = str(result.relative_to(Path(__file__).resolve().parents[1]))
+        relative_review = str(review.relative_to(Path(__file__).resolve().parents[1]))
+        manifest["evidence"][0].update(
+            {
+                "kind": "evaluation",
+                "suite": "rag-generation-live-v1",
+                "level": "E3_CONFIGURED_LIVE",
+                "state": "LOCAL_RESULT",
+                "resultLocation": "local-ignored",
+                "resultPath": relative_result,
+                "resultSha256": hashlib.sha256(result.read_bytes()).hexdigest(),
+                "caseCount": 1,
+                "reviewPath": relative_review,
+                "reviewSha256": hashlib.sha256(review.read_bytes()).hexdigest(),
+                "reviewCaseCount": 1,
+            }
+        )
+
+        self.assertEqual(validate_manifest(manifest, check_local_results=True), [])
+
+        payload = json.loads(review.read_text(encoding="utf-8"))
+        payload["cases"][0]["verdict"] = "FAIL"
+        review.write_text(json.dumps(payload), encoding="utf-8")
+        manifest["evidence"][0]["reviewSha256"] = hashlib.sha256(
+            review.read_bytes()
+        ).hexdigest()
+        errors = validate_manifest(manifest, check_local_results=True)
+        self.assertTrue(any("verdict is inconsistent" in error for error in errors))
 
 
 if __name__ == "__main__":
