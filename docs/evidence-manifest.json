@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-12T19:20:00+08:00",
+  "generatedAt": "2026-08-12T23:39:00+08:00",
   "project": "AI_Shop",
   "targetRoles": [
     "AI application / Agent backend",
@@ -150,13 +150,62 @@
       "datasetLocks": []
     },
     {
-      "id": "configured-live-model",
+      "id": "search-rag-live-retrieval",
+      "kind": "evaluation",
+      "suite": "search-rag-v1",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && JAVA_WEB_URL=http://127.0.0.1:8108 python benchmarks/run_search_rag_eval.py --live --run-id live-search-rag-8471902",
+      "caseCount": 257,
+      "runCommit": "8471902c47ff6536becfc7f89c131c619d76f372",
+      "claim": "162 个确定性 contract 与 95 个 local-live 检索 case 全部执行；Search public/holdout Recall@10 均为 1.0，MRR 分别为 0.8917/0.7889，NDCG@10 为 0.9078/0.8265；RAG public/holdout Recall@K 为 0.9167/1.0，聚合质量门禁通过，严重安全违规为 0。",
+      "boundary": "证据来源仍为 SYNTHETIC，执行方式为 local-live；95 个 live case 中 93 个逐 case 通过，公开 RAG 的 faq-member-001 与 doc-address-001 未通过。Search 链路是 BM25 + Embedding + RRF，不声称使用 Rerank；RAG 使用 qwen3-rerank。Embedding/Rerank 没有可核验账单，不声称 costCny=0 代表免费；95 个延迟样本的 P99 只作样本描述。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-rag-v1/live-search-rag-8471902/summary.json",
+      "resultSha256": "571d2649efa13893d23c140848e24014b696071aa341c0c4187ca1ed076fd408",
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/search_relevance_v1.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/search_relevance_v1.jsonl"
+        },
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.lock.json",
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.jsonl"
+        },
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
+      ]
+    },
+    {
+      "id": "rag-generation-live",
+      "kind": "evaluation",
+      "suite": "rag-generation-live-v1",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && JAVA_WEB_URL=http://127.0.0.1:8108 python benchmarks/run_rag_generation_eval.py --run-id live-rag-generation-76e596b --top-k 10",
+      "caseCount": 10,
+      "runCommit": "76e596bdd4621bced24d5838efa649388ac2e66b",
+      "claim": "deepseek-v4-flash 对 10 个锁定 holdout case 全部完成生成，自动断言 8/10 通过；关键词覆盖率 0.9375、引用正确性 0.875、引用覆盖率 0.75、拒答准确率 1.0、注入鲁棒性 1.0，严重安全违规为 0；AI 辅助初审 9/10 通过。",
+      "boundary": "自动质量门禁未通过：rag-holdout-002 的引用没有覆盖标签指定 FAQ，rag-holdout-011 把流程规则问题误当成当前无答案；AI 初审只将前者判为语义有据，后者仍 FAIL。结果是 SYNTHETIC + local-live，不是独立人工标注、真实用户或生产效果。共采集 3384 input/240 output token，但可信人民币单价和检索账单未配置，成本状态为 UNPRICED。10 个样本的 P95/P99 不作为 SLO。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v1/live-rag-generation-76e596b/summary.json",
+      "resultSha256": "a681b92d95aac8b899f846ee5950818fca64de4e316ffff964726342778017eb",
+      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v1/live-rag-generation-76e596b/ai-review.json",
+      "reviewSha256": "d32ea891d74b2905e463e19443a1c5361d3abe4c1c756d9fa16d450202904661",
+      "reviewCaseCount": 10,
+      "datasetLocks": [
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v1.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
+      ]
+    },
+    {
+      "id": "agent-live-model",
       "kind": "online-evaluation",
       "level": "E3_CONFIGURED_LIVE",
       "state": "NOT_COLLECTED",
-      "command": "Run .github/workflows/online-ai-eval.yml with configured provider secrets and live Elasticsearch",
+      "command": "Run .github/workflows/online-ai-eval.yml with configured provider secrets for Agent runtime and ablation",
       "claim": "未采集。",
-      "boundary": "缺少已冻结的真实模型 Agent、Search/RAG、延迟、token 和成本结果；确定性结果不得替代。",
+      "boundary": "本轮只采集 Search/RAG E3；真实模型 Agent runtime、在线消融及其 token/成本仍未冻结，不能用 deterministic Runner 或本轮 RAG 结果替代。",
       "resultLocation": "not-collected",
       "resultPath": null,
       "datasetLocks": []
@@ -177,6 +226,7 @@
   "honestBoundaries": [
     "普通 benchmarks/results 目录被 Git 忽略；只有显式接受的 baseline lock 才能入库，本轮没有运行 --accept-baseline。",
     "SYNTHETIC、LOCAL_PILOT、REAL_USER 必须分开报告；REAL_USER 没有样本时固定为未采集。",
+    "Search/RAG 的 E3 configured-live 证据已经采集，但生成层最新自动门禁未全过；不得写成生成答案全部通过。",
     "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO。",
     "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
     "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。"

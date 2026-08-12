@@ -236,10 +236,13 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 本地集成、配置真实模型和授权真实用户五级；运行 `python scripts/check_evidence_manifest.py` 可检查结构、
 数据锁、结果 SHA 和“未采集”边界。
 
-当前已实测的 27 条 Commerce runtime、18 条 AI 安全和 162 条 Search/RAG 数据契约均属于
-`SYNTHETIC + deterministic`，不能表述为真实模型或真实用户效果。真实模型 Search/RAG/Agent 成本、
-`REAL_USER`、CTR/CVR、GMV uplift、线上 SLO 与生产规模仍为“未采集”。历史冻结会话及旧小样本结果只用于
-解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，
+当前 27 条 Commerce runtime、18 条 AI 安全和 162 条 Search/RAG 数据契约属于
+`SYNTHETIC + deterministic`。另已采集 `SYNTHETIC + local-live` 的 Search/RAG E3：45 条 Search 与 50 条
+RAG 检索全部执行，Search public/holdout Recall@10 均为 1.0，RAG public/holdout Recall@K 为
+0.9167/1.0；10 条 `deepseek-v4-flash` 生成自动 8/10、AI 辅助初审 9/10，最新自动门禁未全过。
+这些结果不代表真实用户或生产效果；Agent 在线模型、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
+线上 SLO 与生产规模仍为“未采集”。详细失败 case、Provider 调用和诚实边界见证据总览。历史冻结会话及
+旧小样本结果只用于解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，
 不再作为 README 的当前成绩。
 
 本地全链路部署、RAG、搜索、分类、购物车和管理端滚动问题的真实排障过程见

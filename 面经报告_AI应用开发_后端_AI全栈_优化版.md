@@ -169,7 +169,7 @@ AI_Shop 已按 AI 应用 / Agent 后端、Java + AI、AI 全栈和 RAG/Search �
 
 可直接使用的 90 秒版本：
 
-> AI_Shop 是一个 Spring Cloud Alibaba + FastAPI/LangGraph 的单商户电商系统。我重点解决的是如何让 AI 在真实订单、库存、优惠券和售后状态上可靠工作，而不是只做聊天 Demo。读操作通过受控工具查询权威业务事实；写操作由模型提出结构化提案，用户确认后 Java 重新校验身份、归属、状态和幂等。RAG 使用混合检索、引用和拒答，外部知识与工具输出进入模型前会做注入检疫和 PII 脱敏。工程上我补了五角色 RBAC、Java 到 Python 的 HMAC 管理员断言、用户 AI 数据导出/删除，以及统一的 `aishop-eval/v1` 评测协议。当前 27 条 Commerce runtime、18 条安全 case 和 162 条 Search/RAG 数据契约都在确定性环境实跑通过，Java Testcontainers 也覆盖真实中间件；真实模型效果、真实用户 FCR 和业务转化尚未采集，所以我不会把合成评测说成线上效果。
+> AI_Shop 是一个 Spring Cloud Alibaba + FastAPI/LangGraph 的单商户电商系统。我重点解决的是如何让 AI 在真实订单、库存、优惠券和售后状态上可靠工作，而不是只做聊天 Demo。读操作通过受控工具查询权威业务事实；写操作由模型提出结构化提案，用户确认后 Java 重新校验身份、归属、状态和幂等。RAG 使用 BM25 + 向量召回、RRF/Rerank、引用和拒答，外部知识与工具输出进入模型前做注入检疫和 PII 脱敏。工程上我补了五角色 RBAC、HMAC 管理员断言、AI 数据导出/删除和 `aishop-eval/v1` 评测协议。除 27 条 Commerce、18 条安全和 162 条确定性 contract 外，我用 `text-embedding-v4`、`qwen3-rerank`、`deepseek-v4-flash` 做了小规模 E3：45 条 Search、50 条 RAG 检索全部执行，检索聚合门禁通过；10 条生成自动 8/10、AI 辅助初审 9/10，主要 badcase 是流程规则被误拒答。它是合成数据的本地真实模型评测，不是生产或真实用户效果。
 
 面试中最容易继续追问、也最需要主动说明的缺口：
 
@@ -177,7 +177,7 @@ AI_Shop 已按 AI 应用 / Agent 后端、Java + AI、AI 全栈和 RAG/Search �
 |---|---|
 | 27/27 是否只是规则测试 | Runner 调用生产决策内核，但外部依赖用确定性适配器；它证明工程契约，不证明在线模型能力 |
 | 多 Agent 为什么更好 | 当前消融只证明锁定 case 不退化与进程隔离；真实模型质量、token 和成本优势未冻结 |
-| RAG 的 Recall/MRR 在哪 | 新 holdout 已锁数据与标签，但未运行 live ES/Embedding/Rerank，因而正确答案是“未采集” |
+| RAG 的 Recall/MRR 在哪 | 45 条 Search 与 50 条 RAG 已连接 ES/Embedding/Rerank 实跑；应分别报 public/holdout，并主动说出 2 条公开 RAG 逐 case 失败和生成自动 8/10 |
 | 有没有真实用户指标 | pilot、匿名报告和指标口径已实现；REAL_USER 仍未采集，不能声称 FCR、CTR/CVR 或 GMV uplift |
 | Java 后端够不够扎实 | 有交易状态机、幂等/MQ/退款恢复和 Testcontainers IT；common/order 行覆盖约 13%，这是应承认的短板 |
 | 项目是否生产级 | 是本地完整栈和求职工程项目，不代表生产流量、线上 SLO、监管认证或大规模容量 |
