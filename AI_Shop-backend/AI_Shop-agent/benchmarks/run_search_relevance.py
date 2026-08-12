@@ -25,6 +25,7 @@ import hashlib
 import json
 import math
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -269,7 +270,9 @@ async def evaluate_graded_relevance(cases: list[dict], k: int) -> dict[str, Any]
             str(pid): float(grade)
             for pid, grade in (case.get("relevanceGrades") or {}).items()
         }
+        started = time.perf_counter()
         channels = await _retrieve_channels(case.get("query") or "", k)
+        latency_ms = round((time.perf_counter() - started) * 1000, 4)
         ranked = channels["fused"]
         keyword_non_empty += int(bool(channels["keyword"]))
         vector_non_empty += int(bool(channels["vector"]))
@@ -289,6 +292,7 @@ async def evaluate_graded_relevance(cases: list[dict], k: int) -> dict[str, Any]
                 "recall": round(recall, 4),
                 "reciprocalRank": round(rr, 4),
                 "ndcg": round(ndcg, 4),
+                "latencyMs": latency_ms,
                 "keywordCandidates": len(channels["keyword"]),
                 "vectorCandidates": len(channels["vector"]),
             }

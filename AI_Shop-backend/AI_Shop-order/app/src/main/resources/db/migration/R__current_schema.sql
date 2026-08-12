@@ -96,7 +96,7 @@ create table if not exists refund_request
     buy_count               int                                 not null,
     refund_amount           decimal(10, 2)                      not null,
     pay_channel             varchar(20)                         null,
-    status                  varchar(32)                         not null comment 'PENDING_PAYMENT/PAYMENT_CONFIRMED/STOCK_PENDING/COMPLETED/MANUAL_REVIEW',
+    status                  varchar(32)                         not null comment 'PENDING_PAYMENT/PAYMENT_CONFIRMED/STOCK_PENDING/COMPLETED/MANUAL_REVIEW/REJECTED',
     retry_count             int       default 0                 not null,
     next_retry_time         datetime                            null,
     last_error              varchar(512)                        null,
@@ -108,6 +108,31 @@ create table if not exists refund_request
     constraint uk_refund_order_item unique (order_item_id),
     key idx_refund_retry (status, next_retry_time)
 ) comment '持久化退款 Saga' charset = utf8mb4;
+
+-- 进入人工复核前记录原状态，审批通过后按原状态恢复重试（B1 管理端审批）。
+SET @sql = IF(
+    EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'refund_request'
+              AND column_name = 'review_origin_status'),
+    'SELECT 1',
+    'ALTER TABLE refund_request ADD COLUMN review_origin_status varchar(32) NULL COMMENT ''MANUAL_REVIEW 进入前的状态, 审批恢复用'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+create table if not exists refund_review_ledger
+(
+    id                bigint auto_increment primary key,
+    refund_request_id varchar(32)  not null,
+    review_id         varchar(64)  not null comment '审批幂等键（客户端生成，重试必须复用）',
+    action            varchar(16)  not null comment 'APPROVE/REJECT',
+    operator          varchar(64)  null comment '审批人',
+    reason            varchar(512) null comment '审批备注',
+    created_at        datetime default current_timestamp not null,
+    constraint uk_refund_review_id unique (review_id),
+    key idx_refund_review_request (refund_request_id, created_at)
+) comment '退款人工审批台账（幂等）' charset = utf8mb4;
 
 create table if not exists order_comment
 (

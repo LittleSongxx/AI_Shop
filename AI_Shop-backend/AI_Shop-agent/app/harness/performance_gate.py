@@ -27,23 +27,51 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(results)
     success = sum(item.get("terminalSuccess") is True and not item.get("error") for item in results)
 
-    def metric(field: str) -> dict[str, Any]:
+    def distribution(field: str, *, suffix: str = "") -> dict[str, Any]:
         values = [float(item[field]) for item in results if item.get(field) is not None]
         return {
             "samples": len(values),
-            "p95Ms": round(percentile(values) or 0.0, 3) if values else None,
-            "maxMs": round(max(values), 3) if values else None,
+            f"p50{suffix}": round(percentile(values, 0.5) or 0.0, 3)
+            if values
+            else None,
+            f"p95{suffix}": round(percentile(values) or 0.0, 3)
+            if values
+            else None,
+            f"p99{suffix}": round(percentile(values, 0.99) or 0.0, 3)
+            if values
+            else None,
+            f"max{suffix}": round(max(values), 3) if values else None,
         }
+
+    input_tokens = sum(int(item.get("inputTokens") or 0) for item in results)
+    output_tokens = sum(int(item.get("outputTokens") or 0) for item in results)
+    total_cost = round(sum(float(item.get("costCny") or 0) for item in results), 8)
 
     return {
         "requests": total,
         "terminalSuccesses": success,
         "terminalSuccessRate": round(success / total, 4) if total else 0.0,
         "errorCount": total - success,
-        "enqueue": metric("enqueueMs"),
-        "queue": metric("queueMs"),
-        "ttft": metric("ttftMs"),
-        "total": metric("totalMs"),
+        "enqueue": distribution("enqueueMs", suffix="Ms"),
+        "queue": distribution("queueMs", suffix="Ms"),
+        "ttft": distribution("ttftMs", suffix="Ms"),
+        "total": distribution("totalMs", suffix="Ms"),
+        "steps": distribution("stepCount"),
+        "modelCalls": distribution("modelCallCount"),
+        "toolCalls": distribution("toolCallCount"),
+        "inputTokens": input_tokens,
+        "outputTokens": output_tokens,
+        "totalTokens": input_tokens + output_tokens,
+        "costCny": total_cost,
+        "costPerSuccessCny": round(total_cost / success, 8) if success else None,
+        "sampleDisclosure": {
+            "p99Reliable": total >= 100,
+            "message": (
+                None
+                if total >= 100
+                else "fewer than 100 samples; p99 is descriptive only"
+            ),
+        },
     }
 
 

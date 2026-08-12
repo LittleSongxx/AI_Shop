@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routes import agent
-from app.config.settings import get_settings
 from app.services.badcase_service import badcase_service
 from app.services.regression_replay_service import regression_replay_service
+from tests.admin_assertion_helpers import signed_admin_request
 
 
 def _app() -> FastAPI:
@@ -29,7 +29,6 @@ def test_badcase_admin_routes_enforce_internal_auth(monkeypatch):
 def test_badcase_review_accepts_lifecycle_metadata_and_regression(monkeypatch):
     review = AsyncMock(return_value={"candidateId": 7, "status": "REGRESSION_ADDED"})
     monkeypatch.setattr(badcase_service, "review", review)
-    headers = {"X-Internal-Token": get_settings().internal_token}
     regression = {
         "name": "退款状态需要工具依据",
         "input": {"userMessage": "退款到哪了"},
@@ -37,13 +36,12 @@ def test_badcase_review_accepts_lifecycle_metadata_and_regression(monkeypatch):
     }
 
     with TestClient(_app()) as client:
-        response = client.post(
+        body, headers = signed_admin_request(
             "/api/agent/admin/reviewBadcase",
-            headers=headers,
-            json={
+            {
                 "candidateId": 7,
                 "status": "REGRESSION_ADDED",
-                "reviewer": "admin-1",
+                "reviewer": "attacker-controlled",
                 "remark": "已补回归",
                 "labels": ["grounding"],
                 "owner": "agent-team",
@@ -51,13 +49,18 @@ def test_badcase_review_accepts_lifecycle_metadata_and_regression(monkeypatch):
                 "regression": regression,
             },
         )
+        response = client.post(
+            "/api/agent/admin/reviewBadcase",
+            headers=headers,
+            content=body,
+        )
 
     assert response.status_code == 200
     assert response.json()["data"]["status"] == "REGRESSION_ADDED"
     review.assert_awaited_once_with(
         7,
         "REGRESSION_ADDED",
-        "admin-1",
+        "admin-session",
         remark="已补回归",
         labels=["grounding"],
         owner="agent-team",
@@ -69,13 +72,15 @@ def test_badcase_review_accepts_lifecycle_metadata_and_regression(monkeypatch):
 def test_regression_case_list_route(monkeypatch):
     cases = AsyncMock(return_value={"list": [{"caseId": 9}], "totalCount": 1})
     monkeypatch.setattr(badcase_service, "list_regression_cases", cases)
-    headers = {"X-Internal-Token": get_settings().internal_token}
-
     with TestClient(_app()) as client:
+        body, headers = signed_admin_request(
+            "/api/agent/admin/regressionCases",
+            {"pageNo": 2, "pageSize": 20, "status": "ACTIVE"},
+        )
         response = client.post(
             "/api/agent/admin/regressionCases",
             headers=headers,
-            json={"pageNo": 2, "pageSize": 20, "status": "ACTIVE"},
+            content=body,
         )
 
     assert response.status_code == 200
@@ -88,13 +93,14 @@ def test_regression_replay_route_runs_one_active_case(monkeypatch):
         return_value={"total": 1, "passed": 1, "failed": 0, "errors": 0}
     )
     monkeypatch.setattr(regression_replay_service, "run_active", replay)
-    headers = {"X-Internal-Token": get_settings().internal_token}
-
     with TestClient(_app()) as client:
+        body, headers = signed_admin_request(
+            "/api/agent/admin/runRegressionCases", {"caseId": 9}
+        )
         response = client.post(
             "/api/agent/admin/runRegressionCases",
             headers=headers,
-            json={"caseId": 9},
+            content=body,
         )
 
     assert response.status_code == 200

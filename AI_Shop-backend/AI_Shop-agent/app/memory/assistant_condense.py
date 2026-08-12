@@ -6,7 +6,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
-from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.observability.llm_metrics import invoke_llm_with_metrics, reset_run_cost
 from app.services.llm_factory import create_memory_llm
 from app.services.redis_service import redis_service
 
@@ -72,6 +72,8 @@ def schedule_assistant_condense(user_id: str, message_id: int, text: str | None)
     asyncio.create_task(_run_assistant_condense(key, user_id, message_id, stripped))
 
 async def _run_assistant_condense(key: str, user_id: str, message_id: int, text: str) -> None:
+    # 异步调度任务与对话路径的成本累计隔离（同 compress）。
+    reset_run_cost()
     try:
         condensed = await condense_assistant_for_history(text)
         if condensed:

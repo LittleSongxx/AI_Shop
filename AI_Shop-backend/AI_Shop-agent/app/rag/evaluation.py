@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from pathlib import PurePath
 from typing import Any
@@ -52,6 +53,54 @@ def _expected_refs(case: dict[str, Any]) -> list[dict[str, Any]]:
     return [{"id": value} for value in case.get("relevantIds") or []]
 
 
+def _dcg(gains: list[float]) -> float:
+    return sum(gain / math.log2(rank + 1) for rank, gain in enumerate(gains, start=1))
+
+
+def _expected_grade(expected: dict[str, Any]) -> float:
+    value = expected.get("grade", expected.get("relevance", 1.0))
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 1.0
+    return max(0.0, float(value))
+
+
+def _ndcg_at_k(
+    expected_refs: list[dict[str, Any]],
+    actual_refs: list[dict[str, Any]],
+    limit: int,
+) -> float:
+    remaining = set(range(len(expected_refs)))
+    gains: list[float] = []
+    for actual in actual_refs[:limit]:
+        matches = [
+            index
+            for index in remaining
+            if _matches_expected(expected_refs[index], actual)
+        ]
+        if not matches:
+            gains.append(0.0)
+            continue
+        selected = max(matches, key=lambda index: _expected_grade(expected_refs[index]))
+        gains.append(_expected_grade(expected_refs[selected]))
+        remaining.remove(selected)
+    ideal = sorted((_expected_grade(expected) for expected in expected_refs), reverse=True)[
+        :limit
+    ]
+    ideal_dcg = _dcg(ideal)
+    return _dcg(gains) / ideal_dcg if ideal_dcg else 0.0
+
+
+def _citation_supports_answer(
+    actual: dict[str, Any],
+    expected_refs: list[dict[str, Any]],
+    keywords: list[str],
+) -> bool:
+    if not any(_matches_expected(expected, actual) for expected in expected_refs):
+        return False
+    snippet = _normalized_text(actual.get("snippet"))
+    return not keywords or any(keyword in snippet for keyword in keywords)
+
+
 def placeholder_references(cases: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     placeholders: list[dict[str, Any]] = []
     for index, case in enumerate(cases):
@@ -92,20 +141,29 @@ def evaluate_results(
             "noAnswerCases": 0,
             "recallAtK": 0.0,
             "mrr": 0.0,
+            "ndcgAtK": 0.0,
             "topKHitRate": 0.0,
             "answerCitationRate": 0.0,
+            "citationCorrectness": 0.0,
+            "citationCoverage": 0.0,
             "noAnswerAccuracy": 0.0,
             "noAnswerPrecision": 0.0,
             "noAnswerRecall": 0.0,
             "noAnswerF1": 0.0,
+            "injectionCases": 0,
+            "injectionRobustness": 0.0,
             "placeholderRefs": [],
             "perCase": [],
         }
 
     recall_values: list[float] = []
     reciprocal_ranks: list[float] = []
+    ndcg_values: list[float] = []
     top_k_hits = 0
     citation_hits = 0
+    valid_citation_count = returned_citation_count = 0
+    citation_coverage_values: list[float] = []
+    injection_cases = injection_robust = 0
     no_answer_cases = no_answer_hits = 0
     no_answer_tp = no_answer_fp = no_answer_fn = 0
     per_case: list[dict[str, Any]] = []
@@ -118,6 +176,7 @@ def evaluate_results(
         predicted_no_answer = not refs or (
             isinstance(trace, dict) and trace.get("hit") is False
         )
+        latency_ms = trace.get("latencyMs") if isinstance(trace, dict) else None
         matched_positions = [
             position
             for position, actual in enumerate(refs[:limit], start=1)
@@ -130,6 +189,10 @@ def evaluate_results(
                 no_answer_tp += 1
             else:
                 no_answer_fn += 1
+            robust = predicted_no_answer
+            if case.get("injection"):
+                injection_cases += 1
+                injection_robust += int(robust)
             per_case.append(
                 {
                     "index": index,
@@ -137,6 +200,8 @@ def evaluate_results(
                     "expectedNoAnswer": True,
                     "predictedNoAnswer": predicted_no_answer,
                     "passed": predicted_no_answer,
+                    "injectionRobust": robust if case.get("injection") else None,
+                    "latencyMs": latency_ms,
                     "retrievedRefs": refs[:limit],
                 }
             )
@@ -166,16 +231,37 @@ def evaluate_results(
         recall_values.append(recall)
         rank = matched_positions[0] if matched_positions else None
         reciprocal_ranks.append(1.0 / rank if rank else 0.0)
+        ndcg = _ndcg_at_k(expected_refs, refs, limit)
+        ndcg_values.append(ndcg)
         if rank:
             top_k_hits += 1
 
-        keywords = [str(value).lower() for value in case.get("answerKeywords") or []]
-        snippets = " ".join(str(ref.get("snippet") or "") for ref in refs).lower()
-        cited = bool(matched_positions) and (
-            not keywords or any(keyword in snippets for keyword in keywords)
+        keywords = [_normalized_text(value) for value in case.get("answerKeywords") or []]
+        returned_citation_count += len(refs[:limit])
+        valid_refs = [
+            ref
+            for ref in refs[:limit]
+            if _citation_supports_answer(ref, expected_refs, keywords)
+        ]
+        valid_citation_count += len(valid_refs)
+        covered_expected = sum(
+            1
+            for expected in expected_refs
+            if any(
+                _matches_expected(expected, actual)
+                and _citation_supports_answer(actual, expected_refs, keywords)
+                for actual in refs[:limit]
+            )
         )
+        citation_coverage = covered_expected / len(expected_refs)
+        citation_coverage_values.append(citation_coverage)
+        cited = bool(valid_refs)
         if cited:
             citation_hits += 1
+        robust = recall == 1.0 and citation_coverage == 1.0
+        if case.get("injection"):
+            injection_cases += 1
+            injection_robust += int(robust)
         per_case.append(
             {
                 "index": index,
@@ -184,7 +270,14 @@ def evaluate_results(
                 "predictedNoAnswer": predicted_no_answer,
                 "recallAtK": round(recall, 4),
                 "reciprocalRank": round(1.0 / rank, 4) if rank else 0.0,
+                "ndcgAtK": round(ndcg, 4),
                 "citation": cited,
+                "citationCorrectness": round(len(valid_refs) / len(refs[:limit]), 4)
+                if refs[:limit]
+                else 0.0,
+                "citationCoverage": round(citation_coverage, 4),
+                "injectionRobust": robust if case.get("injection") else None,
+                "latencyMs": latency_ms,
                 "passed": recall == 1.0 and cited,
                 "expectedRefs": expected_refs,
                 "retrievedRefs": refs[:limit],
@@ -206,14 +299,27 @@ def evaluate_results(
         "noAnswerCases": no_answer_cases,
         "recallAtK": round(sum(recall_values) / retrieval_count, 4) if retrieval_count else 0.0,
         "mrr": round(sum(reciprocal_ranks) / retrieval_count, 4) if retrieval_count else 0.0,
+        "ndcgAtK": round(sum(ndcg_values) / retrieval_count, 4)
+        if retrieval_count
+        else 0.0,
         "topKHitRate": round(top_k_hits / retrieval_count, 4) if retrieval_count else 0.0,
         "answerCitationRate": round(citation_hits / retrieval_count, 4) if retrieval_count else 0.0,
+        "citationCorrectness": round(valid_citation_count / returned_citation_count, 4)
+        if returned_citation_count
+        else 0.0,
+        "citationCoverage": round(sum(citation_coverage_values) / retrieval_count, 4)
+        if retrieval_count
+        else 0.0,
         "noAnswerAccuracy": round(no_answer_hits / no_answer_cases, 4)
         if no_answer_cases
         else 0.0,
         "noAnswerPrecision": round(precision, 4),
         "noAnswerRecall": round(no_answer_recall, 4),
         "noAnswerF1": round(f1, 4),
+        "injectionCases": injection_cases,
+        "injectionRobustness": round(injection_robust / injection_cases, 4)
+        if injection_cases
+        else 0.0,
         "placeholderRefs": placeholder_references(case_list),
         "perCase": per_case,
     }

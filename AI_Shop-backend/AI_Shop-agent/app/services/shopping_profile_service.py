@@ -105,6 +105,10 @@ _FEATURE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("大容量", ("大容量", "能装", "收纳多")),
     ("轻量", ("轻量", "重量轻")),
 )
+_EXPLICIT_SPEC_PATTERNS = (
+    re.compile(r"(?i)(\d+(?:\.\d+)?\s*(?:GB|TB|G)\s*(?:内存|运存|存储|硬盘))"),
+    re.compile(r"(?i)((?:内存|运存|存储|硬盘)\s*\d+(?:\.\d+)?\s*(?:GB|TB|G))"),
+)
 
 _NEGATIVE_BRAND_WORDS = ("不要", "不想要", "排除", "不考虑", "不选", "别买", "避开")
 _GENERIC_RECOMMEND_WORDS = ("推荐", "买什么", "选什么", "挑什么", "有什么好物", "找点")
@@ -389,6 +393,11 @@ def extract_profile(text: str | None) -> dict[str, Any]:
         for canonical, aliases in _FEATURE_HINTS
         if any(alias in value for alias in aliases)
     ]
+    for pattern in _EXPLICIT_SPEC_PATTERNS:
+        for match in pattern.finditer(value):
+            spec = re.sub(r"\s+", " ", match.group(1)).strip()
+            if spec and spec not in profile["features"]:
+                profile["features"].append(spec)
     if any(hint in value for hint in _ACCEPT_SUBSTITUTE_HINTS):
         profile["acceptSubstitute"] = True
     elif any(hint in value for hint in _REJECT_SUBSTITUTE_HINTS):

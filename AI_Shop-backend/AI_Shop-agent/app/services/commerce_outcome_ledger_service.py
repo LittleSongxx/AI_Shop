@@ -13,7 +13,7 @@ import structlog
 
 from app.config.settings import get_settings
 from app.db.pool import acquire
-from app.models.commerce_outcome import CommerceOutcomeEvent
+from app.models.commerce_outcome import CommerceOutcomeEvent, source_event_matches
 from app.services.episode_service import current_episode, episode_service
 
 logger = structlog.get_logger()
@@ -115,6 +115,12 @@ class CommerceOutcomeLedgerService:
                 "eventId": event.eventId,
                 "accepted": False,
                 "status": "LEDGER_DISABLED",
+            }
+        if not source_event_matches(event.source, event.eventType):
+            return {
+                "eventId": event.eventId,
+                "accepted": False,
+                "status": "SOURCE_EVENT_MISMATCH",
             }
         now = _utc_now()
         oldest = now - timedelta(days=get_settings().commerce_outcome_retention_days)
@@ -283,9 +289,11 @@ class CommerceOutcomeLedgerService:
                     """
                 INSERT INTO commerce_outcome_ledger
                     (event_id,source,idempotency_key,event_type,user_id,
-                     request_id,run_id,product_id,sku_key,order_id,payload_json,
+                     request_id,run_id,pilot_batch_id,product_id,sku_key,order_id,payload_json,
                      occurred_at,created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW(3))
+                VALUES (%s,%s,%s,%s,%s,%s,%s,
+                        (SELECT r.pilot_batch_id FROM agent_run r WHERE r.run_id=%s),
+                        %s,%s,%s,%s,%s,NOW(3))
                 """,
                     (
                         event.eventId,
@@ -294,6 +302,7 @@ class CommerceOutcomeLedgerService:
                         event.eventType,
                         event.userId,
                         event.requestId,
+                        event.runId,
                         event.runId,
                         event.productId,
                         event.skuKey,

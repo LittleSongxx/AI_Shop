@@ -22,6 +22,7 @@ from __future__ import annotations
 import os
 
 from app.config.settings import Settings, get_settings
+from app.services.redis_service import redis_service
 
 # 集成测试自己用 os.getenv 直读的变量，不属于 Settings 的管辖范围，原样放过。
 _PASSTHROUGH_PREFIXES = ("MYSQL_", "RUN_AGENT_")
@@ -58,3 +59,12 @@ def _isolate_settings_from_dotenv() -> None:
 
 
 _isolate_settings_from_dotenv()
+
+
+async def _allow_test_nonce(_nonce_hash: str, _ttl_seconds: int) -> bool:
+    return True
+
+
+# Unit route tests do not start the production Redis lifespan. Individual replay tests
+# replace this function with a stateful fake.
+redis_service.claim_admin_assertion_nonce = _allow_test_nonce

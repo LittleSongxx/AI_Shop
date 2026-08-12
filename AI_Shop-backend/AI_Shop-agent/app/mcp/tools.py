@@ -3,6 +3,7 @@
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+from app.harness.observation import build_tool_result_observation
 from app.services.mcp_streamable_client import mcp_streamable_client
 
 
@@ -123,7 +124,8 @@ class SearchKnowledgeArgs(BaseModel):
 
 async def _call(name: str, **kwargs) -> str:
     args = {k: v for k, v in kwargs.items() if v is not None}
-    return (await mcp_streamable_client.call_tool(name, args)).to_tool_message()
+    result = await mcp_streamable_client.call_tool(name, args)
+    return build_tool_result_observation(result).text
 
 
 def build_mcp_tools(allowed_tools: set[str] | frozenset[str] | None = None) -> list[StructuredTool]:

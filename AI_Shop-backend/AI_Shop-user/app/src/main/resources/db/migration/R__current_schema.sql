@@ -1,5 +1,114 @@
 -- Current schema owned by the user service.
 
+create table if not exists admin_account
+(
+    admin_id             bigint auto_increment primary key,
+    account              varchar(100)                         not null,
+    password_hash        varchar(100)                         not null,
+    display_name         varchar(100)                         null,
+    status               tinyint      default 1              not null comment '0 disabled, 1 active',
+    session_version      bigint       default 1              not null,
+    migrated_from_config tinyint      default 0              not null,
+    last_login_at        datetime(3)                          null,
+    created_at           datetime(3) default current_timestamp(3) not null,
+    updated_at           datetime(3) default current_timestamp(3) not null
+        on update current_timestamp(3),
+    constraint uk_admin_account unique (account)
+) comment 'database-backed administrator identity' charset = utf8mb4;
+
+create table if not exists admin_role
+(
+    role_id      bigint auto_increment primary key,
+    role_code    varchar(64)  not null,
+    role_name    varchar(100) not null,
+    description  varchar(255) null,
+    constraint uk_admin_role_code unique (role_code)
+) comment 'administrator role' charset = utf8mb4;
+
+create table if not exists admin_permission
+(
+    permission_id   bigint auto_increment primary key,
+    permission_code varchar(100) not null,
+    description     varchar(255) null,
+    constraint uk_admin_permission_code unique (permission_code)
+) comment 'administrator permission' charset = utf8mb4;
+
+create table if not exists admin_account_role
+(
+    admin_id bigint not null,
+    role_id  bigint not null,
+    primary key (admin_id, role_id),
+    constraint fk_admin_account_role_admin foreign key (admin_id) references admin_account (admin_id),
+    constraint fk_admin_account_role_role foreign key (role_id) references admin_role (role_id)
+) comment 'administrator role binding' charset = utf8mb4;
+
+create table if not exists admin_role_permission
+(
+    role_id       bigint not null,
+    permission_id bigint not null,
+    primary key (role_id, permission_id),
+    constraint fk_admin_role_permission_role foreign key (role_id) references admin_role (role_id),
+    constraint fk_admin_role_permission_permission foreign key (permission_id)
+        references admin_permission (permission_id)
+) comment 'role permission binding' charset = utf8mb4;
+
+create table if not exists admin_security_audit_log
+(
+    audit_id      bigint auto_increment primary key,
+    actor_admin_id bigint       null,
+    action        varchar(64)   not null,
+    target_admin_id bigint      null,
+    detail_json   json          null,
+    created_at    datetime(3) default current_timestamp(3) not null,
+    key idx_admin_security_audit_actor (actor_admin_id, created_at),
+    key idx_admin_security_audit_target (target_admin_id, created_at)
+) comment 'administrator security audit trail' charset = utf8mb4;
+
+insert into admin_role (role_code, role_name, description) values
+    ('SUPER_ADMIN', '超级管理员', '全权限及管理员治理'),
+    ('AI_OPERATOR', 'AI运营', 'AI配置、评测和试用批次'),
+    ('SUPPORT_AGENT', '客服专员', '脱敏客服查询与处置'),
+    ('DATA_ANALYST', '数据分析', '聚合指标和匿名报告'),
+    ('AUDITOR', '审计员', '只读审计')
+on duplicate key update role_name = values(role_name), description = values(description);
+
+insert into admin_permission (permission_code, description) values
+    ('admin:manage', '管理员、角色和会话治理'),
+    ('admin:legacy', '未细分的既有管理功能'),
+    ('ai:config', 'AI配置和知识库管理'),
+    ('ai:evaluate', 'AI评测和证据复核'),
+    ('ai:pilot', '试用批次管理'),
+    ('support:read', '脱敏客服数据读取'),
+    ('support:write', '客服认领、回复和结案'),
+    ('analytics:read', '聚合指标读取'),
+    ('analytics:export', '匿名指标导出'),
+    ('audit:read', '只读审计')
+on duplicate key update description = values(description);
+
+insert ignore into admin_role_permission (role_id, permission_id)
+select r.role_id, p.permission_id from admin_role r cross join admin_permission p
+where r.role_code = 'SUPER_ADMIN';
+
+insert ignore into admin_role_permission (role_id, permission_id)
+select r.role_id, p.permission_id from admin_role r join admin_permission p
+  on p.permission_code in ('ai:config', 'ai:evaluate', 'ai:pilot', 'analytics:read')
+where r.role_code = 'AI_OPERATOR';
+
+insert ignore into admin_role_permission (role_id, permission_id)
+select r.role_id, p.permission_id from admin_role r join admin_permission p
+  on p.permission_code in ('support:read', 'support:write')
+where r.role_code = 'SUPPORT_AGENT';
+
+insert ignore into admin_role_permission (role_id, permission_id)
+select r.role_id, p.permission_id from admin_role r join admin_permission p
+  on p.permission_code in ('analytics:read', 'analytics:export')
+where r.role_code = 'DATA_ANALYST';
+
+insert ignore into admin_role_permission (role_id, permission_id)
+select r.role_id, p.permission_id from admin_role r join admin_permission p
+  on p.permission_code = 'audit:read'
+where r.role_code = 'AUDITOR';
+
 create table if not exists user_info
 (
     user_id         varchar(10)          not null comment '用户id' primary key,

@@ -27,4 +27,5 @@ public class RefundRequest {
     private Date updatedAt;
     private Date paymentConfirmedAt;
     private Date completedAt;
+    private String reviewOriginStatus;
 }

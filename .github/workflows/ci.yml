@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   java:
@@ -26,7 +27,7 @@ jobs:
       - run: mvn --batch-mode --no-transfer-progress verify
 
   java-integration:
-    name: Java middleware integration
+    name: Java domain integration
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -38,7 +39,9 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - run: mvn --batch-mode --no-transfer-progress -Pintegration -pl AI_Shop-common -am test
+      - run: >-
+          mvn --batch-mode --no-transfer-progress -Pintegration
+          -pl AI_Shop-common,AI_Shop-order/app -am verify
 
   agent:
     name: Agent
@@ -77,6 +80,20 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_USER: root
           MYSQL_PASSWORD: root
+      - name: Deterministic Commerce, Safety, Search/RAG and ablation gates
+        run: |
+          run_id="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python benchmarks/run_agentic_commerce_runtime.py --run-id "${run_id}-commerce"
+          python benchmarks/run_ai_safety.py --run-id "${run_id}-safety"
+          python benchmarks/run_search_rag_eval.py --run-id "${run_id}-search-rag"
+          python benchmarks/run_ablation.py --run-id "${run_id}-ablation"
+      - name: Upload deterministic evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-ai-evidence-${{ github.run_id }}
+          path: AI_Shop-backend/AI_Shop-agent/benchmarks/results
+          if-no-files-found: error
 
   frontend:
     name: Frontend (${{ matrix.app }})
@@ -116,3 +133,53 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          config-file: .github/dependency-review-config.yml
+
+  sbom:
+    name: CycloneDX SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            AI_Shop-front/AI_Shop-admin/package-lock.json
+            AI_Shop-front/AI_Shop-web/package-lock.json
+      - run: python -m pip install cyclonedx-bom==7.3.1
+      - run: python scripts/check_dependency_exceptions.py
+      - run: bash scripts/generate_sbom.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sbom-${{ github.run_id }}
+          path: artifacts/sbom
+          if-no-files-found: error
+
+  evidence-docs:
+    name: Evidence and documentation consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check_evidence_manifest.py
+      - run: python -m unittest discover -s scripts -p 'test_check_evidence_manifest.py'

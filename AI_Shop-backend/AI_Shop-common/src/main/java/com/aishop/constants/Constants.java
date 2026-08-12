@@ -100,6 +100,8 @@ public class Constants {
 
     public static final String REDIS_KEY_TOKEN_ADMIN_ACCOUNT = REDIS_KEY_PREFIX + "token:admin:account:";
 
+    public static final String REDIS_KEY_ADMIN_SESSION_VERSION = REDIS_KEY_PREFIX + "admin:session-version:";
+
     public static final String REDIS_KEY_ADMIN_LOGIN_FAIL = REDIS_KEY_PREFIX + "admin:login:fail:";
 
     public static final String REDIS_KEY_ADMIN_LOGIN_LOCK = REDIS_KEY_PREFIX + "admin:login:lock:";

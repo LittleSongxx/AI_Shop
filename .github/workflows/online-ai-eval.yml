@@ -1,6 +1,8 @@
 name: Online AI evaluation
 
 on:
+  schedule:
+    - cron: "45 18 * * 6"
   workflow_dispatch:
     inputs:
       dataset:
@@ -13,7 +15,7 @@ permissions:
 
 jobs:
   online-ai:
-    name: Live LLM, Embedding, Rerank and RAG gate
+    name: Configured providers and live Search/RAG evidence
     runs-on: ubuntu-latest
     environment: ai-evaluation
     defaults:
@@ -28,7 +30,23 @@ jobs:
           cache-dependency-path: AI_Shop-backend/AI_Shop-agent/requirements.lock
       - run: python -m pip install --requirement requirements.lock
       - run: python -m pip install --no-deps --editable .
-      - run: python scripts/check_online_models.py
+      - name: Detect configured online evaluation environment
+        id: online
+        env:
+          LLM_API_KEY: ${{ secrets.AI_EVAL_LLM_API_KEY }}
+          EMBEDDING_API_KEY: ${{ secrets.AI_EVAL_EMBEDDING_API_KEY }}
+          RERANK_API_KEY: ${{ secrets.AI_EVAL_RERANK_API_KEY }}
+          ES_HOSTS: ${{ vars.AI_EVAL_ES_HOSTS }}
+        run: |
+          if [[ -n "${LLM_API_KEY}" && -n "${EMBEDDING_API_KEY}" && -n "${RERANK_API_KEY}" && -n "${ES_HOSTS}" ]]; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::Online AI evaluation skipped: provider secrets or live Elasticsearch configuration are missing. Result remains 未采集."
+          fi
+      - name: Smoke-test configured providers
+        if: steps.online.outputs.available == 'true'
+        run: python scripts/check_online_models.py
         env:
           APP_ENV: development
           LLM_API_KEY: ${{ secrets.AI_EVAL_LLM_API_KEY }}
@@ -42,7 +60,9 @@ jobs:
           RERANK_MODEL: ${{ vars.AI_EVAL_RERANK_MODEL }}
           REDIS_HOST: ${{ vars.AI_EVAL_REDIS_HOST }}
           REDIS_PORT: ${{ vars.AI_EVAL_REDIS_PORT }}
-      - run: python scripts/eval_rag.py --dataset "${{ inputs.dataset }}"
+      - name: Run unified live Search/RAG evaluation
+        if: steps.online.outputs.available == 'true'
+        run: python benchmarks/run_search_rag_eval.py --live --run-id "online-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
         env:
           APP_ENV: development
           JAVA_WEB_URL: ${{ vars.AI_EVAL_JAVA_WEB_URL }}
@@ -58,3 +78,10 @@ jobs:
           RERANK_MODEL: ${{ vars.AI_EVAL_RERANK_MODEL }}
           REDIS_HOST: ${{ vars.AI_EVAL_REDIS_HOST }}
           REDIS_PORT: ${{ vars.AI_EVAL_REDIS_PORT }}
+      - name: Upload online evidence
+        if: always() && steps.online.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: online-ai-evidence-${{ github.run_id }}
+          path: AI_Shop-backend/AI_Shop-agent/benchmarks/results
+          if-no-files-found: error

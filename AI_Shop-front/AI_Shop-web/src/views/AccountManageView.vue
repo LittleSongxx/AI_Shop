@@ -26,6 +26,12 @@
         <span>修改密码</span>
         <el-icon class="arrow"><ArrowRight /></el-icon>
       </RouterLink>
+      <div class="item-divider" />
+      <RouterLink to="/account/privacy" class="menu-item">
+        <el-icon class="menu-icon"><DataAnalysis /></el-icon>
+        <span>AI 数据与隐私</span>
+        <el-icon class="arrow"><ArrowRight /></el-icon>
+      </RouterLink>
     </section>
 
     <div class="logout-row">
@@ -41,7 +47,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowRight, Edit, Lock, User } from '@element-plus/icons-vue';
+import { ArrowRight, DataAnalysis, Edit, Lock, User } from '@element-plus/icons-vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import { accountApi } from '@/api/modules';
 import { useAuthStore } from '@/stores/auth';

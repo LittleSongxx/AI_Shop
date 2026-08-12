@@ -9,7 +9,6 @@ TOKEN_COOKIE_NAME = "token"
 TOKEN_HEADER_NAME = "token"
 
 REDIS_TOKEN_WEB = f"{REDIS_PREFIX}token:web:"
-REDIS_TOKEN_USERID_WEB = f"{REDIS_PREFIX}token:web:userId:"
 REDIS_CANCEL_AGENT = f"{REDIS_PREFIX}cancel:agent:message:userId:"
 REDIS_PROMPT = f"{REDIS_PREFIX}prompt:"
 REDIS_AGENT_CONSULT_PRODUCT = f"{REDIS_PREFIX}agent:consult:product:userId:"
@@ -49,6 +48,8 @@ OUTPUTTING = 0
 DONE = 1
 ERROR = 2
 
+# RRF 的排名平滑常数。60 是 Cormack 等人原始论文的取值，也是 ES 自己 rrf retriever
+# 的默认值；改它会让所有 RRF 阈值失去意义，所以定在这里供换算复用，不做成配置。
 RRF_K = 60
 PRODUCT_RESULT_SIZE = 12
 PRODUCT_CANDIDATE_SIZE = 24

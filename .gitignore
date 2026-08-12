@@ -51,6 +51,7 @@ run/
 **/.cache/
 coverage/
 *.lcov
+artifacts/
 
 # Frontend local
 **/.vite/
@@ -58,6 +59,6 @@ coverage/
 **/test-results/
 
 # Agent / Python local
-**/Simlect-agent/.venv/
-**/Simlect-agent/.pytest_cache/
-**/Simlect-agent/.langgraph_api/
+**/AI_Shop-agent/.venv/
+**/AI_Shop-agent/.pytest_cache/
+**/AI_Shop-agent/.langgraph_api/

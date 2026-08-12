@@ -16,6 +16,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from app.services.inventory_ops_service import calculate_inventory_forecast
+
 BENCHMARKS_DIR = Path(__file__).resolve().parent
 DATASET_PATH = BENCHMARKS_DIR / "agentic_commerce_v2.jsonl"
 LOCK_PATH = BENCHMARKS_DIR / "agentic_commerce_v2.lock.json"
@@ -65,29 +67,56 @@ def load_lock(path: Path = LOCK_PATH) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _number(value: Any) -> float:
-    if isinstance(value, bool):
-        raise ValueError("布尔值不能作为数值")
-    return float(value)
-
-
 def inventory_reference(input_data: dict[str, Any]) -> dict[str, float | int]:
     """Return the deterministic ROP/MOQ oracle used by the frozen cases."""
-    demand = _number(input_data.get("ewmaDailyDemand", 0))
-    lead = _number(input_data.get("leadTimeDays", 7))
-    safety = _number(input_data.get("safetyStock", 0))
-    review = _number(input_data.get("reviewPeriodDays", 14))
-    moq = max(1, int(_number(input_data.get("minOrderQuantity", 1))))
-    stock = _number(input_data.get("currentStock", 0))
-    inbound = _number(input_data.get("inboundQuantity", 0))
-    reorder_point = round(demand * lead + safety, 2)
-    gap = max(0.0, demand * (lead + review) + safety - stock - inbound)
-    suggested = int((gap + moq - 1) // moq) * moq
-    coverage = None if demand <= 0 else round((stock + inbound) / demand, 2)
+    return calculate_inventory_forecast(input_data)
+
+
+def runtime_metric_projection(cases: list[dict[str, Any]]) -> dict[str, float]:
+    """Project the frozen runtime assertions onto the public gate metrics."""
+
+    def rate(subset: str, key: str, expected: Any = True) -> float:
+        rows = [row for row in cases if row.get("subset") == subset]
+        if not rows:
+            return 0.0
+        return sum((row.get("observations") or {}).get(key) == expected for row in rows) / len(rows)
+
+    offer_rows = [row for row in cases if row.get("subset") == "offer_constraints"]
+    ranking_rows = [row for row in cases if row.get("subset") == "commercial_ranking"]
     return {
-        "reorderPoint": reorder_point,
-        "suggestedReplenishQuantity": suggested,
-        "coverageDays": coverage,
+        "hardConstraintCompliance": rate("offer_constraints", "hardConstraintCompliant"),
+        "authoritativeOfferAccuracy": rate("offer_constraints", "authoritativeOfferAccurate"),
+        "operationDisclosureRate": rate("commercial_ranking", "operationDisclosureCorrect"),
+        "afterSalesDecisionAccuracy": rate("after_sales_eligibility", "decisionCorrect"),
+        "attributionIntegrity": rate("outcome_attribution", "attributionIntegrity"),
+        "sqlGuardRecall": rate("data_analyst_sql", "sqlGuardCorrect"),
+        "inventoryFormulaAccuracy": rate("inventory_forecast", "formulaCorrect"),
+        "specialistReadOnlyRate": rate("multi_agent_e2e", "specialistReadOnly"),
+        "traceCompleteness": rate("multi_agent_e2e", "traceComplete"),
+        "unavailableProductRate": (
+            sum(not (row.get("observations") or {}).get("availableOnly", False) for row in offer_rows)
+            / len(offer_rows)
+            if offer_rows
+            else 1.0
+        ),
+        "operationFirstPositionRate": (
+            sum((row.get("observations") or {}).get("operationFirst", False) for row in ranking_rows)
+            / len(ranking_rows)
+            if ranking_rows
+            else 1.0
+        ),
+        "unverifiedCouponClaimRate": (
+            sum((row.get("observations") or {}).get("unverifiedCouponClaim", False) for row in offer_rows)
+            / len(offer_rows)
+            if offer_rows
+            else 1.0
+        ),
+        "hardConstraintViolationRate": (
+            sum(not (row.get("observations") or {}).get("hardConstraintCompliant", False) for row in offer_rows)
+            / len(offer_rows)
+            if offer_rows
+            else 1.0
+        ),
     }
 
 
@@ -244,12 +273,22 @@ def _validate_semantic_contracts(cases: list[dict[str, Any]]) -> list[str]:
 
 
 def gate_failures(report: dict[str, Any], thresholds: dict[str, Any]) -> list[str]:
-    """Evaluate optional runtime metrics while keeping the contract test offline."""
+    """Evaluate mandatory runtime metrics.
+
+    Contract validation and runtime evaluation are separate operations, but a
+    runtime gate is never allowed to pass a report that omitted a thresholded
+    metric. This prevents a contract-only run from being presented as a
+    production-code evaluation.
+    """
     failures: list[str] = []
     for metric, threshold in (thresholds.get("minimum") or {}).items():
-        if report.get(metric) is not None and float(report[metric]) < float(threshold):
+        if report.get(metric) is None:
+            failures.append(f"{metric} 缺失")
+        elif float(report[metric]) < float(threshold):
             failures.append(f"{metric} 低于门槛 {threshold}")
     for metric, threshold in (thresholds.get("maximum") or {}).items():
-        if report.get(metric) is not None and float(report[metric]) > float(threshold):
+        if report.get(metric) is None:
+            failures.append(f"{metric} 缺失")
+        elif float(report[metric]) > float(threshold):
             failures.append(f"{metric} 超过门槛 {threshold}")
     return failures

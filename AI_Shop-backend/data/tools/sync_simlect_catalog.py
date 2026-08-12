@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any
 
 
 DATA_ROOT = Path(__file__).resolve().parents[1]

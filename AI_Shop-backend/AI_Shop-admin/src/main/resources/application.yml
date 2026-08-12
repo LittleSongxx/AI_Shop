@@ -80,6 +80,9 @@ aishop:
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}
     auth-enabled: true
+  admin-assertion:
+    current-secret: ${AISHOP_ADMIN_ASSERTION_CURRENT_SECRET:${AISHOP_INTERNAL_TOKEN:your-token}}
+    current-key-id: ${AISHOP_ADMIN_ASSERTION_CURRENT_KEY_ID:current}
   feign:
     connect-timeout-ms: 3000
     read-timeout-ms: 10000

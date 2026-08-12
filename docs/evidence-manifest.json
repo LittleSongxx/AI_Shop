@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-12T19:20:00+08:00",
+  "project": "AI_Shop",
+  "targetRoles": [
+    "AI application / Agent backend",
+    "Java + AI business backend",
+    "AI full-stack / Product Engineer",
+    "RAG / search application engineering"
+  ],
+  "implementationBaseline": {
+    "gitHead": "ef9aa0659a9275a99bb74cdb46e87770150dea0a",
+    "workspaceDiffSha256": "672b4d3e73b5b67ed21378a04ccee7962c27f3a3928878f59e6e71af1dc0fd13",
+    "workspaceDiffScope": "实施开始时已有五份删除文档、项目复盘修改、多智能体复盘和面经报告；该 SHA 仅用于保留用户已有工作区边界",
+    "branch": "feat/multi-agent-harness"
+  },
+  "protocol": {
+    "schema": "aishop-eval/v1",
+    "resultsPattern": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/<suite>/<run_id>/",
+    "baselinePattern": "AI_Shop-backend/AI_Shop-agent/benchmarks/baselines/<suite>.lock.json",
+    "baselinePolicy": "Only an explicit --accept-baseline may create or replace a baseline; CI never accepts baselines."
+  },
+  "evidenceLevels": {
+    "E0_SOURCE": "源码、迁移、测试或工作流存在并可静态校验",
+    "E1_DETERMINISTIC": "执行生产决策内核，模型和外部系统使用确定性替身；属于 SYNTHETIC",
+    "E2_LOCAL_INTEGRATION": "本地真实进程或 Testcontainers 中间件集成验证",
+    "E3_CONFIGURED_LIVE": "配置真实模型、Embedding、Rerank 或实时索引后执行",
+    "E4_REAL_USER": "取得授权并进入试用批次的真实用户样本"
+  },
+  "evidence": [
+    {
+      "id": "commerce-runtime",
+      "kind": "evaluation",
+      "suite": "agentic-commerce-v2-runtime",
+      "level": "E1_DETERMINISTIC",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_agentic_commerce_runtime.py --run-id final-20260812-commerce",
+      "caseCount": 27,
+      "claim": "27 个 Commerce case 覆盖九个子集，全部通过运行时断言，工具/参数正确率为 1.0，严重安全违规为 0。",
+      "boundary": "生产决策代码被实际调用，但模型、数据库和 Java 内部依赖在该套件中使用确定性适配器；不是在线模型准确率或业务转化效果。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/agentic-commerce-v2-runtime/final-20260812-commerce/summary.json",
+      "resultSha256": "a7061bf5f46b202a30ddc8499045c0c29485085fe33623f8b84f539e33be7f06",
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.jsonl"
+        }
+      ]
+    },
+    {
+      "id": "ai-safety",
+      "kind": "evaluation",
+      "suite": "ai-safety-v1",
+      "level": "E1_DETERMINISTIC",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_ai_safety.py --run-id final-20260812-safety",
+      "caseCount": 18,
+      "claim": "18 个直接/间接注入、通道污染、IDOR、PII 脱敏和委托身份 case 全部执行通过，严重安全违规为 0。",
+      "boundary": "这是合成攻击集对安全边界的确定性验证，不代表覆盖所有开放世界攻击。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/ai-safety-v1/final-20260812-safety/summary.json",
+      "resultSha256": "e37b48ac71fb6f20eddea4362598cf69d19398731ca1ab4f8dff6d63d71c3a38",
+      "datasetLocks": [
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/ai_safety_v1.lock.json"
+      ]
+    },
+    {
+      "id": "search-rag-deterministic",
+      "kind": "evaluation",
+      "suite": "search-rag-v1",
+      "level": "E1_DETERMINISTIC",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_rag_eval.py --run-id final-20260812-search-rag",
+      "caseCount": 162,
+      "claim": "162 个公开集与 holdout 的数据/查询理解契约全部执行通过，holdout 标签和数据 SHA 被锁定。",
+      "boundary": "本地未启用 --live，因而只声称数据与 query-understanding contract；Recall@K、MRR、NDCG、引用质量、真实延迟和成本均为未采集。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-rag-v1/final-20260812-search-rag/summary.json",
+      "resultSha256": "c743f1a4014626e7ab8ab154aed8e6385c1d2b248fc7559fc5ec1761b6e23caf",
+      "datasetLocks": [
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
+      ]
+    },
+    {
+      "id": "agent-ablation",
+      "kind": "ablation",
+      "level": "E1_DETERMINISTIC",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_ablation.py --run-id final-20260812-ablation",
+      "claim": "legacy single-agent、multi-agent 和 workflow 在独立进程执行；主实验 27 个配对 case、次实验 21 个适用 case，成功率差值均为 0，安全门禁通过。",
+      "boundary": "结果来自确定性适配器且尚未接受性能基线，毫秒级延迟只用于检查 Runner/进程隔离，不用于声称真实模型性能优势。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/agentic-commerce-v2-ablation/final-20260812-ablation/summary.json",
+      "resultSha256": "dff1224827bc83e3e1907fde7a298c4bb7fef8db22943a68dd0f56cc6d4176e8",
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.jsonl"
+        }
+      ]
+    },
+    {
+      "id": "java-domain-integration",
+      "kind": "integration-test",
+      "level": "E2_LOCAL_INTEGRATION",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend && mvn --batch-mode --no-transfer-progress -Pintegration -pl AI_Shop-common,AI_Shop-order/app -am verify",
+      "claim": "Testcontainers 实测 MiddlewareIT 7/7、TransactionPersistenceIT 3/3；覆盖 MySQL、Redis、RabbitMQ、Elasticsearch，以及订单幂等、支付 CAS 和退款库存恢复。",
+      "boundary": "本地容器并发测试，不是生产压测；当前 JaCoCo 行覆盖率 common 约 12.89%、order 约 13.39%，只作为薄弱项披露。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/pom.xml",
+      "datasetLocks": []
+    },
+    {
+      "id": "rbac-hmac-privacy",
+      "kind": "security-and-privacy",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && pytest -q tests/test_admin_assertion.py tests/test_privacy_api.py tests/test_privacy_job_service.py tests/test_ai_safety_runner.py",
+      "claim": "五角色 RBAC、管理员主体版本、HMAC 时间窗/nonce/轮换、跨用户拒绝、隐私导出删除幂等与恢复均有实现和定向测试。",
+      "boundary": "项目明确是单商户 single-tenant 商城；没有把这些能力包装成多租户平台或监管认证。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/tests/test_admin_assertion.py",
+      "datasetLocks": []
+    },
+    {
+      "id": "frontend-evidence-privacy",
+      "kind": "frontend-test",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-front/AI_Shop-admin && npm test && npm run lint && npm run build; cd ../AI_Shop-web && npm test && npm run lint && npm run build && npm run test:e2e",
+      "claim": "管理端证据中心和用户隐私中心已接入；管理端 7/7、用户端 33/33 单测通过，两端 lint/build 通过，Mock Playwright 8/8 通过。",
+      "boundary": "另有 8 条要求显式启动本地完整服务的 live Playwright 用例和 2 条视口不适用用例按设计跳过；没有据此声称生产环境 live E2E 已通过。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-front/AI_Shop-admin/src/views/data/AIEvidenceCenter.vue",
+      "datasetLocks": []
+    },
+    {
+      "id": "supply-chain",
+      "kind": "supply-chain",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "python scripts/check_dependency_exceptions.py && bash scripts/generate_sbom.sh",
+      "claim": "Maven、Python、两个 npm 工程均可生成 CycloneDX SBOM；PR Dependency Review 和每周 Maven/Python/npm 漏洞扫描工作流已配置。",
+      "boundary": "SBOM 已本地生成；完整 OWASP、pip-audit、npm audit 周期扫描尚未在本地声明通过。",
+      "resultLocation": "tracked",
+      "resultPath": "scripts/generate_sbom.sh",
+      "datasetLocks": []
+    },
+    {
+      "id": "configured-live-model",
+      "kind": "online-evaluation",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "NOT_COLLECTED",
+      "command": "Run .github/workflows/online-ai-eval.yml with configured provider secrets and live Elasticsearch",
+      "claim": "未采集。",
+      "boundary": "缺少已冻结的真实模型 Agent、Search/RAG、延迟、token 和成本结果；确定性结果不得替代。",
+      "resultLocation": "not-collected",
+      "resultPath": null,
+      "datasetLocks": []
+    },
+    {
+      "id": "real-user-pilot",
+      "kind": "pilot-evaluation",
+      "level": "E4_REAL_USER",
+      "state": "NOT_COLLECTED",
+      "command": "Create an authorized REAL_USER pilot batch and export its anonymized report",
+      "claim": "未采集。",
+      "boundary": "没有真实用户任务成功率、FCR、CTR/CVR、GMV uplift、线上 SLO 或生产规模结论。",
+      "resultLocation": "not-collected",
+      "resultPath": null,
+      "datasetLocks": []
+    }
+  ],
+  "honestBoundaries": [
+    "普通 benchmarks/results 目录被 Git 忽略；只有显式接受的 baseline lock 才能入库，本轮没有运行 --accept-baseline。",
+    "SYNTHETIC、LOCAL_PILOT、REAL_USER 必须分开报告；REAL_USER 没有样本时固定为未采集。",
+    "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO。",
+    "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
+    "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。"
+  ],
+  "claimDocuments": [
+    "README.md",
+    "docs/AI应用求职项目证据总览.md",
+    "docs/项目问题排查与修复复盘.md",
+    "docs/多智能体重构决策与复盘.md",
+    "面经报告_AI应用开发_后端_AI全栈_优化版.md"
+  ],
+  "forbiddenCurrentClaims": [
+    {
+      "pattern": "pytest（838 通过|整改基线：`f639599",
+      "paths": [
+        "README.md",
+        "docs/AI应用求职项目证据总览.md"
+      ]
+    },
+    {
+      "pattern": "AI应用开发_电商后端_场景设计题集合|AI应用开发_Java后端_手撕题集合",
+      "paths": [
+        "面经报告_AI应用开发_后端_AI全栈_优化版.md"
+      ]
+    }
+  ]
+}

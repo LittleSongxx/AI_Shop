@@ -39,6 +39,10 @@ _SOURCE_EVENT_TYPES: dict[str, frozenset[str]] = {
 }
 
 
+def source_event_matches(source: str, event_type: str) -> bool:
+    return event_type in _SOURCE_EVENT_TYPES.get(source, frozenset())
+
+
 class CommerceOutcomeEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -88,10 +92,6 @@ class CommerceOutcomeEvent(BaseModel):
 
     @model_validator(mode="after")
     def attributed_event_requires_complete_touchpoint(self) -> "CommerceOutcomeEvent":
-        if self.eventType not in _SOURCE_EVENT_TYPES[self.source]:
-            raise ValueError(
-                f"{self.source} cannot emit {self.eventType} commerce outcomes"
-            )
         if self.requestId and (not self.productId or self.position is None):
             raise ValueError(
                 "requestId attribution requires productId and position"

@@ -13,4 +13,6 @@ public interface AgentMessageService {
 	Integer deleteAgentMessageByMessageId(Integer messageId);
 
 	Object callSupport(String action, Map<String, Object> body);
+
+	byte[] callReport(String action, Map<String, Object> body);
 }

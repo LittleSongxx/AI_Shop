@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import time
 from typing import Any
 
@@ -17,6 +18,34 @@ from app.observability.telemetry import get_tracer
 from app.services.episode_service import episode_service
 
 tracer = get_tracer()
+
+# per-request 成本累计（E 工作线）：contextvar 随 worker task 隔离。
+# reset_run_cost() 在每条消息处理开头调用（意图识别之前——它也是对话路径
+# 的固定成本）；record_llm_usage 每次成功调用累计；收尾 snapshot 成
+# costSummary 写进 GRAPH_END。压缩/condense 等异步调度任务从父 task 继承
+# contextvar 引用，任务开头再次 reset 即与对话路径隔离，不会污染摘要。
+_RUN_COST: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "run_cost", default=None
+)
+
+
+def reset_run_cost() -> None:
+    """清空本 task 的累计（每条消息开头、异步调度任务开头各调一次）。"""
+    _RUN_COST.set(None)
+
+
+def _run_cost_state() -> dict:
+    state = _RUN_COST.get()
+    if state is None:
+        state = {
+            "calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost_cny": 0.0,
+            "models": set(),
+        }
+        _RUN_COST.set(state)
+    return state
 
 
 def resolve_llm_model(llm: Any = None, configured_model: str | None = None) -> str:
@@ -103,11 +132,41 @@ def record_llm_usage(
         cost_cny=total_cost,
         model_name=response_model,
     )
+    state = _run_cost_state()
+    state["calls"] += 1
+    if token_counts["input"] is not None:
+        state["input_tokens"] += token_counts["input"]
+    if token_counts["output"] is not None:
+        state["output_tokens"] += token_counts["output"]
+    state["cost_cny"] += total_cost
+    state["models"].add(response_model)
     return {
         "model": response_model,
         "inputTokens": token_counts["input"],
         "outputTokens": token_counts["output"],
         "costCny": total_cost,
+    }
+
+
+def snapshot_cost_summary(*, tools_called: list[str] | None = None) -> dict:
+    """本次请求的 LLM 成本摘要（轻/重路径）。
+
+    path 判定用"是否进入工具循环"而不是 LLM 调用次数：强制工具兜底路径
+    （forced_tools）调工具后直接收尾、不再生成，LLM 次数与工具循环脱钩，
+    按次数判会失真。轻路径（light）= 未调用工具的单轮对话；重路径
+    （heavy）= 调用过工具；未产生任何成功调用时为 "none"。意图识别等
+    固定成本计入 llmCalls。
+    """
+    state = _RUN_COST.get() or {}
+    calls = int(state.get("calls") or 0)
+    path = "heavy" if tools_called else ("light" if calls else "none")
+    return {
+        "path": path,
+        "llmCalls": calls,
+        "inputTokens": int(state.get("input_tokens") or 0),
+        "outputTokens": int(state.get("output_tokens") or 0),
+        "costCny": round(float(state.get("cost_cny") or 0.0), 6),
+        "models": sorted(state.get("models") or []),
     }
 
 

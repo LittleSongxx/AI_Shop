@@ -61,6 +61,9 @@ public interface RefundRequestMapper {
                 last_error = #{error},
                 status = CASE WHEN retry_count >= #{maxRetries}
                               THEN 'MANUAL_REVIEW' ELSE status END,
+                review_origin_status = CASE WHEN retry_count >= #{maxRetries}
+                              THEN COALESCE(review_origin_status, 'PENDING_PAYMENT')
+                              ELSE review_origin_status END,
                 updated_at = NOW()
             WHERE refund_request_id = #{refundRequestId}
               AND status = 'PENDING_PAYMENT'
@@ -89,6 +92,9 @@ public interface RefundRequestMapper {
                 last_error = #{error},
                 status = CASE WHEN retry_count + 1 >= #{maxRetries}
                               THEN 'MANUAL_REVIEW' ELSE status END,
+                review_origin_status = CASE WHEN retry_count + 1 >= #{maxRetries}
+                              THEN COALESCE(review_origin_status, 'STOCK_PENDING')
+                              ELSE review_origin_status END,
                 updated_at = NOW()
             WHERE refund_request_id = #{refundRequestId}
               AND status = 'STOCK_PENDING'
@@ -118,4 +124,57 @@ public interface RefundRequestMapper {
             LIMIT #{limit}
             """)
     List<RefundRequest> selectDue(@Param("limit") int limit);
+
+    @Select("""
+            SELECT * FROM refund_request
+            WHERE status = 'MANUAL_REVIEW'
+            ORDER BY updated_at ASC
+            LIMIT #{limit}
+            """)
+    List<RefundRequest> selectManualReview(@Param("limit") int limit);
+
+    @Update("""
+            UPDATE refund_request
+            SET status = #{originStatus},
+                retry_count = 0,
+                next_retry_time = NOW(),
+                last_error = NULL,
+                review_origin_status = NULL,
+                updated_at = NOW()
+            WHERE refund_request_id = #{refundRequestId}
+              AND status = 'MANUAL_REVIEW'
+            """)
+    int reviewApprove(@Param("refundRequestId") String refundRequestId,
+                      @Param("originStatus") String originStatus);
+
+    @Update("""
+            UPDATE refund_request
+            SET status = 'REJECTED',
+                next_retry_time = NULL,
+                last_error = NULL,
+                updated_at = NOW()
+            WHERE refund_request_id = #{refundRequestId}
+              AND status = 'MANUAL_REVIEW'
+            """)
+    int reviewReject(@Param("refundRequestId") String refundRequestId);
+
+    /**
+     * 用户重开被驳回的退款：REJECTED -> review_origin_status（驳回前阶段）。
+     * COALESCE 兜底：旧数据（origin 为 NULL）按 PENDING_PAYMENT 处理；
+     * 但 STOCK_PENDING 驳回的行保留 origin，重开后直接续跑库存恢复，
+     * 不会重走支付——资金已退过的行再走支付是重复退款风险。
+     * 恢复后清空 origin：下一次重试耗尽重新记录新阶段。
+     */
+    @Update("""
+            UPDATE refund_request
+            SET status = COALESCE(review_origin_status, 'PENDING_PAYMENT'),
+                retry_count = 0,
+                next_retry_time = NOW(),
+                last_error = NULL,
+                review_origin_status = NULL,
+                updated_at = NOW()
+            WHERE refund_request_id = #{refundRequestId}
+              AND status = 'REJECTED'
+            """)
+    int resetRejected(@Param("refundRequestId") String refundRequestId);
 }

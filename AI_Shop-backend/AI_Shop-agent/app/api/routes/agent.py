@@ -1,8 +1,10 @@
 import json
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request, Response
 
 from app.api.deps import TokenUserInfo, get_request_token, require_login
+from app.auth.admin_assertion import AdminAssertion, require_admin_assertion
 from app.config.settings import get_settings
 from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
 from app.exceptions import PendingActionExpired
@@ -31,6 +33,8 @@ from app.services.order_selection_store import (
     OrderSelectionExpired,
 )
 from app.services.pending_action_service import pending_action_service
+from app.services.pilot_batch_service import pilot_batch_service
+from app.services.pilot_metrics_service import pilot_metrics_service
 from app.services.rate_limit_service import rate_limit_service
 from app.services.recommendation_attribution_service import (
     recommendation_attribution_service,
@@ -86,6 +90,13 @@ def _require_internal_token(x_internal_token: str | None = Header(None, alias="X
         raise HTTPException(status_code=401, detail="invalid internal token")
     return x_internal_token
 
+
+async def _require_admin(
+    request: Request,
+    _token: str = Depends(_require_internal_token),
+) -> AdminAssertion:
+    return await require_admin_assertion(request)
+
 async def _read_admin_body(request: Request) -> dict:
 
     ct = (request.headers.get("content-type") or "").lower()
@@ -102,6 +113,16 @@ def _as_int(value, default: int | None = None) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _as_datetime(value: object) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("时间参数必须是 ISO-8601 格式") from exc
 
 @router.post("/loadHistoryMessage")
 async def load_history_message(
@@ -521,8 +542,9 @@ async def cancel_action(
 @router.post("/admin/loadMessages")
 async def admin_load_messages(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "audit:read")
     body = await _read_admin_body(request)
     page_no = _as_int(body.get("pageNo"), 1) or 1
     page_size = _as_int(body.get("pageSize"), 15) or 15
@@ -541,8 +563,9 @@ async def admin_load_messages(
 @router.post("/admin/traceRuns")
 async def admin_trace_runs(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate", "analytics:read", "audit:read")
     body = await _read_admin_body(request)
     data = await episode_query_service.list_runs(
         page_no=_as_int(body.get("pageNo"), 1) or 1,
@@ -560,16 +583,12 @@ async def admin_trace_runs(
 @router.post("/admin/dataAnalyst/ask")
 async def admin_data_analyst_ask(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("analytics:read")
     body = await _read_admin_body(request)
-    # Java extracts this from its authenticated admin session. Do not accept
-    # browser-controlled identity fields such as userId/adminAccount as aliases.
-    admin_id = str(body.get("adminId") or "").strip()
-    if not admin_id:
-        return error(401, "管理员身份缺失")
     result = await data_analyst_service.ask(
-        str(body.get("question") or ""), admin_id=admin_id
+        str(body.get("question") or ""), admin_id=admin.admin_id
     )
     return success(result)
 
@@ -577,14 +596,12 @@ async def admin_data_analyst_ask(
 @router.post("/admin/inventoryOps/suggestions")
 async def admin_inventory_ops_suggestions(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:config")
     body = await _read_admin_body(request)
-    admin_id = str(body.get("adminId") or "").strip()
-    if not admin_id:
-        return error(401, "管理员身份缺失")
     result = await inventory_ops_service.suggestions(
-        admin_id=admin_id,
+        admin_id=admin.admin_id,
         lookback_days=_as_int(body.get("lookbackDays"), 30) or 30,
         limit=_as_int(body.get("limit"), 50) or 50,
     )
@@ -594,8 +611,9 @@ async def admin_inventory_ops_suggestions(
 @router.post("/admin/traceDetail")
 async def admin_trace_detail(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate", "audit:read")
     body = await _read_admin_body(request)
     run_id = str(body.get("runId") or "").strip()
     if not run_id:
@@ -609,14 +627,15 @@ async def admin_trace_detail(
 @router.post("/admin/reviewEpisode")
 async def admin_review_episode(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate")
     body = await _read_admin_body(request)
     try:
         data = await episode_review_service.review(
             _required_text(body, "runId"),
             _required_text(body, "datasetEligible"),
-            _required_text(body, "reviewer"),
+            admin.admin_id,
             note=str(body.get("note") or "").strip() or None,
         )
         return success(data)
@@ -627,8 +646,9 @@ async def admin_review_episode(
 @router.post("/admin/supportCases")
 async def admin_support_cases(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "audit:read")
     body = await _read_admin_body(request)
     try:
         data = await support_case_service.list_admin(
@@ -645,8 +665,9 @@ async def admin_support_cases(
 @router.post("/admin/supportCaseDetail")
 async def admin_support_case_detail(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "audit:read")
     body = await _read_admin_body(request)
     case_id = str(body.get("caseId") or body.get("caseNo") or "").strip()
     if not case_id:
@@ -660,12 +681,13 @@ async def admin_support_case_detail(
 @router.post("/admin/supportCaseClaim")
 async def admin_support_case_claim(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
         data = await support_case_service.claim(
-            _required_text(body, "caseId"), _required_text(body, "adminId")
+            _required_text(body, "caseId"), admin.admin_id
         )
         return success(data)
     except ValueError as exc:
@@ -675,12 +697,13 @@ async def admin_support_case_claim(
 @router.post("/admin/supportCaseInProgress")
 async def admin_support_case_in_progress(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
         data = await support_case_service.in_progress(
-            _required_text(body, "caseId"), _required_text(body, "adminId")
+            _required_text(body, "caseId"), admin.admin_id
         )
         return success(data)
     except ValueError as exc:
@@ -690,13 +713,14 @@ async def admin_support_case_in_progress(
 @router.post("/admin/supportCaseResolve")
 async def admin_support_case_resolve(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
         data = await support_case_service.resolve(
             _required_text(body, "caseId"),
-            _required_text(body, "adminId"),
+            admin.admin_id,
             _required_text(body, "resolutionCode"),
             _required_text(body, "rootCause"),
             _required_text(body, "resolutionSummary"),
@@ -710,9 +734,10 @@ async def admin_support_case_resolve(
 @router.post("/admin/loadPendingActions")
 async def admin_load_pending_actions(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
     """Read-only lookup for uncertain writes and manual-review records."""
+    admin.require_any("support:read", "ai:evaluate", "audit:read")
     body = await _read_admin_body(request)
     try:
         rows = await pending_action_service.list_for_review(
@@ -729,8 +754,9 @@ async def admin_load_pending_actions(
 @router.post("/admin/getMessage")
 async def admin_get_message(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "audit:read")
     body = await _read_admin_body(request)
     message_id = _as_int(body.get("messageId"))
     if not message_id:
@@ -741,8 +767,9 @@ async def admin_get_message(
 @router.post("/admin/deleteMessage")
 async def admin_delete_message(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     message_id = _as_int(body.get("messageId"))
     if not message_id:
@@ -754,8 +781,9 @@ async def admin_delete_message(
 @router.post("/admin/supportQueue")
 async def admin_support_queue(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read")
     body = await _read_admin_body(request)
     data = await support_service.list_queue(
         _as_int(body.get("pageNo"), 1) or 1,
@@ -767,8 +795,9 @@ async def admin_support_queue(
 @router.post("/admin/supportSessions")
 async def admin_support_sessions(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "audit:read")
     body = await _read_admin_body(request)
     data = await support_service.list_sessions(
         _as_int(body.get("pageNo"), 1) or 1,
@@ -782,8 +811,9 @@ async def admin_support_sessions(
 @router.post("/admin/supportStats")
 async def admin_support_stats(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "analytics:read")
     body = await _read_admin_body(request)
     data = await support_service.sla_stats(
         _as_int(body.get("windowHours"), 24) or 24,
@@ -796,11 +826,12 @@ async def admin_support_stats(
 @router.post("/admin/supportClaim")
 async def admin_support_claim(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
-        admin_id = _required_text(body, "adminId")
+        admin_id = admin.admin_id
         session_id = _required_text(body, "sessionId")
         data = await support_service.claim(session_id, admin_id)
         _audit_admin_action("claim", admin_id, session_id)
@@ -812,12 +843,13 @@ async def admin_support_claim(
 @router.post("/admin/supportActivate")
 async def admin_support_activate(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
         data = await support_service.activate(
-            _required_text(body, "sessionId"), _required_text(body, "adminId")
+            _required_text(body, "sessionId"), admin.admin_id
         )
         return success(support_service.public_session(data))
     except ValueError as exc:
@@ -827,11 +859,12 @@ async def admin_support_activate(
 @router.post("/admin/supportReply")
 async def admin_support_reply(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
-        admin_id = _required_text(body, "adminId")
+        admin_id = admin.admin_id
         session_id = _required_text(body, "sessionId")
         content = _required_text(body, "content")
         data = await support_service.reply(session_id, admin_id, content)
@@ -844,13 +877,14 @@ async def admin_support_reply(
 @router.post("/admin/supportResolve")
 async def admin_support_resolve(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
         data = await support_service.resolve(
             _required_text(body, "sessionId"),
-            _required_text(body, "adminId"),
+            admin.admin_id,
             str(body.get("remark") or "").strip() or None,
         )
         return success(support_service.public_session(data))
@@ -861,12 +895,13 @@ async def admin_support_resolve(
 @router.post("/admin/supportReturnAi")
 async def admin_support_return_ai(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
         data = await support_service.return_to_ai(
-            _required_text(body, "sessionId"), _required_text(body, "adminId")
+            _required_text(body, "sessionId"), admin.admin_id
         )
         return success(support_service.public_session(data))
     except ValueError as exc:
@@ -876,8 +911,9 @@ async def admin_support_return_ai(
 @router.post("/admin/supportHistory")
 async def admin_support_history(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("support:read", "audit:read")
     body = await _read_admin_body(request)
     try:
         data = await support_service.history(
@@ -892,8 +928,9 @@ async def admin_support_history(
 @router.post("/admin/badcases")
 async def admin_badcases(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate", "audit:read")
     body = await _read_admin_body(request)
     try:
         data = await badcase_service.list_candidates(
@@ -909,8 +946,9 @@ async def admin_badcases(
 @router.post("/admin/reviewBadcase")
 async def admin_review_badcase(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate")
     body = await _read_admin_body(request)
     candidate_id = _as_int(body.get("candidateId"))
     if not candidate_id:
@@ -919,7 +957,7 @@ async def admin_review_badcase(
         data = await badcase_service.review(
             candidate_id,
             _required_text(body, "status"),
-            _required_text(body, "reviewer"),
+            admin.admin_id,
             remark=str(body.get("remark") or "").strip() or None,
             labels=(body.get("labels") if isinstance(body.get("labels"), list) else []),
             owner=str(body.get("owner") or "").strip() or None,
@@ -938,8 +976,9 @@ async def admin_review_badcase(
 @router.post("/admin/regressionCases")
 async def admin_regression_cases(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate", "audit:read")
     body = await _read_admin_body(request)
     data = await badcase_service.list_regression_cases(
         _as_int(body.get("pageNo"), 1) or 1,
@@ -952,8 +991,9 @@ async def admin_regression_cases(
 @router.post("/admin/runRegressionCases")
 async def admin_run_regression_cases(
     request: Request,
-    _token: str = Depends(_require_internal_token),
+    admin: AdminAssertion = Depends(_require_admin),
 ) -> ResponseVO:
+    admin.require_any("ai:evaluate")
     body = await _read_admin_body(request)
     try:
         return success(
@@ -963,6 +1003,196 @@ async def admin_run_regression_cases(
         )
     except ValueError as exc:
         return error(600, str(exc))
+
+
+@router.post("/admin/createPilotBatch")
+async def admin_create_pilot_batch(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot")
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await pilot_batch_service.create(
+                name=_required_text(body, "name"),
+                description=str(body.get("description") or "").strip() or None,
+                evidence_source=_required_text(body, "evidenceSource"),
+                consent_text_version=_required_text(body, "consentTextVersion"),
+                created_by=admin.admin_id,
+            )
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/pilotBatches")
+async def admin_pilot_batches(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot", "analytics:read", "audit:read")
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await pilot_batch_service.list(
+                status=str(body.get("status") or "").strip() or None,
+                limit=_as_int(body.get("limit"), 50) or 50,
+            )
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/startPilotBatch")
+async def admin_start_pilot_batch(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot")
+    body = await _read_admin_body(request)
+    try:
+        return success(await pilot_batch_service.start(_required_text(body, "batchId")))
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/closePilotBatch")
+async def admin_close_pilot_batch(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot")
+    body = await _read_admin_body(request)
+    try:
+        return success(await pilot_batch_service.close(_required_text(body, "batchId")))
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/registerPilotParticipant")
+async def admin_register_pilot_participant(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot")
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await pilot_batch_service.register_participant(
+                batch_id=_required_text(body, "batchId"),
+                user_id=_required_text(body, "userId"),
+                pseudonym=str(body.get("pseudonym") or "").strip() or None,
+                created_by=admin.admin_id,
+            )
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/withdrawPilotParticipant")
+async def admin_withdraw_pilot_participant(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot")
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await pilot_batch_service.withdraw_participant(
+                batch_id=_required_text(body, "batchId"),
+                participant_id=_required_text(body, "participantId"),
+            )
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/pilotParticipants")
+async def admin_pilot_participants(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("ai:pilot", "audit:read")
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await pilot_batch_service.list_participants(
+                _required_text(body, "batchId")
+            )
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+def _pilot_metric_filters(body: dict) -> dict:
+    start_at = _as_datetime(body.get("startAt"))
+    end_at = _as_datetime(body.get("endAt"))
+    if start_at and end_at and start_at >= end_at:
+        raise ValueError("startAt 必须早于 endAt")
+    return {
+        "batch_id": str(body.get("batchId") or "").strip() or None,
+        "evidence_source": str(body.get("evidenceSource") or "").strip() or None,
+        "start_at": start_at,
+        "end_at": end_at,
+    }
+
+
+@router.post("/admin/metricsOverview")
+async def admin_metrics_overview(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("analytics:read", "ai:evaluate")
+    body = await _read_admin_body(request)
+    try:
+        return success(await pilot_metrics_service.overview(**_pilot_metric_filters(body)))
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/metricsPerformance")
+async def admin_metrics_performance(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("analytics:read", "ai:evaluate")
+    body = await _read_admin_body(request)
+    try:
+        return success(
+            await pilot_metrics_service.performance(**_pilot_metric_filters(body))
+        )
+    except ValueError as exc:
+        return error(600, str(exc))
+
+
+@router.post("/admin/pilotReport")
+async def admin_pilot_report(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> Response:
+    admin.require_any("analytics:export")
+    body = await _read_admin_body(request)
+    try:
+        batch_id = _required_text(body, "batchId")
+        output_format = str(body.get("format") or "json")
+        content, content_type = await pilot_metrics_service.export_report(
+            batch_id, output_format
+        )
+    except ValueError as exc:
+        return Response(
+            content=json.dumps({"code": 600, "message": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=400,
+        )
+    suffix = {"json": "json", "csv": "csv", "markdown": "md"}.get(
+        output_format.lower(), "bin"
+    )
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{batch_id}.{suffix}"'},
+    )
 
 
 def _required_text(body: dict, key: str) -> str:

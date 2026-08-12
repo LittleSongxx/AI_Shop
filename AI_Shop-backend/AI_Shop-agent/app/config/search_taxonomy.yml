@@ -103,7 +103,9 @@ topics:
     terms: [乐器, 吉他, 尤克里里, 电子琴, 钢琴, 电吉他, 民谣]
   - id: appliance
     canonical: 家电
-    aliases: [电器, 小家电, 厨房电器, 厨电, 大家电]
+    # “电器”作为 substring alias 会把“车载充电器”误归一为“家电”。
+    # 保留在 terms 中供检索扩展，只有语义明确的品类别名参与归一化。
+    aliases: [小家电, 厨房电器, 厨电, 大家电]
     terms:
       [
         家电,
@@ -146,7 +148,7 @@ topics:
   - id: bag
     canonical: 包
     aliases: [箱包, 背包, 书包, 双肩包, 手提包, 斜挎包, 旅行包, 健身包]
-    terms: [箱包, 背包, 书包, 双肩包, 手提包, 斜挎包, 旅行包, 健身包, 单肩包]
+    terms: [包, 箱包, 背包, 书包, 双肩包, 手提包, 斜挎包, 旅行包, 健身包, 单肩包]
   - id: beauty
     canonical: 美妆
     aliases: [护肤, 化妆品]

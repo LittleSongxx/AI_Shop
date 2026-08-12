@@ -55,14 +55,20 @@ public class RedisComponent {
         return (String) redisTemplate.opsForValue().get(Constants.REDIS_KEY_CHECK_CODE + checkCodeKey);
     }
 
-    public String saveToken4Admin(@NotEmpty String account) {
-        String accountKey = Constants.REDIS_KEY_TOKEN_ADMIN_ACCOUNT + account;
+    public String saveToken4Admin(@NotNull AdminPrincipalDTO principal) {
+        if (StringTools.isEmpty(principal.getAdminId()) || principal.getSessionVersion() == null) {
+            throw new IllegalArgumentException("管理员主体缺少ID或会话版本");
+        }
+        String accountKey = Constants.REDIS_KEY_TOKEN_ADMIN_ACCOUNT + principal.getAdminId();
         Object oldToken = redisUtils.get(accountKey);
         if (oldToken != null && !StringTools.isEmpty(String.valueOf(oldToken))) {
             redisTemplate.delete(Constants.REDIS_KEY_TOKEN_ADMIN + oldToken);
         }
-        String token = UUID.randomUUID().toString();
-        redisUtils.setex(Constants.REDIS_KEY_TOKEN_ADMIN + token, account, Constants.REDIS_KEY_EXPIRES_DAY);
+        String token = UUID.randomUUID().toString().replace("-", "");
+        stringRedisTemplate.opsForValue().set(
+                Constants.REDIS_KEY_ADMIN_SESSION_VERSION + principal.getAdminId(),
+                String.valueOf(principal.getSessionVersion()));
+        redisUtils.setex(Constants.REDIS_KEY_TOKEN_ADMIN + token, principal, Constants.REDIS_KEY_EXPIRES_DAY);
         redisUtils.setex(accountKey, token, Constants.REDIS_KEY_EXPIRES_DAY);
         return token;
     }
@@ -75,15 +81,96 @@ public class RedisComponent {
         if (StringTools.isEmpty(token)) {
             return;
         }
-        Object account = redisTemplate.opsForValue().get(Constants.REDIS_KEY_TOKEN_ADMIN + token);
-        if (account != null && !StringTools.isEmpty(String.valueOf(account))) {
-            redisUtils.delete(Constants.REDIS_KEY_TOKEN_ADMIN_ACCOUNT + account);
+        AdminPrincipalDTO principal = parseAdminPrincipal(
+                redisTemplate.opsForValue().get(Constants.REDIS_KEY_TOKEN_ADMIN + token));
+        if (principal != null && !StringTools.isEmpty(principal.getAdminId())) {
+            Object mappedToken = redisUtils.get(
+                    Constants.REDIS_KEY_TOKEN_ADMIN_ACCOUNT + principal.getAdminId());
+            if (token.equals(String.valueOf(mappedToken))) {
+                redisUtils.delete(Constants.REDIS_KEY_TOKEN_ADMIN_ACCOUNT + principal.getAdminId());
+            }
         }
         redisTemplate.delete(Constants.REDIS_KEY_TOKEN_ADMIN + token);
     }
 
+    public AdminPrincipalDTO getAdminPrincipal(String token) {
+        if (StringTools.isEmpty(token)) {
+            return null;
+        }
+        AdminPrincipalDTO principal = parseAdminPrincipal(
+                redisTemplate.opsForValue().get(Constants.REDIS_KEY_TOKEN_ADMIN + token));
+        if (principal == null || StringTools.isEmpty(principal.getAdminId())
+                || principal.getSessionVersion() == null) {
+            return null;
+        }
+        String currentVersion = stringRedisTemplate.opsForValue().get(
+                Constants.REDIS_KEY_ADMIN_SESSION_VERSION + principal.getAdminId());
+        if (!String.valueOf(principal.getSessionVersion()).equals(currentVersion)) {
+            redisTemplate.delete(Constants.REDIS_KEY_TOKEN_ADMIN + token);
+            return null;
+        }
+        return principal;
+    }
+
     public Object getLoginInfo4Admin(String token) {
-        return redisTemplate.opsForValue().get(Constants.REDIS_KEY_TOKEN_ADMIN + token);
+        return getAdminPrincipal(token);
+    }
+
+    public void invalidateAdminSessions(String adminId, long sessionVersion) {
+        if (StringTools.isEmpty(adminId)) {
+            return;
+        }
+        String accountKey = Constants.REDIS_KEY_TOKEN_ADMIN_ACCOUNT + adminId;
+        Object token = redisUtils.get(accountKey);
+        if (token != null && !StringTools.isEmpty(String.valueOf(token))) {
+            redisTemplate.delete(Constants.REDIS_KEY_TOKEN_ADMIN + token);
+        }
+        redisUtils.delete(accountKey);
+        stringRedisTemplate.opsForValue().set(
+                Constants.REDIS_KEY_ADMIN_SESSION_VERSION + adminId,
+                String.valueOf(sessionVersion));
+    }
+
+    private AdminPrincipalDTO parseAdminPrincipal(Object value) {
+        if (value instanceof AdminPrincipalDTO principal) {
+            return principal;
+        }
+        if (!(value instanceof Map<?, ?> map)) {
+            // String-only sessions are deliberately rejected after the RBAC migration.
+            return null;
+        }
+        Object adminId = map.get("adminId");
+        Object account = map.get("account");
+        Object displayName = map.get("displayName");
+        Object version = map.get("sessionVersion");
+        if (adminId == null || version == null) {
+            return null;
+        }
+        AdminPrincipalDTO principal = new AdminPrincipalDTO();
+        principal.setAdminId(String.valueOf(adminId));
+        principal.setAccount(account == null ? null : String.valueOf(account));
+        principal.setDisplayName(displayName == null ? null : String.valueOf(displayName));
+        try {
+            principal.setSessionVersion(Long.parseLong(String.valueOf(version)));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        principal.setRoles(toStringSet(map.get("roles")));
+        principal.setPermissions(toStringSet(map.get("permissions")));
+        return principal;
+    }
+
+    private Set<String> toStringSet(Object value) {
+        if (!(value instanceof Collection<?> collection)) {
+            return Collections.emptySet();
+        }
+        Set<String> values = new LinkedHashSet<>();
+        for (Object item : collection) {
+            if (item != null && !StringTools.isEmpty(String.valueOf(item))) {
+                values.add(String.valueOf(item));
+            }
+        }
+        return values;
     }
 
     @SuppressWarnings("unchecked")

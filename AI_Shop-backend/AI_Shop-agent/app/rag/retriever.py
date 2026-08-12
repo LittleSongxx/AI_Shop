@@ -7,7 +7,9 @@ from typing import Any
 import structlog
 
 from app.config.settings import get_settings
+from app.harness.guardrails.channel_guard import scan_external_content
 from app.harness.metrics.runtime_sensors import (
+    RAG_CHANNEL_CONTAMINATED,
     RAG_LATENCY,
     RAG_SEARCH_TOTAL,
 )
@@ -16,6 +18,7 @@ from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_rag_overrides
 from app.rag.embedding import embed_text
 from app.rag.query_expander import expand_query
+from app.rag.rrf import rrf_score_at_rank
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.java_internal_client import java_internal_client
 from app.services.redis_service import redis_service
@@ -36,10 +39,6 @@ KNOWLEDGE_RELEASE_TOPIC = "knowledge.release"
 # Elasticsearch rejects a kNN search whose num_candidates exceeds this.
 ES_MAX_NUM_CANDIDATES = 10_000
 
-# RRF 的排名平滑常数。60 是 Cormack 等人原始论文的取值，也是 ES 自己 rrf retriever
-# 的默认值；改它会让所有 RRF 阈值失去意义，所以定在这里供换算复用，不做成配置。
-RRF_RANK_CONSTANT = 60
-
 # ES 熔断器参数。registry.get_or_create 是"先到先得"：参数只在首次创建时生效，
 # 之后传什么都被忽略。原来 BM25/向量/商品关键词三处各传各的（3/30 vs 默认 5/60），
 # 并发下谁先创建谁的阈值就生效，熔断行为不确定。收敛成一份参数。
@@ -58,15 +57,6 @@ def cosine_to_es_score(cosine: float) -> float:
     写 ``_score >= 0.65`` 只能靠注释解释。
     """
     return (1.0 + max(-1.0, min(1.0, float(cosine)))) / 2.0
-
-
-def rrf_score_at_rank(rank: int) -> float:
-    """名次 ``rank``（从 1 起）在单一路召回里贡献的 RRF 分。
-
-    用来把"至少进了某一路的前 N 名"这个可读的条件，翻译成 ``_has_enough_evidence``
-    能比较的分数。
-    """
-    return 1.0 / (RRF_RANK_CONSTANT + max(int(rank), 1))
 
 
 def knn_num_candidates(k: int, settings) -> int:
@@ -315,6 +305,7 @@ class RagRetriever:
         cleaned = self._rewrite_query(query)
         if not cleaned:
             self._observe_search(started, False, "exact_fast_path")
+            self._finalize_search(False, "exact_fast_path")
             return None
         settings = get_settings()
         try:
@@ -336,12 +327,34 @@ class RagRetriever:
         except TimeoutError:
             logger.warning("faq_fast_path_timeout", query_hash=_sha256(cleaned))
             self._observe_search(started, False, "exact_fast_path_timeout")
+            self._finalize_search(False, "exact_fast_path_timeout")
             return None
         answer = str((row or {}).get("answer") or "").strip()
         if not answer:
             self._observe_search(started, False, "exact_fast_path")
+            self._finalize_search(False, "exact_fast_path")
+            return None
+        # A2 通道检疫：快路径答案直达用户、无 LLM 边界，是知识库投毒的最高杠杆
+        # 出口。投毒的 FAQ 行（在混合路径会被 _trace_result 剔除）在这里必须
+        # 按"无证据"处理落回正常 LLM 路径，不能原样放行；污染痕迹入指标与日志，
+        # 命中计数按最终结论记为 miss。
+        question = str((row or {}).get("question") or "").strip()
+        verdict = scan_external_content(f"{question}\n{answer}" if question else answer)
+        if verdict.contaminated:
+            rules = sorted(verdict.matched_rules)
+            RAG_CHANNEL_CONTAMINATED.labels(rules=",".join(rules)).inc()
+            logger.warning(
+                "rag_exact_faq_quarantined",
+                query=cleaned[:80],
+                question_id=row.get("question_id") or row.get("questionId"),
+                rules=rules,
+                text_length=len(answer),
+            )
+            self._observe_search(started, False, "exact_fast_path")
+            self._finalize_search(False, "exact_fast_path")
             return None
         self._observe_search(started, True, "exact_fast_path")
+        self._finalize_search(True, "exact_fast_path")
         return {
             "answer": answer,
             "question": row.get("question"),
@@ -948,8 +961,13 @@ class RagRetriever:
         return filtered
 
     def _observe_search(self, started: float, hit: bool, mode: str) -> None:
-        RAG_SEARCH_TOTAL.labels(result="hit" if hit else "miss", mode=mode).inc()
+        # 只记录时延。hit/miss 计数统一在 _finalize_search——检疫在 _trace_result
+        # 内发生，全部片段被剔除时"检索命中"与"证据可用"是两回事，必须在最终
+        # 结论确定后计数（M2：避免整组检疫时 hit 虚高、trace 与指标口径背离）。
         RAG_LATENCY.observe(max(0.0, time.perf_counter() - started))
+
+    def _finalize_search(self, hit: bool, mode: str) -> None:
+        RAG_SEARCH_TOTAL.labels(result="hit" if hit else "miss", mode=mode).inc()
 
     def _trace_result(
         self,
@@ -963,9 +981,57 @@ class RagRetriever:
         candidate_count: int | None = None,
         evaluation_candidates: list[dict] | None = None,
     ) -> dict[str, Any]:
+        # A2 通道检疫：注入模型上下文的必须是洁净证据集。命中注入话术的片段
+        # 在这里剔除而不是拒绝整个检索——知识库被投毒是"该修的文档问题"，
+        # 不该让所有用户的检索一起挂掉。污染痕迹写进 trace（不记原文），
+        # 全部被检疫干净时按"无证据"处理。注意 caller 的 _observe_search
+        # 已按原模式计数，整组被剔除时该例会多记一次 hit，由
+        # RAG_CHANNEL_CONTAMINATED 指标补足信号——投毒本身就是告警级事件。
+        contamination: list[dict] = []
+        if hit:
+            kept: list[dict] = []
+            for doc in docs:
+                text = self._doc_text(doc)
+                metadata = doc.get("metadata") or {}
+                source = str(
+                    metadata.get("source")
+                    or metadata.get("title")
+                    or metadata.get("question")
+                    or ""
+                )
+                # 来源行（[来源：…] 前缀）与正文都会进上下文，一并扫描。
+                verdict = scan_external_content(f"{source}\n{text}" if source else text)
+                if verdict.contaminated:
+                    doc_id = str(
+                        doc.get("id")
+                        or metadata.get("chunkId")
+                        or metadata.get("questionId")
+                        or ""
+                    )
+                    rules = sorted(verdict.matched_rules)
+                    contamination.append(
+                        {"id": doc_id, "source": source or "知识库", "rules": rules}
+                    )
+                    RAG_CHANNEL_CONTAMINATED.labels(rules=",".join(rules)).inc()
+                    logger.warning(
+                        "rag_channel_quarantined",
+                        query=query[:80],
+                        doc_id=doc_id,
+                        rules=rules,
+                        text_length=len(text),
+                    )
+                    continue
+                kept.append(doc)
+            if contamination:
+                docs = kept
+                hit = bool(kept)
+        # 最终结论确定（检疫可能把 hit 反转成 miss）后才计数，指标与 trace 同源。
+        self._finalize_search(hit, mode)
         # Only accepted documents are evidence and may be shown as citations.
-        # Rejected candidates remain observable through candidateCount/topScore,
-        # but must not look like sources that were injected into the answer.
+        # Quarantined candidates are observable through quarantineCount/contamination
+        # (with matched rules) and the RAG_CHANNEL_CONTAMINATED metric; candidateCount
+        # and topScore are the "clean candidates that entered the evidence gate"
+        # numbers, so a quarantined doc no longer counts toward either.
         refs = self._source_refs(docs, version) if hit else []
         elapsed_ms = round(max(0.0, time.perf_counter() - started) * 1000, 2)
         result = {
@@ -979,6 +1045,8 @@ class RagRetriever:
                 "bucket": bucket,
                 "sourceCount": len(refs),
                 "candidateCount": len(docs) if candidate_count is None else candidate_count,
+                "quarantineCount": len(contamination),
+                "contamination": contamination,
                 "topScore": max(
                     (float(doc.get("score") or 0) for doc in docs),
                     default=0.0,

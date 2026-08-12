@@ -21,26 +21,6 @@ def test_dedicated_rerank_key_takes_precedence_over_dashscope_key(monkeypatch):
     assert settings.rerank_api_key == "dedicated-key"
 
 
-def test_dedicated_vlm_key_takes_precedence_over_dashscope_key(monkeypatch):
-    monkeypatch.setenv("VLM_API_KEY", "vlm-key")
-    monkeypatch.setenv("DASHSCOPE_API_KEY", "shared-key")
-    monkeypatch.setenv("RERANK_BASE_URL", "https://workspace.example.test/reranks")
-
-    settings = Settings(_env_file=None)
-
-    assert settings.vlm_api_key == "vlm-key"
-
-
-def test_blank_vlm_key_falls_back_to_dashscope_key(monkeypatch):
-    monkeypatch.setenv("VLM_API_KEY", "")
-    monkeypatch.setenv("DASHSCOPE_API_KEY", "shared-key")
-    monkeypatch.setenv("RERANK_BASE_URL", "https://workspace.example.test/reranks")
-
-    settings = Settings(_env_file=None)
-
-    assert settings.vlm_api_key == "shared-key"
-
-
 def test_blank_key_allows_a_workspace_placeholder_for_initial_local_setup():
     settings = Settings(
         rerank_api_key="",

@@ -29,6 +29,7 @@ from app.harness.agents.contracts import (
 )
 from app.harness.agents.registry import AGENT_SPECS
 from app.harness.guardrails.output_guard import strip_emojis
+from app.harness.observation import build_tool_result_observation
 from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.rag.query_rewriter import normalize_policy_query
 from app.services import agent_runtime as rt
@@ -1010,30 +1011,40 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     ),
                 )
                 called.append(required_tool)
-                _record_eligibility_trace(
-                    task=task, result=required_result, run_id=child_run_id
-                )
+                required_observation = build_tool_result_observation(required_result)
+                required_usable = required_result.success and not required_observation.contaminated
+                if required_observation.contaminated:
+                    warnings.append(f"TOOL_RESULT_QUARANTINED:{required_tool}")
+                if required_usable:
+                    _record_eligibility_trace(
+                        task=task, result=required_result, run_id=child_run_id
+                    )
                 evidence.append(
                     {
                         "type": "tool_result",
                         "tool": required_tool,
-                        "success": required_result.success,
-                        "errorCode": required_result.error_code,
+                        "success": required_usable,
+                        "errorCode": (
+                            "TOOL_RESULT_QUARANTINED"
+                            if required_observation.contaminated
+                            else required_result.error_code
+                        ),
                     }
                 )
-                if required_result.success and required_result.source_refs:
+                if required_usable and required_result.source_refs:
                     evidence.extend(required_result.source_refs)
-                if required_result.success and required_tool in _ORDER_CONTEXT_TOOLS:
+                if required_usable and required_tool in _ORDER_CONTEXT_TOOLS:
                     order_evidence = _verified_order_evidence(task)
                     if order_evidence:
                         evidence.append(order_evidence)
-                if required_result.success and required_result.assistant_cards:
+                if required_usable and required_result.assistant_cards:
                     assistant_cards = required_result.assistant_cards
                 if required_result.success:
-                    required_text = required_result.to_tool_message()
-                    verified_tool_outputs.append(
-                        f"{required_tool}: {required_text}"[:3000]
-                    )
+                    required_text = required_observation.text
+                    if required_usable:
+                        verified_tool_outputs.append(
+                            f"{required_tool}: {required_text}"[:3000]
+                        )
                     required_call_id = f"required-{required_tool.lower()}"
                     messages.append(
                         AIMessage(
@@ -1053,7 +1064,9 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                             tool_call_id=required_call_id,
                         )
                     )
-                required_biz = required_result.to_biz_dict() or {}
+                required_biz = (
+                    required_result.to_biz_dict() or {} if required_usable else {}
+                )
                 for key in ("productIds", "productNames", "orderIds"):
                     values = [
                         str(value)
@@ -1064,20 +1077,26 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         tool_biz[key] = list(
                             dict.fromkeys([*(tool_biz.get(key) or []), *values])
                         )[:50]
-                biz_type = required_result.biz_type or biz_type
-                biz_data = required_result.biz_data or biz_data
-                retrieval_trace = required_result.retrieval_trace or retrieval_trace
-                if required_tool == "SEARCH_PRODUCTS":
-                    search_tool_hint = required_result.to_tool_message()
+                if required_usable:
+                    biz_type = required_result.biz_type or biz_type
+                    biz_data = required_result.biz_data or biz_data
+                    retrieval_trace = required_result.retrieval_trace or retrieval_trace
+                if required_usable and required_tool == "SEARCH_PRODUCTS":
+                    search_tool_hint = required_observation.text
                 episode_service.record_step(
                     "SPECIALIST_TOOL",
                     node_name="specialist_runner",
-                    status="OK" if required_result.success else "ERROR",
+                    status="OK" if required_usable else "ERROR",
                     output_data={
                         "tool": required_tool,
                         "required": True,
-                        "success": required_result.success,
-                        "sourceCount": len(required_result.source_refs or []),
+                        "success": required_usable,
+                        "sourceCount": (
+                            len(required_result.source_refs or [])
+                            if required_usable
+                            else 0
+                        ),
+                        "quarantined": required_observation.contaminated,
                     },
                     agent_id=task.agent_id,
                     handoff_id=task.handoff_id,
@@ -1164,24 +1183,35 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         ),
                     )
                     called.append(name)
-                    _record_eligibility_trace(task=task, result=result, run_id=child_run_id)
+                    observation = build_tool_result_observation(result)
+                    result_usable = result.success and not observation.contaminated
+                    if observation.contaminated:
+                        warnings.append(f"TOOL_RESULT_QUARANTINED:{name}")
+                    if result_usable:
+                        _record_eligibility_trace(
+                            task=task, result=result, run_id=child_run_id
+                        )
                     evidence.append(
                         {
                             "type": "tool_result",
                             "tool": name,
-                            "success": result.success,
-                            "errorCode": result.error_code,
+                            "success": result_usable,
+                            "errorCode": (
+                                "TOOL_RESULT_QUARANTINED"
+                                if observation.contaminated
+                                else result.error_code
+                            ),
                         }
                     )
-                    if result.success and result.source_refs:
+                    if result_usable and result.source_refs:
                         evidence.extend(result.source_refs)
-                    if result.success and name in _ORDER_CONTEXT_TOOLS:
+                    if result_usable and name in _ORDER_CONTEXT_TOOLS:
                         order_evidence = _verified_order_evidence(task)
                         if order_evidence:
                             evidence.append(order_evidence)
-                    if result.success and result.assistant_cards:
+                    if result_usable and result.assistant_cards:
                         assistant_cards = result.assistant_cards
-                    result_biz = result.to_biz_dict() or {}
+                    result_biz = result.to_biz_dict() or {} if result_usable else {}
                     for key in ("productIds", "productNames", "orderIds"):
                         values = [
                             str(value)
@@ -1192,13 +1222,14 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                             tool_biz[key] = list(
                                 dict.fromkeys([*(tool_biz.get(key) or []), *values])
                             )[:50]
-                    biz_type = result.biz_type or biz_type
-                    biz_data = result.biz_data or biz_data
-                    retrieval_trace = result.retrieval_trace or retrieval_trace
-                    if name == "SEARCH_PRODUCTS":
-                        search_tool_hint = result.to_tool_message()
-                    tool_message = result.to_tool_message()
-                    if result.success:
+                    if result_usable:
+                        biz_type = result.biz_type or biz_type
+                        biz_data = result.biz_data or biz_data
+                        retrieval_trace = result.retrieval_trace or retrieval_trace
+                    if result_usable and name == "SEARCH_PRODUCTS":
+                        search_tool_hint = observation.text
+                    tool_message = observation.text
+                    if result_usable:
                         verified_tool_outputs.append(f"{name}: {tool_message}"[:3000])
                     messages.append(
                         ToolMessage(
@@ -1208,11 +1239,14 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     episode_service.record_step(
                         "SPECIALIST_TOOL",
                         node_name="specialist_runner",
-                        status="OK" if result.success else "ERROR",
+                        status="OK" if result_usable else "ERROR",
                         output_data={
                             "tool": name,
-                            "success": result.success,
-                            "sourceCount": len(result.source_refs or []),
+                            "success": result_usable,
+                            "sourceCount": (
+                                len(result.source_refs or []) if result_usable else 0
+                            ),
+                            "quarantined": observation.contaminated,
                         },
                         agent_id=task.agent_id,
                         handoff_id=task.handoff_id,
@@ -1965,39 +1999,48 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                     run_id=(state.get("agent_msg") or {}).get("runId"),
                 )
             else:
+                proposal_observation = build_tool_result_observation(proposal)
+                proposal_usable = proposal.success and not proposal_observation.contaminated
                 result["tools_called"] = list(
                     dict.fromkeys([*readonly_tools, plan.action_type])
                 )
                 proposal_contract = ActionProposal(
                     tool=plan.action_type,
                     arguments=args,
-                    success=proposal.success,
+                    success=proposal_usable,
                     evidence_refs=evidence_refs,
-                    reason=None if proposal.success else (proposal.error_code or "ACTION_REJECTED"),
+                    reason=(
+                        None
+                        if proposal_usable
+                        else "TOOL_RESULT_QUARANTINED"
+                        if proposal_observation.contaminated
+                        else proposal.error_code or "ACTION_REJECTED"
+                    ),
                 )
                 result["action_proposal"] = proposal_contract.model_dump(mode="json")
                 messages = list(state.get("llm_messages") or [])
                 messages.append(
                     ToolMessage(
-                        content=proposal.to_tool_message(),
+                        content=proposal_observation.text,
                         tool_call_id="supervisor-action",
                     )
                 )
                 result["llm_messages"] = messages
-                if proposal.success and proposal.assistant_cards:
+                if proposal_usable and proposal.assistant_cards:
                     result["assistant_cards"] = proposal.assistant_cards
-                if not proposal.success:
+                if not proposal_usable:
                     result["chunks"] = [_action_failure_answer(answer)]
                 episode_service.record_step(
                     "ACTION_POLICY_DECISION",
                     node_name="action_executor",
-                    status="OK" if proposal.success else "BLOCKED",
+                    status="OK" if proposal_usable else "BLOCKED",
                     tool_name=plan.action_type,
                     output_data={
                         "proposal": proposal_contract.model_dump(mode="json"),
-                        "success": proposal.success,
+                        "success": proposal_usable,
                         "reason": proposal_contract.reason,
                         "requiresConfirmation": True,
+                        "quarantined": proposal_observation.contaminated,
                     },
                     run_id=(state.get("agent_msg") or {}).get("runId"),
                 )

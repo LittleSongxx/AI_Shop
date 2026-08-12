@@ -1,3 +1,4 @@
+import contextvars
 from typing import Any
 
 import structlog
@@ -6,6 +7,22 @@ from app.config.settings import get_settings
 from app.infra.http_client import get_client
 
 logger = structlog.get_logger()
+
+# 委托用户身份：由 Agent worker 从会话身份（系统信道）写入，作为 X-Agent-User-Id
+# 传给 Java 内部接口。与 body 里模型可见的 userId 分离——模型输出或提示注入可以
+# 改写 body，改不了头；Java 侧比对二者一致性，不一致即拒绝。
+_delegated_user_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "java_internal_delegated_user_id", default=""
+)
+
+
+def set_delegated_user_id(user_id: str | None) -> None:
+    """在当前异步任务上下文中声明本次会话代表哪个用户。"""
+    _delegated_user_id.set((user_id or "").strip())
+
+
+def clear_delegated_user_id() -> None:
+    _delegated_user_id.set("")
 
 
 def _camel_to_snake(name: str) -> str:
@@ -34,10 +51,14 @@ class JavaInternalClient:
 
     def _headers(self) -> dict[str, str]:
         settings = get_settings()
-        return {
+        headers = {
             "X-Internal-Token": settings.internal_token,
             "Content-Type": "application/json",
         }
+        delegated = _delegated_user_id.get()
+        if delegated:
+            headers["X-Agent-User-Id"] = delegated
+        return headers
 
     def _base(self) -> str:
         return get_settings().java_web_url.rstrip("/")

@@ -1,8 +1,12 @@
 package com.aishop.interceptor;
 
 import com.aishop.component.RedisComponent;
+import com.aishop.constants.AdminPermissions;
+import com.aishop.entity.dto.AdminPrincipalDTO;
 import com.aishop.entity.enums.ResponseCodeEnum;
-import com.aishop.exception.BusinessException;
+import com.aishop.exception.HttpBusinessException;
+import com.aishop.security.AdminSecurityContext;
+import com.aishop.security.RequireAdminPermission;
 import com.aishop.utils.AuthCookieHelper;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
@@ -12,6 +16,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.Arrays;
 
 @Component
 @ConditionalOnProperty(name = "aishop.security.admin-interceptor", havingValue = "true")
@@ -33,12 +39,52 @@ public class AppInterceptor implements HandlerInterceptor {
         }
         String token = authCookieHelper.resolveAdminToken(request);
         if (StringTools.isEmpty(token)) {
-            throw new BusinessException(ResponseCodeEnum.CODE_901);
+            throw new HttpBusinessException(401, ResponseCodeEnum.CODE_901.getMsg());
         }
-        Object sessionObj = redisComponent.getLoginInfo4Admin(token);
-        if (sessionObj == null) {
-            throw new BusinessException(ResponseCodeEnum.CODE_901);
+        AdminPrincipalDTO principal = redisComponent.getAdminPrincipal(token);
+        if (principal == null) {
+            throw new HttpBusinessException(401, ResponseCodeEnum.CODE_901.getMsg());
         }
-        return true;
+        request.setAttribute(AdminSecurityContext.REQUEST_ATTRIBUTE, principal);
+        AdminSecurityContext.set(principal);
+        try {
+            enforcePermission((HandlerMethod) handler, principal);
+            return true;
+        } catch (RuntimeException e) {
+            AdminSecurityContext.clear();
+            throw e;
+        }
+    }
+
+    @Override
+    public void afterCompletion(
+            HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        AdminSecurityContext.clear();
+    }
+
+    private void enforcePermission(HandlerMethod handler, AdminPrincipalDTO principal) {
+        if (principal.hasRole(AdminPermissions.SUPER_ADMIN_ROLE)) {
+            return;
+        }
+        RequireAdminPermission requirement = handler.getMethodAnnotation(RequireAdminPermission.class);
+        if (requirement == null) {
+            requirement = handler.getBeanType().getAnnotation(RequireAdminPermission.class);
+        }
+        if (requirement == null) {
+            if (!principal.hasPermission(AdminPermissions.ADMIN_LEGACY)) {
+                throw new HttpBusinessException(403, ResponseCodeEnum.CODE_403.getMsg());
+            }
+            return;
+        }
+        String[] required = requirement.value();
+        if (required.length == 0) {
+            return;
+        }
+        boolean allowed = requirement.requireAll()
+                ? Arrays.stream(required).allMatch(principal::hasPermission)
+                : Arrays.stream(required).anyMatch(principal::hasPermission);
+        if (!allowed) {
+            throw new HttpBusinessException(403, ResponseCodeEnum.CODE_403.getMsg());
+        }
     }
 }

@@ -159,7 +159,7 @@ spring:
             - id: user
               uri: lb://aishop-user
               predicates:
-                - Path=/api/account/**,/api/sign/**,/api/captcha/**,/api/userAddress/**,/api/userBrowse/**,/api/browseHistory/**,/api/userFavorite/**,/api/userMember/**,/api/userNotification/**,/api/location/**,/api/file/**
+                - Path=/api/account/**,/api/sign/**,/api/captcha/**,/api/userAddress/**,/api/userBrowse/**,/api/browseHistory/**,/api/userFavorite/**,/api/userMember/**,/api/userNotification/**,/api/user/privacy/**,/api/location/**,/api/file/**
               filters:
                 - RewritePath=/api/(?<segment>.*), /$\{segment}
             - id: product
@@ -242,7 +242,8 @@ aishop:
         - /api/userMember/getLevelBadge
         - /api/notify/alipayNotify
       admin-exclude-paths:
-        - /admin-api/account/**
+        - /admin-api/account/checkCode
+        - /admin-api/account/login
         - /admin-api/file/getResource
         - /admin-api/file/getResource/**
     rate-limit:

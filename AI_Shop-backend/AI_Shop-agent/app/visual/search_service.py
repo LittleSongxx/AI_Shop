@@ -11,6 +11,7 @@ from typing import Any
 import structlog
 
 from app.config.settings import get_settings
+from app.constants import RRF_K
 from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.rag.retriever import rag_retriever
 from app.services.episode_service import episode_service
@@ -53,7 +54,6 @@ _GENERIC_VISUAL_TERMS = (
 )
 _MAX_BUDGET_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:元|块)?\s*(?:以内|以下|不超过)")
 _MIN_BUDGET_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:元|块)?\s*(?:以上|起)")
-_RRF_K = 60
 
 
 class VisualProductSearchService:
@@ -769,7 +769,7 @@ def _weighted_rrf(
         for rank, hit in enumerate(hits, start=1):
             if not hit.product_id:
                 continue
-            scores[hit.product_id] += weight / (_RRF_K + rank)
+            scores[hit.product_id] += weight / (RRF_K + rank)
             sources[hit.product_id].add(source)
             if hit.cosine is not None:
                 max_cosine[hit.product_id] = max(

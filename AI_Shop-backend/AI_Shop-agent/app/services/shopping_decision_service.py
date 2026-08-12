@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -80,6 +81,18 @@ def _number(value: Any) -> float | None:
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _future_timestamp(value: Any) -> bool:
+    if not value:
+        return False
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc) > datetime.now(timezone.utc)
 
 
 class ShoppingDecisionService:
@@ -230,6 +243,10 @@ class ShoppingDecisionService:
             reason = None
             if str(product.get("status")) != "1" or product.get("in_stock") is False:
                 reason = "NOT_PURCHASABLE"
+            elif not str(product.get("offer_snapshot_id") or "").strip():
+                reason = "OFFER_SNAPSHOT_MISSING"
+            elif not _future_timestamp(product.get("quote_expires_at")):
+                reason = "QUOTE_EXPIRED"
             elif price is None:
                 reason = "QUOTE_MISSING"
             elif max_budget is not None and price > max_budget:
@@ -344,7 +361,7 @@ class ShoppingDecisionService:
         if candidate_index is None:
             return ranked
         candidate = ranked.pop(candidate_index)
-        target_index = min(3, len(ranked))
+        target_index = min(1, len(ranked))
         ranked.insert(target_index, candidate)
         candidate["operation_recommended"] = True
         candidate["commercialDisclosure"] = "运营推荐"

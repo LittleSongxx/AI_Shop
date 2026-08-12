@@ -7,6 +7,7 @@ import com.aishop.biz.OrderItemService;
 import com.aishop.biz.OrderLogisticsInfoService;
 import com.aishop.biz.RefundSagaTransactionService;
 import com.aishop.controller.ABaseController;
+import com.aishop.security.AgentDelegatedIdentity;
 import com.aishop.api.enums.OrderStatusEnum;
 import com.aishop.entity.po.OrderComment;
 import com.aishop.entity.po.OrderInfo;
@@ -59,10 +60,8 @@ public class OrderAgentInternalController extends ABaseController {
 
     @PostMapping("/listOrders")
     public ResponseVO<List<Map<String, Object>>> listOrders(@RequestBody Map<String, Object> body) {
-        String userId = str(body, "userId");
-        if (StringTools.isEmpty(userId)) {
-            return getSuccessResponseVO(Collections.emptyList());
-        }
+        // 身份以委托头为准，body 里的 userId 必须与之一致（防模型改 body 换身份）。
+        String userId = AgentDelegatedIdentity.requireAndMatch(body.get("userId"));
         OrderInfoQuery query = new OrderInfoQuery();
         query.setUserId(userId);
         query.setQueryItems(true);
@@ -103,10 +102,12 @@ public class OrderAgentInternalController extends ABaseController {
         if (StringTools.isEmpty(orderId)) {
             return getSuccessResponseVO(null);
         }
+        String userId = AgentDelegatedIdentity.require();
         OrderInfo order = orderInfoService.getOrderInfoByOrderId(orderId);
         if (order == null) {
             return getSuccessResponseVO(null);
         }
+        AgentDelegatedIdentity.requireOwner(userId, order.getUserId());
         OrderItemQuery iq = new OrderItemQuery();
         iq.setOrderId(orderId);
         order.setOrderItemList(orderItemService.findListByParam(iq));
@@ -119,8 +120,14 @@ public class OrderAgentInternalController extends ABaseController {
         if (StringTools.isEmpty(orderItemId)) {
             return getSuccessResponseVO(null);
         }
+        String userId = AgentDelegatedIdentity.require();
         OrderItem item = orderItemService.getOrderItemByOrderItemId(orderItemId);
-        return getSuccessResponseVO(item == null ? null : toItemMap(item));
+        if (item == null) {
+            return getSuccessResponseVO(null);
+        }
+        OrderInfo order = orderInfoService.getOrderInfoByOrderId(item.getOrderId());
+        AgentDelegatedIdentity.requireOwner(userId, order == null ? null : order.getUserId());
+        return getSuccessResponseVO(toItemMap(item));
     }
 
     @PostMapping("/listOrderItems")
@@ -129,6 +136,9 @@ public class OrderAgentInternalController extends ABaseController {
         if (StringTools.isEmpty(orderId)) {
             return getSuccessResponseVO(Collections.emptyList());
         }
+        String userId = AgentDelegatedIdentity.require();
+        OrderInfo order = orderInfoService.getOrderInfoByOrderId(orderId);
+        AgentDelegatedIdentity.requireOwner(userId, order == null ? null : order.getUserId());
         OrderItemQuery iq = new OrderItemQuery();
         iq.setOrderId(orderId);
         iq.setOrderBy(com.aishop.entity.query.SafeSort.of("order_item_id asc"));
@@ -144,9 +154,9 @@ public class OrderAgentInternalController extends ABaseController {
 
     @PostMapping("/getLogistics")
     public ResponseVO<Map<String, Object>> getLogistics(@RequestBody Map<String, Object> body) {
-        String userId = str(body, "userId");
+        String userId = AgentDelegatedIdentity.requireAndMatch(body.get("userId"));
         String orderId = str(body, "orderId");
-        if (StringTools.isEmpty(userId) || StringTools.isEmpty(orderId)) {
+        if (StringTools.isEmpty(orderId)) {
             return getSuccessResponseVO(null);
         }
         OrderLogisticsInfo info;
@@ -173,9 +183,9 @@ public class OrderAgentInternalController extends ABaseController {
 
     @PostMapping("/getComment")
     public ResponseVO<Map<String, Object>> getComment(@RequestBody Map<String, Object> body) {
-        String userId = str(body, "userId");
+        String userId = AgentDelegatedIdentity.requireAndMatch(body.get("userId"));
         String orderId = str(body, "orderId");
-        if (StringTools.isEmpty(userId) || StringTools.isEmpty(orderId)) {
+        if (StringTools.isEmpty(orderId)) {
             return getSuccessResponseVO(null);
         }
         OrderCommentQuery q = new OrderCommentQuery();
@@ -201,11 +211,10 @@ public class OrderAgentInternalController extends ABaseController {
 
     @PostMapping("/refundStatus")
     public ResponseVO<List<Map<String, Object>>> refundStatus(@RequestBody Map<String, Object> body) {
-        String userId = str(body, "userId");
+        String userId = AgentDelegatedIdentity.requireAndMatch(body.get("userId"));
         String orderId = str(body, "orderId");
         String orderItemId = str(body, "orderItemId");
-        if (StringTools.isEmpty(userId)
-                || (StringTools.isEmpty(orderId) && StringTools.isEmpty(orderItemId))) {
+        if (StringTools.isEmpty(orderId) && StringTools.isEmpty(orderItemId)) {
             return getSuccessResponseVO(Collections.emptyList());
         }
 
@@ -241,6 +250,8 @@ public class OrderAgentInternalController extends ABaseController {
     @PostMapping("/actionStatus")
     public ResponseVO<Map<String, Object>> actionStatus(
             @RequestBody Map<String, Object> body) {
+        // 幂等核对也是用户数据操作：委托身份 + body 一致性一起校验。
+        AgentDelegatedIdentity.requireAndMatch(body.get("userId"));
         return getSuccessResponseVO(agentActionStatusService.resolve(body));
     }
 
@@ -351,6 +362,7 @@ public class OrderAgentInternalController extends ABaseController {
             case "STOCK_PENDING" -> "退款已受理，库存处理中";
             case "COMPLETED" -> "退款已完成";
             case "MANUAL_REVIEW" -> "退款需人工复核";
+            case "REJECTED" -> "退款申请已驳回";
             default -> "退款处理中";
         };
     }

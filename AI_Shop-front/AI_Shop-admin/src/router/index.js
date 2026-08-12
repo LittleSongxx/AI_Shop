@@ -15,6 +15,7 @@ const DESKTOP_TO_MOBILE = {
   '/user/address': '/m/more/address',
   '/setting/agentMessage': '/m/more/agent',
   '/setting/agentQuality': '/m/more/agentQuality',
+  '/data/aiEvidence': '/m/more/aiEvidence',
   '/data/dataAnalyst': '/m/more/dataAnalyst',
   '/discountCoupon': '/m/more/coupon',
   '/marketing/searchHot': '/m/more/searchHot',
@@ -65,6 +66,7 @@ const router = createRouter({
         { path: 'more', component: () => import('@/views/mobile/MobileMore.vue'), meta: { title: '更多', tab: '/m/more' } },
         { path: 'more/agent', component: () => import('@/views/mobile/MobileAgentMessage.vue'), meta: { title: '客服记录', tab: '/m/more', showBack: true } },
         { path: 'more/agentQuality', component: () => import('@/views/setting/AgentQualityCenter.vue'), meta: { title: 'Agent 质量中心', tab: '/m/more', showBack: true } },
+        { path: 'more/aiEvidence', component: () => import('@/views/data/AIEvidenceCenter.vue'), meta: { title: 'AI 证据与试用', tab: '/m/more', showBack: true } },
         { path: 'more/dataAnalyst', component: () => import('@/views/data/DataAnalyst.vue'), meta: { title: 'AI 经营分析', tab: '/m/more', showBack: true } },
         { path: 'more/coupon', component: () => import('@/views/mobile/MobileCoupon.vue'), meta: { title: '优惠券', tab: '/m/more', showBack: true } },
         { path: 'more/searchHot', component: () => import('@/views/mobile/MobileSearchHot.vue'), meta: { title: '热搜词', tab: '/m/more', showBack: true } },
@@ -253,6 +255,12 @@ const router = createRouter({
           name: 'AI经营分析',
           component: () => import('@/views/data/DataAnalyst.vue'),
           meta: { itemList: ["数据中心", "AI经营分析"] }
+        },
+        {
+          path: '/data/aiEvidence',
+          name: 'AI证据与试用',
+          component: () => import('@/views/data/AIEvidenceCenter.vue'),
+          meta: { itemList: ["数据中心", "AI证据与试用"] }
         },
         {
           path: '/data/mqCompensationLog',

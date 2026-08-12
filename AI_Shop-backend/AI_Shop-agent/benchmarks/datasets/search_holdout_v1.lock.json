@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "dataset": "search_holdout_v1",
+  "datasetSha256": "3213425c1616b496557eb06d9047b6ee2a4221ce8499307a81b15de408e01b39",
+  "caseCount": 15,
+  "split": "holdout",
+  "labelSource": "human review of locked 47-product mirror",
+  "catalogPath": "../data/simlect_catalog/catalog.json",
+  "catalogSha256": "fd40ec1288682e508ab4a6c325d67e00186960f16a006c30bc7238370e40cbc3",
+  "productCount": 47,
+  "taxonomyPath": "app/config/search_taxonomy.yml",
+  "taxonomySha256": "655e6c76dad0356b12e78b8d0f19c717dd2b4cf34ca833ff7458dc25e63a429b",
+  "thresholds": {
+    "keywordAccuracy": 1.0,
+    "termCoverage": 1.0,
+    "recallAt10": 0.8,
+    "mrr": 0.65,
+    "ndcgAt10": 0.7
+  }
+}

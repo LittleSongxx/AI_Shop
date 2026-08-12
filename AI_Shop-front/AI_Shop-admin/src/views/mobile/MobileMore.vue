@@ -60,6 +60,7 @@ const groups = [
       title: '数据',
       items: [
         { label: 'AI经营分析', icon: 'robot', path: '/m/more/dataAnalyst' },
+        { label: 'AI证据与试用', icon: 'order-count', path: '/m/more/aiEvidence' },
         { label: '统计明细', icon: 'order-count', path: '/m/more/statistics' },
         { label: 'MQ补偿日志', icon: 'setting', path: '/m/more/mqLog' },
         { label: '收货地址', icon: 'folder', path: '/m/more/address' }

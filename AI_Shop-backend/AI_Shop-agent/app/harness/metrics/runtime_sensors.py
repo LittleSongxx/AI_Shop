@@ -25,6 +25,11 @@ RAG_LATENCY = Histogram(
     "RAG 检索延迟",
     buckets=[0.01, 0.05, 0.1, 0.3, 0.5, 1, 2, 5, 10],
 )
+RAG_CHANNEL_CONTAMINATED = Counter(
+    "agent_rag_channel_contaminated_total",
+    "知识库片段命中注入话术被检疫的次数（按命中规则聚合，告警信号）",
+    ["rules"],
+)
 
 LLM_LATENCY = Histogram(
     "agent_llm_latency_seconds",

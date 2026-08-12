@@ -15,6 +15,7 @@ from app.domain.intent.classifier import classify_request_mode
 from app.domain.intent.types import IntentKind, RequestMode
 from app.domain.intent.write_args import extract_review_content, extract_review_star
 from app.graph.state import AgentGraphState
+from app.harness.observation import build_tool_result_observation
 from app.memory.session_memory_service import session_memory_service
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.order_reference_resolver import (
@@ -111,19 +112,32 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         return {**base, **direct}
 
     result = await mcp_tool_router.invoke(tool_name, args, state["user_id"])
+    observation = build_tool_result_observation(result, fallback="未查询到相关记录。")
     messages = list(state.get("llm_messages") or [])
     messages.append(
         ToolMessage(
-            content=result.to_tool_message() or "未查询到相关记录。",
+            content=observation.text,
             tool_call_id="resolved_order_reference",
         )
     )
+    if observation.contaminated:
+        return {
+            **base,
+            "llm_messages": messages,
+            "tools_called": [tool_name],
+            "tool_biz": None,
+            "biz_type": "agent",
+            "biz_data": None,
+            "assistant_cards": None,
+            "chunks": [observation.text],
+            "route": "finalize",
+        }
     if not result.success:
         return {
             **base,
             "llm_messages": messages,
             "tools_called": [tool_name],
-            "chunks": [result.content or "业务查询失败，请稍后重试。"],
+            "chunks": [observation.text or "业务查询失败，请稍后重试。"],
             "biz_type": result.biz_type or "agent",
             "route": "finalize",
         }
@@ -136,7 +150,7 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         "biz_type": result.biz_type,
         "biz_data": result.biz_data,
         "assistant_cards": result.assistant_cards,
-        "chunks": [] if result.assistant_cards else [result.to_tool_message() or ""],
+        "chunks": [] if result.assistant_cards else [observation.text],
         "route": "finalize",
     }
 

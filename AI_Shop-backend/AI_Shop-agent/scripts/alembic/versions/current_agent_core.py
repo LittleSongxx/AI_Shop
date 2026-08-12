@@ -71,6 +71,9 @@ def upgrade() -> None:
             output_tokens          int NOT NULL DEFAULT 0,
             cost_cny               decimal(14, 8) NOT NULL DEFAULT 0,
             latency_ms             int NULL,
+            ttft_ms                int NULL,
+            pilot_batch_id         varchar(64) NULL,
+            evidence_source        varchar(16) NULL,
             quality_json           json NULL,
             reward_signals_json    json NULL,
             capture_level          varchar(16) NOT NULL DEFAULT 'FULL',
@@ -118,6 +121,79 @@ def upgrade() -> None:
             KEY idx_agent_step_run_time (run_id, occurred_at, step_id),
             KEY idx_agent_step_type_status (event_type, status, occurred_at)
         ) COMMENT 'sanitized observable Agent decisions and actions' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_pilot_batch
+        (
+            batch_id              varchar(64) NOT NULL PRIMARY KEY,
+            name                  varchar(120) NOT NULL,
+            description           varchar(1000) NULL,
+            evidence_source       varchar(16) NOT NULL,
+            status                varchar(16) NOT NULL DEFAULT 'DRAFT',
+            consent_text_version  varchar(64) NOT NULL,
+            created_by            varchar(100) NOT NULL,
+            started_at            datetime(3) NULL,
+            closed_at             datetime(3) NULL,
+            created_at            datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at            datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            KEY idx_agent_pilot_batch_status (status, created_at),
+            KEY idx_agent_pilot_batch_source (evidence_source, created_at)
+        ) COMMENT 'governed AI pilot and evidence batch' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_pilot_participant
+        (
+            participant_id        varchar(64) NOT NULL PRIMARY KEY,
+            batch_id              varchar(64) NOT NULL,
+            pseudonym             varchar(64) NOT NULL,
+            user_id_hash          char(64) NOT NULL,
+            user_id_encrypted     varbinary(512) NULL,
+            consented_at          datetime(3) NOT NULL,
+            withdrawn_at          datetime(3) NULL,
+            status                varchar(16) NOT NULL DEFAULT 'ACTIVE',
+            created_by            varchar(100) NOT NULL,
+            created_at            datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at            datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_agent_pilot_participant_user (batch_id, user_id_hash),
+            UNIQUE KEY uk_agent_pilot_participant_alias (batch_id, pseudonym),
+            KEY idx_agent_pilot_participant_status (batch_id, status, created_at)
+        ) COMMENT 'consented participant with batch-scoped pseudonym' CHARSET = utf8mb4
+        """
+    )
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_privacy_job
+        (
+            job_id                 varchar(64) NOT NULL PRIMARY KEY,
+            user_id                varchar(32) NOT NULL,
+            job_type               varchar(16) NOT NULL,
+            idempotency_key        varchar(128) NOT NULL,
+            request_fingerprint    char(64) NOT NULL,
+            status                 varchar(24) NOT NULL DEFAULT 'PENDING',
+            current_step           varchar(64) NULL,
+            steps_json             json NOT NULL,
+            retry_count            int NOT NULL DEFAULT 0,
+            error_code             varchar(64) NULL,
+            error_message          varchar(512) NULL,
+            export_path            varchar(512) NULL,
+            export_token_hash      char(64) NULL,
+            export_expires_at      datetime(3) NULL,
+            requested_at           datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            started_at             datetime(3) NULL,
+            completed_at           datetime(3) NULL,
+            updated_at             datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE KEY uk_user_privacy_job_idempotency
+                (user_id, job_type, idempotency_key),
+            KEY idx_user_privacy_job_user_time (user_id, requested_at),
+            KEY idx_user_privacy_job_status (status, updated_at)
+        ) COMMENT 'resumable user AI data export and deletion job' CHARSET = utf8mb4
         """
     )
     op.execute(
@@ -730,6 +806,7 @@ def upgrade() -> None:
             user_id             varchar(32) NOT NULL,
             request_id          varchar(128) NULL,
             run_id              varchar(64) NULL,
+            pilot_batch_id      varchar(64) NULL,
             product_id          varchar(64) NULL,
             sku_key             varchar(64) NULL,
             order_id            varchar(64) NULL,
@@ -856,6 +933,7 @@ def upgrade() -> None:
     _reconcile_agent_message()
     _reconcile_session_memory()
     _reconcile_episode_tables()
+    _reconcile_evidence_and_privacy_tables()
     _reconcile_shopping_profile()
     _reconcile_pending_action()
     _reconcile_recommendation_event()
@@ -951,6 +1029,9 @@ def _reconcile_episode_tables() -> None:
             "output_tokens": "int NOT NULL DEFAULT 0",
             "cost_cny": "decimal(14, 8) NOT NULL DEFAULT 0",
             "latency_ms": "int NULL",
+            "ttft_ms": "int NULL",
+            "pilot_batch_id": "varchar(64) NULL",
+            "evidence_source": "varchar(16) NULL",
             "quality_json": "json NULL",
             "reward_signals_json": "json NULL",
             "capture_level": "varchar(16) NOT NULL DEFAULT 'FULL'",
@@ -1021,6 +1102,11 @@ def _reconcile_episode_tables() -> None:
         "NOT NULL DEFAULT 'UNREVIEWED'"
     )
     op.execute(
+        "UPDATE agent_run SET evidence_source=NULL "
+        "WHERE evidence_source IS NOT NULL AND evidence_source NOT IN "
+        "('SYNTHETIC','LOCAL_PILOT','REAL_USER')"
+    )
+    op.execute(
         "UPDATE agent_step SET run_id=CONCAT('legacy-step-', step_id) "
         "WHERE run_id IS NULL OR run_id=''"
     )
@@ -1046,6 +1132,22 @@ def _reconcile_episode_tables() -> None:
             KEY idx_agent_handoff_status (status, created_at)
         ) CHARSET=utf8mb4
     """)
+
+
+def _reconcile_evidence_and_privacy_tables() -> None:
+    inspector = sa.inspect(op.get_bind())
+    if "commerce_outcome_ledger" in inspector.get_table_names():
+        columns = {
+            column["name"]
+            for column in inspector.get_columns("commerce_outcome_ledger")
+        }
+        if "pilot_batch_id" not in columns:
+            op.execute(
+                "ALTER TABLE commerce_outcome_ledger "
+                "ADD COLUMN pilot_batch_id varchar(64) NULL AFTER run_id"
+            )
+
+
 def _reconcile_shopping_profile() -> None:
     columns = {
         column["name"]
@@ -1260,6 +1362,11 @@ def _reconcile_indexes() -> None:
                 ("parent_run_id", "started_at"),
                 False,
             ),
+            (
+                "idx_agent_run_pilot_time",
+                ("pilot_batch_id", "started_at"),
+                False,
+            ),
         ),
         "agent_step": (
             ("idx_agent_step_run_time", ("run_id", "occurred_at", "step_id"), False),
@@ -1359,6 +1466,20 @@ def _reconcile_indexes() -> None:
             ("idx_support_case_status_time", ("status", "priority", "created_at"), False),
             ("idx_support_case_run", ("run_id", "created_at"), False),
         ),
+        "agent_pilot_batch": (
+            ("idx_agent_pilot_batch_status", ("status", "created_at"), False),
+            ("idx_agent_pilot_batch_source", ("evidence_source", "created_at"), False),
+        ),
+        "agent_pilot_participant": (
+            ("uk_agent_pilot_participant_user", ("batch_id", "user_id_hash"), True),
+            ("uk_agent_pilot_participant_alias", ("batch_id", "pseudonym"), True),
+            ("idx_agent_pilot_participant_status", ("batch_id", "status", "created_at"), False),
+        ),
+        "user_privacy_job": (
+            ("uk_user_privacy_job_idempotency", ("user_id", "job_type", "idempotency_key"), True),
+            ("idx_user_privacy_job_user_time", ("user_id", "requested_at"), False),
+            ("idx_user_privacy_job_status", ("status", "updated_at"), False),
+        ),
     }
     inspector = sa.inspect(op.get_bind())
     for table_name, definitions in indexes.items():
@@ -1377,6 +1498,9 @@ def _reconcile_indexes() -> None:
 
 def downgrade() -> None:
     for table_name in (
+        "user_privacy_job",
+        "agent_pilot_participant",
+        "agent_pilot_batch",
         "agent_handoff",
         "agent_step",
         "agent_run",

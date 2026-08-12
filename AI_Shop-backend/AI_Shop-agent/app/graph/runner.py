@@ -9,6 +9,7 @@ from app.db.pool import acquire
 from app.graph.builder import get_compiled_graph
 from app.graph.checkpoint.redis_saver import get_checkpointer
 from app.graph.state import initial_state, thread_id_for
+from app.observability.llm_metrics import snapshot_cost_summary
 from app.observability.telemetry import get_tracer
 from app.services.agent_runtime import parse_agent_message
 from app.services.episode_service import episode_service
@@ -104,6 +105,9 @@ async def run_agent_graph(agent_msg: dict) -> str:
                     "outcome": outcome,
                     "intent": result.get("intent"),
                     "tools": result.get("tools_called") or [],
+                    "costSummary": snapshot_cost_summary(
+                        tools_called=result.get("tools_called")
+                    ),
                 },
                 latency_ms=elapsed_ms,
             )
@@ -123,6 +127,9 @@ async def run_agent_graph(agent_msg: dict) -> str:
                 error_code=type(exc).__name__,
                 error_message=str(exc),
                 latency_ms=elapsed_ms,
+                # 异常路径同样补成本快照：已累计的 LLM 成本随异常结束不应丢失
+                # per-request 摘要（E 工作线"每条消息"口径的异常兜底）。
+                output_data={"costSummary": snapshot_cost_summary()},
             )
             episode_service.finish_run(
                 "graph_exception", latency_ms=elapsed_ms, force_keep=True

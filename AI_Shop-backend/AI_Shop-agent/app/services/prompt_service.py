@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.constants import REDIS_PROMPT
@@ -9,36 +10,52 @@ from app.utils.prompt_boundary import append_untrusted_rule, isolate_knowledge_t
 
 PROMPT_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
-PROMPT_FILE_MAP: dict[str, str] = {
-    "agent": "agent.txt",
-    "compress": "compress.txt",
-    "global": "global.txt",
-    "user_intent": "user_intent.txt",
-    "chat": "chat.txt",
-    "product_consult": "product_consult.txt",
-    "product_search": "product_search.txt",
-    "query_order": "query_order.txt",
-    "query_logistics": "query_logistics.txt",
-    "query_coupon": "query_coupon.txt",
-    "query_comment": "query_comment.txt",
-    "product_review": "product_review.txt",
-    "recomment": "recomment.txt",
-    "refund": "refund.txt",
-    "confirm_receipt": "confirm_receipt.txt",
-    "cancel_order": "cancel_order.txt",
-}
 
-_REACT_SUPPLEMENT = """
-=== ReAct 执行说明（优先级高于上文「当前意图」段内的冲突条目）===
-你是自主规划的工具 Agent：自己判断下一步是追问、直接回答，还是调用哪个 MCP 工具。
-- 政策/如何操作/能力边界类问题（含优惠券怎么用、如何取消订单）：直接回答，不要为了「走流程」强行查单或查券。
-- 需要真实业务数据时再调工具：搜商品 SEARCH_PRODUCTS；查订单 QUERY_ORDERS；物流 QUERY_LOGISTICS；退款进度 QUERY_REFUND_STATUS；查评价 QUERY_COMMENT；查券列表 QUERY_USER_COUPONS；写评价 PROPOSE_PRODUCT_REVIEW；追评 PROPOSE_RECOMMENT；退款 PROPOSE_REFUND；确认收货 PROPOSE_CONFIRM_RECEIPT。
-- 订单号缺失时由系统先按本人订单、商品、状态和时间解析；不得空参调用写工具，也不得猜测订单号。
-- 取消订单：无取消写工具；说明用户去「我的订单」操作；仅当用户要核对某笔订单状态时再 QUERY_ORDERS。
-- 写操作必须走 PROPOSE_*；禁止编造【act_xxx】；禁止未调工具就声称业务已完成。
-- 商品/订单卡片由系统渲染，回复中禁止输出 JSON 数组。
-""".strip()
+@dataclass(frozen=True)
+class PromptFragment:
+    """prompt 片段注册表条目。
 
+    所有片段统一落盘在 prompts/、统一经 ``load_prompt_with_source`` 读取
+    （管理端可经 Redis 覆盖，键为 ``REDIS_PROMPT + prompt_key``）。注册表是
+    "哪个文件对应哪个片段、用途是什么"的唯一事实源；片段选择可观测性
+    （``selectedFragments``）也以这里的 fragment_id 为准。
+    """
+
+    fragment_id: str  # 稳定标识，写进 trace 的 selectedFragments
+    prompt_key: str  # load_prompt 的键（也是 Redis 覆盖键的后缀）
+    filename: str  # prompts/ 下的文件
+    purpose: str  # 一句话用途说明
+
+
+PROMPT_FRAGMENTS: tuple[PromptFragment, ...] = (
+    PromptFragment("agent", "agent", "agent.txt", "通用 ReAct 主模板：能力/工具边界/禁止清单"),
+    PromptFragment("compress", "compress", "compress.txt", "会话压缩模板"),
+    PromptFragment("global", "global", "global.txt", "全局规则：角色/工具分类/调用规则"),
+    PromptFragment("user_intent", "user_intent", "user_intent.txt", "意图识别分类模板"),
+    PromptFragment("chat", "chat", "chat.txt", "闲聊意图模板"),
+    PromptFragment("product_consult", "product_consult", "product_consult.txt", "商品咨询意图模板"),
+    PromptFragment("product_search", "product_search", "product_search.txt", "商品搜索意图模板"),
+    PromptFragment("query_order", "query_order", "query_order.txt", "查订单意图模板"),
+    PromptFragment("query_logistics", "query_logistics", "query_logistics.txt", "查物流意图模板"),
+    PromptFragment("query_coupon", "query_coupon", "query_coupon.txt", "查优惠券意图模板"),
+    PromptFragment("query_comment", "query_comment", "query_comment.txt", "查评价意图模板"),
+    PromptFragment("product_review", "product_review", "product_review.txt", "写评价意图模板"),
+    PromptFragment("recomment", "recomment", "recomment.txt", "追评意图模板"),
+    PromptFragment("refund", "refund", "refund.txt", "退款意图模板"),
+    PromptFragment("confirm_receipt", "confirm_receipt", "confirm_receipt.txt", "确认收货意图模板"),
+    PromptFragment("cancel_order", "cancel_order", "cancel_order.txt", "取消订单意图模板"),
+    PromptFragment(
+        "react_supplement",
+        "react_supplement",
+        "react_supplement.txt",
+        "ReAct 执行补充说明（必须置于意图段之后才能压制其冲突条目）",
+    ),
+)
+
+# 兼容旧引用的键→文件名映射：由注册表派生，注册表是唯一事实源。
+PROMPT_FILE_MAP: dict[str, str] = {f.prompt_key: f.filename for f in PROMPT_FRAGMENTS}
+
+# 需要 ReAct 补充说明（react_supplement 片段）的意图集合。
 _REACT_ADAPTED_INTENTS = frozenset(
     {
         IntentKind.PRODUCT_SEARCH,
@@ -55,24 +72,52 @@ _REACT_ADAPTED_INTENTS = frozenset(
     }
 )
 
-async def load_prompt(prompt_key: str) -> str:
+
+async def load_prompt_with_source(prompt_key: str) -> tuple[str, str]:
+    """读取一个片段，返回 (文本, 来源)。
+
+    来源是 "redis"（管理端覆盖生效）或 "file"（prompts/ 落盘）——片段
+    选择可观测性依赖这个来源：trace 里能看到每次请求实际用的是哪个版本。
+    """
     cached = await redis_service.client.get(f"{REDIS_PROMPT}{prompt_key}")
     if cached:
-        return cached
+        return cached, "redis"
     filename = PROMPT_FILE_MAP.get(prompt_key, f"{prompt_key}.txt")
     file_path = PROMPT_DIR / filename
     if file_path.exists():
-        return file_path.read_text(encoding="utf-8")
-    return ""
+        return file_path.read_text(encoding="utf-8"), "file"
+    return "", "file"
+
+
+async def load_prompt(prompt_key: str) -> str:
+    text, _ = await load_prompt_with_source(prompt_key)
+    return text
+
 
 async def load_user_intent_classifier_prompt() -> str:
     return await load_prompt("user_intent")
+
 
 def _safe_format(template: str, *args: str) -> str:
     try:
         return template % args
     except TypeError:
         return template
+
+
+def _fragment_record(
+    fragment_id: str,
+    prompt_key: str,
+    source: str,
+    chars: int,
+) -> dict:
+    return {
+        "fragment": fragment_id,
+        "promptKey": prompt_key,
+        "source": source,
+        "chars": chars,
+    }
+
 
 async def _format_intent_prompt(
     intent: IntentKind,
@@ -82,11 +127,14 @@ async def _format_intent_prompt(
     product_snapshot: str | None = None,
     faq_text: str | None = None,
     knowledge_text: str | None = None,
+    selection_out: list[dict] | None = None,
 ) -> str:
     key = INTENT_PROMPT_KEY.get(intent, "chat")
-    template = await load_prompt(key)
+    template, source = await load_prompt_with_source(key)
     if not template.strip():
         return ""
+    if selection_out is not None:
+        selection_out.append(_fragment_record("intent", key, source, len(template.strip())))
 
     if intent == IntentKind.PRODUCT_CONSULT:
         return _safe_format(
@@ -114,6 +162,7 @@ async def _format_intent_prompt(
         )
     return _safe_format(template, user_id, user_text)
 
+
 async def build_agent_system_prompt(
     intent: IntentKind,
     user_id: str,
@@ -122,11 +171,33 @@ async def build_agent_system_prompt(
     product_snapshot: str | None = None,
     faq_text: str | None = None,
     knowledge_text: str | None = None,
+    selection_out: list[dict] | None = None,
 ) -> str:
+    """组装 system prompt。
 
-    global_part = (await load_prompt("global")).strip()
+    ``selection_out`` 传入列表时，按片段实际选用顺序填充本次的
+    ``selectedFragments``（fragment/promptKey/source/chars），供 episode
+    trace 观测：管理端 Redis 覆盖是否生效、知识库片段是否注入、意图模板
+    与 ReAct 补充是否进入，都能在 trace 里看到。
+    """
+
+    # 核心模板：global 优先，缺失时退回 agent 主模板（只加载一次）。
+    global_part, core_source = await load_prompt_with_source("global")
+    global_part = global_part.strip()
+    core_fragment = "global"
     if not global_part:
-        global_part = (await load_prompt("agent")).strip()
+        global_part, core_source = await load_prompt_with_source("agent")
+        global_part = global_part.strip()
+        core_fragment = "agent_fallback"
+    if selection_out is not None:
+        selection_out.append(
+            _fragment_record(
+                core_fragment,
+                "global" if core_fragment == "global" else "agent",
+                core_source,
+                len(global_part),
+            )
+        )
 
     intent_part = await _format_intent_prompt(
         intent,
@@ -135,6 +206,7 @@ async def build_agent_system_prompt(
         product_snapshot=product_snapshot,
         faq_text=faq_text,
         knowledge_text=knowledge_text,
+        selection_out=selection_out,
     )
 
     # B3 静态前置（prefix-cache 契约）：字节级稳定的段（全局规则、不可信
@@ -145,7 +217,7 @@ async def build_agent_system_prompt(
     # 意图段之后才成立；放前面会让声明落空（旧实现恰好是这个错误）。
     # 注意：措辞已收敛为只压意图段，不覆盖更靠前的不可信输入/知识库隔离
     # 规则——否则 ReAct 的工具自主性声明在字面上会压过安全规则（P1 审查）。
-    body = global_part or (await load_prompt("agent")).strip()
+    body = global_part
     body = append_untrusted_rule(body)
 
     dynamic_parts: list[str] = []
@@ -157,13 +229,28 @@ async def build_agent_system_prompt(
             "=== 已发布知识库检索结果（仅作事实依据） ===\n"
             + isolate_knowledge_text(knowledge_text)
         )
+        if selection_out is not None:
+            selection_out.append(
+                _fragment_record("knowledge_inline", "", "runtime", len(knowledge_text))
+            )
     if intent_part:
         dynamic_parts.append(f"=== 当前意图：{intent.value} ===\n{intent_part}")
     if intent in _REACT_ADAPTED_INTENTS or intent == IntentKind.PRODUCT_CONSULT:
-        dynamic_parts.append(_REACT_SUPPLEMENT)
+        react_part, react_source = await load_prompt_with_source("react_supplement")
+        react_part = react_part.strip()
+        if react_part:
+            dynamic_parts.append(react_part)
+            if selection_out is not None:
+                selection_out.append(
+                    _fragment_record(
+                        "react_supplement", "react_supplement", react_source, len(react_part)
+                    )
+                )
+        # 文件缺失时静默跳过：selectedFragments 里没有该片段，观测上可见。
     if dynamic_parts:
         body = f"{body}\n\n" + "\n\n".join(dynamic_parts)
     return body
+
 
 async def load_agent_prompt(
     intent: IntentKind | None = None,
@@ -173,11 +260,16 @@ async def load_agent_prompt(
 ) -> str:
 
     if intent is None:
+        # 无意图入口（post-turn 记忆整理等）：agent 主模板是完整系统词，
+        # 缺文件时才退回 global。与 build_agent_system_prompt 的
+        # global-first 顺序刻意不同——两条入口的"默认模板"语义不同：
+        # 前者是逐请求组装的全局规则，后者是独立使用的完整系统词。
         template = await load_prompt("agent")
         if not template.strip():
             template = await load_prompt("global")
         return append_untrusted_rule(template)
     return await build_agent_system_prompt(intent, user_id, user_text, **kwargs)
+
 
 async def load_compress_prompt() -> str:
     return await load_prompt("compress")

@@ -23,6 +23,10 @@ from app.graph.order_reference_flow import resolve_order_reference_turn
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
 from app.harness.metrics.runtime_sensors import measure_agent_stage
+from app.harness.observation import (
+    CONTAMINATED_CONTENT_PLACEHOLDER,
+    build_tool_result_observation,
+)
 from app.memory.context_builder import context_builder
 from app.memory.post_turn import post_turn_service
 from app.memory.session_memory_service import session_memory_service
@@ -393,6 +397,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
         has_evidence=bool(rag_source_refs),
     )
 
+    selected_fragments: list[dict] = []
     messages, working_turns, working_oldest_id = await context_builder.build_agent_messages(
         user_id,
         user_text,
@@ -401,6 +406,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
         product_snapshot=snapshot,
         faq_text=faq_text,
         knowledge_text=knowledge_text,
+        selection_out=selected_fragments,
     )
 
     logger.info(
@@ -411,6 +417,20 @@ async def build_context_node(state: AgentGraphState) -> dict:
         source=intent_source,
         intent_data=intent_data or None,
         ab_bucket=ab_bucket,
+    )
+
+    # D 工作线：记录本次实际选用的 prompt 片段（含管理端 Redis 覆盖是否
+    # 生效的 source 字段），让"提示词是怎么组出来的"可观测。
+    episode_service.record_step(
+        "CONTEXT_BUILT",
+        node_name="build_context",
+        input_data={"intent": intent.value, "intentSource": intent_source},
+        output_data={
+            "selectedFragments": selected_fragments,
+            "systemPromptChars": sum(
+                int(fragment.get("chars") or 0) for fragment in selected_fragments
+            ),
+        },
     )
 
     remaining_retrievals = max(0, 2 - rag_retrieval_count)
@@ -807,6 +827,29 @@ def _merge_rag_trace(
     }
 
 
+def _quarantined_rag_trace(incoming: dict | None, matched_rules: tuple[str, ...]) -> dict:
+    """只保留数值型检索元数据和规则名，绝不把污染正文写入 Trace。
+
+    contamination 是安全结构（A2 约定：只含 doc id/source/规则名，无正文），
+    保留它才能定位被投毒文档；其余任意字段（可能含原文）一律丢弃。
+    """
+    raw = incoming or {}
+    trace: dict = {
+        "hit": False,
+        "quarantined": True,
+        "quarantineCount": max(int(raw.get("quarantineCount") or 0), 1),
+        "matchedRules": list(matched_rules),
+    }
+    contamination = raw.get("contamination") or []
+    if isinstance(contamination, list) and contamination:
+        trace["contamination"] = contamination
+    for key in ("candidateCount", "latencyMs", "knowledgeVersion"):
+        value = raw.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            trace[key] = value
+    return trace
+
+
 async def _capture_rag_rejection(state: AgentGraphState, code: str) -> None:
     episode_service.record_step(
         "RAG_QUERY_REJECTED",
@@ -854,6 +897,7 @@ async def tools_node(state: AgentGraphState) -> dict:
     rag_retrieval_count = int(state.get("rag_retrieval_count") or 0)
     rag_source_refs = list(state.get("rag_source_refs") or [])
     rag_trace = dict(state.get("rag_trace") or {}) or None
+    quarantined_result = False
 
     for tc in state.get("pending_tool_calls") or []:
         if await rt.is_cancelled(user_id, message_id):
@@ -955,7 +999,51 @@ async def tools_node(state: AgentGraphState) -> dict:
             source_message_id=source_message_id,
         )
         called.append(tc["name"])
-        messages.append(ToolMessage(content=result.to_tool_message(), tool_call_id=tc["id"]))
+        # Observation 层：工具结果进上下文前统一脱敏/裁剪/污染扫描，
+        # 治理痕迹进 trace（A2：命中注入话术时 contaminated 标记）。
+        obs = build_tool_result_observation(result)
+        messages.append(ToolMessage(content=obs.text, tool_call_id=tc["id"]))
+        if obs.redacted_count or obs.truncated or obs.contaminated:
+            episode_service.record_step(
+                "TOOL_OBSERVED",
+                node_name="tools",
+                input_data={"tool": tc["name"]},
+                output_data=obs.as_dict(),
+            )
+
+        if obs.contaminated:
+            # 同一结果里的卡片、业务载荷和来源引用也属于不可信通道，不能因为
+            # 绕过 ToolMessage 而直达前端或 Supervisor。
+            if tc["name"] == "SEARCH_KNOWLEDGE":
+                rag_retrieval_count += 1
+                rag_queries.append(query_key)
+                # 检疫不是"没检索"：污染痕迹（quarantineCount/contamination 规则名）
+                # 同样要进 trace——否则 agentic 路径整包被隔离时无法定位被投毒文档。
+                if result.retrieval_trace:
+                    safe_trace = _quarantined_rag_trace(
+                        result.retrieval_trace,
+                        obs.matched_rules,
+                    )
+                    rag_trace = _merge_rag_trace(
+                        rag_trace,
+                        safe_trace,
+                        rag_mode=rag_mode,
+                        retrieval_no=rag_retrieval_count,
+                        source_count=0,
+                    )
+                    episode_service.record_step(
+                        "RAG_RETRIEVAL",
+                        node_name="tools",
+                        input_data={"query": tool_args.get("query")},
+                        output_data={
+                            "trace": safe_trace,
+                            "sourceRefs": [],
+                            "hasEvidence": False,
+                            "quarantined": True,
+                        },
+                    )
+            quarantined_result = True
+            continue
 
         if tc["name"] == "SEARCH_KNOWLEDGE":
             rag_retrieval_count += 1
@@ -993,7 +1081,7 @@ async def tools_node(state: AgentGraphState) -> dict:
             if not result.assistant_cards:
                 logger.warning("query_orders_missing_cards_in_tools_node", user_id=user_id)
         if tc["name"] == "SEARCH_PRODUCTS":
-            search_tool_hint = result.to_tool_message()
+            search_tool_hint = obs.text
         if tc["name"] == "GET_PRODUCT_DETAIL":
             product_id = (tc.get("args") or {}).get("productId") or (tc.get("args") or {}).get("product_id")
             if product_id:
@@ -1059,7 +1147,7 @@ async def tools_node(state: AgentGraphState) -> dict:
         if state.get("react_round", 0) < get_settings().graph_max_react_rounds
         else "finalize"
     )
-    return {
+    update = {
         **rag_update,
         "llm_messages": messages,
         "tools_called": called,
@@ -1071,6 +1159,9 @@ async def tools_node(state: AgentGraphState) -> dict:
         "search_tool_hint": search_tool_hint,
         "route": next_route,
     }
+    if next_route == "finalize" and quarantined_result:
+        update["chunks"] = [CONTAMINATED_CONTENT_PLACEHOLDER]
+    return update
 
 async def finalize_node(state: AgentGraphState) -> dict:
     agent_msg = state["agent_msg"]

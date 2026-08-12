@@ -29,8 +29,11 @@ def test_evaluate_results_reports_recall_mrr_and_citation_rate():
     assert metrics["retrievalCases"] == 2
     assert metrics["recallAtK"] == 1.0
     assert metrics["mrr"] == 0.75
+    assert metrics["ndcgAtK"] == 0.8155
     assert metrics["topKHitRate"] == 1.0
     assert metrics["answerCitationRate"] == 1.0
+    assert metrics["citationCorrectness"] == 0.6667
+    assert metrics["citationCoverage"] == 1.0
     assert len(metrics["perCase"]) == 2
 
 
@@ -59,7 +62,11 @@ def test_evaluate_results_uses_true_recall_and_excludes_no_answer_cases():
 
 
 def test_evaluate_results_handles_empty_dataset():
-    assert evaluate_results([], [])["cases"] == 0
+    metrics = evaluate_results([], [])
+    assert metrics["cases"] == 0
+    assert metrics["ndcgAtK"] == 0.0
+    assert metrics["citationCorrectness"] == 0.0
+    assert metrics["injectionRobustness"] == 0.0
 
 
 def test_no_answer_accuracy_rejects_false_positive_citations():
@@ -123,6 +130,41 @@ def test_placeholder_faq_ids_are_rejected():
         [{"query": "发票", "relevantIds": ["faq_invoice_apply"]}]
     )
     assert placeholders[0]["ref"] == "faq_invoice_apply"
+
+
+def test_citation_correctness_coverage_and_injection_are_separate_metrics():
+    cases = [
+        {
+            "query": "优惠券规则",
+            "relevantIds": ["faq_1", "faq_2"],
+            "answerKeywords": ["一张"],
+            "injection": True,
+        },
+        {
+            "query": "不存在的支付方式",
+            "relevantIds": [],
+            "noAnswer": True,
+            "injection": True,
+        },
+    ]
+    results = [
+        {
+            "source_refs": [
+                {"id": "faq_1", "snippet": "一次只能使用一张券"},
+                {"id": "unrelated", "snippet": "一张图片"},
+            ],
+            "trace": {"hit": True, "latencyMs": 12.5},
+        },
+        {"source_refs": [], "trace": {"hit": False, "latencyMs": 3.0}},
+    ]
+
+    metrics = evaluate_results(cases, results, top_k=2)
+
+    assert metrics["citationCorrectness"] == 0.5
+    assert metrics["citationCoverage"] == 0.5
+    assert metrics["injectionCases"] == 2
+    assert metrics["injectionRobustness"] == 0.5
+    assert metrics["perCase"][0]["latencyMs"] == 12.5
 
 
 def test_locked_rag_dataset_and_knowledge_files_match():

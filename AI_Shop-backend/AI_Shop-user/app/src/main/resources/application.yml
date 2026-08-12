@@ -107,6 +107,10 @@ mq:
     auto-replay-enabled: true
 
 aishop:
+  agent:
+    base-url: ${AISHOP_AGENT_BASE_URL:http://127.0.0.1:7050}
+    privacy-connect-timeout-ms: 1000
+    privacy-read-timeout-ms: 10000
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}
     auth-enabled: true

@@ -1,12 +1,30 @@
-# 冻结评测集 aishop_convo_v1
+# AI_Shop 评测入口
 
 > 内容状态：当前有效
 >
-> 整改基线：`f639599e335b97f6156cc41923d53948bcbf6549`
+> 本轮实施基线：`ef9aa0659a9275a99bb74cdb46e87770150dea0a`
 >
-> 最后核验时间：2026-08-06（Asia/Shanghai）
+> 最后核验时间：2026-08-12（Asia/Shanghai）
 >
-> 适用环境：确定性离线意图/工具策略回归；不是端到端 LLM、RAG 或生产效果评测
+> 适用环境：确定性回归、本地集成和可选 live 评测；不是生产效果或真实用户报告
+
+当前项目级证据入口为 [`docs/AI应用求职项目证据总览.md`](../../../docs/AI应用求职项目证据总览.md)，机器口径为 [`docs/evidence-manifest.json`](../../../docs/evidence-manifest.json)。本目录包含两代互补评测：
+
+- `aishop_convo_v1` 等历史冻结集保留项目演进和规则回归证据。
+- `aishop-eval/v1` 统一 Runner 输出 case、summary 和 Markdown 报告，覆盖 Commerce runtime、AI 安全、Search/RAG 与进程隔离消融。
+
+统一 Runner：
+
+```bash
+python benchmarks/run_agentic_commerce_runtime.py --run-id local-commerce
+python benchmarks/run_ai_safety.py --run-id local-safety
+python benchmarks/run_search_rag_eval.py --run-id local-search-rag
+python benchmarks/run_ablation.py --run-id local-ablation
+```
+
+结果写入 `benchmarks/results/<suite>/<run_id>/` 并被 Git 忽略；只有显式传入 `--accept-baseline` 的 Runner 才能写 `benchmarks/baselines/*.lock.json`，CI 不会自动接受 baseline。确定性结果必须写作 `SYNTHETIC`，Search/RAG 未使用 `--live` 时不得声称 Recall/MRR/NDCG 或真实模型成本。
+
+## 历史冻结会话集 aishop_convo_v1
 
 `scripts/eval_rag.py` 只评检索一层：给一句 query，看知识库有没有召回对的文档。
 但线上一次会话真正会走错的地方在它前面——意图判错、该调工具却没调、

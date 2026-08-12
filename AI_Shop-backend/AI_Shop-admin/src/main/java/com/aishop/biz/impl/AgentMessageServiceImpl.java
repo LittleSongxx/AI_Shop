@@ -22,7 +22,10 @@ import com.aishop.entity.query.AgentMessageQuery;
 import com.aishop.entity.vo.PaginationResultVO;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.exception.BusinessException;
+import com.aishop.security.AdminAssertionSigner;
+import com.aishop.security.AdminSecurityContext;
 import com.aishop.utils.StringTools;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service("agentMessageService")
 public class AgentMessageServiceImpl implements AgentMessageService {
@@ -36,16 +39,32 @@ public class AgentMessageServiceImpl implements AgentMessageService {
 	@Resource
 	private RestClient.Builder restClientBuilder;
 
+	@Resource
+	private AdminAssertionSigner adminAssertionSigner;
+
+	@Resource
+	private ObjectMapper objectMapper;
+
 	private RestClient client() {
 		return restClientBuilder.baseUrl(agentBaseUrl.replaceAll("/$", "")).build();
 	}
 
 	private <T> T post(String path, Object body, ParameterizedTypeReference<ResponseVO<T>> type) {
+		Object payload = body == null ? Map.of() : body;
+		byte[] bodyBytes;
+		try {
+			bodyBytes = objectMapper.writeValueAsBytes(payload);
+		} catch (Exception e) {
+			throw new BusinessException("Agent 请求序列化失败");
+		}
+		Map<String, String> assertionHeaders = adminAssertionSigner.sign(
+				"POST", path, bodyBytes, AdminSecurityContext.requirePrincipal());
 		ResponseVO<T> vo = client().post()
 				.uri(path)
 				.contentType(MediaType.APPLICATION_JSON)
 				.header(InternalApiHeaders.INTERNAL_TOKEN, internalToken)
-				.body(body == null ? Map.of() : body)
+				.headers(headers -> assertionHeaders.forEach(headers::set))
+				.body(bodyBytes)
 				.retrieve()
 				.body(type);
 		if (vo == null) {
@@ -102,6 +121,32 @@ public class AgentMessageServiceImpl implements AgentMessageService {
 				"/api/agent/admin/" + action,
 				body,
 				new ParameterizedTypeReference<ResponseVO<Object>>() {});
+	}
+
+	@Override
+	public byte[] callReport(String action, Map<String, Object> body) {
+		String path = "/api/agent/admin/" + action;
+		Object payload = body == null ? Map.of() : body;
+		byte[] bodyBytes;
+		try {
+			bodyBytes = objectMapper.writeValueAsBytes(payload);
+		} catch (Exception e) {
+			throw new BusinessException("Agent 请求序列化失败");
+		}
+		Map<String, String> assertionHeaders = adminAssertionSigner.sign(
+				"POST", path, bodyBytes, AdminSecurityContext.requirePrincipal());
+		byte[] response = client().post()
+				.uri(path)
+				.contentType(MediaType.APPLICATION_JSON)
+				.header(InternalApiHeaders.INTERNAL_TOKEN, internalToken)
+				.headers(headers -> assertionHeaders.forEach(headers::set))
+				.body(bodyBytes)
+				.retrieve()
+				.body(byte[].class);
+		if (response == null) {
+			throw new BusinessException("Agent 报告导出失败");
+		}
+		return response;
 	}
 
 	private List<AgentMessage> mapMessages(Object raw) {

@@ -145,7 +145,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange, String msg) {
-        exchange.getResponse().setStatusCode(HttpStatus.OK);
+        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "error");

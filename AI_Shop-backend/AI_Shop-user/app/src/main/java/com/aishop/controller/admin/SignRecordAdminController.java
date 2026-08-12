@@ -1,16 +1,16 @@
 package com.aishop.controller.admin;
 
-import com.aishop.component.RedisComponent;
+import com.aishop.constants.AdminPermissions;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.api.vo.SignDateSyncResultVO;
 import com.aishop.api.vo.SignRecordSyncResultVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.biz.SignCalendarCacheService;
 import com.aishop.biz.SignRecordSyncService;
-import com.aishop.utils.AuthCookieHelper;
+import com.aishop.security.AdminSecurityContext;
+import com.aishop.security.RequireAdminPermission;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,12 +23,9 @@ public class SignRecordAdminController extends com.aishop.controller.admin.ABase
     private SignRecordSyncService signRecordSyncService;
     @Resource
     private SignCalendarCacheService signCalendarCacheService;
-    @Resource
-    private AuthCookieHelper authCookieHelper;
-    @Resource
-    private RedisComponent redisComponent;
 
     @PostMapping("/syncAllFromDb")
+    @RequireAdminPermission(AdminPermissions.ADMIN_LEGACY)
     public ResponseVO syncAllFromDb(Boolean force) {
         boolean overwrite = force == null || force;
         SignRecordSyncResultVO result = signRecordSyncService.syncAllFromDb(overwrite);
@@ -36,6 +33,7 @@ public class SignRecordAdminController extends com.aishop.controller.admin.ABase
     }
 
     @PostMapping("/syncUserFromDb")
+    @RequireAdminPermission(AdminPermissions.ADMIN_LEGACY)
     public ResponseVO syncUserFromDb(String userId, Boolean force) {
         if (StringTools.isEmpty(userId)) {
             throw new BusinessException("userId 不能为空");
@@ -49,6 +47,7 @@ public class SignRecordAdminController extends com.aishop.controller.admin.ABase
     }
 
     @PostMapping("/syncSignDatesFromDb")
+    @RequireAdminPermission(AdminPermissions.ADMIN_LEGACY)
     public ResponseVO syncSignDatesFromDb(String syncEndDate, String userId) {
         SignDateSyncResultVO result;
         if (StringTools.isEmpty(userId)) {
@@ -60,21 +59,10 @@ public class SignRecordAdminController extends com.aishop.controller.admin.ABase
     }
 
     @PostMapping("/forceRebuildToday")
-    public ResponseVO forceRebuildToday(String userId, HttpServletRequest request) {
-        String operator = resolveOperator(request);
+    @RequireAdminPermission(AdminPermissions.ADMIN_LEGACY)
+    public ResponseVO forceRebuildToday(String userId) {
+        String operator = AdminSecurityContext.requirePrincipal().getAccount();
         SignDateSyncResultVO result = signCalendarCacheService.forceRebuildToday(userId, operator);
         return getSuccessResponseVO(result);
-    }
-
-    private String resolveOperator(HttpServletRequest request) {
-        if (request == null) {
-            return "unknown";
-        }
-        String token = authCookieHelper.resolveAdminToken(request);
-        if (StringTools.isEmpty(token)) {
-            return "unknown";
-        }
-        Object admin = redisComponent.getLoginInfo4Admin(token);
-        return admin == null ? "unknown" : String.valueOf(admin);
     }
 }

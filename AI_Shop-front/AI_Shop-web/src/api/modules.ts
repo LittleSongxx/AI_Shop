@@ -25,6 +25,53 @@ export const accountApi = {
   forgetPassword: (params: Record<string, unknown>) => request.postForm('/account/forgetPassword', params)
 };
 
+export type PrivacyJobType = 'EXPORT' | 'DELETE';
+export type PrivacyJobStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export interface PrivacyJobStep {
+  name: string;
+  status: PrivacyJobStatus;
+  attempts: number;
+  result?: unknown;
+  error?: string;
+}
+
+export interface PrivacyJob {
+  jobId: string;
+  jobType: PrivacyJobType;
+  status: PrivacyJobStatus;
+  currentStep?: string | null;
+  steps: PrivacyJobStep[];
+  progress: { completed: number; total: number; percent: number };
+  retryCount: number;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  downloadable: boolean;
+  exportExpiresAt?: string | null;
+  requestedAt?: string | null;
+  completedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export const privacyApi = {
+  listJobs: (limit = 50) => request.get<PrivacyJob[]>('/user/privacy/jobs', { params: { limit } }),
+  getJob: (jobId: string) => request.get<PrivacyJob>(`/user/privacy/jobs/${encodeURIComponent(jobId)}`),
+  createExport: (password: string, idempotencyKey: string) =>
+    request.post<PrivacyJob>('/user/privacy/exports', { password }, {
+      headers: { 'Idempotency-Key': idempotencyKey }
+    }),
+  createDeletion: (password: string, idempotencyKey: string) =>
+    request.post<PrivacyJob>('/user/privacy/deletions', { password }, {
+      headers: { 'Idempotency-Key': idempotencyKey }
+    }),
+  retryJob: (jobId: string) =>
+    request.post<PrivacyJob>(`/user/privacy/jobs/${encodeURIComponent(jobId)}/retry`),
+  downloadExport: (jobId: string) =>
+    request.get<Blob>(`/user/privacy/exports/${encodeURIComponent(jobId)}/download`, {
+      responseType: 'blob'
+    })
+};
+
 export const searchApi = {
   loadHotKeywords: () => request.get('/search/loadHotKeywords'),
   loadRecentKeywords: () => request.get('/search/loadRecentKeywords'),

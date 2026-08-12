@@ -46,6 +46,9 @@ def test_current_schema_contract_includes_support_and_episode_training_gates():
         "agent_run",
         "agent_step",
         "agent_pending_action",
+        "agent_pilot_batch",
+        "agent_pilot_participant",
+        "user_privacy_job",
         "ai_badcase_candidate",
         "agent_regression_case",
     }.issubset(_REQUIRED_COLUMNS)
@@ -63,6 +66,9 @@ def test_current_schema_contract_includes_support_and_episode_training_gates():
         "dataset_reviewed_at",
         "dataset_review_note",
         "reward_signals_json",
+        "ttft_ms",
+        "pilot_batch_id",
+        "evidence_source",
     }.issubset(_REQUIRED_COLUMNS["agent_run"])
     assert ("agent_pending_action", "idx_agent_pending_run") in _REQUIRED_INDEXES
     assert ("support_case", "uk_support_case_idempotency") in _REQUIRED_INDEXES

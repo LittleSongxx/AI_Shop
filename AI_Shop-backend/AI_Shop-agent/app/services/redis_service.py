@@ -25,6 +25,8 @@ from app.constants import (
     REDIS_AGENT_IMPRESSION_REQUEST,
     REDIS_AGENT_PENDING_ACTION,
     REDIS_AGENT_PENDING_MSG,
+    REDIS_AGENT_SESSION,
+    REDIS_AGENT_SESSION_COMPRESS_LOCK,
     REDIS_AGENT_SHOPPING_PROFILE,
     REDIS_AGENT_USER_LOCK,
     REDIS_AGENT_WORKER_HEARTBEAT,
@@ -96,6 +98,11 @@ class RedisService:
     async def ensure_connected(self) -> None:
         """Idempotent connect for Agent lifespan and MCP server process."""
         await self.connect()
+
+    async def claim_admin_assertion_nonce(self, nonce_hash: str, ttl_seconds: int) -> bool:
+        key = f"mall:agent:admin-assertion:nonce:{nonce_hash}"
+        claimed = await self.client.set(key, "1", nx=True, ex=max(1, int(ttl_seconds)))
+        return bool(claimed)
 
     async def close(self) -> None:
 
@@ -436,6 +443,34 @@ class RedisService:
     async def clear_bound_message_id(self, user_id: str) -> None:
 
         await self.client.delete(f"{REDIS_AGENT_PENDING_MSG}{user_id}")
+
+    async def clear_user_ai_state(self, user_id: str) -> int:
+        """Remove user-scoped Agent caches after a privacy deletion.
+
+        Request-scoped impression snapshots expire on their own and do not expose a
+        user lookup key. Durable attribution rows are handled by the deletion job.
+        """
+        exact_keys = [
+            f"{REDIS_AGENT_CONSULT_PRODUCT}{user_id}",
+            f"{REDIS_AGENT_CONSULT_ACTIVE}{user_id}",
+            f"{REDIS_AGENT_SHOPPING_PROFILE}{user_id}",
+            f"{REDIS_AGENT_IMPRESSION_LOG}{user_id}",
+            f"{REDIS_AGENT_CLICK_LOG}{user_id}",
+            f"{REDIS_AGENT_PENDING_MSG}{user_id}",
+            f"{REDIS_AGENT_SESSION}{user_id}",
+            f"{REDIS_AGENT_SESSION_COMPRESS_LOCK}{user_id}",
+            f"{REDIS_AGENT_USER_LOCK}{user_id}",
+            f"{REDIS_WS_USER_HEARTBEAT}{user_id}",
+        ]
+        deleted = int(await self.client.delete(*exact_keys))
+        for pattern in (
+            f"{REDIS_CANCEL_AGENT}{user_id}:msg:*",
+            f"{REDIS_AGENT_HISTORY_CONDENSED}{user_id}:msg:*",
+        ):
+            keys = [key async for key in self.client.scan_iter(match=pattern, count=100)]
+            if keys:
+                deleted += int(await self.client.delete(*keys))
+        return deleted
 
     async def acquire_agent_user_lock(
         self,

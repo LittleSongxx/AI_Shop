@@ -517,6 +517,11 @@ def format_search_tool_message(
     alternative_sources = {"browse", "hot_sale", "hot_sale_explicit"}
     kw = (keyword or "").strip()
     kw_display = (normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求"
+    uncertainty_suffix = (
+        " 当前条件仍不完整，结果按较宽范围返回，适配性存在不确定性。"
+        if (mission or {}).get("uncertaintyDisclosureRequired")
+        else ""
+    )
 
     if source == "clarify":
         clarification = next_clarification(mission)
@@ -587,5 +592,8 @@ def format_search_tool_message(
     if source == "shopping_decision_v2":
         summary = mission_summary(mission)
         suffix = f"，已按{summary}筛选" if summary else ""
-        return f"【可信导购】已核验指定 SKU 的实时价格、库存和可用优惠{suffix}，请查看下方对比卡片。"
+        return (
+            f"【可信导购】已核验指定 SKU 的实时价格、库存和可用优惠{suffix}，"
+            f"请查看下方对比卡片。{uncertainty_suffix}"
+        )
     return f"【搜索结果】找到 {len(products)} 个商品（请查看下方卡片）。"

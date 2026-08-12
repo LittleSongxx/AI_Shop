@@ -20,6 +20,10 @@ from langchain_core.messages import ToolMessage
 from app.domain.intent.types import IntentKind
 from app.domain.intent.write_args import required_tool_for_intent
 from app.domain.tool_policy import fallback_biz_type
+from app.harness.observation import (
+    CONTAMINATED_CONTENT_PLACEHOLDER,
+    build_tool_result_observation,
+)
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -79,6 +83,31 @@ def _finalize_tool_failure(messages: list, error: Exception, *, intent: str | No
     }
 
 
+def _finalize_quarantined(messages: list, tool_name: str, observation) -> dict:
+    """污染工具结果只保留安全占位文本，不向展示层传播任何结构化载荷。"""
+    messages.append(
+        ToolMessage(content=observation.text, tool_call_id="quarantined_tool_result")
+    )
+    logger.warning(
+        "tool_result_quarantined",
+        tool=tool_name,
+        rules=observation.matched_rules,
+    )
+    return {
+        "llm_messages": messages,
+        "tools_called": [tool_name],
+        "tool_biz": None,
+        "biz_type": "agent",
+        "biz_data": None,
+        "assistant_cards": None,
+        "search_tool_hint": None,
+        "search_fallback_done": True,
+        "chunks": [CONTAMINATED_CONTENT_PLACEHOLDER],
+        "pending_tool_calls": [],
+        "route": "finalize",
+    }
+
+
 def _has_cards(result: ToolInvokeResult) -> bool:
     return bool(result.assistant_cards and result.assistant_cards.strip() not in ("", "[]"))
 
@@ -112,6 +141,9 @@ async def forced_product_search(
         return _finalize_tool_failure(messages, exc, intent=IntentKind.PRODUCT_SEARCH.value)
     if failed := _failed_result(messages, result, intent=IntentKind.PRODUCT_SEARCH.value):
         return failed
+    obs = build_tool_result_observation(result, fallback="未查询到相关商品。")
+    if obs.contaminated:
+        return _finalize_quarantined(messages, "SEARCH_PRODUCTS", obs)
     logger.info(
         log_event,
         user_id=user_id,
@@ -124,7 +156,7 @@ async def forced_product_search(
         tool_name="SEARCH_PRODUCTS",
         result=result,
         chunks=[llm_body] if llm_body else [],
-        search_hint=result.to_tool_message(),
+        search_hint=obs.text,
     )
 
 
@@ -157,7 +189,11 @@ async def forced_tool_for_intent(
     if failed := _failed_result(messages, result, intent=intent):
         return failed
     tool_text = result.to_tool_message() or ""
-    messages.append(ToolMessage(content=tool_text or "未查询到相关记录。", tool_call_id="forced_mcp"))
+    # Observation 层：兜底路径的工具结果同样经过脱敏/裁剪再进上下文。
+    obs = build_tool_result_observation(result, fallback="未查询到相关记录。")
+    if obs.contaminated:
+        return _finalize_quarantined(messages, tool_name, obs)
+    messages.append(ToolMessage(content=obs.text, tool_call_id="forced_mcp"))
     logger.warning(
         "forced_mcp_after_llm_skip",
         user_id=user_id,
@@ -168,13 +204,13 @@ async def forced_tool_for_intent(
     )
 
     # 有卡片时不再输出文本，避免卡片和纯文本重复描述同一批数据。
-    chunks = [] if _has_cards(result) else [tool_text or "未查询到相关记录。"]
+    chunks = [] if _has_cards(result) else [obs.text]
     return _finalize_with_tool(
         messages=messages,
         tool_name=tool_name,
         result=result,
         chunks=chunks,
-        search_hint=tool_text if tool_name == "SEARCH_PRODUCTS" else None,
+        search_hint=obs.text if tool_name == "SEARCH_PRODUCTS" else None,
     )
 
 
@@ -194,9 +230,11 @@ async def forced_order_list(
         return _finalize_tool_failure(messages, exc, intent=intent)
     if failed := _failed_result(messages, result, intent=intent):
         return failed
-    tool_text = result.to_tool_message() or ""
+    obs = build_tool_result_observation(result, fallback="未查询到相关订单。")
+    if obs.contaminated:
+        return _finalize_quarantined(messages, "QUERY_ORDERS", obs)
     messages.append(
-        ToolMessage(content=tool_text or "未查询到相关订单。", tool_call_id="forced_orders_ui")
+        ToolMessage(content=obs.text, tool_call_id="forced_orders_ui")
     )
     logger.warning(
         "forced_query_orders_for_cards",

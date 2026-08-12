@@ -24,7 +24,7 @@ instance.interceptors.request.use(
         return config;
     },
     (error) => {
-        if (error.config.showLoading && loading) {
+        if (error.config?.showLoading && loading) {
             loading.close();
         }
         Message.error("请求发送失败");
@@ -62,7 +62,7 @@ instance.interceptors.response.use(
         }
     },
     (error) => {
-        if (error.config.showLoading && loading) {
+        if (error.config?.showLoading && loading) {
             loading.close();
         }
         return Promise.reject({ showError: true, msg: "网络异常" })
@@ -70,7 +70,8 @@ instance.interceptors.response.use(
 );
 
 const request = (config) => {
-    const { url, params, dataType, showLoading = true, responseType = responseTypeJson, showError = true, sensitiveConfirmPwd } = config;
+    const { url, params, dataType, method = 'post', showLoading = true, responseType = responseTypeJson, showError = true, sensitiveConfirmPwd } = config;
+    const normalizedMethod = String(method).toLowerCase();
     let contentType = contentTypeForm;
     if (dataType != null && dataType == 'json') {
         contentType = contentTypeJson;
@@ -78,7 +79,7 @@ const request = (config) => {
     let formData = params;
     if (contentType === contentTypeForm) {
         formData = new FormData();
-        for (let key in params) {
+        for (let key in (params || {})) {
             formData.append(key, params[key] == undefined ? "" : params[key]);
         }
     }
@@ -92,7 +93,11 @@ const request = (config) => {
     if (contentType === contentTypeJson) {
         headers['Content-Type'] = contentTypeJson;
     }
-    return instance.post(url, formData, {
+    return instance.request({
+        url,
+        method: normalizedMethod,
+        data: normalizedMethod === 'get' ? undefined : formData,
+        params: normalizedMethod === 'get' ? (params || {}) : undefined,
         onUploadProgress: (event) => {
             if (config.uploadProgressCallback) {
                 config.uploadProgressCallback(event);

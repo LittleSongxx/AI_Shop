@@ -180,6 +180,10 @@ const router = createRouter({
       title: '修改密码',
       requiresAuth: true
     }),
+    subPage('/account/privacy', () => import('@/views/PrivacyCenterView.vue'), {
+      title: 'AI 数据与隐私',
+      requiresAuth: true
+    }),
     subPage(
       '/ai-assistant',
       () => import('@/views/AIAssistantView.vue'),

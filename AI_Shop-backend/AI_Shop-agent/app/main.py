@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, WebSocket
 from prometheus_client import make_asgi_app
 
 from app.api.exception_handlers import business_exception_handler
-from app.api.routes import agent, attribution, commerce_outcomes
+from app.api.routes import agent, attribution, commerce_outcomes, privacy
 from app.api.websocket import (
     admin_websocket_endpoint,
     start_ws_listener,
@@ -32,6 +32,7 @@ from app.services.episode_service import episode_service
 from app.services.health_service import health_service
 from app.services.judge_service import judge_service
 from app.services.mcp_streamable_client import mcp_streamable_client
+from app.services.privacy_job_service import privacy_job_service
 from app.services.redis_service import redis_service
 from app.services.shopping_mission_service import initialize_category_need_schemas
 
@@ -83,6 +84,7 @@ async def lifespan(app: FastAPI):
     if get_settings().agent_auto_migrate:
         await asyncio.to_thread(run_migrations)
     await initialize_category_need_schemas()
+    await privacy_job_service.resume_incomplete()
     # The governed views are owned by the Java Admin Flyway migration. When
     # DataAnalyst is enabled, deployment must migrate Admin first and provision
     # the view-only reader before Agent startup; this check intentionally fails
@@ -119,6 +121,7 @@ async def lifespan(app: FastAPI):
     await close_http_clients()
     await judge_service.close()
     await episode_service.close()
+    await privacy_job_service.close()
     await close_analytics_pool()
     await close_pool()
     await redis_service.close()
@@ -138,6 +141,7 @@ app.add_exception_handler(BusinessException, business_exception_handler)
 app.include_router(agent.router, prefix="/api")
 app.include_router(attribution.router)
 app.include_router(commerce_outcomes.router)
+app.include_router(privacy.router)
 
 app.mount("/metrics", make_asgi_app())
 

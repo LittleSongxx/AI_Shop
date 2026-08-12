@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import time
 import uuid
 from datetime import date
@@ -33,6 +34,44 @@ def _number(value: Any, default: float = 0.0) -> float:
         return float(value) if value is not None else default
     except (TypeError, ValueError):
         return default
+
+
+def calculate_inventory_forecast(values: dict[str, Any]) -> dict[str, float | int | None]:
+    """Calculate the governed ROP, review-period gap and MOQ-rounded suggestion."""
+
+    def value(*names: str, default: float = 0.0) -> float:
+        for name in names:
+            if name in values and values[name] is not None:
+                return _number(values[name], default)
+        return default
+
+    demand = max(0.0, value("ewma_daily_demand", "ewmaDailyDemand"))
+    lead_time = max(0.0, value("lead_time_days", "leadTimeDays", default=7.0))
+    safety_stock = max(0.0, value("safety_stock", "safetyStock"))
+    review_period = max(
+        0.0, value("review_period_days", "reviewPeriodDays", default=14.0)
+    )
+    minimum_order = max(
+        1, int(value("min_order_quantity", "minOrderQuantity", default=1.0))
+    )
+    current_stock = max(0.0, value("current_stock", "currentStock"))
+    inbound = max(0.0, value("inbound_quantity", "inboundQuantity"))
+
+    reorder_point = round(demand * lead_time + safety_stock, 2)
+    gap = max(
+        0.0,
+        demand * (lead_time + review_period)
+        + safety_stock
+        - current_stock
+        - inbound,
+    )
+    suggested = int(math.ceil(gap / minimum_order) * minimum_order) if gap else 0
+    coverage = None if demand <= 0 else round((current_stock + inbound) / demand, 2)
+    return {
+        "reorderPoint": reorder_point,
+        "suggestedReplenishQuantity": suggested,
+        "coverageDays": coverage,
+    }
 
 
 class InventoryOpsService:
@@ -221,6 +260,12 @@ class InventoryOpsService:
             snapshot_date = str(date.today())
             for raw in rows:
                 row = dict(raw)
+                calculated = calculate_inventory_forecast(row)
+                row["reorder_point"] = calculated["reorderPoint"]
+                row["suggested_replenish_quantity"] = calculated[
+                    "suggestedReplenishQuantity"
+                ]
+                row["coverage_days"] = calculated["coverageDays"]
                 priority, score, action = self._priority(row)
                 row["priority"], row["priority_score"], row["suggested_action"] = priority, score, action
                 normalized.append(row)

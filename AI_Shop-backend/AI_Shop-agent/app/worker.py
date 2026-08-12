@@ -17,6 +17,7 @@ from app.constants import AGENT_QUEUE_FAST, AGENT_QUEUE_HIGH, AGENT_QUEUE_LOW
 from app.db.pool import close_pool, init_pool
 from app.domain.intent.classifier import record_intent_metrics, resolve_intent
 from app.domain.intent.types import IntentDecision
+from app.graph.runner import run_agent_graph
 from app.harness.metrics.runtime_sensors import (
     AGENT_TASK_INFLIGHT,
     AGENT_TASK_TOTAL,
@@ -24,11 +25,12 @@ from app.harness.metrics.runtime_sensors import (
     observe_agent_stage,
 )
 from app.infra.http_client import close_clients as close_http_clients
+from app.observability.llm_metrics import reset_run_cost, snapshot_cost_summary
 from app.observability.telemetry import shutdown_telemetry
-from app.services.agent_engine import agent_engine
 from app.services.agent_queue_service import agent_queue_service
 from app.services.agent_service import agent_orchestrator
 from app.services.episode_service import bind_episode, episode_service
+from app.services.java_internal_client import set_delegated_user_id
 from app.services.judge_service import judge_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.message_service import agent_message_service, next_unresolved_count
@@ -400,6 +402,11 @@ class AgentWorker:
             await message.reject(requeue=False)
             return
 
+        # 委托身份（系统信道）：Java 内部接口的 X-Agent-User-Id 只信任这个值，
+        # 不信任模型可见的 body。整个消费 task 内所有 java_internal 调用自动携带。
+        # 每条消息在独立 task 中消费，contextvar 随 task 结束丢弃，无需显式清理。
+        set_delegated_user_id(user_id)
+
         settings = get_settings()
         lease_seconds = settings.agent_task_lease_seconds
         # owner 必须能塞进 agent_task.lease_owner varchar(64)：worker_id
@@ -595,6 +602,9 @@ class AgentWorker:
             lease_lost.set()
 
     async def _execute_payload(self, payload: dict) -> str:
+        # E 工作线：每次请求的 LLM 成本累计从意图识别之前开始
+        # （意图识别是对话路径的固定成本），到 GRAPH_END 快照成 costSummary。
+        reset_run_cost()
         decision = await self._refine_decision(payload)
         if decision.should_handoff:
             await agent_orchestrator._transfer_to_support(
@@ -602,8 +612,21 @@ class AgentWorker:
                 payload.get("userMessage") or "",
                 decision.model_dump(mode="json"),
             )
+            # E 工作线：转人工不经过 run_agent_graph（快照只在 GRAPH_END），
+            # 意图精炼已累计的 LLM 成本在这里补落成本摘要，否则 per-request
+            # 摘要对转人工消息整类缺失。
+            episode_service.record_step(
+                "HANDOFF_COST",
+                node_name="worker",
+                status="OK",
+                output_data={
+                    "outcome": "handoff",
+                    "tools": [],
+                    "costSummary": snapshot_cost_summary(tools_called=[]),
+                },
+            )
             return "ok"
-        return await agent_engine.assistant_answer(payload)
+        return await run_agent_graph(payload)
 
     @staticmethod
     async def _run_with_lease_guard(

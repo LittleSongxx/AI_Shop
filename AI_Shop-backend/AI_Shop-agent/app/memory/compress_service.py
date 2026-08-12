@@ -11,7 +11,7 @@ from app.memory.context_builder import context_builder
 from app.memory.models import SessionMemory
 from app.memory.session_memory_service import session_memory_service
 from app.memory.token_estimator import estimate_text_tokens
-from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.observability.llm_metrics import invoke_llm_with_metrics, reset_run_cost
 from app.services.llm_factory import create_memory_llm
 from app.services.message_service import agent_message_service
 from app.services.prompt_service import load_compress_prompt
@@ -65,6 +65,9 @@ class CompressService:
         working_oldest_id: int | None,
     ) -> None:
 
+        # 异步调度任务从父 task 继承 contextvar：与对话路径的 per-request
+        # 成本累计隔离，压缩成本不计入触发它的那次请求摘要。
+        reset_run_cost()
         if working_oldest_id is None or working_oldest_id <= summary_last_message_id + 1:
             return
 

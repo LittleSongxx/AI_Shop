@@ -194,7 +194,9 @@ async def test_review_lookup_only_allows_uncertain_states():
     )
 
 
-def test_review_lookup_route_requires_internal_token_dependency():
+def test_review_lookup_route_requires_admin_assertion_dependency():
+    # 治理层改造：管理端只读接口从内部 token 迁移到管理员断言签名
+    # （管理员身份经 HMAC 断言，路由内再做细粒度权限），内部 token 不再准入。
     route = next(
         item
         for item in agent_routes.router.routes
@@ -202,4 +204,5 @@ def test_review_lookup_route_requires_internal_token_dependency():
     )
     dependencies = {dependency.call for dependency in route.dependant.dependencies}
 
-    assert agent_routes._require_internal_token in dependencies
+    assert agent_routes._require_admin in dependencies
+    assert agent_routes._require_internal_token not in dependencies

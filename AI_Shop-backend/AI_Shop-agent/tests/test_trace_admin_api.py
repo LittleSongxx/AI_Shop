@@ -4,11 +4,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routes import agent
-from app.config.settings import get_settings
 from app.services.data_analyst_service import data_analyst_service
 from app.services.episode_query_service import episode_query_service
 from app.services.episode_review_service import episode_review_service
 from app.services.inventory_ops_service import inventory_ops_service
+from tests.admin_assertion_helpers import signed_admin_request
 
 
 def _app() -> FastAPI:
@@ -41,18 +41,22 @@ def test_trace_admin_list_and_detail_return_sanitized_episode(monkeypatch):
     )
     monkeypatch.setattr(episode_query_service, "list_runs", list_runs)
     monkeypatch.setattr(episode_query_service, "detail", detail)
-    headers = {"X-Internal-Token": get_settings().internal_token}
-
     with TestClient(_app()) as client:
+        runs_body, runs_headers = signed_admin_request(
+            "/api/agent/admin/traceRuns", {"pageNo": 2, "status": "FAILED"}
+        )
         runs = client.post(
             "/api/agent/admin/traceRuns",
-            headers=headers,
-            json={"pageNo": 2, "status": "FAILED"},
+            headers=runs_headers,
+            content=runs_body,
+        )
+        trace_body, trace_headers = signed_admin_request(
+            "/api/agent/admin/traceDetail", {"runId": "run-1"}
         )
         trace = client.post(
             "/api/agent/admin/traceDetail",
-            headers=headers,
-            json={"runId": "run-1"},
+            headers=trace_headers,
+            content=trace_body,
         )
 
     assert runs.status_code == 200
@@ -77,18 +81,20 @@ def test_episode_review_admin_api_forwards_internal_reviewer(monkeypatch):
         return_value={"runId": "run-1", "datasetEligible": "APPROVED"}
     )
     monkeypatch.setattr(episode_review_service, "review", review)
-    headers = {"X-Internal-Token": get_settings().internal_token}
-
     with TestClient(_app()) as client:
+        body, headers = signed_admin_request(
+            "/api/agent/admin/reviewEpisode",
+            {
+                "runId": "run-1",
+                "datasetEligible": "APPROVED",
+                "reviewer": "attacker-controlled",
+                "note": "完整售后终态",
+            },
+        )
         response = client.post(
             "/api/agent/admin/reviewEpisode",
             headers=headers,
-            json={
-                "runId": "run-1",
-                "datasetEligible": "APPROVED",
-                "reviewer": "admin-from-java-session",
-                "note": "完整售后终态",
-            },
+            content=body,
         )
 
     assert response.status_code == 200
@@ -96,7 +102,7 @@ def test_episode_review_admin_api_forwards_internal_reviewer(monkeypatch):
     review.assert_awaited_once_with(
         "run-1",
         "APPROVED",
-        "admin-from-java-session",
+        "admin-session",
         note="完整售后终态",
     )
 
@@ -106,26 +112,26 @@ def test_admin_agents_require_and_forward_java_session_identity(monkeypatch):
     suggestions = AsyncMock(return_value={"status": "SUCCEEDED", "runId": "inventory-1"})
     monkeypatch.setattr(data_analyst_service, "ask", ask)
     monkeypatch.setattr(inventory_ops_service, "suggestions", suggestions)
-    headers = {"X-Internal-Token": get_settings().internal_token}
-
     with TestClient(_app()) as client:
-        missing_identity = client.post(
+        analysis_body, analysis_headers = signed_admin_request(
             "/api/agent/admin/dataAnalyst/ask",
-            headers=headers,
-            json={"question": "最近七天销售额"},
+            {"question": "最近七天销售额", "adminId": "attacker"},
         )
         analysis = client.post(
             "/api/agent/admin/dataAnalyst/ask",
-            headers=headers,
-            json={"question": "最近七天销售额", "adminId": "admin-session"},
+            headers=analysis_headers,
+            content=analysis_body,
+        )
+        inventory_body, inventory_headers = signed_admin_request(
+            "/api/agent/admin/inventoryOps/suggestions",
+            {"adminId": "attacker", "lookbackDays": 30, "limit": 20},
         )
         inventory = client.post(
             "/api/agent/admin/inventoryOps/suggestions",
-            headers=headers,
-            json={"adminId": "admin-session", "lookbackDays": 30, "limit": 20},
+            headers=inventory_headers,
+            content=inventory_body,
         )
 
-    assert missing_identity.json()["code"] == 401
     assert analysis.json()["data"]["runId"] == "analysis-1"
     assert inventory.json()["data"]["runId"] == "inventory-1"
     ask.assert_awaited_once_with("最近七天销售额", admin_id="admin-session")

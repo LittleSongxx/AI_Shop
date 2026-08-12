@@ -158,6 +158,13 @@ _ACT_TOKEN_PATTERN = re.compile(r"【?\s*act_[a-f0-9]{8,}\s*】?", re.I)
 
 _SUSPICIOUS_BLOCK_THRESHOLD = 2
 
+# 公开别名：channel_guard（外部通道检疫）与这里共用同一张规则表，
+# 保证"用户输入"与"知识库/工具内容"两处对注入话术的判定完全一致，
+# 差异只在响应策略（拒绝 vs 检疫）。
+BLOCKING_RULES = _BLOCKING_RULES
+SUSPICIOUS_RULES = _SUSPICIOUS_RULES
+SUSPICIOUS_BLOCK_THRESHOLD = _SUSPICIOUS_BLOCK_THRESHOLD
+
 @dataclass(frozen=True)
 class InputVerdict:
     """一次输入检查的结果。

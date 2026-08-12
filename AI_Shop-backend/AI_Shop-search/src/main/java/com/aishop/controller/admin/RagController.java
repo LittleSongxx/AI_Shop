@@ -5,12 +5,10 @@ import com.aishop.entity.query.RagQuestionQuery;
 import com.aishop.entity.vo.PaginationResultVO;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.biz.RagQuestionService;
-import com.aishop.component.RedisComponent;
-import com.aishop.exception.BusinessException;
-import com.aishop.utils.AuthCookieHelper;
-import com.aishop.utils.StringTools;
+import com.aishop.constants.AdminPermissions;
+import com.aishop.security.AdminSecurityContext;
+import com.aishop.security.RequireAdminPermission;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,13 +21,10 @@ public class RagController extends com.aishop.controller.admin.ABaseController {
 
     @Resource
     private RagQuestionService ragQuestionService;
-    @Resource
-    private RedisComponent redisComponent;
-    @Resource
-    private AuthCookieHelper authCookieHelper;
 
     // 加载RagQuestion
     @PostMapping("/loadRagQuestion")
+    @RequireAdminPermission(value = {AdminPermissions.AI_CONFIG, AdminPermissions.AUDIT_READ}, requireAll = false)
     public ResponseVO loadRagQuestion(
             Integer pageNo,
             Integer pageSize,
@@ -48,25 +43,22 @@ public class RagController extends com.aishop.controller.admin.ABaseController {
 
     // 保存RagQuestion
     @PostMapping("/saveRagQuestion")
-    public ResponseVO saveRagQuestion(RagQuestion question, HttpServletRequest request){
-        question.setOwner(currentAdmin(request));
+    @RequireAdminPermission(AdminPermissions.AI_CONFIG)
+    public ResponseVO saveRagQuestion(RagQuestion question){
+        question.setOwner(currentAdmin());
         ragQuestionService.saveRagQuestion(question);
         return getSuccessResponseVO(null);
     }
 
     // 删除RagQuestion
     @PostMapping("/delRagQuestion")
+    @RequireAdminPermission(AdminPermissions.AI_CONFIG)
     public ResponseVO delRagQuestion(Integer questionId){
         ragQuestionService.deleteRagQuestionByQuestionId(questionId);
         return getSuccessResponseVO(null);
     }
 
-    private String currentAdmin(HttpServletRequest request) {
-        String token = authCookieHelper.resolveAdminToken(request);
-        Object account = redisComponent.getLoginInfo4Admin(token);
-        if (account == null || StringTools.isEmpty(String.valueOf(account))) {
-            throw new BusinessException("管理员登录已失效");
-        }
-        return String.valueOf(account);
+    private String currentAdmin() {
+        return AdminSecurityContext.requirePrincipal().getAccount();
     }
 }

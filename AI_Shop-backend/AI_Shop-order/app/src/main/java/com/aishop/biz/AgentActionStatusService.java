@@ -2,6 +2,7 @@ package com.aishop.biz;
 
 import com.aishop.api.enums.OrderItemStatusEnum;
 import com.aishop.api.enums.OrderStatusEnum;
+import com.aishop.entity.enums.RefundSagaStatus;
 import com.aishop.entity.po.OrderComment;
 import com.aishop.entity.po.OrderInfo;
 import com.aishop.entity.po.OrderItem;
@@ -134,6 +135,11 @@ public class AgentActionStatusService {
         }
         RefundRequest request = refundSagaTransactionService.findByOrderItemId(orderItemId);
         if (request != null) {
+            // REJECTED 是确定终止的终态：动作未生效，Agent 不得转述"已受理/退款成功"，
+            // 否则用户会误以为退款已办理。其余状态（含 MANUAL_REVIEW）都属受理中。
+            if (RefundSagaStatus.REJECTED.name().equals(request.getStatus())) {
+                return false;
+            }
             return userId.equals(request.getUserId());
         }
         OrderItem item = orderItemService.getOrderItemByOrderItemId(orderItemId);

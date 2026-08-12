@@ -27,6 +27,15 @@ logger = structlog.get_logger()
 
 MISSION_VERSION = 2
 MAX_RECENT_CANDIDATES = 12
+_DECLINE_CLARIFICATION_HINTS = (
+    "不想再回答",
+    "不想回答",
+    "别再问",
+    "不用再问",
+    "不要再问",
+    "直接推荐",
+    "随便推荐",
+)
 
 
 def _utc_now() -> datetime:
@@ -488,6 +497,9 @@ def apply_explicit_turn(
     elif incoming.get("acceptSubstitute") is True:
         hard["requiredBrands"] = []
     mission["unknownSlots"] = _missing_slots(mission)
+    if any(marker in user_text for marker in _DECLINE_CLARIFICATION_HINTS):
+        mission["clarificationDeclined"] = True
+        mission["uncertaintyDisclosureRequired"] = bool(mission["unknownSlots"])
     mission["updatedAt"] = _iso(timestamp)
     mission["expiresAt"] = _iso(
         timestamp + timedelta(hours=get_settings().shopping_mission_active_hours)
@@ -502,6 +514,8 @@ def next_clarification(mission: dict[str, Any] | None) -> dict[str, Any] | None:
     if not mission_is_active(mission):
         return None
     assert mission is not None
+    if mission.get("clarificationDeclined") is True:
+        return None
     if int(mission.get("clarificationCount") or 0) >= get_settings().shopping_mission_max_clarifications:
         return None
     missing = list(mission.get("unknownSlots") or _missing_slots(mission))

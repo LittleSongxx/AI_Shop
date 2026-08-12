@@ -6,14 +6,19 @@ import java.util.Map;
 import com.aishop.entity.query.AgentMessageQuery;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.biz.AgentMessageService;
-import com.aishop.component.RedisComponent;
+import com.aishop.constants.AdminPermissions;
+import com.aishop.security.AdminSecurityContext;
+import com.aishop.security.RequireAdminPermission;
 import com.aishop.exception.BusinessException;
-import com.aishop.utils.AuthCookieHelper;
 import com.aishop.utils.JsonUtils;
 import com.aishop.utils.StringTools;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,31 +30,29 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	@Resource
 	private AgentMessageService agentMessageService;
 
-	@Resource
-	private RedisComponent redisComponent;
-
-	@Resource
-	private AuthCookieHelper authCookieHelper;
-
 	@PostMapping("/loadDataList")
+	@RequireAdminPermission(value = {AdminPermissions.SUPPORT_READ, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO loadDataList(AgentMessageQuery query) {
 		query.setOrderBy(com.aishop.entity.query.SafeSort.of("send_time desc"));
 		return getSuccessResponseVO(agentMessageService.findListByPage(query));
 	}
 
 	@PostMapping("/deleteAgentMessageByMessageId")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO deleteAgentMessageByMessageId(Integer messageId) {
 		agentMessageService.deleteAgentMessageByMessageId(messageId);
 		return getSuccessResponseVO(null);
 	}
 
 	@PostMapping("/supportQueue")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_READ)
 	public ResponseVO supportQueue(Integer pageNo, Integer pageSize) {
 		return getSuccessResponseVO(agentMessageService.callSupport(
 				"supportQueue", page(pageNo, pageSize)));
 	}
 
 	@PostMapping("/supportSessions")
+	@RequireAdminPermission(value = {AdminPermissions.SUPPORT_READ, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO supportSessions(Integer pageNo, Integer pageSize, String status, String userId) {
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
@@ -58,6 +61,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportStats")
+	@RequireAdminPermission(value = {AdminPermissions.SUPPORT_READ, AdminPermissions.ANALYTICS_READ}, requireAll = false)
 	public ResponseVO supportStats(Integer windowHours) {
 		Map<String, Object> body = new HashMap<>();
 		body.put("windowHours", windowHours == null ? 24 : windowHours);
@@ -65,18 +69,21 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportClaim")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportClaim(String sessionId, HttpServletRequest request) {
 		return getSuccessResponseVO(agentMessageService.callSupport(
 				"supportClaim", supportBody(sessionId, request)));
 	}
 
 	@PostMapping("/supportActivate")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportActivate(String sessionId, HttpServletRequest request) {
 		return getSuccessResponseVO(agentMessageService.callSupport(
 				"supportActivate", supportBody(sessionId, request)));
 	}
 
 	@PostMapping("/supportReply")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportReply(String sessionId, String content, HttpServletRequest request) {
 		if (StringTools.isEmpty(content)) {
 			throw new BusinessException("回复内容不能为空");
@@ -87,6 +94,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportResolve")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportResolve(
 			String sessionId, String remark, HttpServletRequest request) {
 		Map<String, Object> body = supportBody(sessionId, request);
@@ -95,12 +103,14 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportReturnAi")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportReturnAi(String sessionId, HttpServletRequest request) {
 		return getSuccessResponseVO(agentMessageService.callSupport(
 				"supportReturnAi", supportBody(sessionId, request)));
 	}
 
 	@PostMapping("/supportHistory")
+	@RequireAdminPermission(value = {AdminPermissions.SUPPORT_READ, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO supportHistory(String sessionId, Integer limit) {
 		Map<String, Object> body = new HashMap<>();
 		body.put("sessionId", requireSessionId(sessionId));
@@ -109,6 +119,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportCases")
+	@RequireAdminPermission(value = {AdminPermissions.SUPPORT_READ, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO supportCases(Integer pageNo, Integer pageSize, String status, String userId) {
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
@@ -117,6 +128,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportCaseDetail")
+	@RequireAdminPermission(value = {AdminPermissions.SUPPORT_READ, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO supportCaseDetail(String caseId) {
 		Map<String, Object> body = new HashMap<>();
 		if (StringTools.isEmpty(caseId)) {
@@ -127,18 +139,21 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/supportCaseClaim")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportCaseClaim(String caseId, HttpServletRequest request) {
 		return getSuccessResponseVO(agentMessageService.callSupport(
 				"supportCaseClaim", caseBody(caseId, request)));
 	}
 
 	@PostMapping("/supportCaseInProgress")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportCaseInProgress(String caseId, HttpServletRequest request) {
 		return getSuccessResponseVO(agentMessageService.callSupport(
 				"supportCaseInProgress", caseBody(caseId, request)));
 	}
 
 	@PostMapping("/supportCaseResolve")
+	@RequireAdminPermission(AdminPermissions.SUPPORT_WRITE)
 	public ResponseVO supportCaseResolve(
 			String caseId, String supportSessionId, String resolutionCode,
 			String rootCause, String resolutionSummary, HttpServletRequest request) {
@@ -151,6 +166,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/traceRuns")
+	@RequireAdminPermission(value = {AdminPermissions.AI_EVALUATE, AdminPermissions.ANALYTICS_READ, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO traceRuns(Integer pageNo, Integer pageSize, String status,
 			String intent, String userId, String outcome, String agentId, String runScope) {
 		Map<String, Object> body = page(pageNo, pageSize);
@@ -164,6 +180,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/dataAnalyst/ask")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_READ)
 	public ResponseVO dataAnalystAsk(String question, HttpServletRequest request) {
 		if (StringTools.isEmpty(question) || question.trim().length() > 500) {
 			throw new BusinessException("问题不能为空且不能超过500字");
@@ -176,6 +193,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/inventoryOps/suggestions")
+	@RequireAdminPermission(AdminPermissions.AI_CONFIG)
 	public ResponseVO inventoryOpsSuggestions(
 			Integer lookbackDays, Integer limit, HttpServletRequest request) {
 		Map<String, Object> body = new HashMap<>();
@@ -187,6 +205,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/traceDetail")
+	@RequireAdminPermission(value = {AdminPermissions.AI_EVALUATE, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO traceDetail(String runId) {
 		if (StringTools.isEmpty(runId)) {
 			throw new BusinessException("runId不能为空");
@@ -196,6 +215,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/reviewEpisode")
+	@RequireAdminPermission(AdminPermissions.AI_EVALUATE)
 	public ResponseVO reviewEpisode(
 			String runId, String datasetEligible, String note, HttpServletRequest request) {
 		if (StringTools.isEmpty(runId)) {
@@ -226,6 +246,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/badcases")
+	@RequireAdminPermission(value = {AdminPermissions.AI_EVALUATE, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO badcases(Integer pageNo, Integer pageSize, String status) {
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
@@ -233,6 +254,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/reviewBadcase")
+	@RequireAdminPermission(AdminPermissions.AI_EVALUATE)
 	public ResponseVO reviewBadcase(
 			Long candidateId,
 			String status,
@@ -260,6 +282,7 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/regressionCases")
+	@RequireAdminPermission(value = {AdminPermissions.AI_EVALUATE, AdminPermissions.AUDIT_READ}, requireAll = false)
 	public ResponseVO regressionCases(Integer pageNo, Integer pageSize, String status) {
 		Map<String, Object> body = page(pageNo, pageSize);
 		putIfText(body, "status", status);
@@ -267,12 +290,155 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 	}
 
 	@PostMapping("/runRegressionCases")
+	@RequireAdminPermission(AdminPermissions.AI_EVALUATE)
 	public ResponseVO runRegressionCases(Long caseId) {
 		Map<String, Object> body = new HashMap<>();
 		if (caseId != null) {
 			body.put("caseId", caseId);
 		}
 		return getSuccessResponseVO(agentMessageService.callSupport("runRegressionCases", body));
+	}
+
+	@PostMapping("/pilotBatches/create")
+	@RequireAdminPermission(AdminPermissions.AI_PILOT)
+	public ResponseVO createPilotBatch(
+			String name, String description, String evidenceSource, String consentTextVersion) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("name", requireText(name, "name"));
+		putIfText(body, "description", description);
+		body.put("evidenceSource", requireText(evidenceSource, "evidenceSource"));
+		body.put("consentTextVersion", requireText(consentTextVersion, "consentTextVersion"));
+		return getSuccessResponseVO(agentMessageService.callSupport("createPilotBatch", body));
+	}
+
+	@PostMapping("/pilotBatches")
+	@RequireAdminPermission(value = {
+			AdminPermissions.AI_PILOT,
+			AdminPermissions.ANALYTICS_READ,
+			AdminPermissions.AUDIT_READ
+	}, requireAll = false)
+	public ResponseVO pilotBatches(String status, Integer limit) {
+		Map<String, Object> body = new HashMap<>();
+		putIfText(body, "status", status);
+		body.put("limit", limit == null ? 50 : Math.min(100, Math.max(1, limit)));
+		return getSuccessResponseVO(agentMessageService.callSupport("pilotBatches", body));
+	}
+
+	@PostMapping("/pilotBatches/start")
+	@RequireAdminPermission(AdminPermissions.AI_PILOT)
+	public ResponseVO startPilotBatch(String batchId) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"startPilotBatch", Map.of("batchId", requireText(batchId, "batchId"))));
+	}
+
+	@PostMapping("/pilotBatches/close")
+	@RequireAdminPermission(AdminPermissions.AI_PILOT)
+	public ResponseVO closePilotBatch(String batchId) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"closePilotBatch", Map.of("batchId", requireText(batchId, "batchId"))));
+	}
+
+	@PostMapping("/pilotBatches/participants/register")
+	@RequireAdminPermission(AdminPermissions.AI_PILOT)
+	public ResponseVO registerPilotParticipant(
+			String batchId, String userId, String pseudonym) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("batchId", requireText(batchId, "batchId"));
+		body.put("userId", requireText(userId, "userId"));
+		putIfText(body, "pseudonym", pseudonym);
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"registerPilotParticipant", body));
+	}
+
+	@PostMapping("/pilotBatches/participants/withdraw")
+	@RequireAdminPermission(AdminPermissions.AI_PILOT)
+	public ResponseVO withdrawPilotParticipant(String batchId, String participantId) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"withdrawPilotParticipant",
+				Map.of(
+						"batchId", requireText(batchId, "batchId"),
+						"participantId", requireText(participantId, "participantId"))));
+	}
+
+	@PostMapping("/pilotBatches/participants")
+	@RequireAdminPermission(value = {
+			AdminPermissions.AI_PILOT, AdminPermissions.AUDIT_READ
+	}, requireAll = false)
+	public ResponseVO pilotParticipants(String batchId) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"pilotParticipants", Map.of("batchId", requireText(batchId, "batchId"))));
+	}
+
+	@PostMapping("/metrics/overview")
+	@RequireAdminPermission(value = {
+			AdminPermissions.ANALYTICS_READ, AdminPermissions.AI_EVALUATE
+	}, requireAll = false)
+	public ResponseVO metricsOverview(
+			String batchId, String evidenceSource, String startAt, String endAt) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"metricsOverview", metricBody(batchId, evidenceSource, startAt, endAt)));
+	}
+
+	@PostMapping("/metrics/performance")
+	@RequireAdminPermission(value = {
+			AdminPermissions.ANALYTICS_READ, AdminPermissions.AI_EVALUATE
+	}, requireAll = false)
+	public ResponseVO metricsPerformance(
+			String batchId, String evidenceSource, String startAt, String endAt) {
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"metricsPerformance", metricBody(batchId, evidenceSource, startAt, endAt)));
+	}
+
+	@PostMapping("/pilotBatches/report")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
+	public ResponseEntity<byte[]> pilotReport(String batchId, String format) {
+		String normalizedFormat = StringTools.isEmpty(format)
+				? "json" : format.trim().toLowerCase();
+		MediaType mediaType;
+		String suffix;
+		switch (normalizedFormat) {
+			case "json" -> {
+				mediaType = MediaType.APPLICATION_JSON;
+				suffix = "json";
+			}
+			case "csv" -> {
+				mediaType = MediaType.parseMediaType("text/csv;charset=UTF-8");
+				suffix = "csv";
+			}
+			case "markdown" -> {
+				mediaType = MediaType.parseMediaType("text/markdown;charset=UTF-8");
+				suffix = "md";
+			}
+			default -> throw new BusinessException("format 必须是 json、csv 或 markdown");
+		}
+		Map<String, Object> body = Map.of(
+				"batchId", requireText(batchId, "batchId"),
+				"format", normalizedFormat);
+		byte[] report = agentMessageService.callReport("pilotReport", body);
+		ContentDisposition disposition = ContentDisposition.attachment()
+				.filename("pilot-report." + suffix)
+				.build();
+		return ResponseEntity.ok()
+				.contentType(mediaType)
+				.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+				.body(report);
+	}
+
+	private Map<String, Object> metricBody(
+			String batchId, String evidenceSource, String startAt, String endAt) {
+		Map<String, Object> body = new HashMap<>();
+		putIfText(body, "batchId", batchId);
+		putIfText(body, "evidenceSource", evidenceSource);
+		putIfText(body, "startAt", startAt);
+		putIfText(body, "endAt", endAt);
+		return body;
+	}
+
+	private String requireText(String value, String field) {
+		if (StringTools.isEmpty(value)) {
+			throw new BusinessException(field + "不能为空");
+		}
+		return value.trim();
 	}
 
 	private Map<String, Object> supportBody(String sessionId, HttpServletRequest request) {
@@ -282,13 +448,8 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 		return body;
 	}
 
-	private String currentAdmin(HttpServletRequest request) {
-		String token = authCookieHelper.resolveAdminToken(request);
-		Object account = redisComponent.getLoginInfo4Admin(token);
-		if (account == null || StringTools.isEmpty(String.valueOf(account))) {
-			throw new BusinessException("管理员登录已失效");
-		}
-		return String.valueOf(account);
+	private String currentAdmin(HttpServletRequest _request) {
+		return AdminSecurityContext.requirePrincipal().getAdminId();
 	}
 
 	private String requireSessionId(String sessionId) {

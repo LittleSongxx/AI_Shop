@@ -5,5 +5,6 @@ public enum RefundSagaStatus {
     PAYMENT_CONFIRMED,
     STOCK_PENDING,
     COMPLETED,
-    MANUAL_REVIEW
+    MANUAL_REVIEW,
+    REJECTED
 }

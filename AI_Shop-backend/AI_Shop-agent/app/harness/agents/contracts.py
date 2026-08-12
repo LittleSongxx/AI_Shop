@@ -102,20 +102,6 @@ class SupervisorPlan(BaseModel):
         return value
 
 
-class SpecialistState(BaseModel):
-    """Bounded state exposed to a specialist subgraph."""
-
-    agent_id: str
-    goal: str
-    verified_context: dict = Field(default_factory=dict)
-    shopping_mission: dict[str, Any] = Field(default_factory=dict)
-    verified_image_context: VerifiedImageContext | None = None
-    facts: list[str] = Field(default_factory=list)
-    evidence: list[dict] = Field(default_factory=list)
-    tool_calls: list[str] = Field(default_factory=list)
-    remaining_rounds: int = Field(default=2, ge=0, le=5)
-
-
 class AgentArtifact(BaseModel):
     """A specialist result. It is not a second user-facing conversation."""
 
@@ -155,9 +141,3 @@ class ActionProposal(BaseModel):
         if not value.startswith("PROPOSE_"):
             raise ValueError("ActionProposal 只能引用 PROPOSE_* 工具")
         return value
-
-
-class PolicyDecision(BaseModel):
-    allowed: bool
-    reason: str | None = None
-    requires_confirmation: bool = False

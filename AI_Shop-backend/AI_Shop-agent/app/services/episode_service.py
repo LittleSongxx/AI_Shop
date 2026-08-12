@@ -26,6 +26,7 @@ from app.harness.metrics.runtime_sensors import (
     EPISODE_WRITE_LATENCY,
 )
 from app.observability.telemetry import current_span_id, current_trace_id
+from app.services.pilot_batch_service import participant_user_hash
 
 logger = structlog.get_logger()
 
@@ -401,6 +402,7 @@ class EpisodeService:
                 "handoff_id": handoff_id,
                 "actor_type": actor_type,
                 "user_id": user_id,
+                "user_id_hash": participant_user_hash(user_id),
                 "session_id": session_id,
                 "trace_id": current_trace_id(),
                 "intent": intent,
@@ -547,6 +549,24 @@ class EpisodeService:
             }
         )
 
+    def observe_first_token(
+        self,
+        *,
+        run_id: str | None = None,
+        observed_at: str | None = None,
+    ) -> None:
+        """Persist end-to-end TTFT once, measured from Run start to first visible token."""
+        resolved_run_id = self._resolve_run_id(run_id)
+        if not resolved_run_id:
+            return
+        self._enqueue(
+            {
+                "op": "ttft",
+                "run_id": resolved_run_id,
+                "observed_at": observed_at or _utcnow_sql(),
+            }
+        )
+
     def update_run(
         self,
         *,
@@ -679,14 +699,46 @@ class EpisodeService:
             for event in batch:
                 op = event["op"]
                 if op == "start":
+                    pilot_batch_id = None
+                    evidence_source = None
+                    if event.get("parent_run_id"):
+                        await cur.execute(
+                            """
+                            SELECT pilot_batch_id,evidence_source
+                            FROM agent_run WHERE run_id=%s
+                            """,
+                            (event["parent_run_id"],),
+                        )
+                        parent = await cur.fetchone()
+                        if parent:
+                            pilot_batch_id = parent.get("pilot_batch_id")
+                            evidence_source = parent.get("evidence_source")
+                    elif event.get("actor_type") == "USER":
+                        await cur.execute(
+                            """
+                            SELECT b.batch_id,b.evidence_source
+                            FROM agent_pilot_participant p
+                            INNER JOIN agent_pilot_batch b ON b.batch_id=p.batch_id
+                            WHERE p.user_id_hash=%s AND p.status='ACTIVE'
+                              AND b.status='RUNNING'
+                            ORDER BY b.started_at DESC,b.created_at DESC
+                            LIMIT 1
+                            """,
+                            (event["user_id_hash"],),
+                        )
+                        pilot = await cur.fetchone()
+                        if pilot:
+                            pilot_batch_id = pilot.get("batch_id")
+                            evidence_source = pilot.get("evidence_source")
                     await cur.execute(
                         """
                         INSERT IGNORE INTO agent_run
                             (run_id, message_id, user_id, session_id, otel_trace_id,
                              status, intent, queue_name, version_json, experiment_json,
                              capture_level, started_at, agent_id, agent_version,
-                             parent_run_id, handoff_id, actor_type)
-                        VALUES (%s,%s,%s,%s,%s,'QUEUED',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                             parent_run_id, handoff_id, actor_type,pilot_batch_id,
+                             evidence_source)
+                        VALUES (%s,%s,%s,%s,%s,'QUEUED',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """,
                         (
                             event["run_id"],
@@ -705,6 +757,8 @@ class EpisodeService:
                             event.get("parent_run_id"),
                             event.get("handoff_id"),
                             event.get("actor_type", "USER"),
+                            pilot_batch_id,
+                            evidence_source,
                         ),
                     )
                     await cur.execute(
@@ -712,16 +766,29 @@ class EpisodeService:
                         UPDATE agent_run
                         SET otel_trace_id=COALESCE(%s,otel_trace_id),
                             intent=COALESCE(%s,intent),
-                            queue_name=COALESCE(%s,queue_name)
+                            queue_name=COALESCE(%s,queue_name),
+                            pilot_batch_id=COALESCE(pilot_batch_id,%s),
+                            evidence_source=COALESCE(evidence_source,%s)
                         WHERE run_id=%s
                         """,
                         (
                             event["trace_id"],
                             event["intent"],
                             event["queue_name"],
+                            pilot_batch_id,
+                            evidence_source,
                             event["run_id"],
                         ),
                     )
+                    if pilot_batch_id:
+                        await cur.execute(
+                            """
+                            UPDATE commerce_outcome_ledger
+                            SET pilot_batch_id=%s
+                            WHERE run_id=%s AND pilot_batch_id IS NULL
+                            """,
+                            (pilot_batch_id, event["run_id"]),
+                        )
                 elif op == "running":
                     await cur.execute(
                         """
@@ -785,6 +852,20 @@ class EpisodeService:
                             event["model_name"],
                             event["run_id"],
                         ),
+                    )
+                elif op == "ttft":
+                    await cur.execute(
+                        """
+                        UPDATE agent_run
+                        SET ttft_ms=COALESCE(
+                            ttft_ms,
+                            GREATEST(0,ROUND(
+                                TIMESTAMPDIFF(MICROSECOND,started_at,%s)/1000
+                            ))
+                        )
+                        WHERE run_id=%s
+                        """,
+                        (event["observed_at"], event["run_id"]),
                     )
                 elif op == "update":
                     await cur.execute(

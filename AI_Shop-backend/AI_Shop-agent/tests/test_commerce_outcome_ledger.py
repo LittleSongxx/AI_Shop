@@ -45,9 +45,20 @@ def test_required_identifiers_reject_whitespace():
         _event(eventId="   ")
 
 
-def test_source_cannot_claim_another_domains_event_type():
-    with pytest.raises(ValidationError, match="ORDER cannot emit ADD_TO_CART"):
-        _event(source="ORDER", eventType="ADD_TO_CART")
+@pytest.mark.asyncio
+async def test_source_cannot_claim_another_domains_event_type(monkeypatch):
+    service = CommerceOutcomeLedgerService()
+    insert = AsyncMock()
+    monkeypatch.setattr(service, "_insert", insert)
+
+    result = await service.record(_event(source="ORDER", eventType="ADD_TO_CART"))
+
+    assert result == {
+        "eventId": "evt-order-1",
+        "accepted": False,
+        "status": "SOURCE_EVENT_MISMATCH",
+    }
+    insert.assert_not_awaited()
 
 
 @pytest.mark.asyncio

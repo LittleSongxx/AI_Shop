@@ -21,6 +21,12 @@ import {
   episodeVerdictLabel,
   formatAgentReply,
 } from '@/utils/agentDisplay.js'
+import {
+  ADMIN_PERMISSION,
+  hasAdminPermission,
+  hasAnyAdminPermission,
+  normalizeAdminPrincipal,
+} from '@/utils/adminAccess.js'
 
 describe('admin workflow helpers', () => {
   it('blocks unsafe product state transitions', () => {
@@ -34,6 +40,21 @@ describe('admin workflow helpers', () => {
     expect(resolveDesktopPath('/m/more/agent')).toBe('/setting/agentMessage')
     expect(resolveDesktopPath('/m/more/agentQuality')).toBe('/setting/agentQuality')
     expect(resolveDesktopPath('/m/more/dataAnalyst')).toBe('/data/dataAnalyst')
+    expect(resolveDesktopPath('/m/more/aiEvidence')).toBe('/data/aiEvidence')
+  })
+
+  it('uses server-issued administrator permissions for evidence actions', () => {
+    const principal = normalizeAdminPrincipal({
+      roles: ['DATA_ANALYST'],
+      permissions: [ADMIN_PERMISSION.ANALYTICS_READ],
+    })
+    expect(hasAdminPermission(principal, ADMIN_PERMISSION.ANALYTICS_READ)).toBe(true)
+    expect(hasAdminPermission(principal, ADMIN_PERMISSION.AI_PILOT)).toBe(false)
+    expect(hasAnyAdminPermission(principal, [
+      ADMIN_PERMISSION.AI_EVALUATE,
+      ADMIN_PERMISSION.ANALYTICS_READ,
+    ])).toBe(true)
+    expect(normalizeAdminPrincipal(null)).toMatchObject({ roles: [], permissions: [] })
   })
 
   it('renders the brand marker as an accessible image', () => {

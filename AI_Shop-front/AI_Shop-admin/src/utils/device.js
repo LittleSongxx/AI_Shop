@@ -79,6 +79,7 @@ export function resolveDesktopPath(mobilePath) {
     '/m/more/address': '/user/address',
     '/m/more/agent': '/setting/agentMessage',
     '/m/more/agentQuality': '/setting/agentQuality',
+    '/m/more/aiEvidence': '/data/aiEvidence',
     '/m/more/dataAnalyst': '/data/dataAnalyst',
     '/m/more/coupon': '/discountCoupon',
     '/m/more/searchHot': '/marketing/searchHot',

@@ -1,0 +1,110 @@
+name: Nightly extended regression
+
+on:
+  schedule:
+    - cron: "30 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  java-domain-integration:
+    name: Java Testcontainers domain integration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: AI_Shop-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - run: >-
+          mvn --batch-mode --no-transfer-progress -Pintegration
+          -pl AI_Shop-common,AI_Shop-order/app -am verify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-jacoco-${{ github.run_id }}
+          path: |
+            AI_Shop-backend/**/target/site/jacoco
+            AI_Shop-backend/**/target/site/jacoco-it
+          if-no-files-found: warn
+
+  agent-extended:
+    name: Agent migrations and deterministic runtime evidence
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: AI_Shop-backend/AI_Shop-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: AI_Shop-backend/AI_Shop-agent/requirements.lock
+      - run: python -m pip install --requirement requirements.lock
+      - run: python -m pip install --no-deps --editable .
+      - run: ruff check .
+      - run: pytest -q
+      - run: pytest -q tests/integration/test_migrations.py
+        env:
+          RUN_AGENT_MIGRATION_TESTS: "1"
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: "3306"
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+      - name: Run all deterministic evidence suites
+        run: |
+          run_id="nightly-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python benchmarks/run_agentic_commerce_runtime.py --run-id "${run_id}-commerce"
+          python benchmarks/run_ai_safety.py --run-id "${run_id}-safety"
+          python benchmarks/run_search_rag_eval.py --run-id "${run_id}-search-rag"
+          python benchmarks/run_ablation.py --run-id "${run_id}-ablation"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-ai-evidence-${{ github.run_id }}
+          path: AI_Shop-backend/AI_Shop-agent/benchmarks/results
+          if-no-files-found: error
+
+  browser-mock:
+    name: Desktop and mobile Playwright regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: AI_Shop-front/AI_Shop-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: AI_Shop-front/AI_Shop-web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: nightly-playwright-failure-${{ github.run_id }}
+          path: |
+            AI_Shop-front/AI_Shop-web/playwright-report
+            AI_Shop-front/AI_Shop-web/test-results
+          if-no-files-found: ignore

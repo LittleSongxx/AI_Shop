@@ -285,6 +285,7 @@ class MiddlewareIT {
                       order_item_id VARCHAR(32) NOT NULL PRIMARY KEY,
                       order_id VARCHAR(32) NOT NULL,
                       product_id VARCHAR(32) NOT NULL,
+                      property_value_id_hash VARCHAR(128) NOT NULL,
                       product_name VARCHAR(255) NOT NULL,
                       buy_count INT NOT NULL,
                       item_amount DECIMAL(18,2) NOT NULL
@@ -293,6 +294,7 @@ class MiddlewareIT {
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS aishop_order.refund_request (
                       refund_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                      created_at DATETIME NOT NULL,
                       completed_at DATETIME NULL,
                       status VARCHAR(32) NOT NULL,
                       refund_amount DECIMAL(18,2) NOT NULL,
@@ -339,6 +341,53 @@ class MiddlewareIT {
                       tool_name VARCHAR(128) NULL,
                       status VARCHAR(32) NOT NULL,
                       latency_ms BIGINT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.agent_recommendation_event (
+                      event_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      retrieval_mode VARCHAR(20) NOT NULL,
+                      event_type VARCHAR(16) NOT NULL,
+                      occurred_at DATETIME(3) NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.commerce_outcome_ledger (
+                      ledger_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      event_type VARCHAR(32) NOT NULL,
+                      product_id VARCHAR(64) NULL,
+                      payload_json JSON NULL,
+                      occurred_at DATETIME(3) NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.agent_final_offer_snapshot (
+                      snapshot_id VARCHAR(64) NOT NULL PRIMARY KEY,
+                      product_id VARCHAR(64) NOT NULL,
+                      offer_json JSON NOT NULL,
+                      created_at DATETIME(3) NOT NULL
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.agent_inventory_supply_parameter (
+                      product_id VARCHAR(64) NOT NULL,
+                      sku_key VARCHAR(64) NOT NULL,
+                      lead_time_days INT NOT NULL,
+                      safety_stock INT NOT NULL,
+                      min_order_quantity INT NOT NULL,
+                      review_period_days INT NOT NULL,
+                      enabled TINYINT(1) NOT NULL,
+                      PRIMARY KEY (product_id, sku_key)
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS aishop_agent.agent_inventory_inbound (
+                      inbound_id VARCHAR(64) NOT NULL PRIMARY KEY,
+                      product_id VARCHAR(64) NOT NULL,
+                      sku_key VARCHAR(64) NOT NULL,
+                      quantity INT NOT NULL,
+                      eta_date DATE NULL,
+                      status VARCHAR(16) NOT NULL
                     ) ENGINE=InnoDB
                     """);
 

@@ -2,9 +2,9 @@
 
 > 内容状态：当前有效
 >
-> 整改基线：`f639599e335b97f6156cc41923d53948bcbf6549`
+> 本轮实施基线：`ef9aa0659a9275a99bb74cdb46e87770150dea0a` + 实施前 workspace diff SHA（见 [证据 manifest](docs/evidence-manifest.json)）
 >
-> 最后核验时间：2026-08-06（Asia/Shanghai）
+> 最后核验时间：2026-08-12（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
@@ -39,7 +39,7 @@
 | 工具调用 | MCP（Model Context Protocol）双向通信 |
 | 会话记忆 | Redis 短期 + MySQL 长期持久化 |
 | 可观测 | OpenTelemetry（OTLP）+ Prometheus 指标 |
-| 测试 | pytest（443 通过 / 2 个真实 MySQL 用例显式跳过；这 2 个已在 MySQL 8 gate 单独通过） |
+| 评测与测试 | pytest + `aishop-eval/v1` 统一 Runner；精确结果、命令和证据边界见 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md) |
 
 ### 前端
 
@@ -88,18 +88,34 @@ AI_Shop/
 - **优惠券秒杀**：Redis Lua 原子预占 + DB 库存双重校验，`CouponRushOrderService` 管理完整生命周期
 - **消息可靠性**：本地消息表 + `TransactionalMqSender`（事务提交后发送）+ MQ 补偿扫描，三层保障
 - **支付生命周期锁**：Redis 互斥锁确保支付回调、超时关单、迟到退款三路并发只有一路生效
+- **退款 Saga 人工复核闭环**：重试耗尽进入 MANUAL_REVIEW 后由管理端审批——通过则按原阶段恢复、对账定时器自动续跑，驳回则本次申请作废、用户可重开；审批用客户端幂等键 + CAS 保证并发单次生效，台账落账，恢复前重新校验冻结字段（金额/数量/属性）防人工窗口期数据漂移
 - **签到系统**：Bitmap 月度记录 + Hash 计数器 + Lua 原子操作，补签次数按累计天数兑换
 - **敏感词过滤**：DFA 算法，支持管理员动态维护词库
 
 ### AI 购物导购与客服
 
 - **ReAct Agent**：基于 LangGraph 的有状态对话，支持商品推荐、订单查询、物流查询、售后引导
+- **Workflow / Agent 分界**：确定性状态流使用规则或 Workflow；只有开放决策、职责隔离或可并行任务进入 bounded specialist，保留 legacy single-agent 回退
 - **RAG 知识库**：店铺公告、商品详情、退换货政策向量化，混合检索后注入上下文
 - **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
 - **输入防护**：NFKC 归一化 + 两级规则（硬阻断 / 可疑累积）+ Propose→用户确认→Java 执行，防 Prompt 注入
 - **强制工具回退**：模型跳过必要工具时，框架层自动补全并路由至 finalize，避免幻觉回复
+- **工具结果 Observation 层**：所有进上下文的工具输出统一脱敏（手机号/邮箱/身份证）、长度裁剪，被省略部分写入 trace
+- **通道污染检疫**：与输入防护共用规则表；RAG 片段在组装点逐条剔除，工具结果命中注入话术即替换为隔离占位符，污染项计数入指标，隔离不等于整链拒绝
+- **Prompt 单一事实源**：fragment 注册表统一管理全部提示词片段（redis 覆盖可观测），每轮对话记录 selectedFragments 到决策 trace
+- **per-request 成本摘要**：contextvar 隔离的轻/重路径成本累计（LLM 调用数、token、金额、模型），异步调度任务与对话路径隔离
+- **委托身份信道**：`X-Agent-User-Id` 系统信道头为权威（模型不可见），body userId 仅作参考；缺失 401、不一致 403、归属不符 403，fail-closed
+- **统一评测与消融**：Commerce、安全、Search/RAG 统一输出 case/summary/report；单 Agent、多 Agent、Workflow 由独立进程对照，临时结果不入库，baseline 只能显式接受
 - **熔断降级**：Circuit Breaker 包装外部 LLM 调用，超时自动降级
 - **速率限制**：用户级别双窗口限流，防止滥用
+
+### 治理与用户闭环
+
+- **管理员 RBAC**：`SUPER_ADMIN`、`AI_OPERATOR`、`SUPPORT_AGENT`、`DATA_ANALYST`、`AUDITOR` 五角色，Redis 会话绑定主体版本，Controller 和 Python 管理接口均执行权限校验
+- **内部管理员断言**：Java → Python 使用 HMAC-SHA256，覆盖 method、path、body hash、管理员、角色、权限、时间戳和 nonce，支持 current/previous 密钥轮换与重放拒绝
+- **试用与指标**：批次、参与者、`SYNTHETIC`/`LOCAL_PILOT`/`REAL_USER` 来源、verified success、FCR、TTFT、token、成本和匿名 JSON/CSV/Markdown 报告
+- **隐私中心**：用户可异步导出或彻底删除 AI 数据，支持密码二次确认、`Idempotency-Key`、分步骤恢复和短期下载；订单/支付保留数据解除 AI 关联并匿名化
+- **分层 CI 与供应链**：PR 跑确定性 AI Runner、Java unit/IT、双前端、Mock Playwright 和 SBOM；nightly 扩展回归，weekly 漏洞扫描，真实模型工作流缺 secrets 时明确“未采集”
 
 ---
 
@@ -186,6 +202,9 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 | 变量名 | 说明 |
 |--------|------|
 | `AISHOP_INTERNAL_TOKEN` | 服务间调用 `/internal/**` 的共享密钥（全服务一致） |
+| `AISHOP_ADMIN_ASSERTION_CURRENT_SECRET` | Java 管理端到 Python Agent 的管理员断言签名密钥 |
+| `PILOT_IDENTITY_HMAC_SECRET` | 试用参与者稳定伪名匹配密钥，不随请求签名密钥轮换 |
+| `PRIVACY_EXPORT_SIGNING_SECRET` | AI 数据删除后保留事实匿名化使用的独立密钥 |
 | `ADMIN_PASSWORD` | 管理后台初始管理员密码；生产环境必须替换默认值 |
 | `MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` | 本地中间件 root 密码与 Java 数据库密码；一键脚本会安全持久化选定值 |
 | `RABBIT_PASSWORD` / `REDIS_PASSWORD` | RabbitMQ 与 Redis 凭据；本地 Redis 默认不启用密码 |
@@ -200,7 +219,7 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 | `EMBEDDING_API_KEY` | 向量检索和知识库索引的 Embedding Key |
 | `RERANK_API_KEY` / `RERANK_BASE_URL` | Qwen3 Rerank Key 与百炼业务空间地址；未配置时回退 RRF |
 | `MEMORY_LLM_API_KEY` | 可选记忆摘要模型 Key，留空复用 `LLM_API_KEY` |
-| `VLM_ENABLED` / `VLM_API_KEY` | 可选视觉模型开关与 Key；用于图片理解，不负责商品图片展示，商城聊天上传链路尚未接通 |
+| `VLM_ENABLED` / `VLM_API_KEY` | 可选视觉模型开关与 Key（Java Search 侧，用于知识文档图片理解）；商城聊天上传链路尚未接通 |
 | `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 可选 DirectMail 邮箱验证码凭据 |
 | `ALIPAY_*` | 真实支付和回调验签凭据 |
 | `AMAP_KEY` | 可选高德逆地理编码 Key |
@@ -212,16 +231,21 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ## 数据与指标口径
 
-说明文档总入口见 [docs/文档导航.md](docs/文档导航.md)，整改后的 AI 能力、验证结果和
-秋招适配复评见 [docs/AI应用整改复核_2026-08-06.md](docs/AI应用整改复核_2026-08-06.md)。
+唯一人工证据入口是 [docs/AI应用求职项目证据总览.md](docs/AI应用求职项目证据总览.md)，机器可校验入口是
+[docs/evidence-manifest.json](docs/evidence-manifest.json)。证据严格分为源码/测试、确定性合成运行时、
+本地集成、配置真实模型和授权真实用户五级；运行 `python scripts/check_evidence_manifest.py` 可检查结构、
+数据锁、结果 SHA 和“未采集”边界。
 
-仓库里的数字分三类：实测的、框架就绪但没数据的、合成或手工编写的。引用任何指标前先看
-[docs/项目数据口径与功能边界.md](docs/项目数据口径与功能边界.md)，评测集的限制与变更见
-[冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)。
+当前已实测的 27 条 Commerce runtime、18 条 AI 安全和 162 条 Search/RAG 数据契约均属于
+`SYNTHETIC + deterministic`，不能表述为真实模型或真实用户效果。真实模型 Search/RAG/Agent 成本、
+`REAL_USER`、CTR/CVR、GMV uplift、线上 SLO 与生产规模仍为“未采集”。历史冻结会话及旧小样本结果只用于
+解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，
+不再作为 README 的当前成绩。
 
 本地全链路部署、RAG、搜索、分类、购物车和管理端滚动问题的真实排障过程见
 [docs/项目问题排查与修复复盘.md](docs/项目问题排查与修复复盘.md)。文档保留了错误假设、
-证据链、修复取舍与回归数据，可作为面试项目复盘材料。
+证据链、修复取舍与回归数据，可作为面试项目复盘材料。关键设计决策（消息可靠性、
+单 Agent 回退、身份字段分层）见 [docs/多智能体重构决策与复盘.md](docs/多智能体重构决策与复盘.md)。
 
 ---
 

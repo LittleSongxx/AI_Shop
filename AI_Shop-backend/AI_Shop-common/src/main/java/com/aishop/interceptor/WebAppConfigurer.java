@@ -18,7 +18,8 @@ public class WebAppConfigurer implements WebMvcConfigurer {
         registry.addInterceptor(appInterceptor)
                 .addPathPatterns("/admin/**")
                 .excludePathPatterns(
-                        "/admin/account/**",
+                        "/admin/account/checkCode",
+                        "/admin/account/login",
                         "/admin/file/getResource",
                         "/admin/file/getResource/**",
                         "/internal/**",

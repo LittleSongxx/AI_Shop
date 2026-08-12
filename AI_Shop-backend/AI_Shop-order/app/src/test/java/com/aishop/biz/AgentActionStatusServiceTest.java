@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -182,6 +183,28 @@ class AgentActionStatusServiceTest {
                 OrderRequestIdempotencyService.COMMAND_AGENT_REFUND,
                 KEY,
                 "退款操作已受理");
+    }
+
+    @Test
+    void rejectedRefundRequestIsNotReportedAsAccepted() {
+        // 审批驳回是确定终止：动作未生效，Agent 不得把"已驳回"转述成"已受理"。
+        when(idempotencyService.find(
+                USER,
+                OrderRequestIdempotencyService.COMMAND_AGENT_REFUND,
+                KEY)).thenReturn(record("FAILED"));
+        RefundRequest request = new RefundRequest();
+        request.setUserId(USER);
+        request.setStatus("REJECTED");
+        when(refundSagaTransactionService.findByOrderItemId("item-1")).thenReturn(request);
+
+        Map<String, Object> result = service.resolve(Map.of(
+                "userId", USER,
+                "actionType", "REFUND",
+                "idempotencyKey", KEY,
+                "params", Map.of("orderItemId", "item-1")));
+
+        assertEquals(AgentActionStatusService.STATUS_FAILED, result.get("status"));
+        verify(idempotencyService, never()).markReconciled(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test

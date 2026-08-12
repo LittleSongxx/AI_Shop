@@ -42,6 +42,8 @@
     <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
     <spring.ai.version>1.1.2</spring.ai.version>
     <springboot.version>3.5.4</springboot.version>
+    <maven.surefire.version>3.5.3</maven.surefire.version>
+    <jacoco.version>0.8.13</jacoco.version>
     <flyway.version>11.7.2</flyway.version>
     <mybatis-spring.version>3.0.5</mybatis-spring.version>
     <mysql.version>8.3.0</mysql.version>
@@ -274,6 +276,43 @@
   </dependencies>
 
   <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.version}</version>
+        <configuration>
+          <useModulePath>false</useModulePath>
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*Tests.java</include>
+          </includes>
+          <excludes>
+            <exclude>**/*IT.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-unit-coverage</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>unit-coverage-report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
     <pluginManagement>
       <plugins>
         <plugin>
@@ -283,10 +322,17 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.5.3</version>
-          <configuration>
-            <useModulePath>false</useModulePath>
-          </configuration>
+          <version>${maven.surefire.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>${maven.surefire.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -299,14 +345,39 @@
         <plugins>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
+            <artifactId>maven-failsafe-plugin</artifactId>
             <configuration>
               <includes>
-                <include>**/*Test.java</include>
-                <include>**/*Tests.java</include>
                 <include>**/*IT.java</include>
               </includes>
             </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>integration-test</goal>
+                  <goal>verify</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-integration-coverage</id>
+                <goals>
+                  <goal>prepare-agent-integration</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>integration-coverage-report</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>report-integration</goal>
+                </goals>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

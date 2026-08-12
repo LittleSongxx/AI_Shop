@@ -40,6 +40,8 @@ public class AGlobalExceptionHandlerController extends ABaseController {
                 response.setStatus(httpBusinessException.getHttpStatus());
             } else if (biz.getCode() != null
                     && (Objects.equals(biz.getCode(), 400)
+                    || Objects.equals(biz.getCode(), 401)
+                    || Objects.equals(biz.getCode(), 403)
                     || Objects.equals(biz.getCode(), 409)
                     || Objects.equals(biz.getCode(), 410))) {
                 response.setStatus(biz.getCode());

@@ -172,11 +172,14 @@ class ContextBuilder:
         product_snapshot: str | None = None,
         faq_text: str | None = None,
         knowledge_text: str | None = None,
+        selection_out: list[dict] | None = None,
     ) -> tuple[list, list[dict], int | None]:
 
         settings = get_settings()
         # Build system prompt and load shopping profile concurrently —
         # the profile is a fast Redis hit in the common case, so this is free.
+        # selection_out 透传给 prompt 层：本次实际选用的片段
+        # （fragment/source）由调用方记录进 episode trace。
         system_prompt, shopping_profile = await asyncio.gather(
             build_agent_system_prompt(
                 intent,
@@ -185,6 +188,7 @@ class ContextBuilder:
                 product_snapshot=product_snapshot,
                 faq_text=faq_text,
                 knowledge_text=knowledge_text,
+                selection_out=selection_out,
             ),
             shopping_profile_service.get_profile(user_id),
         )

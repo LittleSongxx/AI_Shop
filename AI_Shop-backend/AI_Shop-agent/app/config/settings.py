@@ -43,7 +43,6 @@ class Settings(BaseSettings):
     # Autoreload respawns the server on file changes and is a local-dev tool
     # only; leaving it on elsewhere costs a watcher process and restarts.
     app_reload: bool = False
-    allow_development_auth_bypass: bool = False
     otel_enabled: bool = False
     otel_service_name: str = "aishop-agent"
     otel_otlp_endpoint: str = ""
@@ -82,6 +81,26 @@ class Settings(BaseSettings):
             "internal_token",
         ),
     )
+    admin_assertion_current_secret: str = Field(
+        default="your-token",
+        validation_alias=AliasChoices(
+            "AISHOP_ADMIN_ASSERTION_CURRENT_SECRET",
+            "ADMIN_ASSERTION_CURRENT_SECRET",
+            "admin_assertion_current_secret",
+        ),
+    )
+    admin_assertion_current_key_id: str = "current"
+    admin_assertion_previous_secret: str = ""
+    admin_assertion_previous_key_id: str = "previous"
+    admin_assertion_max_age_seconds: int = 300
+    admin_assertion_nonce_ttl_seconds: int = 600
+    # Stable HMAC identity used only to match an explicitly consented pilot
+    # participant to an Agent run. It must not be rotated with the request
+    # assertion key or raw user IDs would become impossible to match.
+    pilot_identity_hmac_secret: str = "development-only-pilot-secret"
+    privacy_export_signing_secret: str = "development-only-privacy-secret"
+    privacy_export_dir: str = ".privacy-exports"
+    privacy_export_ttl_seconds: int = 24 * 60 * 60
 
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
@@ -294,18 +313,6 @@ class Settings(BaseSettings):
     # and false maps to prefetch. New environments default to conditional.
     rag_mode: Literal["prefetch", "conditional", "agentic"] = "conditional"
     agentic_rag: bool = False
-    # P3-2 Multimodal RAG: VLM for image description.
-    # A dedicated VLM key wins; DASHSCOPE_API_KEY is only the shared-key fallback.
-    # Leave empty (default) to disable — images are silently ignored.
-    # Recommended model: qwen-vl-plus (DashScope) or any OpenAI-compatible vision endpoint.
-    vlm_api_key: str = Field(
-        default="",
-        validation_alias=AliasChoices("VLM_API_KEY", "DASHSCOPE_API_KEY", "vlm_api_key"),
-    )
-    vlm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    vlm_model: str = "qwen-vl-plus"
-    vlm_image_max_tokens: int = 150
-    vlm_timeout: int = 15
     # ES requires num_candidates >= k. Raising it trades latency for recall, so
     # keep a floor rather than deriving it from k alone: at k=15 a bare 2x gives
     # the HNSW search very little room to escape a local minimum.
@@ -391,6 +398,16 @@ class Settings(BaseSettings):
             )
         if self.analytics_request_timeout_seconds > 180:
             raise ValueError("ANALYTICS_REQUEST_TIMEOUT_SECONDS must not exceed 180")
+        if not 30 <= self.admin_assertion_max_age_seconds <= 300:
+            raise ValueError("ADMIN_ASSERTION_MAX_AGE_SECONDS must be between 30 and 300")
+        if self.admin_assertion_nonce_ttl_seconds < self.admin_assertion_max_age_seconds:
+            raise ValueError("ADMIN_ASSERTION_NONCE_TTL_SECONDS must cover the signature window")
+        if len(self.pilot_identity_hmac_secret.encode("utf-8")) < 16:
+            raise ValueError("PILOT_IDENTITY_HMAC_SECRET must be at least 16 bytes")
+        if len(self.privacy_export_signing_secret.encode("utf-8")) < 16:
+            raise ValueError("PRIVACY_EXPORT_SIGNING_SECRET must be at least 16 bytes")
+        if not 15 * 60 <= self.privacy_export_ttl_seconds <= 7 * 24 * 60 * 60:
+            raise ValueError("PRIVACY_EXPORT_TTL_SECONDS must be between 900 and 604800")
         if not 3 <= self.multi_agent_specialist_timeout_seconds <= 30:
             raise ValueError(
                 "MULTI_AGENT_SPECIALIST_TIMEOUT_SECONDS must be between 3 and 30"
@@ -537,6 +554,15 @@ class Settings(BaseSettings):
         errors: list[str] = []
         if not self.internal_token.strip() or self.internal_token == "your-token":
             errors.append("AISHOP_INTERNAL_TOKEN must be configured")
+        if (
+            not self.admin_assertion_current_secret.strip()
+            or self.admin_assertion_current_secret == "your-token"
+        ):
+            errors.append("AISHOP_ADMIN_ASSERTION_CURRENT_SECRET must be configured")
+        if self.pilot_identity_hmac_secret == "development-only-pilot-secret":
+            errors.append("PILOT_IDENTITY_HMAC_SECRET must be configured")
+        if self.privacy_export_signing_secret == "development-only-privacy-secret":
+            errors.append("PRIVACY_EXPORT_SIGNING_SECRET must be configured")
         if not self.llm_api_key.strip():
             errors.append("LLM_API_KEY must be configured")
         if not self.embedding_api_key.strip():
@@ -544,8 +570,6 @@ class Settings(BaseSettings):
         if self.rerank_required and not self.rerank_api_key.strip():
             errors.append("RERANK_API_KEY must be configured (RERANK_REQUIRED=true)")
         errors.extend(analytics_errors)
-        if self.allow_development_auth_bypass:
-            errors.append("ALLOW_DEVELOPMENT_AUTH_BYPASS must be false")
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
 

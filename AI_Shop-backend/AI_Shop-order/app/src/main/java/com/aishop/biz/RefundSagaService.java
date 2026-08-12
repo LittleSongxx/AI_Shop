@@ -33,6 +33,10 @@ public class RefundSagaService {
         if (RefundSagaStatus.MANUAL_REVIEW.name().equals(request.getStatus())) {
             throw new BusinessException("退款正在人工复核，请勿重复提交");
         }
+        if (RefundSagaStatus.REJECTED.name().equals(request.getStatus())) {
+            // 驳回 = 本次申请作废；用户重新发起即重开新申请，重新走全流程。
+            transactionService.resetRejected(request.getRefundRequestId());
+        }
         processPayment(request, true);
     }
 

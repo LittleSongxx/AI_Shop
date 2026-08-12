@@ -124,6 +124,12 @@ public class RefundSagaTransactionService {
                 refundRequestId, retrySeconds, maxRetries, truncate(error));
     }
 
+    /** 驳回后用户重新申请：REJECTED → PENDING_PAYMENT 重走全流程（CAS 单次生效）。 */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean resetRejected(String refundRequestId) {
+        return refundRequestMapper.resetRejected(refundRequestId) == 1;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public boolean queueStockRestore(String refundRequestId, boolean retry) {
         RefundRequest request = refundRequestMapper.selectByIdForUpdate(refundRequestId);
@@ -131,7 +137,9 @@ public class RefundSagaTransactionService {
             return false;
         }
         RefundSagaStatus status = RefundSagaStatus.valueOf(request.getStatus());
-        if (status == RefundSagaStatus.COMPLETED || status == RefundSagaStatus.MANUAL_REVIEW) {
+        if (status == RefundSagaStatus.COMPLETED
+                || status == RefundSagaStatus.MANUAL_REVIEW
+                || status == RefundSagaStatus.REJECTED) {
             return false;
         }
 

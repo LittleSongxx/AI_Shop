@@ -23,6 +23,7 @@ from app.harness.metrics.runtime_sensors import (
     STREAM_TOKENS,
     observe_agent_stage,
 )
+from app.harness.observation import build_tool_result_observation
 from app.mcp.tools import build_mcp_tools
 from app.observability.llm_metrics import (
     record_llm_failure,
@@ -153,6 +154,7 @@ async def stream_llm_turn(
                 continue
             if not first_token_observed:
                 observe_agent_stage("first_token", time.perf_counter() - started)
+                episode_service.observe_first_token()
                 first_token_observed = True
             chunks.append(delta)
             # 字符数（真实口径）；旧指标同步累计保持面板兼容。
@@ -408,13 +410,19 @@ async def finalize_agent_response(
                             user_id,
                         )
                         called.append("SEARCH_PRODUCTS")
-                        cards_json = result.assistant_cards
-                        forced_biz = result.biz_type or "product_search"
-                        search_tool_hint = result.to_tool_message()
-                        biz_data = result.biz_data or biz_data
-                        tool_biz_update = result.to_biz_dict()
-                        if tool_biz_update:
-                            tool_biz = {**tool_biz, **tool_biz_update}
+                        observation = build_tool_result_observation(result)
+                        if observation.contaminated:
+                            cards_json = None
+                            forced_biz = "product_search"
+                            search_tool_hint = None
+                        else:
+                            cards_json = result.assistant_cards
+                            forced_biz = result.biz_type or "product_search"
+                            search_tool_hint = observation.text
+                            biz_data = result.biz_data or biz_data
+                            tool_biz_update = result.to_biz_dict()
+                            if tool_biz_update:
+                                tool_biz = {**tool_biz, **tool_biz_update}
                 if cards_json and is_product_cards_json(cards_json):
                     intro = compact_product_search_intro(full_text, search_tool_hint)
                     if text_promises_product_cards(intro) and cards_json == "[]":

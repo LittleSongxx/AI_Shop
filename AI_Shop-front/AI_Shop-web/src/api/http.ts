@@ -35,6 +35,9 @@ function buildFormData(params?: Record<string, unknown>): FormData {
 http.interceptors.response.use(
   async (res: any) => {
     const { data, config } = res;
+    if (config?.responseType === 'blob' || config?.responseType === 'arraybuffer') {
+      return data;
+    }
     if (data.code !== 200) {
       if (data.code === RESPONSE_CODE.LOGIN_TIMEOUT) {
         if (window.location.pathname.startsWith('/payment/')) {
@@ -70,7 +73,11 @@ http.interceptors.response.use(
 
 export const request = {
 
-  get: <T = any>(url: string, config?: { params?: Record<string, unknown> }) =>
+  get: <T = any>(url: string, config?: {
+    params?: Record<string, unknown>;
+    responseType?: 'json' | 'blob' | 'arraybuffer';
+    headers?: Record<string, string>;
+  }) =>
     http.get(url, config) as Promise<T>,
 
   post: <T = any>(url: string, data?: any, config?: Record<string, any>) =>
