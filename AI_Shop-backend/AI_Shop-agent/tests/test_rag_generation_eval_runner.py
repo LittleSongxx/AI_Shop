@@ -106,6 +106,7 @@ def test_answer_metrics_require_keyword_and_valid_citation():
 
     assert passed["success"] is True
     assert passed["citationCorrectness"] == 1.0
+    assert passed["labelCitationPrecision"] == 1.0
     assert passed["citationCoverage"] == 1.0
     assert invalid["success"] is False
     assert invalid["invalidCitationIndexes"] == [2]
@@ -120,6 +121,28 @@ def test_no_answer_requires_the_exact_refusal_without_citation():
         is False
     )
     assert runner._answer_metrics(case, "我不知道。", [])["success"] is False
+
+
+def test_answer_metrics_accept_semantically_duplicate_published_citation():
+    case = {
+        "relevantRefs": [{"type": "faq", "questionId": "9002"}],
+        "answerKeywords": ["一张", "优惠券"],
+    }
+    refs = [
+        {"type": "faq", "questionId": "9002", "snippet": "一张优惠券"},
+        {
+            "type": "knowledge_chunk",
+            "source": "03-membership-and-coupons.md",
+            "heading": "使用限制",
+            "snippet": "一个订单只能选择一张优惠券",
+        },
+    ]
+
+    metrics = runner._answer_metrics(case, "一次只能使用一张优惠券。[1][2]", refs)
+
+    assert metrics["success"] is True
+    assert metrics["citationCorrectness"] == 1.0
+    assert metrics["labelCitationPrecision"] == 0.5
 
 
 @pytest.mark.asyncio
@@ -194,6 +217,7 @@ async def test_full_generation_runner_writes_ten_case_review_template(
     assert evaluation.summary["generationMetrics"] == {
         "keywordCoverage": 1.0,
         "citationCorrectness": 1.0,
+        "labelCitationPrecision": 1.0,
         "citationCoverage": 1.0,
         "noAnswerAccuracy": 1.0,
         "injectionRobustness": 1.0,

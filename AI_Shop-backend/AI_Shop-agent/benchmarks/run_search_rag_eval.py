@@ -599,10 +599,15 @@ async def run(
                     )
                     cases.extend(result_cases)
                     live_metrics[name] = metrics
+                    query_metrics = (
+                        public_query_metrics if split == "public" else holdout_query_metrics
+                    )
                     failures.extend(
                         f"{name}: {failure}"
                         for failure in _metric_gate_failures(
-                            metrics, contract.get("thresholds") or {}, k=top_k
+                            {**query_metrics, **metrics},
+                            contract.get("thresholds") or {},
+                            k=top_k,
                         )
                     )
                 except Exception as exc:
@@ -633,10 +638,13 @@ async def run(
                     )
                     cases.extend(result_cases)
                     live_metrics[name] = report
+                    rag_thresholds = contract.get("thresholds") or contract.get(
+                        "qualityBaseline"
+                    ) or {}
                     failures.extend(
                         f"{name}: {failure}"
                         for failure in _metric_gate_failures(
-                            report["metrics"], contract.get("thresholds") or {}, k=top_k
+                            report["metrics"], rag_thresholds, k=top_k
                         )
                     )
                 except Exception as exc:
@@ -677,8 +685,19 @@ async def run(
             )
 
     summary = aggregate_case_results(cases)
-    deterministic_failures = [case.case_id for case in cases if case.status != "PASSED"]
-    failures.extend(deterministic_failures)
+    contract_failures = [
+        case.case_id
+        for case in cases
+        if case.execution_mode == "deterministic" and case.status != "PASSED"
+    ]
+    execution_failures = [
+        case.case_id
+        for case in cases
+        if case.execution_mode == "local-live"
+        and (case.status == "ERROR" or not case.executed)
+    ]
+    failures.extend(contract_failures)
+    failures.extend(execution_failures)
     summary["evaluationLayers"] = {
         "deterministic": {
             "claim": "dataset/query-understanding contract only",
@@ -723,10 +742,17 @@ async def run(
         "liveCaseCount": live_search_count + live_rag_count,
     }
     summary["providerFacts"] = provider_facts
+    live_case_failures = [
+        case.case_id
+        for case in cases
+        if case.execution_mode == "local-live" and case.status == "FAILED"
+    ]
     summary["qualityGate"] = {
         "passed": not failures,
         "liveRequired": live,
         "failureCount": len(set(failures)),
+        "failedLiveCaseCount": len(live_case_failures),
+        "failedLiveCases": live_case_failures,
     }
     metadata = EvaluationRunMetadata(
         suite=SUITE,

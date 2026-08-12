@@ -9,7 +9,7 @@
   "catalogSha256": "fd40ec1288682e508ab4a6c325d67e00186960f16a006c30bc7238370e40cbc3",
   "productCount": 47,
   "taxonomyPath": "app/config/search_taxonomy.yml",
-  "taxonomySha256": "655e6c76dad0356b12e78b8d0f19c717dd2b4cf34ca833ff7458dc25e63a429b",
+  "taxonomySha256": "3c920bc20c69bf2d11014bc52925aa13095614c28088482f82a63b64f1230192",
   "thresholds": {
     "keywordAccuracy": 1.0,
     "termCoverage": 1.0,

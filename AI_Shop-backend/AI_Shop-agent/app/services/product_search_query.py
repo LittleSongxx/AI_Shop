@@ -33,12 +33,34 @@ def _topic_aliases(topic: dict[str, Any]) -> list[str]:
     return [str(value).strip() for value in values if str(value or "").strip()]
 
 
+def _topic_exact_aliases(topic: dict[str, Any]) -> list[str]:
+    return [
+        str(value).strip()
+        for value in topic.get("exactAliases") or []
+        if str(value or "").strip()
+    ]
+
+
+def _clean_query(value: str) -> str:
+    fillers = [re.escape(str(item)) for item in _taxonomy().get("fillers") or [] if item]
+    cleaned = re.sub("|".join(fillers), "", value) if fillers else value
+    punctuation = str(_taxonomy().get("punctuation") or "")
+    if punctuation:
+        cleaned = re.sub(f"[{re.escape(punctuation)}\\s]+", "", cleaned)
+    return cleaned.strip()
+
+
 def normalize_product_search_query(text: str | None) -> str:
     """Extract a known topic when present, while preserving unknown categories."""
     value = (text or "").strip()
     if not value:
         return ""
     lowered = value.lower()
+    cleaned = _clean_query(value)
+    for topic in _topics():
+        canonical = str(topic.get("canonical") or "").strip()
+        if any(cleaned.lower() == alias.lower() for alias in _topic_exact_aliases(topic)):
+            return canonical
     candidates: list[tuple[str, str]] = []
     for topic in _topics():
         canonical = str(topic.get("canonical") or "").strip()
@@ -47,12 +69,6 @@ def normalize_product_search_query(text: str | None) -> str:
         if alias.lower() in lowered:
             return canonical
 
-    fillers = [re.escape(str(item)) for item in _taxonomy().get("fillers") or [] if item]
-    cleaned = re.sub("|".join(fillers), "", value) if fillers else value
-    punctuation = str(_taxonomy().get("punctuation") or "")
-    if punctuation:
-        cleaned = re.sub(f"[{re.escape(punctuation)}\\s]+", "", cleaned)
-    cleaned = cleaned.strip()
     return cleaned or value
 
 
@@ -76,7 +92,14 @@ def match_terms_for_query(query: str | None) -> list[str]:
     lowered = value.lower()
     for topic in _topics():
         aliases = _topic_aliases(topic)
-        if any(alias.lower() in lowered or alias.lower() in normalized_query.lower() for alias in aliases):
+        exact_aliases = _topic_exact_aliases(topic)
+        exact_match = any(
+            normalized_query.lower() == alias.lower() for alias in exact_aliases
+        )
+        if exact_match or any(
+            alias.lower() in lowered or alias.lower() in normalized_query.lower()
+            for alias in aliases
+        ):
             for term in topic.get("terms") or aliases:
                 add(str(term))
     return terms
@@ -91,8 +114,12 @@ def topic_terms_for_text(text: str | None) -> list[str]:
     seen: set[str] = set()
     for topic in _topics():
         aliases = _topic_aliases(topic)
+        exact_aliases = _topic_exact_aliases(topic)
         topic_terms = topic.get("terms") or aliases
-        if not any(alias.lower() in value for alias in aliases + [str(v) for v in topic_terms]):
+        exact_match = any(value == alias.lower() for alias in exact_aliases)
+        if not exact_match and not any(
+            alias.lower() in value for alias in aliases + [str(v) for v in topic_terms]
+        ):
             continue
         for term in topic_terms:
             normalized = str(term or "").strip().lower()

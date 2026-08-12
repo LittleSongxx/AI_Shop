@@ -18,6 +18,11 @@ def test_unknown_category_is_preserved_for_generic_search():
     assert match_terms_for_query("帮我找露营天幕")[0] == "露营天幕"
 
 
+def test_ambiguous_all_in_one_alias_only_matches_the_exact_computer_query():
+    assert normalize_product_search_query("我想买个一体机") == "电脑"
+    assert normalize_product_search_query("蒸烤一体机") == "蒸烤一体机"
+
+
 def test_bag_mission_query_normalizes_to_catalog_search_term():
     query = "预算提高到1000元，请继续推荐适合上班通勤的包"
 

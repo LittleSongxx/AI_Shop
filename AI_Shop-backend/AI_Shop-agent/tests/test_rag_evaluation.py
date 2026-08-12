@@ -33,6 +33,7 @@ def test_evaluate_results_reports_recall_mrr_and_citation_rate():
     assert metrics["topKHitRate"] == 1.0
     assert metrics["answerCitationRate"] == 1.0
     assert metrics["citationCorrectness"] == 0.6667
+    assert metrics["labelCitationPrecision"] == 0.6667
     assert metrics["citationCoverage"] == 1.0
     assert len(metrics["perCase"]) == 2
 
@@ -165,6 +166,38 @@ def test_citation_correctness_coverage_and_injection_are_separate_metrics():
     assert metrics["injectionCases"] == 2
     assert metrics["injectionRobustness"] == 0.5
     assert metrics["perCase"][0]["latencyMs"] == 12.5
+
+
+def test_semantically_duplicate_published_evidence_counts_as_supported_but_not_label_match():
+    cases = [
+        {
+            "relevantRefs": [{"type": "faq", "questionId": "9002"}],
+            "answerKeywords": ["一张", "优惠券"],
+        }
+    ]
+    results = [
+        {
+            "source_refs": [
+                {
+                    "type": "faq",
+                    "questionId": "9002",
+                    "snippet": "一个订单只能选择一张优惠券。",
+                },
+                {
+                    "type": "knowledge_chunk",
+                    "source": "03-membership-and-coupons.md",
+                    "heading": "使用限制",
+                    "snippet": "单笔订单只能选择一张用户优惠券。",
+                },
+            ]
+        }
+    ]
+
+    metrics = evaluate_results(cases, results, top_k=2)
+
+    assert metrics["citationCorrectness"] == 1.0
+    assert metrics["labelCitationPrecision"] == 0.5
+    assert metrics["citationCoverage"] == 1.0
 
 
 def test_locked_rag_dataset_and_knowledge_files_match():

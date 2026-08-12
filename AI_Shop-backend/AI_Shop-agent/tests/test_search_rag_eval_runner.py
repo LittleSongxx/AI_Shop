@@ -5,6 +5,7 @@ from benchmarks.run_search_rag_eval import (
     _deterministic_search_cases,
     _labelled_search_cases,
     _live_rag_cases,
+    _metric_gate_failures,
     validate_rag_holdout_contract,
     validate_search_holdout_contract,
 )
@@ -97,3 +98,36 @@ def test_live_rag_allows_exact_faq_and_no_candidate_cases():
 
     assert [result.status for result in results] == ["PASSED", "PASSED"]
     assert all(result.observations["rerankFallback"] is False for result in results)
+
+
+def test_search_live_gate_can_combine_query_contract_and_retrieval_metrics():
+    metrics = {
+        "keywordAccuracy": 1.0,
+        "termCoverage": 1.0,
+        "recallAt10": 1.0,
+        "mrr": 0.8,
+        "ndcgAt10": 0.9,
+    }
+    thresholds = {
+        "keywordAccuracy": 1.0,
+        "termCoverage": 1.0,
+        "recallAt10": 0.8,
+        "mrr": 0.65,
+        "ndcgAt10": 0.7,
+    }
+
+    assert _metric_gate_failures(metrics, thresholds, k=10) == []
+
+
+def test_public_rag_quality_baseline_metrics_are_gateable():
+    metrics = {
+        "recallAtK": 0.9167,
+        "mrr": 0.9167,
+        "topKHitRate": 0.9167,
+        "answerCitationRate": 0.9167,
+        "noAnswerPrecision": 0.9091,
+        "noAnswerRecall": 1.0,
+        "noAnswerF1": 0.9524,
+    }
+
+    assert _metric_gate_failures(metrics, metrics, k=10) == []

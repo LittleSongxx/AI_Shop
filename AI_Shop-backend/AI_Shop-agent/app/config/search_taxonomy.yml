@@ -72,8 +72,10 @@ topics:
     terms: [手机, iphone, 苹果, 华为, 小米, 三星, oppo, vivo, 荣耀, 红米, 手机壳]
   - id: computer
     canonical: 电脑
-    aliases: [台式机, 台式, 笔记本, 主机, 显示器, 一体机]
-    terms: [电脑, 台式, 笔记本, 主机, 显示器, 一体机]
+    aliases: [台式机, 台式, 笔记本, 主机, 显示器]
+    # “一体机”单独出现时指电脑，但在“蒸烤一体机”中不能做 substring 归一化。
+    exactAliases: [一体机]
+    terms: [电脑, 台式, 笔记本, 主机, 显示器]
   - id: earphone
     canonical: 耳机
     aliases: [无线耳机, 蓝牙耳机, 降噪耳机, 头戴式耳机, 入耳式耳机, tws耳机, airpods]

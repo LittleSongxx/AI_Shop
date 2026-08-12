@@ -95,10 +95,14 @@ def _citation_supports_answer(
     expected_refs: list[dict[str, Any]],
     keywords: list[str],
 ) -> bool:
-    if not any(_matches_expected(expected, actual) for expected in expected_refs):
-        return False
     snippet = _normalized_text(actual.get("snippet"))
-    return not keywords or any(keyword in snippet for keyword in keywords)
+    if any(_matches_expected(expected, actual) for expected in expected_refs):
+        return not keywords or any(keyword in snippet for keyword in keywords)
+    # A published FAQ and a document chunk can encode the same fact while the
+    # label names only one canonical source. Count the alternate source as
+    # supporting evidence only when it contains every one of at least two
+    # answer keywords; keep strict label precision as a separate metric.
+    return len(keywords) >= 2 and all(keyword in snippet for keyword in keywords)
 
 
 def placeholder_references(cases: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -145,6 +149,7 @@ def evaluate_results(
             "topKHitRate": 0.0,
             "answerCitationRate": 0.0,
             "citationCorrectness": 0.0,
+            "labelCitationPrecision": 0.0,
             "citationCoverage": 0.0,
             "noAnswerAccuracy": 0.0,
             "noAnswerPrecision": 0.0,
@@ -161,7 +166,7 @@ def evaluate_results(
     ndcg_values: list[float] = []
     top_k_hits = 0
     citation_hits = 0
-    valid_citation_count = returned_citation_count = 0
+    valid_citation_count = strict_label_count = returned_citation_count = 0
     citation_coverage_values: list[float] = []
     injection_cases = injection_robust = 0
     no_answer_cases = no_answer_hits = 0
@@ -243,7 +248,13 @@ def evaluate_results(
             for ref in refs[:limit]
             if _citation_supports_answer(ref, expected_refs, keywords)
         ]
+        strict_label_refs = [
+            ref
+            for ref in refs[:limit]
+            if any(_matches_expected(expected, ref) for expected in expected_refs)
+        ]
         valid_citation_count += len(valid_refs)
+        strict_label_count += len(strict_label_refs)
         covered_expected = sum(
             1
             for expected in expected_refs
@@ -273,6 +284,11 @@ def evaluate_results(
                 "ndcgAtK": round(ndcg, 4),
                 "citation": cited,
                 "citationCorrectness": round(len(valid_refs) / len(refs[:limit]), 4)
+                if refs[:limit]
+                else 0.0,
+                "labelCitationPrecision": round(
+                    len(strict_label_refs) / len(refs[:limit]), 4
+                )
                 if refs[:limit]
                 else 0.0,
                 "citationCoverage": round(citation_coverage, 4),
@@ -305,6 +321,9 @@ def evaluate_results(
         "topKHitRate": round(top_k_hits / retrieval_count, 4) if retrieval_count else 0.0,
         "answerCitationRate": round(citation_hits / retrieval_count, 4) if retrieval_count else 0.0,
         "citationCorrectness": round(valid_citation_count / returned_citation_count, 4)
+        if returned_citation_count
+        else 0.0,
+        "labelCitationPrecision": round(strict_label_count / returned_citation_count, 4)
         if returned_citation_count
         else 0.0,
         "citationCoverage": round(sum(citation_coverage_values) / retrieval_count, 4)
