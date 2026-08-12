@@ -2,6 +2,7 @@ package com.aishop.security;
 
 import com.aishop.constants.InternalApiHeaders;
 import com.aishop.entity.dto.AdminPrincipalDTO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ public class AdminAssertionSigner {
     private final String currentKeyId;
     private final Clock clock;
 
+    @Autowired
     public AdminAssertionSigner(
             @Value("${aishop.admin-assertion.current-secret:${aishop.internal.token:your-token}}")
             String currentSecret,
