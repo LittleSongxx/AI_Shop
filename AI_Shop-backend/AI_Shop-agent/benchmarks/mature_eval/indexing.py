@@ -147,7 +147,8 @@ class EvaluationIndexManager:
         for start in range(0, len(values), 500):
             response = await client.post(
                 self.url("/_mget"),
-                json={"ids": values[start : start + 500], "_source": False},
+                json={"ids": values[start : start + 500]},
+                params={"_source": "false"},
                 timeout=30,
             )
             response.raise_for_status()

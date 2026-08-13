@@ -86,6 +86,11 @@ class FakeClient:
                 }
             )
         )
+        self.post = AsyncMock(
+            return_value=FakeResponse(
+                {"docs": [{"_id": "existing", "found": True}]}
+            )
+        )
 
 
 @pytest.mark.asyncio
@@ -102,3 +107,19 @@ async def test_ensure_is_idempotent_and_never_deletes(monkeypatch):
     assert client.put.await_count == 1
     assert not hasattr(client, "delete")
     assert all("aishop_eval_fixture" in call.args[0] for call in client.head.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_existing_ids_uses_elasticsearch_9_compatible_source_parameter(monkeypatch):
+    client = FakeClient()
+    monkeypatch.setattr(indexing, "get_client", AsyncMock(return_value=client))
+    manager = EvaluationIndexManager(
+        "aishop_eval_fixture", es_hosts="http://localhost:9200"
+    )
+
+    found = await manager.existing_ids(["existing", "missing"])
+
+    assert found == {"existing"}
+    request = client.post.await_args
+    assert request.kwargs["json"] == {"ids": ["existing", "missing"]}
+    assert request.kwargs["params"] == {"_source": "false"}
