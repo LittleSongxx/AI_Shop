@@ -4,7 +4,7 @@
 >
 > 本轮实施基线：`ef9aa0659a9275a99bb74cdb46e87770150dea0a`
 >
-> 最后核验时间：2026-08-12（Asia/Shanghai）
+> 最后核验时间：2026-08-13（Asia/Shanghai）
 >
 > 适用环境：确定性回归、本地集成和可选 live 评测；不是生产效果或真实用户报告
 
@@ -21,6 +21,19 @@ python benchmarks/run_ai_safety.py --run-id local-safety
 python benchmarks/run_search_rag_eval.py --run-id local-search-rag
 python benchmarks/run_ablation.py --run-id local-ablation
 ```
+
+成熟 Search/RAG 评测采用显式阶段，holdout 只有在配置冻结后才能执行：
+
+```bash
+python benchmarks/run_search_rag_mature_eval.py prepare
+python benchmarks/run_search_rag_mature_eval.py collect-dev --run-id mature-local
+python benchmarks/run_search_rag_mature_eval.py replay --run-id mature-local
+python benchmarks/run_search_rag_mature_eval.py collect-final --run-id mature-local --finalize-holdout
+python benchmarks/run_search_rag_mature_eval.py package --run-id mature-local
+python benchmarks/run_rag_generation_eval.py --selection-version v2 --run-id mature-generation --top-k 10
+```
+
+`collect-*` 执行一次冷调用并保存查询向量、BM25/Vector Top-50、Rerank 完整顺序和阶段延迟；`replay` 的所有参数消融 Provider 调用数必须为 0。大数据、向量与完整 case 位于 Git 忽略的 `benchmarks/results/`，`package` 只提交多 K 指标、变体汇总、配对差值、bootstrap CI、badcase、原始 SHA 和诚实边界。本轮正式证据目录为 `benchmarks/evidence/search-rag-mature-v1/mature-21d8159/` 与 `benchmarks/evidence/rag-generation-live-v2/mature-rag-generation-21d8159/`，没有接受或覆盖 baseline。
 
 结果写入 `benchmarks/results/<suite>/<run_id>/` 并被 Git 忽略；只有显式传入 `--accept-baseline` 的 Runner 才能写 `benchmarks/baselines/*.lock.json`，CI 不会自动接受 baseline。确定性结果必须写作 `SYNTHETIC`，Search/RAG 未使用 `--live` 时不得声称 Recall/MRR/NDCG 或真实模型成本。
 

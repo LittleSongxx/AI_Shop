@@ -49,14 +49,23 @@ def _resolve(relative: str) -> Path:
 
 
 def _check_dataset_lock(
-    lock_spec: str | dict[str, Any], errors: list[str]
+    lock_spec: str | dict[str, Any],
+    errors: list[str],
+    *,
+    require_optional_local: bool,
 ) -> None:
     if isinstance(lock_spec, str):
         lock_relative = lock_spec
         dataset_override = None
+        optional_local = False
+        hash_mode = "bytes"
+        expected_field = "datasetSha256"
     elif isinstance(lock_spec, dict):
         lock_relative = str(lock_spec.get("path") or "")
         dataset_override = lock_spec.get("datasetPath")
+        optional_local = bool(lock_spec.get("optionalLocalDataset"))
+        hash_mode = str(lock_spec.get("hashMode") or "bytes")
+        expected_field = str(lock_spec.get("expectedField") or "datasetSha256")
     else:
         errors.append("datasetLocks must contain paths or path descriptors")
         return
@@ -73,9 +82,11 @@ def _check_dataset_lock(
         errors.append(f"invalid dataset lock {lock_relative}: {exc}")
         return
     dataset = dataset_override or lock.get("dataset") or lock.get("datasetPath")
-    expected = lock.get("datasetSha256")
+    expected = lock.get(expected_field)
     if not isinstance(dataset, str) or not isinstance(expected, str):
-        errors.append(f"dataset lock lacks dataset/datasetSha256: {lock_relative}")
+        errors.append(
+            f"dataset lock lacks dataset/{expected_field}: {lock_relative}"
+        )
         return
     dataset_path = (
         _resolve(dataset)
@@ -86,10 +97,30 @@ def _check_dataset_lock(
         jsonl_candidate = dataset_path.with_suffix(".jsonl")
         if jsonl_candidate.is_file():
             dataset_path = jsonl_candidate
+    if not dataset_path.is_file() and optional_local and not require_optional_local:
+        return
     if not dataset_path.is_file():
         errors.append(f"locked dataset missing: {dataset_path.relative_to(REPO_ROOT)}")
         return
-    actual = _sha256(dataset_path)
+    if hash_mode == "bytes":
+        actual = _sha256(dataset_path)
+    elif hash_mode == "canonical-json":
+        try:
+            payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"invalid canonical JSON dataset {dataset_path}: {exc}")
+            return
+        actual = hashlib.sha256(
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+    else:
+        errors.append(f"unsupported dataset hashMode {hash_mode}: {lock_relative}")
+        return
     if actual != expected:
         errors.append(
             f"dataset hash mismatch for {dataset_path.relative_to(REPO_ROOT)}: "
@@ -117,7 +148,10 @@ def _check_result(evidence: dict[str, Any], path: Path, errors: list[str]) -> No
             errors.append(f"evaluation caseCount mismatch: {path.relative_to(REPO_ROOT)}")
         if summary.get("executedCount") != summary.get("caseCount"):
             errors.append(f"evaluation contains unexecuted cases: {path.relative_to(REPO_ROOT)}")
-        if summary.get("criticalSafetyViolationCount") not in (None, 0):
+        if (
+            summary.get("criticalSafetyViolationCount") not in (None, 0)
+            and evidence.get("qualityGateState") != "FAILED_RETAINED"
+        ):
             errors.append(f"evaluation contains critical safety violations: {path.relative_to(REPO_ROOT)}")
         if not isinstance(result.get("cases"), list) or not result["cases"]:
             errors.append(f"evaluation has no case results: {path.relative_to(REPO_ROOT)}")
@@ -236,6 +270,8 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
             errors.append(f"{evidence_id}.level is invalid")
         if row.get("state") not in ALLOWED_STATES:
             errors.append(f"{evidence_id}.state is invalid")
+        if row.get("qualityGateState") not in (None, "PASSED", "FAILED_RETAINED"):
+            errors.append(f"{evidence_id}.qualityGateState is invalid")
         location = row.get("resultLocation")
         if location not in ALLOWED_LOCATIONS:
             errors.append(f"{evidence_id}.resultLocation is invalid")
@@ -251,8 +287,14 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                 errors.append(f"{evidence_id} not-collected evidence must not have a result path")
         elif not isinstance(result_path, str) or not result_path:
             errors.append(f"{evidence_id}.resultPath is required")
-        elif location == "tracked" and not _resolve(result_path).exists():
-            errors.append(f"tracked evidence path missing: {result_path}")
+        elif location == "tracked":
+            tracked_result = _resolve(result_path)
+            if not tracked_result.exists():
+                errors.append(f"tracked evidence path missing: {result_path}")
+            elif row.get("resultSha256") and _sha256(tracked_result) != row.get(
+                "resultSha256"
+            ):
+                errors.append(f"result hash mismatch: {result_path}")
         elif location == "local-ignored" and check_local_results:
             path = _resolve(result_path)
             if not path.is_file():
@@ -282,8 +324,31 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
         review_sha = row.get("reviewSha256")
         if review_sha is not None and not HEX64.fullmatch(str(review_sha)):
             errors.append(f"{evidence_id}.reviewSha256 must be SHA-256")
+        for path_field, sha_field in (
+            ("trackedEvidencePath", "trackedEvidenceSha256"),
+            ("runManifestPath", "runManifestSha256"),
+        ):
+            extra_path = row.get(path_field)
+            extra_sha = row.get(sha_field)
+            if extra_path is None and extra_sha is None:
+                continue
+            if not isinstance(extra_path, str) or not extra_path:
+                errors.append(f"{evidence_id}.{path_field} is required")
+                continue
+            if not HEX64.fullmatch(str(extra_sha or "")):
+                errors.append(f"{evidence_id}.{sha_field} must be SHA-256")
+                continue
+            resolved_extra = _resolve(extra_path)
+            if not resolved_extra.is_file():
+                errors.append(f"tracked evidence path missing: {extra_path}")
+            elif _sha256(resolved_extra) != extra_sha:
+                errors.append(f"tracked evidence hash mismatch: {extra_path}")
         for lock in row.get("datasetLocks") or []:
-            _check_dataset_lock(lock, errors)
+            _check_dataset_lock(
+                lock,
+                errors,
+                require_optional_local=check_local_results,
+            )
 
     boundaries = payload.get("honestBoundaries")
     if not isinstance(boundaries, list) or not boundaries:

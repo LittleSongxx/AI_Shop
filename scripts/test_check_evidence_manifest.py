@@ -156,6 +156,47 @@ class EvidenceManifestTest(unittest.TestCase):
         errors = validate_manifest(manifest, check_local_results=True)
         self.assertTrue(any("verdict is inconsistent" in error for error in errors))
 
+    def test_failed_retained_evidence_may_preserve_safety_failure(self):
+        manifest = _manifest(self.root)
+        result = self.root / "failed-retained.json"
+        result.write_text(
+            json.dumps(
+                {
+                    "metadata": {
+                        "schemaVersion": "aishop-eval/v1",
+                        "suite": "rag-generation-live-v2",
+                        "runId": "run-failed",
+                    },
+                    "summary": {
+                        "caseCount": 1,
+                        "executedCount": 1,
+                        "criticalSafetyViolationCount": 1,
+                    },
+                    "cases": [{"caseId": "unsafe-case"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        relative = str(result.relative_to(Path(__file__).resolve().parents[1]))
+        manifest["evidence"][0].update(
+            {
+                "kind": "evaluation",
+                "suite": "rag-generation-live-v2",
+                "level": "E3_CONFIGURED_LIVE",
+                "state": "LOCAL_RESULT",
+                "resultLocation": "local-ignored",
+                "resultPath": relative,
+                "resultSha256": hashlib.sha256(result.read_bytes()).hexdigest(),
+                "caseCount": 1,
+            }
+        )
+
+        errors = validate_manifest(manifest, check_local_results=True)
+        self.assertTrue(any("critical safety violations" in error for error in errors))
+
+        manifest["evidence"][0]["qualityGateState"] = "FAILED_RETAINED"
+        self.assertEqual(validate_manifest(manifest, check_local_results=True), [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "runId": "mature-21d8159",
+  "summaryPath": "benchmarks/evidence/search-rag-mature-v1/mature-21d8159/summary.json",
+  "summarySha256": "7528cf9dcde820bc537ac45488ba6c45907de5159c2e09e371e3d8f468008bb9",
+  "datasetSha256": "2b82df64e6db108a15e5bea2fe64df0705733783567fd310ba5df3c11b4497fb",
+  "compactSources": {
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/chinese-dev-replay.json": "2028646f55ca394ebfdb8deb5e267e3967ae678fe5f1d88983684d90e9ba21b8",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/chinese-final-replay.json": "0fa2c918f0b6e2351b4f5488504bfd03d69f5079b0f45f6f7d3a3eac7f0b7897",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/wands-final-replay.json": "27bc99575a971355ffd06713c304d7b3079da0e7ab680121ab5300d6c091d477",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/rag-dev-replay.json": "9bddb811b84e9c26388efa6027b9afb60e8572609c53fea2c7bbbe39d7fa85cd",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/rag-final-replay.json": "cca957d1865ba9b9380a59f5f9aa925a7680270af324ff6194aa27d2e2928195",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/frozen-config.json": "8173a5a024b3c59b8d44438a8fcdc146af81c91661a442e1ead7d4b5af82a651",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/finalization.json": "b65cae3781548a0e588ea76fbc54ba8c5a6772bf1315d34bb520dbe203861cc1"
+  },
+  "rawArtifacts": {
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/chinese-dev-collection.json.gz": "0aeae509e804bd7b252925b7c95e5f383a75360d297cc32d6857e9110237ef95",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/chinese-final-collection.json.gz": "7f58d85fe4f090297bc052c4930f31bb87a71b4bbd945c72a7f8d2c2e8a38189",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/chinese-product-vectors.json.gz": "6b16f5b97436e204adf8c491dcc3c97678e6e874004ccfdda8da73321c6283a5",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/rag-dev-collection.json.gz": "7ec1152effea8ea5625cabd57590d2e63b0468f513be5f5164da5053f11d8ed3",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/rag-final-collection.json.gz": "543d445de01c4cba7b633c57e9e759041b90bbebdc02efb127e427aa42cb787c",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/wands-final-collection.json.gz": "c14b3ebc891f9b3fce44fbcb7ce87aaeae53378658aec052feab0994143454db",
+    "benchmarks/results/search-rag-mature-v1/mature-21d8159/raw/wands-product-vectors.json.gz": "7b09ca1481b44ccdf09b675c9153249079e317babaa22ca14ccf76e078e36f82"
+  }
+}

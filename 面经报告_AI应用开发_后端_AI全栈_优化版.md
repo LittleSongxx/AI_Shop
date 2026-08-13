@@ -163,13 +163,13 @@ flowchart TD
 
 这段话必须能展开为 15–20 分钟，而不是背完就结束。
 
-#### AI_Shop 当前证据卡（2026-08-12）
+#### AI_Shop 当前证据卡（2026-08-13）
 
 AI_Shop 已按 AI 应用 / Agent 后端、Java + AI、AI 全栈和 RAG/Search 求职方向完成一轮求职向整改。它适合证明“把模型接入真实业务状态和工程约束”的能力，但不用于投递 Agent Infra、训练/微调或推理优化算法岗位。仓库唯一证据入口为 [AI应用求职项目证据总览](./docs/AI应用求职项目证据总览.md)，机器口径见 [evidence-manifest.json](./docs/evidence-manifest.json)。
 
 可直接使用的 90 秒版本：
 
-> AI_Shop 是一个 Spring Cloud Alibaba + FastAPI/LangGraph 的单商户电商系统。我重点解决的是如何让 AI 在真实订单、库存、优惠券和售后状态上可靠工作，而不是只做聊天 Demo。读操作通过受控工具查询权威业务事实；写操作由模型提出结构化提案，用户确认后 Java 重新校验身份、归属、状态和幂等。RAG 使用 BM25 + 向量召回、RRF/Rerank、引用和拒答，外部知识与工具输出进入模型前做注入检疫和 PII 脱敏。工程上我补了五角色 RBAC、HMAC 管理员断言、AI 数据导出/删除和 `aishop-eval/v1` 评测协议。除 27 条 Commerce、18 条安全和 162 条确定性 contract 外，我用 `text-embedding-v4`、`qwen3-rerank`、`deepseek-v4-flash` 做了小规模 E3：45 条 Search、50 条 RAG 检索全部执行，检索聚合门禁通过；10 条生成自动 8/10、AI 辅助初审 9/10，主要 badcase 是流程规则被误拒答。它是合成数据的本地真实模型评测，不是生产或真实用户效果。
+> AI_Shop 是一个 Spring Cloud Alibaba + FastAPI/LangGraph 的单商户电商系统。我重点解决的是如何让 AI 在真实订单、库存、优惠券和售后状态上可靠工作，而不是只做聊天 Demo。读操作通过受控工具查询权威业务事实；写操作由模型提出结构化提案，用户确认后 Java 重新校验身份、归属、状态和幂等。RAG 使用 BM25、向量召回、RRF/Rerank、引用和拒答，外部知识与工具输出进入模型前做注入检疫和 PII 脱敏。除 27 条 Commerce 与 18 条安全集外，我用真实 Embedding/Rerank 和本地 Elasticsearch 评了中文 300 商品/120 查询、WANDS 4,960 商品/58 查询及 64 条 RAG。中文 fresh 的 Recall@1/3/5 是 0.50/1/1，说明能力上限在 K=3；WANDS Rerank 的 NDCG@5 增益有正 bootstrap CI，但 Recall@5 增益没有统计支持。24 条生成只有 16 条通过并保留 1 条严重安全失败。它是合成数据和外部人工 judged-pool 的本地真实模型评测，不是生产或真实用户效果。
 
 面试中最容易继续追问、也最需要主动说明的缺口：
 
@@ -177,10 +177,18 @@ AI_Shop 已按 AI 应用 / Agent 后端、Java + AI、AI 全栈和 RAG/Search �
 |---|---|
 | 27/27 是否只是规则测试 | Runner 调用生产决策内核，但外部依赖用确定性适配器；它证明工程契约，不证明在线模型能力 |
 | 多 Agent 为什么更好 | 当前消融只证明锁定 case 不退化与进程隔离；真实模型质量、token 和成本优势未冻结 |
-| RAG 的 Recall/MRR 在哪 | 45 条 Search 与 50 条 RAG 已连接 ES/Embedding/Rerank 实跑；应分别报 public/holdout，并主动说出 2 条公开 RAG 逐 case 失败和生成自动 8/10 |
+| RAG 的 Recall/MRR 在哪 | 中文 120 查询、WANDS 58 查询和 RAG 64 条已连接 ES/Embedding/Rerank 实跑；应分别报 public/fresh/challenge、WANDS judged-pool、RAG public/regression/fresh，并主动说生成 v2 仅 16/24 |
 | 有没有真实用户指标 | pilot、匿名报告和指标口径已实现；REAL_USER 仍未采集，不能声称 FCR、CTR/CVR 或 GMV uplift |
 | Java 后端够不够扎实 | 有交易状态机、幂等/MQ/退款恢复和 Testcontainers IT；common/order 行覆盖约 13%，这是应承认的短板 |
 | 项目是否生产级 | 是本地完整栈和求职工程项目，不代表生产流量、线上 SLO、监管认证或大规模容量 |
+
+成熟 Search/RAG 评测最适合展开的实验结论：
+
+- 中文 frozen chain 的 fresh Recall@1/3/5 为 0.50/1.00/1.00，不能只报 Recall@10=1；10 条 typo 在 K=3 全召回，10 条冲突负例准确率 1.0。
+- 同候选预算下，中文结构化过滤对 NDCG@5 的增益为 0.2346，95% CI [0.1858, 0.2835]；过滤后 Rerank 再增加 0.0855，95% CI [0.0497, 0.1248]。
+- WANDS 外部人工 judged-pool 上，Rerank 相对 RRF 的 NDCG@5 增益为 0.0471，95% CI [0.0184, 0.0766]；Recall@5 增益 CI 跨 0，所以只能说改善前排排序，不能说提升召回。
+- RAG public/regression/fresh 的 Recall@5 都为 1.0，但 no-answer accuracy 分别为 0.80/1.00/0.75；检索满 Recall 不代表最终拒答和引用已经解决。
+- 24 条生成最终为 16 PASS/8 FAIL、注入鲁棒性 0.75，并有 1 条严重安全失败；正确表达是“E3 已采集但质量门禁失败”。
 
 ### 3.3 高频追问与回答落点
 

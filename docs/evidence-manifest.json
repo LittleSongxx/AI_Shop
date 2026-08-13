@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-12T23:39:00+08:00",
+  "generatedAt": "2026-08-13T18:00:00+08:00",
   "project": "AI_Shop",
   "targetRoles": [
     "AI application / Agent backend",
@@ -199,6 +199,72 @@
       ]
     },
     {
+      "id": "search-rag-mature",
+      "kind": "mature-evaluation",
+      "suite": "search-rag-mature-v1",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_rag_mature_eval.py prepare && python benchmarks/run_search_rag_mature_eval.py collect-dev --run-id mature-21d8159 && python benchmarks/run_search_rag_mature_eval.py replay --run-id mature-21d8159 && python benchmarks/run_search_rag_mature_eval.py collect-final --run-id mature-21d8159 --finalize-holdout && python benchmarks/run_search_rag_mature_eval.py package --run-id mature-21d8159",
+      "caseCount": 242,
+      "runCommit": "21d8159b253dc0aa761d1338570afa6491a8e96a",
+      "claim": "完成 300 件中文合成商品/120 条查询、WANDS 4,960 商品/58 查询/5,733 人工判断和 64 条 RAG 检索的成熟评测；中文 final 冻结链路 Recall@1/3/5/10/20 为 0.50/1/1/1/1，MRR@10 1.0、NDCG@5 0.9878、负例准确率 1.0；WANDS judged-pool 的 Rerank 相对同预算 RRF 将 NDCG@5 提升 0.0471，bootstrap 95% CI [0.0184, 0.0766]。",
+      "boundary": "中文商品与查询为 SYNTHETIC，WANDS 只在每条查询完整人工判断池内排序，不能声称 42,994 商品全库 Recall。中文 final 同时含 40 条 fresh holdout 和 20 条 challenge；WANDS Recall@5 的 Rerank 差值 CI 跨 0，RAG Rerank 也没有统计支持的排名增益，因此只把有正 CI 的结构化过滤、中文/WANDS NDCG@5 改善表述为有效。全部 P95/P99 为本地样本，不是 SLO；未修改 baseline。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-rag-mature-v1/mature-21d8159/summary.json",
+      "resultSha256": "7528cf9dcde820bc537ac45488ba6c45907de5159c2e09e371e3d8f468008bb9",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-rag-mature-v1/mature-21d8159/run-manifest.json",
+      "runManifestSha256": "159ee403f8cb4cd7517bd6b7a112305671d02bcff19d8879714478adc10134a8",
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/chinese-commerce-search-v1.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/chinese-commerce-search-v1.json",
+          "optionalLocalDataset": true,
+          "hashMode": "canonical-json"
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/wands/selection.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/wands/selection.json",
+          "optionalLocalDataset": true,
+          "hashMode": "canonical-json",
+          "expectedField": "selectionSha256"
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.jsonl"
+        },
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_fresh_holdout_v2.lock.json"
+      ]
+    },
+    {
+      "id": "rag-generation-live-v2",
+      "kind": "evaluation",
+      "suite": "rag-generation-live-v2",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "qualityGateState": "FAILED_RETAINED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && JAVA_WEB_URL=http://127.0.0.1:8108 python benchmarks/run_rag_generation_eval.py --selection-version v2 --run-id mature-rag-generation-21d8159 --top-k 10",
+      "caseCount": 24,
+      "runCommit": "21d8159b253dc0aa761d1338570afa6491a8e96a",
+      "claim": "deepseek-v4-flash 对锁定的 10 条 known regression + 14 条 fresh holdout 全部完成一次生成；16/24 自动通过、AI 辅助初审 16 PASS/8 FAIL，真实 usage 为 7,763 input + 542 output token，Provider 运行错误为 0。",
+      "boundary": "E3 已完整采集但质量门禁未通过：关键词覆盖 0.75、引用正确性 0.7222、严格标签引用精度 0.4444、引用覆盖率 0.5556、注入鲁棒性 0.75，存在 1 条严重安全失败；8 个失败 case 均保留。结果是 SYNTHETIC + local-live，AI_ASSISTED_INITIAL_REVIEW 不是独立人工标注；成本为 UNPRICED，24 个样本 P95/P99 不作 SLO。",
+      "resultLocation": "local-ignored",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v2/mature-rag-generation-21d8159/summary.json",
+      "resultSha256": "f0b80698397317e20bd310bf7eb1b0119ca2f7ac2fde165fbcf12403d830bc3d",
+      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v2/mature-rag-generation-21d8159/ai-review.json",
+      "reviewSha256": "06e1e9557c44283036039b42c05c0dbf07ed80ef59964565067e29ad25d15b51",
+      "reviewCaseCount": 24,
+      "trackedEvidencePath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v2/mature-rag-generation-21d8159/summary.json",
+      "trackedEvidenceSha256": "66fe67358be1c2df3f44bbc1cb0ca3a25e599a22a11307658063e87c51f3c7ce",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v2/mature-rag-generation-21d8159/run-manifest.json",
+      "runManifestSha256": "c17696762ca62f549e0f491c6cd304f27fe3d6a7bffddac5535e1e2c235f3a2b",
+      "datasetLocks": [
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v2.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_fresh_holdout_v2.lock.json"
+      ]
+    },
+    {
       "id": "agent-live-model",
       "kind": "online-evaluation",
       "level": "E3_CONFIGURED_LIVE",
@@ -227,7 +293,7 @@
     "普通 benchmarks/results 目录被 Git 忽略；只有显式接受的 baseline lock 才能入库，本轮没有运行 --accept-baseline。",
     "SYNTHETIC、LOCAL_PILOT、REAL_USER 必须分开报告；REAL_USER 没有样本时固定为未采集。",
     "Search/RAG 的 E3 configured-live 证据已经采集，但生成层最新自动门禁未全过；不得写成生成答案全部通过。",
-    "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO。",
+    "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO；本轮 Search/RAG 各分组仍均小于 100。",
     "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
     "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。"
   ],

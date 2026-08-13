@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,13 +18,20 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.config.settings import get_settings  # noqa: E402
 from app.evaluation.artifacts import git_commit, workspace_sha256  # noqa: E402
+from app.evaluation.ranking import (  # noqa: E402
+    aggregate_ranking_cases,
+    paired_ranking_comparison,
+    ranking_case_metrics,
+)
 from app.rag.embedding import embedding_evaluation_scope  # noqa: E402
+from app.rag.evaluation import evaluate_results  # noqa: E402
 from app.services.redis_service import redis_service  # noqa: E402
 from benchmarks.mature_eval.chinese_dataset import (  # noqa: E402
     generate_dataset,
     validate_dataset,
 )
 from benchmarks.mature_eval.common import (  # noqa: E402
+    atomic_write_bytes,
     atomic_write_json,
     combined_sha,
     read_gzip_json,
@@ -35,6 +43,8 @@ from benchmarks.mature_eval.indexing import (  # noqa: E402
     product_embedding_text,
 )
 from benchmarks.mature_eval.rag_pipeline import (  # noqa: E402
+    _candidate_refs,
+    _ref_ranking_ids,
     choose_rag_configuration,
     collect_rag_cases,
     load_rag_sets,
@@ -389,6 +399,220 @@ def _badcases(report: dict[str, Any], *, metric: str = "recall", k: str = "5") -
     return result
 
 
+def _compact_variant_metrics(report: dict[str, Any]) -> dict[str, Any]:
+    """Keep aggregate variant results while leaving per-case evidence local."""
+
+    return {
+        key: {
+            field: value
+            for field, value in metrics.items()
+            if field != "perCase"
+        }
+        for key, metrics in (report.get("variantMetrics") or {}).items()
+        if isinstance(metrics, dict)
+    }
+
+
+def _compact_paired_deltas(report: dict[str, Any]) -> dict[str, Any]:
+    """Keep paired aggregates/CI; raw per-case deltas remain SHA-locked locally."""
+
+    return {
+        key: {
+            field: value
+            for field, value in comparison.items()
+            if field != "perCase"
+        }
+        for key, comparison in (report.get("pairedDeltas") or {}).items()
+        if isinstance(comparison, dict)
+    }
+
+
+def _compact_provider_facts(report: dict[str, Any]) -> dict[str, Any]:
+    """Remove Provider response rows without hiding call/fallback counters."""
+
+    def compact(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: compact(item)
+                for key, item in value.items()
+                if key not in {"responseFacts", "responseRecords"}
+            }
+        if isinstance(value, list):
+            return [compact(item) for item in value]
+        return value
+
+    return compact(report.get("providerFacts") or {})
+
+
+def _selected_badcases(
+    reports: dict[str, dict[str, Any]], frozen: dict[str, Any]
+) -> dict[str, list[dict[str, Any]]]:
+    selected = {
+        "chinese-dev-replay": str((frozen.get("search") or {}).get("selectedVariant") or ""),
+        "chinese-final-replay": str((frozen.get("search") or {}).get("selectedVariant") or ""),
+        "rag-dev-replay": str((frozen.get("rag") or {}).get("selectedVariant") or ""),
+        "rag-final-replay": str((frozen.get("rag") or {}).get("selectedVariant") or ""),
+    }
+    result: dict[str, list[dict[str, Any]]] = {}
+    for report_name, variant in selected.items():
+        report = reports.get(report_name) or {}
+        if not variant:
+            continue
+        rows = (report.get("cases") or {}).get(variant) or []
+        failures: list[dict[str, Any]] = []
+        for row in rows:
+            ranking = row.get("metrics") or row.get("ranking") or {}
+            value = (((ranking.get("metricsByK") or {}).get("5") or {}).get("recall"))
+            expected_no_results = bool(ranking.get("expectedNoResults"))
+            no_result_correct = ranking.get("noResultCorrect")
+            if value is not None and float(value) < 1.0:
+                failures.append(
+                    {
+                        "variant": variant,
+                        "caseId": row.get("caseId"),
+                        "metric": "recall@5",
+                        "value": value,
+                    }
+                )
+            elif expected_no_results and no_result_correct is False:
+                failures.append(
+                    {
+                        "variant": variant,
+                        "caseId": row.get("caseId"),
+                        "metric": "noResultCorrect",
+                        "value": False,
+                    }
+                )
+        result[report_name] = failures
+    return result
+
+
+def _component_ablation(
+    report: dict[str, Any], comparisons: dict[str, tuple[str, str]]
+) -> dict[str, Any]:
+    """Compare named variants on identical cases and candidate budgets."""
+
+    cases = report.get("cases") or {}
+    result: dict[str, Any] = {}
+    for name, (baseline_key, candidate_key) in comparisons.items():
+        baseline_rows = cases.get(baseline_key) or []
+        candidate_rows = cases.get(candidate_key) or []
+        if not baseline_rows or len(baseline_rows) != len(candidate_rows):
+            continue
+
+        def comparable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            values: list[dict[str, Any]] = []
+            for row in rows:
+                ranking = row.get("metrics") or row.get("ranking") or {}
+                if ranking.get("applicable"):
+                    values.append({"caseId": row.get("caseId"), **ranking})
+            return values
+
+        baseline = comparable(baseline_rows)
+        candidate = comparable(candidate_rows)
+        if not baseline or len(baseline) != len(candidate):
+            continue
+        metrics = {}
+        for metric_name, metric_key, metric_k in (
+            ("ndcg", "ndcg", "5"),
+            ("recall", "recall", "5"),
+            ("reciprocalRank", "mrr", "10"),
+        ):
+            comparison = paired_ranking_comparison(
+                baseline,
+                candidate,
+                metric_path=["metricsByK", metric_k, metric_name],
+            )
+            comparison.pop("perCase", None)
+            metrics[f"{metric_key}@{metric_k}"] = comparison
+        result[name] = {
+            "baseline": baseline_key,
+            "candidate": candidate_key,
+            "metrics": metrics,
+        }
+    return result
+
+
+def _product_embedding_facts(run_root: Path, dataset: str) -> dict[str, Any]:
+    path = run_root / "raw" / f"{dataset}-product-vectors.json.gz"
+    payload = read_gzip_json(path)
+    facts = dict(payload.get("providerFacts") or {})
+    facts.pop("responseRecords", None)
+    return {
+        "model": payload.get("model"),
+        "dimensions": payload.get("dimensions"),
+        **facts,
+    }
+
+
+def _search_split_metrics(
+    report: dict[str, Any], variant: str, split: str, *, query_type: str | None = None
+) -> dict[str, Any]:
+    rows = [
+        row
+        for row in (report.get("cases") or {}).get(variant) or []
+        if row.get("split") == split
+        and (query_type is None or row.get("queryType") == query_type)
+    ]
+    if not rows:
+        return {}
+    return aggregate_ranking_cases([row["metrics"] for row in rows])
+
+
+def _rag_split_metrics(
+    collection_path: Path,
+    *,
+    split: str,
+    variant: str,
+    rerank_top_n: int,
+    evidence_threshold: float,
+) -> dict[str, Any]:
+    payload = read_gzip_json(collection_path)
+    cases: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    ranking_rows: list[dict[str, Any]] = []
+    for row in payload.get("cases") or []:
+        case = dict(row["case"])
+        if case.get("split") != split:
+            continue
+        refs = _candidate_refs(
+            row,
+            variant=variant,
+            rerank_top_n=rerank_top_n,
+            evidence_threshold=evidence_threshold,
+        )
+        cases.append(case)
+        results.append({"source_refs": refs, "trace": {"hit": bool(refs)}})
+        ranked_ids, labels = _ref_ranking_ids(case, refs)
+        ranking_rows.append(
+            ranking_case_metrics(
+                ranked_ids,
+                labels,
+                k_values=(1, 3, 5, 10, 20),
+                expected_no_results=bool(case.get("noAnswer", not labels)),
+            )
+        )
+    if not cases:
+        return {}
+    ranking = aggregate_ranking_cases(ranking_rows)
+    retrieval = evaluate_results(cases, results, top_k=20)
+    return {
+        "caseCount": len(cases),
+        "retrievalCaseCount": retrieval["retrievalCases"],
+        "noAnswerCaseCount": retrieval["noAnswerCases"],
+        "injectionCaseCount": retrieval["injectionCases"],
+        "metricCurves": ranking["metricCurves"],
+        "noResultAccuracy": ranking["noResultAccuracy"],
+        "citationCorrectness": retrieval["citationCorrectness"],
+        "labelCitationPrecision": retrieval["labelCitationPrecision"],
+        "citationCoverage": retrieval["citationCoverage"],
+        "noAnswerAccuracy": retrieval["noAnswerAccuracy"],
+        "injectionRobustness": retrieval["injectionRobustness"]
+        if retrieval["injectionCases"]
+        else None,
+    }
+
+
 def package(args: argparse.Namespace) -> dict[str, Any]:
     run_root = RESULTS_ROOT / args.run_id
     required = [
@@ -406,12 +630,33 @@ def package(args: argparse.Namespace) -> dict[str, Any]:
     reports = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in required}
     evidence_dir = EVIDENCE_ROOT / args.run_id
     evidence_dir.mkdir(parents=True, exist_ok=True)
+    existing_summary_path = evidence_dir / "summary.json"
+    existing_summary = (
+        json.loads(existing_summary_path.read_text(encoding="utf-8"))
+        if existing_summary_path.is_file()
+        else {}
+    )
+    frozen = reports["frozen-config"]
+    selected_search = str((frozen.get("search") or {}).get("selectedVariant") or "")
+    selected_rag = str((frozen.get("rag") or {}).get("selectedVariant") or "")
+    rag_match = re.fullmatch(
+        r"(?P<variant>[a-z_]+):n(?P<top_n>\d+):t(?P<threshold>\d+(?:\.\d+)?)",
+        selected_rag,
+    )
+    if not selected_search or not rag_match:
+        raise ValueError("frozen Search/RAG configuration is invalid")
+    rag_variant = rag_match.group("variant")
+    rag_top_n = int(rag_match.group("top_n"))
+    rag_threshold = float(rag_match.group("threshold"))
     compact = {
         "schemaVersion": "aishop-eval/v1",
         "suite": SUITE,
         "runId": args.run_id,
-        "gitCommit": git_commit(REPO_ROOT),
-        "workspaceSha256": workspace_sha256(REPO_ROOT),
+        # Repackaging may happen after documentation edits. Preserve the first
+        # package's execution identity instead of relabeling an existing run.
+        "gitCommit": existing_summary.get("gitCommit") or git_commit(REPO_ROOT),
+        "workspaceSha256": existing_summary.get("workspaceSha256")
+        or workspace_sha256(REPO_ROOT),
         "evidenceSource": "SYNTHETIC",
         "executionMode": "local-live",
         "labelScope": {
@@ -419,20 +664,140 @@ def package(args: argparse.Namespace) -> dict[str, Any]:
             "wands": "judged-pool",
             "rag": "locked FAQ and knowledge references",
         },
+        "splitMetrics": {
+            "chinesePublic": _search_split_metrics(
+                reports["chinese-dev-replay"], selected_search, "public"
+            ),
+            "chineseFreshHoldout": _search_split_metrics(
+                reports["chinese-final-replay"], selected_search, "fresh_holdout"
+            ),
+            "chineseChallengeTypo": _search_split_metrics(
+                reports["chinese-final-replay"],
+                selected_search,
+                "challenge",
+                query_type="typo",
+            ),
+            "chineseChallengeConflict": _search_split_metrics(
+                reports["chinese-final-replay"],
+                selected_search,
+                "challenge",
+                query_type="conflict",
+            ),
+            "ragPublic": _rag_split_metrics(
+                run_root / "raw" / "rag-dev-collection.json.gz",
+                split="public",
+                variant=rag_variant,
+                rerank_top_n=rag_top_n,
+                evidence_threshold=rag_threshold,
+            ),
+            "ragRegression": _rag_split_metrics(
+                run_root / "raw" / "rag-dev-collection.json.gz",
+                split="regression",
+                variant=rag_variant,
+                rerank_top_n=rag_top_n,
+                evidence_threshold=rag_threshold,
+            ),
+            "ragFreshHoldout": _rag_split_metrics(
+                run_root / "raw" / "rag-final-collection.json.gz",
+                split="fresh_holdout",
+                variant=rag_variant,
+                rerank_top_n=rag_top_n,
+                evidence_threshold=rag_threshold,
+            ),
+        },
         "metricCurves": {
             key: report.get("metricCurves")
             for key, report in reports.items()
             if isinstance(report, dict) and report.get("metricCurves")
         },
         "variantMetrics": {
-            key: report.get("variantMetrics")
+            key: _compact_variant_metrics(report)
             for key, report in reports.items()
             if isinstance(report, dict) and report.get("variantMetrics")
         },
         "pairedDeltas": {
-            key: report.get("pairedDeltas")
+            key: _compact_paired_deltas(report)
             for key, report in reports.items()
             if isinstance(report, dict) and report.get("pairedDeltas") is not None
+        },
+        "componentAblations": {
+            "chineseDev": _component_ablation(
+                reports["chinese-dev-replay"],
+                {
+                    "queryNormalization": (
+                        "raw_bm25:c24:rrf60:n24",
+                        "normalized_bm25:c24:rrf60:n24",
+                    ),
+                    "hybridFusion": (
+                        "normalized_bm25:c24:rrf60:n24",
+                        "rrf:c24:rrf60:n24",
+                    ),
+                    "structuredFilter": (
+                        "rrf:c24:rrf60:n24",
+                        "rrf_relevance_filter:c24:rrf60:n24",
+                    ),
+                    "rerank": (
+                        "rrf_relevance_filter:c24:rrf60:n24",
+                        "full_rerank:c24:rrf60:n24",
+                    ),
+                },
+            ),
+            "chineseFinal": _component_ablation(
+                reports["chinese-final-replay"],
+                {
+                    "queryNormalization": (
+                        "raw_bm25:c24:rrf60:n24",
+                        "normalized_bm25:c24:rrf60:n24",
+                    ),
+                    "hybridFusion": (
+                        "normalized_bm25:c24:rrf60:n24",
+                        "rrf:c24:rrf60:n24",
+                    ),
+                    "structuredFilter": (
+                        "rrf:c24:rrf60:n24",
+                        "rrf_relevance_filter:c24:rrf60:n24",
+                    ),
+                    "rerank": (
+                        "rrf_relevance_filter:c24:rrf60:n24",
+                        "full_rerank:c24:rrf60:n24",
+                    ),
+                },
+            ),
+            "wands": _component_ablation(
+                reports["wands-final-replay"],
+                {
+                    "hybridFusion": (
+                        "raw_bm25:c24:rrf60:n24",
+                        "rrf:c24:rrf60:n24",
+                    ),
+                    "rerank": (
+                        "rrf:c24:rrf60:n24",
+                        "full_rerank:c24:rrf60:n24",
+                    ),
+                },
+            ),
+            "ragDev": _component_ablation(
+                reports["rag-dev-replay"],
+                {
+                    "hybridFusion": ("bm25:n20:t0.00", "rrf:n20:t0.00"),
+                    "rerank": ("rrf:n20:t0.00", "rrf_rerank:n6:t0.00"),
+                    "productionGate": (
+                        "rrf_rerank:n6:t0.00",
+                        "production:n6:t0.55",
+                    ),
+                },
+            ),
+            "ragFinal": _component_ablation(
+                reports["rag-final-replay"],
+                {
+                    "hybridFusion": ("bm25:n20:t0.00", "rrf:n20:t0.00"),
+                    "rerank": ("rrf:n20:t0.00", "rrf_rerank:n6:t0.00"),
+                    "productionGate": (
+                        "rrf_rerank:n6:t0.00",
+                        "production:n6:t0.55",
+                    ),
+                },
+            ),
         },
         "confidenceIntervals": {
             key: report.get("confidenceIntervals")
@@ -445,16 +810,16 @@ def package(args: argparse.Namespace) -> dict[str, Any]:
             if isinstance(report, dict) and report.get("stageLatency")
         },
         "providerFacts": {
-            key: report.get("providerFacts")
+            key: _compact_provider_facts(report)
             for key, report in reports.items()
             if isinstance(report, dict) and report.get("providerFacts")
         },
-        "frozenConfiguration": reports["frozen-config"],
-        "badcases": {
-            key: _badcases(report)
-            for key, report in reports.items()
-            if isinstance(report, dict) and report.get("cases")
+        "productEmbeddingFacts": {
+            "chinese": _product_embedding_facts(run_root, "chinese"),
+            "wands": _product_embedding_facts(run_root, "wands"),
         },
+        "frozenConfiguration": reports["frozen-config"],
+        "badcases": _selected_badcases(reports, reports["frozen-config"]),
         "honestBoundaries": [
             "Chinese products and queries are explicitly SYNTHETIC; labels are computed from structured constraints.",
             "WANDS metrics rank only each query's complete human-judged pool, not the full 42,994-product catalog.",
@@ -490,12 +855,6 @@ def package(args: argparse.Namespace) -> dict[str, Any]:
         "rawArtifacts": raw_sha,
     }
     atomic_write_json(evidence_dir / "run-manifest.json", manifest)
-    sums = [
-        f"{sha256_file(path)}  {path.name}"
-        for path in sorted(evidence_dir.iterdir())
-        if path.name != "SHA256SUMS"
-    ]
-    (evidence_dir / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8")
     report_lines = [
         "# Search/RAG mature evaluation",
         "",
@@ -506,7 +865,17 @@ def package(args: argparse.Namespace) -> dict[str, Any]:
         "",
         "The machine-readable metrics, paired deltas, confidence intervals, badcases and Provider facts are in `summary.json`.",
     ]
-    (evidence_dir / "report.md").write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+    atomic_write_bytes(
+        evidence_dir / "report.md", ("\n".join(report_lines) + "\n").encode("utf-8")
+    )
+    sums = [
+        f"{sha256_file(path)}  {path.name}"
+        for path in sorted(evidence_dir.iterdir())
+        if path.name != "SHA256SUMS"
+    ]
+    atomic_write_bytes(
+        evidence_dir / "SHA256SUMS", ("\n".join(sums) + "\n").encode("utf-8")
+    )
     return {"phase": "package", "evidenceDir": str(evidence_dir), "manifest": manifest}
 
 

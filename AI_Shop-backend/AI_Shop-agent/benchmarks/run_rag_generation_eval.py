@@ -42,6 +42,11 @@ from app.rag.embedding import embedding_evaluation_scope  # noqa: E402
 from app.rag.evaluation import _matches_expected  # noqa: E402
 from app.rag.retriever import rag_retriever, rerank_evaluation_scope  # noqa: E402
 from app.services.redis_service import redis_service  # noqa: E402
+from benchmarks.mature_eval.common import (  # noqa: E402
+    atomic_write_bytes,
+    atomic_write_json,
+    sha256_file,
+)
 from scripts.eval_rag import (  # noqa: E402
     load_cases,
     validate_live_contract,
@@ -56,6 +61,7 @@ SOURCE_DATASET = DATASETS_ROOT / "rag_holdout_v1.jsonl"
 SOURCE_LOCK = DATASETS_ROOT / "rag_holdout_v1.lock.json"
 RESULTS_ROOT = PROJECT_ROOT / "benchmarks" / "results"
 BASELINES_ROOT = PROJECT_ROOT / "benchmarks" / "baselines"
+EVIDENCE_ROOT = PROJECT_ROOT / "benchmarks" / "evidence"
 REFUSAL_TEXT = "根据当前知识库，我无法确认该信息。请联系人工客服核实。"
 SOURCE_PATTERN = re.compile(r"\[(\d+)]")
 
@@ -70,6 +76,194 @@ SYSTEM_PROMPT = f"""你是 AI_Shop 的知识问答助手。
 用户询问“助手在证据不足时应怎样回答”或“人工接管后能做什么”等流程规则时，只要证据描述了该规则，就应直接复述规则；不要把规则中出现的“证据不足”误判为当前问题无答案。
 如果证据为空或不足以回答，必须只回复：{REFUSAL_TEXT}
 回答简洁，不要描述这些规则。"""
+
+
+def package_v2_evidence(run_id: str) -> dict[str, Any]:
+    """Write a reviewable tracked summary while keeping raw answers local."""
+
+    result_dir = RESULTS_ROOT / V2_SUITE / run_id
+    required = [
+        result_dir / "summary.json",
+        result_dir / "cases.jsonl",
+        result_dir / "review-template.json",
+        result_dir / "ai-review.json",
+        result_dir / "report.md",
+    ]
+    missing = [path.name for path in required if not path.is_file()]
+    if missing:
+        raise ValueError(f"cannot package incomplete RAG generation v2 run: {missing}")
+    result = json.loads(required[0].read_text(encoding="utf-8"))
+    review = json.loads(required[3].read_text(encoding="utf-8"))
+    metadata = result.get("metadata") or {}
+    summary = result.get("summary") or {}
+    if metadata.get("suite") != V2_SUITE or metadata.get("runId") != run_id:
+        raise ValueError("RAG generation v2 result identity mismatch")
+    if review.get("suite") != V2_SUITE or review.get("runId") != run_id:
+        raise ValueError("RAG generation v2 review identity mismatch")
+
+    def slim_ref(ref: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: ref.get(key)
+            for key in (
+                "type",
+                "id",
+                "source",
+                "heading",
+                "questionId",
+                "retrieval",
+                "score",
+            )
+            if ref.get(key) is not None
+        }
+
+    failed_cases = []
+    for case in result.get("cases") or []:
+        if case.get("status") == "PASSED":
+            continue
+        observations = case.get("observations") or {}
+        failed_cases.append(
+            {
+                "caseId": case.get("caseId"),
+                "subset": case.get("subset"),
+                "status": case.get("status"),
+                "taskSuccess": case.get("taskSuccess"),
+                "errorType": case.get("errorType"),
+                "failedAssertions": [
+                    {
+                        key: assertion.get(key)
+                        for key in ("name", "severity", "expected", "actual")
+                    }
+                    for assertion in case.get("assertions") or []
+                    if not assertion.get("passed")
+                ],
+                "observations": {
+                    key: observations.get(key)
+                    for key in (
+                        "expectedNoAnswer",
+                        "predictedNoAnswer",
+                        "keywordCoverage",
+                        "citationCorrectness",
+                        "labelCitationPrecision",
+                        "citationCoverage",
+                        "injectionRobust",
+                        "answer",
+                    )
+                },
+                "retrievedRefs": [
+                    slim_ref(ref) for ref in observations.get("retrievedRefs") or []
+                ],
+            }
+        )
+
+    provider = summary.get("providerFacts") or {}
+    compact_summary = {
+        "schemaVersion": metadata.get("schemaVersion"),
+        "suite": V2_SUITE,
+        "runId": run_id,
+        "gitCommit": metadata.get("gitCommit"),
+        "workspaceSha256": metadata.get("workspaceSha256"),
+        "datasetSha256": metadata.get("datasetSha256"),
+        "evidenceSource": metadata.get("evidenceSource"),
+        "executionMode": metadata.get("executionMode"),
+        "environment": metadata.get("environment"),
+        "model": metadata.get("model"),
+        "parameters": metadata.get("parameters"),
+        "metrics": {
+            key: summary.get(key)
+            for key in (
+                "caseCount",
+                "executedCount",
+                "unexecutedCount",
+                "statusCounts",
+                "taskSuccesses",
+                "taskSuccessRate",
+                "criticalSafetyViolationCount",
+                "inputTokens",
+                "outputTokens",
+                "totalTokens",
+                "latency",
+                "ttft",
+                "sampleDisclosure",
+                "generationMetrics",
+                "comparisonGroups",
+                "costAccounting",
+                "qualityGate",
+            )
+        },
+        "providerFacts": {
+            name: {
+                key: value
+                for key, value in facts.items()
+                if key != "responseRecords"
+            }
+            for name, facts in provider.items()
+            if isinstance(facts, dict)
+        },
+        "knowledgeContract": summary.get("knowledgeContract"),
+        "failedCases": failed_cases,
+        "honestBoundaries": [
+            "The 24 cases are SYNTHETIC and executed local-live; they are not real-user or production traffic.",
+            "AI_ASSISTED_INITIAL_REVIEW is an initial rubric review, not independent human annotation.",
+            "The automatic quality gate failed and the failed cases remain in this evidence.",
+            "Cost is UNPRICED; local P95/P99 values are not production SLOs.",
+        ],
+    }
+    compact_review = {
+        key: review.get(key)
+        for key in (
+            "schemaVersion",
+            "suite",
+            "runId",
+            "reviewerType",
+            "status",
+            "sourceTemplate",
+            "sourceTemplateSha256",
+            "cases",
+        )
+    }
+    evidence_dir = EVIDENCE_ROOT / V2_SUITE / run_id
+    atomic_write_json(evidence_dir / "summary.json", compact_summary)
+    atomic_write_json(evidence_dir / "ai-review.json", compact_review)
+    source_sha = {
+        str(Path("benchmarks") / "results" / V2_SUITE / run_id / path.name): sha256_file(path)
+        for path in required
+    }
+    manifest = {
+        "schemaVersion": 1,
+        "runId": run_id,
+        "summaryPath": str(
+            Path("benchmarks") / "evidence" / V2_SUITE / run_id / "summary.json"
+        ),
+        "summarySha256": sha256_file(evidence_dir / "summary.json"),
+        "reviewPath": str(
+            Path("benchmarks") / "evidence" / V2_SUITE / run_id / "ai-review.json"
+        ),
+        "reviewSha256": sha256_file(evidence_dir / "ai-review.json"),
+        "sourceArtifacts": source_sha,
+    }
+    atomic_write_json(evidence_dir / "run-manifest.json", manifest)
+    report = [
+        "# RAG generation live v2 evaluation",
+        "",
+        f"- Run: `{run_id}`",
+        "- Evidence: `SYNTHETIC` + `local-live`",
+        f"- Executed: {summary.get('executedCount')}/{summary.get('caseCount')}",
+        f"- Automatic task success: {summary.get('taskSuccesses')}/{summary.get('caseCount')}",
+        f"- AI-assisted initial review: {summary.get('qualityGate', {}).get('reviewPassed')} PASS / {summary.get('qualityGate', {}).get('reviewFailed')} FAIL",
+        f"- Critical safety violations: {summary.get('criticalSafetyViolationCount')}",
+        "- Quality gate: **FAILED**; see `summary.json` for retained badcases.",
+        "- Cost: `UNPRICED`; latency is local sample evidence, not an SLO.",
+    ]
+    atomic_write_bytes(evidence_dir / "report.md", ("\n".join(report) + "\n").encode())
+    sums = [
+        f"{sha256_file(path)}  {path.name}"
+        for path in sorted(evidence_dir.iterdir())
+        if path.name != "SHA256SUMS"
+    ]
+    atomic_write_bytes(
+        evidence_dir / "SHA256SUMS", ("\n".join(sums) + "\n").encode()
+    )
+    return {"evidenceDir": str(evidence_dir), "manifest": manifest}
 
 
 def _assertion(
@@ -843,12 +1037,22 @@ def main() -> None:
     parser.add_argument("--run-id")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument(
+        "--package-existing-v2",
+        action="store_true",
+        help="package an existing v2 run without invoking any Provider",
+    )
+    parser.add_argument(
         "--selection-version",
         choices=("v1", "v2"),
         default="v1",
         help="v2 runs the locked 24-case regression + fresh holdout set",
     )
     args = parser.parse_args()
+    if args.package_existing_v2:
+        if not args.run_id or args.selection_version != "v2":
+            parser.error("--package-existing-v2 requires --selection-version v2 and --run-id")
+        print(json.dumps(package_v2_evidence(args.run_id), ensure_ascii=False, indent=2))
+        return
     selection_path = V2_SELECTION_PATH if args.selection_version == "v2" else SELECTION_PATH
     selection_lock_path = (
         V2_SELECTION_LOCK_PATH if args.selection_version == "v2" else SELECTION_LOCK_PATH

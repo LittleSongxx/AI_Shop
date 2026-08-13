@@ -1,3 +1,4 @@
+import json
 from contextlib import contextmanager
 from unittest.mock import AsyncMock
 
@@ -301,3 +302,92 @@ def test_ai_assisted_initial_review_uses_complete_four_field_rubric():
     assert review["cases"][1]["complete"] is False
     assert review["cases"][1]["citationAligned"] is False
     assert review["cases"][1]["reason"]
+
+
+def test_v2_package_keeps_failed_cases_and_hashes_sources(monkeypatch, tmp_path):
+    results_root = tmp_path / "results"
+    evidence_root = tmp_path / "evidence"
+    run_id = "v2-existing"
+    result_dir = results_root / runner.V2_SUITE / run_id
+    result_dir.mkdir(parents=True)
+    result = {
+        "metadata": {
+            "schemaVersion": "aishop-eval/v1",
+            "suite": runner.V2_SUITE,
+            "runId": run_id,
+            "gitCommit": "a" * 40,
+            "workspaceSha256": "b" * 64,
+            "datasetSha256": "c" * 64,
+            "evidenceSource": "SYNTHETIC",
+            "executionMode": "local-live",
+            "environment": {},
+            "model": {},
+            "parameters": {},
+        },
+        "summary": {
+            "caseCount": 1,
+            "executedCount": 1,
+            "taskSuccesses": 0,
+            "taskSuccessRate": 0.0,
+            "criticalSafetyViolationCount": 1,
+            "qualityGate": {"passed": False, "reviewPassed": 0, "reviewFailed": 1},
+            "providerFacts": {
+                "embedding": {"providerRequests": 1, "responseRecords": [{"raw": True}]}
+            },
+        },
+        "cases": [
+            {
+                "caseId": "failed",
+                "subset": "injection",
+                "status": "FAILED",
+                "taskSuccess": False,
+                "assertions": [
+                    {
+                        "name": "answer_behavior_correct",
+                        "passed": False,
+                        "severity": "CRITICAL",
+                        "expected": True,
+                        "actual": False,
+                    }
+                ],
+                "observations": {
+                    "answer": "retained badcase",
+                    "retrievedRefs": [{"id": "doc-1", "snippet": "raw text"}],
+                },
+            }
+        ],
+    }
+    review = {
+        "schemaVersion": 1,
+        "suite": runner.V2_SUITE,
+        "runId": run_id,
+        "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+        "status": "COMPLETED",
+        "cases": [
+            {
+                "caseId": "failed",
+                "grounded": False,
+                "complete": False,
+                "citationAligned": False,
+                "safe": False,
+                "verdict": "FAIL",
+                "reason": "retained failure",
+            }
+        ],
+    }
+    (result_dir / "summary.json").write_text(json.dumps(result), encoding="utf-8")
+    (result_dir / "ai-review.json").write_text(json.dumps(review), encoding="utf-8")
+    for name in ("cases.jsonl", "review-template.json", "report.md"):
+        (result_dir / name).write_text("source\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "RESULTS_ROOT", results_root)
+    monkeypatch.setattr(runner, "EVIDENCE_ROOT", evidence_root)
+
+    packaged = runner.package_v2_evidence(run_id)
+    compact = json.loads(
+        (evidence_root / runner.V2_SUITE / run_id / "summary.json").read_text()
+    )
+
+    assert compact["failedCases"][0]["caseId"] == "failed"
+    assert compact["failedCases"][0]["observations"]["answer"] == "retained badcase"
+    assert compact["providerFacts"]["embedding"] == {"providerRequests": 1}
+    assert len(packaged["manifest"]["sourceArtifacts"]) == 5
