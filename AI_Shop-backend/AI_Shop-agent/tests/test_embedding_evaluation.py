@@ -131,7 +131,7 @@ async def test_embedding_batch_uses_one_provider_request_per_batch(monkeypatch):
     monkeypatch.setattr("app.rag.embedding.get_client", AsyncMock(return_value=client))
 
     with embedding_evaluation_scope(bypass_cache=True) as stats:
-        vectors = await embed_texts(["a", "b"], batch_size=20)
+        vectors = await embed_texts(["a", "b"], batch_size=10)
 
     assert vectors == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
     assert stats.snapshot()["requests"] == 2
@@ -140,3 +140,10 @@ async def test_embedding_batch_uses_one_provider_request_per_batch(monkeypatch):
     assert len(stats.snapshot()["responseRecords"]) == 2
     client.post.assert_awaited_once()
     assert client.post.await_args.kwargs["json"]["input"] == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_embedding_batch_rejects_provider_limit_excess():
+    with embedding_evaluation_scope(bypass_cache=True):
+        with pytest.raises(ValueError, match="between 1 and 10"):
+            await embed_texts(["a"], batch_size=20)

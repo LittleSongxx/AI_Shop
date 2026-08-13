@@ -142,7 +142,9 @@ async def _embed_products(
             chunk = pending[start : start + 200]
             vectors = await embed_texts(
                 [product_embedding_text(product, dataset=dataset) for product in chunk],
-                batch_size=20,
+                # DashScope text-embedding-v4 accepts at most ten input strings
+                # in one OpenAI-compatible request.
+                batch_size=10,
             )
             failures: list[str] = []
             for product, vector in zip(chunk, vectors):

@@ -154,7 +154,7 @@ async def _get_cached_embedding(key: str) -> list[float] | None:
     return None
 
 
-async def embed_texts(texts: list[str], *, batch_size: int = 20) -> list[list[float] | None]:
+async def embed_texts(texts: list[str], *, batch_size: int = 10) -> list[list[float] | None]:
     """Embed a bounded batch through the OpenAI-compatible Provider endpoint."""
 
     values = [str(text or "").strip() for text in texts]
@@ -162,8 +162,8 @@ async def embed_texts(texts: list[str], *, batch_size: int = 20) -> list[list[fl
         return []
     if _EVALUATION_STATS.get() is None:
         return [await embed_text(value) for value in values]
-    if batch_size < 1:
-        raise ValueError("embedding batch_size must be positive")
+    if not 1 <= batch_size <= 10:
+        raise ValueError("embedding batch_size must be between 1 and 10")
     settings = get_settings()
     evaluation = _EVALUATION_STATS.get()
     assert evaluation is not None
