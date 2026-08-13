@@ -21,9 +21,14 @@ import unicodedata
 from dataclasses import dataclass
 
 from app.harness.guardrails.input_guard import (
-    BLOCKING_RULES,
+    BLOCKING_RULES as BLOCKING_RULES,
+)
+from app.harness.guardrails.input_guard import (
     SUSPICIOUS_BLOCK_THRESHOLD,
-    SUSPICIOUS_RULES,
+    scan_guardrail_rules,
+)
+from app.harness.guardrails.input_guard import (
+    SUSPICIOUS_RULES as SUSPICIOUS_RULES,
 )
 
 
@@ -56,8 +61,7 @@ def scan_external_content(text: str | None) -> ChannelVerdict:
         ch for ch in normalized
         if ch in "\n\r\t" or not unicodedata.category(ch).startswith("C")
     )
-    blocking = [name for name, pattern in BLOCKING_RULES if pattern.search(normalized)]
-    suspicious = [name for name, pattern in SUSPICIOUS_RULES if pattern.search(normalized)]
+    blocking, suspicious = scan_guardrail_rules(normalized)
     contaminated = bool(blocking) or len(suspicious) >= SUSPICIOUS_BLOCK_THRESHOLD
     return ChannelVerdict(
         contaminated=contaminated,

@@ -7,6 +7,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
+from app.harness.metrics.runtime_sensors import COMPRESS_TOTAL
 from app.memory.context_builder import context_builder
 from app.memory.models import SessionMemory
 from app.memory.session_memory_service import session_memory_service
@@ -73,8 +74,9 @@ class CompressService:
 
         if not await session_memory_service.try_acquire_compress_lock(user_id, redis_service.client):
             return
-        try:
 
+        settings = get_settings()
+        try:
             memory = await session_memory_service.load(user_id, redis_service.client)
             turns = await agent_message_service.load_turns_for_memory(user_id)
 
@@ -86,21 +88,33 @@ class CompressService:
             if not to_compress:
                 return
 
-            new_summary = await self._merge_summary(memory.summary, to_compress)
+            new_summary = await asyncio.wait_for(
+                self._merge_summary(memory.summary, to_compress),
+                timeout=float(settings.memory_llm_timeout or settings.llm_timeout),
+            )
             memory.summary = new_summary
-
             memory.summary_last_message_id = int(to_compress[-1]["message_id"])
             await session_memory_service.save(memory, redis_service.client)
+            COMPRESS_TOTAL.labels(result="ok").inc()
             logger.info(
                 "session_compressed",
                 user_id=user_id,
                 compressed_turns=len(to_compress),
                 new_boundary=memory.summary_last_message_id,
             )
+        except asyncio.TimeoutError:
+            # Memory LLM 超时：记录指标，保留上一次成功的摘要，不中断对话。
+            # 下一轮 post_turn 若 token 仍超阈值会再次触发压缩。
+            COMPRESS_TOTAL.labels(result="timeout").inc()
+            logger.warning(
+                "session_compress_timeout",
+                user_id=user_id,
+                timeout=settings.memory_llm_timeout or settings.llm_timeout,
+            )
         except Exception as e:
+            COMPRESS_TOTAL.labels(result="error").inc()
             logger.exception("session_compress_failed", user_id=user_id, error=str(e))
         finally:
-
             await session_memory_service.release_compress_lock(user_id, redis_service.client)
 
     async def _merge_summary(self, current: dict, turns: list[dict]) -> dict:

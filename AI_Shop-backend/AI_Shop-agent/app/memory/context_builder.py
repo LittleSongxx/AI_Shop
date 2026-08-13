@@ -172,6 +172,7 @@ class ContextBuilder:
         product_snapshot: str | None = None,
         faq_text: str | None = None,
         knowledge_text: str | None = None,
+        grounding_system_messages: list[SystemMessage] | None = None,
         selection_out: list[dict] | None = None,
     ) -> tuple[list, list[dict], int | None]:
 
@@ -204,6 +205,7 @@ class ContextBuilder:
 
         messages: list = [SystemMessage(content=system_prompt)]
         messages.append(SystemMessage(content=context_block))
+        messages.extend(list(grounding_system_messages or []))
 
         for turn in working_turns:
             if not is_complete_turn_for_context(turn):

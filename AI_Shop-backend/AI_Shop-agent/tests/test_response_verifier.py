@@ -160,6 +160,56 @@ def test_policy_violation_rejects_an_unsafe_custom_fallback():
     assert result.assistant.startswith("当前没有检索到足够的已发布规则依据")
 
 
+def test_supported_rag_abstention_is_rejected():
+    result = response_verifier.verify(
+        assistant="根据当前知识库，我无法确认该信息。请联系人工客服核实。",
+        biz_type="agent",
+        tools_called=["SEARCH_KNOWLEDGE"],
+        source_refs=[{"id": "knowledge_1", "source": "规则.md"}],
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "UNNECESSARY_RAG_ABSTENTION"
+
+
+def test_rag_citation_must_exist_and_stay_in_range():
+    missing = response_verifier.verify(
+        assistant="每个订单只能使用一张优惠券。",
+        biz_type="agent",
+        tools_called=["SEARCH_KNOWLEDGE"],
+        source_refs=[{"id": "faq_9002"}],
+        has_pending_action=False,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+    invalid = response_verifier.verify(
+        assistant="每个订单只能使用一张优惠券。[2]",
+        biz_type="agent",
+        tools_called=["SEARCH_KNOWLEDGE"],
+        source_refs=[{"id": "faq_9002"}],
+        has_pending_action=False,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+    valid = response_verifier.verify(
+        assistant="每个订单只能使用一张优惠券。[1]",
+        biz_type="agent",
+        tools_called=["SEARCH_KNOWLEDGE"],
+        source_refs=[{"id": "faq_9002"}],
+        has_pending_action=False,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert missing.issues[0].code == "INVALID_RAG_CITATION"
+    assert invalid.issues[0].code == "INVALID_RAG_CITATION"
+    assert valid.passed is True
+
+
 def test_recommendation_hard_constraints_are_deterministic():
     result = response_verifier.verify(
         assistant="为你找到了两款",

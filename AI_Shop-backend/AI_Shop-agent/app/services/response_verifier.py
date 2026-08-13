@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from app.rag.prompt_builder import RAG_REFUSAL_TEXT
+
 _DYNAMIC_BIZ_TOOLS = {
     "query_order": frozenset({"QUERY_ORDERS"}),
     "query_logistics": frozenset({"QUERY_LOGISTICS"}),
@@ -34,6 +36,11 @@ _POLICY_UNCERTAINTY_PREFIX_RE = re.compile(
     r"(?:无法|暂时无法|暂无法|不能|暂不能).{0,12}(?:确认|判断|核实)"
 )
 _POLICY_ADVERSATIVE_RE = re.compile(r"(?:但|但是|不过|然而|可是|仍然|最终|其实)")
+_RAG_CITATION_RE = re.compile(r"\[(\d+)]")
+_CURRENT_RAG_ABSTENTION_RE = re.compile(
+    r"^(?:根据当前知识库|当前(?:没有|未检索到|缺少)|本轮(?:没有|未检索到)).{0,30}"
+    r"(?:无法确认|不能确认|没有足够|缺少依据|联系人工)"
+)
 _FALLBACKS = {
     "WRITE_WITHOUT_PENDING_ACTION": (
         "未能生成可执行的确认卡片。请核对订单信息后重试，或回复“转人工”。"
@@ -50,6 +57,12 @@ _FALLBACKS = {
     ),
     "INVALID_SUPPORT_CASE": (
         "工单信息尚不完整，暂不能提交。请补充订单与问题描述，或回复“转人工”。"
+    ),
+    "UNNECESSARY_RAG_ABSTENTION": (
+        "已检索到相关规则，但本次回答未能正确使用证据。请稍后重试，或回复“转人工”。"
+    ),
+    "INVALID_RAG_CITATION": (
+        "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。"
     ),
 }
 
@@ -93,11 +106,44 @@ class ResponseVerifier:
         recommendation_candidates: list[dict] | None = None,
         support_case: dict | None = None,
         policy_evidence_required: bool = False,
+        rag_citation_required: bool = False,
+        rag_evidence_state: str | None = None,
         safe_fallback: str | None = None,
     ) -> VerificationResult:
         text = str(assistant or "").strip()
         called = frozenset(str(tool) for tool in tools_called or [])
         issues: list[VerificationIssue] = []
+        source_count = _source_count(source_refs)
+
+        if (
+            str(rag_evidence_state or "").upper() == "SUPPORTED"
+            and source_count > 0
+            and (
+                text == RAG_REFUSAL_TEXT
+                or bool(_CURRENT_RAG_ABSTENTION_RE.search(text))
+            )
+        ):
+            issues.append(
+                VerificationIssue(
+                    "UNNECESSARY_RAG_ABSTENTION",
+                    "检索证据充分，但回答把当前轮误判为证据不足",
+                )
+            )
+
+        if rag_citation_required and source_count > 0 and text != RAG_REFUSAL_TEXT:
+            citations = [int(value) for value in _RAG_CITATION_RE.findall(text)]
+            invalid = sorted({value for value in citations if value < 1 or value > source_count})
+            if not citations or invalid:
+                issues.append(
+                    VerificationIssue(
+                        "INVALID_RAG_CITATION",
+                        (
+                            f"回答引用越界：{invalid}，可用编号为 1..{source_count}"
+                            if invalid
+                            else "回答使用了 RAG 事实，但没有提供有效编号引用"
+                        ),
+                    )
+                )
 
         presents_write = str(biz_type or "") == "action_confirm" or bool(
             re.search(r"(?:【)?act_[a-f0-9]{32}(?:】)?", text, re.I)
@@ -188,6 +234,8 @@ class ResponseVerifier:
                 recommendation_candidates=recommendation_candidates,
                 support_case=support_case,
                 policy_evidence_required=policy_evidence_required,
+                rag_citation_required=rag_citation_required,
+                rag_evidence_state=rag_evidence_state,
             )
             if fallback_check.passed:
                 fallback_assistant = fallback_check.assistant
@@ -208,6 +256,16 @@ def _has_sources(source_refs: list[dict] | dict | None) -> bool:
             isinstance(item, dict) and item for item in sources
         )
     return False
+
+
+def _source_count(source_refs: list[dict] | dict | None) -> int:
+    if isinstance(source_refs, list):
+        return sum(isinstance(item, dict) and bool(item) for item in source_refs)
+    if isinstance(source_refs, dict):
+        sources = source_refs.get("sources")
+        if isinstance(sources, list):
+            return sum(isinstance(item, dict) and bool(item) for item in sources)
+    return 0
 
 
 def _has_unsupported_policy_claim(text: str) -> bool:

@@ -103,6 +103,22 @@ class AgentOrchestrator:
         task_text = submitted_text or "查找图中同款或相似商品"
         verdict = input_guard.inspect(task_text)
         message = verdict.text
+        mixed_injection_flags = [
+            rule for rule in verdict.matched_rules if rule.startswith("mixed_injection_")
+        ]
+
+        # 极短消息（单字/单标点）：too_short 规则把 blocked 置 True，给出引导文案。
+        # 与注入拦截的 raise 不同，这里用温和的引导——不是安全事件。
+        if verdict.blocked and verdict.matched_rules == ("too_short",):
+            raise ValueError("请描述您的具体问题，例如：退款咨询、商品尺寸、物流查询")
+
+        # HTML 源码：不进 LLM，直接引导用户换一种方式描述需求。
+        if verdict.html_content and not image_asset_id:
+            raise ValueError(
+                "看起来您发送了网页代码。请改为描述您的商品需求，"
+                "或者直接粘贴商品名称，我来帮您查找。"
+            )
+
         if not message:
             raise ValueError("请输入咨询内容或上传一张商品图片")
 
@@ -113,6 +129,14 @@ class AgentOrchestrator:
             total = await agent_message_service.count_user_messages(user_id)
             if total >= settings.ai_chat_limit:
                 raise ValueError("AI购物体验已经结束")
+
+        # Token 预算检查（软限制）：超限时降级到 FAQ 快速路径，不中断会话。
+        # 检查顺序在消息落库之前，避免超预算消息占用历史槽位。
+        _token_budget_ok = await rate_limit_service.check_session_token_budget(
+            user_id, settings.per_session_token_budget
+        ) and await rate_limit_service.check_daily_token_quota(
+            user_id, settings.daily_user_token_quota
+        )
 
         # 限流放在注入判定之前：探测注入模式的请求也要消耗配额，否则可以无成本试探。
         if verdict.blocked:
@@ -174,6 +198,44 @@ class AgentOrchestrator:
         queue_name, priority = agent_queue_service.queue_for_decision(decision)
         run_id = new_run_id()
         trace_id = current_trace_id()
+
+        # 重复意图快速路径（P1）：10 分钟内同一意图连续触发 ≥ intent_repeat_threshold 次时，
+        # 跳过 LLM 直接提示用户转人工。节约 Token，同时给出明确的行动路径。
+        # 购物类意图（PRODUCT_SEARCH/PRODUCT_CONSULT）和闲聊不参与计数——用户连续搜索商品是
+        # 正常行为，不应被当做重复投诉处理。
+        _INTENT_REPEAT_SKIP = frozenset(
+            {"CHITCHAT", "UNKNOWN", "PRODUCT_SEARCH", "PRODUCT_CONSULT", "VISUAL_PRODUCT_SEARCH"}
+        )
+        if decision.intent.value not in _INTENT_REPEAT_SKIP:
+            intent_count = await rate_limit_service.record_intent(
+                user_id, decision.intent.value, window_seconds=600
+            )
+            if intent_count >= settings.intent_repeat_threshold:
+                _repeat_msg = (
+                    "您刚才已多次提到该问题。"
+                    "如需人工处理，请点击“转人工”按钮，客服将尽快与您联系。"
+                )
+                agent_msg = await agent_message_service.save_user_message(
+                    user_id,
+                    safe_message,
+                    decision=decision,
+                    previous_unresolved_count=previous_unresolved,
+                    queue_name=queue_name,
+                    session_id=active_support.get("session_id") if active_support else None,
+                    run_id=run_id,
+                    trace_id=trace_id,
+                )
+                _repeat_run_id = agent_msg.get("runId") or run_id
+                await agent_message_service.complete_message(
+                    agent_msg["messageId"], _repeat_msg, "intent_repeat", None
+                )
+                await stream_service.push_done(
+                    user_id, agent_msg["messageId"], _repeat_msg, "intent_repeat", safe_message
+                )
+                agent_msg["deliveryState"] = "INTENT_REPEAT"
+                agent_msg["assistantMessage"] = _repeat_msg
+                episode_service.finish_run("intent_repeat", run_id=_repeat_run_id)
+                return agent_msg
         agent_msg = await agent_message_service.save_user_message(
             user_id,
             safe_message,
@@ -276,6 +338,10 @@ class AgentOrchestrator:
                 error=type(exc).__name__,
             )
         agent_msg["fromProduct"] = from_product
+        if mixed_injection_flags:
+            # Persist only rule IDs with the queued task. The removed attack text
+            # is neither stored in the normal conversation nor emitted to traces.
+            agent_msg["inputSecurityFlags"] = mixed_injection_flags
         if selected_comparison_ids:
             agent_msg["comparisonProductIds"] = selected_comparison_ids
         if verified_image_context:
@@ -314,6 +380,41 @@ class AgentOrchestrator:
             return await self._transfer_to_support(
                 agent_msg, safe_message, decision.model_dump(mode="json")
             )
+
+        # Token 预算超限时降级到 FAQ 快速路径：先尝试精确匹配，命中则返回缓存答案；
+        # 未命中则返回温和的提示，不进 LLM。
+        if not _token_budget_ok:
+            faq = await rag_retriever.exact_faq_answer(original_user_text)
+            if faq:
+                answer = await sensitive_word_service.replace(
+                    str(faq.get("answer") or "").strip()
+                )
+                await agent_message_service.complete_message(
+                    agent_msg["messageId"], answer, "faq", None
+                )
+                await stream_service.push_done(
+                    user_id, agent_msg["messageId"], answer, "faq", safe_message
+                )
+                agent_msg["deliveryState"] = "FAQ_FAST_PATH"
+                agent_msg["assistantMessage"] = answer
+                agent_msg["bizType"] = "faq"
+                episode_service.finish_run("faq", run_id=run_id)
+                return agent_msg
+            # 无 FAQ 命中时给出温和提示，不进 LLM。
+            _budget_msg = "今日 AI 咨询配额已达上限，请明日再试，或转人工客服处理。"
+            await agent_message_service.complete_message(
+                agent_msg["messageId"], _budget_msg, "budget_exceeded", None
+            )
+            await stream_service.push_done(
+                user_id, agent_msg["messageId"], _budget_msg, "budget_exceeded", safe_message
+            )
+            agent_msg["deliveryState"] = "BUDGET_EXCEEDED"
+            agent_msg["assistantMessage"] = _budget_msg
+            episode_service.record_step(
+                "TOKEN_BUDGET_EXCEEDED", run_id=run_id, node_name="api", status="OK"
+            )
+            episode_service.finish_run("budget_exceeded", run_id=run_id)
+            return agent_msg
 
         if decision.intent.value == "CHAT":
             faq = await rag_retriever.exact_faq_answer(original_user_text)

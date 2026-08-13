@@ -1,0 +1,606 @@
+<title>AI_Shop 技术选型评审</title>
+
+<style>
+  :root {
+    --paper: #F4F6F8;
+    --card: #FFFFFF;
+    --ink: #1B2835;
+    --ink-2: #43566A;
+    --muted: #67798B;
+    --line: #DCE3E9;
+    --line-strong: #C2CDD7;
+    --accent: #0E6B7B;
+    --accent-soft: #E2EEF0;
+    --accent-ink: #0A4E5A;
+    --hi: #FFD44D;
+    --hi-ink: #45370A;
+    --ok: #1E8E5A;
+    --ok-soft: #E2F2EA;
+    --warn: #B45309;
+    --warn-soft: #F9EFDF;
+    --risk: #C23B31;
+    --risk-soft: #F9E8E6;
+    --shadow: 0 1px 2px rgba(27, 40, 53, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #10171F;
+      --card: #172129;
+      --ink: #E7EDF2;
+      --ink-2: #B9C7D2;
+      --muted: #8BA0B1;
+      --line: #263441;
+      --line-strong: #3B4D5E;
+      --accent: #5CC0CE;
+      --accent-soft: #102C33;
+      --accent-ink: #BCE6EC;
+      --hi: #D3AE3C;
+      --hi-ink: #241C04;
+      --ok: #3FC68A;
+      --ok-soft: #12291F;
+      --warn: #E2A24B;
+      --warn-soft: #2E2413;
+      --risk: #E57266;
+      --risk-soft: #311E1C;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #10171F;
+    --card: #172129;
+    --ink: #E7EDF2;
+    --ink-2: #B9C7D2;
+    --muted: #8BA0B1;
+    --line: #263441;
+    --line-strong: #3B4D5E;
+    --accent: #5CC0CE;
+    --accent-soft: #102C33;
+    --accent-ink: #BCE6EC;
+    --hi: #D3AE3C;
+    --hi-ink: #241C04;
+    --ok: #3FC68A;
+    --ok-soft: #12291F;
+    --warn: #E2A24B;
+    --warn-soft: #2E2413;
+    --risk: #E57266;
+    --risk-soft: #311E1C;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.75;
+  }
+  .mono {
+    font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 72px; }
+  a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--line-strong); }
+  a:hover { border-bottom-color: var(--accent); }
+  a:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- 封面头部 ---- */
+  .cover { border-bottom: 3px solid var(--ink); padding-bottom: 28px; margin-bottom: 32px; }
+  .cover h1 {
+    margin: 0 0 6px;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: .01em;
+    text-wrap: balance;
+  }
+  .cover .sub { color: var(--ink-2); font-size: 15px; margin: 0 0 22px; }
+  .meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .meta > div { background: var(--card); padding: 10px 14px; }
+  .meta .k {
+    display: block;
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .meta .v { font-size: 13.5px; font-weight: 600; }
+
+  /* ---- 结论速览 ---- */
+  .scoreline {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 28px 0 8px;
+  }
+  .score {
+    flex: 1 1 150px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--ok);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+  .score.warn-t { border-top-color: var(--warn); }
+  .score.risk-t { border-top-color: var(--risk); }
+  .score .n { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .score .l { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .scoreline + p { color: var(--ink-2); }
+
+  /* ---- 板块 ---- */
+  section { margin-top: 40px; }
+  .eyebrow {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin-bottom: 6px;
+  }
+  h2 {
+    font-size: 21px;
+    font-weight: 800;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+  .lead { color: var(--ink-2); margin: 0 0 20px; max-width: 70ch; }
+  h3 { font-size: 17px; font-weight: 700; margin: 0 0 2px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+  /* ---- 判定色块 ---- */
+  .chip {
+    display: inline-block;
+    padding: 1px 10px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .chip.ok   { background: var(--ok-soft);   color: var(--ok);   border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+  .chip.risk { background: var(--risk-soft); color: var(--risk); border-color: color-mix(in srgb, var(--risk) 35%, transparent); }
+
+  /* ---- 逐项卡片 ---- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--ok);
+    box-shadow: var(--shadow);
+    padding: 22px 26px 20px;
+    margin-bottom: 22px;
+  }
+  .card.warn-t { border-left-color: var(--warn); }
+  .card .cur {
+    margin: 8px 0 12px;
+    padding: 10px 14px;
+    background: var(--paper);
+    border: 1px dashed var(--line-strong);
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .card .cur b { color: var(--ink); }
+  .card p { margin: 10px 0; }
+  .card ul { margin: 8px 0; padding-left: 22px; }
+  .card li { margin: 5px 0; }
+  .card li::marker { color: var(--accent); }
+  .note {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-top: 14px;
+  }
+  .note b:first-child { color: var(--accent-ink); }
+
+  /* ---- 核心回答高亮 ---- */
+  .answer {
+    background: var(--hi);
+    color: var(--hi-ink);
+    padding: 4px 14px;
+    font-weight: 700;
+    font-size: 15px;
+    border-radius: 3px;
+  }
+  .corebox {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--ink);
+    box-shadow: var(--shadow);
+    padding: 24px 26px;
+    margin: 26px 0;
+  }
+  .corebox h3 { margin-bottom: 12px; }
+  .corebox p { margin: 12px 0; }
+  .corebox .answer { margin-right: 8px; }
+
+  /* ---- 表格 ---- */
+  .tblwrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13.5px; }
+  thead th {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 2px solid var(--line-strong);
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-weight: 700; white-space: nowrap; color: var(--ink-2); }
+  tbody tr.win td { background: var(--ok-soft); }
+  td .mono { font-size: 12.5px; color: var(--ink-2); }
+
+  /* ---- 来源 ---- */
+  .sources { columns: 2; column-gap: 36px; font-size: 13px; }
+  .sources li { margin: 5px 0; break-inside: avoid; }
+  .sources a { border: none; }
+  .sources a:hover { text-decoration: underline; }
+  .sources .d { color: var(--muted); font-size: 12px; }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-strong);
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  @media (max-width: 720px) {
+    .meta { grid-template-columns: repeat(2, 1fr); }
+    .sources { columns: 1; }
+    .wrap { padding: 28px 16px 56px; }
+    .card { padding: 18px 18px 16px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="cover">
+    <h1>AI_Shop 技术选型评审</h1>
+    <p class="sub">电商微服务 + 多智能体导购/客服项目的技术选型,与 2026 年业界共识逐项对照</p>
+    <div class="meta">
+      <div><span class="k">评审对象</span><span class="v">AI_Shop(Java 微服务 × Python Agent)</span></div>
+      <div><span class="k">评审口径</span><span class="v">项目自述定位:秋招演示/求职作品,单商户</span></div>
+      <div><span class="k">评审日期</span><span class="v">2026-08-13</span></div>
+      <div><span class="k">依据</span><span class="v">仓库代码事实 + 公开调研(附来源)</span></div>
+    </div>
+  </header>
+
+  <div class="scoreline">
+    <div class="score"><div class="n">9<span style="font-size:16px;color:var(--muted)"> / 10</span></div><div class="l">判定「合理」的选型项</div></div>
+    <div class="score warn-t"><div class="n">1<span style="font-size:16px;color:var(--muted)"> / 10</span></div><div class="l">「基本合理」,需注意边界</div></div>
+    <div class="score risk-t"><div class="n">0</div><div class="l">「高风险」选型</div></div>
+  </div>
+  <p>结论:本项目选型与 2026 年业界共识高度一致。两个最容易被面试官挑战的选择——<b>用 RabbitMQ 而非 RocketMQ</b>、<b>用 Elasticsearch 兼任向量库而非专用向量库</b>——在项目当前规模下反而是更理性的决策,但需要准备好在「生产口径」下的完整解释(见第三节)。</p>
+
+  <div class="corebox">
+    <h3>两个核心问题,先给答案</h3>
+    <p><span class="answer">消息队列:RabbitMQ,合理</span>三选一对照:电商核心交易链路业界倾向 RocketMQ(原生事务消息/延迟消息/顺序消息);Kafka 属于日志与埋点管线;RabbitMQ 定位中小规模灵活路由。本项目是演示规模、Java×Python 双栈,且已用「本地消息表 + 补偿 + 死信」补齐可靠消息短板——这是 RabbitMQ 生产实践的标准组合,当前选择成立;若核心交易流量起来,RocketMQ 是平滑演进方向。</p>
+    <p><span class="answer">向量库:都不是,ES 兼任更优</span>四选一对照:pgvector 因项目主库是 MySQL 而直接出局(为向量单养一个 PG 实例不划算);Qdrant/Milvus 的价值在 50 万~亿级向量,对千级规模是过度设计;ES 9.2.1 本来就要承担商品搜索,复用同一集群做 1024 维 RAG 检索 + 视觉检索,是「已有 ES 基础设施时优先 ES」业界建议的教科书式落地。</p>
+  </div>
+
+  <section>
+    <div class="eyebrow">Section 01 · Overview</div>
+    <h2>一、选型总览</h2>
+    <p class="lead">项目实际选型(仓库事实)与 2026 业界共识逐项对照。版本信息来自 pom.xml / docker-compose / pyproject.toml。</p>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>选型项</th><th>项目选择</th><th>业界共识(2026)</th><th>判定</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>消息队列</td>
+            <td>RabbitMQ 3.13,唯一 MQ;outbox + 补偿 + 死信</td>
+            <td>核心交易链路倾向 RocketMQ;中小规模/复杂路由 RabbitMQ;日志管线 Kafka</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>向量检索</td>
+            <td>Elasticsearch 9.2.1 兼任(1024 维 RAG + 视觉索引)</td>
+            <td>已有 ES 则复用 ES/OpenSearch;专用库 Qdrant 是 50 万~5000 万级主流</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>分布式事务</td>
+            <td>Seata 2.2.0 AT 模式 + 本地消息表并存</td>
+            <td>AT 适合短事务且无侵入;与可靠消息按场景分工,混用是主流</td>
+            <td><span class="chip warn">基本合理</span></td>
+          </tr>
+          <tr>
+            <td>语言/框架</td>
+            <td>Java 17 + Spring Boot 3.5.4 + Spring Cloud 2025.0.0 + SCA 2025.0.0.0</td>
+            <td>新项目 SB 3.5.x 正确(2.x 已 EOL);JDK 21 首选、17 次选</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>服务治理</td>
+            <td>Nacos 2.4.3 + Sentinel + Spring Cloud Gateway</td>
+            <td>国内事实标准组合(Eureka/Hystrix/Zuul 均已退役)</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>LLM / Embedding</td>
+            <td>DeepSeek + 百炼 text-embedding-v4 / qwen3-rerank / qwen3-vl-*</td>
+            <td>低成本 API 路线主流;自托管 BGE-M3 是私有化备选</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>Agent 编排</td>
+            <td>LangGraph 0.2.76(监督者+专家)+ MCP 1.28 双向</td>
+            <td>LangGraph 是多智能体生产共识(1.0 已发布);MCP 是 2026 生态热点</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>存储层</td>
+            <td>MySQL 8.3(10 库)+ Redis 7 + 本地磁盘文件</td>
+            <td>演示定位匹配;生产需 OSS / 分库分表 / 读写分离</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>可观测性</td>
+            <td>OTel + Prometheus / Grafana / Tempo,Java×Python 双栈打通</td>
+            <td>2026 标准栈(Micrometer Tracing 取代 Sleuth)</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+          <tr>
+            <td>前端</td>
+            <td>Vue 3.5 + Element Plus</td>
+            <td>国内电商/中后台主流组合</td>
+            <td><span class="chip ok">合理</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Section 02 · Item-by-item</div>
+    <h2>二、逐项评估</h2>
+    <p class="lead">重点展开两个核心问题(消息队列、向量检索)的完整对比;其余选型给出判定依据与注意点。</p>
+
+    <div class="card">
+      <h3>2.1 消息队列:RabbitMQ <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>RabbitMQ 3.13 单实例(端口偏移 5673);manual ack + prefetch=1;7 类交换机(秒杀/支付/退款/RAG/浏览/通知/成长值);延迟队列 + 死信队列;可靠性靠本地消息表 <span class="mono">local_message_outbox</span> + <span class="mono">mq_compensation_log</span> 补偿重放;Python 侧经 aio-pika 消费视觉索引任务。</div>
+      <p>三选一的事实基础,2026 年公开资料的共识口径:</p>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>维度</th><th>RabbitMQ 3.13</th><th>RocketMQ 5.x</th><th>Kafka</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>核心定位</td>
+              <td>灵活路由的消息代理</td>
+              <td>金融级交易消息中间件(阿里双 11 验证,峰值 17.6 万 TPS)</td>
+              <td>高吞吐流式数据平台(日志/埋点)</td>
+            </tr>
+            <tr>
+              <td>吞吐量级</td>
+              <td>万级 TPS</td>
+              <td>十万级 TPS</td>
+              <td>百万级 TPS</td>
+            </tr>
+            <tr>
+              <td>事务消息</td>
+              <td>无原生支持,靠 outbox 模式补齐</td>
+              <td><b>原生</b>(半消息 + 事务回查)</td>
+              <td>仅消息发送原子性,不解决跨系统事务</td>
+            </tr>
+            <tr>
+              <td>延迟消息</td>
+              <td>TTL+DLX 或插件(有队头阻塞/Mnesia 丢失风险)</td>
+              <td><b>原生</b>(4.9+ 任意时间延迟)</td>
+              <td>无</td>
+            </tr>
+            <tr>
+              <td>顺序消息</td>
+              <td>单队列内有序</td>
+              <td><b>原生强顺序</b>(库存扣减刚需)</td>
+              <td>分区内有序</td>
+            </tr>
+            <tr>
+              <td>Python 生态</td>
+              <td>aio-pika 成熟</td>
+              <td>弱(主要为 Java/C++)</td>
+              <td>中等(confluent-kafka)</td>
+            </tr>
+            <tr>
+              <td>运维负担</td>
+              <td>低(单节点可跑,本项目 mem 768M)</td>
+              <td>中(NameServer+Broker,内存占用高)</td>
+              <td>高(集群调优,KRaft 演进中)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>判定依据:</b>①演示规模下吞吐差异无意义,选型的真实约束是「16G 宿主机内存预算 + 双栈语言生态」——RabbitMQ 是唯一能 768M 内存单机跑、且 Java/Python 生态都成熟的选择;②可靠性短板已用 outbox + 补偿 + 死信兜住,这正是 RabbitMQ 生产实践的标准答案;③本项目并无「下单后必须毫秒级扣库存」的强实时链路,事务消息的价值没有用武之地。</p>
+      <div class="note"><b>两个注意点(面试高频追问):</b>
+        <ul>
+          <li><b>「为什么不用 RocketMQ?」标准答法:</b>本项目用 outbox 换掉了对事务消息的依赖,当前规模不需要 RocketMQ 的事务/延迟/顺序能力;若核心交易链路流量上来,RocketMQ 接手交易域、RabbitMQ 退守 RAG/通知等旁路,是平滑演进而非推倒重来。</li>
+          <li><b>延迟队列实现需自查:</b>若用的是 delayed_message_exchange 插件,存在 Mnesia 暂存丢失与长延迟漂移风险;若用 TTL+DLX,存在队头阻塞(长延迟消息卡住后续短延迟消息)。订单超时取消类场景,生产口径应补「定时扫描对账」兜底。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2.2 向量检索:Elasticsearch 兼任 <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>ES 9.2.1(含 IK 中文分词插件)单节点一石三鸟——①商品全文搜索;②RAG 向量检索(索引 <span class="mono">aishop_vectorstore</span>,embedding 1024 维,Spring AI 自动管理 schema);③视觉商品检索(alias <span class="mono">aishop_visual_products</span>)。混合检索 = BM25 + 向量 + RRF/rerank,同栈完成。</div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>维度</th><th>pgvector</th><th>Qdrant</th><th>Milvus</th><th>Elasticsearch 9.x</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>架构</td>
+              <td>PostgreSQL 扩展</td>
+              <td>Rust 单二进制</td>
+              <td>多组件分布式(etcd/对象存储/Pulsar)</td>
+              <td>分布式搜索引擎 + 向量字段</td>
+            </tr>
+            <tr>
+              <td>规模甜区</td>
+              <td>&lt; 1000 万(已用 PG 时零成本)</td>
+              <td>50 万 ~ 5000 万(生产 RAG 默认之选)</td>
+              <td>千万 ~ 亿级</td>
+              <td>全谱,取决于集群规划</td>
+            </tr>
+            <tr>
+              <td>延迟</td>
+              <td>1M 向量下 p50 ≈ 8.5ms</td>
+              <td>p50 ≈ 1.8~4ms(最低)</td>
+              <td>p50 ≈ 2.5~6ms</td>
+              <td>与 Qdrant 同量级;纯向量高并发下弱于专用库</td>
+            </tr>
+            <tr>
+              <td>混合检索</td>
+              <td>需拼 PG FTS,组合最弱</td>
+              <td>原生(Query API + BM25)</td>
+              <td>原生(sparse vector)</td>
+              <td><b>最强</b>:BM25+向量+RRF 单查询融合,9.2 起 ES|QL 支持</td>
+            </tr>
+            <tr>
+              <td>运维负担</td>
+              <td>复用 PG 运维</td>
+              <td>低(单二进制)</td>
+              <td>高(≥3 节点起步)</td>
+              <td>已有集群则零新增</td>
+            </tr>
+            <tr>
+              <td>对本项目适配</td>
+              <td>✗ 主库是 MySQL,需单养 PG</td>
+              <td>△ 需新增一个存储组件</td>
+              <td>△ 过度设计</td>
+              <td><b>✓ ES 本来就在做商品搜索</b></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>判定依据:</b>四个选项里,ES 兼任是当前定位下的最优解。pgvector 出局的原因不是性能而是「主库是 MySQL」——为向量检索单独引入 PostgreSQL 实例违背零新增基础设施原则;Qdrant/Milvus 的价值门槛在 50 万~亿级向量,项目千级商品/文档规模下无差别;而 ES 9.x 的 BBQ 量化(向量内存压缩最高 32 倍)、ACORN 过滤剪枝、ES|QL 混合检索,让「搜索 + 向量 + 融合」在一条查询内完成,正好覆盖本项目的 BM25+向量+RRF 混合检索需求。</p>
+      <div class="note"><b>容量与演进提醒:</b>单节点 1G 内存同时扛全文 + 1024 维向量 + 视觉向量三负载,是演示级配置——生产口径需 3 节点集群并按负载分索引规划。若未来向量检索成为独立主负载(百万级以上),演进方向是 Qdrant(低延迟 + 原生过滤 + 单二进制易运维);Milvus 仅在亿级才值得承担其运维复杂度。另注意:qwen3-vl-embedding(1024 维)与 text-embedding-v4(1024 维)维度相同但语义空间不同,务必分索引存储,不可混用。</div>
+    </div>
+
+    <div class="card warn-t">
+      <h3>2.3 分布式事务:Seata AT + 本地消息表并存 <span class="chip warn">基本合理</span></h3>
+      <div class="cur"><b>项目现状:</b>Seata 2.2.0 AT 模式(<span class="mono">@GlobalTransactional</span>,自建镜像,注册到 Nacos)+ 本地消息表 outbox + 补偿日志,两套机制并存。</div>
+      <p><b>为什么「基本合理」而非满分:</b>对求职项目,同时展示「准强一致(AT)」与「最终一致(可靠消息)」两种主流范式是加分的广度展示,Seata 2.2 + Nacos + SB 3.5 也是新一代搭配;但对演示规模,outbox 一套其实已足够,Seata 属于「展示型组件」——需要在复盘/文档中写清两者的边界,否则评审时会显得堆砌。</p>
+      <div class="note"><b>边界写法(生产口径 + 面试考点):</b>
+        <ul>
+          <li>AT 用于「短事务、多服务写同一流程、不容许中间态」:下单扣库存类;但高并发抢同一行数据时 AT 全局锁会使 QPS 下降约 15~20%,秒杀场景必须前置 Redis 预扣减。</li>
+          <li>资金类链路禁用 AT,业界共识是 TCC 或对账补偿。</li>
+          <li>outbox 用于「允许短暂不一致的旁路」:积分、优惠券、通知、RAG 索引刷新等,消费者幂等 + 死信兜底。</li>
+          <li>两者并存时的口径:AT 管「跨服务写的一致性」,outbox 管「本地事务与消息的原子性」,不是重复建设。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2.4 Java 17 + Spring Boot 3.5.4 <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>Java 17;SB 3.5.4 + Spring Cloud 2025.0.0 + SCA 2025.0.0.0 + Spring AI 1.1.2;MyBatis 3.0.5 + Flyway + Testcontainers。</div>
+      <p>版本组合是「最新一代且互相配套」,方向完全正确:Spring Boot 2.x 已停止安全维护(商业支持 2024-11 终止),新项目选 3.5.x 是唯一解;SCA 2025 系适配 SB 3.x,无版本错配。JDK 17 满足 3.x 最低要求,2026 新项目首选 21(虚拟线程、GC 收益),但演示项目 17 完全可接受——「JDK 21 + 虚拟线程提升订单处理吞吐」可作为面试演进储备答案。ES 9.2.1 + Spring AI 1.1.2 属于激进组合(近期 git log 里有 ES 9 mget 兼容补丁),踩坑成本存在但已被记录与修复,可控。</p>
+    </div>
+
+    <div class="card">
+      <h3>2.5 服务治理:Nacos + Sentinel + Gateway <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>Nacos 2.4.3(standalone + MySQL 存储,仅用 discovery);Sentinel dashboard 1.8.8;网关显式路由表 + 双层限流(default-qps 200 / auth-qps 30 / agent-send-qps 10)+ 429 fallback + Feign 熔断。</div>
+      <p>这套组合是 2026 年国内微服务的<b>事实标准</b>:Eureka/Hystrix/Ribbon/Zuul 均已退役,Spring Cloud Alibaba 的 Nacos(注册+配置)+ Sentinel(限流熔断)+ SCG(网关)是替代它们的默认答案。两个小注:①Nacos 单机演示合理,生产需 3 节点集群;②Sentinel dashboard 1.8.8(第三方 bladex 镜像)版本偏旧——dashboard 只是可视化面板,实际 client 由 SCA 2025 引入,功能无碍,面试被问可如此解释。网关的「QPS 分级限流 + 熔断降级 + 内部 Token 鉴权」是真实工程亮点,不是摆设。</p>
+    </div>
+
+    <div class="card">
+      <h3>2.6 LLM / Embedding 全家桶 <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>主 LLM DeepSeek(deepseek-chat);Embedding 阿里百炼 text-embedding-v4(1024 维);Rerank 百炼 qwen3-rerank(未配 Key 时回退 RRF);VLM qwen-vl-plus(知识文档图片,默认关);视觉搜索 qwen3-vl-plus(grounding)+ qwen3-vl-embedding-1024-v1 + qwen3-vl-rerank。</div>
+      <p>全 API 化、零 GPU 运维,对个人/演示项目是<b>成本最优解</b>;且所选模型都在中文第一梯队:qwen3-rerank 是中文 rerank 上限之一,text-embedding-v4 是中文 API embedding 主流,视觉三件套形成完整多模态链路。项目里「rerank 缺失回退 RRF」「VLM 默认关」的降级链设计是加分项。</p>
+      <div class="note"><b>注意点:</b>①fallback LLM 与主 LLM 同为 deepseek-chat,是「伪降级」——若面试讲高可用,可补一个真正的异构 fallback(如通义 API);②API embedding 模型不可控,供应商改版/下线会破坏向量空间——项目已有 eval runner(aishop-eval/v1)做检索回归,这是正确姿势,但需写明「换 embedding 必须全量重建索引」;③「私有化/降本」叙事可用自托管 BGE-M3(电商场景下混合召回 + bge-reranker-v2-m3 是开源主流组合);④多供应商耦合偏阿里生态(百炼 Workspace),属可控风险。</p>
+    </div>
+
+    <div class="card">
+      <h3>2.7 Agent 编排:LangGraph + MCP <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>FastAPI + LangGraph 0.2.76;监督者 + 至多 2 个受限专家(shopping_advisor / order_fulfillment_specialist / after_sales_policy_specialist,管理端另有 data_analyst + inventory_ops);确定性流程走 Workflow、开放决策才进专家;写操作 Propose→用户确认→Java 执行;含 guardrails、双窗口限流、双层记忆(Redis+MySQL)、episode 轨迹、独立 Worker(租约制)。</div>
+      <p>这套设计<b>与 2026 生产共识完全对齐</b>:LangGraph 已 1.0,是多智能体编排的事实标准(Uber/JPMorgan 等在生产使用),其 checkpoint、HITL、显式状态机正是本项目 harness 所依托的能力;MCP 双向(对外暴露 Streamable HTTP server、对内消费工具)踩在 2026 生态热点上;「监督者 + 受限专家 + 单智能体回退」的降级链、写操作确认制、轨迹持久化,都是教科书级的多智能体治理实践。小注:langgraph 0.2.76 是 2025 年的版本线,1.x 的 durable execution 更成熟,可评估升级(属「顺手升级」,非架构改动)。</p>
+    </div>
+
+    <div class="card">
+      <h3>2.8 存储层:MySQL / Redis / 本地磁盘 <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>MySQL 8.3 单实例、一域一库共 10 库(无分表、无读写分离);Redis 7(Redisson 4.0.0):Lua 原子秒杀、分布式锁、Bitmap 签到、MQ 幂等键、Agent 短期记忆/语义缓存、限流计数;文件存储为本地磁盘(/data/aishop/upload),无 OSS/MinIO。</div>
+      <p>域拆库清晰、Redis 用途全部正统(没有滥用),演示定位下合理。唯一需要主动准备解释的是<b>本地磁盘文件存储</b>:生产口径下图片/文件必须外迁 OSS + CDN(面试必问),迁移叙事现成——直传 OSS、回源 CDN、挂接内容审核(项目已预留百度图片审核),架构上只需替换存储适配层。</p>
+    </div>
+
+    <div class="card">
+      <h3>2.9 可观测性与前端 <span class="chip ok">合理</span></h3>
+      <div class="cur"><b>项目现状:</b>Prometheus v2.54.1 + Grafana 11.2.0 + Tempo 2.6.1 + OTel Collector(0.113.0);Java 侧 actuator + Micrometer,Python 侧 OTel 插桩 fastapi/httpx/redis/sqlalchemy;前端 Vue 3.5 + Element Plus(用户端与管理端)。</div>
+      <p>可观测栈是 2026 标准组合,且做到了 Java×Python <b>双栈指标/链路打通</b>(Agent worker 独立指标端口),这对一个双语言异构项目是超出多数同类作品的完成度。前端选型是国内电商/中后台默认答案,无争议。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Section 03 · Production lens</div>
+    <h2>三、生产化口径差距清单</h2>
+    <p class="lead">当前选择全部以「演示/求职」定位为基准成立。若按生产口径评审,以下是需要提前准备演进叙事的差距项——面试中被追问时,承认差距 + 给出演进路径,比声称「已生产就绪」更可信。</p>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>项</th><th>现状(演示级)</th><th>生产化演进方向</th></tr></thead>
+        <tbody>
+          <tr><td>ES 单节点 1G,三负载并存</td><td>全文 + 1024 维向量 + 视觉向量同节点</td><td>3 节点集群;按负载分索引;BBQ 量化控内存;向量规模上量后评估 Qdrant 分流</td></tr>
+          <tr><td>RabbitMQ 单机 + 延迟队列</td><td>单实例;延迟靠 TTL+DLX 或插件</td><td>镜像/Quorum 队列;延迟方案定级(插件风险或分段 TTL);死信监控与告警</td></tr>
+          <tr><td>JDK 17</td><td>满足 SB 3.5 最低要求</td><td>JDK 21 + 虚拟线程(订单/网关 I/O 密集场景收益最大)</td></tr>
+          <tr><td>Nacos / Sentinel / Seata 单机</td><td>standalone / 单节点 dashboard</td><td>Nacos 3 节点;Sentinel 规则持久化到 Nacos;Seata 高可用部署</td></tr>
+          <tr><td>MySQL 单实例 10 库,无分表</td><td>无读写分离、无分片</td><td>读写分离;订单/流水大表分库分表(ShardingSphere 叙事)</td></tr>
+          <tr><td>LLM 单供应商伪降级</td><td>fallback 与主模型同为 DeepSeek</td><td>异构 fallback(通义 API);私有化降本走 BGE-M3 自托管</td></tr>
+          <tr><td>本地磁盘文件存储</td><td>无 OSS/MinIO</td><td>OSS 直传 + CDN + 内容审核管线(已预留百度审核)</td></tr>
+          <tr><td>部署清单仅 compose</td><td>docker-compose + nginx 示例</td><td>K8s/Helm 部署清单,或至少 compose 生产编排 + 健康检查完备</td></tr>
+          <tr><td>LangGraph 0.2.76</td><td>2025 版本线</td><td>升级 1.x(durable execution / checkpoint 成熟)</td></tr>
+          <tr><td>Seata AT 边界未文档化</td><td>决策文档缺失(docs/ 引用了不存在的文件)</td><td>补一份「AT vs outbox 分工」的决策记录——评审时这是被追问概率最高的一处</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Section 04 · Sources</div>
+    <h2>四、调研来源</h2>
+    <p class="lead">结论基于 2026-08 公开资料与仓库代码事实;选型类结论随行业变化较快,建议 6 个月后复评。</p>
+    <ul class="sources">
+      <li><a href="https://www.dfhcn.com/post/346.html">消息队列选型(三巨头定位对比)</a> <span class="d">dfhcn.com</span></li>
+      <li><a href="https://www.cnblogs.com/clnchanpin/p/19554580">深入解析:消息中间件选型的艺术</a> <span class="d">cnblogs.com</span></li>
+      <li><a href="https://cloud.tencent.cn/developer/article/2225184">RabbitMQ / RocketMQ / Kafka 延迟队列实现对比</a> <span class="d">tencent.cn</span></li>
+      <li><a href="https://cloud.tencent.cn/developer/article/2436821">RabbitMQ 延迟队列实现原理与坑</a> <span class="d">tencent.cn</span></li>
+      <li><a href="https://aimultiple.com/open-source-vector-databases">Vector Database Benchmark: 7 Open-Source Engines</a> <span class="d">aimultiple.com</span></li>
+      <li><a href="https://lucaberton.com/blog/vector-database-kubernetes-qdrant-milvus-pgvector-2026/">Vector Databases on K8s: Qdrant vs Milvus vs pgvector</a> <span class="d">lucaberton.com</span></li>
+      <li><a href="https://www.pingcap.com/compare/best-vector-database/">Best Vector Databases for RAG: Top Picks 2026</a> <span class="d">pingcap.com</span></li>
+      <li><a href="https://lushbinary.com/blog/vector-database-benchmarks-production-selection-guide-2026/">Vector DB Benchmarks: Production Selection Guide 2026</a> <span class="d">lushbinary.com</span></li>
+      <li><a href="https://huggingface.co/blog/ImranzamanML/pgvector-vs-elasticsearch-vs-qdrant-vs-pinecone-vs">pgvector vs Elasticsearch vs Qdrant: 14-Case Benchmark</a> <span class="d">huggingface.co</span></li>
+      <li><a href="https://www.elastic.co/blog/whats-new-elastic-9-3-0">What's New in Elastic 9.3(向量索引/BBQ/ACORN)</a> <span class="d">elastic.co</span></li>
+      <li><a href="https://www.infoq.cn/article/bDuSyAJix8z1Aq0ff0lZ">Elastic 9.3 升级:向量搜索快 12 倍</a> <span class="d">infoq.cn</span></li>
+      <li><a href="https://www.elastic.co/search-labs/es/blog/hybrid-search-multi-stage-retrieval-esql">Hybrid Search in ES|QL(多阶段检索)</a> <span class="d">elastic.co</span></li>
+      <li><a href="https://blog.csdn.net/2601_94871597/article/details/157177291">Spring Cloud Alibaba 2026 选型指南(Sentinel + Nacos)</a> <span class="d">csdn.net</span></li>
+      <li><a href="https://jishuzhan.net:443/article/2012789408962494465">Nacos / Sentinel / Seata 理论体系解析</a> <span class="d">jishuzhan.net</span></li>
+      <li><a href="https://www.cnblogs.com/aibi1/p/19033966">SEATA AT vs SAGA vs 本地消息表</a> <span class="d">cnblogs.com</span></li>
+      <li><a href="https://blog.csdn.net/uybji/article/details/163251422">分布式事务方案对比(AT/消息表/事务消息)</a> <span class="d">csdn.net</span></li>
+      <li><a href="https://cloud.tencent.cn/developer/article/2667470">Spring Boot 2 与 3 全维度差异与避坑</a> <span class="d">tencent.cn</span></li>
+      <li><a href="https://blog.mvpbang.com/p/4ee28f7f7fdb448e82c48d68a95c7334/">Spring Boot 版本与 JDK 对应关系</a> <span class="d">mvpbang.com</span></li>
+      <li><a href="https://www.respan.ai/articles/langchain-vs-langgraph">LangChain vs LangGraph(2026): Which One Should You Build On</a> <span class="d">respan.ai</span></li>
+      <li><a href="https://www.spheron.network/blog/langgraph-vs-langchain/">LangGraph vs LangChain: Production AI Agents 2026</a> <span class="d">spheron.network</span></li>
+      <li><a href="https://www.modb.pro/db/2080475415660027904">从 Qwen3 到 ColPali:2026 下半年 Embedding 模型怎么选</a> <span class="d">modb.pro</span></li>
+      <li><a href="https://blog.csdn.net/weixin_42509507/article/details/157154086">Qwen3-Embedding vs BGE 实战对比(MTEB)</a> <span class="d">csdn.net</span></li>
+      <li><a href="https://zilliz.com.cn/blog/YizhiAI-Milvus-ecommerce-AI-customer-service-architecture">熠智 AI + Milvus:电商 AI 客服架构实践</a> <span class="d">zilliz.com.cn</span></li>
+      <li><a href="https://www.cnblogs.com/zhaww/p/19797029">电商客服 + 导购智能体的设计与开发</a> <span class="d">cnblogs.com</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    AI_Shop 技术选型评审 · 2026-08-13 · 评估基准:项目自述定位(秋招演示/求职作品,单商户,无生产流量)。仓库事实来自 pom.xml / docker-compose.middleware.yml / pyproject.toml / 各服务 application.yml / .env.example 及 git 历史;行业结论来自上方公开资料,标注时间均为 2026 年。版本与行业格局会变化,结论有效期建议以半年为限。
+  </footer>
+
+</div>

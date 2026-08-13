@@ -11,6 +11,7 @@ import structlog
 
 from app.config.settings import get_settings
 from app.harness.guardrails.channel_guard import scan_external_content
+from app.harness.guardrails.query_security import separate_explicit_attack_suffix
 from app.harness.metrics.runtime_sensors import (
     RAG_CHANNEL_CONTAMINATED,
     RAG_LATENCY,
@@ -20,6 +21,12 @@ from app.infra.http_client import get_client
 from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_rag_overrides
 from app.rag.embedding import embed_text
+from app.rag.grounding import (
+    EvidenceItem,
+    EvidenceState,
+    GroundingEnvelope,
+    QueryPlan,
+)
 from app.rag.query_expander import expand_query
 from app.rag.rrf import rrf_score_at_rank
 from app.resilience.circuit_breaker import circuit_registry
@@ -59,6 +66,10 @@ class RerankEvaluationStats:
     fallback_count: int = 0
     fallback_reasons: dict[str, int] = field(default_factory=dict)
     response_records: list[dict[str, Any]] = field(default_factory=list)
+    instruction_override: str | None = None
+    rerank_top_n: int | None = None
+    evidence_threshold: float | None = None
+    top_score_margin: float | None = None
 
     def fallback(self, reason: str) -> None:
         self.fallback_count += 1
@@ -82,8 +93,27 @@ _RERANK_EVALUATION_STATS: contextvars.ContextVar[RerankEvaluationStats | None] =
 
 
 @contextmanager
-def rerank_evaluation_scope() -> Iterator[RerankEvaluationStats]:
-    stats = RerankEvaluationStats()
+def rerank_evaluation_scope(
+    *,
+    instruction: str | None = None,
+    rerank_top_n: int | None = None,
+    evidence_threshold: float | None = None,
+    top_score_margin: float | None = None,
+) -> Iterator[RerankEvaluationStats]:
+    """Account live rerank calls and optionally isolate an eval-only instruction."""
+
+    if rerank_top_n is not None and rerank_top_n < 1:
+        raise ValueError("evaluation rerank_top_n must be positive")
+    if evidence_threshold is not None and not 0 <= evidence_threshold <= 1:
+        raise ValueError("evaluation evidence_threshold must be between 0 and 1")
+    if top_score_margin is not None and not 0 <= top_score_margin <= 1:
+        raise ValueError("evaluation top_score_margin must be between 0 and 1")
+    stats = RerankEvaluationStats(
+        instruction_override=instruction,
+        rerank_top_n=rerank_top_n,
+        evidence_threshold=evidence_threshold,
+        top_score_margin=top_score_margin,
+    )
     token = _RERANK_EVALUATION_STATS.set(stats)
     try:
         yield stats
@@ -158,6 +188,8 @@ class RagRetriever:
         category_filter: list[str] | None = None,
         bucket: str = "A",
         include_evaluation_candidates: bool = False,
+        query_variants: list[str] | None = None,
+        security_flags: list[str] | tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
         """Search FAQ/knowledge and retain bounded evidence for observability.
 
@@ -170,12 +202,50 @@ class RagRetriever:
         settings = get_settings()
         overrides = get_rag_overrides(bucket)
         effective_top_k = int(overrides.get("rag_top_k") or top_k or settings.rag_top_k)
-        rerank_top_n = int(overrides.get("rerank_top_n") or settings.rerank_top_n)
+        evaluation = _RERANK_EVALUATION_STATS.get()
+        rerank_top_n = int(
+            evaluation.rerank_top_n
+            if evaluation is not None and evaluation.rerank_top_n is not None
+            else overrides.get("rerank_top_n") or settings.rerank_top_n
+        )
 
-        cleaned = self.normalize_query(query)
+        original_query = str(query or "")
+        separation = separate_explicit_attack_suffix(original_query)
+        collected_security_flags = list(security_flags or [])
+        collected_security_flags.extend(separation.security_flags)
+        cleaned = self.normalize_query(separation.safe_query)
         if not cleaned:
             self._observe_search(started, False, "empty")
-            return self._trace_result(cleaned, 0, "empty", False, [], started)
+            return self._trace_result(
+                cleaned,
+                0,
+                "empty",
+                False,
+                [],
+                started,
+                original_query=original_query,
+                security_flags=collected_security_flags,
+            )
+
+        # Direct callers such as evaluation runners do not pass through the API
+        # input guard. A pure attack therefore fails closed here; an explicit
+        # mixed suffix has already been separated above and the legitimate prefix
+        # continues through retrieval.
+        direct_verdict = scan_external_content(original_query)
+        if direct_verdict.contaminated and not separation.separated:
+            collected_security_flags.extend(direct_verdict.matched_rules)
+            self._observe_search(started, False, "input_quarantine")
+            return self._trace_result(
+                cleaned,
+                0,
+                "input_quarantine",
+                False,
+                [],
+                started,
+                original_query=original_query,
+                security_flags=collected_security_flags,
+                forced_evidence_state=EvidenceState.QUARANTINED,
+            )
 
         catalog = await self._knowledge_catalog()
         try:
@@ -198,6 +268,11 @@ class RagRetriever:
                 started,
                 bucket=bucket,
                 evaluation_candidates=docs if include_evaluation_candidates else None,
+                original_query=original_query,
+                security_flags=collected_security_flags,
+                normalization_rules=(
+                    ("explicit_attack_suffix_removed",) if separation.separated else ()
+                ),
             )
 
         cache_key = self._semantic_cache_key(
@@ -218,7 +293,21 @@ class RagRetriever:
                 # 不抽样盲评就发现不了误报（行业建议按周评审误报率）。
                 await self._sample_cache_hit(cleaned, cached)
                 self._observe_search(started, True, "cache")
-                return self._trace_result(cleaned, version, "cache", True, cached, started, bucket=bucket)
+                return self._trace_result(
+                    cleaned,
+                    version,
+                    "cache",
+                    True,
+                    cached,
+                    started,
+                    bucket=bucket,
+                    original_query=original_query,
+                    security_flags=collected_security_flags,
+                    variant_count=0,
+                    normalization_rules=(
+                        ("explicit_attack_suffix_removed",) if separation.separated else ()
+                    ),
+                )
 
         extra_filters: list[dict] | None = (
             [{"terms": {"metadata.category": category_filter}}] if category_filter else None
@@ -232,6 +321,7 @@ class RagRetriever:
         # 当前目录过滤，避免旧版本结果在发布或归档后继续返回。
         # 如果 Java 与 last-known-good 目录都不可用，只允许 FAQ 分支继续，
         # 绝不能用固定版本或无目录检索可能已经归档的知识切片。
+        variants = await self._query_variants(cleaned, query_variants)
         candidates = await self._search_knowledge_docs(
             cleaned,
             effective_top_k,
@@ -240,7 +330,10 @@ class RagRetriever:
             version_filter=version if catalog else None,
             active_document_ids=(catalog or {}).get("active_document_ids") if catalog else None,
             knowledge_enabled=bool(catalog),
+            queries=variants,
         )
+        if catalog is not None:
+            candidates = self._filter_catalog(candidates, catalog)
         docs = self._filter_evidence_docs(candidates)
         if not docs:
             self._observe_search(started, False, "hybrid")
@@ -253,6 +346,12 @@ class RagRetriever:
                 started,
                 bucket=bucket,
                 evaluation_candidates=candidates if include_evaluation_candidates else None,
+                original_query=original_query,
+                security_flags=collected_security_flags,
+                variant_count=len(variants),
+                normalization_rules=(
+                    ("explicit_attack_suffix_removed",) if separation.separated else ()
+                ),
             )
         if not include_evaluation_candidates:
             await self._set_cache(cache_key, docs, settings.rag_cache_ttl_seconds)
@@ -267,7 +366,35 @@ class RagRetriever:
             bucket=bucket,
             candidate_count=len(candidates),
             evaluation_candidates=candidates if include_evaluation_candidates else None,
+            original_query=original_query,
+            security_flags=collected_security_flags,
+            variant_count=len(variants),
+            normalization_rules=(
+                ("explicit_attack_suffix_removed",) if separation.separated else ()
+            ),
         )
+
+    async def _query_variants(
+        self,
+        query: str,
+        supplied: list[str] | None = None,
+    ) -> list[str]:
+        variants = await expand_query(query)
+        result: list[str] = []
+        seen: set[str] = set()
+        for value in [query, *(supplied or []), *variants]:
+            cleaned = self.normalize_query(str(value or ""))
+            key = self._normalize_question(cleaned)
+            if not cleaned or not key or key in seen:
+                continue
+            verdict = scan_external_content(cleaned)
+            if verdict.contaminated:
+                continue
+            seen.add(key)
+            result.append(cleaned)
+            if len(result) == 3:
+                break
+        return result or [query]
 
     def _semantic_cache_key(
         self,
@@ -304,6 +431,7 @@ class RagRetriever:
             # rag_evidence_min_rrf_rank 后，旧标准写入的缓存条目不应继续按
             # 命中输出（P1 审查：阈值调整最长滞后一个 TTL）。
             "min_relevance": settings.rag_evidence_min_relevance,
+            "top_score_margin": settings.rag_evidence_top_score_margin,
             "min_rrf_rank": settings.rag_evidence_min_rrf_rank,
         }
         canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
@@ -477,6 +605,7 @@ class RagRetriever:
         version_filter: int | None = None,
         active_document_ids: list[str] | None = None,
         knowledge_enabled: bool = True,
+        queries: list[str] | None = None,
     ) -> list[dict]:
         with tracer.start_as_current_span("rag.hybrid_search") as span:
             span.set_attribute("rag.query_length", len(query))
@@ -486,8 +615,8 @@ class RagRetriever:
             # hybrid search (BM25 + kNN → per-variant RRF) for each, then fuse
             # all ranked lists with a final RRF pass.  Falls back to the original
             # single-query path automatically when the expander returns one entry.
-            queries = await expand_query(query)
-            span.set_attribute("rag.query_variants", len(queries))
+            effective_queries = queries or await self._query_variants(query)
+            span.set_attribute("rag.query_variants", len(effective_queries))
 
             # P0-5 版本过滤：knowledge 必须「已发布」（version <= 当前版本），
             # FAQ 不受版本约束。注意是 range(lte) 而不是 term(==)：
@@ -505,18 +634,20 @@ class RagRetriever:
                 # an empty `terms` array.
                 document_filter = {
                     "terms": {
-                        "metadata.documentId": active_ids or ["__no_active_document__"]
+                        "metadata.documentId.keyword": active_ids
+                        or ["__no_active_document__"]
                     }
                 }
                 effective_filters.append(
                     {
                         "bool": {
                             "should": [
-                                {"term": {"metadata.dataType": "faq"}},
+                                {"term": {"metadata.dataType.keyword": "faq"}},
                                 {
                                     "bool": {
                                         "must": [
-                                            {"term": {"metadata.dataType": "knowledge"}},
+                                            {"term": {"metadata.dataType.keyword": "knowledge"}},
+                                            {"term": {"metadata.status.keyword": "PUBLISHED"}},
                                             {
                                                 "range": {
                                                     "metadata.version": {
@@ -549,7 +680,9 @@ class RagRetriever:
                 # 白白占住 top-k 名额，把有效文档挤出候选池。
                 return self._filter_expired(merged)
 
-            ranked_groups = await asyncio.gather(*[_hybrid_one(q) for q in queries])
+            ranked_groups = await asyncio.gather(
+                *[_hybrid_one(q) for q in effective_queries]
+            )
             rrf_docs = self._rrf_docs(list(ranked_groups), limit=max(limit, 1))
             rrf_docs = self._filter_expired(rrf_docs)
             span.set_attribute("rag.active_hits", len(rrf_docs))
@@ -573,7 +706,7 @@ class RagRetriever:
                 "query": {
                     "bool": {
                         "filter": [
-                            {"terms": {"metadata.dataType": list(data_types)}},
+                            {"terms": {"metadata.dataType.keyword": list(data_types)}},
                             *(extra_filters or []),
                         ],
                         "should": [
@@ -645,7 +778,7 @@ class RagRetriever:
                     "filter": {
                         "bool": {
                             "must": [
-                                {"terms": {"metadata.dataType": data_types}},
+                                {"terms": {"metadata.dataType.keyword": data_types}},
                                 *(extra_filters or []),
                             ]
                         }
@@ -674,11 +807,25 @@ class RagRetriever:
             logger.error("vector_search_failed", data_type=data_type, error=str(e))
             return []
 
-    async def _rerank(self, query: str, docs: list[dict], limit: int) -> list[dict]:
+    async def _rerank(
+        self,
+        query: str,
+        docs: list[dict],
+        limit: int,
+        *,
+        instruction_override: str | None = None,
+    ) -> list[dict]:
         settings = get_settings()
         if not docs or limit <= 0:
             return []
         evaluation = _RERANK_EVALUATION_STATS.get()
+        instruction = (
+            instruction_override
+            if instruction_override is not None
+            else evaluation.instruction_override
+            if evaluation is not None and evaluation.instruction_override is not None
+            else getattr(settings, "rerank_instruct", "")
+        )
         if evaluation is not None:
             evaluation.eligible_requests += 1
         fallback = docs[:limit]
@@ -694,6 +841,8 @@ class RagRetriever:
         try:
             if evaluation is not None:
                 evaluation.provider_requests += 1
+            # ES searched the enriched content, but a generated contextual prefix
+            # is never evidence. Rerank sees only the immutable original body.
             candidates = [self._doc_text(doc)[:4000] for doc in docs]
             top_n = min(limit, len(candidates))
             if settings.rerank_api_format == "compatible":
@@ -703,8 +852,8 @@ class RagRetriever:
                     "documents": candidates,
                     "top_n": top_n,
                 }
-                if settings.rerank_instruct.strip():
-                    request_body["instruct"] = settings.rerank_instruct.strip()
+                if instruction.strip():
+                    request_body["instruct"] = instruction.strip()
             else:
                 request_body = {
                     "model": settings.rerank_model,
@@ -769,6 +918,7 @@ class RagRetriever:
                 evaluation.response_records.append(
                     {
                         "queryHash": _sha256(query),
+                        "instructionHash": _sha256(instruction),
                         "candidateIds": [str(doc.get("id") or "") for doc in docs],
                         "results": [
                             {
@@ -904,7 +1054,16 @@ class RagRetriever:
                     raise ValueError("catalog contains an empty document id")
                 if item not in normalized_ids:
                     normalized_ids.append(item)
-            return {"version": version, "active_document_ids": normalized_ids}
+            raw_documents = payload.get("documents")
+            if raw_documents is not None and not isinstance(raw_documents, list):
+                raise ValueError("catalog documents are invalid")
+            result = {
+                "version": version,
+                "active_document_ids": normalized_ids,
+            }
+            if raw_documents is not None:
+                result["documents"] = self._normalize_catalog_documents(raw_documents)
+            return result
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             logger.error("knowledge_catalog_lkg_invalid", error=str(exc))
             return None
@@ -951,7 +1110,14 @@ class RagRetriever:
                     raise ValueError("Java knowledge catalog contains an empty document id")
                 if item not in active_ids:
                     active_ids.append(item)
-            catalog = {"version": version, "active_document_ids": active_ids}
+            catalog = {
+                "version": version,
+                "active_document_ids": active_ids,
+            }
+            if "documents" in raw_catalog:
+                catalog["documents"] = self._normalize_catalog_documents(
+                    raw_catalog.get("documents") or []
+                )
             if hint is not None and version < hint:
                 raise ValueError(
                     f"Java knowledge catalog regressed below release hint: {version} < {hint}"
@@ -974,6 +1140,35 @@ class RagRetriever:
                 error=str(exc),
             )
             return None
+
+    @staticmethod
+    def _normalize_catalog_documents(documents: list[Any]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for value in documents:
+            if not isinstance(value, dict):
+                raise ValueError("catalog document is invalid")
+            document_id = str(
+                value.get("document_id") or value.get("documentId") or ""
+            ).strip()
+            if not document_id:
+                raise ValueError("catalog document id is invalid")
+            normalized.append(
+                {
+                    "document_id": document_id,
+                    "source_name": str(
+                        value.get("source_name") or value.get("sourceName") or ""
+                    ).strip(),
+                    "content_hash": str(
+                        value.get("content_hash") or value.get("contentHash") or ""
+                    ).strip().lower(),
+                    "version": int(value.get("version") or 0),
+                    "domain": str(value.get("domain") or "GENERAL").strip().upper(),
+                    "chunk_count": int(
+                        value.get("chunk_count") or value.get("chunkCount") or 0
+                    ),
+                }
+            )
+        return normalized
 
     async def _knowledge_version(self) -> int:
         """Resolve the authoritative version used to partition FAQ caches.
@@ -1013,6 +1208,13 @@ class RagRetriever:
         """Apply the same release/catalog gate to semantic-cache hits."""
         active_ids = set(str(value) for value in (catalog or {}).get("active_document_ids", []))
         version = int((catalog or {}).get("version") or 0)
+        catalog_domains = {
+            str(item.get("document_id") or ""): str(
+                item.get("domain") or "GENERAL"
+            ).upper()
+            for item in (catalog or {}).get("documents", [])
+            if isinstance(item, dict) and item.get("document_id")
+        }
         filtered: list[dict] = []
         for doc in docs:
             metadata = doc.get("metadata") or {}
@@ -1025,6 +1227,12 @@ class RagRetriever:
                 # removed while the authoritative catalog is unavailable.
                 continue
             document_id = str(metadata.get("documentId") or "")
+            if str(metadata.get("status") or "").upper() != "PUBLISHED":
+                continue
+            expected_domain = catalog_domains.get(document_id)
+            actual_domain = str(metadata.get("domain") or "").upper()
+            if expected_domain is not None and actual_domain != expected_domain:
+                continue
             try:
                 document_version = int(metadata.get("version"))
             except (TypeError, ValueError):
@@ -1053,6 +1261,11 @@ class RagRetriever:
         bucket: str = "A",
         candidate_count: int | None = None,
         evaluation_candidates: list[dict] | None = None,
+        original_query: str | None = None,
+        security_flags: list[str] | tuple[str, ...] | None = None,
+        variant_count: int = 1,
+        normalization_rules: tuple[str, ...] = (),
+        forced_evidence_state: EvidenceState | None = None,
     ) -> dict[str, Any]:
         # A2 通道检疫：注入模型上下文的必须是洁净证据集。命中注入话术的片段
         # 在这里剔除而不是拒绝整个检索——知识库被投毒是"该修的文档问题"，
@@ -1106,6 +1319,52 @@ class RagRetriever:
         # and topScore are the "clean candidates that entered the evidence gate"
         # numbers, so a quarantined doc no longer counts toward either.
         refs = self._source_refs(docs, version) if hit else []
+        evidence_items: tuple[EvidenceItem, ...] = ()
+        if hit:
+            items: list[EvidenceItem] = []
+            seen_ids: set[str] = set()
+            ref_index = 0
+            for doc in docs:
+                metadata = doc.get("metadata") or {}
+                doc_id = str(
+                    doc.get("id")
+                    or metadata.get("chunkId")
+                    or metadata.get("questionId")
+                    or ""
+                )
+                if not doc_id or doc_id in seen_ids:
+                    continue
+                seen_ids.add(doc_id)
+                if ref_index >= len(refs):
+                    break
+                text = self._doc_text(doc)
+                if not text:
+                    continue
+                items.append(
+                    EvidenceItem(
+                        citation=len(items) + 1,
+                        text=text,
+                        ref=refs[ref_index],
+                    )
+                )
+                ref_index += 1
+            evidence_items = tuple(items)
+        evidence_state = forced_evidence_state or (
+            EvidenceState.SUPPORTED if hit and evidence_items else EvidenceState.INSUFFICIENT
+        )
+        if contamination and not evidence_items:
+            evidence_state = EvidenceState.QUARANTINED
+        envelope = GroundingEnvelope(
+            evidence_state=evidence_state,
+            evidence_items=evidence_items,
+            query_plan=QueryPlan(
+                original_query_hash=_sha256(original_query if original_query is not None else query),
+                safe_business_query=query,
+                variant_count=max(0, int(variant_count)),
+                normalization_rules=normalization_rules,
+            ),
+            security_flags=tuple(security_flags or ()),
+        )
         elapsed_ms = round(max(0.0, time.perf_counter() - started) * 1000, 2)
         result = {
             "text": self._format_docs(docs) if hit else "",
@@ -1126,6 +1385,7 @@ class RagRetriever:
                 ),
                 "latencyMs": elapsed_ms,
             },
+            **envelope.result_fields(),
         }
         if evaluation_candidates is not None:
             result["_evaluationCandidateRefs"] = self._source_refs(
@@ -1172,6 +1432,7 @@ class RagRetriever:
                 ("chunkId", "chunkId"),
                 ("questionId", "questionId"),
                 ("heading", "heading"),
+                ("domain", "domain"),
             ):
                 if metadata.get(metadata_key) is not None:
                     ref[ref_key] = metadata[metadata_key]
@@ -1270,6 +1531,10 @@ class RagRetriever:
         return "\n\n".join(parts)
 
     def _doc_text(self, doc: dict) -> str:
+        metadata = doc.get("metadata") or {}
+        original = metadata.get("originalContent")
+        if original is not None and str(original).strip():
+            return str(original).strip()
         return str(doc.get("content") or doc.get("text") or "").strip()
 
     def _has_enough_evidence(self, docs: list[dict]) -> bool:
@@ -1287,7 +1552,24 @@ class RagRetriever:
     def _filter_evidence_docs(self, docs: list[dict]) -> list[dict]:
         """Keep only candidates whose own score clears its scoring-scale gate."""
         settings = get_settings()
+        evaluation = _RERANK_EVALUATION_STATS.get()
+        evidence_threshold = (
+            evaluation.evidence_threshold
+            if evaluation is not None and evaluation.evidence_threshold is not None
+            else settings.rag_evidence_min_relevance
+        )
         rrf_floor = rrf_score_at_rank(settings.rag_evidence_min_rrf_rank)
+        rerank_scores = [
+            float(doc.get("score") or 0)
+            for doc in docs
+            if doc.get("source") == "rerank"
+        ]
+        rerank_top = max(rerank_scores, default=0.0)
+        margin = (
+            evaluation.top_score_margin
+            if evaluation is not None and evaluation.top_score_margin is not None
+            else settings.rag_evidence_top_score_margin
+        )
         accepted: list[dict] = []
         for doc in docs:
             score = float(doc.get("score") or 0)
@@ -1296,7 +1578,9 @@ class RagRetriever:
                 enough = score >= rrf_floor
             else:
                 # rerank and exact/non-fused results both use a 0..1 score.
-                enough = score >= settings.rag_evidence_min_relevance
+                enough = score >= evidence_threshold
+                if source == "rerank" and margin is not None:
+                    enough = enough and score >= rerank_top - float(margin)
             if enough:
                 accepted.append(doc)
         return accepted
@@ -1325,17 +1609,11 @@ class RagRetriever:
         return result
 
     def _rewrite_query(self, query: str) -> str:
-        text = (query or "").strip()
-        replacements = {
-            "这个": "",
-            "那个": "",
-            "它": "",
-            "吗": "",
-            "呢": "",
-        }
-        for old, new in replacements.items():
-            text = text.replace(old, new)
-        return " ".join(text.split())
+        # Preserve the user's complete question. Pronouns and sentence-final
+        # particles can carry meaning, and removing them silently changed the
+        # retrieval target. Multi-turn resolution is handled separately and only
+        # when conversation context exists.
+        return " ".join(str(query or "").strip().split())
 
     async def _get_faq_exact_cache(self, version: int, query: str) -> dict | None:
         key = f"mall:rag:faq_exact:v{version}:{_sha256(self._normalize_question(query))}"

@@ -50,6 +50,8 @@ create table if not exists knowledge_document
     status varchar(16) not null,
     version int default 1 not null,
     owner varchar(100) null,
+    domain varchar(64) default 'GENERAL' not null,
+    index_schema_version int default 0 not null,
     effective_start datetime null,
     effective_end datetime null,
     error_message varchar(512) null,
@@ -345,3 +347,32 @@ SET normalized_question = LOWER(
         question, ' ', ''), '，', ''), '。', ''), '？', ''), '?', ''), '！', '')
 )
 WHERE normalized_question IS NULL;
+
+-- Domain is optional at the HTTP boundary but always materialized in storage.
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'knowledge_document'
+          AND column_name = 'domain'
+    ),
+    'SELECT 1',
+    'ALTER TABLE knowledge_document ADD COLUMN domain varchar(64) DEFAULT ''GENERAL'' NOT NULL AFTER owner'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Published rows created before the metadata contract upgrade stay at 0 so the
+-- bootstrap can repair their ES documents exactly once.
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'knowledge_document'
+          AND column_name = 'index_schema_version'
+    ),
+    'SELECT 1',
+    'ALTER TABLE knowledge_document ADD COLUMN index_schema_version int DEFAULT 0 NOT NULL AFTER domain'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

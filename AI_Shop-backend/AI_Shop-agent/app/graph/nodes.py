@@ -33,6 +33,7 @@ from app.memory.session_memory_service import session_memory_service
 from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_bucket
+from app.rag.prompt_builder import build_grounding_prompt, grounding_repair_reason
 from app.rag.query_rewriter import rewrite_for_rag
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
@@ -344,6 +345,10 @@ async def build_context_node(state: AgentGraphState) -> dict:
     knowledge_text = ""
     rag_source_refs: list[dict] = []
     rag_trace: dict | None = None
+    rag_evidence_state = "INSUFFICIENT"
+    rag_evidence_items: list[dict] = []
+    rag_safe_business_query = user_text
+    grounding_system_messages: list[SystemMessage] = []
     rag_queries: list[str] = []
     rag_retrieval_count = 0
     rag_evidence_required = requires_rag_evidence(user_text, intent)
@@ -361,14 +366,30 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 _cat_map = get_settings().rag_intent_category_map
                 category_filter = (_cat_map.get(intent.value) or None) if _cat_map else None
                 rag_result = await rag_retriever.search_faq_with_trace(
-                    rag_query,
+                    user_text,
                     category_filter=category_filter,
                     bucket=ab_bucket,
+                    query_variants=[rag_query],
+                    security_flags=list(
+                        (state.get("agent_msg") or {}).get("inputSecurityFlags") or []
+                    ),
                 )
-            rag_queries.append(rag_retriever.query_key(rag_query))
+            rag_queries.append(rag_retriever.query_key(user_text))
             rag_retrieval_count = 1
             faq_text = str(rag_result.get("text") or "")
             rag_source_refs = list(rag_result.get("source_refs") or [])
+            grounding_prompt = build_grounding_prompt(
+                str((rag_result.get("queryPlan") or {}).get("safeBusinessQuery") or user_text),
+                evidence_state=str(rag_result.get("evidenceState") or "INSUFFICIENT"),
+                evidence_items=list(rag_result.get("evidenceItems") or []),
+            )
+            rag_evidence_state = grounding_prompt.evidence_state.value
+            rag_evidence_items = list(rag_result.get("evidenceItems") or [])
+            rag_safe_business_query = str(
+                (rag_result.get("queryPlan") or {}).get("safeBusinessQuery")
+                or user_text
+            )
+            grounding_system_messages = grounding_prompt.production_system_messages()
             retrieval_trace = dict(rag_result.get("trace") or {})
             retrieval_trace.update({"retrievalNo": 1, "phase": "prefetch"})
             rag_trace = {
@@ -376,15 +397,26 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 "ragMode": rag_mode,
                 "retrievals": [retrieval_trace],
             }
-            knowledge_text = faq_text
+            # Production and evaluation use the same numbered grounding
+            # contract. The legacy text/source_refs fields remain available for
+            # UI and trace compatibility.
+            # Grounding rules and numbered evidence are injected as separate
+            # SystemMessages below. Do not pass them through the intent template,
+            # which would escape the rules into the untrusted knowledge block and
+            # repeat the user query.
+            knowledge_text = ""
+            faq_text = ""
             episode_service.record_step(
                 "RAG_RETRIEVAL",
                 node_name="build_context",
-                input_data={"query": rag_query, "categoryFilter": category_filter},
+                input_data={
+                    "queryHash": rag_retriever.query_key(user_text),
+                    "categoryFilter": category_filter,
+                },
                 output_data={
                     "trace": rag_trace,
                     "sourceRefs": rag_source_refs,
-                    "hasEvidence": bool(faq_text and rag_source_refs),
+                    "hasEvidence": bool(rag_source_refs),
                 },
                 latency_ms=round((time.perf_counter() - rag_started) * 1_000),
             )
@@ -406,6 +438,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
         product_snapshot=snapshot,
         faq_text=faq_text,
         knowledge_text=knowledge_text,
+        grounding_system_messages=grounding_system_messages,
         selection_out=selected_fragments,
     )
 
@@ -450,6 +483,30 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 content=(
                     "【RAG 编排】本轮不开放额外 SEARCH_KNOWLEDGE 调用。"
                     "只使用已注入且带来源的知识；没有依据时不得给出确定政策结论。"
+                )
+            )
+        )
+
+    # P2 无证据拒答强化：当本轮没有任何通过证据门禁的知识片段时，明确告知模型
+    # 不得根据通用训练知识推断商品参数、价格、政策等具体数据。
+    # 条件：已做了预取（说明这类意图需要知识支撑），但证据为空；
+    # 且不是商品搜索/推荐意图（那些依赖工具结果而非 RAG 证据）。
+    _EVIDENCE_REQUIRED_INTENTS = frozenset(
+        {IntentKind.CHAT, IntentKind.PRODUCT_CONSULT, IntentKind.QUERY_LOGISTICS}
+    )
+    if (
+        prefetched
+        and not rag_source_refs
+        and rag_evidence_required
+        and intent in _EVIDENCE_REQUIRED_INTENTS
+    ):
+        messages.append(
+            SystemMessage(
+                content=(
+                    "[无证据提示]本轮未检索到相关知识库内容，证据库为空。"
+                    "你必须诚实告知用户：暂无相关信息，建议查看商品详情页或联系人工客服。"
+                    "禁止根据通用训练知识推断或猜测商品价格、规格、售后政策等具体数据。"
+                    "若涉及账号、订单或物流，请引导用户提供订单号后通过工具查询。"
                 )
             )
         )
@@ -539,6 +596,9 @@ async def build_context_node(state: AgentGraphState) -> dict:
         "image_understanding": image_understanding,
         "rag_source_refs": rag_source_refs,
         "rag_trace": rag_trace,
+        "rag_evidence_state": rag_evidence_state,
+        "rag_evidence_items": rag_evidence_items,
+        "rag_safe_business_query": rag_safe_business_query,
         "rag_mode": rag_mode,
         "rag_queries": rag_queries,
         "rag_retrieval_count": rag_retrieval_count,
@@ -609,6 +669,12 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         and not state.get("search_fallback_done")
     )
     non_stream_turn = similar_first_turn or category_switch_first_turn or tool_required_first_turn
+    grounded_answer_turn = bool(
+        state.get("rag_evidence_required")
+        and state.get("rag_evidence_state") == "SUPPORTED"
+        and state.get("rag_evidence_items")
+    )
+    non_stream_turn = non_stream_turn or grounded_answer_turn
     try:
         if non_stream_turn:
             response = await invoke_llm_with_metrics(
@@ -742,6 +808,80 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             order_id=(intent_data or "").strip() or extract_order_id(user_text),
         )
 
+    repair_attempted = bool(state.get("rag_repair_attempted"))
+    repair_reason = None
+    if grounded_answer_turn and not repair_attempted:
+        initial_text = strip_emojis(
+            rt.chunk_text(getattr(response, "content", "") or "")
+        )
+        evidence_items = list(state.get("rag_evidence_items") or [])
+        repair_reason = grounding_repair_reason(
+            initial_text,
+            evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
+            evidence_count=len(evidence_items),
+        )
+        if repair_reason:
+            repair_attempted = True
+            repair_prompt = build_grounding_prompt(
+                str(state.get("rag_safe_business_query") or user_text),
+                evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
+                evidence_items=evidence_items,
+                repair_reason=repair_reason,
+            )
+            try:
+                repair_llm = rt.bind_agent_llm(
+                    max_tokens=256,
+                    disable_thinking=True,
+                    tools_enabled=False,
+                )
+                repaired = await invoke_llm_with_metrics(
+                    repair_llm,
+                    repair_prompt.messages(),
+                    model=settings.llm_model,
+                )
+                repaired_text = strip_emojis(
+                    rt.chunk_text(getattr(repaired, "content", "") or "")
+                )
+                remaining = grounding_repair_reason(
+                    repaired_text,
+                    evidence_state=str(
+                        state.get("rag_evidence_state") or "INSUFFICIENT"
+                    ),
+                    evidence_count=len(evidence_items),
+                )
+                if repaired_text and not remaining:
+                    response = repaired
+                    turn_chunks = [repaired_text]
+                else:
+                    repair_reason = (
+                        f"{repair_reason}；修复后仍失败：{remaining or '空答案'}"
+                    )
+                episode_service.record_step(
+                    "RAG_GENERATION_REPAIR",
+                    node_name="agent_loop",
+                    status="OK" if repaired_text and not remaining else "FAILED",
+                    input_data={
+                        "reason": repair_reason,
+                        "initialAnswer": initial_text,
+                        "evidenceCount": len(evidence_items),
+                    },
+                    output_data={"repairedAnswer": repaired_text},
+                )
+            except Exception as exc:
+                repair_reason = f"{repair_reason}；修复调用失败：{type(exc).__name__}"
+                episode_service.record_step(
+                    "RAG_GENERATION_REPAIR",
+                    node_name="agent_loop",
+                    status="ERROR",
+                    input_data={
+                        "reason": repair_reason,
+                        "initialAnswer": initial_text,
+                        "evidenceCount": len(evidence_items),
+                    },
+                    error_code=type(exc).__name__,
+                    error_message=str(exc),
+                )
+
     messages.append(response)
     if not turn_chunks:
         llm_body = strip_emojis(rt.chunk_text(getattr(response, "content", "") or ""))
@@ -752,6 +892,8 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         "chunks": turn_chunks,
         "pending_tool_calls": [],
         "route": "finalize",
+        "rag_repair_attempted": repair_attempted,
+        "rag_repair_reason": repair_reason,
     }
 
 
@@ -897,6 +1039,11 @@ async def tools_node(state: AgentGraphState) -> dict:
     rag_retrieval_count = int(state.get("rag_retrieval_count") or 0)
     rag_source_refs = list(state.get("rag_source_refs") or [])
     rag_trace = dict(state.get("rag_trace") or {}) or None
+    rag_evidence_state = str(state.get("rag_evidence_state") or "INSUFFICIENT")
+    rag_evidence_items = list(state.get("rag_evidence_items") or [])
+    rag_safe_business_query = str(
+        state.get("rag_safe_business_query") or state.get("user_text") or ""
+    )
     quarantined_result = False
 
     for tc in state.get("pending_tool_calls") or []:
@@ -1034,7 +1181,7 @@ async def tools_node(state: AgentGraphState) -> dict:
                     episode_service.record_step(
                         "RAG_RETRIEVAL",
                         node_name="tools",
-                        input_data={"query": tool_args.get("query")},
+                        input_data={"queryHash": query_key},
                         output_data={
                             "trace": safe_trace,
                             "sourceRefs": [],
@@ -1058,10 +1205,49 @@ async def tools_node(state: AgentGraphState) -> dict:
                 retrieval_no=rag_retrieval_count,
                 source_count=len(rag_source_refs),
             )
+            grounding = result.grounding or {}
+            incoming_state = str(grounding.get("evidenceState") or "INSUFFICIENT")
+            if incoming_state == "SUPPORTED":
+                rag_evidence_state = "SUPPORTED"
+            elif incoming_state == "QUARANTINED" and rag_evidence_state != "SUPPORTED":
+                rag_evidence_state = "QUARANTINED"
+            grounding_prompt = build_grounding_prompt(
+                str((grounding.get("queryPlan") or {}).get("safeBusinessQuery") or ""),
+                evidence_state=incoming_state,
+                evidence_items=list(grounding.get("evidenceItems") or []),
+            )
+            # A ToolMessage is untrusted by definition; the shared behavioral
+            # contract must still be a true system-role message.
+            messages.insert(-1, grounding_prompt.production_system_messages()[0])
+            for item in grounding.get("evidenceItems") or []:
+                if not isinstance(item, dict):
+                    continue
+                identity = str(
+                    (item.get("ref") or {}).get("id")
+                    or (item.get("ref") or {}).get("chunkId")
+                    or (item.get("ref") or {}).get("questionId")
+                    or ""
+                )
+                existing_ids = {
+                    str(
+                        (row.get("ref") or {}).get("id")
+                        or (row.get("ref") or {}).get("chunkId")
+                        or (row.get("ref") or {}).get("questionId")
+                        or ""
+                    )
+                    for row in rag_evidence_items
+                    if isinstance(row, dict)
+                }
+                if identity and identity not in existing_ids:
+                    rag_evidence_items.append(item)
+            rag_safe_business_query = str(
+                (grounding.get("queryPlan") or {}).get("safeBusinessQuery")
+                or rag_safe_business_query
+            )
             episode_service.record_step(
                 "RAG_RETRIEVAL",
                 node_name="tools",
-                input_data={"query": tool_args.get("query")},
+                input_data={"queryHash": query_key},
                 output_data={
                     "trace": result.retrieval_trace,
                     "sourceRefs": result.source_refs,
@@ -1093,6 +1279,9 @@ async def tools_node(state: AgentGraphState) -> dict:
         "rag_retrieval_count": rag_retrieval_count,
         "rag_source_refs": rag_source_refs,
         "rag_trace": rag_trace,
+        "rag_evidence_state": rag_evidence_state,
+        "rag_evidence_items": rag_evidence_items,
+        "rag_safe_business_query": rag_safe_business_query,
     }
     if is_order_cards_json(assistant_cards) and "QUERY_ORDERS" in called:
         logger.info("finalize_after_order_cards", user_id=user_id)
@@ -1246,6 +1435,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
             message_card=state.get("message_card"),
             order_resolution=state.get("order_resolution"),
             rag_evidence_required=bool(state.get("rag_evidence_required")),
+            rag_evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
             verifier_fallback=state.get("verifier_fallback"),
         )
     except Exception as e:

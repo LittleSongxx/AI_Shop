@@ -89,6 +89,25 @@ async def run_agent_graph(agent_msg: dict) -> str:
 
             outcome = str(result.get("outcome") or "ok")
             elapsed_ms = round((time.perf_counter() - started) * 1_000)
+
+            # Token 消耗累计：将本次图运行消耗的真实 token 累加到用户的会话和每日配额。
+            # snapshot_cost_summary() 从 contextvar 读取本次请求内所有 LLM 调用的汇总。
+            cost_summary = snapshot_cost_summary(tools_called=result.get("tools_called"))
+            total_tokens = int(cost_summary.get("inputTokens") or 0) + int(
+                cost_summary.get("outputTokens") or 0
+            )
+            if total_tokens > 0:
+                try:
+                    from app.services.rate_limit_service import rate_limit_service
+                    await rate_limit_service.record_token_usage(user_id, total_tokens)
+                except Exception as _token_err:
+                    logger.warning(
+                        "token_usage_record_failed",
+                        user_id=user_id,
+                        tokens=total_tokens,
+                        error=type(_token_err).__name__,
+                    )
+
             episode_service.update_run(
                 intent=result.get("intent"),
                 experiment={

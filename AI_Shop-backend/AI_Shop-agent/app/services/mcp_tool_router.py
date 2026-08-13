@@ -11,6 +11,7 @@ from app.harness.agents.contracts import VerifiedImageContext
 from app.harness.guardrails.tool_guard import ToolGuardrail
 from app.harness.metrics.runtime_sensors import TOOL_CALL_TOTAL, measure_agent_stage
 from app.observability.telemetry import get_tracer
+from app.rag.prompt_builder import format_grounding_evidence
 from app.services.badcase_service import badcase_service
 from app.services.episode_service import current_episode, episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
@@ -153,7 +154,12 @@ class McpToolRouter:
             if context and context.run_id:
                 raw.setdefault("runId", context.run_id)
         if tool_name == "SEARCH_KNOWLEDGE":
-            return {"userId": user_id, "query": raw.get("query") or ""}
+            query = str(raw.get("query") or "")
+            return {
+                "userId": user_id,
+                "queryHash": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+                "queryChars": len(query),
+            }
         if tool_name == "SEARCH_PRODUCTS_BY_IMAGE":
             trusted = raw.get("imageAssetId") or raw.get("image_asset_id")
             return {
@@ -307,17 +313,42 @@ class McpToolRouter:
             retrieval_trace = (
                 result.get("trace") if isinstance(result.get("trace"), dict) else None
             )
+            grounding = {
+                key: result.get(key)
+                for key in (
+                    "evidenceState",
+                    "evidenceItems",
+                    "queryPlan",
+                    "securityFlags",
+                )
+            }
             TOOL_CALL_TOTAL.labels(tool="SEARCH_KNOWLEDGE", status="success").inc()
             if not text:
                 return ToolInvokeResult(
                     content="【知识检索】未找到通过证据门禁的相关内容",
                     source_refs=[],
                     retrieval_trace=retrieval_trace,
+                    grounding=grounding,
                 )
+            has_grounding_contract = bool(
+                grounding.get("evidenceState")
+                or grounding.get("evidenceItems")
+                or grounding.get("queryPlan")
+            )
             return ToolInvokeResult(
-                content=text,
+                content=(
+                    format_grounding_evidence(
+                        evidence_state=str(
+                            grounding.get("evidenceState") or "INSUFFICIENT"
+                        ),
+                        evidence_items=list(grounding.get("evidenceItems") or []),
+                    )
+                    if has_grounding_contract
+                    else text
+                ),
                 source_refs=source_refs,
                 retrieval_trace=retrieval_trace,
+                grounding=grounding,
             )
         except Exception as e:
             logger.exception("search_knowledge_failed", query=query[:80], error=str(e))

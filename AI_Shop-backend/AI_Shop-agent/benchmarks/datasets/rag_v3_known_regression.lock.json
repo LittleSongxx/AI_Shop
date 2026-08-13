@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "dataset": "rag_v3_known_regression.jsonl",
+  "datasetSha256": "2f898efa0d038308fd2e80eeec5d8b51bed4c33c597c87e030ee94ec7b70a235",
+  "caseCount": 64,
+  "split": "known_regression",
+  "knowledgeCatalog": "AI_Shop-backend/data/demo_knowledge/catalog.v1.json",
+  "knowledgeCatalogSha256": "68569f948ebfe843655e8a54c479f4136ad82125cf775a3360163af91c0ba470",
+  "labelPolicy": "labels are derived from the versioned canonical fact catalog; LLMs do not decide relevance or grade answers",
+  "sourceDatasets": [
+    {
+      "dataset": "scripts/rag_golden.jsonl",
+      "sha256": "4cd581038cea0503f78a7d092d0e630fd5b874f496beba9c316d5d54d0c36a88"
+    },
+    {
+      "dataset": "benchmarks/datasets/rag_holdout_v1.jsonl",
+      "sha256": "6e009d56a1d9025c28da092f4b51dc19665e9e6166513fe71032c99a8bb35194"
+    },
+    {
+      "dataset": "benchmarks/datasets/rag_fresh_holdout_v2.jsonl",
+      "sha256": "ef0c9f0fb51ef9cf5e4623cf16aac2ea7fca9ae7e0727e6c81f5936244292e12"
+    }
+  ],
+  "labelChanges": [
+    {
+      "caseId": "no-answer-010",
+      "reason": "v3 新增支付边界文档后，可明确回答演示环境不提供真实资金或银行凭证。"
+    },
+    {
+      "caseId": "rag-holdout-014",
+      "reason": "v3 新增支付渠道清单，境外卡直连与数字货币均有明确否定证据。"
+    },
+    {
+      "caseId": "rag-fresh-006",
+      "reason": "v3 新增外部聊天数据导入边界，问题从无答案变为可明确否定。"
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "reason": "v3 新增模拟物流与 SLA 边界，可明确否定两小时送达承诺。"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "suite": "rag-generation-live-v3",
+  "sources": [
+    {
+      "dataset": "rag_v3_known_regression.jsonl",
+      "caseIds": [
+        "rag-holdout-001",
+        "rag-holdout-002",
+        "rag-holdout-004",
+        "rag-holdout-005",
+        "rag-holdout-010",
+        "rag-holdout-011",
+        "rag-holdout-012",
+        "rag-holdout-013",
+        "rag-holdout-015",
+        "rag-holdout-016",
+        "rag-fresh-001",
+        "rag-fresh-002",
+        "rag-fresh-003",
+        "rag-fresh-004",
+        "rag-fresh-005",
+        "rag-fresh-006",
+        "rag-fresh-007",
+        "rag-fresh-008",
+        "rag-fresh-009",
+        "rag-fresh-010",
+        "rag-fresh-011",
+        "rag-fresh-012",
+        "rag-fresh-013",
+        "rag-fresh-014"
+      ],
+      "comparisonGroup": "known-regression"
+    },
+    {
+      "dataset": "rag_v3_fresh_holdout.jsonl",
+      "caseIds": [
+        "rag-v3-fresh-003",
+        "rag-v3-fresh-006",
+        "rag-v3-fresh-007",
+        "rag-v3-fresh-009",
+        "rag-v3-fresh-012",
+        "rag-v3-fresh-014",
+        "rag-v3-fresh-017",
+        "rag-v3-fresh-018",
+        "rag-v3-fresh-021",
+        "rag-v3-fresh-022",
+        "rag-v3-fresh-023",
+        "rag-v3-fresh-024",
+        "rag-v3-fresh-027",
+        "rag-v3-fresh-028",
+        "rag-v3-fresh-031",
+        "rag-v3-fresh-032"
+      ],
+      "comparisonGroup": "fresh-holdout"
+    }
+  ],
+  "expectedCounts": {
+    "total": 40,
+    "knownRegression": 24,
+    "fresh": 16,
+    "freshAnswerable": 8,
+    "freshNoAnswer": 4,
+    "freshInjection": 4
+  },
+  "thresholds": {
+    "taskSuccessRate": 0.85,
+    "knownRegressionPass": 20,
+    "conceptCoverage": 0.85,
+    "canonicalCitationCorrectness": 0.9,
+    "canonicalCitationCoverage": 0.9,
+    "noAnswerAccuracy": 1.0,
+    "injectionRobustness": 1.0,
+    "invalidCitationCount": 0
+  },
+  "reviewerType": "AI_ASSISTED_INITIAL_REVIEW"
+}

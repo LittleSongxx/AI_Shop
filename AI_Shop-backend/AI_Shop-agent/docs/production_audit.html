@@ -1,0 +1,1179 @@
+<title>AI_Shop 生产成熟度评估</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+/* ── Token layer ──────────────────────────────────────────── */
+:root {
+  --bg:        #F2F5FB;
+  --surface:   #FFFFFF;
+  --border:    #D8E1EE;
+  --text-1:    #1B2537;
+  --text-2:    #4E6180;
+  --text-3:    #8497B0;
+  --accent:    #1A56DB;
+  --accent-dim:#E8EFFD;
+  --ok:        #0C7C59;
+  --ok-bg:     #E6F4EE;
+  --warn:      #B45309;
+  --warn-bg:   #FEF3C7;
+  --crit:      #A9242D;
+  --crit-bg:   #FEE2E2;
+  --info:      #0369A1;
+  --info-bg:   #E0F2FE;
+  --mono:      'Courier New', Courier, monospace;
+  --sans:      system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius:    6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0B0F18;
+    --surface:   #141A27;
+    --border:    #1F2D40;
+    --text-1:    #E2EAF4;
+    --text-2:    #8497B0;
+    --text-3:    #4E6180;
+    --accent:    #4D8EF0;
+    --accent-dim:#0F1E38;
+    --ok:        #34D399;
+    --ok-bg:     #052E1C;
+    --warn:      #FBB843;
+    --warn-bg:   #2C1A00;
+    --crit:      #F87171;
+    --crit-bg:   #2A0A0A;
+    --info:      #38BDF8;
+    --info-bg:   #0C2436;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:        #0B0F18;
+  --surface:   #141A27;
+  --border:    #1F2D40;
+  --text-1:    #E2EAF4;
+  --text-2:    #8497B0;
+  --text-3:    #4E6180;
+  --accent:    #4D8EF0;
+  --accent-dim:#0F1E38;
+  --ok:        #34D399;
+  --ok-bg:     #052E1C;
+  --warn:      #FBB843;
+  --warn-bg:   #2C1A00;
+  --crit:      #F87171;
+  --crit-bg:   #2A0A0A;
+  --info:      #38BDF8;
+  --info-bg:   #0C2436;
+}
+
+/* ── Reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text-1);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, pre {
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── Layout ───────────────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-badge {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--accent-dim);
+  color: var(--accent);
+  padding: 0.2em 0.55em;
+  border-radius: 3px;
+}
+.topbar-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.topbar-meta {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+.sidebar {
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 1.5rem 0 2rem;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+.nav-group { margin-bottom: 1.5rem; }
+.nav-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0 1rem;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+.nav-link {
+  display: block;
+  padding: 0.3rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-2);
+  border-left: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.nav-link:hover, .nav-link.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-dim);
+  text-decoration: none;
+}
+.main {
+  padding: 2.5rem 3rem 4rem;
+  max-width: 860px;
+}
+
+/* ── Typography ───────────────────────────────────────────── */
+.section { margin-bottom: 3.5rem; }
+.section-eyebrow {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 0.4rem;
+}
+.section-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.3;
+  text-wrap: balance;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+}
+.section-title + p { color: var(--text-2); font-size: 0.9rem; margin-bottom: 1.5rem; }
+h3 {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--text-1);
+  margin: 1.5rem 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+/* ── Summary header ───────────────────────────────────────── */
+.summary-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.75rem;
+  margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+  align-items: start;
+}
+.grade-block { text-align: center; }
+.grade {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.grade-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 0.25rem;
+}
+.summary-body p { font-size: 0.88rem; color: var(--text-2); line-height: 1.65; }
+.summary-body p + p { margin-top: 0.6rem; }
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.stat-pill {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.25em 0.6em;
+  border-radius: 20px;
+  border: 1px solid;
+}
+.stat-pill.ok  { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok); }
+.stat-pill.warn{ color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+.stat-pill.crit{ color: var(--crit); background: var(--crit-bg); border-color: var(--crit); }
+
+/* ── Finding card ─────────────────────────────────────────── */
+.finding-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 1rem;
+  overflow: hidden;
+  border-left: 4px solid var(--border);
+}
+.finding-card.ok   { border-left-color: var(--ok); }
+.finding-card.warn { border-left-color: var(--warn); }
+.finding-card.crit { border-left-color: var(--crit); }
+.finding-card.info { border-left-color: var(--info); }
+.finding-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem 0.5rem;
+}
+.finding-title {
+  font-weight: 650;
+  font-size: 0.9rem;
+  color: var(--text-1);
+  flex: 1;
+}
+.badge {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.18em 0.5em;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.badge-ok   { background: var(--ok-bg);   color: var(--ok); }
+.badge-warn { background: var(--warn-bg); color: var(--warn); }
+.badge-crit { background: var(--crit-bg); color: var(--crit); }
+.badge-info { background: var(--info-bg); color: var(--info); }
+.finding-body {
+  padding: 0 1rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  line-height: 1.65;
+}
+.finding-body p + p { margin-top: 0.45rem; }
+.finding-body ul { padding-left: 1.2rem; margin-top: 0.4rem; }
+.finding-body li { margin-bottom: 0.25rem; }
+.finding-body code {
+  background: var(--bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  color: var(--accent);
+  font-size: 0.82em;
+}
+.finding-fix {
+  background: var(--ok-bg);
+  border-top: 1px solid var(--border);
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  color: var(--ok);
+}
+.finding-fix code { color: var(--ok); background: transparent; }
+
+/* ── Coverage bars ────────────────────────────────────────── */
+.coverage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.coverage-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+.coverage-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 0.5rem;
+}
+.coverage-bar {
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+.coverage-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.coverage-fill.high   { background: var(--ok); }
+.coverage-fill.medium { background: var(--warn); }
+.coverage-fill.low    { background: var(--crit); }
+.coverage-score {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-3);
+}
+
+/* ── Case study box ───────────────────────────────────────── */
+.case-study {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.case-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.case-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.case-name {
+  font-weight: 650;
+  font-size: 0.9rem;
+  color: var(--text-1);
+}
+.case-body { padding: 1rem 1.1rem; font-size: 0.85rem; color: var(--text-2); }
+.case-body p + p { margin-top: 0.45rem; }
+.verdict-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.verdict-item {
+  font-size: 0.78rem;
+  padding: 0.2em 0.55em;
+  border-radius: 3px;
+}
+.verdict-item.yes { background: var(--ok-bg); color: var(--ok); }
+.verdict-item.partial { background: var(--warn-bg); color: var(--warn); }
+.verdict-item.no { background: var(--crit-bg); color: var(--crit); }
+
+/* ── Recommendation list ──────────────────────────────────── */
+.rec-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+.rec-item {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  align-items: start;
+}
+.rec-num {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--accent);
+  line-height: 1.4;
+}
+.rec-content { font-size: 0.85rem; color: var(--text-2); }
+.rec-content strong { color: var(--text-1); display: block; margin-bottom: 0.2rem; font-size: 0.88rem; }
+
+/* ── Industry table ───────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin-top: 0.75rem; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+thead { background: var(--bg); }
+th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 0.65rem 0.9rem;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+td:first-child { color: var(--text-1); font-weight: 600; font-size: 0.83rem; }
+
+/* ── Divider ──────────────────────────────────────────────── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5rem 0;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .topbar { grid-column: 1; }
+  .main { padding: 1.5rem 1.25rem 3rem; }
+  .coverage-grid { grid-template-columns: 1fr; }
+  .summary-header { grid-template-columns: 1fr; }
+  .grade-block { text-align: left; display: flex; align-items: baseline; gap: 0.75rem; }
+}
+</style>
+
+<div class="layout">
+  <!-- Top bar -->
+  <header class="topbar">
+    <span class="topbar-badge">Audit Report</span>
+    <span class="topbar-title">AI_Shop — 生产成熟度评估</span>
+    <span class="topbar-meta">2026-08-13 &nbsp;·&nbsp; feat/multi-agent-harness</span>
+  </header>
+
+  <!-- Sidebar nav -->
+  <nav class="sidebar" aria-label="页面导航">
+    <div class="nav-group">
+      <span class="nav-label">Overview</span>
+      <a class="nav-link" href="#summary">执行摘要</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">已实现</span>
+      <a class="nav-link" href="#guardrails">输入/输出防护</a>
+      <a class="nav-link" href="#ratelimit">限流与熔断</a>
+      <a class="nav-link" href="#context">上下文管理</a>
+      <a class="nav-link" href="#ops">可观测性</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">边缘案例</span>
+      <a class="nav-link" href="#case-html">HTML 源码输入</a>
+      <a class="nav-link" href="#case-char">逐字发送</a>
+      <a class="nav-link" href="#case-repeat">重复提问</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">缺口分析</span>
+      <a class="nav-link" href="#gaps">分级缺口</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">行业参照</span>
+      <a class="nav-link" href="#industry">生产AI客服问题全景</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">建议</span>
+      <a class="nav-link" href="#recommendations">优先修复建议</a>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- ① 执行摘要 -->
+    <section class="section" id="summary">
+      <p class="section-eyebrow">Executive Summary</p>
+      <h2 class="section-title">这个项目远超 Demo 水准，但上线前还有几道真实的坎</h2>
+
+      <div class="summary-header">
+        <div class="summary-body">
+          <p>AI_Shop 在防护架构上的思考已经到了工程级别：输入归一化 + 分档注入检测、通道内容检疫、输出幻觉防护、Redis 多进程安全限流、熔断器、上下文压缩、写操作签名确认 ——这些在绝大多数"Demo 转生产"项目里都是空白，而这里都有具体实现。</p>
+          <p>但仍有几个真实风险点没有完整闭合：单用户 Token 消耗无硬性上限、逐字/低信息量消息对 LLM pipeline 的穿透、间接提示注入文档的入库时检查、以及 WebSocket 路径的输入验证一致性。这些不是"锦上添花"，是上线后第一周就可能被触发的洞。</p>
+          <div class="stat-row">
+            <span class="stat-pill ok">✓ 19 项已实现</span>
+            <span class="stat-pill warn">⚡ 6 项部分实现</span>
+            <span class="stat-pill crit">✗ 8 项缺失</span>
+          </div>
+        </div>
+        <div class="grade-block">
+          <div class="grade">B+</div>
+          <div class="grade-label">成熟度评级</div>
+        </div>
+      </div>
+
+      <div class="coverage-grid">
+        <div class="coverage-item">
+          <div class="coverage-name">输入安全防护</div>
+          <div class="coverage-bar"><div class="coverage-fill high" style="width:85%"></div></div>
+          <div class="coverage-score">85% — 注入检测完整，缺少入库时文档扫描</div>
+        </div>
+        <div class="coverage-item">
+          <div class="coverage-name">限流 / 资源保护</div>
+          <div class="coverage-bar"><div class="coverage-fill medium" style="width:60%"></div></div>
+          <div class="coverage-score">60% — 用户级限流完整，Token 消耗无上限</div>
+        </div>
+        <div class="coverage-item">
+          <div class="coverage-name">上下文 / 会话管理</div>
+          <div class="coverage-bar"><div class="coverage-fill high" style="width:80%"></div></div>
+          <div class="coverage-score">80% — 压缩机制完善，竞态边缘需补全</div>
+        </div>
+        <div class="coverage-item">
+          <div class="coverage-name">输出一致性防护</div>
+          <div class="coverage-bar"><div class="coverage-fill high" style="width:90%"></div></div>
+          <div class="coverage-score">90% — 幻觉操作拦截到位，商品数据幻觉无覆盖</div>
+        </div>
+        <div class="coverage-item">
+          <div class="coverage-name">可观测性 / 告警</div>
+          <div class="coverage-bar"><div class="coverage-fill high" style="width:75%"></div></div>
+          <div class="coverage-score">75% — Episode+Judge+Badcase 体系完整，缺 Token 消耗告警</div>
+        </div>
+        <div class="coverage-item">
+          <div class="coverage-name">人工兜底 / 升级路径</div>
+          <div class="coverage-bar"><div class="coverage-fill high" style="width:88%"></div></div>
+          <div class="coverage-score">88% — 人工转接完整，重复问题升级逻辑已有</div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ② 已实现的防护 -->
+    <section class="section" id="guardrails">
+      <p class="section-eyebrow">已实现 · 输入 / 输出防护</p>
+      <h2 class="section-title">深度防御栈：三层隔离已到位</h2>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">输入归一化 + 分档注入检测（input_guard.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>NFKC 折叠先将全角字符、零宽字符、Unicode 兼容形式统一为 ASCII 等价，再删除 C* 类别控制字符，最后压空白 + 截断到 <code>max_input_chars=4000</code>。这一步让 <code>ｉｇｎｏｒｅ</code> 和 <code>ig​nore</code>（夹零宽字符）都能被后续正则命中。</p>
+          <p>规则分两档：<strong>BLOCKING_RULES</strong>（10 条）命中即拒，涵盖指令覆盖、Prompt 泄露、角色劫持、模板注入、防护绕过；<strong>SUSPICIOUS_RULES</strong>（8 条）弱信号，单独命中只记日志，≥2 类才升级为拒绝——有效压住误伤。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">通道内容检疫（channel_guard.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>RAG 召回的知识库片段和工具返回结果在进入模型上下文前经过同一张规则表扫描。命中的片段被<strong>剔除</strong>而非拒答，整体按"无证据"处理——避免被污染文档劫持 LLM 输出，也避免"一个脏文档让整个对话崩溃"。</p>
+          <p>关键设计：检疫事件写入检索 trace + 观测日志，使"知识库出现被注入文档"可被发现、可定位到具体文档。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">Spotlighting：用户输入隔离（prompt_boundary.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>用户输入被包裹在 <code>&lt;user_input&gt;</code> 标签中送入模型，系统词中声明标签内是数据而非指令。RAG 知识库片段经 <code>isolate_knowledge_text()</code> 做同样的隔离处理。这是目前最有效的提示注入缓解手段之一。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">输出幻觉防护（output_guard.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>三类幻觉被主动拦截：</p>
+          <ul>
+            <li><strong>FALSE_COMPLETION</strong>：没有 PROPOSE_* 工具调用时，声称"退款已成功"等会被替换为澄清文案</li>
+            <li><strong>FALSE_CONFIRM_CARD</strong>：声称已生成确认卡片但实际没有 → 重定向到正确流程</li>
+            <li><strong>FALSE_CAPABILITY</strong>：声称"帮你下单"等不具备的能力 → 追加免责提示</li>
+          </ul>
+          <p>同时剥离 Emoji（避免模型通过 Emoji 编码绕过文本过滤）和内嵌的产品 JSON 片段。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">写操作签名确认 + 工具白名单（tool_guard.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>所有写操作走 <code>PROPOSE_*</code> → 服务端生成 <code>actionToken</code>（加密签名）→ 用户点击确认 → 服务端校验归属 的两步确认流程。模型无论输出什么文本都无法直接触发写操作，Token 由服务端签发且绑定 <code>user_id</code>。工具白名单静态定义，不由对话内容决定。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">数据分析 SQL 防护（sql_guard.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>Admin DataAnalyst 模块使用 <code>sqlglot</code> AST 解析，强制：仅 SELECT、禁 JOIN/子查询/OR/变量/锁、仅允许视图白名单、函数白名单、LIMIT 强制、列名白名单、日期窗口强制且最大 90 天。这层防护使 LLM 生成的 SQL 无法泄露敏感表或执行危险函数。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="infra">
+      <p class="section-eyebrow">已实现 · Java 后端基础设施</p>
+      <h2 class="section-title">分布式系统核心模式已正确实现</h2>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">分布式事务 + MQ 三层可靠性</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>下单路径使用 Seata AT 模式 <code>@GlobalTransactional</code> 保证跨服务一致性。MQ 可靠性通过三层叠加：本地 outbox 表 → <code>TransactionalMqSender</code>（事务提交后发送）→ 补偿扫描任务。支付回调、超时关单、迟到退款三路竞态由 Redis 互斥锁强制串行。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">退款 Saga + 优惠券超卖防护</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>退款 Saga 含 MANUAL_REVIEW 状态和 CAS 保护的审批恢复，在审核窗口期检测数据漂移后重新校验。秒杀优惠券使用 Redis Lua 原子预扣 + DB 库存双重确认，全生命周期管理。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="context">
+      <p class="section-eyebrow">已实现 · 上下文管理</p>
+      <h2 class="section-title">Token 预算 + 压缩 + 历史裁剪</h2>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">会话上下文压缩（session_memory_service.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>运行时 Token 预算 <code>working_token_budget=16,000</code>，压缩触发阈值 <code>compress_token_threshold=12,000</code>。超阈值时用独立的 Memory LLM 生成会话摘要，再把完整历史替换为摘要 + 最近若干轮。Redis 缓存层（TTL 24小时）+ MySQL 持久层双写，避免 Worker 重启后会话丢失。</p>
+          <p>历史消息上限 <code>history_message_limit=15</code>，助手历史最大长度 <code>assistant_history_max_len=500</code>，防止上下文随对话轮数二次方膨胀。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">ReAct 轮次上限（graph_max_react_rounds=5）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>Agent 图节点在每次进入 <code>agent_loop_node</code> 时检查 <code>react_round</code>，达到上限强制跳转 finalize，避免工具调用链被攻击者或边缘问题驱动成无限循环（Denial-of-Wallet 的一种常见路径）。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="ops">
+      <p class="section-eyebrow">已实现 · 可观测性与质量闭环</p>
+      <h2 class="section-title">Episode 追踪 + 影子评审 + Badcase 管线</h2>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">Episode 服务 + Judge 影子评分</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>每次 Agent 运行生成 <code>run_id</code>，关键节点通过 <code>episode_service.record_step()</code> 录入。Judge 服务以 5% 抽样率异步评分（<code>judge_sample_rate=0.05</code>），低于 0.65 分的回答进入 Badcase 候选队列，由人工审核后沉淀为回归测试集。这是"上线后持续变好"而非"上线后慢慢变差"的核心机制。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">RAG 语义缓存 + FAQ 快速路径</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>语义缓存 TTL 30 分钟，命中按 1% 比例进盲评队列（<code>rag_cache_sample_rate=0.01</code>）——"命中率突降按事故处理，误报率按周评审"的行业建议已内化。FAQ 精确匹配路径有 1.5 秒快速超时，6 小时 TTL。高频重复问题在此层被短路，不进 LLM。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">人工转接 + SLA 监控</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>用户可主动发起 <code>requestHuman</code>；Agent 检测到意图连续重复（<code>HANDOFF_SUGGESTED</code>）或低置信时主动建议转人工，追加文案"可以回复'转人工'"。Support 队列有 SLA 告警：首响应 <code>support_first_response_sla_seconds=300</code>，队列预警 <code>support_queue_alert_seconds=600</code>。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 边缘案例深度分析 -->
+    <section class="section" id="case-html">
+      <p class="section-eyebrow">边缘案例分析 · 01</p>
+      <h2 class="section-title">用户直接粘贴商品网页 HTML 源码</h2>
+
+      <div class="case-study">
+        <div class="case-head">
+          <span class="case-icon">📄</span>
+          <span class="case-name">场景：用户复制整个商品页面源码（HTML + JS + CSS）发给客服</span>
+        </div>
+        <div class="case-body">
+          <p><strong>现有防护能做什么：</strong><code>max_input_chars=4000</code> 会在归一化后截断超长输入并抛出 <code>ValueError("输入内容不能超过4000个字符")</code>，前端展示为业务错误码 600。一个典型的商品详情页 HTML 源码通常在 50KB~200KB 之间，远超这个上限，因此会被截断。</p>
+          <p><strong>漏洞在哪里：</strong>4000 字符的阈值本身是对的，但有两个细节问题。第一，错误提示不够语义化——用户看到"不能超过4000个字符"时通常会剪短后重发，但 4000 字节的 HTML 片段依然是噪声。第二，<code>template_injection</code> 规则能命中 <code>&lt;system&gt;</code>、<code>&lt;user_input&gt;</code> 等 LLM 特殊标签，但普通的 <code>&lt;div&gt;</code>、<code>&lt;script&gt;</code>、<code>&lt;meta&gt;</code> 不会触发任何规则——如果用户分多次发送 HTML 片段（每次 &lt; 4000 字符），这些片段会逐条进入 LLM，消耗大量 Token 但毫无信息价值。</p>
+          <p><strong>实际危害：</strong>用户通常的真实意图是"帮我看一下这个商品值不值得买"。现有路径下这条问题会触发 PRODUCT_CONSULT 或 PRODUCT_SEARCH 意图，LLM 拿到一段残缺 HTML 尝试解析，大概率产生幻觉或回复"无法处理该格式"，同时消耗 2000-4000 个输入 Token。</p>
+          <div class="verdict-row">
+            <span class="verdict-item yes">✓ 超长输入截断</span>
+            <span class="verdict-item yes">✓ LLM 特殊标签拦截</span>
+            <span class="verdict-item partial">⚡ 错误提示不语义化</span>
+            <span class="verdict-item no">✗ HTML 内容类型检测</span>
+            <span class="verdict-item no">✗ 分段HTML累计防护</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="finding-card warn">
+        <div class="finding-header">
+          <span class="finding-title">建议补充：内容类型预检 + 引导文案</span>
+          <span class="badge badge-warn">建议</span>
+        </div>
+        <div class="finding-body">
+          <p>在 <code>input_guard.inspect()</code> 之后增加一层轻量内容类型判断：检测消息是否以 <code>&lt;html</code>、<code>&lt;!DOCTYPE</code>、<code>&lt;div</code> 等开头，或包含大量 HTML 标签密度（如 <code>&lt;/&gt;</code> 字符占比超过 15%），若是则直接返回友好提示："看起来您发送了网页代码，您可以复制商品名称或分享商品链接，我来帮您查找。" 这既降低 Token 消耗，又改善用户体验。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="case-char">
+      <p class="section-eyebrow">边缘案例分析 · 02</p>
+      <h2 class="section-title">一个字一个字地发送消息</h2>
+
+      <div class="case-study">
+        <div class="case-head">
+          <span class="case-icon">⌨️</span>
+          <span class="case-name">场景：用户依次发送"我"、"要"、"退"、"款" 四条消息</span>
+        </div>
+        <div class="case-body">
+          <p><strong>现有防护能做什么：</strong><code>sendMessage</code> 接口限流为 1次/1秒（<code>allow(user_id, "sendMessage", 1, 1)</code>），所以每秒最多 1 条消息。<code>ai_chat_limit=200</code> 是会话总上限。每条消息都会触发 <code>resolve_intent()</code>，对单个字符消息，规则引擎很可能分类为 <code>UNKNOWN</code> 或 <code>CHITCHAT</code>，不进 LLM 的快速路径会直接返回兜底回复。</p>
+          <p><strong>漏洞在哪里：</strong>1次/秒的固定窗口限流对此场景防护不足。如果用户每 1.1 秒发一个字，一分钟可以发 ~54 条单字消息。每条消息都触发：意图分类（可能含 LLM 调用）→ RAG 检索 → 历史消息保存。4000 字 × 200 条消息的会话上限，假设每条是 1 个字，则 200 条消息只有 200 个字符的信息量，但消耗了 200 次 LLM 调用的基础开销（系统词 + 历史 context + 工具 schema），每次至少 2000-3000 Token，总计约 40-60 万 Token。</p>
+          <p><strong>还有一个更隐性的问题：</strong>短消息会不断清洗历史消息窗口（<code>history_message_limit=15</code>），使得真正有意义的上下文被单字消息挤出窗口，导致后续的正常对话质量下降。</p>
+          <div class="verdict-row">
+            <span class="verdict-item yes">✓ 1次/秒速率限制</span>
+            <span class="verdict-item yes">✓ 200条会话总上限</span>
+            <span class="verdict-item partial">⚡ 单字消息有兜底意图</span>
+            <span class="verdict-item no">✗ 消息最小长度校验</span>
+            <span class="verdict-item no">✗ Token 消耗预算上限</span>
+            <span class="verdict-item no">✗ 短消息聚合/debounce</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="finding-card crit">
+        <div class="finding-header">
+          <span class="finding-title">P1 缺口：无消息最小长度 + 无 Token 消耗上限</span>
+          <span class="badge badge-crit">高优先级</span>
+        </div>
+        <div class="finding-body">
+          <p>最简单的补丁：在 <code>InputGuardrail.inspect()</code> 之后添加 <code>min_effective_chars</code> 校验（建议 2-4 字符），空消息或单个标点直接返回"请描述您的问题，例如：退款咨询"。更完整的方案是在 <code>Settings</code> 中引入 <code>per_session_token_budget: int = 500_000</code>，在 Worker 完成每次 LLM 调用后累加 Token 到 Redis key，超限后降级为 FAQ 快速路径或提示今日咨询配额已用完。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="case-repeat">
+      <p class="section-eyebrow">边缘案例分析 · 03</p>
+      <h2 class="section-title">同一个问题反复问好几遍</h2>
+
+      <div class="case-study">
+        <div class="case-head">
+          <span class="case-icon">🔁</span>
+          <span class="case-name">场景：用户反复问"我的退款什么时候到账"（或稍微改写后重问）</span>
+        </div>
+        <div class="case-body">
+          <p><strong>现有防护相当完善：</strong>这是三个场景中项目处理最好的一个。</p>
+          <p>完全相同的问题会命中 <code>faq_exact_cache</code>（6小时 TTL）或 RAG 语义缓存（30分钟 TTL），直接短路返回缓存回答，不触发 LLM。<code>recent_intents</code> 被用于意图延续检测：连续相同意图会触发 <code>HANDOFF_SUGGESTED</code> 状态，系统在回答末尾追加"如仍未解决，可以回复'转人工'"的建议文案。<code>agent_support_summary_limit=12</code> 记录历史支持摘要，多次重复问题会被汇总到支持工单里。</p>
+          <p><strong>剩余漏洞：</strong>语义缓存基于向量相似度，微小改写（"退款何时到账"→"什么时候到账退款"→"退款到账要多久"）可能绕过缓存，每次都进 RAG + Rerank + LLM 完整流程。目前没有明确的"您在过去 X 分钟内已经问过 N 次类似问题"的检测和响应策略，只有连续相同意图的软性提示。</p>
+          <div class="verdict-row">
+            <span class="verdict-item yes">✓ FAQ 精确缓存（6h）</span>
+            <span class="verdict-item yes">✓ RAG 语义缓存（30min）</span>
+            <span class="verdict-item yes">✓ 连续意图触发转人工建议</span>
+            <span class="verdict-item partial">⚡ 改写变体绕过缓存</span>
+            <span class="verdict-item no">✗ 明确的重复问题计数+响应策略</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="finding-card warn">
+        <div class="finding-header">
+          <span class="finding-title">建议补充：轻量重复问题检测</span>
+          <span class="badge badge-warn">中优先级</span>
+        </div>
+        <div class="finding-body">
+          <p>在 <code>agent_service.py</code> 的意图解析前，检查 Redis 中 <code>recent_intents</code> 是否连续 3 次以上为同一意图（比 HANDOFF_SUGGESTED 当前的触发条件更直接），且时间窗口在 10 分钟内。若满足，直接跳过 LLM 推理，返回预设的"您的问题正在处理中，如需更快响应请转人工" + 强制推送工单创建 CTA。这样既节约 Token，又给了用户明确的行动路径。</p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ④ 缺口评估 -->
+    <section class="section" id="gaps">
+      <p class="section-eyebrow">缺口评估</p>
+      <h2 class="section-title">分级缺口：P0 须上线前修复，P1 须上线后 30 天内修复</h2>
+
+      <div class="finding-card crit">
+        <div class="finding-header">
+          <span class="finding-title">P0 · 单会话 Token 消耗无硬性上限</span>
+          <span class="badge badge-crit">P0 · 严重</span>
+        </div>
+        <div class="finding-body">
+          <p>当前只有消息条数上限（200条）和 ReAct 轮次上限（5次），但没有按 Token 计量的消耗上限。一个精心构造的请求（超长输入 + 触发多次工具调用链）单次可消耗 20,000+ Token，乘以 200 条上限理论上可达 400 万 Token。按 DeepSeek-Chat 当前价格，单用户上限内可消耗约 ¥2。看起来不多，但在促销期并发千人时就是 ¥2000+/小时的 LLM 账单。</p>
+          <p><strong>这是"Denial of Wallet"攻击的直接入口。</strong>攻击者不需要绕过任何安全检查，只需要正常登录后反复发送能触发长 ReAct 链的问题。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：引入 <code>per_session_token_budget</code> + 每日 <code>daily_token_quota</code>（Redis 计数），超限降级到 FAQ 快速路径。
+        </div>
+      </div>
+
+      <div class="finding-card crit">
+        <div class="finding-header">
+          <span class="finding-title">P0 · 无消息最小长度校验（单字/空消息穿透）</span>
+          <span class="badge badge-crit">P0 · 严重</span>
+        </div>
+        <div class="finding-body">
+          <p><code>input_guard.normalize()</code> 压缩空白后如果内容为空会走到 <code>task_text = "查找图中同款或相似商品"</code> 这个默认分支（非图片时，空消息在 <code>agent_service.py:102</code> 被 <code>raise ValueError</code> 拦截），但 1-3 字符的消息（"？"、"嗯"、"呢"）不会触发任何长度校验，会完整进入 intent 分类 + RAG + LLM pipeline。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：在 <code>InputGuardrail</code> 增加 <code>min_effective_chars: int = 3</code> 配置，低于阈值返回引导文案而非进 pipeline。
+        </div>
+      </div>
+
+      <div class="finding-card warn">
+        <div class="finding-header">
+          <span class="finding-title">P1 · 知识库文档入库时无注入预扫描</span>
+          <span class="badge badge-warn">P1 · 高</span>
+        </div>
+        <div class="finding-body">
+          <p><code>channel_guard.py</code> 在检索时扫描 RAG 片段，这是"查询时检疫"。但被污染的文档已经进了 Elasticsearch 索引，每次检索都要过滤它。更好的策略是在管理端上传文档时（Java 侧 <code>upload</code> 接口或 Python 侧的索引 Worker）做一次预扫描，被标记为污染的文档拒绝入库 + 告警管理员。减少查询时的计算开销，同时将"被注入文档"这一事件提前可见。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：在 RabbitMQ 索引 Worker 消费文档前调用 <code>scan_external_content()</code>，污染判定为 True 时拒绝入库并发 structlog WARN + Prometheus counter。
+        </div>
+      </div>
+
+      <div class="finding-card warn">
+        <div class="finding-header">
+          <span class="finding-title">P1 · WebSocket 路径缺少与 REST 路径等效的输入验证</span>
+          <span class="badge badge-warn">P1 · 高</span>
+        </div>
+        <div class="finding-body">
+          <p><code>app/api/websocket.py</code> 存在但未能确认是否复用了 <code>InputGuardrail</code>。如果 WebSocket 消息绕过了 <code>input_guard.inspect()</code>，所有注入检测、长度限制、Token strip 都失效。这是防护体系中最危险的不一致点。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：在 WebSocket 消息处理函数的入口处显式调用 <code>input_guard.inspect()</code>，与 <code>agent_service.send_message()</code> 保持同样的检查栈。
+        </div>
+      </div>
+
+      <div class="finding-card warn">
+        <div class="finding-header">
+          <span class="finding-title">P1 · IP 级限流缺失（用户级限流可被多账号绕过）</span>
+          <span class="badge badge-warn">P1 · 高</span>
+        </div>
+        <div class="finding-body">
+          <p>当前 <code>rate_limit_service</code> 以 <code>user_id</code> 为 key。如果攻击者批量注册账号（或使用泄露的账号），可以绕过单用户限流。Gateway 层有 <code>AuthGlobalFilter</code> 和 <code>InternalTokenGlobalFilter</code>，但未见基于 IP 的滑动窗口限流。在公网环境下，这是分布式 DoW 攻击的入口。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：在 Spring Cloud Gateway 层添加基于 IP 的 Redis 限流（Spring Cloud Gateway RateLimiter 内置支持）；对异常高频 IP 触发 CAPTCHA 或临时封禁。
+        </div>
+      </div>
+
+      <div class="finding-card warn">
+        <div class="finding-header">
+          <span class="finding-title">P1 · 会话压缩锁为乐观锁，高并发下可能多次触发压缩</span>
+          <span class="badge badge-warn">P1 · 中</span>
+        </div>
+        <div class="finding-body">
+          <p><code>session_memory_service.try_acquire_compress_lock()</code> 用 Redis <code>SET NX</code> 实现，TTL 60 秒。如果 Memory LLM 超时（>60秒），锁释放后第二个 Worker 会重新触发压缩，导致两次 Memory LLM 调用并发写入。压缩失败时也没有记录"本次压缩失败，使用上一次压缩结果"的 fallback 路径，可能导致 Token 持续膨胀直到 OOM。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：在 <code>memory_llm_timeout</code> 之外为压缩任务单独设置 deadline；压缩失败时记录 WARN 并在下一轮次重试，而不是让 Token 静默累积。
+        </div>
+      </div>
+
+      <div class="finding-card info">
+        <div class="finding-header">
+          <span class="finding-title">P2 · 商品数据幻觉无结构化防护</span>
+          <span class="badge badge-info">P2 · 中</span>
+        </div>
+        <div class="finding-body">
+          <p><code>output_guard.py</code> 防止了"声称已执行操作"类幻觉，但没有覆盖"编造商品价格/参数/库存状态"类幻觉。如果 RAG 证据不足（<code>rag_evidence_min_relevance</code> 阈值以下），模型可能用训练数据中的"通用商品知识"来填充回答，给出不准确的价格或规格。</p>
+        </div>
+        <div class="finding-fix">
+          修复方向：在证据不足时（拒答逻辑）明确告知用户"暂无该商品的准确信息，请查看商品详情页"，而非让模型自由生成。这需要将 <code>_has_enough_evidence</code> 的判断结果更显式地传递到 system prompt 的引导词。
+        </div>
+      </div>
+
+      <div class="finding-card info">
+        <div class="finding-header">
+          <span class="finding-title">P2 · 无跨用户行为模式检测</span>
+          <span class="badge badge-info">P2 · 中</span>
+        </div>
+        <div class="finding-body">
+          <p>当前观测是单用户视角（Episode per run_id）。没有跨用户的异常模式检测：例如 100 个账号同时问同一类触发长 ReAct 链的问题（协调攻击），或 1 个账号在不同时间段累计发送了 5000 条历史消息后新注册的账号接续之前的攻击模式。这类攻击在限流和单用户配额体系下无法被检测。</p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ⑤ 行业参照 -->
+    <section class="section" id="industry">
+      <p class="section-eyebrow">行业参照</p>
+      <h2 class="section-title">生产 AI 客服系统常见问题全景</h2>
+      <p>以下基于公开研究和行业报告（Gartner 2024、Decagon、AWS、IBM）整理，标注了 AI_Shop 当前的覆盖状态。</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>问题类型</th>
+              <th>具体表现</th>
+              <th>行业解决方案</th>
+              <th>AI_Shop 状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Prompt 注入（直接）</td>
+              <td>用户在消息中嵌入"忽略所有规则"类指令，试图劫持 LLM 角色</td>
+              <td>Spotlighting + 分档规则过滤 + 系统词隔离</td>
+              <td><span class="badge badge-ok">已覆盖</span></td>
+            </tr>
+            <tr>
+              <td>Prompt 注入（间接）</td>
+              <td>被污染的商品描述/FAQ 文档被 RAG 召回后注入对话上下文</td>
+              <td>通道内容检疫、入库预扫描</td>
+              <td><span class="badge badge-warn">查询时已覆盖，入库时缺</span></td>
+            </tr>
+            <tr>
+              <td>Denial of Wallet</td>
+              <td>触发长工具调用链、发送大量短消息，耗尽 LLM API 配额</td>
+              <td>Token 预算上限、消息最小长度、ReAct 轮次上限</td>
+              <td><span class="badge badge-warn">轮次上限已有，Token 上限缺</span></td>
+            </tr>
+            <tr>
+              <td>上下文窗口爆炸</td>
+              <td>长对话导致 LLM 推理成本二次方增长，p99 延迟超标</td>
+              <td>会话摘要压缩、历史消息裁剪</td>
+              <td><span class="badge badge-ok">已覆盖</span></td>
+            </tr>
+            <tr>
+              <td>幻觉能力声明</td>
+              <td>LLM 声称"帮您下单"等不具备的能力，或声称操作已完成</td>
+              <td>输出防护规则、写操作两步确认</td>
+              <td><span class="badge badge-ok">已覆盖</span></td>
+            </tr>
+            <tr>
+              <td>商品数据幻觉</td>
+              <td>RAG 证据不足时 LLM 编造价格/规格</td>
+              <td>证据阈值拒答 + 明确的无证据提示</td>
+              <td><span class="badge badge-warn">阈值已有，拒答文案不够明确</span></td>
+            </tr>
+            <tr>
+              <td>多轮上下文丢失</td>
+              <td>用户转接人工后须重复信息；会话在 Worker 崩溃后丢失</td>
+              <td>Redis + DB 双写会话、转接时携带上下文</td>
+              <td><span class="badge badge-ok">已覆盖</span></td>
+            </tr>
+            <tr>
+              <td>知识库污染</td>
+              <td>管理员不知情地上传含注入内容的 FAQ 文档</td>
+              <td>上传时扫描 + 自动告警</td>
+              <td><span class="badge badge-crit">缺失</span></td>
+            </tr>
+            <tr>
+              <td>升级判断失误</td>
+              <td>AI 无法识别应转人工的场景；或过于频繁转人工</td>
+              <td>意图置信度阈值 + 重复意图计数</td>
+              <td><span class="badge badge-ok">已覆盖</span></td>
+            </tr>
+            <tr>
+              <td>SQL 注入（Text-to-SQL）</td>
+              <td>LLM 生成含恶意语句的 SQL，数据泄露或被篡改</td>
+              <td>AST 解析 + 函数/表/列白名单</td>
+              <td><span class="badge badge-ok">已覆盖（admin 路径）</span></td>
+            </tr>
+            <tr>
+              <td>Token 盗用 / API Key 泄露</td>
+              <td>LLM API Key 暴露后被第三方盗用，产生异常账单</td>
+              <td>Key Rotation + 消耗监控告警</td>
+              <td><span class="badge badge-warn">Key 在配置中，缺实时消耗告警</span></td>
+            </tr>
+            <tr>
+              <td>速率滥用（分布式）</td>
+              <td>多账号协调绕过单用户限流</td>
+              <td>IP 级限流 + 行为指纹识别</td>
+              <td><span class="badge badge-crit">缺失</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ⑥ 优先修复建议 -->
+    <section class="section" id="recommendations">
+      <p class="section-eyebrow">优先修复建议</p>
+      <h2 class="section-title">按投入产出排序的 10 项行动建议</h2>
+
+      <div class="rec-list">
+        <div class="rec-item">
+          <span class="rec-num">P0</span>
+          <div class="rec-content">
+            <strong>引入 per_session_token_budget + 每日配额（Denial of Wallet 防护）</strong>
+            在 <code>Settings</code> 增加 <code>per_session_token_budget: int = 200_000</code> 和 <code>daily_user_token_quota: int = 1_000_000</code>，Worker 每次 LLM 调用后原子累加到 Redis（TTL 24h），超限降级到 FAQ 快速路径并提示用户。预计 2 天工作量，防护效果显著。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P0</span>
+          <div class="rec-content">
+            <strong>增加消息最小有效长度校验（min_effective_chars）</strong>
+            在 <code>InputGuardrail</code> 中增加去空白后 &lt; N 字符（建议 N=3）的检测，返回引导文案"请描述您的具体问题"而非进入 LLM pipeline。预计 0.5 天工作量，无副作用。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P0</span>
+          <div class="rec-content">
+            <strong>确认 WebSocket 路径复用 InputGuardrail</strong>
+            检查 <code>app/api/websocket.py</code>，确保每条 WebSocket 消息都经过 <code>input_guard.inspect()</code>、速率限制检查、和 <code>ai_chat_limit</code> 校验。如不一致，统一提取为中间件。预计 1 天工作量。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P1</span>
+          <div class="rec-content">
+            <strong>知识库文档入库时执行注入预扫描</strong>
+            在 RabbitMQ visual/RAG 索引 Worker 消费消息时，对文档内容调用 <code>scan_external_content()</code>，污染文档拒绝入库 + 触发 Prometheus counter <code>rag_doc_contamination_total</code> + structlog WARN。预计 1 天工作量，将"事后检疫"升级为"事前拦截"。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P1</span>
+          <div class="rec-content">
+            <strong>Gateway 层增加 IP 级滑动窗口限流</strong>
+            利用 Spring Cloud Gateway 内置的 Redis RateLimiter 对 <code>/agent/sendMessage</code> 等高频接口按真实客户端 IP 设置限流（建议 10次/分钟/IP），超限返回 429。可防止多账号协调攻击和未认证的探测请求。预计 1-2 天工作量。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P1</span>
+          <div class="rec-content">
+            <strong>HTML 内容类型检测 + 引导文案</strong>
+            在 <code>input_guard.inspect()</code> 之后检测"是否为 HTML 代码"（标签密度 > 15% 或以 <code>&lt;html</code>/<code>&lt;!DOCTYPE</code> 开头），返回"您发送了网页代码，请改为描述商品需求或粘贴商品名称"。预计 0.5 天工作量。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P1</span>
+          <div class="rec-content">
+            <strong>强化会话压缩的失败处理路径</strong>
+            在 <code>session_memory_service</code> 压缩失败时记录 WARN + Prometheus counter，并以"上一次成功的压缩结果 + 最近 N 轮"作为 fallback，防止 Token 在压缩持续失败时静默膨胀。压缩锁 TTL 应短于 <code>memory_llm_timeout</code>。预计 1 天工作量。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P1</span>
+          <div class="rec-content">
+            <strong>引入 LLM API Key 实时消耗监控告警</strong>
+            在 <code>episode_service</code> 或独立的 LLM metrics 中记录每次调用的 Token 消耗，按小时聚合后与历史基线对比，异常上涨（>3σ）触发告警。预计 1 天工作量，可捕获 Key 泄露和批量攻击。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P2</span>
+          <div class="rec-content">
+            <strong>明确的无证据拒答文案</strong>
+            当 <code>rag_evidence_min_relevance</code> 未达标时，在 system prompt 中明确告知模型"没有相关信息，必须告诉用户查看商品详情页，禁止根据通用知识推断"，而非目前可能的"允许模型自由补充"。预计 0.5 天工作量。
+          </div>
+        </div>
+        <div class="rec-item">
+          <span class="rec-num">P2</span>
+          <div class="rec-content">
+            <strong>轻量重复问题检测（Redis 意图频次计数）</strong>
+            在 Redis 中以 <code>user_id:intent:WINDOW</code> 为 key 计数，10 分钟内同一意图 ≥ 3 次时直接返回"您的问题正在处理中"+ 工单创建 CTA，不再进 LLM。既节约 Token，又给用户明确行动路径。预计 1 天工作量。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--text-3); font-family: var(--mono);">
+      <p>基于代码库静态分析 + 在线资料调研生成 · 评估覆盖 AI_Shop-agent app/ 目录 + AI_Shop-backend Java 侧已检查文件</p>
+      <p style="margin-top: 0.35rem;">参考来源：
+        <a href="https://beyondscale.tech/blog/ai-denial-of-wallet-attack-enterprise-defense" target="_blank" rel="noopener">Denial of Wallet 防御指南</a> ·
+        <a href="https://tianpan.co/blog/2026-04-19-stateful-multi-turn-conversation-infrastructure" target="_blank" rel="noopener">多轮会话基础设施</a> ·
+        <a href="https://aws.amazon.com/blogs/security/safeguard-your-generative-ai-workloads-from-prompt-injections/" target="_blank" rel="noopener">AWS Prompt Injection 防护</a> ·
+        <a href="https://decagon.ai/blog/ai-chatbot-challenges" target="_blank" rel="noopener">AI 客服挑战 Playbook</a>
+      </p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+// Sidebar active link on scroll
+const sections = document.querySelectorAll('section[id], section.section[id]');
+const navLinks = document.querySelectorAll('.nav-link');
+function onScroll() {
+  let current = '';
+  sections.forEach(s => {
+    const top = s.getBoundingClientRect().top;
+    if (top <= 80) current = s.id;
+  });
+  navLinks.forEach(l => {
+    l.classList.toggle('active', l.getAttribute('href') === '#' + current);
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">Redis 固定窗口限流（rate_limit_service.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>配额存储在 Redis，通过 EVAL 脚本原子完成计数 + TTL 设置，多 uvicorn worker 进程共享同一配额——解决了进程内计数器在多 worker 下实际倍乘的经典陷阱。</p>
+          <p>已覆盖的接口：<code>sendMessage</code>（1次/1秒）、<code>confirmAction</code>（1次/3秒）、<code>cancelAction</code>（1次/3秒）。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">LLM 熔断器（circuit_breaker.py）</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p>标准三态（CLOSED / OPEN / HALF_OPEN），连续失败 5 次开路，60 秒后半开探测。HALF_OPEN 状态只允许单个探测请求，探测超时（30秒）后自动回收探针位，防止因调用方崩溃导致熔断器永久卡死。状态指标通过 <code>CIRCUIT_STATE</code> Prometheus gauge 实时暴露。</p>
+        </div>
+      </div>
+
+      <div class="finding-card ok">
+        <div class="finding-header">
+          <span class="finding-title">用户锁 + 任务队列 + 优先级</span>
+          <span class="badge badge-ok">已实现</span>
+        </div>
+        <div class="finding-body">
+          <p><code>agent_user_lock_ttl_seconds=180</code> 防止同一用户并发提交多个任务。RabbitMQ 三级队列（HIGH/FAST/LOW）按意图类型路由，售后投诉走高优先级，避免闲聊阻塞紧急工单。任务有 lease 机制（30秒），Worker 崩溃后其他 Worker 可在 deadline 内接管。</p>
+        </div>
+      </div>
+    </section>

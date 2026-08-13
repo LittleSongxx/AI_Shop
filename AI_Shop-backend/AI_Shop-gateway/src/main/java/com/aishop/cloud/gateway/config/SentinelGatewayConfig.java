@@ -6,6 +6,7 @@ import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPathPredicateItem;
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPredicateItem;
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.GatewayApiDefinitionManager;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
+import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayParamFlowItem;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
 import com.alibaba.csp.sentinel.adapter.gateway.sc.callback.BlockRequestHandler;
 import com.alibaba.csp.sentinel.adapter.gateway.sc.callback.GatewayCallbackManager;
@@ -98,6 +99,13 @@ public class SentinelGatewayConfig {
         adminItems.add(prefix("/admin-api/"));
         definitions.add(new ApiDefinition("admin-api").setPredicateItems(adminItems));
 
+        // Agent 发消息接口（IP 级精细限流）：防止多账号分布式绕过用户级配额。
+        // 单 IP 每秒最多 agentSendQps 次；/api/agent/sendMessage 是 LLM 开销的主要入口，
+        // 其余 agent 接口走通用 web-api 规则。
+        Set<ApiPredicateItem> agentSendItems = new HashSet<>();
+        agentSendItems.add(exact("/api/agent/sendMessage"));
+        definitions.add(new ApiDefinition("agent-send").setPredicateItems(agentSendItems));
+
         GatewayApiDefinitionManager.loadApiDefinitions(definitions);
     }
 
@@ -105,10 +113,22 @@ public class SentinelGatewayConfig {
         Set<GatewayFlowRule> rules = new HashSet<>();
         double defaultQps = rateLimitProperties.getDefaultQps();
         double authQps = rateLimitProperties.getAuthQps();
+        double agentSendQps = rateLimitProperties.getAgentSendQps();
 
         rules.add(apiRule("auth-sensitive", authQps));
         rules.add(apiRule("web-api", defaultQps));
         rules.add(apiRule("admin-api", defaultQps));
+
+        // agent-send：IP 级精细限流，防止多账号分布式绕过用户级配额。
+        // 按来源 IP（PARAM_PARSE_STRATEGY_CLIENT_IP）限流，不按 API 分组。
+        // 这比 web-api 规则更精细：web-api 是 API 整体 QPS，agent-send 是每 IP 的 QPS。
+        GatewayFlowRule agentSendRule = new GatewayFlowRule("agent-send")
+                .setResourceMode(SentinelGatewayConstants.RESOURCE_MODE_CUSTOM_API_NAME)
+                .setCount(agentSendQps)
+                .setIntervalSec(1)
+                .setParamItem(new GatewayParamFlowItem()
+                        .setParseStrategy(SentinelGatewayConstants.PARAM_PARSE_STRATEGY_CLIENT_IP));
+        rules.add(agentSendRule);
 
         for (String routeId : new String[]{
                 "user", "product", "cart", "order", "pay", "coupon",

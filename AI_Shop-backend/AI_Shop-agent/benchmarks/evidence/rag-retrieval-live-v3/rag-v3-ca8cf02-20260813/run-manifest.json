@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "suite": "rag-retrieval-live-v3",
+  "runId": "rag-v3-ca8cf02-20260813",
+  "summaryPath": "benchmarks/evidence/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/summary.json",
+  "summarySha256": "b2027fbac2d43eac4bbfd16af5921d83723717443bdfd56ac014954fcee58af9",
+  "datasetSha256": "d140c0a9cb83fc0f5a83af36aeba77b0b09ce88ffcacaf6959a052ea52bb9da8",
+  "sourceArtifacts": {
+    "benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/rag-v3-dev-replay.json": "99dd0904b493a050143bd6f8c4c436e6953ee5f2c9c8e0f47f1ef968030501e3",
+    "benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/rag-v3-final-replay.json": "7eebc460ce6ff02b282622c88400382fe3f900a1872903ce13139bc24e0a26df",
+    "benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/frozen-config.json": "6f6ecbe9845fb35ae4424514304d5774f11fc56087b6ad76dd38e8d156b7a52e",
+    "benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/finalization.json": "169c4c9a4b759a76c398c6e44ca37ded26f0ff059d512db570b75a62e88e69ce",
+    "benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/raw/rag-v3-dev-collection.json.gz": "d783c1135438cc6cbd87117c1f37ee6ba1e8e1191ad7d32ddc5f17fb305da2bd",
+    "benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/raw/rag-v3-final-collection.json.gz": "4a769a1909752a5b1c931cfb9293e1a7b0b85faa29250d3500b839b13576d85a"
+  }
+}

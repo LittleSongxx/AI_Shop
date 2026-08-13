@@ -237,3 +237,18 @@ REGRESSION_REPLAY_TOTAL = Counter(
     "Deterministic regression replay results",
     ["result"],
 )
+
+# 会话压缩结果监控：ok = 成功压缩；timeout = Memory LLM 超时；error = 其他异常。
+# timeout 连续出现意味着 token 无法被压缩，会话 context 将持续膨胀直到 OOM。
+COMPRESS_TOTAL = Counter(
+    "agent_session_compress_total",
+    "会话历史压缩结果（ok/timeout/error）",
+    ["result"],
+)
+
+# Token 预算超限降级次数：budget_exceeded = 单会话预算超限；daily_exceeded = 每日配额超限。
+TOKEN_BUDGET_EXCEEDED = Counter(
+    "agent_token_budget_exceeded_total",
+    "Token 预算超限降级次数（软限制触发 FAQ 快速路径）",
+    ["kind"],
+)

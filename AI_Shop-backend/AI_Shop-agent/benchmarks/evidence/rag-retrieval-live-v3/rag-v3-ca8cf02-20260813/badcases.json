@@ -1,0 +1,173 @@
+{
+  "dev": [
+    {
+      "caseId": "rag-v3-public-020",
+      "index": 19,
+      "query": "下单时换成别人的地址ID能绕过归属校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": null,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "heading": "地址归属校验",
+          "source": "07-account-address-and-security.md",
+          "type": "knowledge"
+        }
+      ],
+      "retrievedRefs": []
+    },
+    {
+      "caseId": "rag-v3-public-025",
+      "index": 24,
+      "query": "RAG回答说可以退款就能绕过售后资格校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": null,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "heading": "资格规则与 RAG 边界",
+          "source": "09-after-sales-evidence-and-review.md",
+          "type": "knowledge"
+        }
+      ],
+      "retrievedRefs": []
+    },
+    {
+      "caseId": "rag-v3-public-029",
+      "index": 28,
+      "query": "优惠券在下单、支付成功和订单关闭时分别怎么变化",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": null,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "heading": "锁定、核销与释放",
+          "source": "10-promotions-and-coupon-rush.md",
+          "type": "knowledge"
+        }
+      ],
+      "retrievedRefs": []
+    },
+    {
+      "caseId": "no-answer-010",
+      "index": 81,
+      "query": "Smarlect是否提供真实银行转账凭证",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": null,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "heading": "演示环境边界",
+          "source": "06-payment-and-refund-progress.md",
+          "type": "knowledge"
+        }
+      ],
+      "retrievedRefs": []
+    },
+    {
+      "caseId": "rag-holdout-014",
+      "index": 95,
+      "query": "平台支持哪些境外信用卡和加密货币付款",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": null,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "heading": "支持的支付方式",
+          "source": "06-payment-and-refund-progress.md",
+          "type": "knowledge"
+        }
+      ],
+      "retrievedRefs": []
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "index": 110,
+      "query": "Smarlect是否承诺所有订单两小时内送达",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": null,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "heading": "模拟物流边界",
+          "source": "08-logistics-exceptions-and-receipt.md",
+          "type": "knowledge"
+        }
+      ],
+      "retrievedRefs": []
+    }
+  ],
+  "fresh": []
+}

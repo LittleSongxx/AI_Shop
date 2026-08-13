@@ -24,42 +24,15 @@ from app.resilience.circuit_breaker import circuit_registry
 
 logger = structlog.get_logger()
 
-_POLICY_QUERY_TOPICS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("退款", "退货", "退换", "能退", "无理由"), "退货与退款"),
-    (("取消订单", "订单取消"), "订单取消规则"),
-    (("物流", "快递", "配送", "发货"), "订单配送与物流"),
-    (("优惠券", "优惠卷", "用券"), "优惠券使用规则"),
-    (("发票", "开票"), "发票规则"),
-    (("破损", "损坏", "坏了", "错发", "漏发", "保修"), "商品售后服务"),
-    (("售后", "投诉"), "售后服务规则"),
-)
-_POLICY_DETAIL_TERMS = (
-    "拆封",
-    "已使用",
-    "七天",
-    "无理由",
-    "运费",
-    "时效",
-    "多久",
-    "条件",
-    "材料",
-    "凭证",
-    "质量问题",
-)
-
-
 def normalize_policy_query(query: str) -> str:
-    """Turn unstable conversational policy wording into a retrieval topic."""
+    """Compatibility helper that preserves the user's concrete proposition.
 
-    text = str(query or "").strip()
-    if not text:
-        return text
-    for markers, topic in _POLICY_QUERY_TOPICS:
-        if any(marker in text for marker in markers):
-            details = [term for term in _POLICY_DETAIL_TERMS if term in text]
-            suffix = " ".join(dict.fromkeys(details))
-            return f"{topic} 政策 条件 流程 {suffix}".strip()
-    return text
+    Older callers used this function to replace a concrete question with a
+    generic policy topic. Retrieval now keeps the original as the first route;
+    aliases are additive variants in ``query_expander``.
+    """
+
+    return " ".join(str(query or "").strip().split())
 
 _SYSTEM_PROMPT = (
     "你是一个查询改写助手，服务于电商客服 RAG 检索。"
@@ -91,10 +64,6 @@ async def rewrite_for_rag(user_text: str, memory: SessionMemory) -> str:
 
     调用方始终得到可用字符串（最差情况回落为原始 ``user_text``）。
     """
-    normalized = normalize_policy_query(user_text)
-    if normalized != str(user_text or "").strip():
-        return normalized
-
     context = _build_context(memory)
     if not context:
         return user_text  # 第一轮，没有可利用的上下文
@@ -143,7 +112,7 @@ async def rewrite_for_rag(user_text: str, memory: SessionMemory) -> str:
             original=user_text[:120],
             rewritten=rewritten[:120],
         )
-        return normalize_policy_query(rewritten)
+        return " ".join(rewritten.split())
     except Exception as exc:
         breaker.record_failure()
         logger.warning("rag_query_rewrite_failed", error=str(exc))

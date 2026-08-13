@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.document.Document;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -125,7 +126,10 @@ class KnowledgeBaseServiceImplTest {
                         "document_id", 11L,
                         "source_name", "shipping.md",
                         "content_hash", "a".repeat(64),
-                        "version", 2)));
+                        "version", 2,
+                        "domain", "LOGISTICS",
+                        "index_schema_version", 1,
+                        "chunk_count", 7L)));
 
         Map<String, Object> catalog = service.releaseCatalog();
 
@@ -133,6 +137,116 @@ class KnowledgeBaseServiceImplTest {
         assertEquals(List.of("11", "12"), catalog.get("activeDocumentIds"));
         assertEquals("shipping.md", ((List<Map<String, Object>>) catalog.get("documents"))
                 .get(0).get("sourceName"));
+        assertEquals("LOGISTICS", ((List<Map<String, Object>>) catalog.get("documents"))
+                .get(0).get("domain"));
+        assertEquals(7L, ((List<Map<String, Object>>) catalog.get("documents"))
+                .get(0).get("chunkCount"));
+        assertEquals(1, ((List<Map<String, Object>>) catalog.get("documents"))
+                .get(0).get("indexSchemaVersion"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void currentSchemaPublishedDocumentSkipsReindex() {
+        Map<String, Object> current = document(42L, "PUBLISHED");
+        current.put("indexSchemaVersion", 1);
+        when(jdbcTemplate.query(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_document")
+                        && sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(current));
+        when(jdbcTemplate.queryForObject(
+                argThat((String sql) -> sql != null && sql.contains("current_version")),
+                eq(Long.class)))
+                .thenReturn(9L);
+
+        Map<String, Object> result = service.reindexPublished(42L, "owner");
+
+        assertEquals(false, result.get("reindexed"));
+        assertEquals(9L, result.get("releaseVersion"));
+        verify(vectorStore, never()).add(anyList());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void reindexWritesOriginalContentDomainAndSchemaMetadata() {
+        Map<String, Object> legacy = document(42L, "PUBLISHED");
+        legacy.put("indexSchemaVersion", 0);
+        legacy.put("domain", "LOGISTICS");
+        when(jdbcTemplate.query(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_document")
+                        && sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(legacy));
+        when(jdbcTemplate.queryForList(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_chunk")
+                        && sql.contains("status='PUBLISHED'")),
+                eq(42L),
+                eq(1)))
+                .thenReturn(List.of(Map.of(
+                        "chunk_id", "knowledge_42_1_0",
+                        "chunk_index", 0,
+                        "heading", "物流异常",
+                        "content", "请从订单详情联系人工客服。",
+                        "token_count", 14)));
+        lenient().when(jdbcTemplate.update(
+                argThat((String sql) -> sql != null
+                        && sql.contains("INSERT INTO knowledge_release"))))
+                .thenReturn(1);
+        when(jdbcTemplate.queryForObject(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_release")
+                        && sql.contains("FOR UPDATE")),
+                eq(Long.class)))
+                .thenReturn(5L);
+        lenient().when(jdbcTemplate.update(
+                argThat((String sql) -> sql != null && sql.contains("SET current_version=?")),
+                eq(6L),
+                eq(5L)))
+                .thenReturn(1);
+        when(jdbcTemplate.query(
+                argThat((String sql) -> sql != null
+                        && sql.contains("FROM knowledge_document WHERE document_id=?")
+                        && !sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(legacy));
+
+        Map<String, Object> result = service.reindexPublished(42L, "owner");
+
+        assertEquals(true, result.get("reindexed"));
+        verify(vectorStore).add(argThat(documents -> {
+            Document indexed = documents.get(0);
+            Map<String, Object> metadata = indexed.getMetadata();
+            return "请从订单详情联系人工客服。".equals(indexed.getText())
+                    && "请从订单详情联系人工客服。".equals(metadata.get("originalContent"))
+                    && "LOGISTICS".equals(metadata.get("domain"))
+                    && "PUBLISHED".equals(metadata.get("status"))
+                    && Integer.valueOf(1).equals(metadata.get("indexSchemaVersion"))
+                    && Boolean.FALSE.equals(metadata.get("contextEnriched"));
+        }));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void nonPublishedDocumentCannotBeReindexed() {
+        Map<String, Object> draft = document(42L, "DRAFT");
+        draft.put("indexSchemaVersion", 0);
+        when(jdbcTemplate.query(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_document")
+                        && sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(draft));
+
+        assertThrows(BusinessException.class, () -> service.reindexPublished(42L, "owner"));
+        verify(vectorStore, never()).add(anyList());
     }
 
     @Test
@@ -152,6 +266,8 @@ class KnowledgeBaseServiceImplTest {
         result.put("documentId", documentId);
         result.put("title", "配送规则");
         result.put("sourceName", "shipping.md");
+        result.put("domain", "GENERAL");
+        result.put("indexSchemaVersion", 0);
         result.put("status", status);
         result.put("version", 1);
         return result;

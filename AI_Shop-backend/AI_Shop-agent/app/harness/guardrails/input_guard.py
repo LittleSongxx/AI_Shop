@@ -26,8 +26,17 @@ from dataclasses import dataclass
 import structlog
 
 from app.config.settings import get_settings
+from app.harness.guardrails.query_security import separate_explicit_attack_suffix
 
 logger = structlog.get_logger()
+
+# HTML 内容检测：标签密度阈值
+# 计算 "<x" 或 "</x" 形式的标签数量相对于文本长度的比例
+_HTML_TAG_PATTERN = re.compile(r"</?[a-zA-Z][a-zA-Z0-9]*[\s>/]")
+# 开头即是 HTML 文档结构的标志
+_HTML_DOC_PREFIX = re.compile(r"^\s*(<\s*!DOCTYPE\s+html|<\s*html\b)", re.I)
+# 触发 HTML 友好提示的密度阈值（标签数/总字符数）
+_HTML_TAG_DENSITY_THRESHOLD = 0.08
 
 # 命中即拒。购物咨询场景里这些写法没有正常语义，误伤风险可以忽略。
 _BLOCKING_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -158,6 +167,38 @@ _ACT_TOKEN_PATTERN = re.compile(r"【?\s*act_[a-f0-9]{8,}\s*】?", re.I)
 
 _SUSPICIOUS_BLOCK_THRESHOLD = 2
 
+# 规范性否定句中的“不能绕过/不得跳过”是在描述系统边界，不是攻击指令。
+# 规则本身仍保留对“请绕过风控”这类祈使句的拦截；在统一扫描函数中按命中
+# 位置检查前缀，避免用一个脆弱的超长正则吞掉正常知识事实。
+_NEGATED_BYPASS_PREFIX = re.compile(
+    r"(?:不能够|不能|不可|无法|不应|不得|禁止|严禁|不允许|不可以)\s*$"
+)
+
+
+def scan_guardrail_rules(text: str) -> tuple[list[str], list[str]]:
+    """Return blocking and suspicious rule IDs for normalized channel content.
+
+    Input and external-channel guards must share this position-aware filtering.
+    In particular, a knowledge sentence such as ``不能绕过归属校验`` is a
+    legitimate negative policy fact, while an imperative ``请绕过风控`` is not.
+    """
+
+    blocking: list[str] = []
+    for name, pattern in _BLOCKING_RULES:
+        matches = list(pattern.finditer(text))
+        if name == "guard_bypass_zh":
+            matches = [
+                match
+                for match in matches
+                if not _NEGATED_BYPASS_PREFIX.search(
+                    text[max(0, match.start() - 12) : match.start()]
+                )
+            ]
+        if matches:
+            blocking.append(name)
+    suspicious = [name for name, pattern in _SUSPICIOUS_RULES if pattern.search(text)]
+    return blocking, suspicious
+
 # 公开别名：channel_guard（外部通道检疫）与这里共用同一张规则表，
 # 保证"用户输入"与"知识库/工具内容"两处对注入话术的判定完全一致，
 # 差异只在响应策略（拒绝 vs 检疫）。
@@ -170,12 +211,14 @@ class InputVerdict:
     """一次输入检查的结果。
 
     ``text`` 始终是可以继续用的净化文本；``blocked`` 为真时调用方应当拒绝这一轮。
+    ``html_content`` 为真时输入疑似 HTML/网页源码，调用方可给出更友好的引导文案。
     ``matched_rules`` 只用于日志和后续统计，不参与业务判断。
     """
 
     text: str
     blocked: bool
     matched_rules: tuple[str, ...]
+    html_content: bool = False
 
 
 class InputGuardrail:
@@ -210,25 +253,67 @@ class InputGuardrail:
             raise ValueError(f"输入内容不能超过{max_len}个字符")
         return value
 
+    @staticmethod
+    def _is_html_content(text: str) -> bool:
+        """判断输入是否疑似 HTML/网页源码。
+
+        两种情况触发：
+        1. 文本以 <!DOCTYPE html> 或 <html 开头（典型的完整页面粘贴）；
+        2. HTML 标签密度超过阈值（分段粘贴的 HTML 片段）。
+
+        不把这类输入直接 block——用户可能是想让客服帮忙看某个页面——而是
+        通过 ``InputVerdict.html_content`` 标志让上层给出更友好的引导文案。
+        """
+        if _HTML_DOC_PREFIX.match(text):
+            return True
+        if len(text) < 50:
+            return False
+        tag_count = len(_HTML_TAG_PATTERN.findall(text))
+        return tag_count / len(text) >= _HTML_TAG_DENSITY_THRESHOLD
+
     def _scan(self, text: str) -> tuple[list[str], list[str]]:
-        blocking = [name for name, pattern in _BLOCKING_RULES if pattern.search(text)]
-        suspicious = [name for name, pattern in _SUSPICIOUS_RULES if pattern.search(text)]
-        return blocking, suspicious
+        return scan_guardrail_rules(text)
 
     def inspect(self, text: str | None) -> InputVerdict:
         """归一化并检查一段用户输入。
 
         归一化后的长度超限仍然抛 ``ValueError``（这是用户可修正的输入错误），
         注入判定则通过返回值表达，让调用方决定怎么响应。
+
+        新增检查：
+        - 有效字符数下限（``min_input_chars``）：低于阈值的极短消息（单字、单标点）
+          触发友好引导，不进 LLM pipeline，避免单字轰炸消耗 token。
+        - HTML 内容标记（``html_content``）：疑似网页源码时上层可返回引导文案，
+          而非让 LLM 尝试解析无意义的 HTML，浪费 token 且容易产生幻觉。
         """
         normalized = self.normalize(text)
+        separated = separate_explicit_attack_suffix(normalized)
+        if separated.separated:
+            normalized = separated.safe_query
+
+        settings = get_settings()
+        # 最小有效长度：去空白后字符数不足时直接返回引导提示标志。
+        # 注意：这里不抛异常——单字/单标点是用户失误而非攻击，不应记安全日志。
+        # 调用方检查 verdict.blocked + verdict.text 为空时给出引导文案。
+        min_chars = settings.min_input_chars
+        effective = normalized.strip()
+        if min_chars > 0 and len(effective) < min_chars:
+            return InputVerdict(
+                text=effective,
+                blocked=True,
+                matched_rules=("too_short",),
+                html_content=False,
+            )
+
+        html_content = self._is_html_content(normalized)
+
         blocking, suspicious = self._scan(normalized)
 
         cleaned = _ACT_TOKEN_PATTERN.sub("", normalized)
         cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
 
         blocked = bool(blocking) or len(suspicious) >= _SUSPICIOUS_BLOCK_THRESHOLD
-        matched = tuple(blocking + suspicious)
+        matched = tuple([*separated.security_flags, *blocking, *suspicious])
         if blocked:
             # 不记原文：输入可能含用户隐私，命中的规则名足够定位问题。
             logger.warning(
@@ -236,11 +321,19 @@ class InputGuardrail:
                 rules=matched,
                 blocking=tuple(blocking),
                 text_length=len(normalized),
+                html_content=html_content,
             )
         elif matched:
             logger.info("input_guard_suspicious", rules=matched, text_length=len(normalized))
+        elif html_content:
+            logger.info("input_guard_html_content", text_length=len(normalized))
 
-        return InputVerdict(text=cleaned, blocked=blocked, matched_rules=matched)
+        return InputVerdict(
+            text=cleaned,
+            blocked=blocked,
+            matched_rules=matched,
+            html_content=html_content,
+        )
 
     def check_chat_limit(self, user_round_count: int) -> bool:
 

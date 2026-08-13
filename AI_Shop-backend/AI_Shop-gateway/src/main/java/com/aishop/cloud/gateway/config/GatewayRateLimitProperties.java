@@ -11,6 +11,9 @@ public class GatewayRateLimitProperties {
 
     private double authQps = 30;
 
+    /** 单 IP 每秒最多调用 /api/agent/sendMessage 的次数。防止多账号分布式绕过用户级限流。 */
+    private double agentSendQps = 10;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -33,5 +36,13 @@ public class GatewayRateLimitProperties {
 
     public void setAuthQps(double authQps) {
         this.authQps = authQps;
+    }
+
+    public double getAgentSendQps() {
+        return agentSendQps;
+    }
+
+    public void setAgentSendQps(double agentSendQps) {
+        this.agentSendQps = agentSendQps;
     }
 }

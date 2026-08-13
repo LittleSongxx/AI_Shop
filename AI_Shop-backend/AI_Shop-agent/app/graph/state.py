@@ -59,11 +59,17 @@ class AgentGraphState(TypedDict, total=False):
     request_mode: str | None
     rag_source_refs: list[dict] | None
     rag_trace: dict | None
+    rag_evidence_state: str
+    rag_evidence_items: list[dict]
+    rag_safe_business_query: str
+    rag_repair_attempted: bool
+    rag_repair_reason: str | None
     rag_mode: str
     rag_queries: list[str]
     rag_retrieval_count: int
     rag_agentic_allowed: bool
     rag_evidence_required: bool
+    input_security_flags: list[str]
     order_resolution: str | None
     pending_order_reference: dict | None
     selected_order_reference: dict | None
@@ -117,11 +123,17 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "request_mode": None,
         "rag_source_refs": [],
         "rag_trace": None,
+        "rag_evidence_state": "INSUFFICIENT",
+        "rag_evidence_items": [],
+        "rag_safe_business_query": user_text,
+        "rag_repair_attempted": False,
+        "rag_repair_reason": None,
         "rag_mode": "conditional",
         "rag_queries": [],
         "rag_retrieval_count": 0,
         "rag_agentic_allowed": False,
         "rag_evidence_required": False,
+        "input_security_flags": list(agent_msg.get("inputSecurityFlags") or []),
         "order_resolution": None,
         "pending_order_reference": None,
         "selected_order_reference": agent_msg.get("selectedOrderReference"),

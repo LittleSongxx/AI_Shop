@@ -299,6 +299,7 @@ async def finalize_agent_response(
     message_card: dict | None = None,
     order_resolution: str | None = None,
     rag_evidence_required: bool = False,
+    rag_evidence_state: str = "INSUFFICIENT",
     verifier_fallback: str | None = None,
 ) -> None:
     user_id = agent_msg["userId"]
@@ -492,6 +493,11 @@ async def finalize_agent_response(
         except (TypeError, json.JSONDecodeError):
             support_case_for_verifier = {}
 
+    if isinstance(source_refs, dict):
+        rag_sources = source_refs.get("sources") or []
+    else:
+        rag_sources = source_refs or []
+    rag_supported = str(rag_evidence_state).upper() == "SUPPORTED" and bool(rag_sources)
     verification = response_verifier.verify(
         assistant=assistant,
         biz_type=biz_type,
@@ -503,6 +509,8 @@ async def finalize_agent_response(
         recommendation_candidates=recommendation_candidates,
         support_case=support_case_for_verifier,
         policy_evidence_required=rag_evidence_required,
+        rag_citation_required=rag_evidence_required and rag_supported,
+        rag_evidence_state=rag_evidence_state,
         safe_fallback=verifier_fallback,
     )
     verifier_fallback_applied = bool(

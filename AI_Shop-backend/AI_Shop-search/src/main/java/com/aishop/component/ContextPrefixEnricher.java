@@ -9,6 +9,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
@@ -25,9 +26,9 @@ import java.util.Map;
  * for fragments that are opaque when read in isolation (e.g. "符合以上条件的商品可
  * 在7天内退换").
  *
- * <p>All failures are silently swallowed: the chunk remains searchable with its
- * original content.  The original content is stored in
- * {@code metadata.originalContent} for debugging and re-enrichment.
+ * <p>All failures are swallowed: the initially indexed original chunk remains
+ * searchable. The original content is present before enrichment and remains the
+ * only text allowed as rerank/generation evidence.
  */
 @Component
 @Slf4j
@@ -41,14 +42,14 @@ public class ContextPrefixEnricher {
     /** Max chars sent to LLM — enough for context, cheap for the model. */
     private static final int MAX_EXCERPT_CHARS = 600;
 
-    /** Max original-content chars stored in ES metadata for audit/debug purposes. */
-    private static final int MAX_ORIGINAL_STORE_CHARS = 2000;
-
     @Resource
     private ChatModel chatModel;
 
     @Resource
     private VectorStore vectorStore;
+
+    @Value("${spring.ai.openai.chat.options.model:unknown}")
+    private String contextModel;
 
     /**
      * Asynchronously generate a context prefix and re-index {@code chunkId} with
@@ -69,8 +70,9 @@ public class ContextPrefixEnricher {
             String enriched = prefix + "\n\n" + content;
             Map<String, Object> enrichedMeta = new LinkedHashMap<>(metadata);
             enrichedMeta.put("contextPrefix", prefix);
-            enrichedMeta.put("originalContent", content.length() > MAX_ORIGINAL_STORE_CHARS
-                    ? content.substring(0, MAX_ORIGINAL_STORE_CHARS) : content);
+            enrichedMeta.put("originalContent", content);
+            enrichedMeta.put("contextEnriched", true);
+            enrichedMeta.put("contextModel", contextModel);
             // VectorStore.add() upserts by document ID — overwrites the original entry.
             vectorStore.add(List.of(new Document(chunkId, enriched, enrichedMeta)));
             log.debug("rag_context_prefix_written chunkId={} prefixLen={}", chunkId, prefix.length());

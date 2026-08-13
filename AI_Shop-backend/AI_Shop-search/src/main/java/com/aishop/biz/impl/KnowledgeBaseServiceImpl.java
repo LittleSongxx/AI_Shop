@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.aishop.biz.KnowledgeBaseService;
 import com.aishop.component.ContextPrefixEnricher;
+import com.aishop.component.InjectionScanner;
 import com.aishop.component.KnowledgeDocumentParser;
 import com.aishop.component.KnowledgeDocumentParser.Chunk;
 import com.aishop.component.KnowledgeDocumentParser.ParsedDocument;
@@ -48,6 +49,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private static final String RELEASE_KEY = "mall:knowledge:version";
     private static final String RELEASE_TOPIC = "knowledge.release";
+    private static final int INDEX_SCHEMA_VERSION = 1;
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -65,13 +67,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private TransactionalMqSender transactionalMqSender;
     @Resource
     private ContextPrefixEnricher contextPrefixEnricher;
+    @Resource
+    private InjectionScanner injectionScanner;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> upload(MultipartFile file, String title, String owner) {
+    public Map<String, Object> upload(
+            MultipartFile file, String title, String owner, String domain) {
         ParsedDocument parsed = documentParser.parse(file);
         String resolvedTitle = text(title).isBlank()
                 ? stripExtension(parsed.sourceName()) : text(title);
+        String resolvedDomain = normalizeDomain(domain);
         String hash = sha256(parsed.normalizedText());
         List<Map<String, Object>> existing = jdbcTemplate.queryForList(
                 "SELECT document_id FROM knowledge_document WHERE content_hash=? LIMIT 1", hash);
@@ -79,10 +85,23 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             return getDocument(((Number) existing.get(0).get("document_id")).longValue());
         }
 
-        long documentId = insertDocument(resolvedTitle, parsed, hash, owner);
+        long documentId = insertDocument(
+                resolvedTitle, parsed, hash, owner, resolvedDomain);
         long jobId = insertJob(documentId, "RUNNING", "CHUNK", 30);
         try {
-            insertChunks(documentId, 1, parsed.chunks(), resolvedTitle, parsed.sourceName());
+            // 入库时预扫描：检测切片内容中是否含有注入话术。
+            // 发现污染时抛出 ContaminatedDocumentException，由上层返回 400；
+            // 不进向量库，同时 warn 日志提供可定位信号。
+            for (KnowledgeDocumentParser.Chunk chunk : parsed.chunks()) {
+                injectionScanner.scan(chunk.content());
+            }
+            insertChunks(
+                    documentId,
+                    1,
+                    parsed.chunks(),
+                    resolvedTitle,
+                    parsed.sourceName(),
+                    resolvedDomain);
             jdbcTemplate.update(
                     "UPDATE knowledge_document SET status='READY', updated_at=NOW() WHERE document_id=?",
                     documentId);
@@ -136,17 +155,12 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             List<Document> toEnrich = new ArrayList<>();
             List<Document> batch = new ArrayList<>();
             for (Map<String, Object> chunk : chunks) {
-                Map<String, Object> metadata = new LinkedHashMap<>();
-                metadata.put("dataType", "knowledge");
-                metadata.put("documentId", String.valueOf(documentId));
-                metadata.put("title", document.get("title"));
-                metadata.put("heading", chunk.get("heading"));
-                metadata.put("source", document.get("sourceName"));
-                metadata.put("version", nextRelease);
-                metadata.put("status", "PUBLISHED");
+                String originalContent = String.valueOf(chunk.get("content"));
+                Map<String, Object> metadata = knowledgeMetadata(
+                        document, chunk, nextRelease, originalContent);
                 Document doc = new Document(
                         String.valueOf(chunk.get("chunk_id")),
-                        String.valueOf(chunk.get("content")),
+                        originalContent,
                         metadata);
                 batch.add(doc);
                 toEnrich.add(doc);
@@ -162,10 +176,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             jdbcTemplate.update(
                     """
                     UPDATE knowledge_document
-                    SET status='PUBLISHED', owner=COALESCE(NULLIF(?, ''), owner), updated_at=NOW()
+                    SET status='PUBLISHED', index_schema_version=?,
+                        owner=COALESCE(NULLIF(?, ''), owner), updated_at=NOW()
                     WHERE document_id=?
                     """,
-                    text(owner), documentId);
+                    INDEX_SCHEMA_VERSION, text(owner), documentId);
             jdbcTemplate.update(
                     """
                     UPDATE knowledge_chunk SET status='PUBLISHED', updated_at=NOW()
@@ -210,6 +225,95 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 }
             }
             throw new BusinessException("知识文档发布失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> reindexPublished(long documentId, String owner) {
+        Map<String, Object> document = requireDocumentForUpdate(documentId);
+        if (!"PUBLISHED".equals(document.get("status"))) {
+            throw new BusinessException("只有已发布知识文档可以重建索引");
+        }
+        if (number(document.get("indexSchemaVersion"), 0) >= INDEX_SCHEMA_VERSION) {
+            Map<String, Object> result = new LinkedHashMap<>(document);
+            result.put("reindexed", false);
+            result.put("releaseVersion", releaseVersion());
+            return result;
+        }
+
+        int version = number(document.get("version"), 1);
+        List<Map<String, Object>> chunks = jdbcTemplate.queryForList(
+                """
+                SELECT chunk_id, chunk_index, heading, content, token_count
+                FROM knowledge_chunk
+                WHERE document_id=? AND version=? AND status='PUBLISHED'
+                ORDER BY chunk_index
+                """,
+                documentId, version);
+        if (chunks.isEmpty()) {
+            throw new BusinessException("已发布文档没有可重建的切片");
+        }
+
+        long currentRelease = lockReleaseVersion();
+        long jobId = insertJob(documentId, "RUNNING", "REINDEX", 85);
+        List<Document> toEnrich = new ArrayList<>();
+        try {
+            List<Document> batch = new ArrayList<>();
+            for (Map<String, Object> chunk : chunks) {
+                String originalContent = String.valueOf(chunk.get("content"));
+                Map<String, Object> metadata = knowledgeMetadata(
+                        document, chunk, currentRelease, originalContent);
+                Document indexed = new Document(
+                        String.valueOf(chunk.get("chunk_id")),
+                        originalContent,
+                        metadata);
+                batch.add(indexed);
+                toEnrich.add(indexed);
+                if (batch.size() == 10) {
+                    vectorStore.add(batch);
+                    batch = new ArrayList<>();
+                }
+            }
+            if (!batch.isEmpty()) {
+                vectorStore.add(batch);
+            }
+            jdbcTemplate.update(
+                    """
+                    UPDATE knowledge_document
+                    SET index_schema_version=?, owner=COALESCE(NULLIF(?, ''), owner),
+                        updated_at=NOW()
+                    WHERE document_id=?
+                    """,
+                    INDEX_SCHEMA_VERSION, text(owner), documentId);
+            jdbcTemplate.update(
+                    """
+                    UPDATE knowledge_ingest_job
+                    SET status='SUCCESS', stage='REINDEXED', progress=100,
+                        chunk_count=?, updated_at=NOW()
+                    WHERE job_id=?
+                    """,
+                    chunks.size(), jobId);
+            long releaseVersion = advanceReleaseVersion(currentRelease);
+            String title = String.valueOf(document.get("title"));
+            registerAfterCommit(() -> {
+                publishVersionBestEffort(releaseVersion, "知识索引契约升级");
+                for (Document indexed : toEnrich) {
+                    try {
+                        contextPrefixEnricher.enrichAsync(
+                                indexed.getId(), title, indexed.getText(), indexed.getMetadata());
+                    } catch (RuntimeException e) {
+                        log.warn("知识重索引后上下文增强调度失败, chunkId={}", indexed.getId(), e);
+                    }
+                }
+            });
+            Map<String, Object> result = getDocument(documentId);
+            result.put("reindexed", true);
+            result.put("releaseVersion", releaseVersion);
+            return result;
+        } catch (RuntimeException e) {
+            markReindexJobFailed(jobId, e);
+            throw new BusinessException("知识文档重建索引失败：" + e.getMessage(), e);
         }
     }
 
@@ -271,7 +375,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         List<Map<String, Object>> rows = jdbcTemplate.query(
                 """
                 SELECT document_id, title, file_type, source_name, content_hash, status,
-                       version, owner, effective_start, effective_end, error_message,
+                       version, owner, domain, index_schema_version, effective_start,
+                       effective_end, error_message,
                        created_at, updated_at
                 FROM knowledge_document
                 """ + where + " ORDER BY updated_at DESC LIMIT ? OFFSET ?",
@@ -496,10 +601,18 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .toList();
         List<Map<String, Object>> documents = camelRows(jdbcTemplate.queryForList(
                 """
-                SELECT document_id, source_name, content_hash, version
-                FROM knowledge_document
-                WHERE status='PUBLISHED'
-                ORDER BY document_id
+                SELECT d.document_id, d.source_name, d.content_hash, d.version, d.domain,
+                       d.index_schema_version,
+                       COUNT(c.chunk_id) AS chunk_count
+                FROM knowledge_document d
+                LEFT JOIN knowledge_chunk c
+                  ON c.document_id=d.document_id
+                 AND c.version=d.version
+                 AND c.status='PUBLISHED'
+                WHERE d.status='PUBLISHED'
+                GROUP BY d.document_id, d.source_name, d.content_hash, d.version, d.domain,
+                         d.index_schema_version
+                ORDER BY d.document_id
                 """));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version", version);
@@ -534,15 +647,19 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     private long insertDocument(
-            String title, ParsedDocument parsed, String hash, String owner) {
+            String title,
+            ParsedDocument parsed,
+            String hash,
+            String owner,
+            String domain) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
                     """
                     INSERT INTO knowledge_document
                         (title, file_type, source_name, content_hash, normalized_text,
-                         status, version, owner, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, 'PARSING', 1, ?, NOW(), NOW())
+                         status, version, owner, domain, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'PARSING', 1, ?, ?, NOW(), NOW())
                     """,
                     Statement.RETURN_GENERATED_KEYS);
             statement.setString(1, title);
@@ -551,6 +668,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             statement.setString(4, hash);
             statement.setString(5, parsed.normalizedText());
             statement.setString(6, text(owner));
+            statement.setString(7, domain);
             return statement;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -585,14 +703,16 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             int version,
             List<Chunk> chunks,
             String title,
-            String sourceName) {
+            String sourceName,
+            String domain) {
         List<Object[]> args = new ArrayList<>();
         for (Chunk chunk : chunks) {
             String chunkId = "knowledge_" + documentId + "_" + version + "_" + chunk.index();
             Map<String, Object> metadata = Map.of(
                     "title", title,
                     "source", sourceName,
-                    "heading", chunk.heading());
+                    "heading", chunk.heading(),
+                    "domain", domain);
             args.add(new Object[] {
                     chunkId,
                     documentId,
@@ -645,7 +765,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         List<Map<String, Object>> rows = jdbcTemplate.query(
                 """
                 SELECT document_id, title, file_type, source_name, content_hash, status,
-                       version, owner, effective_start, effective_end, error_message,
+                       version, owner, domain, index_schema_version, effective_start,
+                       effective_end, error_message,
                        created_at, updated_at
                 FROM knowledge_document WHERE document_id=?
                 """,
@@ -666,7 +787,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         List<Map<String, Object>> rows = jdbcTemplate.query(
                 """
                 SELECT document_id, title, file_type, source_name, content_hash, status,
-                       version, owner, effective_start, effective_end, error_message,
+                       version, owner, domain, index_schema_version, effective_start,
+                       effective_end, error_message,
                        created_at, updated_at
                 FROM knowledge_document WHERE document_id=? FOR UPDATE
                 """,
@@ -689,6 +811,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             row.put("status", rs.getString("status"));
             row.put("version", rs.getInt("version"));
             row.put("owner", rs.getString("owner"));
+            row.put("domain", rs.getString("domain"));
+            row.put("indexSchemaVersion", rs.getInt("index_schema_version"));
             row.put("effectiveStart", time(rs.getObject("effective_start", LocalDateTime.class)));
             row.put("effectiveEnd", time(rs.getObject("effective_end", LocalDateTime.class)));
             row.put("errorMessage", rs.getString("error_message"));
@@ -717,6 +841,40 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 WHERE document_id=?
                 """,
                 error, documentId);
+    }
+
+    private void markReindexJobFailed(long jobId, Exception e) {
+        String error = text(e.getMessage());
+        if (error.length() > 500) {
+            error = error.substring(0, 500);
+        }
+        jdbcTemplate.update(
+                """
+                UPDATE knowledge_ingest_job
+                SET status='FAILED', stage='REINDEX_FAILED', error_message=?, updated_at=NOW()
+                WHERE job_id=?
+                """,
+                error, jobId);
+    }
+
+    private Map<String, Object> knowledgeMetadata(
+            Map<String, Object> document,
+            Map<String, Object> chunk,
+            long releaseVersion,
+            String originalContent) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("dataType", "knowledge");
+        metadata.put("documentId", String.valueOf(document.get("documentId")));
+        metadata.put("title", document.get("title"));
+        metadata.put("heading", chunk.get("heading"));
+        metadata.put("source", document.get("sourceName"));
+        metadata.put("domain", document.get("domain"));
+        metadata.put("version", releaseVersion);
+        metadata.put("status", "PUBLISHED");
+        metadata.put("originalContent", originalContent);
+        metadata.put("contextEnriched", false);
+        metadata.put("indexSchemaVersion", INDEX_SCHEMA_VERSION);
+        return metadata;
     }
 
     private long lockReleaseVersion() {
@@ -898,6 +1056,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private String text(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private String normalizeDomain(String value) {
+        String domain = text(value).toUpperCase(Locale.ROOT);
+        if (domain.isBlank()) {
+            return "GENERAL";
+        }
+        if (!domain.matches("[A-Z][A-Z0-9_]{0,63}")) {
+            throw new BusinessException("知识领域只能包含大写字母、数字和下划线");
+        }
+        return domain;
     }
 
     private int number(Object value, int fallback) {

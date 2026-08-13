@@ -238,10 +238,12 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 当前 27 条 Commerce runtime、18 条 AI 安全和 162 条 Search/RAG 数据契约属于
 `SYNTHETIC + deterministic`。在 `SYNTHETIC + local-live` 层，成熟评测进一步覆盖中文 300 商品/120 查询、
-WANDS 4,960 商品/58 查询/5,733 条人工判断，以及 64 条 RAG 检索。冻结中文链路在 40 条 fresh holdout 上
+WANDS 4,960 商品/58 查询/5,733 条人工判断。冻结中文链路在 40 条 fresh holdout 上
 Recall@1/3/5 为 0.50/1.00/1.00、NDCG@5 为 0.9848，10 条冲突负例准确率为 1.0；WANDS Rerank 相对同预算
-RRF 的 NDCG@5 增益为 0.0471，bootstrap 95% CI [0.0184, 0.0766]。24 条 `deepseek-v4-flash` 生成仅
-16/24 通过，存在 1 条严重安全失败，已按 `FAILED_RETAINED` 留存，不能表述为生成层达标。
+RRF 的 NDCG@5 增益为 0.0471，bootstrap 95% CI [0.0184, 0.0766]。RAG v3 将知识库扩为 12 份/75 chunk，
+在 48 public + 64 regression + 32 一次性 fresh 上实跑；fresh Recall@1/3/5 为 0.9583/1.0/1.0、MRR@10
+为 0.9792、NDCG@5 为 0.9846，检索门禁通过。40 条 `deepseek-v4-flash` 生成仅 28/40 通过，按
+`FAILED_RETAINED` 留存，不能表述为生成层达标。
 这些结果不代表真实用户或生产效果；Agent 在线模型、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
 线上 SLO 与生产规模仍为“未采集”。详细分组指标、消融、失败 case、Provider 调用和诚实边界见证据总览。历史冻结会话及
 旧小样本结果只用于解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，
@@ -249,8 +251,8 @@ RRF 的 NDCG@5 增益为 0.0471，bootstrap 95% CI [0.0184, 0.0766]。24 条 `de
 
 本地全链路部署、RAG、搜索、分类、购物车和管理端滚动问题的真实排障过程见
 [docs/项目问题排查与修复复盘.md](docs/项目问题排查与修复复盘.md)。文档保留了错误假设、
-证据链、修复取舍与回归数据，可作为面试项目复盘材料。关键设计决策（消息可靠性、
-单 Agent 回退、身份字段分层）见 [docs/多智能体重构决策与复盘.md](docs/多智能体重构决策与复盘.md)。
+证据链、修复取舍与回归数据，可作为面试项目复盘材料；Search/RAG 数据、消融、SHA 和坏例见
+[docs/Search与RAG成熟评测报告.md](docs/Search与RAG成熟评测报告.md)。用户已删除的旧审计/决策文档不再作为当前证据入口。
 
 ---
 

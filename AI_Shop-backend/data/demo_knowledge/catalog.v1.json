@@ -1,0 +1,192 @@
+{
+  "schemaVersion": "aishop-knowledge-catalog/v1",
+  "catalogVersion": 1,
+  "expectedDocumentCount": 12,
+  "expectedKnowledgeChunkCount": 75,
+  "expectedFaqCount": 6,
+  "documents": [
+    {
+      "file": "01-shopping-guide.md",
+      "title": "Smarlect 智能选购指南",
+      "domain": "GENERAL",
+      "sha256": "3b33c204a901d0d22efac57ee41a88841e090ab7fd72b5c1931ab4d4968158c4",
+      "normalizedSha256": "9c10a9b9d3c4f259e3a74be535766d5239cb2ac7d401904acbdea6896a8fca0c",
+      "sections": [
+        {"heading": "Smarlect 是什么", "factId": "platform.smarlect.scope", "equivalentRefs": [], "sourceFacts": ["README.md"]},
+        {"heading": "如何获得更准确的推荐", "factId": "shopping.recommendation.input_constraints", "equivalentRefs": ["faq:9001"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/graph/multi_agent.py"]},
+        {"heading": "商品信息与库存", "factId": "checkout.price_and_stock_revalidation", "equivalentRefs": ["05-cart-and-checkout.md#结算重新校验", "05-cart-and-checkout.md#库存检查与扣减"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "AI 推荐原则", "factId": "ai.recommendation.evidence_boundary", "equivalentRefs": ["04-ai-assistant-and-support.md#AI 助手能做什么"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/response_verifier.py"]}
+      ]
+    },
+    {
+      "file": "02-orders-delivery-and-returns.md",
+      "title": "Smarlect 订单、配送与售后规则",
+      "domain": "GENERAL",
+      "sha256": "22537c01425793b763be174321ab06e808b4f56705be94077056053218d4b855",
+      "normalizedSha256": "cb2e4c26ad14a22c71528acde9c2fd202edcc6d3ee3f38a890ed37e715937ed1",
+      "sections": [
+        {"heading": "订单状态", "factId": "order.status.lifecycle", "equivalentRefs": ["06-payment-and-refund-progress.md#支付记录与待支付状态"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/api/src/main/java/com/aishop/api/enums/OrderStatusEnum.java"]},
+        {"heading": "配送说明", "factId": "logistics.demo_tracking_and_address", "equivalentRefs": ["faq:9004", "08-logistics-exceptions-and-receipt.md#模拟物流边界", "07-account-address-and-security.md#订单生成后地址有误"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderLogisticsInfoServiceImpl.java"]},
+        {"heading": "取消订单", "factId": "order.cancel.by_fulfillment_state", "equivalentRefs": ["08-logistics-exceptions-and-receipt.md#物流与售后的职责分界"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "退货与退款", "factId": "aftersales.request_and_refund_boundary", "equivalentRefs": ["09-after-sales-evidence-and-review.md#发起售后申请", "06-payment-and-refund-progress.md#退款申请与进度"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/RefundSagaService.java"]},
+        {"heading": "评价", "factId": "review.eligibility_and_privacy", "equivalentRefs": ["11-reviews-and-content-guidelines.md#评价资格", "11-reviews-and-content-guidelines.md#星级与文字内容"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderCommentServiceImpl.java"]}
+      ]
+    },
+    {
+      "file": "03-membership-and-coupons.md",
+      "title": "Smarlect 会员、签到与优惠券说明",
+      "domain": "GENERAL",
+      "sha256": "36ad7168c5e08fdd4b6616d9751cf37662cec5b2545d10b92c1719007bce25fc",
+      "normalizedSha256": "00dfa82593e40463c161ec6b0c37f573c99e28a0074526601c0699bf8c639ddf",
+      "sections": [
+        {"heading": "会员成长", "factId": "member.growth.thresholds", "equivalentRefs": ["faq:9003"], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/UserMemberProfileServiceImpl.java"]},
+        {"heading": "升级礼", "factId": "member.level_reward.once", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/MemberLevelRewardConfigServiceImpl.java"]},
+        {"heading": "每日签到", "factId": "member.signin.streak_reward", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/SignServiceImpl.java"]},
+        {"heading": "优惠券类型", "factId": "coupon.types", "equivalentRefs": ["10-promotions-and-coupon-rush.md#优惠券类型"], "sourceFacts": ["AI_Shop-backend/AI_Shop-coupon/api/src/main/java/com/aishop/api/enums/CouponTypeEnum.java"]},
+        {"heading": "使用限制", "factId": "coupon.single_per_order_and_revalidate", "equivalentRefs": ["faq:9002", "10-promotions-and-coupon-rush.md#单订单使用限制", "05-cart-and-checkout.md#优惠券预占"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]}
+      ]
+    },
+    {
+      "file": "04-ai-assistant-and-support.md",
+      "title": "Smarlect AI 助手与人工客服",
+      "domain": "GENERAL",
+      "sha256": "4794dcf842287f6cf3953a2dfbdbb024762169f56b6e36cca08343ec724affb4",
+      "normalizedSha256": "72939fee6c4dad367ec0888f278d16c947101bac1a6c0b29b1712b5baa92b029",
+      "sections": [
+        {"heading": "AI 助手能做什么", "factId": "ai.capability_and_confirmation", "equivalentRefs": ["faq:9005", "12-privacy-data-and-ai-boundaries.md#转人工与写操作确认"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/response_verifier.py"]},
+        {"heading": "对话记忆", "factId": "ai.memory.local_storage", "equivalentRefs": ["faq:9006", "12-privacy-data-and-ai-boundaries.md#对话记忆与撤回"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/memory"]},
+        {"heading": "知识检索", "factId": "rag.retrieval_and_abstention", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/rag/retriever.py"]},
+        {"heading": "转人工", "factId": "support.handoff.workflow", "equivalentRefs": ["09-after-sales-evidence-and-review.md#安全降级与人工入口"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/support_case_service.py"]},
+        {"heading": "隐私提示", "factId": "privacy.sensitive_data_chat_boundary", "equivalentRefs": ["07-account-address-and-security.md#敏感信息边界"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/harness/guardrails/input_guard.py"]}
+      ]
+    },
+    {
+      "file": "05-cart-and-checkout.md",
+      "title": "Smarlect 购物车与结算规则",
+      "domain": "CHECKOUT",
+      "sha256": "1965aa1ffc3b27ac51e8b44c3ffbea5cb0a1533a7c498671d199178a12babd0d",
+      "normalizedSha256": "fc4b24bdf5eea0f22e001bd3aa65b01ba3081ef7fadd8db6927067e067e9352d",
+      "sections": [
+        {"heading": "购物车价格快照", "factId": "cart.price_snapshot_not_guarantee", "equivalentRefs": ["01-shopping-guide.md#商品信息与库存"], "sourceFacts": ["AI_Shop-backend/AI_Shop-cart/app/src/main/java"]},
+        {"heading": "结算重新校验", "factId": "checkout.current_product_revalidation", "equivalentRefs": ["01-shopping-guide.md#商品信息与库存"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "库存检查与扣减", "factId": "checkout.stock_deduct_and_compensate", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "优惠券预占", "factId": "checkout.coupon_validate_and_lock", "equivalentRefs": ["03-membership-and-coupons.md#使用限制", "10-promotions-and-coupon-rush.md#锁定、核销与释放"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "订单提交幂等", "factId": "checkout.idempotency_key", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/OrderRequestIdempotencyService.java"]},
+        {"heading": "结算成功后的购物车", "factId": "checkout.cart_cleanup_and_order_snapshot", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "失败与补偿边界", "factId": "checkout.failure_compensation", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-common/src/main/java/com/aishop/component/RemoteCompensateRecorder.java"]}
+      ]
+    },
+    {
+      "file": "06-payment-and-refund-progress.md",
+      "title": "Smarlect 支付与退款进度说明",
+      "domain": "PAYMENT",
+      "sha256": "9bcbc3be112e14456d260a1f6c7cef00c2deb7d16183bae6f1d32d5f487552ca",
+      "normalizedSha256": "f8623edbe395fa26418491bb64bf2bee645676e356778b7766e86b022bc6614a",
+      "sections": [
+        {"heading": "支持的支付方式", "factId": "payment.supported_channels", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-pay/api/src/main/java/com/aishop/api/enums/PayChannelEnum.java"]},
+        {"heading": "支付记录与待支付状态", "factId": "payment.pending_record", "equivalentRefs": ["02-orders-delivery-and-returns.md#订单状态"], "sourceFacts": ["AI_Shop-backend/AI_Shop-pay/app/src/main/java/com/aishop/biz/impl/PayTradeRecordServiceImpl.java"]},
+        {"heading": "支付回调校验", "factId": "payment.callback_validation", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-pay/app/src/main/java/com/aishop/controller/PayNotifyController.java"]},
+        {"heading": "重复回调与查单", "factId": "payment.callback_idempotency_and_query", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-pay/app/src/main/java/com/aishop/biz/impl/PayTradeRecordServiceImpl.java"]},
+        {"heading": "退款申请与进度", "factId": "refund.saga_progress", "equivalentRefs": ["02-orders-delivery-and-returns.md#退货与退款", "09-after-sales-evidence-and-review.md#售后状态"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/AgentActionStatusService.java"]},
+        {"heading": "部分退款与异常恢复", "factId": "refund.partial_and_manual_review", "equivalentRefs": ["09-after-sales-evidence-and-review.md#部分退款", "09-after-sales-evidence-and-review.md#重试耗尽与人工复核"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/RefundSagaTransactionService.java"]},
+        {"heading": "演示环境边界", "factId": "payment.demo_no_real_funds", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-pay/app/src/main/resources/application.yml"]}
+      ]
+    },
+    {
+      "file": "07-account-address-and-security.md",
+      "title": "Smarlect 账户、地址与安全说明",
+      "domain": "ACCOUNT",
+      "sha256": "690501155385226293154454741ca4ce1f5535791fbc36f2abaffed151ab1dda",
+      "normalizedSha256": "adc00f1a83405f32cb89e88619b505e389e027e49e1b2df3ee19af999b64a62e",
+      "sections": [
+        {"heading": "收货地址管理", "factId": "address.crud", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/controller/UserAddressController.java"]},
+        {"heading": "默认地址", "factId": "address.single_default", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/UserAddressServiceImpl.java"]},
+        {"heading": "地址归属校验", "factId": "address.ownership_check", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/UserAddressServiceImpl.java"]},
+        {"heading": "下单前确认", "factId": "address.order_snapshot", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "订单生成后地址有误", "factId": "address.post_order_contact_support", "equivalentRefs": ["02-orders-delivery-and-returns.md#配送说明"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "账户与订单边界", "factId": "account.resource_ownership", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/OrderInternalService.java"]},
+        {"heading": "敏感信息边界", "factId": "account.sensitive_data_boundary", "equivalentRefs": ["04-ai-assistant-and-support.md#隐私提示"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/harness/guardrails/input_guard.py"]}
+      ]
+    },
+    {
+      "file": "08-logistics-exceptions-and-receipt.md",
+      "title": "Smarlect 物流异常与收货说明",
+      "domain": "LOGISTICS",
+      "sha256": "6519923e186c5ac6651d29e5d2c53cdf212fc0f8b0276b58cb7caa5bcfaeddef",
+      "normalizedSha256": "77360ba3a88905227d5df5c4c558625c1265ef6b7ead7fa1989e24cff693e345",
+      "sections": [
+        {"heading": "查看物流", "factId": "logistics.view_tracking", "equivalentRefs": ["faq:9004", "02-orders-delivery-and-returns.md#配送说明"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderLogisticsInfoServiceImpl.java"]},
+        {"heading": "模拟物流边界", "factId": "logistics.simulated_no_sla", "equivalentRefs": ["02-orders-delivery-and-returns.md#配送说明"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/component/RabbitMQPayOrderDeadListenerComponent.java"]},
+        {"heading": "轨迹暂未更新", "factId": "logistics.delayed_event_support", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/component/RabbitMQPayOrderDeadListenerComponent.java"]},
+        {"heading": "配送延迟与异常件", "factId": "logistics.exception_support_boundary", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderLogisticsInfoServiceImpl.java"]},
+        {"heading": "确认收货", "factId": "logistics.confirm_receipt", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "破损、错发与漏发", "factId": "logistics.damage_after_sales_entry", "equivalentRefs": ["09-after-sales-evidence-and-review.md#凭证要求"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/RefundSagaService.java"]},
+        {"heading": "物流与售后的职责分界", "factId": "logistics.rag_read_only_boundary", "equivalentRefs": ["09-after-sales-evidence-and-review.md#资格规则与 RAG 边界"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/response_verifier.py"]}
+      ]
+    },
+    {
+      "file": "09-after-sales-evidence-and-review.md",
+      "title": "Smarlect 售后凭证与复核说明",
+      "domain": "AFTER_SALES",
+      "sha256": "0966dd2cb68fec7932570c6bce55a5685123b0648e030177d3edff83dfcb4e9a",
+      "normalizedSha256": "28a1691dab4a5136d5e317c892183001a0095952af98cb744959b84d2a33a020",
+      "sections": [
+        {"heading": "发起售后申请", "factId": "aftersales.submit_idempotently", "equivalentRefs": ["02-orders-delivery-and-returns.md#退货与退款"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/RefundSagaService.java"]},
+        {"heading": "资格规则与 RAG 边界", "factId": "aftersales.rule_engine_authoritative", "equivalentRefs": ["08-logistics-exceptions-and-receipt.md#物流与售后的职责分界"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/OrderInternalService.java"]},
+        {"heading": "凭证要求", "factId": "aftersales.evidence_privacy", "equivalentRefs": ["08-logistics-exceptions-and-receipt.md#破损、错发与漏发"], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/ImageModerationServiceImpl.java"]},
+        {"heading": "售后状态", "factId": "aftersales.status_progress", "equivalentRefs": ["06-payment-and-refund-progress.md#退款申请与进度"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/AgentActionStatusService.java"]},
+        {"heading": "部分退款", "factId": "aftersales.partial_refund", "equivalentRefs": ["06-payment-and-refund-progress.md#部分退款与异常恢复"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/RefundSagaTransactionService.java"]},
+        {"heading": "重试耗尽与人工复核", "factId": "aftersales.manual_review", "equivalentRefs": ["06-payment-and-refund-progress.md#部分退款与异常恢复"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/RefundReviewService.java"]},
+        {"heading": "安全降级与人工入口", "factId": "aftersales.safe_handoff", "equivalentRefs": ["04-ai-assistant-and-support.md#转人工"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/support_case_service.py"]}
+      ]
+    },
+    {
+      "file": "10-promotions-and-coupon-rush.md",
+      "title": "Smarlect 促销与抢券规则",
+      "domain": "PROMOTION",
+      "sha256": "30a7403c4fe3981c4d7ac945170eb211900f17c22a68483a6bd74927082d26aa",
+      "normalizedSha256": "adf1687499ef84440d62158bb398dc008f948edf85eed1e871c8e6fcd4f2f57e",
+      "sections": [
+        {"heading": "优惠券类型", "factId": "coupon.types", "equivalentRefs": ["03-membership-and-coupons.md#优惠券类型"], "sourceFacts": ["AI_Shop-backend/AI_Shop-coupon/api/src/main/java/com/aishop/api/enums/CouponTypeEnum.java"]},
+        {"heading": "领取与用户归属", "factId": "coupon.claim_and_ownership", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-coupon/app/src/main/java/com/aishop/biz/CouponInternalService.java"]},
+        {"heading": "券库存与抢券", "factId": "coupon.rush_stock", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-coupon/app/src/main/java/com/aishop/component/CouponRushStockService.java"]},
+        {"heading": "单订单使用限制", "factId": "coupon.single_per_order_and_revalidate", "equivalentRefs": ["faq:9002", "03-membership-and-coupons.md#使用限制"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "有效期与状态", "factId": "coupon.validity_and_status", "equivalentRefs": ["03-membership-and-coupons.md#使用限制"], "sourceFacts": ["AI_Shop-backend/AI_Shop-coupon/api/src/main/java/com/aishop/api/enums/CouponStatusEnum.java"]},
+        {"heading": "锁定、核销与释放", "factId": "coupon.lock_consume_release", "equivalentRefs": ["05-cart-and-checkout.md#优惠券预占"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderInfoServiceImpl.java"]},
+        {"heading": "对账与补偿", "factId": "coupon.reconcile_and_compensate", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-coupon/app/src/main/java/com/aishop/task/CouponRushReconcileTask.java"]}
+      ]
+    },
+    {
+      "file": "11-reviews-and-content-guidelines.md",
+      "title": "Smarlect 评价与内容规范",
+      "domain": "REVIEW",
+      "sha256": "fea286d19d9f632de3cbd120846924b8eafda4df5f9aaecd9af911fa136a3d5b",
+      "normalizedSha256": "101d46311e5ce5c1bb340ed98db6e8b3aea79fb3250ed7bcb274bddfd1f6cfc7",
+      "sections": [
+        {"heading": "评价资格", "factId": "review.eligibility", "equivalentRefs": ["02-orders-delivery-and-returns.md#评价"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderCommentServiceImpl.java"]},
+        {"heading": "星级与文字内容", "factId": "review.text_policy", "equivalentRefs": ["02-orders-delivery-and-returns.md#评价"], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderCommentServiceImpl.java"]},
+        {"heading": "评价图片", "factId": "review.image_moderation", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/biz/impl/ImageModerationServiceImpl.java"]},
+        {"heading": "追加评价", "factId": "review.followup_once", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderCommentServiceImpl.java"]},
+        {"heading": "评价删除", "factId": "review.logical_delete", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/biz/impl/OrderCommentServiceImpl.java"]},
+        {"heading": "商家回复与异常处理", "factId": "review.reply_and_failure", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/controller/admin/OrderCommentController.java"]},
+        {"heading": "AI 处理边界", "factId": "review.ai_write_boundary", "equivalentRefs": ["04-ai-assistant-and-support.md#AI 助手能做什么"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/response_verifier.py"]}
+      ]
+    },
+    {
+      "file": "12-privacy-data-and-ai-boundaries.md",
+      "title": "Smarlect 隐私数据与 AI 能力边界",
+      "domain": "PRIVACY",
+      "sha256": "524e92f4182210997379a3e272c987dae5791ee4de38acb79a49b4a68531d821",
+      "normalizedSha256": "ee307180a73570ebc8432ff2549f8866b989304314cbb21ce4720831107c0a47",
+      "sections": [
+        {"heading": "清空聊天与彻底删除", "factId": "privacy.clear_chat_vs_delete", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/privacy_job_service.py"]},
+        {"heading": "数据导出任务", "factId": "privacy.async_export", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-user/app/src/main/java/com/aishop/controller/UserPrivacyController.java"]},
+        {"heading": "数据删除任务", "factId": "privacy.async_delete_resume", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/privacy_job_service.py"]},
+        {"heading": "必须保留的业务数据", "factId": "privacy.retained_business_anonymization", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/privacy_job_service.py"]},
+        {"heading": "对话记忆与撤回", "factId": "privacy.memory_deletion_and_withdrawal", "equivalentRefs": ["04-ai-assistant-and-support.md#对话记忆"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/privacy_job_service.py"]},
+        {"heading": "转人工与写操作确认", "factId": "privacy.handoff_and_write_confirmation", "equivalentRefs": ["faq:9005", "04-ai-assistant-and-support.md#AI 助手能做什么"], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/services/response_verifier.py"]},
+        {"heading": "不支持的外部数据导入", "factId": "privacy.no_external_chat_import", "equivalentRefs": [], "sourceFacts": ["AI_Shop-backend/AI_Shop-agent/app/memory"]}
+      ]
+    }
+  ]
+}

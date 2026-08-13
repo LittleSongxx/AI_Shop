@@ -489,6 +489,11 @@ class JavaInternalClient:
                     "source_name": source_name,
                     "content_hash": content_hash,
                     "version": int(row.get("version") or 0),
+                    "domain": str(row.get("domain") or "GENERAL").strip().upper(),
+                    "chunk_count": int(row.get("chunk_count") or 0),
+                    "index_schema_version": int(
+                        row.get("index_schema_version") or 0
+                    ),
                 }
             )
         return {

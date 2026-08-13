@@ -250,6 +250,7 @@ aishop:
       enabled: true
       default-qps: 200
       auth-qps: 30
+      agent-send-qps: 10
 
 app:
   # 网关没有定时任务，也不依赖 AI_Shop-common（那些 @Scheduled 类根本不在 classpath 上）。

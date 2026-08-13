@@ -7,9 +7,12 @@ import java.util.Map;
 
 public interface KnowledgeBaseService {
 
-    Map<String, Object> upload(MultipartFile file, String title, String owner);
+    Map<String, Object> upload(
+            MultipartFile file, String title, String owner, String domain);
 
     Map<String, Object> publish(long documentId, String owner);
+
+    Map<String, Object> reindexPublished(long documentId, String owner);
 
     Map<String, Object> archive(long documentId);
 

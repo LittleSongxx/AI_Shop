@@ -43,6 +43,20 @@ def test_episode_payload_redacts_raw_text_credentials_and_business_ids():
     assert "ABCD2026080712345678" not in str(payload)
 
 
+def test_episode_payload_fingerprints_rag_repair_answers():
+    payload = sanitize_episode_payload(
+        {
+            "initialAnswer": "初答包含用户地址测试路 1 号",
+            "repairedAnswer": "修复答案包含订单 ORDER202608130001",
+        }
+    )
+
+    assert payload["initialAnswer"]["chars"] > 0
+    assert payload["repairedAnswer"]["chars"] > 0
+    assert "测试路" not in str(payload)
+    assert "ORDER202608130001" not in str(payload)
+
+
 def test_current_otel_ids_only_come_from_an_active_span():
     assert current_trace_id() is None
     assert current_span_id() is None

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "dataset": "rag_v3_public.jsonl",
+  "datasetSha256": "6884f98f657940883fcfe7eda5e957ef7664bf85d543a5d59488d93efeb39c37",
+  "caseCount": 48,
+  "split": "public",
+  "knowledgeCatalog": "AI_Shop-backend/data/demo_knowledge/catalog.v1.json",
+  "knowledgeCatalogSha256": "68569f948ebfe843655e8a54c479f4136ad82125cf775a3360163af91c0ba470",
+  "labelPolicy": "labels are derived from the versioned canonical fact catalog; LLMs do not decide relevance or grade answers",
+  "distribution": {
+    "answerable": 36,
+    "noAnswer": 6,
+    "injection": 6
+  }
+}

@@ -5,6 +5,12 @@ from collections.abc import Iterable
 from pathlib import PurePath
 from typing import Any
 
+from app.rag.canonical_facts import (
+    canonical_citation_metrics,
+    canonical_match,
+    relevant_fact_ids,
+)
+
 
 def _reference_ids(ref: dict[str, Any]) -> set[str]:
     values = {
@@ -151,6 +157,9 @@ def evaluate_results(
             "citationCorrectness": 0.0,
             "labelCitationPrecision": 0.0,
             "citationCoverage": 0.0,
+            "canonicalCitationCorrectness": 0.0,
+            "canonicalCitationCoverage": 0.0,
+            "strictExactRefPrecision": 0.0,
             "noAnswerAccuracy": 0.0,
             "noAnswerPrecision": 0.0,
             "noAnswerRecall": 0.0,
@@ -168,6 +177,8 @@ def evaluate_results(
     citation_hits = 0
     valid_citation_count = strict_label_count = returned_citation_count = 0
     citation_coverage_values: list[float] = []
+    canonical_correct_count = canonical_returned_count = 0
+    canonical_coverage_values: list[float] = []
     injection_cases = injection_robust = 0
     no_answer_cases = no_answer_hits = 0
     no_answer_tp = no_answer_fp = no_answer_fn = 0
@@ -182,10 +193,17 @@ def evaluate_results(
             isinstance(trace, dict) and trace.get("hit") is False
         )
         latency_ms = trace.get("latencyMs") if isinstance(trace, dict) else None
+        expected_facts = relevant_fact_ids(case)
+
+        def matches(actual: dict[str, Any]) -> bool:
+            if expected_facts:
+                return bool(canonical_match(case, actual))
+            return any(_matches_expected(expected, actual) for expected in expected_refs)
+
         matched_positions = [
             position
             for position, actual in enumerate(refs[:limit], start=1)
-            if any(_matches_expected(expected, actual) for expected in expected_refs)
+            if matches(actual)
         ]
         if expected_no_answer:
             no_answer_cases += 1
@@ -200,6 +218,7 @@ def evaluate_results(
                 injection_robust += int(robust)
             per_case.append(
                 {
+                    "caseId": str(case.get("id") or index),
                     "index": index,
                     "query": case.get("query"),
                     "expectedNoAnswer": True,
@@ -213,9 +232,10 @@ def evaluate_results(
             continue
         if predicted_no_answer:
             no_answer_fp += 1
-        if not expected_refs:
+        if not expected_refs and not expected_facts:
             per_case.append(
                 {
+                    "caseId": str(case.get("id") or index),
                     "index": index,
                     "query": case.get("query"),
                     "expectedNoAnswer": False,
@@ -227,12 +247,18 @@ def evaluate_results(
             )
             continue
 
-        matched_expected = sum(
-            1
-            for expected in expected_refs
-            if any(_matches_expected(expected, actual) for actual in refs[:limit])
-        )
-        recall = matched_expected / len(expected_refs)
+        if expected_facts:
+            matched_facts = set().union(
+                *(canonical_match(case, actual) for actual in refs[:limit])
+            ) if refs[:limit] else set()
+            recall = len(matched_facts) / len(expected_facts)
+        else:
+            matched_expected = sum(
+                1
+                for expected in expected_refs
+                if any(_matches_expected(expected, actual) for actual in refs[:limit])
+            )
+            recall = matched_expected / len(expected_refs)
         recall_values.append(recall)
         rank = matched_positions[0] if matched_positions else None
         reciprocal_ranks.append(1.0 / rank if rank else 0.0)
@@ -246,7 +272,11 @@ def evaluate_results(
         valid_refs = [
             ref
             for ref in refs[:limit]
-            if _citation_supports_answer(ref, expected_refs, keywords)
+            if (
+                bool(canonical_match(case, ref))
+                if expected_facts
+                else _citation_supports_answer(ref, expected_refs, keywords)
+            )
         ]
         strict_label_refs = [
             ref
@@ -255,6 +285,13 @@ def evaluate_results(
         ]
         valid_citation_count += len(valid_refs)
         strict_label_count += len(strict_label_refs)
+        canonical_metrics = canonical_citation_metrics(case, refs[:limit]) if expected_facts else None
+        if canonical_metrics is not None:
+            canonical_correct_count += round(
+                canonical_metrics["correctness"] * len(refs[:limit])
+            )
+            canonical_returned_count += len(refs[:limit])
+            canonical_coverage_values.append(canonical_metrics["coverage"])
         covered_expected = sum(
             1
             for expected in expected_refs
@@ -269,12 +306,18 @@ def evaluate_results(
         cited = bool(valid_refs)
         if cited:
             citation_hits += 1
-        robust = recall == 1.0 and citation_coverage == 1.0
+        effective_coverage = (
+            canonical_metrics["coverage"]
+            if canonical_metrics is not None
+            else citation_coverage
+        )
+        robust = recall == 1.0 and effective_coverage == 1.0
         if case.get("injection"):
             injection_cases += 1
             injection_robust += int(robust)
         per_case.append(
             {
+                "caseId": str(case.get("id") or index),
                 "index": index,
                 "query": case.get("query"),
                 "expectedNoAnswer": False,
@@ -292,9 +335,22 @@ def evaluate_results(
                 if refs[:limit]
                 else 0.0,
                 "citationCoverage": round(citation_coverage, 4),
+                "canonicalCitationCorrectness": (
+                    round(canonical_metrics["correctness"], 4)
+                    if canonical_metrics is not None
+                    else None
+                ),
+                "canonicalCitationCoverage": (
+                    round(canonical_metrics["coverage"], 4)
+                    if canonical_metrics is not None
+                    else None
+                ),
+                "strictExactRefPrecision": round(
+                    len(strict_label_refs) / len(refs[:limit]), 4
+                ) if refs[:limit] else 0.0,
                 "injectionRobust": robust if case.get("injection") else None,
                 "latencyMs": latency_ms,
-                "passed": recall == 1.0 and cited,
+                "passed": recall == 1.0 and cited and effective_coverage == 1.0,
                 "expectedRefs": expected_refs,
                 "retrievedRefs": refs[:limit],
             }
@@ -328,6 +384,15 @@ def evaluate_results(
         else 0.0,
         "citationCoverage": round(sum(citation_coverage_values) / retrieval_count, 4)
         if retrieval_count
+        else 0.0,
+        "canonicalCitationCorrectness": round(
+            canonical_correct_count / canonical_returned_count, 4
+        ) if canonical_returned_count else 0.0,
+        "canonicalCitationCoverage": round(
+            sum(canonical_coverage_values) / len(canonical_coverage_values), 4
+        ) if canonical_coverage_values else 0.0,
+        "strictExactRefPrecision": round(strict_label_count / returned_citation_count, 4)
+        if returned_citation_count
         else 0.0,
         "noAnswerAccuracy": round(no_answer_hits / no_answer_cases, 4)
         if no_answer_cases

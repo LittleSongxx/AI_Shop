@@ -24,9 +24,10 @@ public class KnowledgeBaseController extends com.aishop.controller.admin.ABaseCo
     @RequireAdminPermission(AdminPermissions.AI_CONFIG)
     public ResponseVO upload(
             @RequestParam("file") MultipartFile file,
-            String title) {
+            String title,
+            String domain) {
         return getSuccessResponseVO(knowledgeBaseService.upload(
-                file, title, currentAdmin()));
+                file, title, currentAdmin(), domain));
     }
 
     @PostMapping("/publish")
@@ -36,6 +37,16 @@ public class KnowledgeBaseController extends com.aishop.controller.admin.ABaseCo
             throw new BusinessException("documentId不能为空");
         }
         return getSuccessResponseVO(knowledgeBaseService.publish(
+                documentId, currentAdmin()));
+    }
+
+    @PostMapping("/reindex")
+    @RequireAdminPermission(AdminPermissions.AI_CONFIG)
+    public ResponseVO reindex(Long documentId) {
+        if (documentId == null) {
+            throw new BusinessException("documentId不能为空");
+        }
+        return getSuccessResponseVO(knowledgeBaseService.reindexPublished(
                 documentId, currentAdmin()));
     }
 

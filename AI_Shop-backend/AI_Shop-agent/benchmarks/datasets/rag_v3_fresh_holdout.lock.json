@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "dataset": "rag_v3_fresh_holdout.jsonl",
+  "datasetSha256": "4f0a1157e1d40ad79b82f274e0f704f07391b687886d7adca5c5a39c6fa3e9a6",
+  "caseCount": 32,
+  "split": "fresh_holdout",
+  "knowledgeCatalog": "AI_Shop-backend/data/demo_knowledge/catalog.v1.json",
+  "knowledgeCatalogSha256": "68569f948ebfe843655e8a54c479f4136ad82125cf775a3360163af91c0ba470",
+  "labelPolicy": "labels are derived from the versioned canonical fact catalog; LLMs do not decide relevance or grade answers",
+  "distribution": {
+    "answerable": 20,
+    "noAnswer": 6,
+    "injection": 6
+  },
+  "frozenConfigPath": "/home/song/code/Java/AI_Shop/AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/frozen-config.json",
+  "frozenConfigSha256": "6f6ecbe9845fb35ae4424514304d5774f11fc56087b6ad76dd38e8d156b7a52e",
+  "executionPolicy": "finalize after dev freeze; execute final retrieval once and retain failures"
+}

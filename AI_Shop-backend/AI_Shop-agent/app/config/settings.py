@@ -22,6 +22,7 @@ def _blank_to_none(value: object) -> object:
 
 
 OptionalInt = Annotated[int | None, BeforeValidator(_blank_to_none)]
+OptionalFloat = Annotated[float | None, BeforeValidator(_blank_to_none)]
 
 
 class Settings(BaseSettings):
@@ -261,7 +262,20 @@ class Settings(BaseSettings):
     support_first_response_sla_seconds: int = 300
     support_queue_alert_seconds: int = 600
 
+    # Token 消耗防护：防止单用户通过长 ReAct 链或持续对话消耗过多 LLM 预算。
+    # per_session_token_budget: 单个对话会话（从首次对话到 ai_chat_limit）的 token 上限。
+    # 0 = 禁用。超限后 LLM 调用降级为 FAQ 快速路径，不强制截断已有会话。
+    per_session_token_budget: int = 0
+    # daily_user_token_quota: 每用户每自然日（UTC）的 token 配额，跨会话累计。
+    # 0 = 禁用。超限后当日不再进 LLM，次日 00:00 UTC 重置。
+    daily_user_token_quota: int = 0
     ai_chat_limit: int = 200
+    # 有效输入最小字符数（归一化后）。0 = 禁用。
+    # 低于阈值的极短消息（单字、单标点）触发引导提示，不进 LLM pipeline。
+    min_input_chars: int = 3
+    # 重复意图快速路径阈值：同一用户在 10 分钟窗口内触发同一意图达到此次数后，
+    # 跳过 LLM 直接提示转人工。0 = 禁用。购物类意图不参与计数。
+    intent_repeat_threshold: int = 3
     rag_top_k: int = 15
 
     # ---- 检索阈值：三个阶段的分数量纲互不相同，不能共用一个常量 ----
@@ -289,6 +303,10 @@ class Settings(BaseSettings):
     # 2026-08-06 的阈值扫描：Recall@10/MRR=0.9167，拒答 F1=0.9524。
     # 完整数据哈希和回归下限见 scripts/rag_golden.lock.json。
     rag_evidence_min_relevance: float = 0.65
+    # Disabled by default so an unvalidated experiment cannot alter production.
+    # When configured, reranked evidence must also be within this distance of the
+    # top relevance score. A value of 0 keeps only tied top-scoring passages.
+    rag_evidence_top_score_margin: OptionalFloat = None
     # 无 rerank 时的兜底闸门，单位是 RRF 融合分而不是任何引擎的原始分。
     # RRF 的全部意义就是丢掉不可比的原始分只留排名，所以这道闸门只能用排名表达：
     # "至少在某一路里进了前 N 名"。1/(60+N) 是 RRF 的定义式，N 越大越宽松。
@@ -424,6 +442,19 @@ class Settings(BaseSettings):
             raise ValueError("COMMERCE_OUTCOME_RETENTION_DAYS must be between 30 and 730")
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
+        if self.min_input_chars < 0 or self.min_input_chars > 20:
+            raise ValueError("MIN_INPUT_CHARS must be between 0 and 20")
+        if self.per_session_token_budget < 0:
+            raise ValueError("PER_SESSION_TOKEN_BUDGET must be non-negative (0 to disable)")
+        if self.daily_user_token_quota < 0:
+            raise ValueError("DAILY_USER_TOKEN_QUOTA must be non-negative (0 to disable)")
+        if self.intent_repeat_threshold < 0 or self.intent_repeat_threshold > 20:
+            raise ValueError("INTENT_REPEAT_THRESHOLD must be between 0 and 20")
+        if (
+            self.rag_evidence_top_score_margin is not None
+            and not 0 <= self.rag_evidence_top_score_margin <= 1
+        ):
+            raise ValueError("RAG_EVIDENCE_TOP_SCORE_MARGIN must be between 0 and 1")
         for model, pricing in self.llm_pricing_cny_per_million_json.items():
             if not str(model).strip() or not isinstance(pricing, dict):
                 raise ValueError("LLM pricing requires a non-empty model and an object price")
