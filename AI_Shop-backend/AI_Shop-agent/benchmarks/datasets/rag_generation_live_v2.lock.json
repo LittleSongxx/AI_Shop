@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "dataset": "rag_generation_live_v2.json",
+  "datasetSha256": "7be8773ee8aa346cf744ac1bd3e3591400fa8e1e0b902324a1d97227987cd953",
+  "caseCount": 24,
+  "knownRegressionCount": 10,
+  "freshHoldoutCount": 14,
+  "sourceDatasets": [
+    {
+      "dataset": "rag_holdout_v1.jsonl",
+      "datasetSha256": "6e009d56a1d9025c28da092f4b51dc19665e9e6166513fe71032c99a8bb35194"
+    },
+    {
+      "dataset": "rag_fresh_holdout_v2.jsonl",
+      "datasetSha256": "ef0c9f0fb51ef9cf5e4623cf16aac2ea7fca9ae7e0727e6c81f5936244292e12"
+    }
+  ],
+  "distribution": {
+    "faq": 8,
+    "knowledge": 8,
+    "no_answer": 4,
+    "injection": 4
+  },
+  "executionPolicy": "one final configured-model pass; failures are retained and labels are immutable"
+}

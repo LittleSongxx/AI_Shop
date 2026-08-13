@@ -79,6 +79,22 @@ def test_generation_selection_is_hash_locked_and_balanced():
     assert sum(bool(case.get("noAnswer")) for case in cases) == 2
 
 
+def test_generation_v2_selection_has_10_regression_and_14_fresh_cases():
+    cases, selection = runner.load_selection(
+        runner.V2_SELECTION_PATH,
+        runner.V2_SELECTION_LOCK_PATH,
+    )
+
+    assert len(cases) == 24
+    assert len(set(selection["caseIds"])) == 24
+    assert sum(case["comparisonGroup"] == "known-regression" for case in cases) == 10
+    assert sum(case["comparisonGroup"] == "fresh-holdout" for case in cases) == 14
+    assert sum(case.get("subset") == "faq" for case in cases) == 8
+    assert sum(case.get("subset") == "knowledge" for case in cases) == 8
+    assert sum(bool(case.get("noAnswer")) and not case.get("injection") for case in cases) == 4
+    assert sum(bool(case.get("injection")) for case in cases) == 4
+
+
 @pytest.mark.asyncio
 async def test_stream_answer_collects_first_token_and_provider_usage():
     llm = FakeStreamingLlm({"测试问题": "测试答案。[1]"})
@@ -243,3 +259,45 @@ def test_error_result_is_executed_and_does_not_substitute_an_answer():
     assert result.task_success is False
     assert result.error_type == "TimeoutError"
     assert result.observations["answerAvailable"] is False
+
+
+def test_ai_assisted_initial_review_uses_complete_four_field_rubric():
+    template = {
+        "suite": runner.V2_SUITE,
+        "runId": "review-run",
+        "cases": [
+            {
+                "caseId": "pass",
+                "automaticMetrics": {
+                    "expectedNoAnswer": False,
+                    "predictedNoAnswer": False,
+                    "keywordCoverage": 1.0,
+                    "citationCorrectness": 1.0,
+                    "citationCoverage": 1.0,
+                    "invalidCitationIndexes": [],
+                    "injectionRobust": True,
+                },
+            },
+            {
+                "caseId": "fail",
+                "automaticMetrics": {
+                    "expectedNoAnswer": False,
+                    "predictedNoAnswer": False,
+                    "keywordCoverage": 0.5,
+                    "citationCorrectness": 1.0,
+                    "citationCoverage": 0.5,
+                    "invalidCitationIndexes": [],
+                    "injectionRobust": True,
+                },
+            },
+        ],
+    }
+
+    review = runner.build_initial_review(template)
+
+    assert review["reviewerType"] == "AI_ASSISTED_INITIAL_REVIEW"
+    assert review["status"] == "COMPLETED"
+    assert [row["verdict"] for row in review["cases"]] == ["PASS", "FAIL"]
+    assert review["cases"][1]["complete"] is False
+    assert review["cases"][1]["citationAligned"] is False
+    assert review["cases"][1]["reason"]

@@ -149,6 +149,9 @@ def _check_ai_review(
     result_run_id = (result.get("metadata") or {}).get("runId")
     if review.get("runId") != result_run_id:
         errors.append(f"AI-assisted review runId mismatch: {path.relative_to(REPO_ROOT)}")
+    result_suite = (result.get("metadata") or {}).get("suite")
+    if review.get("suite") != result_suite:
+        errors.append(f"AI-assisted review suite mismatch: {path.relative_to(REPO_ROOT)}")
     rows = review.get("cases")
     expected_count = int(evidence.get("reviewCaseCount") or 10)
     if not isinstance(rows, list) or len(rows) != expected_count:

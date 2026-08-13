@@ -1,8 +1,9 @@
 import contextvars
 import hashlib
+import json
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Any, Iterator
 
 import httpx
 import structlog
@@ -26,6 +27,11 @@ class EmbeddingEvaluationStats:
     provider_successes: int = 0
     provider_failures: int = 0
     breaker_rejections: int = 0
+    response_records: list[dict[str, Any]] | None = None
+
+    def __post_init__(self) -> None:
+        if self.response_records is None:
+            self.response_records = []
 
     def snapshot(self) -> dict[str, int | bool]:
         return {
@@ -36,6 +42,7 @@ class EmbeddingEvaluationStats:
             "providerSuccesses": self.provider_successes,
             "providerFailures": self.provider_failures,
             "breakerRejections": self.breaker_rejections,
+            "responseRecords": list(self.response_records or []),
         }
 
 
@@ -58,7 +65,6 @@ def embedding_evaluation_scope(
         _EVALUATION_STATS.reset(token)
 
 async def embed_text(text: str) -> list[float] | None:
-
     settings = get_settings()
     query = (text or "").strip()
     if not query:
@@ -109,6 +115,18 @@ async def embed_text(text: str) -> list[float] | None:
         breaker.record_success()
         if evaluation is not None:
             evaluation.provider_successes += 1
+            evaluation.response_records.append(
+                {
+                    "inputSha256": _sha256(query),
+                    "dimensions": len(vector),
+                    "vectorSha256": hashlib.sha256(
+                        json.dumps(
+                            [round(float(item), 10) for item in vector],
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest(),
+                }
+            )
         await _set_cached_embedding(cache_key, vector)
         return vector
     except httpx.HTTPStatusError as e:
@@ -134,6 +152,89 @@ async def _get_cached_embedding(key: str) -> list[float] | None:
     except Exception:
         return None
     return None
+
+
+async def embed_texts(texts: list[str], *, batch_size: int = 20) -> list[list[float] | None]:
+    """Embed a bounded batch through the OpenAI-compatible Provider endpoint."""
+
+    values = [str(text or "").strip() for text in texts]
+    if not values:
+        return []
+    if _EVALUATION_STATS.get() is None:
+        return [await embed_text(value) for value in values]
+    if batch_size < 1:
+        raise ValueError("embedding batch_size must be positive")
+    settings = get_settings()
+    evaluation = _EVALUATION_STATS.get()
+    assert evaluation is not None
+    output: list[list[float] | None] = [None] * len(values)
+    for start in range(0, len(values), batch_size):
+        batch = values[start : start + batch_size]
+        non_empty = [(index, value) for index, value in enumerate(batch) if value]
+        evaluation.requests += len(batch)
+        if not non_empty:
+            continue
+        breaker = circuit_registry.get_or_create(
+            "embedding", failure_threshold=3, recovery_timeout=30
+        )
+        if not breaker.allow_request():
+            evaluation.provider_failures += 1
+            evaluation.breaker_rejections += 1
+            continue
+        try:
+            evaluation.provider_requests += 1
+            client = await get_client("embedding", timeout=30)
+            response = await client.post(
+                f"{settings.embedding_base_url.rstrip('/')}/embeddings",
+                headers={"Authorization": f"Bearer {settings.embedding_api_key}"},
+                json={
+                    "model": settings.embedding_model,
+                    "input": [value for _index, value in non_empty],
+                    "dimensions": settings.embedding_dimensions,
+                    "encoding_format": "float",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            rows = response.json().get("data") or []
+            vectors: dict[int, list[float]] = {}
+            for ordinal, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    continue
+                provider_index = row.get("index", ordinal)
+                if not isinstance(provider_index, int) or not 0 <= provider_index < len(non_empty):
+                    continue
+                vector = row.get("embedding")
+                if not isinstance(vector, list):
+                    continue
+                vectors[provider_index] = [float(item) for item in vector]
+            if len(vectors) != len(non_empty):
+                raise ValueError(
+                    f"embedding batch returned {len(vectors)}/{len(non_empty)} vectors"
+                )
+            breaker.record_success()
+            evaluation.provider_successes += 1
+            for provider_index, vector in vectors.items():
+                original_index, value = non_empty[provider_index]
+                output[start + original_index] = vector
+                evaluation.response_records.append(
+                    {
+                        "inputSha256": _sha256(value),
+                        "dimensions": len(vector),
+                        "vectorSha256": hashlib.sha256(
+                            json.dumps(
+                                [round(float(item), 10) for item in vector],
+                                separators=(",", ":"),
+                            ).encode("utf-8")
+                        ).hexdigest(),
+                        "batch": True,
+                    }
+                )
+        except Exception as exc:
+            breaker.record_failure()
+            evaluation.provider_failures += 1
+            logger.warning("embedding_batch_failed", error=str(exc), batchSize=len(non_empty))
+    return output
 
 
 async def _set_cached_embedding(key: str, vector: list[float]) -> None:

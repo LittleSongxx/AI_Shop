@@ -58,6 +58,7 @@ class RerankEvaluationStats:
     provider_failures: int = 0
     fallback_count: int = 0
     fallback_reasons: dict[str, int] = field(default_factory=dict)
+    response_records: list[dict[str, Any]] = field(default_factory=list)
 
     def fallback(self, reason: str) -> None:
         self.fallback_count += 1
@@ -71,6 +72,7 @@ class RerankEvaluationStats:
             "providerFailures": self.provider_failures,
             "fallbackCount": self.fallback_count,
             "fallbackReasons": dict(sorted(self.fallback_reasons.items())),
+            "responseRecords": list(self.response_records),
         }
 
 
@@ -764,6 +766,19 @@ class RagRetriever:
             breaker.record_success()
             if evaluation is not None:
                 evaluation.provider_successes += 1
+                evaluation.response_records.append(
+                    {
+                        "queryHash": _sha256(query),
+                        "candidateIds": [str(doc.get("id") or "") for doc in docs],
+                        "results": [
+                            {
+                                "id": str(doc.get("id") or ""),
+                                "score": round(float(doc.get("score") or 0), 8),
+                            }
+                            for doc in reranked
+                        ],
+                    }
+                )
             return reranked
         except Exception as exc:
             breaker.record_failure()

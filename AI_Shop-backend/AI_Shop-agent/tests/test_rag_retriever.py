@@ -546,6 +546,7 @@ async def test_invalid_rerank_results_fall_back_to_original_order(monkeypatch):
         "providerFailures": 1,
         "fallbackCount": 1,
         "fallbackReasons": {"provider_error": 1},
+        "responseRecords": [],
     }
     breaker.record_success.assert_not_called()
     breaker.record_failure.assert_called_once_with()

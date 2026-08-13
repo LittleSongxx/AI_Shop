@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "chinese-commerce-search-v1",
+  "datasetSha256": "60cb8dc0507c87c82111ec06f69d1156c30b2d4183ad44c9dfe30c1a9bac7896",
+  "evidenceSource": "SYNTHETIC",
+  "counts": {
+    "products": 300,
+    "queries": 120,
+    "categories": 20,
+    "splits": {
+      "challenge": 20,
+      "fresh_holdout": 40,
+      "public": 60
+    },
+    "challengeTypes": {
+      "conflict": 10,
+      "typo": 10
+    }
+  },
+  "labelSource": "structured constraints over an allowed-value schema; LLM writes surface text only"
+}

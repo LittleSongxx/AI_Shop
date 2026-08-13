@@ -9,6 +9,14 @@ from app.evaluation.contracts import (
     EvaluationRunMetadata,
     aggregate_case_results,
 )
+from app.evaluation.ranking import (
+    DEFAULT_K_VALUES,
+    aggregate_ranking_cases,
+    aggregate_stage_latency,
+    bootstrap_mean_ci,
+    paired_ranking_comparison,
+    ranking_case_metrics,
+)
 
 __all__ = [
     "EVAL_SCHEMA_VERSION",
@@ -18,5 +26,11 @@ __all__ = [
     "EvaluationRun",
     "EvaluationRunMetadata",
     "aggregate_case_results",
+    "DEFAULT_K_VALUES",
+    "aggregate_ranking_cases",
+    "aggregate_stage_latency",
+    "bootstrap_mean_ci",
+    "paired_ranking_comparison",
+    "ranking_case_metrics",
     "sha256_path",
 ]

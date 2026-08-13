@@ -108,6 +108,7 @@ class EvidenceManifestTest(unittest.TestCase):
             json.dumps(
                 {
                     "schemaVersion": 1,
+                    "suite": "rag-generation-live-v1",
                     "runId": "run-1",
                     "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
                     "status": "COMPLETED",
