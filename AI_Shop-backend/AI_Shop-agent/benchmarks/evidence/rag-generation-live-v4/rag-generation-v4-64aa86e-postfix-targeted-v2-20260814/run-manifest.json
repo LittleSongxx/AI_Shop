@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-targeted-v2-20260814",
+  "sourceRunId": "rag-generation-v4-64aa86e-postfix-targeted-20260814",
+  "status": "POST_FIX_TARGETED_REGRESSION",
+  "holdoutExposed": true,
+  "freshEvidence": false,
+  "summarySha256": "eb741159aee69e01b8c4076de765006e280f52de9599f520ed6f9c336979869a",
+  "badcasesSha256": "afb03197fb6b6a018f09b4b9a190f828133e2cef125978f17d4701ce201b6882",
+  "aiReviewSha256": "8e3ac9736a50502d2a629a65a8936a16843db2ed7adacf1f679684381871e382",
+  "sourceArtifacts": {
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-20260814/summary.json": "6edd31743e1fcd920329a0f25f27564579cee1517bf6bd8b8babbe5e2b17ad14",
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-20260814/cases.jsonl": "e6e8977277fad31d4adbd7fe76c2a27dcc46b43829bfdbcfad9d3ccc8a87d121"
+  },
+  "localArtifacts": {
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/summary.json": "2c2be48e1d66a5fe1c3daaccd4a19fc32afc1d3dd2669fff0ef8b7ca0bcd0bba",
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/cases.jsonl": "c4ebc25486ae0d35e2610e14bfe4a6a2bf5c515d6b1da4fde342c95834971c33",
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/review-template.json": "84e692f8f952fe0cb6b628cd914401435a8833c1c85ddde5a83ebb95f722d2de",
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/ai-review.json": "8e3ac9736a50502d2a629a65a8936a16843db2ed7adacf1f679684381871e382",
+    "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/human-review/package-manifest.json": "6f0082092496d69d4f6e9e12f16a08a6557aee045f4e85af03ad5f421e795569"
+  },
+  "humanReviewStatus": "HUMAN_REVIEW_PENDING"
+}

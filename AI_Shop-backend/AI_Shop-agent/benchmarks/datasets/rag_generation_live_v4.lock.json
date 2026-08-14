@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 4,
+  "dataset": "rag_generation_live_v4.json",
+  "datasetSha256": "8d9b669468b31d1c10a4da71136aebb7e68fa723fef2daab754a2f8d948dc171",
+  "sourceDatasetSha256": {
+    "rag_v4_known_regression.jsonl": "4e3503e87651274975e3a43828587b0781877961aff9d98d61b1ce9488e06123",
+    "rag_v4_public.jsonl": "8c449853b7a76dc5e38658aa024e708cbeb709b56a7fcf731b2566493698d2ba",
+    "rag_v4_fresh_holdout.jsonl": "6bb9d719434cbc784b821c0b9f3de22047d5488ea9aee5a208df8305b81e08e5"
+  },
+  "caseCount": 60
+}

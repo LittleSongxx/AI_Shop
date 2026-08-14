@@ -1,9 +1,11 @@
 import pytest
 
 from app.evaluation.ranking import (
+    aggregate_incomplete_judgment_cases,
     aggregate_ranking_cases,
     aggregate_stage_latency,
     bootstrap_mean_ci,
+    incomplete_judgment_case_metrics,
     paired_ranking_comparison,
     ranking_case_metrics,
 )
@@ -59,6 +61,23 @@ def test_judged_pool_rejects_unjudged_documents():
             {"judged": 2},
             judged_pool=True,
         )
+
+
+def test_incomplete_judgment_metrics_keep_unjudged_results_neutral():
+    row = incomplete_judgment_case_metrics(
+        ["unjudged", "relevant", "nonrelevant", "relevant-2"],
+        {"relevant": 2, "relevant-2": 1, "nonrelevant": 0},
+        k_values=[1, 2, 4],
+    )
+
+    assert row["metricsByK"]["1"]["knownRelevantRecall"] == 0.0
+    assert row["metricsByK"]["1"]["judgedRate"] == 0.0
+    assert row["metricsByK"]["2"]["knownRelevantRecall"] == 0.5
+    assert row["metricsByK"]["4"]["knownRelevantRecall"] == 1.0
+    assert row["bpref"] == 0.5
+    report = aggregate_incomplete_judgment_cases([row])
+    assert report["metricCurves"]["4"]["condensedNdcg"] > 0
+    assert report["labelScope"] == "full-catalog-incomplete-qrels"
 
 
 def test_aggregate_reports_rank_saturation_and_metric_curves():

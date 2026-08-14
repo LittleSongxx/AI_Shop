@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-targeted-v5-20260814",
+  "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+  "status": "COMPLETED",
+  "sourceTemplate": "review-template.json",
+  "sourceTemplateSha256": "c6fdfa456cd2900a8ff90da4b828b1f2d7bceb2f2ce1cf988ad75d9543755f3d",
+  "cases": [
+    {
+      "caseId": "rag-fresh-013",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    }
+  ]
+}

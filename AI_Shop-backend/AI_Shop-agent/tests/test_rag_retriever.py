@@ -345,9 +345,9 @@ def test_evidence_gate_uses_the_scale_that_produced_the_score():
     """冻结的 rerank 门槛不能被误用于判定 RRF 融合分。"""
     retriever = RagRetriever()
 
-    # rerank 之后使用 2026-08-06 评测冻结的 0.65 绝对阈值。
-    assert retriever._has_enough_evidence([{"score": 0.65, "source": "rerank"}])
-    assert not retriever._has_enough_evidence([{"score": 0.64, "source": "rerank"}])
+    # v4 默认 rerank 绝对阈值为 0.70；实验可以通过 policy scope 覆盖。
+    assert retriever._has_enough_evidence([{"score": 0.70, "source": "rerank"}])
+    assert not retriever._has_enough_evidence([{"score": 0.69, "source": "rerank"}])
 
     # 没有 rerank（未配 key 或熔断）：RRF 分远小于 0.65，按名次判才有意义。
     settings = get_settings()
@@ -399,6 +399,41 @@ def test_evidence_top_score_margin_is_optional_and_filters_relative_noise(monkey
         "top",
         "near",
     ]
+
+
+def test_canonical_fact_hint_recovers_and_prioritizes_direct_evidence():
+    retriever = RagRetriever()
+    docs = [
+        {
+            "id": "topic-only",
+            "content": "退款状态可以在订单详情查看。",
+            "metadata": {
+                "dataType": "knowledge",
+                "source": "09-after-sales-evidence-and-review.md",
+                "heading": "售后状态",
+            },
+            "score": 0.75,
+            "source": "rerank",
+        },
+        {
+            "id": "direct-boundary",
+            "content": "AI 不能直接退款，写操作必须经用户确认。",
+            "metadata": {
+                "dataType": "knowledge",
+                "source": "12-privacy-data-and-ai-boundaries.md",
+                "heading": "转人工与写操作确认",
+            },
+            "score": 0.62,
+            "source": "rerank",
+        },
+    ]
+
+    accepted = retriever._filter_evidence_docs(
+        docs,
+        preferred_fact_ids=["ai.capability_and_confirmation"],
+    )
+
+    assert [doc["id"] for doc in accepted] == ["direct-boundary", "topic-only"]
 
 
 def test_evaluation_scope_overrides_evidence_gate_without_changing_settings(monkeypatch):

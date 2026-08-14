@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 4,
+  "dataset": "rag_v4_public.jsonl",
+  "datasetSha256": "8c449853b7a76dc5e38658aa024e708cbeb709b56a7fcf731b2566493698d2ba",
+  "caseCount": 72,
+  "split": "public",
+  "catalogSha256": "68569f948ebfe843655e8a54c479f4136ad82125cf775a3360163af91c0ba470",
+  "labelPolicy": "canonical fact catalog and deterministic aliases; no LLM relevance grading",
+  "source": "v3 public + 24 additional domains"
+}

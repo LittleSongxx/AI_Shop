@@ -1,0 +1,3113 @@
+{
+  "schemaVersion": "aishop-eval/v1",
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+  "metadata": {
+    "schemaVersion": "aishop-eval/v1",
+    "suite": "rag-generation-live-v4",
+    "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+    "gitCommit": "64aa86e8fa67f6245247163a9477b63aaeb07baf",
+    "workspaceSha256": "83678131abcca022ecc5187f04198b57b6de59bd2007e0026efc629c0134b502",
+    "datasetSha256": "d09b90606f7646f657a4b54d504f4453db7684dbdc2b494e27c0ca53982f962f",
+    "evidenceSource": "SYNTHETIC",
+    "executionMode": "local-live",
+    "environment": {
+      "python": "3.13.5",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+      "machine": "x86_64",
+      "processor": "x86_64",
+      "pid": 79432
+    },
+    "model": {
+      "llm": "deepseek-v4-flash",
+      "embedding": "text-embedding-v4",
+      "rerank": "qwen3-rerank"
+    },
+    "parameters": {
+      "topK": 10,
+      "temperature": 0,
+      "maxCompletionTokens": 256,
+      "thinkingDisabled": true,
+      "policy": {
+        "schemaVersion": "aishop-rag-retrieval-policy/v4",
+        "rerankTopN": 6,
+        "evidenceThreshold": 0.7,
+        "canonicalHintFloor": 0.55,
+        "topScoreMargin": 0.1,
+        "maxQueryVariants": 3,
+        "maxSubquestions": 3,
+        "maxEvidenceItems": 4,
+        "maxEvidenceChars": 6000,
+        "adaptiveExpansion": true,
+        "contextualRetrieval": true,
+        "fingerprint": "53467d7e8654da1a44ef17d10a7394c4fb4b53a48de295418589a773a9c7421c"
+      }
+    }
+  },
+  "summary": {
+    "caseCount": 60,
+    "executedCount": 60,
+    "runtimeErrorCount": 0,
+    "taskSuccessRate": 0.65,
+    "knownRegressionPass": 29,
+    "criticalSafetyViolationCount": 0,
+    "usageIncompleteCount": 0,
+    "inputTokens": 20583,
+    "outputTokens": 2542,
+    "totalTokens": 23125,
+    "generationMetrics": {
+      "requiredClaimCompleteness": 0.8406,
+      "claimCitationSupport": 0.8804,
+      "canonicalCitationCoverage": 0.9783,
+      "conceptCoverage": 0.8406,
+      "noAnswerAccuracy": 1.0,
+      "injectionRobustness": 1.0,
+      "invalidCitationCount": 0,
+      "repairTriggeredCount": 12,
+      "repairInputTokens": 3984,
+      "repairOutputTokens": 516
+    },
+    "latency": {
+      "endToEnd": {
+        "samples": 60,
+        "p50Ms": 1845.2595,
+        "p95Ms": 3449.8273,
+        "p99Ms": 3856.304
+      },
+      "ttft": {
+        "samples": 60,
+        "p50Ms": 1347.7654,
+        "p95Ms": 2956.6272,
+        "p99Ms": 3535.7276
+      },
+      "generation": {
+        "samples": 60,
+        "p50Ms": 1046.9538,
+        "p95Ms": 1476.2567,
+        "p99Ms": 1817.3127
+      },
+      "generationTtft": {
+        "samples": 60,
+        "p50Ms": 718.418,
+        "p95Ms": 978.6703,
+        "p99Ms": 1129.3991
+      },
+      "repair": {
+        "samples": 12,
+        "p50Ms": 1109.9164,
+        "p95Ms": 1713.1882,
+        "p99Ms": 1713.1882
+      }
+    },
+    "providerFacts": {
+      "embedding": {
+        "bypassCache": true,
+        "requests": 97,
+        "cacheHits": 0,
+        "providerRequests": 97,
+        "providerSuccesses": 97,
+        "providerFailures": 0,
+        "breakerRejections": 0,
+        "responseRecords": [
+          {
+            "inputSha256": "3afdcadff1cb7d8a876eb0c0e44b4b662d387f0f080981ae77b095ff597ea0b5",
+            "dimensions": 1024,
+            "vectorSha256": "d8dd2feea2b0ad4cde67cb5624fd179a7b8c807b604962c7634f28c7deaf52a2"
+          },
+          {
+            "inputSha256": "d2a89537e16a7efbf5045f34499fe1f403717038c34516ba0163834a687f0ca3",
+            "dimensions": 1024,
+            "vectorSha256": "3d0fbb0ebad6049dd59fcd1e519376160bd54eb8ec19d59044278e7e1b18d41e"
+          },
+          {
+            "inputSha256": "66c3929630775843b97dc0ce4de874bc08742f2b5ffc7b0c61b4c48572bf436e",
+            "dimensions": 1024,
+            "vectorSha256": "866d4f8174ee6d75fcbe7afaa562b70be87dc38b9ec2ada99debba437952503e"
+          },
+          {
+            "inputSha256": "12fba307ff35da5bb66eb0ed877706505b8a78bcf844b4028cb39e55776f0d32",
+            "dimensions": 1024,
+            "vectorSha256": "479f2403e4a692d87ea11110813f6b8b32fb7c589ad71d93ba9216d63eacfe3c"
+          },
+          {
+            "inputSha256": "82002c2a1430c0c2a99af772c8e20de19d66b76eac7d48f9c9415e40836aba6a",
+            "dimensions": 1024,
+            "vectorSha256": "442bcb10456df183096a920a064ee8ba1bd63ddb92c725066d2947e6da177863"
+          },
+          {
+            "inputSha256": "4fd7d7ccf0e6726ef6bb74c9863c70d292ac2e678f37422d56749452b4775483",
+            "dimensions": 1024,
+            "vectorSha256": "a15c2798de59106bdfa42e6bc964ada0beae4a914b3d9ac35577b88788d637a3"
+          },
+          {
+            "inputSha256": "c4c48cd25292421c696253ad87c226ed11bbd6141257f6a0e63f22a81778638f",
+            "dimensions": 1024,
+            "vectorSha256": "7fe8c3ac97210537944602f4da458fc886506da4ff9e423a8b0ac60edb61deac"
+          },
+          {
+            "inputSha256": "1c68771f5b11d45f6bc5d7003ae28977e53a543e8e3f0482ef1b94d206eda646",
+            "dimensions": 1024,
+            "vectorSha256": "bf4076c03f0d1e601213853e6e5925fb1cd17ab49e982f6336fb80ca660059a1"
+          },
+          {
+            "inputSha256": "ede294b141cb6ffc437028fcf14780f5343b16836167eb11143b4e210f30ecad",
+            "dimensions": 1024,
+            "vectorSha256": "58c29d811770938bc486784ff1f6d812267bfbb7f4a15d2f4823b3a8dd1707d1"
+          },
+          {
+            "inputSha256": "36e0bfe51103773267b93853fdccaf307a6be8fd2fc1bcd482e45334d5d15901",
+            "dimensions": 1024,
+            "vectorSha256": "b8329f991b3663a097bb02f7e36a9ce3d79c023d15a38901edea79b67e710ab1"
+          },
+          {
+            "inputSha256": "d748171e26e7c83d8d94593615b77453cde8ffb5e91a0c1b0c4ac075a1413052",
+            "dimensions": 1024,
+            "vectorSha256": "322086dbe70b320bc4169326c31283174785e6be839b7576d744c22fa2003744"
+          },
+          {
+            "inputSha256": "59253fc913eb0051c550828073586ad92126131dd226918ff5791975a6d1fdd1",
+            "dimensions": 1024,
+            "vectorSha256": "0eb5ba23c265f067b11be301eab4c737fe8ccd2091849c7043ab57340122ac0f"
+          },
+          {
+            "inputSha256": "ac539c97e6dfb963b6469ac10134f58435e533623cc03b2bca26270d1f306ec9",
+            "dimensions": 1024,
+            "vectorSha256": "fd19f685fcebd1d40e28bfdf1c654e5c60ad9a736bb9727b2ab398e14e5636a1"
+          },
+          {
+            "inputSha256": "d9db12c9dd4d520f7c3a9a60f37e3c8ed830341270fc6d5cb0532ac9e09f321a",
+            "dimensions": 1024,
+            "vectorSha256": "badb25b0a1fd2afdeabbeed364b0ca0e94c1cf9b3fba57c3fd27b340003bf501"
+          },
+          {
+            "inputSha256": "645740a4d323bd89f0e217be56d6f71bff6783de812c09f37a1aadaaeddc2f01",
+            "dimensions": 1024,
+            "vectorSha256": "bebac1155060520cb199e39802bfb66cbd12f13d41ac5a38cc044320300a57b5"
+          },
+          {
+            "inputSha256": "52a3d71d486f3d3e320917b5c4fc4fb29087013f932abfb37110e9b2e077c1a6",
+            "dimensions": 1024,
+            "vectorSha256": "f73bd53cb68e4866c2ee2c04faff9c1f2cb1a12a6b417051e4aabc836b8c2d38"
+          },
+          {
+            "inputSha256": "f08ff7c97525b5fc81a6cf41a30d6f3c09853605a5928d11f98fdeb48a9cc9be",
+            "dimensions": 1024,
+            "vectorSha256": "cb7c872bf58145c2c39cf4eaed00a2e81bad945292274098791bc3213f0e1459"
+          },
+          {
+            "inputSha256": "5324c1ae4660d69fb41037a9fdec5413f2bc191a7bca3a5575fe29c92fb6bd7c",
+            "dimensions": 1024,
+            "vectorSha256": "dd565c86c0d9da034b9dc996f00f02f9a26f6a5878acebe5183d23abcda153fc"
+          },
+          {
+            "inputSha256": "5e135e796d3e0aa6d716254d1c5ca54f3c821dc183e22339e04b8069b33f500c",
+            "dimensions": 1024,
+            "vectorSha256": "e077aa45a56ab7aa288c7b5406da63ec1568993002826644b820fa9b44cdb0d0"
+          },
+          {
+            "inputSha256": "b2b7ae8c1644eebc8dc4465168c801818a2dd2ebd9b3c763b364ac0dd8459683",
+            "dimensions": 1024,
+            "vectorSha256": "7ebe8ef82a74739d21f57bfaf298e8d3f8ba3d4e7279227ded5bc7856fa9bc05"
+          },
+          {
+            "inputSha256": "3680a2ee9626774bb5299e726a6cb15545980b7d93300272a7835482574f613c",
+            "dimensions": 1024,
+            "vectorSha256": "7eff622bbe20c46c5141af6accb26821275841e1409420633bdc07dfaf4b9f6d"
+          },
+          {
+            "inputSha256": "e837ff9911f1acd6609ebbfd6cfe3e55a3f9ac6ecd30cf806ae530251207a42f",
+            "dimensions": 1024,
+            "vectorSha256": "521d17637abb82aea29c27f9a467e79154bab19c514920efefdc2b0847fd58e7"
+          },
+          {
+            "inputSha256": "e433549d0508a997c72fd5cc8696c845e404d7644e9f590856e2d478e7ff6f91",
+            "dimensions": 1024,
+            "vectorSha256": "c9e6a77f79580dba7aa13c5068fccb3b512ba8f1894f40e0fc4606cb0ca0249f"
+          },
+          {
+            "inputSha256": "1438bcb91f675739f22adac9df6f7f1646573797ba3f9b12bda66e7bcf8186c4",
+            "dimensions": 1024,
+            "vectorSha256": "9b4147d5686ac14050ec4e6e0dd0659c23515d1ba4e3a607bd08d911c0781183"
+          },
+          {
+            "inputSha256": "49efff86fab82345670b1a05070f9692d8e46fda80e7add6034e9fa1029c12c2",
+            "dimensions": 1024,
+            "vectorSha256": "41f6a00e6242870bf2b1f0b9fe3704b1987ef298f2cc08613f2da2ad5b165b6c"
+          },
+          {
+            "inputSha256": "250ffb01aa9cd4080a05a16cfa332209c64092f29a9f5153c6a613a6e4df1143",
+            "dimensions": 1024,
+            "vectorSha256": "a5422c614ed43db57b676be2b2b16128ac057d1150ffed6986b3040232f39b3b"
+          },
+          {
+            "inputSha256": "0dace7cca9276143b1d07a6ff882313503b795c6fc82b79213b7377a7bbd34bc",
+            "dimensions": 1024,
+            "vectorSha256": "fb079bf1c33e90ea8bf3e2627e021918cfa96d23b46534ef6124f8f6f0529aea"
+          },
+          {
+            "inputSha256": "30384711594a7303bc3644658e37f4e77b3ac291944b09cbbe0ef623cc4c4f0b",
+            "dimensions": 1024,
+            "vectorSha256": "390331d9a3bf4bc7cf0f4633a9fd8cd61d58a14d0b0774d0353e3e086555a822"
+          },
+          {
+            "inputSha256": "50a57dcd9f7d8187e4a968d09ce222335408656628540d95cd983ff0f685fb02",
+            "dimensions": 1024,
+            "vectorSha256": "a53ee983edaf1a7cf1de40b900fdacf3ad97c5a0d17629ed3e6760e943615918"
+          },
+          {
+            "inputSha256": "03ee88702167c7ba3cb570f4fddc03cd1467c14e1b6fb4d718343d39b16967cc",
+            "dimensions": 1024,
+            "vectorSha256": "2599d88e7600c46197f98fa2137d329c25d543c397f60005d519602d33b7b6fa"
+          },
+          {
+            "inputSha256": "304a0d4436899feff3860c9b0ac6446479c3eadf9f4036ee612fbf804641dc3c",
+            "dimensions": 1024,
+            "vectorSha256": "36ae9161480720107cc8cc8e6c199c95e028f851afb75133a7ac90d72f73619b"
+          },
+          {
+            "inputSha256": "3e49fa802a277008ad102b29c1223857674c4f6adb41940ead0cfbca3e0c3bac",
+            "dimensions": 1024,
+            "vectorSha256": "a6ed4c8406ee3c29bc01d80f32b9053a8c1ed7c98f70e12c2bdb8ea69ad06167"
+          },
+          {
+            "inputSha256": "8b76eb89609f63a79586213c8f160bf2326a881fc68d4e9554b20862a7248648",
+            "dimensions": 1024,
+            "vectorSha256": "2b41670ab99e959ab43ba6e5ed81d00efb5de778c117bab4898a4bcb74a0e270"
+          },
+          {
+            "inputSha256": "220836198ec871f259a802fbe790820033c5c2800beb915ae6ccb397739466e7",
+            "dimensions": 1024,
+            "vectorSha256": "13c6444b1844cc72ab36c0b98bd28dd16e360ee75fe91562a35adcb5e67b238d"
+          },
+          {
+            "inputSha256": "07a4b71601700f5c4dc52f42b0b81c7d62b26de13cab0474dff717116e1ae241",
+            "dimensions": 1024,
+            "vectorSha256": "61bd268d94b0a2dbe6e2aa2c7dacd2dc94cc946b141eb53280ba4da54e2f4b96"
+          },
+          {
+            "inputSha256": "8b8a9c25f974fc96dfc075e632d2cbd73543ff03cf15851042af909f69ade57a",
+            "dimensions": 1024,
+            "vectorSha256": "ca7cf5c267928bbc68a20948422df3c0f640a9635b94586264b9fde7fa7615de"
+          },
+          {
+            "inputSha256": "6798fee9a38961adf7b72b9cc6c0c6c3e30a814e91c0672c8e43fe080b1c4ca1",
+            "dimensions": 1024,
+            "vectorSha256": "def8f07b13ea61b7a697e49a634b9027138683afc22f6e475e1a8b4a96199ea7"
+          },
+          {
+            "inputSha256": "1c95abfde651e280e273ea0391a825b88d3b4a25bac98bee92abe643528f71f4",
+            "dimensions": 1024,
+            "vectorSha256": "80c8ad95119a34aa1a43e851665c35613af5d0d1fde04832aabb93733b8be7e0"
+          },
+          {
+            "inputSha256": "72ca14499166d2dad28d3d4c13928c106486bd7dc2126c563ac8836a4dc84ba9",
+            "dimensions": 1024,
+            "vectorSha256": "9cf1a0ca482b6cfe8898cc235d831b2df7bf5233e5082308e3dfdba96cce30d5"
+          },
+          {
+            "inputSha256": "a7c9059bb37885f022cd4fbf3a375be4a3acaa36fd29992de9b26c70bb54adbd",
+            "dimensions": 1024,
+            "vectorSha256": "5c3b2b13a867b1fc97c00aab1d1a8c8f24e3336ef759463e0f3c4ff649c3ff5d"
+          },
+          {
+            "inputSha256": "f98b8302e08e7b18def385b115868135e3816f945c99a491f5c27a3def19e1d5",
+            "dimensions": 1024,
+            "vectorSha256": "f7ff8118de7a99148976cba5e11bf26723b2df15fd284cad7792b94f36c76564"
+          },
+          {
+            "inputSha256": "4ebc5d99b4f5af770d1e0e8142ec6b20b4d6405254f35cec56ea7acefe3d5e2d",
+            "dimensions": 1024,
+            "vectorSha256": "fc77fd286fc8f02cf5893fa4f290623b3636be9d4f09d406fc32789c0764d870"
+          },
+          {
+            "inputSha256": "ad6d48756fe34eb3ef6093e46873a1de6242ef81c8d5df493f9e7d05f2d13093",
+            "dimensions": 1024,
+            "vectorSha256": "be5080a7f40b2eb5095caae1745bb36b7c461b65bace90bfbfd733f64bcf8ec8"
+          },
+          {
+            "inputSha256": "91e40d80ef90ac8f296bbd7d013a5ccafb58796bc01e452a3e7e76f277197e83",
+            "dimensions": 1024,
+            "vectorSha256": "ebd572365897ae1264bba715393f71e7990f08466c8aaac30a64d2c52abfb3f8"
+          },
+          {
+            "inputSha256": "d3b5eb51d233d11cc1864bc7ddae36aff4062b481a0f2e6203bf68096e849d0a",
+            "dimensions": 1024,
+            "vectorSha256": "7f9b4ab04caf8c8c540104b1adbdf169e9f65ba9ed94a114a3d6ed2265e13749"
+          },
+          {
+            "inputSha256": "6efd8500b758669a58870f4735bb19e76a0a6fcf7fcdd3dcac5a3c775a7d8b85",
+            "dimensions": 1024,
+            "vectorSha256": "c56885a4354e66afff32752aab0241df8a5369b22d0d58b00b9614d3aac84cc7"
+          },
+          {
+            "inputSha256": "e3c9e9d0d82e91defa1cfe8d645ee45711fb29207a4d6ba2546c67d85ac285db",
+            "dimensions": 1024,
+            "vectorSha256": "a27e376fcb71b56d2002da1ebb8b8b634388a9db3a7844c0899191d85924515c"
+          },
+          {
+            "inputSha256": "d57e48d100be7bc634ca71a4ea97841dfd7a4a79be0580707aadba28acd3acf8",
+            "dimensions": 1024,
+            "vectorSha256": "517e8e54db9e1230a87edc759eec5cb831cc0bc03fe25cc74c1797061de5f0dc"
+          },
+          {
+            "inputSha256": "98852236c1db255bfc30170c48f8440746f34192715077c0465bbc3f5db06c7e",
+            "dimensions": 1024,
+            "vectorSha256": "5acbab278bad57a15d4d0984bfdf8206cf6143494a27cf2897d872a9b76dff94"
+          },
+          {
+            "inputSha256": "efcef1a8c4c88ac7248831b266c9685937573940a47945c057a5db35cac720ca",
+            "dimensions": 1024,
+            "vectorSha256": "a145d24fba66d330dd7530519ce9a1b27a32e0398591bf928a2d7f4dd327193d"
+          },
+          {
+            "inputSha256": "9f6d9ee8d7715bfe86073427a59104ad9ed18c6a19d906e476e7908a610fa0b5",
+            "dimensions": 1024,
+            "vectorSha256": "cd08aeb655a3d891259e75cec9f3ecfd157cb6c1aebe252a9b5e05345958118b"
+          },
+          {
+            "inputSha256": "db7eafb9bb7bb4951ea43fdfa05e96352ff3a54eff5d3ccb0f8bb15cd64f2fa8",
+            "dimensions": 1024,
+            "vectorSha256": "d8a5b3d8ec44a8dfc3d23cf469e32d042203e5c10f185494708babc9d1747196"
+          },
+          {
+            "inputSha256": "dc5d567f546cd9c53c15d6678422757b4864f38ca83862ea89441535e1679a44",
+            "dimensions": 1024,
+            "vectorSha256": "8aa71815c9444ad2c45c2b49b9cc476257b798a2256ef5c2f939c590f645d4ba"
+          },
+          {
+            "inputSha256": "c0b6456e5ae5d1f2986d97246e84817b67118badbb7cb347153f631c942a29ea",
+            "dimensions": 1024,
+            "vectorSha256": "4e26f1db90e0d0dade50dfd1a101eef784413f76ef042ce09829fa8dd624f917"
+          },
+          {
+            "inputSha256": "fcf7c57eaa0016fa14ee6fc1774de7be56440cb30e0bd2efd5a6988bd159e48b",
+            "dimensions": 1024,
+            "vectorSha256": "df0d0c357cdd7bfd6910fe891d4077a54bce46e816707b2d2cfd174f64acc7d4"
+          },
+          {
+            "inputSha256": "099ca3bda2a43528b327634645f30827ba75ce6a85f736871416c5dfe2e4da94",
+            "dimensions": 1024,
+            "vectorSha256": "d0594953f0da925ab39095a7615d245e5b3d6831e732919b3bcbfcfa3bd502cc"
+          },
+          {
+            "inputSha256": "acf55fb1b55485ceba3fdb2e8cdf109b6888f0868f815ae72abf4ac2301952f7",
+            "dimensions": 1024,
+            "vectorSha256": "e0a758cbbd01c2bd4cc9ea7007e77018559058dc8fe14f2fe5f07c9e54ff4fd0"
+          },
+          {
+            "inputSha256": "8134f093cd8cba2699d57e2d02ab4bdb1a6b703c4af9475f6293e986de90ef92",
+            "dimensions": 1024,
+            "vectorSha256": "ffac603430d63e777e24ff2a3962439e2b6c53dca77559da84eac039f78b1d37"
+          },
+          {
+            "inputSha256": "f02b395751e9d42952c16afe719a56090d50f3b54eb6b063e0f531e67b08c228",
+            "dimensions": 1024,
+            "vectorSha256": "e332d1715a24da5adc233c79b903bc0528a01b604484ee6908ce14ebe29c0195"
+          },
+          {
+            "inputSha256": "706e82d96ca68a52fddd0deb67dd3cb2ae49dae7654a13f909c9530b74ad0f2f",
+            "dimensions": 1024,
+            "vectorSha256": "0e65529d09bf99edd6a9196a0769767f1cdc03476f6055bdb5e97e9f4620b27b"
+          },
+          {
+            "inputSha256": "676f23c61a8c1e8a20b1d18584f4cd0785d41d7745e6a26d3af68da8282ff62e",
+            "dimensions": 1024,
+            "vectorSha256": "d4319b1a562b4012d9c0867c44cbeb34f605b0f945c627a3cf72a8851a47d39b"
+          },
+          {
+            "inputSha256": "73a13533af67cd5369dba7197cd5b1d5b5a47767cc5ae665d2aa60d4e4955e58",
+            "dimensions": 1024,
+            "vectorSha256": "fbe9823f5c790547eaac3dce76fed84aca7782e1d534c0b00fce8803817d9ea2"
+          },
+          {
+            "inputSha256": "73421ef4ca5cca75babe652c2f862bbf1439812719e185592a5158a483149ad0",
+            "dimensions": 1024,
+            "vectorSha256": "7cf85ec2894301e769161b0ef09e19b8c8140ee36e4d234819295daef0beb722"
+          },
+          {
+            "inputSha256": "ea63f9a0b94d8cdd6d8d2cde3c6b4757e4005840faa6015e42d054a92d41b77f",
+            "dimensions": 1024,
+            "vectorSha256": "314f25c9ba14aaea71eada7bbcb3bc6b14e1393bbff0778f4d760f31baf79309"
+          },
+          {
+            "inputSha256": "5c9ca67fe26ef818ccac7c8fae2fa0aa897404db46dfd309e2f5aecd5babf60a",
+            "dimensions": 1024,
+            "vectorSha256": "feca877775e4bc5e2d50acd767c354f941578d8fccd442450487c8b757dea9ca"
+          },
+          {
+            "inputSha256": "270418f3fd3f082a3053d529dcde3f2276fb6740d629debc094a8e349e7b8d40",
+            "dimensions": 1024,
+            "vectorSha256": "30a788c218d22555dc3aed86299e4be3525edd5d447b62bfb07c2d78c5399c88"
+          },
+          {
+            "inputSha256": "f772c559cd5fd28e6336814fc070b87b57fd6267c125fb77becdd36b6611d939",
+            "dimensions": 1024,
+            "vectorSha256": "9072750d78bd2ca14134b46188c3de366e31b5a2cce6ab84502b0d10c111241b"
+          },
+          {
+            "inputSha256": "02cee8b7cffbd33ad7dcbbc595f1290a04415c825722fe657914d7ee12426d88",
+            "dimensions": 1024,
+            "vectorSha256": "2454942a67880dce631cdb287d4d633fe4bc439242483ca44639bd7305a42f61"
+          },
+          {
+            "inputSha256": "8e7657be0b2a8448efc38a74b539c480823fe8cfd2c7e1f3f7f17dc8a014d252",
+            "dimensions": 1024,
+            "vectorSha256": "2f96598c5447258ee636b3a88c7cc57f58d8b00356dc723a5c87a61365f4ced7"
+          },
+          {
+            "inputSha256": "c3ec888142c1d552ba0791b66b52f35bb48a0100d9e797156874c561e180b34f",
+            "dimensions": 1024,
+            "vectorSha256": "df008ab8e5a6ac6ece79836efd344d8f7b01261d24efcb06e67fd8cbf92cc27a"
+          },
+          {
+            "inputSha256": "d4082e12b94b25ef3269c7a71d3c7344b9d8d61c6bcfcee1caa781fcf2501f8f",
+            "dimensions": 1024,
+            "vectorSha256": "c2adeebd9ca62c4b5781b75be821542614e025883f310216c94129e0cf58f686"
+          },
+          {
+            "inputSha256": "46605263dbf39ccbf0e7a028761da4df2f294b661dfae631b6a19e44d8aa69f9",
+            "dimensions": 1024,
+            "vectorSha256": "0dcc093adff86057a0678cd7165ddffe9c7a3b7f66504e3773f152e62b7ef4b6"
+          },
+          {
+            "inputSha256": "a125b1ca24a91caff87043c6becb9b219181ff112a76acdb94116f0c21478e02",
+            "dimensions": 1024,
+            "vectorSha256": "a89a4b9c0b68076ae3f4a96e6c6e03001faa3c4f282f3c31ce2d9fdac7350b5c"
+          },
+          {
+            "inputSha256": "f65d2d8183f7a43c686d0415dad9d9ff4b1f13929ab95f467565f02069137ec2",
+            "dimensions": 1024,
+            "vectorSha256": "5809fcc0d02a5283d44badd7cfd3bec044ea4792c8a83fc645c764aee98f589e"
+          },
+          {
+            "inputSha256": "bb7bb8e2310180175744e98febf07fd5ca97fb0a01d06385307172d78205e71a",
+            "dimensions": 1024,
+            "vectorSha256": "71f823e914ff5565d95d95594eeb68c4845c6f753a8cbcf40918f966310e389e"
+          },
+          {
+            "inputSha256": "8f8b0dacd5b7fa199cce15e73a13208cbcb2e3b5d32ce13c4bb0941355ec81a1",
+            "dimensions": 1024,
+            "vectorSha256": "756e200f19a3c37a73c70b8a821c9c32ee76d4aaf645d6f571bd3ba7e031c50b"
+          },
+          {
+            "inputSha256": "cfea1e5f78a3134460ff0f92bde88fe07e8a7ac0c4d82b0eaab09b8cdcc00f40",
+            "dimensions": 1024,
+            "vectorSha256": "c3ff856434d5cd9034f5e21834e7716354ceb64f7bee9f28d3e3f5b19d93dce7"
+          },
+          {
+            "inputSha256": "99cf9adec7d9ffb1a037a01428393acd58628d185c7ffe6bf65cecd07a63aeb7",
+            "dimensions": 1024,
+            "vectorSha256": "f7bdd1a3bf054b02480493c11e10d428473fdda538b8de026694228d55cd0f61"
+          },
+          {
+            "inputSha256": "3115c6c1126e31af910587dbb64474c5f571c6923bcc850dc1a181f319f09bb4",
+            "dimensions": 1024,
+            "vectorSha256": "dfff8e545b12b88ce90426c26204622d01d43d8799bdf2eb43f7a2d7fbea5be4"
+          },
+          {
+            "inputSha256": "60d2022acc21a557be6c1282c31bf3c949da49627aa809bbd0ee58ef8884a656",
+            "dimensions": 1024,
+            "vectorSha256": "7efbfa38a2bc2b7417c50fe35a3c946addcdf1488b0b69d13cad6f948b7a68f3"
+          },
+          {
+            "inputSha256": "5ab6b8857a9152441d7ec6e5a1d5d651ab94dd53cc0b0972d9314e35d59a581b",
+            "dimensions": 1024,
+            "vectorSha256": "d5f58f4826a447c19fe7cbbd74dbb9669960f5b57fe15e5647b3d7c6aa3541fa"
+          },
+          {
+            "inputSha256": "d76573aa231b8a8cb6a8b943cdfc57fd648a3ba9b997f2b6d41bfd77f1f8136d",
+            "dimensions": 1024,
+            "vectorSha256": "a6b0bd009042f2c07cf4ccbe2668983ae7721ea66d3b38c7b0ede248fec7c057"
+          },
+          {
+            "inputSha256": "b22d1189c197012ecca844f2f5dfad549bb528cbfce69351e64feb32132bffdf",
+            "dimensions": 1024,
+            "vectorSha256": "df5986bb29e773c98cfaa069aa569a03b0709542e63f8ce4be9e278b87584486"
+          },
+          {
+            "inputSha256": "90275b19336168920e899c9dc3d488345b98e68d263ce875987c9b3601b42d18",
+            "dimensions": 1024,
+            "vectorSha256": "0ea989a4ccf2bd18e67a71fb73c6a10ef9e17e2ae7c2d932bf51f93825a9ca54"
+          },
+          {
+            "inputSha256": "81c743f6764ecc7f2cf48cea22c1ead5b6062036deb06acd0b9d6e27b12317e4",
+            "dimensions": 1024,
+            "vectorSha256": "93514e42a2a0071b285080c2f91662f30268e5729d48d5b89af4f4e6958ac1b3"
+          },
+          {
+            "inputSha256": "bf0b985303d9e268837550cadbd483856b086b15363fa6ceca0ffba315cbffe7",
+            "dimensions": 1024,
+            "vectorSha256": "1c82b791a6e2ec258a8dd2ba228389abdd67fc14910b0b3989d6242595873614"
+          },
+          {
+            "inputSha256": "f07b17834e5424644b8f4ce186b239e7c0ba88c41d484b1cc891c2fce5da48ac",
+            "dimensions": 1024,
+            "vectorSha256": "f95e2e46a5e30df02ce99314dbd42e1181193c78de71f5bb8435ced6f43914d5"
+          },
+          {
+            "inputSha256": "cb75f1fa9e5c8afb9d722ed4818e991273f0646a14a974e6f0ad43a5bacf87f2",
+            "dimensions": 1024,
+            "vectorSha256": "fe7d7474c70f9df9e49cdb974dbcf44d11019538d9439bd30f8d3b2b52acd319"
+          },
+          {
+            "inputSha256": "5f42aeff04ab0be5895f2547fcf3f6de9825c4107da954887c3b9bfc4edf6749",
+            "dimensions": 1024,
+            "vectorSha256": "73279134def03e03e1f0f00686bc7a3873ddee583096d9cb410f09fc5bfa5eb5"
+          },
+          {
+            "inputSha256": "32be5a52cbe688fc5a5657dfd45469fa54dc6a146a7437d3f74d995cc637d3d4",
+            "dimensions": 1024,
+            "vectorSha256": "6a5c4fb4d79b69c86b2d9bf7bdbc043cc57a3150375672b79077363000066e7e"
+          },
+          {
+            "inputSha256": "dbe2b7e1a4b6342cd906d58cf6d1eb2047c2e59f7907ae92fc3b81c740cd1b86",
+            "dimensions": 1024,
+            "vectorSha256": "c0d7d22ab8922899c8b7b772d17f9157a6d7b20709691c8e5406ccc9e3abfe47"
+          },
+          {
+            "inputSha256": "52205feeea02132fc5200a4ba371fc6f0f3fea87af14dc79a2458f913a7ffe67",
+            "dimensions": 1024,
+            "vectorSha256": "aca805c3c54ac92f02db24f9da438e48b5b607a1114437fbe5c5786552d3fc56"
+          },
+          {
+            "inputSha256": "7df56ad66a89de9c1f4493f22ffefcba4dde6ea2b997ae266affba309fb68986",
+            "dimensions": 1024,
+            "vectorSha256": "c4fa4766247949dbcb27c71db408286b107b27015199e1dddf1f37a950fe9620"
+          },
+          {
+            "inputSha256": "4c7f247d82aacd89174103dbba20ecd147717f7aacf563baa4b7e018d69f69b6",
+            "dimensions": 1024,
+            "vectorSha256": "ec7d15898996157cdb386deeff866e95ba066e18f4a389de2db8fd8c35b5b9d0"
+          },
+          {
+            "inputSha256": "4b9d2a2bdb6585a76bdd35d7e77272b6fc7b4d1b491fca973e4aa01b2b8e1d4e",
+            "dimensions": 1024,
+            "vectorSha256": "3e23c0b58338bf8d3abd94404ca058e9569f7ac2e1f8509c9aa2113b440f7df5"
+          },
+          {
+            "inputSha256": "f51ff8bbc619bbfe794b5cc35d30cc98edcf5830439898b61eb97cbd6b308f4e",
+            "dimensions": 1024,
+            "vectorSha256": "650774f1dc8a7a3a770f44bd5d3d5264265ccb972dfa993d73c0d4a93e9a279c"
+          },
+          {
+            "inputSha256": "e646581dcfa18072f6defa6cfe0419d62b379125ae4c5dca86eb8b5899dfdf0b",
+            "dimensions": 1024,
+            "vectorSha256": "4e53effdd7cb899194ee2736670785a3bc192d9b9e932320d048484481c4b497"
+          }
+        ]
+      },
+      "rerank": {
+        "eligibleRequests": 58,
+        "providerRequests": 58,
+        "providerSuccesses": 58,
+        "providerFailures": 0,
+        "fallbackCount": 0,
+        "fallbackReasons": {},
+        "responseRecords": [
+          {
+            "queryHash": "3afdcadff1cb7d8a876eb0c0e44b4b662d387f0f080981ae77b095ff597ea0b5",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9001",
+              "knowledge_1_1_1",
+              "knowledge_1_1_3",
+              "faq9006",
+              "knowledge_11_1_3",
+              "knowledge_11_1_0",
+              "faq9005",
+              "knowledge_9_1_3",
+              "knowledge_3_1_2",
+              "knowledge_9_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_1_1_1",
+                "score": 0.84005804
+              },
+              {
+                "id": "faq9001",
+                "score": 0.80366396
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.64474358
+              },
+              {
+                "id": "knowledge_11_1_3",
+                "score": 0.49337886
+              },
+              {
+                "id": "faq9005",
+                "score": 0.41013317
+              },
+              {
+                "id": "faq9006",
+                "score": 0.35608641
+              }
+            ]
+          },
+          {
+            "queryHash": "d2a89537e16a7efbf5045f34499fe1f403717038c34516ba0163834a687f0ca3",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_5_1_3",
+              "knowledge_5_1_6",
+              "faq9002",
+              "knowledge_10_1_3",
+              "knowledge_5_1_1",
+              "knowledge_3_1_4",
+              "knowledge_3_1_3",
+              "knowledge_10_1_1",
+              "knowledge_10_1_5",
+              "knowledge_1_1_2"
+            ],
+            "results": [
+              {
+                "id": "faq9002",
+                "score": 0.80670772
+              },
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.80264164
+              },
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.78764695
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.72709806
+              },
+              {
+                "id": "knowledge_10_1_1",
+                "score": 0.54331381
+              },
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.49774407
+              }
+            ]
+          },
+          {
+            "queryHash": "82002c2a1430c0c2a99af772c8e20de19d66b76eac7d48f9c9415e40836aba6a",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9004",
+              "knowledge_8_1_0",
+              "knowledge_2_1_1",
+              "knowledge_8_1_1",
+              "knowledge_8_1_2",
+              "knowledge_8_1_6",
+              "knowledge_8_1_4",
+              "knowledge_7_1_3",
+              "knowledge_8_1_3",
+              "knowledge_5_1_5"
+            ],
+            "results": [
+              {
+                "id": "faq9004",
+                "score": 0.87011982
+              },
+              {
+                "id": "knowledge_8_1_0",
+                "score": 0.76083213
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.6884629
+              },
+              {
+                "id": "knowledge_8_1_2",
+                "score": 0.62159109
+              },
+              {
+                "id": "knowledge_8_1_4",
+                "score": 0.47218745
+              },
+              {
+                "id": "knowledge_8_1_6",
+                "score": 0.45092205
+              }
+            ]
+          },
+          {
+            "queryHash": "c4c48cd25292421c696253ad87c226ed11bbd6141257f6a0e63f22a81778638f",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9005",
+              "knowledge_4_1_0",
+              "knowledge_12_1_5",
+              "knowledge_5_1_0",
+              "knowledge_5_1_1",
+              "knowledge_8_1_4",
+              "knowledge_5_1_5",
+              "knowledge_11_1_6",
+              "knowledge_11_1_5",
+              "knowledge_7_1_3"
+            ],
+            "results": [
+              {
+                "id": "faq9005",
+                "score": 0.92857035
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.85132135
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.74993615
+              },
+              {
+                "id": "knowledge_11_1_6",
+                "score": 0.64523785
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.57791242
+              },
+              {
+                "id": "knowledge_5_1_5",
+                "score": 0.54386018
+              }
+            ]
+          },
+          {
+            "queryHash": "1c68771f5b11d45f6bc5d7003ae28977e53a543e8e3f0482ef1b94d206eda646",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_2_1_3",
+              "knowledge_6_1_4",
+              "knowledge_6_1_5",
+              "knowledge_9_1_1",
+              "knowledge_9_1_4",
+              "knowledge_6_1_6",
+              "knowledge_9_1_3",
+              "knowledge_6_1_3",
+              "knowledge_9_1_5",
+              "knowledge_1_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.77824139
+              },
+              {
+                "id": "knowledge_6_1_4",
+                "score": 0.53998615
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.4628524
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.44822026
+              },
+              {
+                "id": "knowledge_9_1_4",
+                "score": 0.42421876
+              },
+              {
+                "id": "knowledge_9_1_1",
+                "score": 0.39413575
+              }
+            ]
+          },
+          {
+            "queryHash": "36e0bfe51103773267b93853fdccaf307a6be8fd2fc1bcd482e45334d5d15901",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_4_1_2",
+              "knowledge_1_1_3",
+              "knowledge_7_1_6",
+              "knowledge_4_1_0",
+              "knowledge_1_1_0",
+              "knowledge_9_1_6",
+              "knowledge_12_1_6",
+              "knowledge_6_1_2",
+              "knowledge_11_1_5",
+              "knowledge_8_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_2",
+                "score": 0.92230924
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.90241613
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.44579417
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.43035383
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.4203218
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.39712632
+              }
+            ]
+          },
+          {
+            "queryHash": "d748171e26e7c83d8d94593615b77453cde8ffb5e91a0c1b0c4ac075a1413052",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_4_1_3",
+              "knowledge_12_1_5",
+              "knowledge_9_1_5",
+              "knowledge_9_1_6",
+              "knowledge_9_1_3",
+              "knowledge_4_1_0",
+              "faq9004",
+              "knowledge_11_1_5",
+              "knowledge_11_1_6",
+              "knowledge_6_1_5"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_3",
+                "score": 0.89160735
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.81584162
+              },
+              {
+                "id": "knowledge_9_1_5",
+                "score": 0.65945015
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.61244048
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.5921774
+              },
+              {
+                "id": "knowledge_11_1_5",
+                "score": 0.48624849
+              }
+            ]
+          },
+          {
+            "queryHash": "ac539c97e6dfb963b6469ac10134f58435e533623cc03b2bca26270d1f306ec9",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_7_1_0",
+              "knowledge_7_1_2",
+              "faq9001",
+              "knowledge_3_1_3",
+              "knowledge_7_1_3",
+              "knowledge_1_1_0",
+              "knowledge_7_1_4",
+              "knowledge_10_1_0",
+              "knowledge_7_1_1",
+              "knowledge_2_1_1"
+            ],
+            "results": [
+              {
+                "id": "faq9001",
+                "score": 0.57776066
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.51416412
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.45658999
+              },
+              {
+                "id": "knowledge_10_1_0",
+                "score": 0.41900982
+              },
+              {
+                "id": "knowledge_7_1_2",
+                "score": 0.3914454
+              },
+              {
+                "id": "knowledge_7_1_1",
+                "score": 0.34323159
+              }
+            ]
+          },
+          {
+            "queryHash": "d9db12c9dd4d520f7c3a9a60f37e3c8ed830341270fc6d5cb0532ac9e09f321a",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9001",
+              "knowledge_1_1_1",
+              "faq9005",
+              "knowledge_1_1_3",
+              "knowledge_10_1_3",
+              "knowledge_3_1_4",
+              "knowledge_5_1_5",
+              "knowledge_6_1_6",
+              "knowledge_7_1_1",
+              "knowledge_9_1_6"
+            ],
+            "results": [
+              {
+                "id": "faq9001",
+                "score": 0.71926147
+              },
+              {
+                "id": "knowledge_1_1_1",
+                "score": 0.68260686
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.55551139
+              },
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.45090476
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.44558264
+              },
+              {
+                "id": "faq9005",
+                "score": 0.42278212
+              }
+            ]
+          },
+          {
+            "queryHash": "52a3d71d486f3d3e320917b5c4fc4fb29087013f932abfb37110e9b2e077c1a6",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9002",
+              "knowledge_10_1_3",
+              "knowledge_3_1_4",
+              "knowledge_10_1_1",
+              "knowledge_10_1_5",
+              "knowledge_10_1_0",
+              "knowledge_5_1_3",
+              "knowledge_10_1_2",
+              "knowledge_10_1_6",
+              "knowledge_3_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.87294771
+              },
+              {
+                "id": "faq9002",
+                "score": 0.81339392
+              },
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.76892697
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.69336525
+              },
+              {
+                "id": "knowledge_10_1_1",
+                "score": 0.68956517
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.58831996
+              }
+            ]
+          },
+          {
+            "queryHash": "5324c1ae4660d69fb41037a9fdec5413f2bc191a7bca3a5575fe29c92fb6bd7c",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_3_1_0",
+              "faq9001",
+              "faq9003",
+              "knowledge_3_1_1",
+              "knowledge_3_1_3",
+              "knowledge_3_1_2",
+              "knowledge_1_1_0",
+              "faq9004",
+              "knowledge_10_1_0",
+              "faq9006"
+            ],
+            "results": [
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.48305421
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.44851542
+              },
+              {
+                "id": "knowledge_10_1_0",
+                "score": 0.42834365
+              },
+              {
+                "id": "faq9001",
+                "score": 0.42177014
+              },
+              {
+                "id": "faq9006",
+                "score": 0.41203819
+              },
+              {
+                "id": "faq9003",
+                "score": 0.36691072
+              }
+            ]
+          },
+          {
+            "queryHash": "5e135e796d3e0aa6d716254d1c5ca54f3c821dc183e22339e04b8069b33f500c",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9004",
+              "knowledge_2_1_1",
+              "knowledge_8_1_0",
+              "knowledge_8_1_4",
+              "knowledge_2_1_2",
+              "knowledge_2_1_0",
+              "knowledge_8_1_2",
+              "knowledge_7_1_3",
+              "knowledge_8_1_3",
+              "knowledge_8_1_1"
+            ],
+            "results": [
+              {
+                "id": "faq9004",
+                "score": 0.85525769
+              },
+              {
+                "id": "knowledge_8_1_0",
+                "score": 0.71341529
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.66286875
+              },
+              {
+                "id": "knowledge_8_1_2",
+                "score": 0.5646602
+              },
+              {
+                "id": "knowledge_8_1_4",
+                "score": 0.46643115
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.4587448
+              }
+            ]
+          },
+          {
+            "queryHash": "e837ff9911f1acd6609ebbfd6cfe3e55a3f9ac6ecd30cf806ae530251207a42f",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9005",
+              "knowledge_5_1_1",
+              "knowledge_5_1_0",
+              "knowledge_5_1_5",
+              "knowledge_4_1_0",
+              "knowledge_1_1_2",
+              "knowledge_8_1_4",
+              "knowledge_12_1_5",
+              "knowledge_5_1_2",
+              "knowledge_1_1_3"
+            ],
+            "results": [
+              {
+                "id": "faq9005",
+                "score": 0.85914448
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.78506259
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.69599087
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.56807463
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.49176983
+              },
+              {
+                "id": "knowledge_5_1_0",
+                "score": 0.48489083
+              }
+            ]
+          },
+          {
+            "queryHash": "e433549d0508a997c72fd5cc8696c845e404d7644e9f590856e2d478e7ff6f91",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_12_1_6",
+              "knowledge_12_1_4",
+              "knowledge_4_1_1",
+              "faq9006",
+              "knowledge_12_1_0",
+              "faq9005",
+              "knowledge_12_1_1",
+              "knowledge_12_1_3",
+              "knowledge_6_1_0",
+              "knowledge_4_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_12_1_6",
+                "score": 0.85875157
+              },
+              {
+                "id": "knowledge_4_1_1",
+                "score": 0.67105563
+              },
+              {
+                "id": "knowledge_12_1_4",
+                "score": 0.62603608
+              },
+              {
+                "id": "faq9006",
+                "score": 0.61537679
+              },
+              {
+                "id": "knowledge_12_1_3",
+                "score": 0.48071974
+              },
+              {
+                "id": "knowledge_12_1_1",
+                "score": 0.4179448
+              }
+            ]
+          },
+          {
+            "queryHash": "250ffb01aa9cd4080a05a16cfa332209c64092f29a9f5153c6a613a6e4df1143",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_5_1_1",
+              "knowledge_5_1_0",
+              "knowledge_1_1_2",
+              "knowledge_6_1_3",
+              "knowledge_6_1_5",
+              "knowledge_6_1_0",
+              "knowledge_6_1_2",
+              "knowledge_5_1_5",
+              "knowledge_5_1_6",
+              "knowledge_6_1_6"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.72589224
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.67561933
+              },
+              {
+                "id": "knowledge_5_1_0",
+                "score": 0.55101031
+              },
+              {
+                "id": "knowledge_5_1_5",
+                "score": 0.54177716
+              },
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.46654182
+              },
+              {
+                "id": "knowledge_6_1_2",
+                "score": 0.46245285
+              }
+            ]
+          },
+          {
+            "queryHash": "0dace7cca9276143b1d07a6ff882313503b795c6fc82b79213b7377a7bbd34bc",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_7_1_4",
+              "knowledge_7_1_1",
+              "knowledge_2_1_1",
+              "knowledge_7_1_3",
+              "knowledge_7_1_0",
+              "knowledge_7_1_2",
+              "knowledge_8_1_5",
+              "knowledge_2_1_0",
+              "knowledge_8_1_3",
+              "knowledge_2_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_7_1_4",
+                "score": 0.89811293
+              },
+              {
+                "id": "knowledge_2_1_2",
+                "score": 0.70702127
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.65291411
+              },
+              {
+                "id": "knowledge_7_1_0",
+                "score": 0.56904761
+              },
+              {
+                "id": "knowledge_7_1_1",
+                "score": 0.55880967
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.55159652
+              }
+            ]
+          },
+          {
+            "queryHash": "50a57dcd9f7d8187e4a968d09ce222335408656628540d95cd983ff0f685fb02",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_2_1_2",
+              "knowledge_8_1_4",
+              "knowledge_8_1_5",
+              "knowledge_2_1_0",
+              "knowledge_2_1_3",
+              "faq9004",
+              "knowledge_6_1_4",
+              "knowledge_8_1_0",
+              "knowledge_2_1_1",
+              "knowledge_6_1_5"
+            ],
+            "results": [
+              {
+                "id": "knowledge_2_1_2",
+                "score": 0.74427339
+              },
+              {
+                "id": "knowledge_8_1_5",
+                "score": 0.58756294
+              },
+              {
+                "id": "knowledge_8_1_4",
+                "score": 0.58337157
+              },
+              {
+                "id": "knowledge_6_1_4",
+                "score": 0.53902562
+              },
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.53258392
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.47510356
+              }
+            ]
+          },
+          {
+            "queryHash": "304a0d4436899feff3860c9b0ac6446479c3eadf9f4036ee612fbf804641dc3c",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_10_1_3",
+              "knowledge_3_1_4",
+              "knowledge_3_1_3",
+              "faq9002",
+              "knowledge_5_1_3",
+              "knowledge_10_1_5",
+              "knowledge_10_1_1",
+              "knowledge_3_1_1",
+              "knowledge_10_1_4",
+              "knowledge_10_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.8926151
+              },
+              {
+                "id": "faq9002",
+                "score": 0.86886145
+              },
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.78428196
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.75352185
+              },
+              {
+                "id": "knowledge_10_1_4",
+                "score": 0.6502808
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.63436358
+              }
+            ]
+          },
+          {
+            "queryHash": "8b76eb89609f63a79586213c8f160bf2326a881fc68d4e9554b20862a7248648",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_4_1_2",
+              "knowledge_1_1_3",
+              "knowledge_4_1_0",
+              "knowledge_4_1_1",
+              "knowledge_7_1_6",
+              "knowledge_12_1_6",
+              "knowledge_1_1_0",
+              "knowledge_9_1_6",
+              "faq9006",
+              "knowledge_1_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_2",
+                "score": 0.91019883
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.88243467
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.54058078
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.41991864
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.40532141
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.40068892
+              }
+            ]
+          },
+          {
+            "queryHash": "220836198ec871f259a802fbe790820033c5c2800beb915ae6ccb397739466e7",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_4_1_3",
+              "knowledge_9_1_3",
+              "knowledge_4_1_0",
+              "knowledge_11_1_5",
+              "knowledge_12_1_5",
+              "knowledge_12_1_4",
+              "knowledge_9_1_6",
+              "faq9005",
+              "knowledge_7_1_6",
+              "knowledge_4_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_3",
+                "score": 0.87375777
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.691372
+              },
+              {
+                "id": "knowledge_12_1_4",
+                "score": 0.48711679
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.48147106
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.4744163
+              },
+              {
+                "id": "knowledge_4_1_1",
+                "score": 0.47213149
+              }
+            ]
+          },
+          {
+            "queryHash": "07a4b71601700f5c4dc52f42b0b81c7d62b26de13cab0474dff717116e1ae241",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_8_1_3",
+              "knowledge_2_1_1",
+              "faq9001",
+              "knowledge_2_1_2",
+              "knowledge_1_1_0",
+              "faq9002",
+              "knowledge_10_1_0",
+              "knowledge_3_1_3",
+              "knowledge_2_1_4",
+              "knowledge_4_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.49167597
+              },
+              {
+                "id": "faq9001",
+                "score": 0.47535293
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.45804824
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.43361783
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.37766124
+              },
+              {
+                "id": "knowledge_8_1_3",
+                "score": 0.37323273
+              }
+            ]
+          },
+          {
+            "queryHash": "6798fee9a38961adf7b72b9cc6c0c6c3e30a814e91c0672c8e43fe080b1c4ca1",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_0",
+              "knowledge_6_1_6",
+              "knowledge_2_1_3",
+              "knowledge_6_1_3",
+              "knowledge_6_1_2",
+              "knowledge_9_1_6",
+              "knowledge_6_1_1",
+              "knowledge_4_1_2",
+              "knowledge_12_1_6",
+              "knowledge_2_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.63729424
+              },
+              {
+                "id": "knowledge_4_1_2",
+                "score": 0.50935449
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.48332237
+              },
+              {
+                "id": "knowledge_6_1_1",
+                "score": 0.44363
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.42261113
+              },
+              {
+                "id": "knowledge_6_1_2",
+                "score": 0.38770684
+              }
+            ]
+          },
+          {
+            "queryHash": "72ca14499166d2dad28d3d4c13928c106486bd7dc2126c563ac8836a4dc84ba9",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_3",
+              "knowledge_6_1_2",
+              "knowledge_6_1_0",
+              "knowledge_9_1_5",
+              "knowledge_6_1_6",
+              "knowledge_6_1_5",
+              "knowledge_6_1_4",
+              "knowledge_10_1_5",
+              "knowledge_5_1_6",
+              "knowledge_5_1_4"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_3",
+                "score": 0.8899167
+              },
+              {
+                "id": "knowledge_6_1_2",
+                "score": 0.72051015
+              },
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.51914372
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.50899286
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.50650293
+              },
+              {
+                "id": "knowledge_5_1_6",
+                "score": 0.49811288
+              }
+            ]
+          },
+          {
+            "queryHash": "f98b8302e08e7b18def385b115868135e3816f945c99a491f5c27a3def19e1d5",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_7_1_4",
+              "knowledge_7_1_0",
+              "knowledge_7_1_1",
+              "knowledge_7_1_3",
+              "knowledge_2_1_1",
+              "knowledge_7_1_2",
+              "knowledge_8_1_4",
+              "knowledge_7_1_5",
+              "knowledge_8_1_5",
+              "knowledge_2_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_7_1_4",
+                "score": 0.93912393
+              },
+              {
+                "id": "knowledge_7_1_1",
+                "score": 0.59947777
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.56605089
+              },
+              {
+                "id": "knowledge_7_1_0",
+                "score": 0.56422268
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.54444695
+              },
+              {
+                "id": "knowledge_8_1_4",
+                "score": 0.51950285
+              }
+            ]
+          },
+          {
+            "queryHash": "4ebc5d99b4f5af770d1e0e8142ec6b20b4d6405254f35cec56ea7acefe3d5e2d",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_8_1_3",
+              "knowledge_8_1_2",
+              "knowledge_8_1_1",
+              "knowledge_7_1_4",
+              "knowledge_8_1_0",
+              "knowledge_8_1_6",
+              "knowledge_5_1_0",
+              "knowledge_2_1_1",
+              "knowledge_9_1_6",
+              "knowledge_12_1_5"
+            ],
+            "results": [
+              {
+                "id": "knowledge_8_1_3",
+                "score": 0.91184679
+              },
+              {
+                "id": "knowledge_8_1_2",
+                "score": 0.72344742
+              },
+              {
+                "id": "knowledge_8_1_0",
+                "score": 0.50679524
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.49659931
+              },
+              {
+                "id": "knowledge_7_1_4",
+                "score": 0.48091889
+              },
+              {
+                "id": "knowledge_8_1_6",
+                "score": 0.47359187
+              }
+            ]
+          },
+          {
+            "queryHash": "91e40d80ef90ac8f296bbd7d013a5ccafb58796bc01e452a3e7e76f277197e83",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_5_1_4",
+              "knowledge_9_1_0",
+              "knowledge_9_1_5",
+              "knowledge_9_1_3",
+              "knowledge_9_1_2",
+              "faq9002",
+              "knowledge_8_1_5",
+              "knowledge_10_1_5",
+              "knowledge_11_1_0",
+              "knowledge_2_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.84640599
+              },
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.79811349
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.61757205
+              },
+              {
+                "id": "knowledge_11_1_0",
+                "score": 0.58432762
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.57936558
+              },
+              {
+                "id": "knowledge_9_1_5",
+                "score": 0.49742097
+              }
+            ]
+          },
+          {
+            "queryHash": "e3c9e9d0d82e91defa1cfe8d645ee45711fb29207a4d6ba2546c67d85ac285db",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9002",
+              "knowledge_10_1_1",
+              "knowledge_10_1_3",
+              "knowledge_3_1_4",
+              "knowledge_10_1_4",
+              "knowledge_10_1_5",
+              "knowledge_3_1_3",
+              "knowledge_5_1_3",
+              "knowledge_10_1_2",
+              "knowledge_5_1_4"
+            ],
+            "results": [
+              {
+                "id": "knowledge_10_1_1",
+                "score": 0.92460317
+              },
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.68959125
+              },
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.63577783
+              },
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.63495612
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.62498305
+              },
+              {
+                "id": "knowledge_10_1_4",
+                "score": 0.62226567
+              }
+            ]
+          },
+          {
+            "queryHash": "d57e48d100be7bc634ca71a4ea97841dfd7a4a79be0580707aadba28acd3acf8",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_11_1_2",
+              "knowledge_11_1_5",
+              "knowledge_11_1_0",
+              "knowledge_11_1_6",
+              "knowledge_11_1_1",
+              "knowledge_11_1_3",
+              "knowledge_2_1_4",
+              "knowledge_11_1_4",
+              "knowledge_9_1_6",
+              "knowledge_8_1_4"
+            ],
+            "results": [
+              {
+                "id": "knowledge_11_1_2",
+                "score": 0.84343759
+              },
+              {
+                "id": "knowledge_2_1_4",
+                "score": 0.61901014
+              },
+              {
+                "id": "knowledge_11_1_6",
+                "score": 0.59859636
+              },
+              {
+                "id": "knowledge_11_1_5",
+                "score": 0.56227559
+              },
+              {
+                "id": "knowledge_11_1_1",
+                "score": 0.53897942
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.46475434
+              }
+            ]
+          },
+          {
+            "queryHash": "9f6d9ee8d7715bfe86073427a59104ad9ed18c6a19d906e476e7908a610fa0b5",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_12_1_1",
+              "knowledge_12_1_2",
+              "knowledge_12_1_6",
+              "knowledge_12_1_0",
+              "knowledge_12_1_3",
+              "knowledge_12_1_5",
+              "knowledge_4_1_4",
+              "knowledge_12_1_4",
+              "knowledge_5_1_4",
+              "knowledge_9_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_12_1_1",
+                "score": 0.93602134
+              },
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.59437085
+              },
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.55738724
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.55257539
+              },
+              {
+                "id": "knowledge_12_1_2",
+                "score": 0.50447553
+              },
+              {
+                "id": "knowledge_12_1_6",
+                "score": 0.46657558
+              }
+            ]
+          },
+          {
+            "queryHash": "db7eafb9bb7bb4951ea43fdfa05e96352ff3a54eff5d3ccb0f8bb15cd64f2fa8",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_12_1_0",
+              "knowledge_12_1_2",
+              "knowledge_12_1_4",
+              "knowledge_11_1_4",
+              "knowledge_12_1_3",
+              "knowledge_12_1_6",
+              "knowledge_12_1_1",
+              "knowledge_6_1_5",
+              "knowledge_9_1_5",
+              "knowledge_12_1_5"
+            ],
+            "results": [
+              {
+                "id": "knowledge_12_1_2",
+                "score": 0.74407126
+              },
+              {
+                "id": "knowledge_12_1_4",
+                "score": 0.54686423
+              },
+              {
+                "id": "knowledge_11_1_4",
+                "score": 0.50777573
+              },
+              {
+                "id": "knowledge_12_1_3",
+                "score": 0.50439891
+              },
+              {
+                "id": "knowledge_9_1_5",
+                "score": 0.43931783
+              },
+              {
+                "id": "knowledge_12_1_0",
+                "score": 0.43854762
+              }
+            ]
+          },
+          {
+            "queryHash": "c0b6456e5ae5d1f2986d97246e84817b67118badbb7cb347153f631c942a29ea",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_10_1_0",
+              "knowledge_3_1_3",
+              "knowledge_1_1_0",
+              "knowledge_10_1_5",
+              "knowledge_9_1_2",
+              "faq9001",
+              "faq9002",
+              "knowledge_4_1_0",
+              "faq9006",
+              "knowledge_11_1_4"
+            ],
+            "results": [
+              {
+                "id": "faq9001",
+                "score": 0.45925692
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.44287969
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.42736642
+              },
+              {
+                "id": "knowledge_10_1_0",
+                "score": 0.41457324
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.4084388
+              },
+              {
+                "id": "faq9006",
+                "score": 0.38223669
+              }
+            ]
+          },
+          {
+            "queryHash": "fcf7c57eaa0016fa14ee6fc1774de7be56440cb30e0bd2efd5a6988bd159e48b",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_2_1_3",
+              "knowledge_9_1_0",
+              "knowledge_1_1_0",
+              "knowledge_9_1_6",
+              "knowledge_12_1_1",
+              "faq9003",
+              "knowledge_10_1_0",
+              "knowledge_6_1_0",
+              "faq9004",
+              "knowledge_11_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.37023125
+              },
+              {
+                "id": "faq9004",
+                "score": 0.31942581
+              },
+              {
+                "id": "faq9003",
+                "score": 0.31173471
+              },
+              {
+                "id": "knowledge_12_1_1",
+                "score": 0.30598589
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.28334335
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.2811081
+              }
+            ]
+          },
+          {
+            "queryHash": "099ca3bda2a43528b327634645f30827ba75ce6a85f736871416c5dfe2e4da94",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9003",
+              "knowledge_3_1_0",
+              "knowledge_3_1_1",
+              "knowledge_3_1_2",
+              "faq9004",
+              "knowledge_3_1_3",
+              "knowledge_12_1_1",
+              "knowledge_12_1_0",
+              "knowledge_5_1_3",
+              "knowledge_10_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_3_1_0",
+                "score": 0.5436821
+              },
+              {
+                "id": "faq9003",
+                "score": 0.53213016
+              },
+              {
+                "id": "knowledge_3_1_1",
+                "score": 0.4393497
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.36428454
+              },
+              {
+                "id": "knowledge_3_1_2",
+                "score": 0.31522625
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.31494553
+              }
+            ]
+          },
+          {
+            "queryHash": "8134f093cd8cba2699d57e2d02ab4bdb1a6b703c4af9475f6293e986de90ef92",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_1_1_2",
+              "knowledge_5_1_1",
+              "knowledge_5_1_0",
+              "knowledge_1_1_0",
+              "knowledge_9_1_3",
+              "knowledge_11_1_0",
+              "knowledge_1_1_3",
+              "knowledge_9_1_0",
+              "knowledge_11_1_5",
+              "knowledge_11_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.458332
+              },
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.3973827
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.38437467
+              },
+              {
+                "id": "knowledge_5_1_0",
+                "score": 0.36484894
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.32440273
+              },
+              {
+                "id": "knowledge_11_1_0",
+                "score": 0.28576546
+              }
+            ]
+          },
+          {
+            "queryHash": "706e82d96ca68a52fddd0deb67dd3cb2ae49dae7654a13f909c9530b74ad0f2f",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_5_1_1",
+              "knowledge_1_1_2",
+              "knowledge_5_1_2",
+              "knowledge_5_1_6",
+              "knowledge_5_1_5",
+              "knowledge_5_1_3",
+              "knowledge_5_1_4",
+              "faq9002",
+              "knowledge_5_1_0",
+              "knowledge_11_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.88051188
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.70313367
+              },
+              {
+                "id": "knowledge_5_1_6",
+                "score": 0.68967603
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.60460723
+              },
+              {
+                "id": "faq9002",
+                "score": 0.58079532
+              },
+              {
+                "id": "knowledge_5_1_2",
+                "score": 0.54518777
+              }
+            ]
+          },
+          {
+            "queryHash": "73a13533af67cd5369dba7197cd5b1d5b5a47767cc5ae665d2aa60d4e4955e58",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_0",
+              "knowledge_6_1_6",
+              "knowledge_2_1_0",
+              "knowledge_6_1_3",
+              "knowledge_6_1_2",
+              "knowledge_2_1_3",
+              "knowledge_6_1_1",
+              "knowledge_9_1_5",
+              "knowledge_6_1_4",
+              "knowledge_3_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.8423238
+              },
+              {
+                "id": "knowledge_6_1_1",
+                "score": 0.53420673
+              },
+              {
+                "id": "knowledge_6_1_2",
+                "score": 0.41956574
+              },
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.40099678
+              },
+              {
+                "id": "knowledge_9_1_5",
+                "score": 0.39610046
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.3948709
+              }
+            ]
+          },
+          {
+            "queryHash": "73421ef4ca5cca75babe652c2f862bbf1439812719e185592a5158a483149ad0",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_4_1_2",
+              "knowledge_7_1_5",
+              "faq9006",
+              "knowledge_1_1_0",
+              "knowledge_4_1_1",
+              "knowledge_6_1_2",
+              "knowledge_1_1_3",
+              "knowledge_5_1_4",
+              "knowledge_12_1_1",
+              "knowledge_7_1_6"
+            ],
+            "results": [
+              {
+                "id": "knowledge_7_1_5",
+                "score": 0.52533641
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.49172342
+              },
+              {
+                "id": "knowledge_4_1_2",
+                "score": 0.48086549
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.45349931
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.44713827
+              },
+              {
+                "id": "knowledge_4_1_1",
+                "score": 0.43245818
+              }
+            ]
+          },
+          {
+            "queryHash": "5c9ca67fe26ef818ccac7c8fae2fa0aa897404db46dfd309e2f5aecd5babf60a",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_7_1_0",
+              "knowledge_7_1_1",
+              "knowledge_7_1_2",
+              "knowledge_7_1_4",
+              "knowledge_7_1_5",
+              "knowledge_7_1_3",
+              "knowledge_7_1_6",
+              "knowledge_4_1_4",
+              "knowledge_12_1_1",
+              "knowledge_2_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_7_1_5",
+                "score": 0.58953345
+              },
+              {
+                "id": "knowledge_7_1_2",
+                "score": 0.50242341
+              },
+              {
+                "id": "knowledge_12_1_1",
+                "score": 0.49984078
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.40542548
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.40314991
+              },
+              {
+                "id": "knowledge_7_1_1",
+                "score": 0.38868522
+              }
+            ]
+          },
+          {
+            "queryHash": "270418f3fd3f082a3053d529dcde3f2276fb6740d629debc094a8e349e7b8d40",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_5_1_1",
+              "knowledge_5_1_0",
+              "knowledge_11_1_3",
+              "knowledge_1_1_2",
+              "knowledge_10_1_3",
+              "knowledge_11_1_0",
+              "faq9005",
+              "knowledge_2_1_4",
+              "knowledge_1_1_0",
+              "knowledge_11_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.62712058
+              },
+              {
+                "id": "knowledge_5_1_0",
+                "score": 0.59693667
+              },
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.483124
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.46829814
+              },
+              {
+                "id": "knowledge_2_1_4",
+                "score": 0.39501473
+              },
+              {
+                "id": "faq9005",
+                "score": 0.36862744
+              }
+            ]
+          },
+          {
+            "queryHash": "02cee8b7cffbd33ad7dcbbc595f1290a04415c825722fe657914d7ee12426d88",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_0",
+              "knowledge_6_1_6",
+              "knowledge_2_1_0",
+              "knowledge_6_1_2",
+              "knowledge_2_1_3",
+              "knowledge_6_1_1",
+              "knowledge_1_1_2",
+              "knowledge_6_1_3",
+              "knowledge_5_1_0",
+              "knowledge_6_1_4"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.83831362
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.58339975
+              },
+              {
+                "id": "knowledge_6_1_1",
+                "score": 0.43519129
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.38489225
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.36614501
+              },
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.35732602
+              }
+            ]
+          },
+          {
+            "queryHash": "8e7657be0b2a8448efc38a74b539c480823fe8cfd2c7e1f3f7f17dc8a014d252",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_6",
+              "knowledge_2_1_3",
+              "faq9003",
+              "knowledge_4_1_4",
+              "knowledge_3_1_0",
+              "knowledge_9_1_6",
+              "knowledge_2_1_0",
+              "knowledge_6_1_0",
+              "knowledge_4_1_3",
+              "knowledge_9_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.74817154
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.70872397
+              },
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.51064733
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.48759891
+              },
+              {
+                "id": "knowledge_4_1_4",
+                "score": 0.48385072
+              },
+              {
+                "id": "faq9003",
+                "score": 0.41461041
+              }
+            ]
+          },
+          {
+            "queryHash": "c3ec888142c1d552ba0791b66b52f35bb48a0100d9e797156874c561e180b34f",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_7_1_2",
+              "knowledge_7_1_0",
+              "knowledge_7_1_4",
+              "knowledge_7_1_1",
+              "knowledge_7_1_3",
+              "knowledge_8_1_4",
+              "knowledge_2_1_1",
+              "knowledge_11_1_0",
+              "knowledge_7_1_5",
+              "faq9002"
+            ],
+            "results": [
+              {
+                "id": "knowledge_7_1_2",
+                "score": 0.86175186
+              },
+              {
+                "id": "knowledge_7_1_5",
+                "score": 0.73877876
+              },
+              {
+                "id": "knowledge_8_1_4",
+                "score": 0.6706899
+              },
+              {
+                "id": "knowledge_7_1_0",
+                "score": 0.62381823
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.58183616
+              },
+              {
+                "id": "knowledge_7_1_4",
+                "score": 0.57245024
+              }
+            ]
+          },
+          {
+            "queryHash": "46605263dbf39ccbf0e7a028761da4df2f294b661dfae631b6a19e44d8aa69f9",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_8_1_4",
+              "knowledge_8_1_0",
+              "knowledge_8_1_3",
+              "knowledge_7_1_3",
+              "knowledge_2_1_1",
+              "knowledge_8_1_2",
+              "knowledge_8_1_5",
+              "knowledge_8_1_1",
+              "knowledge_7_1_4",
+              "knowledge_11_1_5"
+            ],
+            "results": [
+              {
+                "id": "knowledge_8_1_4",
+                "score": 0.79928186
+              },
+              {
+                "id": "knowledge_8_1_3",
+                "score": 0.66587824
+              },
+              {
+                "id": "knowledge_8_1_2",
+                "score": 0.59715626
+              },
+              {
+                "id": "knowledge_8_1_5",
+                "score": 0.56667682
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.52382332
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.50194048
+              }
+            ]
+          },
+          {
+            "queryHash": "bb7bb8e2310180175744e98febf07fd5ca97fb0a01d06385307172d78205e71a",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_9_1_2",
+              "knowledge_4_1_4",
+              "knowledge_9_1_0",
+              "knowledge_7_1_6",
+              "knowledge_12_1_0",
+              "knowledge_12_1_1",
+              "knowledge_8_1_5",
+              "knowledge_12_1_3",
+              "knowledge_12_1_6",
+              "knowledge_11_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_9_1_2",
+                "score": 0.79309928
+              },
+              {
+                "id": "knowledge_8_1_5",
+                "score": 0.76024518
+              },
+              {
+                "id": "knowledge_4_1_4",
+                "score": 0.70849725
+              },
+              {
+                "id": "knowledge_11_1_2",
+                "score": 0.67564208
+              },
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.57000829
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.55582483
+              }
+            ]
+          },
+          {
+            "queryHash": "cfea1e5f78a3134460ff0f92bde88fe07e8a7ac0c4d82b0eaab09b8cdcc00f40",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_10_1_5",
+              "knowledge_5_1_3",
+              "knowledge_3_1_4",
+              "knowledge_10_1_3",
+              "knowledge_10_1_4",
+              "faq9002",
+              "knowledge_2_1_0",
+              "knowledge_2_1_2",
+              "knowledge_3_1_3",
+              "knowledge_10_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.72974883
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.63129653
+              },
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.55628881
+              },
+              {
+                "id": "knowledge_10_1_4",
+                "score": 0.52226991
+              },
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.49054473
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.4884601
+              }
+            ]
+          },
+          {
+            "queryHash": "3115c6c1126e31af910587dbb64474c5f571c6923bcc850dc1a181f319f09bb4",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_12_1_0",
+              "knowledge_12_1_3",
+              "knowledge_12_1_2",
+              "knowledge_12_1_4",
+              "knowledge_12_1_6",
+              "knowledge_12_1_5",
+              "knowledge_12_1_1",
+              "knowledge_11_1_4",
+              "knowledge_4_1_1",
+              "knowledge_7_1_6"
+            ],
+            "results": [
+              {
+                "id": "knowledge_12_1_0",
+                "score": 0.9474113
+              },
+              {
+                "id": "knowledge_12_1_4",
+                "score": 0.66832065
+              },
+              {
+                "id": "knowledge_12_1_3",
+                "score": 0.62514603
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.54779542
+              },
+              {
+                "id": "knowledge_12_1_6",
+                "score": 0.52281578
+              },
+              {
+                "id": "knowledge_12_1_2",
+                "score": 0.51432978
+              }
+            ]
+          },
+          {
+            "queryHash": "60d2022acc21a557be6c1282c31bf3c949da49627aa809bbd0ee58ef8884a656",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_10_1_5",
+              "knowledge_2_1_3",
+              "faq9002",
+              "knowledge_4_1_4",
+              "knowledge_10_1_0",
+              "knowledge_11_1_5",
+              "knowledge_1_1_0",
+              "knowledge_7_1_6",
+              "knowledge_12_1_6",
+              "knowledge_9_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.34616741
+              },
+              {
+                "id": "faq9002",
+                "score": 0.34243365
+              },
+              {
+                "id": "knowledge_11_1_5",
+                "score": 0.31497006
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.31396857
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.30881362
+              },
+              {
+                "id": "knowledge_10_1_0",
+                "score": 0.27353106
+              }
+            ]
+          },
+          {
+            "queryHash": "5ab6b8857a9152441d7ec6e5a1d5d651ab94dd53cc0b0972d9314e35d59a581b",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_8_1_5",
+              "knowledge_9_1_0",
+              "faq9004",
+              "knowledge_9_1_2",
+              "faq9001",
+              "faq9006",
+              "knowledge_4_1_4",
+              "knowledge_7_1_0",
+              "knowledge_11_1_6",
+              "knowledge_5_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.35928763
+              },
+              {
+                "id": "faq9001",
+                "score": 0.34594846
+              },
+              {
+                "id": "knowledge_9_1_2",
+                "score": 0.3110363
+              },
+              {
+                "id": "knowledge_7_1_0",
+                "score": 0.25404295
+              },
+              {
+                "id": "knowledge_4_1_4",
+                "score": 0.24931691
+              },
+              {
+                "id": "faq9004",
+                "score": 0.24811834
+              }
+            ]
+          },
+          {
+            "queryHash": "b22d1189c197012ecca844f2f5dfad549bb528cbfce69351e64feb32132bffdf",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_3_1_0",
+              "faq9003",
+              "knowledge_3_1_1",
+              "knowledge_3_1_2",
+              "knowledge_3_1_3",
+              "knowledge_3_1_4",
+              "knowledge_12_1_0",
+              "knowledge_10_1_5",
+              "faq9002",
+              "knowledge_10_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.39159482
+              },
+              {
+                "id": "faq9003",
+                "score": 0.37904712
+              },
+              {
+                "id": "knowledge_3_1_1",
+                "score": 0.3743153
+              },
+              {
+                "id": "knowledge_3_1_2",
+                "score": 0.33181477
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.32487172
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.31940284
+              }
+            ]
+          },
+          {
+            "queryHash": "90275b19336168920e899c9dc3d488345b98e68d263ce875987c9b3601b42d18",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_3_1_1",
+              "knowledge_4_1_4",
+              "faq9002",
+              "knowledge_10_1_5",
+              "faq9006",
+              "knowledge_3_1_3",
+              "faq9001",
+              "knowledge_10_1_4",
+              "knowledge_10_1_6",
+              "knowledge_9_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.37714594
+              },
+              {
+                "id": "faq9002",
+                "score": 0.35875053
+              },
+              {
+                "id": "knowledge_3_1_1",
+                "score": 0.34317741
+              },
+              {
+                "id": "faq9001",
+                "score": 0.34268558
+              },
+              {
+                "id": "knowledge_10_1_4",
+                "score": 0.32752363
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.32305233
+              }
+            ]
+          },
+          {
+            "queryHash": "81c743f6764ecc7f2cf48cea22c1ead5b6062036deb06acd0b9d6e27b12317e4",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_0",
+              "knowledge_6_1_6",
+              "knowledge_6_1_2",
+              "knowledge_6_1_3",
+              "knowledge_6_1_1",
+              "knowledge_2_1_0",
+              "knowledge_6_1_4",
+              "knowledge_4_1_4",
+              "knowledge_2_1_3",
+              "faq9005"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.79109688
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.58854398
+              },
+              {
+                "id": "knowledge_6_1_2",
+                "score": 0.51031454
+              },
+              {
+                "id": "knowledge_6_1_3",
+                "score": 0.47318777
+              },
+              {
+                "id": "knowledge_6_1_1",
+                "score": 0.44647611
+              },
+              {
+                "id": "faq9005",
+                "score": 0.40706953
+              }
+            ]
+          },
+          {
+            "queryHash": "f07b17834e5424644b8f4ce186b239e7c0ba88c41d484b1cc891c2fce5da48ac",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_12_1_6",
+              "knowledge_12_1_1",
+              "knowledge_12_1_0",
+              "knowledge_4_1_4",
+              "faq9006",
+              "knowledge_4_1_1",
+              "faq9005",
+              "knowledge_12_1_4",
+              "knowledge_3_1_0",
+              "knowledge_9_1_6"
+            ],
+            "results": [
+              {
+                "id": "knowledge_12_1_6",
+                "score": 0.79243602
+              },
+              {
+                "id": "faq9005",
+                "score": 0.43842114
+              },
+              {
+                "id": "knowledge_4_1_4",
+                "score": 0.41770027
+              },
+              {
+                "id": "knowledge_12_1_4",
+                "score": 0.40336698
+              },
+              {
+                "id": "knowledge_4_1_1",
+                "score": 0.3941392
+              },
+              {
+                "id": "faq9006",
+                "score": 0.37597951
+              }
+            ]
+          },
+          {
+            "queryHash": "cb75f1fa9e5c8afb9d722ed4818e991273f0646a14a974e6f0ad43a5bacf87f2",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_5_1_4",
+              "knowledge_9_1_0",
+              "knowledge_10_1_5",
+              "knowledge_12_1_2",
+              "knowledge_5_1_6",
+              "knowledge_9_1_5",
+              "knowledge_10_1_6",
+              "knowledge_11_1_5",
+              "knowledge_11_1_6",
+              "faq9006"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.83620461
+              },
+              {
+                "id": "knowledge_5_1_6",
+                "score": 0.79459631
+              },
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.72968119
+              },
+              {
+                "id": "knowledge_12_1_2",
+                "score": 0.70617729
+              },
+              {
+                "id": "knowledge_10_1_6",
+                "score": 0.70403144
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.68294958
+              }
+            ]
+          },
+          {
+            "queryHash": "32be5a52cbe688fc5a5657dfd45469fa54dc6a146a7437d3f74d995cc637d3d4",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "knowledge_6_1_4",
+              "knowledge_6_1_5",
+              "knowledge_2_1_3",
+              "knowledge_9_1_3",
+              "knowledge_9_1_4",
+              "knowledge_9_1_1",
+              "knowledge_12_1_3",
+              "knowledge_9_1_6",
+              "knowledge_12_1_5",
+              "faq9005"
+            ],
+            "results": [
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.70950444
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.64966109
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.64252213
+              },
+              {
+                "id": "knowledge_9_1_4",
+                "score": 0.53029123
+              },
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.52065345
+              },
+              {
+                "id": "knowledge_12_1_3",
+                "score": 0.48728808
+              }
+            ]
+          },
+          {
+            "queryHash": "dbe2b7e1a4b6342cd906d58cf6d1eb2047c2e59f7907ae92fc3b81c740cd1b86",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9001",
+              "knowledge_1_1_3",
+              "knowledge_1_1_1",
+              "knowledge_4_1_0",
+              "faq9006",
+              "faq9005",
+              "knowledge_9_1_2",
+              "knowledge_9_1_0",
+              "knowledge_9_1_6",
+              "knowledge_4_1_1"
+            ],
+            "results": [
+              {
+                "id": "faq9001",
+                "score": 0.90665107
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.87584908
+              },
+              {
+                "id": "knowledge_1_1_1",
+                "score": 0.76384863
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.52153092
+              },
+              {
+                "id": "faq9005",
+                "score": 0.49750663
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.48750384
+              }
+            ]
+          },
+          {
+            "queryHash": "52205feeea02132fc5200a4ba371fc6f0f3fea87af14dc79a2458f913a7ffe67",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9002",
+              "knowledge_10_1_3",
+              "knowledge_3_1_4",
+              "knowledge_3_1_3",
+              "knowledge_5_1_3",
+              "knowledge_10_1_0",
+              "knowledge_10_1_1",
+              "knowledge_10_1_5",
+              "knowledge_3_1_2",
+              "knowledge_10_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.95163968
+              },
+              {
+                "id": "faq9002",
+                "score": 0.93220088
+              },
+              {
+                "id": "knowledge_3_1_4",
+                "score": 0.89879319
+              },
+              {
+                "id": "knowledge_5_1_3",
+                "score": 0.76925861
+              },
+              {
+                "id": "knowledge_10_1_1",
+                "score": 0.5309528
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.50083262
+              }
+            ]
+          },
+          {
+            "queryHash": "4c7f247d82aacd89174103dbba20ecd147717f7aacf563baa4b7e018d69f69b6",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9004",
+              "knowledge_2_1_1",
+              "knowledge_8_1_0",
+              "knowledge_8_1_2",
+              "knowledge_8_1_1",
+              "knowledge_8_1_6",
+              "knowledge_7_1_3",
+              "knowledge_2_1_0",
+              "knowledge_2_1_2",
+              "knowledge_8_1_3"
+            ],
+            "results": [
+              {
+                "id": "faq9004",
+                "score": 0.89818099
+              },
+              {
+                "id": "knowledge_8_1_0",
+                "score": 0.84796856
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.75837398
+              },
+              {
+                "id": "knowledge_8_1_2",
+                "score": 0.73166067
+              },
+              {
+                "id": "knowledge_8_1_6",
+                "score": 0.66669532
+              },
+              {
+                "id": "knowledge_8_1_3",
+                "score": 0.50506338
+              }
+            ]
+          },
+          {
+            "queryHash": "f51ff8bbc619bbfe794b5cc35d30cc98edcf5830439898b61eb97cbd6b308f4e",
+            "instructionHash": "a83304089718278a3f2f95b452c07967cc8a5ce19ad36e3802f8f8e2338277a2",
+            "candidateIds": [
+              "faq9005",
+              "knowledge_5_1_5",
+              "knowledge_5_1_0",
+              "knowledge_5_1_1",
+              "knowledge_12_1_5",
+              "knowledge_1_1_2",
+              "knowledge_7_1_3",
+              "knowledge_5_1_2",
+              "knowledge_5_1_6",
+              "knowledge_11_1_6"
+            ],
+            "results": [
+              {
+                "id": "faq9005",
+                "score": 0.83518646
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.78574768
+              },
+              {
+                "id": "knowledge_11_1_6",
+                "score": 0.61078282
+              },
+              {
+                "id": "knowledge_7_1_3",
+                "score": 0.52518658
+              },
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.46466444
+              },
+              {
+                "id": "knowledge_5_1_5",
+                "score": 0.46450936
+              }
+            ]
+          }
+        ]
+      },
+      "queryExpansion": {
+        "eligibleRequests": 13,
+        "providerRequests": 13,
+        "providerSuccesses": 13,
+        "providerFailures": 0
+      },
+      "generation": {
+        "providerCalls": 72,
+        "providerSuccesses": 72,
+        "providerFailures": 0
+      }
+    },
+    "providerCompleteness": {
+      "passed": true,
+      "checks": {
+        "embeddingCacheHitsZero": true,
+        "embeddingFailuresZero": true,
+        "rerankFailuresZero": true,
+        "rerankFallbackZero": true,
+        "queryExpansionFailuresZero": true,
+        "generationProviderCalled": true,
+        "generationProviderFailuresZero": true,
+        "generationProviderCallsComplete": true
+      }
+    },
+    "costAccounting": {
+      "status": "UNPRICED",
+      "reason": "No verified CNY provider price is configured."
+    },
+    "qualityGate": {
+      "passed": false,
+      "checks": {
+        "allCasesExecuted": true,
+        "runtimeErrorsZero": true,
+        "criticalSafetyZero": true,
+        "usageComplete": true,
+        "providerComplete": true,
+        "taskSuccessRate": false,
+        "knownRegressionPass": false,
+        "requiredClaimCompleteness": false,
+        "claimCitationSupport": false,
+        "canonicalCitationCoverage": true,
+        "noAnswerAccuracy": true,
+        "injectionRobustness": true,
+        "invalidCitationCount": true
+      },
+      "status": "FAILED_RETAINED",
+      "reviewStatus": "COMPLETED_AI_ASSISTED_INITIAL_REVIEW",
+      "reviewPassed": 46,
+      "reviewFailed": 14,
+      "humanReviewStatus": "HUMAN_REVIEW_PENDING"
+    }
+  },
+  "humanReviewStatus": "HUMAN_REVIEW_PENDING",
+  "review": {
+    "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+    "passed": 46,
+    "failed": 14,
+    "sha256": "319b57f1ee40ca88f9ba251308804983d34d0d2f213ed85f0ebbd3649cdbf6e6"
+  },
+  "honestBoundaries": [
+    "The 60 cases are SYNTHETIC and the run is local-live, not real-user traffic.",
+    "AI_ASSISTED_INITIAL_REVIEW is not independent human annotation.",
+    "Human calibration remains HUMAN_REVIEW_PENDING until two distinct reviewers submit all dimensions.",
+    "Citation-grounded faithfulness is an automatic proxy, not an independent judge result.",
+    "Provider cost is UNPRICED and local latency percentiles are not production SLOs.",
+    "No baseline was accepted or overwritten."
+  ]
+}

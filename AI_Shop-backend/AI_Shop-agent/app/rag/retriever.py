@@ -20,15 +20,24 @@ from app.harness.metrics.runtime_sensors import (
 from app.infra.http_client import get_client
 from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_rag_overrides
+from app.rag.canonical_facts import get_canonical_fact_catalog
 from app.rag.embedding import embed_text
+from app.rag.evidence_selector import evidence_item_limit, select_minimal_evidence
+from app.rag.fact_metadata import get_fact_metadata_catalog
 from app.rag.grounding import (
-    EvidenceItem,
     EvidenceState,
     GroundingEnvelope,
     QueryPlan,
 )
-from app.rag.query_expander import expand_query
+from app.rag.policy import runtime_rag_policy
+from app.rag.query_expander import deterministic_query_variants, expand_query
+from app.rag.query_planner import PlannedRagQuery, plan_rag_query
 from app.rag.rrf import rrf_score_at_rank
+from app.rag.runtime_trace import (
+    RagRuntimeTrace,
+    active_rag_runtime_trace,
+    rag_runtime_trace_scope,
+)
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.java_internal_client import java_internal_client
 from app.services.redis_service import redis_service
@@ -53,6 +62,77 @@ ES_MAX_NUM_CANDIDATES = 10_000
 # 之后传什么都被忽略。原来 BM25/向量/商品关键词三处各传各的（3/30 vs 默认 5/60），
 # 并发下谁先创建谁的阈值就生效，熔断行为不确定。收敛成一份参数。
 ES_BREAKER_ARGS = {"failure_threshold": 3, "recovery_timeout": 30}
+
+
+def _canonical_fact_ids_for_doc(doc: dict[str, Any]) -> frozenset[str]:
+    metadata = doc.get("metadata") or {}
+    return get_canonical_fact_catalog().facts_for_ref(
+        {
+            "type": metadata.get("dataType"),
+            "questionId": metadata.get("questionId"),
+            "source": metadata.get("source") or metadata.get("sourceName"),
+            "heading": metadata.get("heading"),
+        }
+    )
+
+
+def _promote_canonical_hint_docs(
+    ranked_groups: list[list[dict[str, Any]]],
+    fused_docs: list[dict[str, Any]],
+    *,
+    fact_hints: tuple[str, ...] | list[str],
+    limit: int,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Keep explicitly routed canonical facts from being lost at RRF truncation."""
+
+    preferred = {str(value) for value in fact_hints if str(value)}
+    if not preferred or limit < 1:
+        return fused_docs[: max(0, limit)], []
+    promoted: list[dict[str, Any]] = []
+    promoted_ids: list[str] = []
+    seen: set[str] = set()
+    for group in ranked_groups:
+        for doc in group:
+            identity = str(doc.get("id") or "")
+            if not identity or identity in seen:
+                continue
+            if not preferred.intersection(_canonical_fact_ids_for_doc(doc)):
+                continue
+            promoted.append(doc)
+            promoted_ids.append(identity)
+            seen.add(identity)
+    combined = [*promoted, *fused_docs]
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    for doc in combined:
+        identity = str(doc.get("id") or "")
+        if not identity or identity in selected_ids:
+            continue
+        selected.append(doc)
+        selected_ids.add(identity)
+        if len(selected) == limit:
+            break
+    return selected, promoted_ids
+
+
+def _rerank_query_with_fact_hints(
+    query: str,
+    fact_hints: tuple[str, ...] | list[str],
+) -> str:
+    """Append trusted catalog titles to a routed rerank query, never eval labels."""
+
+    catalog = get_fact_metadata_catalog()
+    titles = [
+        catalog.facts[fact_id].aliases[0]
+        for fact_id in fact_hints
+        if fact_id in catalog.facts and catalog.facts[fact_id].aliases
+    ]
+    if not titles:
+        return query
+    return (
+        f"{query}\n检索目标：{'；'.join(dict.fromkeys(titles))}。"
+        "优先直接回答、约束或明确否定该命题的证据。"
+    )
 
 
 @dataclass
@@ -90,6 +170,37 @@ class RerankEvaluationStats:
 _RERANK_EVALUATION_STATS: contextvars.ContextVar[RerankEvaluationStats | None] = (
     contextvars.ContextVar("rerank_evaluation_stats", default=None)
 )
+
+_ES_KNOWLEDGE_INDEX_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "rag_knowledge_index_override", default=None
+)
+
+
+@contextmanager
+def evaluation_es_index_scope(index_name: str | None) -> Iterator[str | None]:
+    """Route an evaluation to an isolated ``aishop_eval_`` knowledge index.
+
+    Production calls leave this unset and continue using ``ES_INDEX``.  The
+    prefix check prevents an evaluation typo from writing or reading a
+    production index while still allowing two immutable context-retrieval
+    variants to run in the same process.
+    """
+
+    if index_name is not None:
+        value = str(index_name).strip()
+        if not value.startswith("aishop_eval_"):
+            raise ValueError("evaluation knowledge index must start with aishop_eval_")
+    else:
+        value = None
+    token = _ES_KNOWLEDGE_INDEX_OVERRIDE.set(value)
+    try:
+        yield value
+    finally:
+        _ES_KNOWLEDGE_INDEX_OVERRIDE.reset(token)
+
+
+def _knowledge_index_name(settings: Any) -> str:
+    return _ES_KNOWLEDGE_INDEX_OVERRIDE.get() or settings.es_index
 
 
 @contextmanager
@@ -191,6 +302,32 @@ class RagRetriever:
         query_variants: list[str] | None = None,
         security_flags: list[str] | tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
+        policy = runtime_rag_policy()
+        runtime_trace = RagRuntimeTrace(policy_fingerprint=policy.fingerprint())
+        with rag_runtime_trace_scope(runtime_trace):
+            result = await self._search_faq_with_trace(
+                query,
+                top_k,
+                category_filter=category_filter,
+                bucket=bucket,
+                include_evaluation_candidates=include_evaluation_candidates,
+                query_variants=query_variants,
+                security_flags=security_flags,
+            )
+        trace = result.setdefault("trace", {})
+        trace["runtime"] = runtime_trace.public()
+        return result
+
+    async def _search_faq_with_trace(
+        self,
+        query: str,
+        top_k: int | None = None,
+        category_filter: list[str] | None = None,
+        bucket: str = "A",
+        include_evaluation_candidates: bool = False,
+        query_variants: list[str] | None = None,
+        security_flags: list[str] | tuple[str, ...] | None = None,
+    ) -> dict[str, Any]:
         """Search FAQ/knowledge and retain bounded evidence for observability.
 
         ``bucket`` 是 A/B 分桶（默认 "A" = 基线）。A/B 覆盖参数（rag_top_k /
@@ -200,13 +337,14 @@ class RagRetriever:
         """
         started = time.perf_counter()
         settings = get_settings()
+        policy = runtime_rag_policy()
         overrides = get_rag_overrides(bucket)
         effective_top_k = int(overrides.get("rag_top_k") or top_k or settings.rag_top_k)
         evaluation = _RERANK_EVALUATION_STATS.get()
         rerank_top_n = int(
             evaluation.rerank_top_n
             if evaluation is not None and evaluation.rerank_top_n is not None
-            else overrides.get("rerank_top_n") or settings.rerank_top_n
+            else overrides.get("rerank_top_n") or policy.rerank_top_n
         )
 
         original_query = str(query or "")
@@ -214,6 +352,21 @@ class RagRetriever:
         collected_security_flags = list(security_flags or [])
         collected_security_flags.extend(separation.security_flags)
         cleaned = self.normalize_query(separation.safe_query)
+        planning_started = time.perf_counter()
+        planned_query = plan_rag_query(
+            cleaned,
+            max_subquestions=policy.max_subquestions,
+        )
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.observe(
+                "decomposition", (time.perf_counter() - planning_started) * 1000
+            )
+            runtime_trace.route = planned_query.route
+            runtime_trace.observations["plannedQuery"] = planned_query.public(
+                actual_variant_count=len(planned_query.deterministic_variants),
+                llm_expansion_calls=0,
+            )
         if not cleaned:
             self._observe_search(started, False, "empty")
             return self._trace_result(
@@ -247,7 +400,10 @@ class RagRetriever:
                 forced_evidence_state=EvidenceState.QUARANTINED,
             )
 
+        catalog_started = time.perf_counter()
         catalog = await self._knowledge_catalog()
+        if runtime_trace is not None:
+            runtime_trace.observe("catalog", (time.perf_counter() - catalog_started) * 1000)
         try:
             version = int(catalog["version"]) if catalog else await self._knowledge_version()
         except KnowledgeCatalogUnavailable:
@@ -255,7 +411,10 @@ class RagRetriever:
             # observable in trace and is never used to authorize knowledge ES
             # documents.
             version = 0
+        exact_started = time.perf_counter()
         exact = await self._exact_faq(cleaned, version)
+        if runtime_trace is not None:
+            runtime_trace.observe("exactFaq", (time.perf_counter() - exact_started) * 1000)
         if exact:
             docs = [self._faq_row_to_doc(exact, score=1.0)]
             self._observe_search(started, True, "exact")
@@ -282,7 +441,10 @@ class RagRetriever:
         if cached:
             # 缓存里的 FAQ 可能已过期（发布后新版本号才会换 key），读出来再滤一遍。
             cached = self._filter_catalog(self._filter_expired(cached), catalog)
-            cached = self._filter_evidence_docs(cached)
+            cached = self._filter_evidence_docs(
+                cached,
+                preferred_fact_ids=planned_query.fact_hints,
+            )
             if not cached:
                 # 缓存条目全部已过生效窗口（effectiveEnd 已过）——这是"假命中"：
                 # 不能返回空证据、也不能把 hit=True 记进命中率/盲评样本（P1 审查），
@@ -292,6 +454,8 @@ class RagRetriever:
                 # B2：按比例抽样命中记录进盲评队列——语义缓存的失败是静默的，
                 # 不抽样盲评就发现不了误报（行业建议按周评审误报率）。
                 await self._sample_cache_hit(cleaned, cached)
+                if runtime_trace is not None:
+                    runtime_trace.cache_hits += 1
                 self._observe_search(started, True, "cache")
                 return self._trace_result(
                     cleaned,
@@ -321,7 +485,6 @@ class RagRetriever:
         # 当前目录过滤，避免旧版本结果在发布或归档后继续返回。
         # 如果 Java 与 last-known-good 目录都不可用，只允许 FAQ 分支继续，
         # 绝不能用固定版本或无目录检索可能已经归档的知识切片。
-        variants = await self._query_variants(cleaned, query_variants)
         candidates = await self._search_knowledge_docs(
             cleaned,
             effective_top_k,
@@ -330,11 +493,15 @@ class RagRetriever:
             version_filter=version if catalog else None,
             active_document_ids=(catalog or {}).get("active_document_ids") if catalog else None,
             knowledge_enabled=bool(catalog),
-            queries=variants,
+            queries=query_variants,
+            planned_query=planned_query,
         )
         if catalog is not None:
             candidates = self._filter_catalog(candidates, catalog)
-        docs = self._filter_evidence_docs(candidates)
+        docs = self._filter_evidence_docs(
+            candidates,
+            preferred_fact_ids=planned_query.fact_hints,
+        )
         if not docs:
             self._observe_search(started, False, "hybrid")
             return self._trace_result(
@@ -348,7 +515,11 @@ class RagRetriever:
                 evaluation_candidates=candidates if include_evaluation_candidates else None,
                 original_query=original_query,
                 security_flags=collected_security_flags,
-                variant_count=len(variants),
+                variant_count=int(
+                    (runtime_trace.observations.get("plannedQuery") or {}).get(
+                        "actualVariantCount", len(planned_query.deterministic_variants)
+                    )
+                ) if runtime_trace is not None else len(planned_query.deterministic_variants),
                 normalization_rules=(
                     ("explicit_attack_suffix_removed",) if separation.separated else ()
                 ),
@@ -368,7 +539,11 @@ class RagRetriever:
             evaluation_candidates=candidates if include_evaluation_candidates else None,
             original_query=original_query,
             security_flags=collected_security_flags,
-            variant_count=len(variants),
+            variant_count=int(
+                (runtime_trace.observations.get("plannedQuery") or {}).get(
+                    "actualVariantCount", len(planned_query.deterministic_variants)
+                )
+            ) if runtime_trace is not None else len(planned_query.deterministic_variants),
             normalization_rules=(
                 ("explicit_attack_suffix_removed",) if separation.separated else ()
             ),
@@ -424,6 +599,8 @@ class RagRetriever:
             "rerank_api_format": settings.rerank_api_format,
             "rerank_instruct": settings.rerank_instruct,
             "rerank_enabled": bool(settings.rerank_api_key.strip()),
+            "knowledge_index": _knowledge_index_name(settings),
+            "rag_policy_fingerprint": runtime_rag_policy().fingerprint(),
             "min_cosine": settings.rag_vector_min_cosine,
             "knn_factor": settings.knn_num_candidates_factor,
             "knn_min": settings.knn_num_candidates_min,
@@ -606,17 +783,32 @@ class RagRetriever:
         active_document_ids: list[str] | None = None,
         knowledge_enabled: bool = True,
         queries: list[str] | None = None,
+        planned_query: PlannedRagQuery | None = None,
     ) -> list[dict]:
         with tracer.start_as_current_span("rag.hybrid_search") as span:
             span.set_attribute("rag.query_length", len(query))
             span.set_attribute("rag.limit", limit)
 
-            # P2-1 Query Expansion: obtain synonym / alias variants, run a full
-            # hybrid search (BM25 + kNN → per-variant RRF) for each, then fuse
-            # all ranked lists with a final RRF pass.  Falls back to the original
-            # single-query path automatically when the expander returns one entry.
-            effective_queries = queries or await self._query_variants(query)
+            policy = runtime_rag_policy()
+            plan = planned_query or plan_rag_query(
+                query, max_subquestions=policy.max_subquestions
+            )
+            if queries is None and planned_query is None:
+                effective_queries = [query]
+            else:
+                effective_queries = list(
+                    dict.fromkeys(
+                        queries
+                        or list(plan.deterministic_variants)
+                        or deterministic_query_variants(query)
+                    )
+                )[: policy.max_query_variants]
             span.set_attribute("rag.query_variants", len(effective_queries))
+            runtime_trace = active_rag_runtime_trace()
+            if runtime_trace is not None:
+                runtime_trace.observations["knowledgeIndex"] = _knowledge_index_name(
+                    get_settings()
+                )
 
             # P0-5 版本过滤：knowledge 必须「已发布」（version <= 当前版本），
             # FAQ 不受版本约束。注意是 range(lte) 而不是 term(==)：
@@ -665,7 +857,7 @@ class RagRetriever:
                     }
                 )
 
-            async def _hybrid_one(q: str) -> list[dict]:
+            async def _hybrid_one(q: str) -> tuple[list[dict], list[dict], list[dict]]:
                 data_types = ("faq", "knowledge") if knowledge_enabled else ("faq",)
                 kw, vec = await asyncio.gather(
                     self._keyword_search_docs(
@@ -678,15 +870,174 @@ class RagRetriever:
                 merged = self._rrf_docs([kw, vec], limit=max(limit, 1))
                 # 过期 FAQ 在并进最终融合之前就滤掉：先限量再过滤会让过期项
                 # 白白占住 top-k 名额，把有效文档挤出候选池。
-                return self._filter_expired(merged)
+                return kw, vec, self._filter_expired(merged)
 
-            ranked_groups = await asyncio.gather(
+            initial_groups = await asyncio.gather(
                 *[_hybrid_one(q) for q in effective_queries]
             )
+            ranked_groups = [group[2] for group in initial_groups]
+            bm25_ids = {
+                str(doc.get("id") or "") for group in initial_groups for doc in group[0]
+            }
+            vector_ids = {
+                str(doc.get("id") or "") for group in initial_groups for doc in group[1]
+            }
+            candidate_domains = {
+                str((doc.get("metadata") or {}).get("domain") or "").upper()
+                for group in ranked_groups
+                for doc in group
+                if str((doc.get("metadata") or {}).get("domain") or "")
+            }
+            missing_domains = set(plan.domains) - candidate_domains
+            low_dual_route_overlap = not bool(bm25_ids.intersection(vector_ids))
+            expansion_reasons = list(plan.expansion_reasons)
+            if not ranked_groups or not any(ranked_groups):
+                expansion_reasons.append("no_initial_candidates")
+            if missing_domains:
+                expansion_reasons.append("missing_domain_coverage")
+            if low_dual_route_overlap:
+                expansion_reasons.append("low_bm25_vector_overlap")
+
+            # A low BM25/vector overlap is only a signal.  Do not pay for an
+            # online expansion on a clear question when both channels already
+            # produced a healthy candidate pool; expand only when coverage is
+            # demonstrably thin or the planner marked a complex/negative
+            # workflow.
+            initial_candidate_count = len({
+                str(doc.get("id") or "")
+                for group in ranked_groups
+                for doc in group
+                if str(doc.get("id") or "")
+            })
+            needs_adaptive_expansion = bool(
+                not any(ranked_groups)
+                or missing_domains
+                or any(
+                    reason in expansion_reasons
+                    for reason in (
+                        "multiple_business_subquestions",
+                        "capability_or_negative_claim",
+                        "multi_step_workflow",
+                    )
+                )
+                or (low_dual_route_overlap and initial_candidate_count < max(3, limit // 2))
+            )
+            llm_expansion_calls = 0
+            if policy.adaptive_expansion and queries is None and needs_adaptive_expansion:
+                llm_expansion_calls = 1
+                expansion_started = time.perf_counter()
+                expanded = await expand_query(query)
+                if runtime_trace is not None:
+                    runtime_trace.observe(
+                        "llmExpansion",
+                        (time.perf_counter() - expansion_started) * 1000,
+                    )
+                additions = [
+                    value
+                    for value in expanded
+                    if value not in effective_queries
+                ][: max(0, policy.max_query_variants - len(effective_queries))]
+                if additions:
+                    additional_groups = await asyncio.gather(
+                        *[_hybrid_one(value) for value in additions]
+                    )
+                    effective_queries.extend(additions)
+                    initial_groups.extend(additional_groups)
+                    ranked_groups.extend(group[2] for group in additional_groups)
+            if runtime_trace is not None:
+                runtime_trace.observations["plannedQuery"] = plan.public(
+                    actual_variant_count=len(effective_queries),
+                    llm_expansion_calls=llm_expansion_calls,
+                )
+                runtime_trace.observations["adaptiveExpansionReasons"] = list(
+                    dict.fromkeys(expansion_reasons)
+                )
+
+            rrf_started = time.perf_counter()
             rrf_docs = self._rrf_docs(list(ranked_groups), limit=max(limit, 1))
+            hint_candidate_groups = [
+                route
+                for group in initial_groups
+                for route in (group[2], group[0], group[1])
+            ]
+            rrf_docs, promoted_hint_ids = _promote_canonical_hint_docs(
+                hint_candidate_groups,
+                rrf_docs,
+                fact_hints=plan.fact_hints,
+                limit=max(limit, 1),
+            )
+            if runtime_trace is not None:
+                runtime_trace.observe("rrf", (time.perf_counter() - rrf_started) * 1000)
+                runtime_trace.observations["candidateChannels"] = {
+                    "bm25": [
+                        self._source_refs([doc], version_filter or 0)[0]
+                        for group in initial_groups
+                        for doc in group[0]
+                        if self._source_refs([doc], version_filter or 0)
+                    ],
+                    "vector": [
+                        self._source_refs([doc], version_filter or 0)[0]
+                        for group in initial_groups
+                        for doc in group[1]
+                        if self._source_refs([doc], version_filter or 0)
+                    ],
+                    "rrf": [
+                        self._source_refs([doc], version_filter or 0)[0]
+                        for doc in rrf_docs
+                        if self._source_refs([doc], version_filter or 0)
+                    ],
+                }
+                runtime_trace.observations["canonicalHintPromotions"] = (
+                    promoted_hint_ids
+                )
             rrf_docs = self._filter_expired(rrf_docs)
             span.set_attribute("rag.active_hits", len(rrf_docs))
-            result = await self._rerank(query, rrf_docs, min(rerank_top_n or get_settings().rerank_top_n, limit))
+            if not rrf_docs:
+                return []
+            canonical = False
+            if len(rrf_docs) == 1:
+                try:
+                    from app.rag.canonical_facts import get_canonical_fact_catalog
+
+                    ref = self._source_refs([rrf_docs[0]], version_filter or 0)[0]
+                    canonical = bool(get_canonical_fact_catalog().facts_for_ref(ref))
+                except (IndexError, ValueError):
+                    canonical = False
+            if canonical:
+                if runtime_trace is not None:
+                    runtime_trace.observations["rerankSkipped"] = "unique_canonical_hit"
+                return rrf_docs[:1]
+            rerank_query = _rerank_query_with_fact_hints(query, plan.fact_hints)
+            effective_rerank_top_n = (
+                len(rrf_docs)
+                if plan.fact_hints
+                else min(rerank_top_n or policy.rerank_top_n, limit)
+            )
+            if runtime_trace is not None:
+                runtime_trace.observations["rerankRouting"] = {
+                    "factHints": list(plan.fact_hints),
+                    "configuredTopN": rerank_top_n or policy.rerank_top_n,
+                    "effectiveTopN": effective_rerank_top_n,
+                    "queryAugmented": rerank_query != query,
+                }
+            result = await self._rerank(
+                rerank_query,
+                rrf_docs,
+                effective_rerank_top_n,
+            )
+            if result and any(doc.get("source") != "rerank" for doc in result):
+                if runtime_trace is not None:
+                    runtime_trace.fallback("rerank_not_completed")
+                logger.error("rag_rerank_required_but_fallback_returned")
+                return []
+            if runtime_trace is not None:
+                runtime_trace.observations.setdefault("candidateChannels", {})[
+                    "rerank"
+                ] = [
+                    self._source_refs([doc], version_filter or 0)[0]
+                    for doc in result
+                    if self._source_refs([doc], version_filter or 0)
+                ]
             span.set_attribute("rag.result_count", len(result))
             return result
 
@@ -697,8 +1048,16 @@ class RagRetriever:
         limit: int,
         extra_filters: list[dict] | None = None,
     ) -> list[dict]:
+        stage_started = time.perf_counter()
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.called("elasticsearchBm25")
         breaker = circuit_registry.get_or_create("es", **ES_BREAKER_ARGS)
         if not breaker.allow_request() or not query.strip():
+            if runtime_trace is not None:
+                runtime_trace.observe("bm25", (time.perf_counter() - stage_started) * 1000)
+                if query.strip():
+                    runtime_trace.fallback("bm25_breaker_open")
             return []
         try:
             body = {
@@ -724,15 +1083,24 @@ class RagRetriever:
             }
             client = await get_client("es", timeout=15)
             resp = await client.post(
-                self._es_url(f"/{get_settings().es_index}/_search"), json=body, timeout=15
+                self._es_url(
+                    f"/{_knowledge_index_name(get_settings())}/_search"
+                ),
+                json=body,
+                timeout=15,
             )
             resp.raise_for_status()
             hits = resp.json().get("hits", {}).get("hits", [])
             breaker.record_success()
+            if runtime_trace is not None:
+                runtime_trace.observe("bm25", (time.perf_counter() - stage_started) * 1000)
             return [self._hit_to_doc(hit, "bm25") for hit in hits]
         except Exception as exc:
             breaker.record_failure()
             logger.error("es_keyword_search_failed", data_types=data_types, error=str(exc))
+            if runtime_trace is not None:
+                runtime_trace.observe("bm25", (time.perf_counter() - stage_started) * 1000)
+                runtime_trace.fallback("bm25_provider_error")
             return []
 
     async def _vector_search(
@@ -759,15 +1127,29 @@ class RagRetriever:
         # 此前此处仍是默认 5/60，asyncio.gather 并发下先到先得，参数不唯一）。
         breaker = circuit_registry.get_or_create("es", **ES_BREAKER_ARGS)
         if not breaker.allow_request():
+            runtime_trace = active_rag_runtime_trace()
+            if runtime_trace is not None:
+                runtime_trace.fallback("vector_breaker_open")
             return []
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.called("embedding")
+        embedding_started = time.perf_counter()
         vector = await embed_text(query)
+        if runtime_trace is not None:
+            runtime_trace.observe("embedding", (time.perf_counter() - embedding_started) * 1000)
         if not vector:
             # The ES call never happened, so hand back any half-open probe slot
             # instead of holding it until the reclaim timeout.
             breaker.release_probe()
+            if runtime_trace is not None:
+                runtime_trace.fallback("embedding_empty")
             return []
         data_types = [data_type] if isinstance(data_type, str) else list(data_type)
         try:
+            vector_started = time.perf_counter()
+            if runtime_trace is not None:
+                runtime_trace.called("elasticsearchVector")
             body = {
                 "size": k,
                 "knn": {
@@ -788,13 +1170,15 @@ class RagRetriever:
             }
             client = await get_client("es", timeout=20)
             resp = await client.post(
-                self._es_url(f"/{settings.es_index}/_search"),
+                self._es_url(f"/{_knowledge_index_name(settings)}/_search"),
                 json=body,
                 timeout=20,
             )
             resp.raise_for_status()
             hits = resp.json().get("hits", {}).get("hits", [])
             breaker.record_success()
+            if runtime_trace is not None:
+                runtime_trace.observe("vector", (time.perf_counter() - vector_started) * 1000)
             results = []
             for hit in hits:
                 score = float(hit.get("_score") or 0)
@@ -805,6 +1189,9 @@ class RagRetriever:
         except Exception as e:
             breaker.record_failure()
             logger.error("vector_search_failed", data_type=data_type, error=str(e))
+            if runtime_trace is not None:
+                runtime_trace.observe("vector", (time.perf_counter() - vector_started) * 1000)
+                runtime_trace.fallback("vector_provider_error")
             return []
 
     async def _rerank(
@@ -828,17 +1215,25 @@ class RagRetriever:
         )
         if evaluation is not None:
             evaluation.eligible_requests += 1
+        runtime_trace = active_rag_runtime_trace()
         fallback = docs[:limit]
         if not settings.rerank_api_key.strip():
             if evaluation is not None:
                 evaluation.fallback("unconfigured")
+            if runtime_trace is not None:
+                runtime_trace.fallback("rerank_unconfigured")
             return fallback
         breaker = circuit_registry.get_or_create("rerank", failure_threshold=3, recovery_timeout=30)
         if not breaker.allow_request():
             if evaluation is not None:
                 evaluation.fallback("breaker_open")
+            if runtime_trace is not None:
+                runtime_trace.fallback("rerank_breaker_open")
             return fallback
         try:
+            rerank_started = time.perf_counter()
+            if runtime_trace is not None:
+                runtime_trace.called("rerank")
             if evaluation is not None:
                 evaluation.provider_requests += 1
             # ES searched the enriched content, but a generated contextual prefix
@@ -913,6 +1308,8 @@ class RagRetriever:
             if not reranked:
                 raise ValueError("rerank response contains no valid results")
             breaker.record_success()
+            if runtime_trace is not None:
+                runtime_trace.observe("rerank", (time.perf_counter() - rerank_started) * 1000)
             if evaluation is not None:
                 evaluation.provider_successes += 1
                 evaluation.response_records.append(
@@ -936,6 +1333,9 @@ class RagRetriever:
                 evaluation.provider_failures += 1
                 evaluation.fallback("provider_error")
             logger.warning("rerank_failed_fallback_rrf", error=str(exc))
+            if runtime_trace is not None:
+                runtime_trace.observe("rerank", (time.perf_counter() - rerank_started) * 1000)
+                runtime_trace.fallback("rerank_provider_error")
             return fallback
 
     async def rerank_products(
@@ -954,7 +1354,7 @@ class RagRetriever:
         This is intentionally a thin shim: the heavy lifting (circuit breaker,
         silent fallback, response parsing) is already handled by ``_rerank()``.
         """
-        if not products or len(products) <= limit:
+        if not products or len(products) <= 1:
             return products[:limit]
         docs = []
         for product in products:
@@ -982,12 +1382,17 @@ class RagRetriever:
             pid = str(doc.get("id") or "")
             if pid and pid not in seen and pid in id_to_product:
                 seen.add(pid)
-                result.append(id_to_product[pid])
+                product = id_to_product[pid]
+                product["_search_rerank_source"] = (
+                    "rerank" if doc.get("source") == "rerank" else "rrf_fallback"
+                )
+                result.append(product)
         # Guard against unexpected gaps in the reranker response (shouldn't
         # happen because _rerank already falls back to the original order).
         for p in products:
             pid = str(p.get("product_id") or p.get("productId") or "")
             if pid and pid not in seen:
+                p["_search_rerank_source"] = "rrf_fallback"
                 result.append(p)
         return result[:limit]
 
@@ -1318,37 +1723,58 @@ class RagRetriever:
         # (with matched rules) and the RAG_CHANNEL_CONTAMINATED metric; candidateCount
         # and topScore are the "clean candidates that entered the evidence gate"
         # numbers, so a quarantined doc no longer counts toward either.
-        refs = self._source_refs(docs, version) if hit else []
-        evidence_items: tuple[EvidenceItem, ...] = ()
+        clean_candidate_count = len(docs)
+        refs: list[dict[str, Any]] = []
+        paired_docs: list[dict[str, Any]] = []
         if hit:
-            items: list[EvidenceItem] = []
-            seen_ids: set[str] = set()
-            ref_index = 0
             for doc in docs:
-                metadata = doc.get("metadata") or {}
-                doc_id = str(
-                    doc.get("id")
-                    or metadata.get("chunkId")
-                    or metadata.get("questionId")
-                    or ""
-                )
-                if not doc_id or doc_id in seen_ids:
-                    continue
-                seen_ids.add(doc_id)
-                if ref_index >= len(refs):
-                    break
-                text = self._doc_text(doc)
-                if not text:
-                    continue
-                items.append(
-                    EvidenceItem(
-                        citation=len(items) + 1,
-                        text=text,
-                        ref=refs[ref_index],
-                    )
-                )
-                ref_index += 1
-            evidence_items = tuple(items)
+                row = self._source_refs([doc], version)
+                if row:
+                    paired_docs.append(doc)
+                    refs.append(row[0])
+        runtime_trace = active_rag_runtime_trace()
+        planned_observation = (
+            (runtime_trace.observations.get("plannedQuery") or {})
+            if runtime_trace is not None
+            else {}
+        )
+        selection_started = time.perf_counter()
+        policy = runtime_rag_policy()
+        planned_subquestions = tuple(planned_observation.get("subquestions") or ())
+        evidence_limit = evidence_item_limit(
+            planned_subquestions,
+            configured_max=policy.max_evidence_items,
+            preferred_fact_ids=planned_observation.get("factHints") or (),
+            candidates=refs,
+        )
+        selection = (
+            select_minimal_evidence(
+                paired_docs,
+                refs,
+                query_domains=planned_observation.get("domains") or [],
+                preferred_fact_ids=planned_observation.get("factHints") or [],
+                max_items=evidence_limit,
+                max_chars=policy.max_evidence_chars,
+            )
+            if hit
+            else None
+        )
+        evidence_items = selection.items if selection else ()
+        if selection:
+            docs = list(selection.documents)
+            refs = list(selection.refs)
+            hit = bool(evidence_items)
+        if runtime_trace is not None:
+            runtime_trace.observe(
+                "evidenceSelection", (time.perf_counter() - selection_started) * 1000
+            )
+            if selection:
+                runtime_trace.observations["evidenceSelection"] = {
+                    **selection.trace(),
+                    "configuredMaxItems": policy.max_evidence_items,
+                    "effectiveMaxItems": evidence_limit,
+                    "subquestionCount": len(planned_subquestions),
+                }
         evidence_state = forced_evidence_state or (
             EvidenceState.SUPPORTED if hit and evidence_items else EvidenceState.INSUFFICIENT
         )
@@ -1362,6 +1788,21 @@ class RagRetriever:
                 safe_business_query=query,
                 variant_count=max(0, int(variant_count)),
                 normalization_rules=normalization_rules,
+                subquestions=planned_subquestions,
+                domains=tuple(planned_observation.get("domains") or ()),
+                route=str(planned_observation.get("route") or "GENERAL"),
+                expansion_reasons=tuple(
+                    planned_observation.get("expansionReasons") or ()
+                ),
+                fact_hints=tuple(planned_observation.get("factHints") or ()),
+                llm_expansion_calls=int(
+                    planned_observation.get("llmExpansionCalls") or 0
+                ),
+                policy_fingerprint=(
+                    runtime_trace.policy_fingerprint
+                    if runtime_trace is not None
+                    else None
+                ),
             ),
             security_flags=tuple(security_flags or ()),
         )
@@ -1376,7 +1817,9 @@ class RagRetriever:
                 "knowledgeVersion": version,
                 "bucket": bucket,
                 "sourceCount": len(refs),
-                "candidateCount": len(docs) if candidate_count is None else candidate_count,
+                "candidateCount": clean_candidate_count
+                if candidate_count is None
+                else candidate_count,
                 "quarantineCount": len(contamination),
                 "contamination": contamination,
                 "topScore": max(
@@ -1391,6 +1834,10 @@ class RagRetriever:
             result["_evaluationCandidateRefs"] = self._source_refs(
                 evaluation_candidates, version
             )
+            if runtime_trace is not None:
+                result["_evaluationChannels"] = runtime_trace.observations.get(
+                    "candidateChannels", {}
+                )
         return result
 
     def _source_refs(self, docs: list[dict], version: int) -> list[dict]:
@@ -1436,6 +1883,14 @@ class RagRetriever:
             ):
                 if metadata.get(metadata_key) is not None:
                     ref[ref_key] = metadata[metadata_key]
+            try:
+                from app.rag.canonical_facts import get_canonical_fact_catalog
+
+                fact_ids = sorted(get_canonical_fact_catalog().facts_for_ref(ref))
+                if fact_ids:
+                    ref["factIds"] = fact_ids
+            except ValueError:
+                pass
             refs.append(ref)
         return refs
 
@@ -1549,14 +2004,20 @@ class RagRetriever:
         """
         return bool(self._filter_evidence_docs(docs))
 
-    def _filter_evidence_docs(self, docs: list[dict]) -> list[dict]:
+    def _filter_evidence_docs(
+        self,
+        docs: list[dict],
+        *,
+        preferred_fact_ids: tuple[str, ...] | list[str] = (),
+    ) -> list[dict]:
         """Keep only candidates whose own score clears its scoring-scale gate."""
         settings = get_settings()
+        policy = runtime_rag_policy()
         evaluation = _RERANK_EVALUATION_STATS.get()
         evidence_threshold = (
             evaluation.evidence_threshold
             if evaluation is not None and evaluation.evidence_threshold is not None
-            else settings.rag_evidence_min_relevance
+            else policy.evidence_threshold
         )
         rrf_floor = rrf_score_at_rank(settings.rag_evidence_min_rrf_rank)
         rerank_scores = [
@@ -1568,22 +2029,30 @@ class RagRetriever:
         margin = (
             evaluation.top_score_margin
             if evaluation is not None and evaluation.top_score_margin is not None
-            else settings.rag_evidence_top_score_margin
+            else policy.top_score_margin
         )
+        preferred = {str(value) for value in preferred_fact_ids if str(value)}
+        preferred_accepted: list[dict] = []
         accepted: list[dict] = []
         for doc in docs:
             score = float(doc.get("score") or 0)
             source = doc.get("source")
+            hinted = bool(preferred.intersection(_canonical_fact_ids_for_doc(doc)))
             if source == "rrf":
                 enough = score >= rrf_floor
             else:
                 # rerank and exact/non-fused results both use a 0..1 score.
-                enough = score >= evidence_threshold
-                if source == "rerank" and margin is not None:
+                floor = (
+                    min(evidence_threshold, policy.canonical_hint_floor)
+                    if source == "rerank" and hinted
+                    else evidence_threshold
+                )
+                enough = score >= floor
+                if source == "rerank" and margin is not None and not hinted:
                     enough = enough and score >= rerank_top - float(margin)
             if enough:
-                accepted.append(doc)
-        return accepted
+                (preferred_accepted if hinted else accepted).append(doc)
+        return [*preferred_accepted, *accepted]
 
     def _filter_expired(self, docs: list[dict]) -> list[dict]:
         """过滤 FAQ 时效窗口之外的文档。

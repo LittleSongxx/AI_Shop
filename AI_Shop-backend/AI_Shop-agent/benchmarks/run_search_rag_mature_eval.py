@@ -147,6 +147,8 @@ async def _embed_products(
             },
         )
 
+    checkpoint_interval = 2_000 if len(products) > 5_000 else 200
+    since_checkpoint = 0
     with embedding_evaluation_scope(bypass_cache=True) as stats:
         for start in range(0, len(pending), 200):
             chunk = pending[start : start + 200]
@@ -163,7 +165,10 @@ async def _embed_products(
                     failures.append(product_id)
                     continue
                 existing[product_id] = [float(value) for value in vector]
-            checkpoint(merged_facts(stats.snapshot()))
+            since_checkpoint += len(chunk)
+            if since_checkpoint >= checkpoint_interval or failures:
+                checkpoint(merged_facts(stats.snapshot()))
+                since_checkpoint = 0
             if failures:
                 raise RuntimeError(f"product embedding failed: {failures[:5]}")
         provider_facts = merged_facts(stats.snapshot())

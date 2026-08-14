@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-targeted-v2-20260814",
+  "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+  "status": "COMPLETED",
+  "sourceTemplate": "review-template.json",
+  "sourceTemplateSha256": "84e692f8f952fe0cb6b628cd914401435a8833c1c85ddde5a83ebb95f722d2de",
+  "cases": [
+    {
+      "caseId": "rag-holdout-011",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "grounded": false,
+      "complete": false,
+      "citationAligned": false,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded、complete、citationAligned。"
+    },
+    {
+      "caseId": "rag-v3-fresh-009",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-003-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    }
+  ]
+}

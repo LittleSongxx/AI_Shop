@@ -233,6 +233,133 @@ def aggregate_ranking_cases(cases: Sequence[Mapping[str, Any]]) -> dict[str, Any
     }
 
 
+def incomplete_judgment_case_metrics(
+    ranked_ids: Sequence[Any],
+    relevance_grades: Mapping[Any, Any],
+    *,
+    k_values: Sequence[int] = DEFAULT_K_VALUES,
+    relevant_threshold: float = 1.0,
+) -> dict[str, Any]:
+    """Evaluate a full-catalog ranking without treating unjudged items as negative.
+
+    ``knownRelevantRecall`` uses only judged relevant documents as its denominator.
+    Rank-sensitive quality is reported on the condensed judged ranking, while
+    ``judgedRate`` makes the incomplete-pool coverage visible. ``bpref`` follows
+    the TREC definition and ignores unjudged documents entirely.
+    """
+
+    ks = sorted({max(1, int(value)) for value in k_values})
+    if not ks:
+        raise ValueError("k_values must not be empty")
+    labels = _labels(relevance_grades)
+    ranked = _deduplicate(ranked_ids)
+    relevant = {item for item, grade in labels.items() if grade >= relevant_threshold}
+    nonrelevant = set(labels) - relevant
+    if not relevant:
+        raise ValueError("incomplete-judgment query must contain judged relevant items")
+
+    condensed = [item for item in ranked if item in labels]
+    condensed_metrics = ranking_case_metrics(
+        condensed,
+        labels,
+        k_values=ks,
+        relevant_threshold=relevant_threshold,
+        judged_pool=True,
+    )
+
+    nonrelevant_seen = 0
+    preference_sum = 0.0
+    denominator = min(len(relevant), len(nonrelevant))
+    for item in ranked:
+        if item not in labels:
+            continue
+        if item in nonrelevant:
+            nonrelevant_seen += 1
+            continue
+        if item in relevant:
+            preference_sum += (
+                1.0
+                if denominator == 0
+                else 1.0 - min(nonrelevant_seen, len(relevant)) / denominator
+            )
+    bpref = preference_sum / len(relevant)
+
+    metrics_by_k: dict[str, dict[str, Any]] = {}
+    for k in ks:
+        top = ranked[:k]
+        judged_count = sum(item in labels for item in top)
+        known_hits = len(set(top).intersection(relevant))
+        condensed_row = condensed_metrics["metricsByK"][str(k)]
+        metrics_by_k[str(k)] = {
+            "knownRelevantRecall": _round(known_hits / len(relevant)),
+            "knownRelevantPrecisionLowerBound": _round(known_hits / k),
+            "hitRate": float(bool(known_hits)),
+            "allKnownRelevantRate": float(known_hits == len(relevant)),
+            "judgedRate": _round(judged_count / k),
+            "judgedCount": judged_count,
+            "unjudgedCount": len(top) - judged_count,
+            "condensedNdcg": condensed_row["ndcg"],
+            "condensedReciprocalRank": condensed_row["reciprocalRank"],
+            "condensedAveragePrecision": condensed_row["averagePrecision"],
+        }
+    return {
+        "applicable": True,
+        "labelScope": "full-catalog-incomplete-qrels",
+        "returnedCount": len(ranked),
+        "judgedRelevantCount": len(relevant),
+        "judgedNonrelevantCount": len(nonrelevant),
+        "judgedRetrievedCount": len(condensed),
+        "bpref": _round(bpref),
+        "metricsByK": metrics_by_k,
+    }
+
+
+def aggregate_incomplete_judgment_cases(
+    cases: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate rows produced by :func:`incomplete_judgment_case_metrics`."""
+
+    if not cases:
+        raise ValueError("cannot aggregate an empty incomplete-judgment case list")
+    keys = sorted(
+        {
+            int(key)
+            for row in cases
+            for key in (row.get("metricsByK") or {}).keys()
+        }
+    )
+    curves: dict[str, dict[str, float | int]] = {}
+    for k in keys:
+        rows = [row["metricsByK"][str(k)] for row in cases]
+
+        def mean(field: str) -> float:
+            return _round(sum(float(row[field]) for row in rows) / len(rows))
+
+        curves[str(k)] = {
+            "samples": len(rows),
+            "knownRelevantRecall": mean("knownRelevantRecall"),
+            "knownRelevantPrecisionLowerBound": mean(
+                "knownRelevantPrecisionLowerBound"
+            ),
+            "hitRate": mean("hitRate"),
+            "allKnownRelevantRate": mean("allKnownRelevantRate"),
+            "judgedRate": mean("judgedRate"),
+            "condensedNdcg": mean("condensedNdcg"),
+            "condensedMrr": mean("condensedReciprocalRank"),
+            "condensedMap": mean("condensedAveragePrecision"),
+        }
+    return {
+        "caseCount": len(cases),
+        "labelScope": "full-catalog-incomplete-qrels",
+        "metricCurves": curves,
+        "bpref": _round(sum(float(row["bpref"]) for row in cases) / len(cases)),
+        "judgedRelevantCount": sum(int(row["judgedRelevantCount"]) for row in cases),
+        "judgedNonrelevantCount": sum(
+            int(row["judgedNonrelevantCount"]) for row in cases
+        ),
+    }
+
+
 def bootstrap_mean_ci(
     values: Sequence[float],
     *,

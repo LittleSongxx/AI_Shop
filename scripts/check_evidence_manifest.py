@@ -26,6 +26,7 @@ ALLOWED_LEVELS = {
 ALLOWED_STATES = {"VERIFIED", "LOCAL_RESULT", "CI_ARTIFACT", "NOT_COLLECTED"}
 ALLOWED_LOCATIONS = {"tracked", "local-ignored", "ci-artifact", "not-collected"}
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+MISSING = object()
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -46,6 +47,42 @@ def _resolve(relative: str) -> Path:
     except ValueError as exc:
         raise ValueError(f"path escapes repository: {relative}") from exc
     return candidate
+
+
+def _nested_value(payload: Any, dotted_path: str) -> Any:
+    current = payload
+    for part in dotted_path.split("."):
+        if part == "$length" and isinstance(current, (dict, list, str)):
+            current = len(current)
+        elif isinstance(current, dict) and part in current:
+            current = current[part]
+        elif isinstance(current, list) and part.isdigit() and int(part) < len(current):
+            current = current[int(part)]
+        else:
+            return MISSING
+    return current
+
+
+def _check_assertions(
+    label: str,
+    payload: dict[str, Any],
+    assertions: Any,
+    errors: list[str],
+) -> None:
+    if assertions is None:
+        return
+    if not isinstance(assertions, dict) or not assertions:
+        errors.append(f"{label} assertions must be a non-empty object")
+        return
+    for dotted_path, expected in assertions.items():
+        actual = _nested_value(payload, str(dotted_path))
+        if actual is MISSING:
+            errors.append(f"{label} assertion path is missing: {dotted_path}")
+        elif actual != expected:
+            errors.append(
+                f"{label} assertion failed for {dotted_path}: "
+                f"expected {expected!r}, got {actual!r}"
+            )
 
 
 def _check_dataset_lock(
@@ -318,6 +355,47 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                             except (OSError, json.JSONDecodeError, ValueError):
                                 result_payload = {}
                             _check_ai_review(row, result_payload, review_path, errors)
+        if (
+            row.get("resultAssertions") is not None
+            and location in {"tracked", "local-ignored"}
+            and isinstance(result_path, str)
+        ):
+            assertion_path = _resolve(result_path)
+            if assertion_path.is_file():
+                try:
+                    assertion_payload = _json(assertion_path)
+                except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    errors.append(f"invalid assertion result {result_path}: {exc}")
+                else:
+                    _check_assertions(
+                        evidence_id,
+                        assertion_payload,
+                        row.get("resultAssertions"),
+                        errors,
+                    )
+        review_relative = row.get("reviewPath")
+        if review_relative is not None and location != "local-ignored":
+            if not isinstance(review_relative, str) or not review_relative:
+                errors.append(f"{evidence_id}.reviewPath is invalid")
+            else:
+                review_path = _resolve(review_relative)
+                if not review_path.is_file():
+                    errors.append(f"review evidence missing: {review_relative}")
+                else:
+                    expected_review_sha = row.get("reviewSha256")
+                    if expected_review_sha and _sha256(review_path) != expected_review_sha:
+                        errors.append(f"review hash mismatch: {review_relative}")
+                    try:
+                        review_payload = _json(review_path)
+                    except (OSError, json.JSONDecodeError, ValueError) as exc:
+                        errors.append(f"invalid review evidence {review_relative}: {exc}")
+                    else:
+                        _check_assertions(
+                            f"{evidence_id}.review",
+                            review_payload,
+                            row.get("reviewAssertions"),
+                            errors,
+                        )
         result_sha = row.get("resultSha256")
         if result_sha is not None and not HEX64.fullmatch(str(result_sha)):
             errors.append(f"{evidence_id}.resultSha256 must be SHA-256")
@@ -343,6 +421,38 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                 errors.append(f"tracked evidence path missing: {extra_path}")
             elif _sha256(resolved_extra) != extra_sha:
                 errors.append(f"tracked evidence hash mismatch: {extra_path}")
+        for artifact_index, artifact in enumerate(row.get("relatedArtifacts") or []):
+            label = f"{evidence_id}.relatedArtifacts[{artifact_index}]"
+            if not isinstance(artifact, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            artifact_relative = artifact.get("path")
+            artifact_sha = artifact.get("sha256")
+            if not isinstance(artifact_relative, str) or not artifact_relative:
+                errors.append(f"{label}.path is required")
+                continue
+            if not HEX64.fullmatch(str(artifact_sha or "")):
+                errors.append(f"{label}.sha256 must be SHA-256")
+                continue
+            artifact_path = _resolve(artifact_relative)
+            if not artifact_path.is_file():
+                errors.append(f"related artifact missing: {artifact_relative}")
+                continue
+            if _sha256(artifact_path) != artifact_sha:
+                errors.append(f"related artifact hash mismatch: {artifact_relative}")
+                continue
+            try:
+                artifact_payload = _json(artifact_path)
+            except (OSError, json.JSONDecodeError, ValueError):
+                if artifact.get("assertions"):
+                    errors.append(f"{label} assertions require a JSON object")
+            else:
+                _check_assertions(
+                    label,
+                    artifact_payload,
+                    artifact.get("assertions"),
+                    errors,
+                )
         for lock in row.get("datasetLocks") or []:
             _check_dataset_lock(
                 lock,

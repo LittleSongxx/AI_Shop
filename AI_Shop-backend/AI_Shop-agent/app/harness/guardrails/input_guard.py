@@ -171,8 +171,10 @@ _SUSPICIOUS_BLOCK_THRESHOLD = 2
 # 规则本身仍保留对“请绕过风控”这类祈使句的拦截；在统一扫描函数中按命中
 # 位置检查前缀，避免用一个脆弱的超长正则吞掉正常知识事实。
 _NEGATED_BYPASS_PREFIX = re.compile(
-    r"(?:不能够|不能|不可|无法|不应|不得|禁止|严禁|不允许|不可以)\s*$"
+    r"(?:不能够|不能|不可|无法|不应|不得|禁止|严禁|不允许|不可以)"
+    r"[^。；\n]{0,12}$"
 )
+_BYPASS_REQUEST_PREFIX = re.compile(r"(?:请|帮|替|告诉|教|如何|怎么|方法|步骤)")
 
 
 def scan_guardrail_rules(text: str) -> tuple[list[str], list[str]]:
@@ -187,13 +189,16 @@ def scan_guardrail_rules(text: str) -> tuple[list[str], list[str]]:
     for name, pattern in _BLOCKING_RULES:
         matches = list(pattern.finditer(text))
         if name == "guard_bypass_zh":
-            matches = [
-                match
-                for match in matches
-                if not _NEGATED_BYPASS_PREFIX.search(
-                    text[max(0, match.start() - 12) : match.start()]
+            retained = []
+            for match in matches:
+                prefix = text[max(0, match.start() - 20) : match.start()]
+                negated = _NEGATED_BYPASS_PREFIX.search(prefix)
+                request_like = _BYPASS_REQUEST_PREFIX.search(
+                    prefix[negated.start() :] if negated else prefix
                 )
-            ]
+                if not negated or request_like:
+                    retained.append(match)
+            matches = retained
         if matches:
             blocking.append(name)
     suspicious = [name for name, pattern in _SUSPICIOUS_RULES if pattern.search(text)]

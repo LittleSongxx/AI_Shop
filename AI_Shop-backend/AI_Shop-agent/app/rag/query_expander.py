@@ -17,6 +17,7 @@ import structlog
 from app.config.settings import get_settings
 from app.harness.guardrails.channel_guard import scan_external_content
 from app.infra.http_client import get_client
+from app.rag.runtime_trace import active_rag_runtime_trace
 from app.resilience.circuit_breaker import circuit_registry
 
 logger = structlog.get_logger()
@@ -108,6 +109,9 @@ async def expand_query(query: str) -> list[str]:
     try:
         if evaluation is not None:
             evaluation.provider_requests += 1
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.called("llmQueryExpansion")
         client = await get_client("llm_query_expander", timeout=6)
         resp = await client.post(
             f"{settings.llm_base_url.rstrip('/')}/chat/completions",

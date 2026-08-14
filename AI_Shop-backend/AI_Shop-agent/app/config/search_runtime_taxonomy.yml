@@ -1,0 +1,63 @@
+# Runtime-only catalog leaves. The historical query-normalization taxonomy is
+# hash-locked by Search v1, so additive runtime categories live separately.
+topics:
+  - canonical: 笔记本电脑
+    aliases: [笔记本, 轻薄本, 游戏本]
+    runtimeCategory: 笔记本电脑
+  - canonical: 台式电脑
+    aliases: [台式机, 电脑主机, 台式电脑主机, 台式主机]
+    runtimeCategory: 电脑
+  - canonical: 蓝牙音箱
+    aliases: [桌面音箱, 蓝牙音响, 桌面音响, 音箱, 音响]
+    runtimeCategory: 音箱
+  - canonical: 车载充电器
+    aliases: [车充, 车载快充, 汽车充电器]
+    runtimeCategory: 车载充电器
+  - canonical: 新生儿礼盒
+    aliases: [新生儿衣服礼盒, 婴儿礼盒, 宝宝礼盒]
+    runtimeCategory: 服饰
+  - canonical: 空气炸锅
+    aliases: [炸锅]
+    runtimeCategory: 空气炸锅
+  - canonical: 电饭煲
+    aliases: [电饭锅]
+    runtimeCategory: 电饭煲
+  - canonical: 吸尘器
+    aliases: [无线吸尘器, 除螨仪]
+    runtimeCategory: 吸尘器
+  - canonical: 空气净化器
+    aliases: [净化器]
+    runtimeCategory: 空气净化器
+  - canonical: 咖啡机
+    aliases: [意式咖啡机, 胶囊咖啡机]
+    runtimeCategory: 咖啡机
+  - canonical: 双肩包
+    aliases: [背包, 书包]
+    runtimeCategory: 双肩包
+  - canonical: 跑鞋
+    aliases: [跑步鞋]
+    runtimeCategory: 跑鞋
+  - canonical: 外套
+    aliases: [夹克]
+    runtimeCategory: 外套
+  - canonical: 面霜
+    aliases: [护肤霜]
+    runtimeCategory: 面霜
+  - canonical: 积木玩具
+    aliases: [积木]
+    runtimeCategory: 积木玩具
+  - canonical: 吉他
+    aliases: [民谣吉他, 电吉他]
+    runtimeCategory: 吉他
+  - canonical: 办公椅
+    aliases: [人体工学椅]
+    runtimeCategory: 办公椅
+  - canonical: 行李箱
+    aliases: [拉杆箱]
+    runtimeCategory: 行李箱
+  - canonical: 智能手表
+    aliases: [智能手表, 运动手表]
+    runtimeCategory: 智能手表
+  - canonical: 平板电脑
+    aliases: [平板电脑, ipad, 学习平板]
+    runtimeCategory: 平板电脑

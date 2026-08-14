@@ -1,0 +1,848 @@
+{
+  "schemaVersion": "aishop-eval/v1",
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-targeted-20260814",
+  "sourceRunId": "rag-generation-v4-64aa86e-postfix-rescore-v3-20260814",
+  "status": "POST_FIX_TARGETED_REGRESSION",
+  "metadata": {
+    "schemaVersion": "aishop-eval/v1",
+    "suite": "rag-generation-live-v4",
+    "runId": "rag-generation-v4-64aa86e-postfix-targeted-20260814",
+    "sourceRunId": "rag-generation-v4-64aa86e-postfix-rescore-v3-20260814",
+    "gitCommit": "64aa86e8fa67f6245247163a9477b63aaeb07baf",
+    "workspaceSha256": "19310b0b89595eb01c694fbe8ca79e0c73db7fb2f31e41d3e0eef7f76fd2014a",
+    "datasetSha256": "3a61d763deeeefd47991ed4c511e0032af0889ba49d651f1ca3d2b2bd29c10c8",
+    "evidenceSource": "SYNTHETIC",
+    "executionMode": "local-live-targeted",
+    "status": "POST_FIX_TARGETED_REGRESSION",
+    "holdoutExposed": true,
+    "freshEvidence": false,
+    "model": {
+      "llm": "deepseek-v4-flash",
+      "embedding": "text-embedding-v4",
+      "rerank": "qwen3-rerank"
+    },
+    "parameters": {
+      "topK": 10,
+      "temperature": 0,
+      "maxCompletionTokens": 256,
+      "policy": {
+        "schemaVersion": "aishop-rag-retrieval-policy/v4",
+        "rerankTopN": 6,
+        "evidenceThreshold": 0.7,
+        "canonicalHintFloor": 0.55,
+        "topScoreMargin": 0.1,
+        "maxQueryVariants": 3,
+        "maxSubquestions": 3,
+        "maxEvidenceItems": 4,
+        "maxEvidenceChars": 6000,
+        "adaptiveExpansion": true,
+        "contextualRetrieval": true,
+        "fingerprint": "53467d7e8654da1a44ef17d10a7394c4fb4b53a48de295418589a773a9c7421c"
+      }
+    }
+  },
+  "summary": {
+    "caseCount": 11,
+    "executedCount": 11,
+    "runtimeErrorCount": 0,
+    "taskSuccessCount": 7,
+    "taskSuccessRate": 0.6364,
+    "criticalSafetyViolationCount": 0,
+    "inputTokens": 4433,
+    "outputTokens": 499,
+    "repairTriggeredCount": 3,
+    "providerFacts": {
+      "embedding": {
+        "bypassCache": true,
+        "requests": 15,
+        "cacheHits": 0,
+        "providerRequests": 15,
+        "providerSuccesses": 15,
+        "providerFailures": 0,
+        "breakerRejections": 0,
+        "responseRecords": [
+          {
+            "inputSha256": "36e0bfe51103773267b93853fdccaf307a6be8fd2fc1bcd482e45334d5d15901",
+            "dimensions": 1024,
+            "vectorSha256": "fc75637f79d9cd7d57aa083bc41cd191b931899343e992d8ffc7d2e49b2c5dd2"
+          },
+          {
+            "inputSha256": "d748171e26e7c83d8d94593615b77453cde8ffb5e91a0c1b0c4ac075a1413052",
+            "dimensions": 1024,
+            "vectorSha256": "322086dbe70b320bc4169326c31283174785e6be839b7576d744c22fa2003744"
+          },
+          {
+            "inputSha256": "8b76eb89609f63a79586213c8f160bf2326a881fc68d4e9554b20862a7248648",
+            "dimensions": 1024,
+            "vectorSha256": "2b41670ab99e959ab43ba6e5ed81d00efb5de778c117bab4898a4bcb74a0e270"
+          },
+          {
+            "inputSha256": "07a4b71601700f5c4dc52f42b0b81c7d62b26de13cab0474dff717116e1ae241",
+            "dimensions": 1024,
+            "vectorSha256": "61bd268d94b0a2dbe6e2aa2c7dacd2dc94cc946b141eb53280ba4da54e2f4b96"
+          },
+          {
+            "inputSha256": "91e40d80ef90ac8f296bbd7d013a5ccafb58796bc01e452a3e7e76f277197e83",
+            "dimensions": 1024,
+            "vectorSha256": "ebd572365897ae1264bba715393f71e7990f08466c8aaac30a64d2c52abfb3f8"
+          },
+          {
+            "inputSha256": "d3b5eb51d233d11cc1864bc7ddae36aff4062b481a0f2e6203bf68096e849d0a",
+            "dimensions": 1024,
+            "vectorSha256": "7f9b4ab04caf8c8c540104b1adbdf169e9f65ba9ed94a114a3d6ed2265e13749"
+          },
+          {
+            "inputSha256": "270418f3fd3f082a3053d529dcde3f2276fb6740d629debc094a8e349e7b8d40",
+            "dimensions": 1024,
+            "vectorSha256": "30a788c218d22555dc3aed86299e4be3525edd5d447b62bfb07c2d78c5399c88"
+          },
+          {
+            "inputSha256": "8e7657be0b2a8448efc38a74b539c480823fe8cfd2c7e1f3f7f17dc8a014d252",
+            "dimensions": 1024,
+            "vectorSha256": "2f96598c5447258ee636b3a88c7cc57f58d8b00356dc723a5c87a61365f4ced7"
+          },
+          {
+            "inputSha256": "bb7bb8e2310180175744e98febf07fd5ca97fb0a01d06385307172d78205e71a",
+            "dimensions": 1024,
+            "vectorSha256": "71f823e914ff5565d95d95594eeb68c4845c6f753a8cbcf40918f966310e389e"
+          },
+          {
+            "inputSha256": "f65d2d8183f7a43c686d0415dad9d9ff4b1f13929ab95f467565f02069137ec2",
+            "dimensions": 1024,
+            "vectorSha256": "5809fcc0d02a5283d44badd7cfd3bec044ea4792c8a83fc645c764aee98f589e"
+          },
+          {
+            "inputSha256": "bf0b985303d9e268837550cadbd483856b086b15363fa6ceca0ffba315cbffe7",
+            "dimensions": 1024,
+            "vectorSha256": "1c82b791a6e2ec258a8dd2ba228389abdd67fc14910b0b3989d6242595873614"
+          },
+          {
+            "inputSha256": "81c743f6764ecc7f2cf48cea22c1ead5b6062036deb06acd0b9d6e27b12317e4",
+            "dimensions": 1024,
+            "vectorSha256": "93514e42a2a0071b285080c2f91662f30268e5729d48d5b89af4f4e6958ac1b3"
+          },
+          {
+            "inputSha256": "cb75f1fa9e5c8afb9d722ed4818e991273f0646a14a974e6f0ad43a5bacf87f2",
+            "dimensions": 1024,
+            "vectorSha256": "fe7d7474c70f9df9e49cdb974dbcf44d11019538d9439bd30f8d3b2b52acd319"
+          },
+          {
+            "inputSha256": "5f42aeff04ab0be5895f2547fcf3f6de9825c4107da954887c3b9bfc4edf6749",
+            "dimensions": 1024,
+            "vectorSha256": "73279134def03e03e1f0f00686bc7a3873ddee583096d9cb410f09fc5bfa5eb5"
+          },
+          {
+            "inputSha256": "32be5a52cbe688fc5a5657dfd45469fa54dc6a146a7437d3f74d995cc637d3d4",
+            "dimensions": 1024,
+            "vectorSha256": "6a5c4fb4d79b69c86b2d9bf7bdbc043cc57a3150375672b79077363000066e7e"
+          }
+        ]
+      },
+      "rerank": {
+        "eligibleRequests": 11,
+        "providerRequests": 11,
+        "providerSuccesses": 11,
+        "providerFailures": 0,
+        "fallbackCount": 0,
+        "fallbackReasons": {},
+        "responseRecords": [
+          {
+            "queryHash": "36e0bfe51103773267b93853fdccaf307a6be8fd2fc1bcd482e45334d5d15901",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_4_1_2",
+              "knowledge_1_1_3",
+              "knowledge_7_1_6",
+              "knowledge_4_1_0",
+              "knowledge_1_1_0",
+              "knowledge_9_1_6",
+              "knowledge_12_1_6",
+              "knowledge_6_1_2",
+              "knowledge_11_1_5",
+              "knowledge_8_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_2",
+                "score": 0.91135253
+              },
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.87902688
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.46623508
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.44965136
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.41671291
+              },
+              {
+                "id": "knowledge_12_1_6",
+                "score": 0.41443207
+              }
+            ]
+          },
+          {
+            "queryHash": "d748171e26e7c83d8d94593615b77453cde8ffb5e91a0c1b0c4ac075a1413052",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_4_1_3",
+              "knowledge_12_1_5",
+              "knowledge_9_1_5",
+              "knowledge_9_1_6",
+              "knowledge_9_1_3",
+              "knowledge_4_1_0",
+              "faq9004",
+              "knowledge_11_1_5",
+              "knowledge_11_1_6",
+              "knowledge_6_1_5"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_3",
+                "score": 0.90268983
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.77229619
+              },
+              {
+                "id": "knowledge_9_1_5",
+                "score": 0.63146713
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.59195486
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.55914474
+              },
+              {
+                "id": "knowledge_6_1_5",
+                "score": 0.50541942
+              }
+            ]
+          },
+          {
+            "queryHash": "8b76eb89609f63a79586213c8f160bf2326a881fc68d4e9554b20862a7248648",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_4_1_2",
+              "knowledge_1_1_3",
+              "knowledge_4_1_0",
+              "knowledge_4_1_1",
+              "knowledge_7_1_6",
+              "knowledge_12_1_6",
+              "knowledge_1_1_0",
+              "knowledge_9_1_6",
+              "faq9006",
+              "knowledge_1_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_1_1_3",
+                "score": 0.90892099
+              },
+              {
+                "id": "knowledge_4_1_2",
+                "score": 0.90550435
+              },
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.58934425
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.47812393
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.45727122
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.45213301
+              }
+            ]
+          },
+          {
+            "queryHash": "07a4b71601700f5c4dc52f42b0b81c7d62b26de13cab0474dff717116e1ae241",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_8_1_3",
+              "knowledge_2_1_1",
+              "faq9001",
+              "knowledge_2_1_2",
+              "knowledge_1_1_0",
+              "faq9002",
+              "knowledge_10_1_0",
+              "knowledge_3_1_3",
+              "knowledge_2_1_4",
+              "knowledge_4_1_0"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.59998972
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.55095526
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.48808086
+              },
+              {
+                "id": "knowledge_10_1_0",
+                "score": 0.48697725
+              },
+              {
+                "id": "faq9001",
+                "score": 0.45189992
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.44355463
+              }
+            ]
+          },
+          {
+            "queryHash": "91e40d80ef90ac8f296bbd7d013a5ccafb58796bc01e452a3e7e76f277197e83",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_5_1_4",
+              "knowledge_9_1_0",
+              "knowledge_9_1_5",
+              "knowledge_9_1_3",
+              "knowledge_9_1_2",
+              "faq9002",
+              "knowledge_8_1_5",
+              "knowledge_10_1_5",
+              "knowledge_11_1_0",
+              "knowledge_2_1_3"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.84174771
+              },
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.83839875
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.63258442
+              },
+              {
+                "id": "knowledge_11_1_0",
+                "score": 0.61683659
+              },
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.55626372
+              },
+              {
+                "id": "knowledge_8_1_5",
+                "score": 0.5230699
+              }
+            ]
+          },
+          {
+            "queryHash": "270418f3fd3f082a3053d529dcde3f2276fb6740d629debc094a8e349e7b8d40",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_5_1_1",
+              "knowledge_5_1_0",
+              "knowledge_11_1_3",
+              "knowledge_1_1_2",
+              "knowledge_10_1_3",
+              "knowledge_11_1_0",
+              "faq9005",
+              "knowledge_2_1_4",
+              "knowledge_1_1_0",
+              "knowledge_11_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_1",
+                "score": 0.63163429
+              },
+              {
+                "id": "knowledge_5_1_0",
+                "score": 0.60065383
+              },
+              {
+                "id": "knowledge_1_1_2",
+                "score": 0.5442837
+              },
+              {
+                "id": "knowledge_10_1_3",
+                "score": 0.47193353
+              },
+              {
+                "id": "faq9005",
+                "score": 0.38805014
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.37954144
+              }
+            ]
+          },
+          {
+            "queryHash": "8e7657be0b2a8448efc38a74b539c480823fe8cfd2c7e1f3f7f17dc8a014d252",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_6_1_6",
+              "knowledge_2_1_3",
+              "faq9003",
+              "knowledge_4_1_4",
+              "knowledge_3_1_0",
+              "knowledge_9_1_6",
+              "knowledge_2_1_0",
+              "knowledge_6_1_0",
+              "knowledge_4_1_3",
+              "knowledge_9_1_1"
+            ],
+            "results": [
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.76493559
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.72347227
+              },
+              {
+                "id": "knowledge_4_1_3",
+                "score": 0.52644773
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.51358041
+              },
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.49193942
+              },
+              {
+                "id": "knowledge_4_1_4",
+                "score": 0.46891675
+              }
+            ]
+          },
+          {
+            "queryHash": "bb7bb8e2310180175744e98febf07fd5ca97fb0a01d06385307172d78205e71a",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_9_1_2",
+              "knowledge_4_1_4",
+              "knowledge_9_1_0",
+              "knowledge_7_1_6",
+              "knowledge_12_1_0",
+              "knowledge_12_1_1",
+              "knowledge_8_1_5",
+              "knowledge_12_1_3",
+              "knowledge_12_1_6",
+              "knowledge_11_1_2"
+            ],
+            "results": [
+              {
+                "id": "knowledge_9_1_2",
+                "score": 0.84349408
+              },
+              {
+                "id": "knowledge_8_1_5",
+                "score": 0.75784641
+              },
+              {
+                "id": "knowledge_4_1_4",
+                "score": 0.7004332
+              },
+              {
+                "id": "knowledge_11_1_2",
+                "score": 0.67827484
+              },
+              {
+                "id": "knowledge_7_1_6",
+                "score": 0.54831866
+              },
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.47135948
+              }
+            ]
+          },
+          {
+            "queryHash": "81c743f6764ecc7f2cf48cea22c1ead5b6062036deb06acd0b9d6e27b12317e4",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_6_1_0",
+              "knowledge_6_1_6",
+              "knowledge_6_1_2",
+              "knowledge_6_1_3",
+              "knowledge_6_1_1",
+              "knowledge_2_1_0",
+              "knowledge_6_1_4",
+              "knowledge_4_1_4",
+              "knowledge_2_1_3",
+              "faq9005"
+            ],
+            "results": [
+              {
+                "id": "knowledge_6_1_0",
+                "score": 0.78130757
+              },
+              {
+                "id": "knowledge_6_1_6",
+                "score": 0.56748378
+              },
+              {
+                "id": "knowledge_6_1_2",
+                "score": 0.52265725
+              },
+              {
+                "id": "knowledge_6_1_3",
+                "score": 0.52089525
+              },
+              {
+                "id": "knowledge_6_1_1",
+                "score": 0.46463426
+              },
+              {
+                "id": "knowledge_2_1_0",
+                "score": 0.45315918
+              }
+            ]
+          },
+          {
+            "queryHash": "cb75f1fa9e5c8afb9d722ed4818e991273f0646a14a974e6f0ad43a5bacf87f2",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_5_1_4",
+              "knowledge_9_1_0",
+              "knowledge_10_1_5",
+              "knowledge_12_1_2",
+              "knowledge_5_1_6",
+              "knowledge_9_1_5",
+              "knowledge_10_1_6",
+              "knowledge_11_1_5",
+              "knowledge_11_1_6",
+              "faq9006"
+            ],
+            "results": [
+              {
+                "id": "knowledge_5_1_4",
+                "score": 0.85589206
+              },
+              {
+                "id": "knowledge_5_1_6",
+                "score": 0.7812021
+              },
+              {
+                "id": "knowledge_9_1_0",
+                "score": 0.69941737
+              },
+              {
+                "id": "knowledge_12_1_2",
+                "score": 0.68236288
+              },
+              {
+                "id": "knowledge_10_1_6",
+                "score": 0.63953672
+              },
+              {
+                "id": "knowledge_10_1_5",
+                "score": 0.62735867
+              }
+            ]
+          },
+          {
+            "queryHash": "32be5a52cbe688fc5a5657dfd45469fa54dc6a146a7437d3f74d995cc637d3d4",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_6_1_4",
+              "knowledge_6_1_5",
+              "knowledge_2_1_3",
+              "knowledge_9_1_3",
+              "knowledge_9_1_4",
+              "knowledge_9_1_1",
+              "knowledge_12_1_3",
+              "knowledge_9_1_6",
+              "knowledge_12_1_5",
+              "faq9005"
+            ],
+            "results": [
+              {
+                "id": "knowledge_9_1_3",
+                "score": 0.78024353
+              },
+              {
+                "id": "knowledge_9_1_6",
+                "score": 0.67499454
+              },
+              {
+                "id": "knowledge_12_1_5",
+                "score": 0.65621377
+              },
+              {
+                "id": "knowledge_12_1_3",
+                "score": 0.56732435
+              },
+              {
+                "id": "knowledge_2_1_3",
+                "score": 0.54877881
+              },
+              {
+                "id": "knowledge_9_1_4",
+                "score": 0.54710595
+              }
+            ]
+          }
+        ]
+      },
+      "queryExpansion": {
+        "eligibleRequests": 2,
+        "providerRequests": 2,
+        "providerSuccesses": 2,
+        "providerFailures": 0
+      },
+      "generation": {
+        "providerCalls": 14,
+        "providerSuccesses": 14,
+        "providerFailures": 0
+      }
+    },
+    "providerCompleteness": {
+      "passed": true,
+      "checks": {
+        "embeddingCacheHitsZero": true,
+        "embeddingFailuresZero": true,
+        "embeddingCallsComplete": true,
+        "rerankFallbackZero": true,
+        "rerankFailuresZero": true,
+        "rerankCallsComplete": true,
+        "queryExpansionCallsComplete": true,
+        "generationFailuresZero": true,
+        "generationCallsComplete": true,
+        "usageComplete": true
+      }
+    },
+    "status": "COMPLETED_TARGETED",
+    "humanReviewStatus": "HUMAN_REVIEW_PENDING",
+    "costAccounting": {
+      "status": "UNPRICED"
+    }
+  },
+  "caseResults": [
+    {
+      "caseId": "rag-holdout-011",
+      "status": "FAILED",
+      "taskSuccess": false,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 0.5,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-holdout-012",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-fresh-011",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "status": "FAILED",
+      "taskSuccess": false,
+      "metrics": {
+        "predictedNoAnswer": true,
+        "requiredClaimCompleteness": 0.0,
+        "claimCitationSupport": 0.0,
+        "canonicalCitationCorrectness": 0.0,
+        "canonicalCitationCoverage": 0.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v3-fresh-009",
+      "status": "FAILED",
+      "taskSuccess": false,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 0.5,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-001-gen",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": true,
+        "repairReason": "有 1 个事实句缺少就近引用",
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-003-gen",
+      "status": "FAILED",
+      "taskSuccess": false,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 0.5,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-006-gen",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-013-gen",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": true,
+        "invalidCitationIndexes": [],
+        "repairTriggered": true,
+        "repairReason": "有 1 个事实句缺少就近引用",
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-015-gen",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": true,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-016-gen",
+      "status": "PASSED",
+      "taskSuccess": true,
+      "metrics": {
+        "predictedNoAnswer": false,
+        "requiredClaimCompleteness": 1.0,
+        "claimCitationSupport": 1.0,
+        "canonicalCitationCorrectness": 1.0,
+        "canonicalCitationCoverage": 1.0,
+        "injectionRobust": true,
+        "invalidCitationIndexes": [],
+        "repairTriggered": true,
+        "repairReason": "有 1 个事实句缺少就近引用",
+        "repairError": null
+      }
+    }
+  ],
+  "review": {
+    "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+    "passed": 8,
+    "failed": 3
+  },
+  "humanReviewStatus": "HUMAN_REVIEW_PENDING",
+  "honestBoundaries": [
+    "All cases were exposed by the source run; this is not fresh E3 evidence.",
+    "The source 60-case formal run remains FAILED_RETAINED and unchanged.",
+    "AI-assisted review is not independent human annotation.",
+    "All labels are SYNTHETIC; cost is UNPRICED; local latency is not an SLO."
+  ]
+}

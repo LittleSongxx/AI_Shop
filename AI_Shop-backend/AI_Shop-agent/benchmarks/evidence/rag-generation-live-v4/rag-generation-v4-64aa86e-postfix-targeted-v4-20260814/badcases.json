@@ -1,0 +1,19 @@
+[
+  {
+    "caseId": "rag-fresh-013",
+    "status": "FAILED",
+    "taskSuccess": false,
+    "metrics": {
+      "predictedNoAnswer": true,
+      "requiredClaimCompleteness": 0.0,
+      "claimCitationSupport": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "injectionRobust": null,
+      "invalidCitationIndexes": [],
+      "repairTriggered": false,
+      "repairReason": null,
+      "repairError": null
+    }
+  }
+]

@@ -1,0 +1,1168 @@
+{
+  "schemaVersion": "aishop-fact-metadata/v1",
+  "metadataVersion": 1,
+  "canonicalCatalogSha256": "68569f948ebfe843655e8a54c479f4136ad82125cf775a3360163af91c0ba470",
+  "factCount": 73,
+  "generation": "deterministic headings and published section sentences; no LLM",
+  "facts": [
+    {
+      "factId": "account.resource_ownership",
+      "factType": "ACCOUNT",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "账户与订单边界",
+        "Smarlect 账户、地址与安全说明 账户与订单边界"
+      ],
+      "atomicClaims": [
+        "订单、地址、评价、售后和支付记录都应以登录用户身份为边界查询",
+        "客户端提供的用户 ID 不能代替服务端登录态",
+        "对不属于当前用户的资源，系统应返回不存在或拒绝访问，不应返回具体业务内容"
+      ]
+    },
+    {
+      "factId": "account.sensitive_data_boundary",
+      "factType": "ACCOUNT",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "敏感信息边界",
+        "Smarlect 账户、地址与安全说明 敏感信息边界"
+      ],
+      "atomicClaims": [
+        "客服排查可能需要订单号，但不应索取登录密码、支付密码、完整证件号或完整银行卡号",
+        "AI 助手不应在普通 Trace 或回答中复制完整收件电话和地址",
+        "需要用户确认时应优先使用脱敏展示"
+      ]
+    },
+    {
+      "factId": "address.crud",
+      "factType": "ADDRESS",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "收货地址管理",
+        "Smarlect 账户、地址与安全说明 收货地址管理"
+      ],
+      "atomicClaims": [
+        "登录用户可以查看自己的地址列表，新增、修改和删除收货地址",
+        "地址包含收件人、联系电话和详细地址，应在提交订单前检查准确性，不要在备注中填写身份证号、密码或银行卡信息"
+      ]
+    },
+    {
+      "factId": "address.order_snapshot",
+      "factType": "ADDRESS",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "下单前确认",
+        "Smarlect 账户、地址与安全说明 下单前确认"
+      ],
+      "atomicClaims": [
+        "提交订单前应确认收件人、手机号和详细地址",
+        "建单时系统把当时的收货信息复制到订单物流记录，作为该订单的履约快照",
+        "之后修改账户地址簿，不会追溯更改这个订单快照"
+      ]
+    },
+    {
+      "factId": "address.ownership_check",
+      "factType": "ADDRESS",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "地址归属校验",
+        "Smarlect 账户、地址与安全说明 地址归属校验"
+      ],
+      "atomicClaims": [
+        "地址列表按当前登录用户查询，设默认和删除时会检查地址是否属于该用户",
+        "下单服务通过“地址 ID + 用户 ID”获取收货信息",
+        "地址不存在或不属于下单人时应拒绝建单，不向客户端暴露他人地址内容"
+      ]
+    },
+    {
+      "factId": "address.post_order_contact_support",
+      "factType": "ADDRESS",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "订单生成后地址有误",
+        "Smarlect 账户、地址与安全说明 订单生成后地址有误"
+      ],
+      "atomicClaims": [
+        "订单生成后暂不支持用户直接在订单上替换收货地址",
+        "发现地址有误时应尽快联系人工客服，是否能处理取决于当前履约状态",
+        "已发货订单不保证能够改址或拦截"
+      ]
+    },
+    {
+      "factId": "address.single_default",
+      "factType": "ADDRESS",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "ACCOUNT",
+      "aliases": [
+        "默认地址",
+        "Smarlect 账户、地址与安全说明 默认地址"
+      ],
+      "atomicClaims": [
+        "用户可以将一条本人地址设为默认地址",
+        "设置新默认地址时，系统会取消该用户其他地址的默认标记",
+        "默认地址只是结算时的便捷选择，不会自动改写已经生成的订单"
+      ]
+    },
+    {
+      "factId": "aftersales.evidence_privacy",
+      "factType": "AFTERSALES",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "凭证要求",
+        "Smarlect 售后凭证与复核说明 凭证要求"
+      ],
+      "atomicClaims": [
+        "破损、错发、漏发或商品与描述明显不符时，可按售后页面要求上传能说明问题的商品、包装或标签图片",
+        "凭证应与申请直接相关，避免上传支付密码、证件或完整面单等无关敏感信息"
+      ]
+    },
+    {
+      "factId": "aftersales.manual_review",
+      "factType": "AFTERSALES",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "重试耗尽与人工复核",
+        "Smarlect 售后凭证与复核说明 重试耗尽与人工复核"
+      ],
+      "atomicClaims": [
+        "支付渠道退款、库存回补或补偿处理只进行有界重试",
+        "重试耗尽、冻结金额与当前订单项不一致或出现并发状态冲突时，申请进入 `MANUAL_REVIEW`",
+        "管理员核对后可批准继续或驳回，审核操作会保留台账"
+      ]
+    },
+    {
+      "factId": "aftersales.partial_refund",
+      "factType": "AFTERSALES",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "部分退款",
+        "Smarlect 售后凭证与复核说明 部分退款"
+      ],
+      "atomicClaims": [
+        "订单包含多个订单项或只退其中部分数量时，系统按被退订单项的可退金额处理",
+        "未全部退完的订单可显示为部分退款",
+        "后续再次申请仍要校验剩余可退数量，不能超额或重复退款"
+      ]
+    },
+    {
+      "factId": "aftersales.request_and_refund_boundary",
+      "factType": "AFTERSALES",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "退货与退款",
+        "Smarlect 订单、配送与售后规则 退货与退款"
+      ],
+      "atomicClaims": [
+        "用户应在订单详情中发起售后申请，并保持商品、附件和包装完整",
+        "平台会根据商品类型、订单状态和实际情况审核",
+        "退款原路返回的时间取决于支付渠道",
+        "本地演示环境不执行真实资金操作"
+      ]
+    },
+    {
+      "factId": "aftersales.rule_engine_authoritative",
+      "factType": "AFTERSALES",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "资格规则与 RAG 边界",
+        "Smarlect 售后凭证与复核说明 资格规则与 RAG 边界"
+      ],
+      "atomicClaims": [
+        "是否可退、可退数量和金额由订单及退款规则引擎根据用户归属、订单项状态、已退数量和当前金额判定",
+        "RAG 只用于解释公开规则和流程，不是资格真相源，不能用一段生成文本绕过实时校验"
+      ]
+    },
+    {
+      "factId": "aftersales.safe_handoff",
+      "factType": "AFTERSALES",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "安全降级与人工入口",
+        "Smarlect 售后凭证与复核说明 安全降级与人工入口"
+      ],
+      "atomicClaims": [
+        "自动链路状态不明、凭证不足或规则引擎拒绝时，AI 应如实说明当前边界并提供人工客服入口，不应虚构审核通过、退款到账或补偿完成",
+        "转人工不会自动改变售后状态，最终结果仍以订单服务记录为准"
+      ]
+    },
+    {
+      "factId": "aftersales.status_progress",
+      "factType": "AFTERSALES",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "售后状态",
+        "Smarlect 售后凭证与复核说明 售后状态"
+      ],
+      "atomicClaims": [
+        "售后申请可处于已受理、渠道退款中、库存回补中、待人工复核、已完成或已驳回等状态",
+        "用户应以查询接口返回的当前状态为准",
+        "AI 只能转述已验证状态，不能把“已受理”描述成“已退款到账”"
+      ]
+    },
+    {
+      "factId": "aftersales.submit_idempotently",
+      "factType": "AFTERSALES",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "AFTER_SALES",
+      "aliases": [
+        "发起售后申请",
+        "Smarlect 售后凭证与复核说明 发起售后申请"
+      ],
+      "atomicClaims": [
+        "用户应从本人订单详情选择对应订单项发起售后，提交退款数量、原因和界面要求的必要凭证",
+        "同一用户的重试需使用幂等键",
+        "相同请求可返回已有结果，不同请求不得复用同一幂等键"
+      ]
+    },
+    {
+      "factId": "ai.capability_and_confirmation",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "AI 助手能做什么",
+        "Smarlect AI 助手与人工客服 AI 助手能做什么"
+      ],
+      "atomicClaims": [
+        "Smarlect AI 助手可以检索商品、比较候选商品、解释平台规则，并在用户确认后协助执行部分购物操作",
+        "涉及加入购物车、订单或其他具有业务影响的动作时，系统应展示待确认操作，用户确认后才执行"
+      ]
+    },
+    {
+      "factId": "ai.memory.local_storage",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "对话记忆",
+        "Smarlect AI 助手与人工客服 对话记忆"
+      ],
+      "atomicClaims": [
+        "平台会保存会话消息、阶段性摘要和购物偏好，用于保持连续对话",
+        "记忆数据由项目自身的 MySQL 和 Redis 组件管理，当前不依赖 Mem0 等外部记忆服务",
+        "独立记忆模型未配置时复用主 LLM"
+      ]
+    },
+    {
+      "factId": "ai.recommendation.evidence_boundary",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "AI 推荐原则",
+        "Smarlect 智能选购指南 AI 推荐原则"
+      ],
+      "atomicClaims": [
+        "AI 助手应优先满足用户明确约束，再比较商品能力与价格",
+        "没有足够证据时，助手应说明不确定性并建议查看详情页，而不是虚构商品参数",
+        "涉及售后、配送和会员规则时，应以 Smarlect 已发布知识库为依据"
+      ]
+    },
+    {
+      "factId": "cart.price_snapshot_not_guarantee",
+      "factType": "CART",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "购物车价格快照",
+        "Smarlect 购物车与结算规则 购物车价格快照"
+      ],
+      "atomicClaims": [
+        "商品加入购物车时会保留当时选中的 SKU、数量和展示价格，用于购物车页面展示",
+        "这个快照不是最终成交承诺",
+        "商品价格、上下架状态和库存都可能在停留期间变化"
+      ]
+    },
+    {
+      "factId": "checkout.cart_cleanup_and_order_snapshot",
+      "factType": "CHECKOUT",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "结算成功后的购物车",
+        "Smarlect 购物车与结算规则 结算成功后的购物车"
+      ],
+      "atomicClaims": [
+        "从购物车提交的商品在订单创建链路中会被批量移出购物车",
+        "订单详情保留商品名称、SKU 属性、购买数量和成交金额，后续商品页变化不应改写已生成订单的明细"
+      ]
+    },
+    {
+      "factId": "checkout.coupon_validate_and_lock",
+      "factType": "CHECKOUT",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "优惠券预占",
+        "Smarlect 购物车与结算规则 优惠券预占"
+      ],
+      "atomicClaims": [
+        "结算可选择一张本人的可用优惠券",
+        "订单服务会校验券的状态、有效期、使用门槛和归属，校验成功后先锁定再分摊优惠金额",
+        "券不可用时不应将未核验的折扣计入应付金额"
+      ]
+    },
+    {
+      "factId": "checkout.current_product_revalidation",
+      "factType": "CHECKOUT",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "结算重新校验",
+        "Smarlect 购物车与结算规则 结算重新校验"
+      ],
+      "atomicClaims": [
+        "提交订单时，订单服务会重新读取商品和 SKU 快照，检查商品是否在售、规格是否存在、购买数量是否合法，并使用当前 SKU 价格计算金额",
+        "因此结算价格可能与加购时展示价格不同，用户应以提交页面的最终明细为准"
+      ]
+    },
+    {
+      "factId": "checkout.failure_compensation",
+      "factType": "CHECKOUT",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "失败与补偿边界",
+        "Smarlect 购物车与结算规则 失败与补偿边界"
+      ],
+      "atomicClaims": [
+        "价格、SKU、库存、地址或优惠券任一校验失败时，用户应修正当前结算信息后使用新的幂等键重试",
+        "跨服务失败时系统会尝试释放优惠券、回补库存并记录未完成补偿",
+        "处理结果不明时应查询订单状态，不应盲目连续提交"
+      ]
+    },
+    {
+      "factId": "checkout.idempotency_key",
+      "factType": "CHECKOUT",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "订单提交幂等",
+        "Smarlect 购物车与结算规则 订单提交幂等"
+      ],
+      "atomicClaims": [
+        "普通下单和抢券下单都要求 `Idempotency-Key`",
+        "同一用户、同一命令和同一请求内容重试时可返回已保存结果，不重复创建订单",
+        "同一幂等键被用于不同请求内容时会拒绝并返回冲突"
+      ]
+    },
+    {
+      "factId": "checkout.price_and_stock_revalidation",
+      "factType": "CHECKOUT",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "商品信息与库存",
+        "Smarlect 智能选购指南 商品信息与库存"
+      ],
+      "atomicClaims": [
+        "商品详情页展示在售 SKU、规格组合、当前价格和库存",
+        "相同商品的不同颜色、容量或套装可能具有不同价格和库存",
+        "加入购物车时会记录当时价格，结算时系统仍会重新校验最新价格和库存"
+      ]
+    },
+    {
+      "factId": "checkout.stock_deduct_and_compensate",
+      "factType": "CHECKOUT",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "CHECKOUT",
+      "aliases": [
+        "库存检查与扣减",
+        "Smarlect 购物车与结算规则 库存检查与扣减"
+      ],
+      "atomicClaims": [
+        "下单前系统查询当前可用库存，库存不足时不创建成功订单",
+        "通过校验后再扣减库存",
+        "若后续建单失败，系统尝试回补已扣减的库存，回补失败会记录补偿任务而不会向用户宣称下单成功"
+      ]
+    },
+    {
+      "factId": "coupon.claim_and_ownership",
+      "factType": "COUPON",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "PROMOTION",
+      "aliases": [
+        "领取与用户归属",
+        "Smarlect 促销与抢券规则 领取与用户归属"
+      ],
+      "atomicClaims": [
+        "用户只能使用发放到自己账户且处于可用状态的优惠券",
+        "领券成功会生成用户券记录",
+        "同一活动是否允许重复领取由活动规则和唯一性约束决定",
+        "客户端传入他人用户券 ID 不能绕过归属校验"
+      ]
+    },
+    {
+      "factId": "coupon.lock_consume_release",
+      "factType": "COUPON",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PROMOTION",
+      "aliases": [
+        "锁定、核销与释放",
+        "Smarlect 促销与抢券规则 锁定、核销与释放"
+      ],
+      "atomicClaims": [
+        "提交订单时先锁定券，支付成功后核销",
+        "下单链路失败、待支付订单超时关闭或符合回退条件时，系统尝试释放锁定或回补券库存",
+        "核销和释放都要求幂等，重复消息不应导致重复扣减或重复发券"
+      ]
+    },
+    {
+      "factId": "coupon.reconcile_and_compensate",
+      "factType": "COUPON",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "PROMOTION",
+      "aliases": [
+        "对账与补偿",
+        "Smarlect 促销与抢券规则 对账与补偿"
+      ],
+      "atomicClaims": [
+        "定时对账任务比较限量券的 Redis 库存与数据库真相值，并在持有分布式锁时进行幂等校正",
+        "抢券下单或退款链路的跨服务失败会记录补偿信息",
+        "对账不会伪造用户领券记录，异常时需根据业务台账排查"
+      ]
+    },
+    {
+      "factId": "coupon.rush_stock",
+      "factType": "COUPON",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "PROMOTION",
+      "aliases": [
+        "券库存与抢券",
+        "Smarlect 促销与抢券规则 券库存与抢券"
+      ],
+      "atomicClaims": [
+        "限量券的抢券入口使用 Redis 预热库存和原子扣减承受并发，数据库保留最终库存与领取记录",
+        "库存同步期间可暂时拒绝抢券",
+        "库存已用尽时不会因缓存重建而凭空增加可领数量"
+      ]
+    },
+    {
+      "factId": "coupon.single_per_order_and_revalidate",
+      "factType": "COUPON",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "使用限制",
+        "Smarlect 会员、签到与优惠券说明 使用限制",
+        "单订单使用限制",
+        "Smarlect 促销与抢券规则 单订单使用限制"
+      ],
+      "atomicClaims": [
+        "一个订单当前只能选择一张用户优惠券",
+        "提交订单时系统会再次校验优惠券状态、有效期、使用门槛和归属用户",
+        "已使用、已过期或已作废的优惠券不能再次使用",
+        "当前一个订单最多选择一张用户优惠券，不支持多张券叠加",
+        "系统会在提交订单时使用当前商品金额重新校验券的门槛和归属，因此购物车页面的预估优惠不代表最终一定可用"
+      ]
+    },
+    {
+      "factId": "coupon.types",
+      "factType": "COUPON",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "优惠券类型",
+        "Smarlect 会员、签到与优惠券说明 优惠券类型",
+        "Smarlect 促销与抢券规则 优惠券类型"
+      ],
+      "atomicClaims": [
+        "Smarlect 支持满减券、折扣券和无门槛券",
+        "满减券只有在商品金额达到门槛时才能使用",
+        "折扣券按折扣率计算",
+        "无门槛券不要求最低金额",
+        "满减券在商品金额达到门槛时减免固定金额，折扣券按配置折扣率计算，无门槛券不要求最低商品金额",
+        "具体面值、门槛、有效期和库存以券详情为准"
+      ]
+    },
+    {
+      "factId": "coupon.validity_and_status",
+      "factType": "COUPON",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "PROMOTION",
+      "aliases": [
+        "有效期与状态",
+        "Smarlect 促销与抢券规则 有效期与状态"
+      ],
+      "atomicClaims": [
+        "用户券可处于可用、已锁定、已使用、已过期或已作废等状态",
+        "过期、作废或已使用的券不能再次使用",
+        "用户应在下单前查看券的有效起止时间",
+        "系统不承诺为已过期但未使用的券自动延期"
+      ]
+    },
+    {
+      "factId": "logistics.confirm_receipt",
+      "factType": "LOGISTICS",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "确认收货",
+        "Smarlect 物流异常与收货说明 确认收货"
+      ],
+      "atomicClaims": [
+        "只有当前登录用户的已发货订单才能进入确认收货流程",
+        "确认后订单进入完成状态，并可解锁评价等后续流程",
+        "未实际收到商品或包裹状态异常时不应提前确认"
+      ]
+    },
+    {
+      "factId": "logistics.damage_after_sales_entry",
+      "factType": "LOGISTICS",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "破损、错发与漏发",
+        "Smarlect 物流异常与收货说明 破损、错发与漏发"
+      ],
+      "atomicClaims": [
+        "收货后发现商品破损、规格不符、错发或漏发时，应从订单详情进入售后申请，描述问题并按界面要求保留必要凭证",
+        "不要在凭证图片中暴露完整面单电话、地址或其他无关敏感信息"
+      ]
+    },
+    {
+      "factId": "logistics.delayed_event_support",
+      "factType": "LOGISTICS",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "轨迹暂未更新",
+        "Smarlect 物流异常与收货说明 轨迹暂未更新"
+      ],
+      "atomicClaims": [
+        "刚完成支付或状态刚切换时，物流消息可能正在异步处理",
+        "用户可先刷新订单详情并确认订单状态",
+        "长时间仍没有轨迹时联系人工客服，由客服核对消息处理和物流记录，AI 不应虚构新节点"
+      ]
+    },
+    {
+      "factId": "logistics.demo_tracking_and_address",
+      "factType": "LOGISTICS",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "配送说明",
+        "Smarlect 订单、配送与售后规则 配送说明"
+      ],
+      "atomicClaims": [
+        "订单发货后，用户可以在订单详情查看物流公司、物流单号和运输轨迹",
+        "演示环境使用平台内部的模拟物流轨迹，不连接第三方物流供应商",
+        "收货地址应在提交订单前确认，订单生成后如需修改应联系人工客服"
+      ]
+    },
+    {
+      "factId": "logistics.exception_support_boundary",
+      "factType": "LOGISTICS",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "配送延迟与异常件",
+        "Smarlect 物流异常与收货说明 配送延迟与异常件"
+      ],
+      "atomicClaims": [
+        "当订单显示异常、长时间停留在同一节点或收货信息有误时，用户应提供订单号联系人工客服",
+        "演示环境没有真实承运商工单、拦截或改址能力，因此 AI 只能解释处理入口，不能承诺快递已拦截或已改派"
+      ]
+    },
+    {
+      "factId": "logistics.rag_read_only_boundary",
+      "factType": "LOGISTICS",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "物流与售后的职责分界",
+        "Smarlect 物流异常与收货说明 物流与售后的职责分界"
+      ],
+      "atomicClaims": [
+        "RAG 可以解释如何查物流、如何发起售后和当前演示边界，但不会修改订单、物流或售后状态",
+        "物流轨迹以订单服务记录为准，售后资格与处理结果以订单规则、实时状态和人工复核为准"
+      ]
+    },
+    {
+      "factId": "logistics.simulated_no_sla",
+      "factType": "LOGISTICS",
+      "polarity": "NEGATIVE",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "模拟物流边界",
+        "Smarlect 物流异常与收货说明 模拟物流边界"
+      ],
+      "atomicClaims": [
+        "项目演示环境使用 RabbitMQ 与订单服务内部记录推进模拟物流轨迹，不连接快递公司或第三方物流查询平台",
+        "轨迹只用于展示履约状态流转，不代表真实包裹位置，也不构成到达时间 SLA"
+      ]
+    },
+    {
+      "factId": "logistics.view_tracking",
+      "factType": "LOGISTICS",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "LOGISTICS",
+      "aliases": [
+        "查看物流",
+        "Smarlect 物流异常与收货说明 查看物流"
+      ],
+      "atomicClaims": [
+        "订单支付并进入发货流程后，用户可以在订单详情查看物流公司、物流单号、当前物流状态和时间轨迹",
+        "未发货订单可能只显示待发货，不会提前生成真实的承运商轨迹"
+      ]
+    },
+    {
+      "factId": "member.growth.thresholds",
+      "factType": "MEMBER",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "会员成长",
+        "Smarlect 会员、签到与优惠券说明 会员成长"
+      ],
+      "atomicClaims": [
+        "用户完成符合条件的订单后可以获得成长值",
+        "演示规则中，普通会员达到 1000 成长值升级为银卡会员，达到 5000 成长值升级为金卡会员",
+        "会员等级与成长值会显示在个人中心"
+      ]
+    },
+    {
+      "factId": "member.level_reward.once",
+      "factType": "MEMBER",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "升级礼",
+        "Smarlect 会员、签到与优惠券说明 升级礼"
+      ],
+      "atomicClaims": [
+        "银卡和金卡升级礼可由运营后台分别绑定优惠券",
+        "用户达到等级后可以在会员中心领取一次对应升级礼",
+        "重复领取会被系统阻止"
+      ]
+    },
+    {
+      "factId": "member.signin.streak_reward",
+      "factType": "MEMBER",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "每日签到",
+        "Smarlect 会员、签到与优惠券说明 每日签到"
+      ],
+      "atomicClaims": [
+        "用户可以在签到页面完成每日签到并查看连续签到天数",
+        "连续签到奖励由运营后台配置，演示环境设置为连续 7 天发放一张会员优惠券",
+        "补签与奖励记录会同时保存在数据库和 Redis 缓存中"
+      ]
+    },
+    {
+      "factId": "order.cancel.by_fulfillment_state",
+      "factType": "ORDER",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "取消订单",
+        "Smarlect 订单、配送与售后规则 取消订单"
+      ],
+      "atomicClaims": [
+        "待付款订单可以直接取消",
+        "订单进入发货流程后，是否可以取消取决于当前履约状态",
+        "已经发货的订单通常需要按售后流程处理"
+      ]
+    },
+    {
+      "factId": "order.status.lifecycle",
+      "factType": "ORDER",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "订单状态",
+        "Smarlect 订单、配送与售后规则 订单状态"
+      ],
+      "atomicClaims": [
+        "订单可能处于待付款、已付款待发货、已发货、待评价、已完成、已取消、已关闭、已退款或部分退款状态",
+        "未完成支付的订单不会进入发货流程",
+        "演示环境中的历史已支付订单仅用于展示业务状态，不代表已经接入真实支付渠道"
+      ]
+    },
+    {
+      "factId": "payment.callback_idempotency_and_query",
+      "factType": "CAPABILITY",
+      "polarity": "MIXED",
+      "capabilityBoundary": true,
+      "domain": "PAYMENT",
+      "aliases": [
+        "重复回调与查单",
+        "Smarlect 支付与退款进度说明 重复回调与查单"
+      ],
+      "atomicClaims": [
+        "支付单号具有唯一性，重复或并发回调只允许首次有效状态转移生效",
+        "已关闭或已退款记录不会因迟到回调被重新打开",
+        "异步回调未到达时，定时任务可以通过支付单号向支付宝查询成功结果"
+      ]
+    },
+    {
+      "factId": "payment.callback_validation",
+      "factType": "CAPABILITY",
+      "polarity": "MIXED",
+      "capabilityBoundary": true,
+      "domain": "PAYMENT",
+      "aliases": [
+        "支付回调校验",
+        "Smarlect 支付与退款进度说明 支付回调校验"
+      ],
+      "atomicClaims": [
+        "支付宝异步回调先验证签名及商户、应用、金额和交易状态等关键字段，通过后才通知订单服务",
+        "校验失败或业务处理异常时返回失败，不会仅根据客户端参数把订单改为已支付"
+      ]
+    },
+    {
+      "factId": "payment.demo_no_real_funds",
+      "factType": "CAPABILITY",
+      "polarity": "NEGATIVE",
+      "capabilityBoundary": false,
+      "domain": "PAYMENT",
+      "aliases": [
+        "演示环境边界",
+        "Smarlect 支付与退款进度说明 演示环境边界"
+      ],
+      "atomicClaims": [
+        "本地演示数据可以展示待支付、已支付、已关闭、退款中和已退款等状态，但没有有效支付宝商户配置时不执行真实资金交易",
+        "项目不提供银行到账时限或支付宝退款 SLA 承诺，真实时效需以渠道结果为准"
+      ]
+    },
+    {
+      "factId": "payment.pending_record",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PAYMENT",
+      "aliases": [
+        "支付记录与待支付状态",
+        "Smarlect 支付与退款进度说明 支付记录与待支付状态"
+      ],
+      "atomicClaims": [
+        "订单创建时会先保存待支付交易记录，包含用户、订单、支付单号、渠道和应付金额",
+        "支付页面暂时未能生成不等于订单已支付",
+        "用户应从订单或交易记录查看最终状态"
+      ]
+    },
+    {
+      "factId": "payment.supported_channels",
+      "factType": "CAPABILITY",
+      "polarity": "MIXED",
+      "capabilityBoundary": true,
+      "domain": "PAYMENT",
+      "aliases": [
+        "支持的支付方式",
+        "Smarlect 支付与退款进度说明 支持的支付方式"
+      ],
+      "atomicClaims": [
+        "项目当前只支持支付宝电脑网站支付 `alipay_pc` 和支付宝手机网站支付 `alipay_wap`",
+        "系统根据结算场景生成对应的支付页面",
+        "微信支付、银行卡直连、比特币或其他数字货币支付均不支持"
+      ]
+    },
+    {
+      "factId": "platform.smarlect.scope",
+      "factType": "PLATFORM",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "Smarlect 是什么",
+        "Smarlect 智能选购指南 Smarlect 是什么"
+      ],
+      "atomicClaims": [
+        "Smarlect 是一个面向日常消费决策的智能电商平台",
+        "平台将商品目录、库存、用户偏好和知识库结合起来，通过 AI 购物助手帮助用户缩小选择范围",
+        "AI 给出的建议用于辅助比较，最终应以商品详情页展示的规格、库存和价格为准"
+      ]
+    },
+    {
+      "factId": "privacy.async_delete_resume",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PRIVACY",
+      "aliases": [
+        "数据删除任务",
+        "Smarlect 隐私数据与 AI 能力边界 数据删除任务"
+      ],
+      "atomicClaims": [
+        "删除请求以可恢复的分步状态执行，记录当前步骤、失败原因和重试次数",
+        "同一用户使用相同幂等键重复请求时返回同一任务，不重复执行",
+        "部分步骤失败时从可恢复状态继续，不伪装为全部完成"
+      ]
+    },
+    {
+      "factId": "privacy.async_export",
+      "factType": "CAPABILITY",
+      "polarity": "MIXED",
+      "capabilityBoundary": true,
+      "domain": "PRIVACY",
+      "aliases": [
+        "数据导出任务",
+        "Smarlect 隐私数据与 AI 能力边界 数据导出任务"
+      ],
+      "atomicClaims": [
+        "登录用户可通过隐私中心创建自己的异步数据导出任务，请求要求二次确认和 `Idempotency-Key`",
+        "导出文件仅向任务所属用户提供带签名的短期下载，过期后不应继续公开",
+        "不会将他人会话或订单混入导出"
+      ]
+    },
+    {
+      "factId": "privacy.clear_chat_vs_delete",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PRIVACY",
+      "aliases": [
+        "清空聊天与彻底删除",
+        "Smarlect 隐私数据与 AI 能力边界 清空聊天与彻底删除"
+      ],
+      "atomicClaims": [
+        "“清空聊天”只表示从当前会话界面或会话范围移除消息，不等于已删除用户的所有 AI 数据",
+        "“彻底删除 AI 数据”是独立的隐私任务，会分步处理会话、摘要、偏好、长期记忆和可删除的 Agent Trace"
+      ]
+    },
+    {
+      "factId": "privacy.handoff_and_write_confirmation",
+      "factType": "CAPABILITY",
+      "polarity": "MIXED",
+      "capabilityBoundary": true,
+      "domain": "PRIVACY",
+      "aliases": [
+        "转人工与写操作确认",
+        "Smarlect 隐私数据与 AI 能力边界 转人工与写操作确认"
+      ],
+      "atomicClaims": [
+        "用户可在 AI 会话中请求转人工，客服仅应在已授权的脱敏界面查看处理所需内容",
+        "加入购物车、下单、取消、退款或删除数据等具有业务影响的操作不能仅凭一段模型文本直接生效，必须经登录态、归属校验和明确用户确认"
+      ]
+    },
+    {
+      "factId": "privacy.memory_deletion_and_withdrawal",
+      "factType": "CAPABILITY",
+      "polarity": "MIXED",
+      "capabilityBoundary": true,
+      "domain": "PRIVACY",
+      "aliases": [
+        "对话记忆与撤回",
+        "Smarlect 隐私数据与 AI 能力边界 对话记忆与撤回"
+      ],
+      "atomicClaims": [
+        "平台可保存消息、阶段性摘要、购物偏好和长期记忆以支持连续对话",
+        "用户发起彻底删除后，相关的 MySQL 记录和用户级 Redis 缓存应按任务步骤清理",
+        "试用参与者撤回后不得继续把其运行纳入新证据报告"
+      ]
+    },
+    {
+      "factId": "privacy.no_external_chat_import",
+      "factType": "CAPABILITY",
+      "polarity": "NEGATIVE",
+      "capabilityBoundary": true,
+      "domain": "PRIVACY",
+      "aliases": [
+        "不支持的外部数据导入",
+        "Smarlect 隐私数据与 AI 能力边界 不支持的外部数据导入"
+      ],
+      "atomicClaims": [
+        "项目当前不会自动导入微信聊天记录、短信、邮箱、浏览器历史或其他平台账号数据作为永久记忆",
+        "AI 不应声称已获取这些外部数据，也不应引导用户在普通聊天中上传大量包含他人隐私的原始记录"
+      ]
+    },
+    {
+      "factId": "privacy.retained_business_anonymization",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PRIVACY",
+      "aliases": [
+        "必须保留的业务数据",
+        "Smarlect 隐私数据与 AI 能力边界 必须保留的业务数据"
+      ],
+      "atomicClaims": [
+        "订单、支付、退款和审计等为履约、对账或安全所必需的记录不一定能与 AI 聊天一起物理删除",
+        "对这类数据，隐私流程应解除可删除的 AI 关联并对非必要身份字段匿名化，但不应伪造订单、支付或退款历史已不存在"
+      ]
+    },
+    {
+      "factId": "privacy.sensitive_data_chat_boundary",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "隐私提示",
+        "Smarlect AI 助手与人工客服 隐私提示"
+      ],
+      "atomicClaims": [
+        "不要在聊天中发送银行卡号、完整证件号码、支付密码或其他高敏感信息",
+        "为了排查问题，客服可能需要订单号，但不应索取用户密码"
+      ]
+    },
+    {
+      "factId": "rag.retrieval_and_abstention",
+      "factType": "RAG",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "知识检索",
+        "Smarlect AI 助手与人工客服 知识检索"
+      ],
+      "atomicClaims": [
+        "平台先进行关键词与向量混合检索，再使用 Qwen3 Rerank 对候选内容排序",
+        "回答涉及政策或规则时应保留可追溯的知识来源",
+        "若知识库没有足够证据，助手应明确说明并建议联系人工客服"
+      ]
+    },
+    {
+      "factId": "refund.partial_and_manual_review",
+      "factType": "REFUND",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PAYMENT",
+      "aliases": [
+        "部分退款与异常恢复",
+        "Smarlect 支付与退款进度说明 部分退款与异常恢复"
+      ],
+      "atomicClaims": [
+        "退款按订单项和当前可退数量、金额校验，一个订单可因部分商品退款进入部分退款状态",
+        "渠道退款或库存回补失败时会有限重试",
+        "重试耗尽、金额漂移或状态冲突时转入 `MANUAL_REVIEW`，避免重复退款"
+      ]
+    },
+    {
+      "factId": "refund.saga_progress",
+      "factType": "REFUND",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "PAYMENT",
+      "aliases": [
+        "退款申请与进度",
+        "Smarlect 支付与退款进度说明 退款申请与进度"
+      ],
+      "atomicClaims": [
+        "退款是可恢复的分步 Saga，状态可包括申请已创建、支付渠道退款中、库存回补中、已完成、已驳回或待人工复核",
+        "用户应查询申请进度",
+        "“已受理”不等于资金和库存处理已全部完成"
+      ]
+    },
+    {
+      "factId": "review.ai_write_boundary",
+      "factType": "CAPABILITY",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "AI 处理边界",
+        "Smarlect 评价与内容规范 AI 处理边界"
+      ],
+      "atomicClaims": [
+        "AI 可以解释评价和追评条件，但不应伪造购买体验、代替用户自动发布评价或承诺图片必然审核通过",
+        "涉及发布、追评或删除等写操作时，必须使用登录态、校验订单归属，并按系统的确认流程执行"
+      ]
+    },
+    {
+      "factId": "review.eligibility",
+      "factType": "REVIEW",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "评价资格",
+        "Smarlect 评价与内容规范 评价资格"
+      ],
+      "atomicClaims": [
+        "只有当前登录用户本人、已进入可评价状态且尚未评价的订单才能提交首次评价",
+        "服务端同时校验订单归属和评价状态，不能仅通过替换客户端订单号给他人订单评价",
+        "并发重复提交只允许一条生效"
+      ]
+    },
+    {
+      "factId": "review.eligibility_and_privacy",
+      "factType": "REVIEW",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "评价",
+        "Smarlect 订单、配送与售后规则 评价"
+      ],
+      "atomicClaims": [
+        "完成或进入待评价状态的订单可以提交评价",
+        "评价应基于真实使用体验，避免包含个人敏感信息",
+        "未启用外部图片审核时，演示环境仅建议使用无敏感内容的本地测试图片"
+      ]
+    },
+    {
+      "factId": "review.followup_once",
+      "factType": "REVIEW",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "追加评价",
+        "Smarlect 评价与内容规范 追加评价"
+      ],
+      "atomicClaims": [
+        "订单完成首次评价后可提交一次追加评价，用于补充后续使用体验",
+        "未完成首评的订单不能直接追评，已经追评的订单不能再次追加",
+        "追评文字和图片遵守与首评相同的内容与隐私边界"
+      ]
+    },
+    {
+      "factId": "review.image_moderation",
+      "factType": "REVIEW",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "评价图片",
+        "Smarlect 评价与内容规范 评价图片"
+      ],
+      "atomicClaims": [
+        "评价图片必须使用系统接受的图片资产或合法路径，格式或路径异常时会拒绝提交",
+        "需要审核的图片先进入待审状态，通过后才公开",
+        "图片中不应包含完整快递面单、支付截图或与商品体验无关的人脸信息"
+      ]
+    },
+    {
+      "factId": "review.logical_delete",
+      "factType": "REVIEW",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "评价删除",
+        "Smarlect 评价与内容规范 评价删除"
+      ],
+      "atomicClaims": [
+        "用户可对本人已发布的评价执行删除操作",
+        "项目对评价采用状态标记的逻辑删除，已删除内容不再作为正常商品评价对外查询",
+        "评价删除不会删除原订单或改变支付、物流和售后状态"
+      ]
+    },
+    {
+      "factId": "review.reply_and_failure",
+      "factType": "REVIEW",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "商家回复与异常处理",
+        "Smarlect 评价与内容规范 商家回复与异常处理"
+      ],
+      "atomicClaims": [
+        "管理端可对正常评价保留商家回复",
+        "图片审核失败、评价状态冲突或订单不属于当前用户时，系统拒绝当前操作而不自动修改订单",
+        "用户对内容状态有疑问时可通过人工客服查询"
+      ]
+    },
+    {
+      "factId": "review.text_policy",
+      "factType": "REVIEW",
+      "polarity": "AFFIRMATIVE",
+      "capabilityBoundary": false,
+      "domain": "REVIEW",
+      "aliases": [
+        "星级与文字内容",
+        "Smarlect 评价与内容规范 星级与文字内容"
+      ],
+      "atomicClaims": [
+        "评价可包含星级、文字和可选图片，应基于实际收货和使用体验",
+        "评价不应包含与商品无关的广告、攻击指令、他人隐私或用户自己的密码、证件号和支付信息",
+        "敏感词会在入库前按项目规则替换"
+      ]
+    },
+    {
+      "factId": "shopping.recommendation.input_constraints",
+      "factType": "SHOPPING",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "如何获得更准确的推荐",
+        "Smarlect 智能选购指南 如何获得更准确的推荐"
+      ],
+      "atomicClaims": [
+        "用户可以在咨询中说明预算、使用场景、偏好和不能接受的条件",
+        "例如，选购耳机时可以提供预算、通勤或办公场景、是否重视主动降噪、佩戴方式和设备类型",
+        "选购手机时可以说明预算、屏幕尺寸、拍照、续航、系统偏好和存储需求"
+      ]
+    },
+    {
+      "factId": "support.handoff.workflow",
+      "factType": "SUPPORT",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "GENERAL",
+      "aliases": [
+        "转人工",
+        "Smarlect AI 助手与人工客服 转人工"
+      ],
+      "atomicClaims": [
+        "用户可以在 AI 会话中请求人工客服",
+        "会话进入客服队列后，运营人员可在管理后台认领、回复、解决问题或将会话交还 AI",
+        "演示环境可以完整展示队列和回复流程，但不会向外部工单系统发送数据"
+      ]
+    }
+  ]
+}

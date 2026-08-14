@@ -1,3 +1,4 @@
+from app.rag.prompt_builder import grounding_repair_reason
 from app.services.response_verifier import response_verifier
 
 
@@ -208,6 +209,33 @@ def test_rag_citation_must_exist_and_stay_in_range():
     assert missing.issues[0].code == "INVALID_RAG_CITATION"
     assert invalid.issues[0].code == "INVALID_RAG_CITATION"
     assert valid.passed is True
+
+
+def test_rag_citation_is_checked_per_factual_sentence():
+    result = response_verifier.verify(
+        assistant="每个订单只能使用一张优惠券。[1] 支付失败后优惠券会释放。",
+        biz_type="agent",
+        tools_called=["SEARCH_KNOWLEDGE"],
+        source_refs=[{"id": "faq_9002"}],
+        has_pending_action=False,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "INVALID_RAG_CITATION"
+    assert "事实句" in result.issues[0].detail
+
+
+def test_grounding_repair_catches_uncited_short_boundary_answer():
+    reason = grounding_repair_reason(
+        "不保证。加购价格快照可能变化 [1]。",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+    )
+
+    assert reason is not None
+    assert "事实句缺少就近引用" in reason
 
 
 def test_recommendation_hard_constraints_are_deterministic():

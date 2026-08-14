@@ -5,6 +5,7 @@ from app.services.shopping_mission_service import (
     _validated_category_schema,
     apply_explicit_turn,
     empty_shopping_mission,
+    next_clarification,
     schema_for,
 )
 from app.services.shopping_profile_service import empty_profile
@@ -62,6 +63,20 @@ def test_category_schema_is_versioned_and_has_user_utility_weights():
     assert sum(schema["weights"].values()) == pytest.approx(1.0)
     assert "useCase" in schema["required"]
     assert schema["questions"]["useCase"][1]
+
+
+def test_speaker_category_is_not_misclassified_as_luggage():
+    mission = apply_explicit_turn(
+        None,
+        profile=empty_profile(),
+        user_text="蓝牙桌面音箱",
+        message_id=12,
+    )
+
+    assert mission is not None
+    assert mission["category"] == "音箱"
+    assert mission["unknownSlots"] == []
+    assert next_clarification(mission) is None
 
 
 def test_category_schema_rejects_weights_that_do_not_sum_to_one():

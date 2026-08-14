@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-retrieval-live-v4",
+  "runId": "rag-v4-64aa86e-postfix-targeted-20260814",
+  "sourceRunId": "rag-v4-64aa86e-routefix-20260814",
+  "status": "POST_FIX_TARGETED_REGRESSION",
+  "holdoutExposed": true,
+  "freshEvidence": false,
+  "summarySha256": "2f4d3fc8bb6485c397af2510a5286959fa5e449b9a95e5d0073d24c902865f71",
+  "rawCollectionSha256": "634832e5b87ca2620240ff420a8ffe0ba9634beccc4e9c023b6f199b305aadd4",
+  "sourceArtifacts": {
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/raw/rag-v4-final-collection.json.gz": "713d61f18910bb8e794a5140be5dd18752945727e9bddee95063fe5dbca68d71",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/rag-v4-final-replay.json": "525240bef7842d9c971b57bed94cd97cbb88ca1e3c17c7ce7ae20e98aeccc1dd",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/finalization.json": "9c049c1864b682464e5a895c64018fa6c88332c8a1375112757d914c9c0c84b9"
+  },
+  "resultArtifacts": {
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-targeted-20260814/summary.json": "2f4d3fc8bb6485c397af2510a5286959fa5e449b9a95e5d0073d24c902865f71",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-targeted-20260814/targeted-replay.json": "e8c24eda47ea725cb4f692637c1108dc97f085d530369c75e13c94af76aa6167"
+  },
+  "humanReviewStatus": "NOT_APPLICABLE"
+}

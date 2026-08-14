@@ -75,7 +75,21 @@ def _category_key(category: str | None) -> str:
         return "mobile"
     if "耳机" in value:
         return "headphones"
-    if any(token in value for token in ("包", "箱", "背包")):
+    if any(token in value for token in ("音箱", "音响")):
+        return "generic"
+    if any(
+        token in value
+        for token in (
+            "箱包",
+            "背包",
+            "书包",
+            "双肩包",
+            "手提包",
+            "斜挎包",
+            "行李箱",
+            "拉杆箱",
+        )
+    ) or value == "包":
         return "bags"
     if any(token in value for token in ("服", "鞋", "裙", "外套")):
         return "apparel"

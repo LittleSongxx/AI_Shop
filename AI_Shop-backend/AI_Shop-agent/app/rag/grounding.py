@@ -18,9 +18,15 @@ class EvidenceItem:
     citation: int
     text: str
     ref: dict[str, Any]
+    fact_ids: tuple[str, ...] = ()
+    domain: str = "GENERAL"
+    support_type: str = "SEMANTIC"
 
     def public(self) -> dict[str, Any]:
-        return asdict(self)
+        value = asdict(self)
+        value["factIds"] = value.pop("fact_ids")
+        value["supportType"] = value.pop("support_type")
+        return value
 
 
 @dataclass(frozen=True)
@@ -29,6 +35,13 @@ class QueryPlan:
     safe_business_query: str
     variant_count: int
     normalization_rules: tuple[str, ...] = ()
+    subquestions: tuple[str, ...] = ()
+    domains: tuple[str, ...] = ()
+    route: str = "GENERAL"
+    expansion_reasons: tuple[str, ...] = ()
+    fact_hints: tuple[str, ...] = ()
+    llm_expansion_calls: int = 0
+    policy_fingerprint: str | None = None
 
     def public(self) -> dict[str, Any]:
         return {
@@ -36,6 +49,13 @@ class QueryPlan:
             "safeBusinessQuery": self.safe_business_query,
             "variantCount": self.variant_count,
             "normalizationRules": list(self.normalization_rules),
+            "subquestions": list(self.subquestions),
+            "domains": list(self.domains),
+            "route": self.route,
+            "expansionReasons": list(self.expansion_reasons),
+            "factHints": list(self.fact_hints),
+            "llmExpansionCalls": self.llm_expansion_calls,
+            "policyFingerprint": self.policy_fingerprint,
         }
 
 

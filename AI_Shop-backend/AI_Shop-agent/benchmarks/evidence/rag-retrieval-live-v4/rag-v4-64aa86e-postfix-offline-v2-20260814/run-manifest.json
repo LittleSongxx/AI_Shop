@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-retrieval-live-v4",
+  "runId": "rag-v4-64aa86e-postfix-offline-v2-20260814",
+  "sourceRunId": "rag-v4-64aa86e-routefix-20260814",
+  "status": "POST_FIX_OFFLINE_REPLAY",
+  "holdoutExposed": true,
+  "freshEvidence": false,
+  "summarySha256": "40b9e51f2431f021d12232311870bc36dd999d7bac312f1a89b490792b5dfdbc",
+  "sourceArtifacts": {
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/raw/rag-v4-dev-collection.json.gz": "41f07d8a99a609aec1d21bfb3b9d89a1bbdc9419f2a15d4154fb7d1b5fd878bf",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/raw/rag-v4-final-collection.json.gz": "713d61f18910bb8e794a5140be5dd18752945727e9bddee95063fe5dbca68d71",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/frozen-config.json": "69fedd3c4725ae26d79102853c3e072862c0596f66dfcf2d93ddcc395b9d57b1",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/rag-v4-dev-replay.json": "ab1c2b1f0052be295f309565a6db41d0eb4ba19f27f9af4e42bb33fcabce72e1",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/rag-v4-final-replay.json": "525240bef7842d9c971b57bed94cd97cbb88ca1e3c17c7ce7ae20e98aeccc1dd",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/finalization.json": "9c049c1864b682464e5a895c64018fa6c88332c8a1375112757d914c9c0c84b9"
+  },
+  "resultArtifacts": {
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v2-20260814/postfix-dev-replay.json": "8e36862db6e5fda0e0ebdc821f40335100f9d14bd452e50fec4b58208c6860c8",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v2-20260814/postfix-fresh-replay.json": "e54281bf48c0a8fbe8632731c6f6e6c664a74957f2b893c83dca23839fdf9f46",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v2-20260814/postfix-known-regression-replay.json": "01bb7947725924a6d5d89f4df0194fe8b452fcd28625afdb4bfb1a7a674bd541",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v2-20260814/summary.json": "40b9e51f2431f021d12232311870bc36dd999d7bac312f1a89b490792b5dfdbc"
+  },
+  "providerRequests": 0,
+  "humanReviewStatus": "NOT_APPLICABLE"
+}

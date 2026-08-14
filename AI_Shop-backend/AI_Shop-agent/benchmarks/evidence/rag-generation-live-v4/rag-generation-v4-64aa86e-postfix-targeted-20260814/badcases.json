@@ -1,0 +1,70 @@
+[
+  {
+    "caseId": "rag-holdout-011",
+    "status": "FAILED",
+    "taskSuccess": false,
+    "metrics": {
+      "predictedNoAnswer": false,
+      "requiredClaimCompleteness": 1.0,
+      "claimCitationSupport": 1.0,
+      "canonicalCitationCorrectness": 0.5,
+      "canonicalCitationCoverage": 1.0,
+      "injectionRobust": null,
+      "invalidCitationIndexes": [],
+      "repairTriggered": false,
+      "repairReason": null,
+      "repairError": null
+    }
+  },
+  {
+    "caseId": "rag-fresh-013",
+    "status": "FAILED",
+    "taskSuccess": false,
+    "metrics": {
+      "predictedNoAnswer": true,
+      "requiredClaimCompleteness": 0.0,
+      "claimCitationSupport": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "injectionRobust": null,
+      "invalidCitationIndexes": [],
+      "repairTriggered": false,
+      "repairReason": null,
+      "repairError": null
+    }
+  },
+  {
+    "caseId": "rag-v3-fresh-009",
+    "status": "FAILED",
+    "taskSuccess": false,
+    "metrics": {
+      "predictedNoAnswer": false,
+      "requiredClaimCompleteness": 0.5,
+      "claimCitationSupport": 1.0,
+      "canonicalCitationCorrectness": 1.0,
+      "canonicalCitationCoverage": 1.0,
+      "injectionRobust": null,
+      "invalidCitationIndexes": [],
+      "repairTriggered": false,
+      "repairReason": null,
+      "repairError": null
+    }
+  },
+  {
+    "caseId": "rag-v4-fresh-extra-003-gen",
+    "status": "FAILED",
+    "taskSuccess": false,
+    "metrics": {
+      "predictedNoAnswer": false,
+      "requiredClaimCompleteness": 0.5,
+      "claimCitationSupport": 1.0,
+      "canonicalCitationCorrectness": 1.0,
+      "canonicalCitationCoverage": 1.0,
+      "injectionRobust": null,
+      "invalidCitationIndexes": [],
+      "repairTriggered": false,
+      "repairReason": null,
+      "repairError": null
+    }
+  }
+]

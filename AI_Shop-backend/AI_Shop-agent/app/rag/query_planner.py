@@ -1,0 +1,197 @@
+"""Conservative deterministic decomposition and routing for RAG v4."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Any
+
+from app.rag.query_expander import deterministic_query_variants
+
+_DOMAIN_TERMS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("CHECKOUT", ("购物车", "结算", "下单", "库存", "价格")),
+    ("PAYMENT", ("支付", "付款", "支付宝", "退款进度", "比特币", "数字货币")),
+    ("ACCOUNT", ("地址", "账户", "账号", "登录", "归属")),
+    ("LOGISTICS", ("物流", "快递", "配送", "包裹", "收货", "发货")),
+    ("AFTER_SALES", ("售后", "退货", "退款", "破损", "错发", "漏发")),
+    ("PROMOTION", ("优惠券", "优惠卷", "抢券", "用券", "促销")),
+    ("REVIEW", ("评价", "评论", "追评", "晒单")),
+    ("PRIVACY", ("隐私", "数据导出", "删除数据", "清空聊天", "记忆")),
+    ("AI_SUPPORT", ("AI助手", "AI 助手", "人工客服", "转人工", "写操作")),
+    ("MEMBER", ("会员", "成长值", "签到", "等级")),
+)
+_BOUNDARY_RE = re.compile(r"(?:是否|能否|能不能|可不可以|支不支持|不支持|不允许|不能).{0,20}")
+_MULTI_STEP_RE = re.compile(r"(?:然后|之后|再|流程|步骤|进度)")
+_SPLIT_RE = re.compile(r"(?:，|；|;|并且|同时|另外|以及|还想|还要|并想)")
+
+
+@dataclass(frozen=True)
+class PlannedRagQuery:
+    original_query: str
+    subquestions: tuple[str, ...]
+    deterministic_variants: tuple[str, ...]
+    domains: tuple[str, ...]
+    route: str
+    expansion_reasons: tuple[str, ...]
+    fact_hints: tuple[str, ...]
+
+    def public(self, *, actual_variant_count: int, llm_expansion_calls: int) -> dict[str, Any]:
+        return {
+            "subquestions": list(self.subquestions),
+            "domains": list(self.domains),
+            "route": self.route,
+            "expansionReasons": list(self.expansion_reasons),
+            "factHints": list(self.fact_hints),
+            "deterministicVariantCount": len(self.deterministic_variants),
+            "actualVariantCount": actual_variant_count,
+            "llmExpansionCalls": llm_expansion_calls,
+        }
+
+
+def query_domains(query: str) -> tuple[str, ...]:
+    folded = str(query or "").casefold()
+    return tuple(
+        domain
+        for domain, terms in _DOMAIN_TERMS
+        if any(term.casefold() in folded for term in terms)
+    )
+
+
+def query_fact_hints(query: str) -> tuple[str, ...]:
+    """Map explicit business propositions to canonical facts without eval labels."""
+
+    text = str(query or "").casefold()
+    hints: list[str] = []
+
+    def add(fact_id: str) -> None:
+        if fact_id not in hints:
+            hints.append(fact_id)
+
+    price_question = any(
+        term in text for term in ("价格", "成交价", "价格不同", "快照")
+    )
+    checkout_price_question = price_question and any(
+        term in text for term in ("提交订单", "下单时", "结算时", "结算")
+    )
+    if checkout_price_question:
+        add("checkout.current_product_revalidation")
+    elif any(term in text for term in ("加购", "购物车")) and price_question:
+        add("cart.price_snapshot_not_guarantee")
+    ai_is_actor = bool(
+        re.search(
+            r"(?:让|由)?\s*ai(?:助手)?\s*"
+            r"(?:能|会|可|可以|是否|能否|帮|直接|替|执行|退款|下单|加购|取消)",
+            text,
+        )
+    )
+    if ai_is_actor and any(
+        term in text for term in ("加购", "购物车", "下单", "取消", "退款", "删除")
+    ):
+        add("ai.capability_and_confirmation")
+    if any(term in text for term in ("会员等级", "成长值")) and any(
+        term in text for term in ("门槛", "数值", "升级", "银卡", "金卡")
+    ):
+        add("member.growth.thresholds")
+    if any(term in text for term in ("演示", "模拟")) and any(
+        term in text for term in ("物流", "轨迹")
+    ) and any(term in text for term in ("真实", "时效", "承诺", "sla")):
+        add("logistics.simulated_no_sla")
+    if any(term in text for term in ("售后资格", "退款资格", "可退资格")) and any(
+        term in text for term in ("规则引擎", "知识问答", "rag")
+    ):
+        add("aftersales.rule_engine_authoritative")
+    if "地址" in text and any(term in text for term in ("别人", "他人", "归属")) and any(
+        term in text for term in ("绕过", "校验", "下单")
+    ):
+        add("address.ownership_check")
+    if "优惠券" in text and all(
+        term in text for term in ("下单", "支付", "关闭")
+    ):
+        add("coupon.lock_consume_release")
+    if any(term in text for term in ("知识库", "知识检索")) and any(
+        term in text
+        for term in ("证据不足", "证据不够", "找不到充分依据", "没有充分依据")
+    ):
+        add("rag.retrieval_and_abstention")
+    if any(term in text for term in ("知识助手", "助手")) and any(
+        term in text for term in ("规则不足", "依据不足", "证据不足")
+    ):
+        add("rag.retrieval_and_abstention")
+    if any(term in text for term in ("售后", "退货", "退款")) and any(
+        term in text for term in ("幂等", "重复提交", "多个申请")
+    ):
+        add("aftersales.submit_idempotently")
+    if any(term in text for term in ("删除ai数据", "彻底删除ai数据")) and any(
+        term in text for term in ("摘要", "缓存", "记忆")
+    ):
+        add("privacy.memory_deletion_and_withdrawal")
+    if any(term in text for term in ("删除ai数据", "删除 ai 数据")) and any(
+        term in text for term in ("订单", "支付", "历史", "记录")
+    ):
+        add("privacy.retained_business_anonymization")
+    if "演示" in text and any(term in text for term in ("资金", "扣款", "扣除")):
+        add("payment.demo_no_real_funds")
+    if any(term in text for term in ("退货申请", "售后申请")) and any(
+        term in text for term in ("到账", "退款成功", "等于退款")
+    ):
+        add("aftersales.request_and_refund_boundary")
+    if "幂等键" in text and any(
+        term in text for term in ("结算内容", "请求内容", "换了", "冲突")
+    ):
+        add("checkout.idempotency_key")
+    if any(term in text for term in ("物流", "轨迹")) and any(
+        term in text for term in ("不更新", "长时间", "延迟")
+    ) and any(term in text for term in ("客服", "提供", "处理")):
+        add("logistics.delayed_event_support")
+    if "ai" in text and "写操作" in text and any(
+        term in text for term in ("确认", "执行", "立即")
+    ):
+        add("ai.capability_and_confirmation")
+    if any(term in text for term in ("承诺", "保证")) and any(
+        term in text for term in ("送达", "到达", "时效", "小时内", "sla")
+    ):
+        add("logistics.simulated_no_sla")
+    return tuple(hints)
+
+
+def plan_rag_query(query: str, *, max_subquestions: int = 3) -> PlannedRagQuery:
+    original = " ".join(str(query or "").strip().split())
+    raw_parts = [part.strip(" ，；;。!?！？") for part in _SPLIT_RE.split(original)]
+    parts = [part for part in raw_parts if len(part) >= 4]
+    part_domains = [query_domains(part) for part in parts]
+    distinct_domain_parts = [
+        part
+        for part, domains in zip(parts, part_domains)
+        if domains
+    ]
+    should_split = len(distinct_domain_parts) >= 2 or (
+        len(parts) >= 2 and bool(_MULTI_STEP_RE.search(original))
+    )
+    subquestions = tuple((parts if should_split else [original])[:max_subquestions])
+    domains = query_domains(original)
+    reasons: list[str] = []
+    if len(subquestions) > 1:
+        reasons.append("multiple_business_subquestions")
+    if _BOUNDARY_RE.search(original):
+        reasons.append("capability_or_negative_claim")
+    if _MULTI_STEP_RE.search(original):
+        reasons.append("multi_step_workflow")
+    deterministic: list[str] = []
+    for value in (original, *subquestions):
+        for variant in deterministic_query_variants(value):
+            if variant and variant not in deterministic:
+                deterministic.append(variant)
+            if len(deterministic) == 3:
+                break
+        if len(deterministic) == 3:
+            break
+    route = "MULTI_DOMAIN" if len(domains) > 1 else domains[0] if domains else "GENERAL"
+    return PlannedRagQuery(
+        original_query=original,
+        subquestions=subquestions or ((original,) if original else ()),
+        deterministic_variants=tuple(deterministic or ([original] if original else [])),
+        domains=domains,
+        route=route,
+        expansion_reasons=tuple(reasons),
+        fact_hints=query_fact_hints(original),
+    )

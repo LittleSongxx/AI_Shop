@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "datasetVersion": "chinese-commerce-search-v2",
+  "datasetSha256": "f1d183d4dc34910b24212d4f71a33539a4ee7960bb55ff06489fa8c60eb2a878",
+  "evidenceSource": "SYNTHETIC",
+  "counts": {
+    "products": 600,
+    "queries": 240,
+    "categories": 20,
+    "splits": {
+      "challenge": 40,
+      "fresh_holdout": 80,
+      "public": 120
+    },
+    "challengeTypes": {
+      "conflict": 10,
+      "no_match": 10,
+      "typo": 20
+    }
+  },
+  "labelSource": "deterministic structured constraints; no LLM self-grading"
+}

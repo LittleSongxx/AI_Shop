@@ -219,3 +219,148 @@ Fresh 本地阶段延迟：Exact FAQ P50/P95=10.7828/17.5385 ms，BM25=11.0300/1
 3. 新增 87 条定向回归测试覆盖上述两项、引用、流式 usage、RAG 检索和旧生成 Runner。
 
 这些修复不会改变 v3 冻结数字；要验证收益必须创建新的命名运行并保留本次 `FAILED_RETAINED`。本轮结果仍是 `SYNTHETIC + local-live`，不是真实用户、生产流量、线上 SLO 或业务转化效果；P99 样本不足，成本未定价，AI 初审也不是人工标注。
+
+## 7. Search v2：运行时对齐、全库外部集与修复后回归
+
+### 7.1 运行与数据
+
+| 项目 | 首次正式 final | 修复后运行时 regression |
+| --- | --- | --- |
+| Suite / Run ID | `search-mature-v2` / `search-v2-64aa86e-final-20260814` | `search-mature-v2` / `search-v2-64aa86e-postfix-regression-v5-20260814` |
+| Git commit | `64aa86e8fa67f6245247163a9477b63aaeb07baf` | 同一起始 commit + 本轮 workspace 修复 |
+| 证据性质 | `SYNTHETIC + local-live`，首次 final | `POST_FIX_RUNTIME_REGRESSION`，`holdoutExposed=true`，`freshEvidence=false` |
+| Summary SHA-256 | `64445a87f51fa63f140a35dae4d0f056b04a552edae4586fe7c48e6b8632e7ba` | `324a99789114d99e3addea4c6f1dd514fc834b3a8a74c1bca4aac4ab7dc8b62d` |
+| Run manifest SHA-256 | `6e62f595bd63f76b89e0c92a90971505e277de9516c3ffe12d6c7a92ac4513b9` | `3a024ec8cf995860b5562f4c1cf29b79fa77f4025bfbef902c20e98f72f7f876` |
+| 修复后原始结果 SHA-256 | 不适用 | `e98b6f693e67dcbe30c4bd0a428bd5b6d704f24ae156af15a58b9859b85f8007` |
+
+| 数据层 | 规模 | 口径 |
+| --- | ---: | --- |
+| 真实演示目录 | 47 商品，30 public + 15 holdout | 逐条调真实 `ProductService`；权威价格/库存来自 Java 快照 |
+| 中文合成 v2 | 600 商品，240 查询：120 public、80 fresh、40 challenge | 结构属性来自允许值集，0–3 级标签由确定性约束计算，不用 LLM 自评 |
+| WANDS 全库 | 42,994 商品，202 查询，32,919 有效判断，133 query class | 固定上游 commit `3b74dcf4...`；冲突标注排除，未标注商品不当作无关 |
+
+中文链路比较 raw BM25、normalized-only BM25、Vector、raw+normalized RRF、运行时约束过滤、Rerank 和独立 `oracle_gold_filter`。Oracle 仅是理论上限，`diagnosticOracle=true`，不参与配置选择或产品结论。WANDS 比较 BM25、Vector、RRF 和 RRF+`qwen3-rerank`；向量、原始候选和 Rerank 只冷采集一次，参数消融从锁定原始候选零 Provider 重放。
+
+### 7.2 首次正式结果
+
+| 数据 | 关键结果 | 门禁 |
+| --- | --- | --- |
+| 中文 public | Recall@3 `0.965972`，Recall@5 `1.0`，NDCG@5 `0.919456` | 通过 |
+| 中文 fresh | Recall@3 `0.889583`，Recall@5 `0.996875`，MRR@10 `1.0`，NDCG@5 `0.975290` | 通过 |
+| challenge | 20 条正例 Recall@3 `0.883333`；20 条负例 no-result accuracy `0.80` | 低于 `0.90` |
+| ProductService 45 条 | Recall@10 `0.377778`，MRR@10 `0.377778`，NDCG@10 `0.371969` | 未通过 |
+
+首次正式质量状态为 `FAILED_RETAINED`。主要问题不是底层召回器未找到候选，而是真实服务路径中的 taxonomy 误杀、澄清误触发、品牌/schema 缺失、别名语义漂移与缺货口径混淆。失败证据保留，没有用修复后结果覆盖。
+
+### 7.3 WANDS 全库结果
+
+WANDS 是 42,994 商品全库检索，但 qrels 不完整，因此只报告不把未标注项当负例的指标：
+
+| K | Known-relevant Recall | HitRate | Judged@K | Condensed NDCG | Condensed MRR | Condensed MAP |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 5 | `0.045194` | `0.990099` | `0.922772` | `0.790708` | `0.978960` | `0.953960` |
+| 10 | `0.088340` | `1.000000` | `0.912871` | `0.795349` | `0.979579` | `0.937044` |
+
+`bpref=0.343359`。Known-relevant Recall 分母是全部已知相关标注，不是“是否找到一个正确商品”；该结果不能表述为完整标注的全库 Recall。
+
+### 7.4 修复后 ProductService regression
+
+| 口径 | Recall@1 | Recall@3/5/10 | MRR@10 | NDCG@10 | 样本 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 原始 catalog relevance | `0.785185` | `0.977778` | `0.944444` | `0.949732` | 45 |
+| availability-adjusted | - | `1.000000` | `0.965909` | `0.971317` | 44 条当前可购正例 |
+
+45/45 执行，44 条走 `shopping_decision_v2`，1 条走 `out_of_stock`。Java 权威库存审计显示 30 个相关商品中 29 个 available、1 个 unavailable、0 个 unknown。缺货 badcase `graded-019` 的唯一相关商品 `158081823347974` 仍在 ES 中可召回，但权威库存为 0；修复后不再用跨品类耳机补位，缺货 no-result accuracy 为 `1.0`。
+
+Provider 完整性：Embedding 86/86 成功、缓存命中 0、失败 0；Rerank 30/30 成功、fallback 0。全部运行时门禁通过，但只标记 `PASSED_POST_FIX_REGRESSION`。该数据在修复时已反复暴露，不是 fresh holdout，也不证明首次 challenge 负例已达标。本轮未执行 `--accept-baseline`，旧 baseline 不变。
+
+## 8. RAG v4：自适应检索、最小充分证据与 claim 级评测
+
+### 8.1 数据、链路与运行信息
+
+| 项目 | 正式 Retrieval | 正式 Generation |
+| --- | --- | --- |
+| Suite / Run ID | `rag-retrieval-live-v4` / `rag-v4-64aa86e-routefix-20260814` | `rag-generation-live-v4` / `rag-generation-v4-64aa86e-postfix-20260814` |
+| Git commit | `64aa86e8fa67f6245247163a9477b63aaeb07baf` | 同左 |
+| Workspace SHA-256 | `fd79749bd7b3b5de9327d5bd8f49b060db061f6e0907067fa6ebea91227bd72c` | `83678131abcca022ecc5187f04198b57b6de59bd2007e0026efc629c0134b502` |
+| 数据 | 72 public/dev + 144 known regression + 48 一次性 fresh，共 264 条 | 40 known regression + 20 fresh，共 60 条 |
+| 模型 | `text-embedding-v4`、`qwen3-rerank`，复杂题按策略调用 `deepseek-v4-flash` expansion | `deepseek-v4-flash`、`text-embedding-v4`、`qwen3-rerank` |
+| 执行/数据来源 | `local-live` / `SYNTHETIC` | `local-live` / `SYNTHETIC` |
+| Summary SHA-256 | `be1b3b0fb1bf2bb337eb38d100c57841f5643e865925e3e65c2d77a85effb29f` | `b751ac463f97e43681d402b96d4795404e9a669a8b41186673223609ba77bfe0` |
+| Run manifest SHA-256 | `2b0c1e1105a80bc5479dee4cff4bae3364422531eff92f51026d425a6bdb3720` | `18786d733bc82b9d044584db9ab9cc0cddfb2368240ce241a62fe9906f49543e` |
+| 质量状态 | `FAILED_RETAINED` | `FAILED_RETAINED`，`HUMAN_REVIEW_PENDING` |
+
+知识源仍为已发布的 12 份文档、75 个 knowledge chunk 和 6 个 FAQ。v4 在 canonical fact catalog 上增加版本化 fact metadata、事实极性、能力边界、领域、受控别名和 atomic claims；评测标签由 `requiredClaims` 绑定 canonical fact，不使用 LLM 自评相关性。
+
+正式检索链路为 Exact FAQ → 原问题与最多 3 个确定性子问题/变体并行 BM25 + Vector → 路内及跨路 RRF → 覆盖不足时至多一次 LLM Expansion → `qwen3-rerank` → `0.70` 阈值、`0.10` margin 与注入检疫 → 最多 4 条、6,000 字符的最小充分证据。Context Prefix 只参与召回，Rerank、引用和生成只使用可信原文。生成端按事实句就近引用，SUPPORTED 下误拒答、缺引用或越界引用最多 repair 一次，并保留初答、额外 token 和延迟。
+
+正式运行前曾把知识 Java 服务误指向未监听的 `127.0.0.1:8081`，smoke check 无法验证 release/FAQ。该诊断没有升级为 E3；修正到 Search 服务 `127.0.0.1:8108` 并验证 12 文档、75 chunk、6 FAQ 后，才创建 `routefix` 正式 run。错误路由的失败现象未被归因给检索算法。
+
+### 8.2 正式 Retrieval 结果
+
+| Split | 可回答样本 | Recall@1 | Recall@3/5 | MRR@10 | NDCG@5 | No-answer | Injection | Canonical correctness / coverage |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| public + known regression | 179 | `0.905028` | `0.932961 / 0.932961` | `0.917132` | `0.921189` | `0.9730` | `1.0000` | `0.8657 / 0.9330` |
+| fresh | 36 | `0.694444` | `0.805556 / 0.805556` | `0.750000` | `0.764548` | `1.0000` | `0.9167` | `0.7442 / 0.8056` |
+
+264/264 全部执行。dev/fresh 的 Embedding 缓存命中、Provider 失败和 Rerank fallback 均为 0，Query Expansion 调用也完整；已知回归 guard 通过。失败来自 fresh Recall@3/5、MRR、NDCG、injection 和 canonical citation 均低于门槛，因此不能把“Provider 调用完整”写成“质量达标”。
+
+fresh 本地阶段延迟 P50/P95 为：Embedding `479.09/987.51 ms`、Rerank `286.26/522.83 ms`、LLM Expansion `1532.69/2356.25 ms`、端到端 `613.70/2913.93 ms`。Expansion 只触发 16 条，fresh 总样本也仅 48，P99 不作为稳定统计或线上 SLO。
+
+| 代表性坏例 | 正式结果 | 根因与归属 |
+| --- | --- | --- |
+| `rag-v4-fresh-extra-001` 加购价是否保证成交价 | 误判 `INSUFFICIENT` | runtime fact hint 未把价格快照边界带到候选，检索规划 |
+| `rag-v4-fresh-extra-016` AI 能否直接退款并附恶意命令 | 找到部分证据但 injection 判定失败 | “AI 数据/动作”提示范围过宽，查询规划与安全路由 |
+| `rag-v4-fresh-extra-020` 会员等级数值和门槛 | 误拒答 | query hint 与 canonical fact 覆盖不足，检索规划 |
+| `rag-v4-fresh-extra-030` 模拟轨迹能否作为真实时效承诺 | 误拒答 | 直接证据在 RRF 截断及 Rerank Top-6 后丢失，候选合并/精排 |
+| `rag-v4-fresh-extra-032` 售后资格由问答还是规则引擎决定 | 误拒答 | 否定能力事实未稳定提升到证据集，检索/证据选择 |
+| `rag-v4-fresh-extra-021` 连续签到中断如何计算 | 误拒答 | 冻结标签要求的“中断后重置细节”不在已发布知识中，数据标签 |
+| `rag-v4-fresh-extra-024` 转人工携带哪些排查上下文 | 误拒答 | 冻结标签要求的具体上下文字段不在已发布知识中，数据标签 |
+
+最后两题不是简单的召回失败。当前知识只能说明签到和转人工的一般规则，不能支持标签要求的具体细节；安全行为应保持 `INSUFFICIENT`，不能为了分数降低阈值、补写不存在事实或修改冻结标签。
+
+### 8.3 正式 Generation 结果
+
+| 指标 | 正式结果 |
+| --- | ---: |
+| 完整执行 / runtime error / 严重安全违规 | `60/60` / `0` / `0` |
+| 自动任务成功 | `39/60`（`0.6500`） |
+| known regression | `29/40` |
+| Required-claim completeness | `0.8406` |
+| Claim-citation support | `0.8804` |
+| Canonical citation coverage | `0.9783` |
+| No-answer / injection robustness | `1.0000 / 1.0000` |
+| 无效引用 | `0` |
+| Repair | 12 次；额外 input/output token `3984/516` |
+| Input / output / total token | `20,583 / 2,542 / 23,125` |
+| 端到端 P50 / P95 | `1845.26 / 3449.83 ms` |
+| TTFT P50 / P95 | `1347.77 / 2956.63 ms` |
+| AI 辅助初审 | `46 PASS / 14 FAIL` |
+| 人工校准 | `HUMAN_REVIEW_PENDING` |
+
+60 条均完整调用真实 Provider 且 usage 完整，但任务成功、known regression、claim completeness 和 claim-citation support 未过门禁。21 条自动失败主要分为：Markdown 换行未切事实句导致引用支持误判；“一张/1 张”“券/优惠券”等可辩护同义表达未被受控 alias 覆盖；引用了语义等价证据却被更早命中的无引用字面 alias 抢占；模型短答漏掉必要 claim；检索仍拒答；以及混合注入题回答安全但不完整。AI 初审不是独立人工标注，Reviewer A/B 盲评包保留为空，不伪造 reviewer 结果。
+
+### 8.4 暴露后优化与回归
+
+正式结果冻结后，修复只使用已暴露 case，所有输出明确标记 `holdoutExposed=true`、`freshEvidence=false`，不覆盖正式 run。
+
+| Run | 类型 | 结果 | 结论 |
+| --- | --- | --- | --- |
+| `rag-v4-64aa86e-postfix-offline-20260814` | `POST_FIX_OFFLINE_REPLAY`，0 Provider | fresh Recall@3/5 `0.861111`，known regression 下降超过 5 个百分点 | “一题只留一条证据”的机械规则破坏多事实题，方案拒绝 |
+| `rag-v4-64aa86e-postfix-offline-v3-20260814` | `POST_FIX_OFFLINE_REPLAY`，0 Provider | fresh Recall@3/5、MRR、NDCG 均 `0.944444`；canonical `1.0/0.9444`；no-answer/injection `1.0`；known guard 通过 | 最小充分证据改为按 fact 覆盖去重，并对相近歧义候选保留第二条 |
+| `rag-v4-64aa86e-postfix-targeted-20260814` | 7 条 `POST_FIX_TARGETED_REGRESSION` | 5/5 修复目标通过，2/2 标签超出知识题继续安全拒答；Embedding 16/16、Rerank 7/7、Expansion 5/5 | 真实 Provider 验证修复路径，状态 `PASSED_TARGETED_WITH_KNOWN_LABEL_LIMITS` |
+| `rag-generation-v4-64aa86e-postfix-rescore-v3-20260814` | `POST_FIX_OFFLINE_RESCORE`，0 Provider | `49/60`（`0.8167`），known `35/40`，claim completeness `0.9674`，claim support `0.9565`，canonical coverage `0.9783` | 评分器修复有效，但总成功率仍低于 `0.85`，继续 `FAILED_RETAINED` |
+
+生成 live targeted 链保留了每一步诊断：首轮 11 条为 `7/11`，剩余 4 条为 `3/4`；单条物流 SLA 在 v3 证明 fact-hint 候选仍被跨 variant RRF 截断，在 v4 证明候选进入 Rerank 后仍落在返回 Top-6 外。v5 使用可信 fact catalog 标题增强 Rerank query，并让单次 Rerank 返回当前完整候选顺序后，该题通过，证据 `模拟物流边界` 得分 `0.567471`，答案正确否定“两小时承诺”并就近引用。该链不能拼成新的 60 条总分，也不是 fresh E3。
+
+评分器修复包括：Markdown 换行视为事实句终止；alias 仅在 fact scope 内受控扩展；同时存在未引用字面表达和已引用等价表达时优先后者。检索修复包括：缩窄“AI 动作”提示，保留各路 RRF 截断前 fact-hint 候选，fact-hinted 请求使用可信 catalog 标题参与精排，证据选择按 required fact 覆盖后停止并保留必要歧义候选。生成 Prompt 强制每个事实句就近引用，短的“不支持/不保证”事实句也进入有界 repair。
+
+没有采用“把 frozen `requiredClaims` 或 holdout alias 注入 repair prompt”的方案。那会把评测 gold 泄漏到推理链，即使分数上升也不代表运行时能力；repair 只能使用用户问题、检索证据、运行时 query plan 和 verifier 可见的格式错误。
+
+### 8.5 结论与证据边界
+
+- RAG v4 正式 Retrieval 和 Generation 均未过质量门禁，必须保留为 `FAILED_RETAINED`；正式数字不能被后续定向回归覆盖。
+- 暴露后 offline replay/rescore 与 live targeted regression 证明已定位并修复多类具体问题，但它们只支持“修复对已知坏例有效”，不能支持 fresh 泛化结论。
+- 两个 Retrieval frozen label 超出知识事实边界，继续拒答是正确行为。下一轮应新建、独立锁定未见数据，而不是修改这两条历史标签。
+- 人工盲评工具已生成，但两位真实 reviewer 尚未提交，状态固定为 `HUMAN_REVIEW_PENDING`。
+- 所有数据均为 `SYNTHETIC`，运行是 `local-live`；成本为 `UNPRICED`，本地延迟不是生产 SLO，本轮未接受 baseline。

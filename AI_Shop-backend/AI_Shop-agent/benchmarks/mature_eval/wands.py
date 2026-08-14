@@ -55,6 +55,9 @@ def select_subset(
     product_cap: int = 5_000,
     minimum_depth: int = 25,
     maximum_depth: int = 200,
+    include_all_products: bool = False,
+    exclude_conflicting_pairs: bool = False,
+    label_scope: str = "judged-pool",
 ) -> dict[str, Any]:
     """Select queries by new-class coverage, then minimum product-union growth."""
 
@@ -68,8 +71,39 @@ def select_subset(
         labels_by_query[row["query_id"]].append(row)
 
     eligible: list[dict[str, Any]] = []
+    ambiguous_pairs: list[dict[str, Any]] = []
     for query in query_rows:
-        labels = labels_by_query.get(query["query_id"], [])
+        raw_labels = labels_by_query.get(query["query_id"], [])
+        grouped: dict[str, set[str]] = defaultdict(set)
+        for row in raw_labels:
+            grouped[row["product_id"]].add(row["label"])
+        labels: list[dict[str, str]] = []
+        for product_id, values in sorted(grouped.items(), key=lambda item: int(item[0])):
+            if len(values) > 1 and exclude_conflicting_pairs:
+                ambiguous_pairs.append(
+                    {
+                        "queryId": query["query_id"],
+                        "productId": product_id,
+                        "labels": sorted(values),
+                    }
+                )
+                continue
+            selected_label = next(
+                (
+                    row["label"]
+                    for row in reversed(raw_labels)
+                    if row["product_id"] == product_id
+                ),
+                None,
+            )
+            if selected_label:
+                labels.append(
+                    {
+                        "query_id": query["query_id"],
+                        "product_id": product_id,
+                        "label": selected_label,
+                    }
+                )
         product_ids = {row["product_id"] for row in labels}
         label_values = {row["label"] for row in labels}
         if not minimum_depth <= len(product_ids) <= maximum_depth:
@@ -79,7 +113,14 @@ def select_subset(
         missing = sorted(product_ids - set(product_by_id))
         if missing:
             raise ValueError(f"WANDS query {query['query_id']} references missing products")
-        eligible.append({**query, "labels": labels, "productIds": product_ids})
+        eligible.append(
+            {
+                **query,
+                "labels": labels,
+                "rawAnnotationCount": len(raw_labels),
+                "productIds": product_ids,
+            }
+        )
 
     selected: list[dict[str, Any]] = []
     product_union: set[str] = set()
@@ -116,11 +157,14 @@ def select_subset(
                 "query": row["query"],
                 "queryClass": row["query_class"],
                 "split": "external",
-                "labelScope": "judged-pool",
+                "labelScope": label_scope,
                 "relevanceGrades": labels,
             }
         )
-    products = [product_by_id[product_id] for product_id in sorted(product_union, key=int)]
+    selected_product_ids = set(product_by_id) if include_all_products else product_union
+    products = [
+        product_by_id[product_id] for product_id in sorted(selected_product_ids, key=int)
+    ]
     result = {
         "schemaVersion": 1,
         "source": "WANDS",
@@ -131,23 +175,43 @@ def select_subset(
             "minimumJudgmentDepth": minimum_depth,
             "maximumJudgmentDepth": maximum_depth,
             "productCap": product_cap,
+            "includeAllProducts": include_all_products,
+            "excludeConflictingPairs": exclude_conflicting_pairs,
             "priority": ["new-query-class", "minimum-added-products", "sha256-query-id"],
         },
         "counts": {
             "eligibleQueries": len(eligible),
             "queries": len(query_cases),
             "products": len(products),
-            "judgments": sum(len(row["labels"]) for row in selected),
+            "judgments": sum(
+                len(row["labels"])
+                if exclude_conflicting_pairs
+                else int(row["rawAnnotationCount"])
+                for row in selected
+            ),
             "queryClasses": len(covered_classes),
+        },
+        "judgmentAudit": {
+            "annotationRows": sum(int(row["rawAnnotationCount"]) for row in selected),
+            "uniqueAcceptedPairs": sum(len(row["labels"]) for row in selected),
+            "ambiguousPairsExcluded": sum(
+                row["queryId"] in {item["query_id"] for item in selected}
+                for row in ambiguous_pairs
+            ),
         },
         "queries": query_cases,
         "products": products,
     }
-    validate_subset(result, product_cap=product_cap)
+    validate_subset(result, product_cap=product_cap, expected_label_scope=label_scope)
     return result
 
 
-def validate_subset(payload: dict[str, Any], *, product_cap: int = 5_000) -> None:
+def validate_subset(
+    payload: dict[str, Any],
+    *,
+    product_cap: int = 5_000,
+    expected_label_scope: str = "judged-pool",
+) -> None:
     products = payload.get("products") or []
     queries = payload.get("queries") or []
     product_ids = {str(row.get("product_id") or "") for row in products}
@@ -164,8 +228,8 @@ def validate_subset(payload: dict[str, Any], *, product_cap: int = 5_000) -> Non
             raise ValueError(f"WANDS {query.get('id')} contains missing products")
         if 2 not in grades.values() or 0 not in grades.values():
             raise ValueError(f"WANDS {query.get('id')} lacks Exact or Irrelevant labels")
-        if query.get("labelScope") != "judged-pool":
-            raise ValueError("WANDS label scope must be judged-pool")
+        if query.get("labelScope") != expected_label_scope:
+            raise ValueError(f"WANDS label scope must be {expected_label_scope}")
 
 
 def prepare_wands(raw_dir: Path, output_dir: Path) -> dict[str, Any]:
@@ -191,4 +255,56 @@ def prepare_wands(raw_dir: Path, output_dir: Path) -> dict[str, Any]:
         "labelScope": "judged-pool",
     }
     atomic_write_json(output_dir / "selection.lock.json", lock)
+    return {"selection": subset, "lock": lock}
+
+
+def prepare_wands_full_catalog(
+    raw_dir: Path,
+    selection_path: Path,
+    lock_path: Path,
+) -> dict[str, Any]:
+    """Prepare Search v2's full WANDS catalog without tracking the 90 MB source.
+
+    Qrels remain incomplete for the full catalog.  The lock therefore records
+    the selection policy and source hashes, while the selected query cases and
+    complete product rows live under the ignored results directory.
+    """
+
+    sources = download_sources(raw_dir)
+    subset = select_subset(
+        sources["query.csv"],
+        sources["product.csv"],
+        sources["label.csv"],
+        product_cap=50_000,
+        minimum_depth=25,
+        maximum_depth=300,
+        include_all_products=True,
+        exclude_conflicting_pairs=True,
+        label_scope="full-catalog-incomplete-qrels",
+    )
+    atomic_write_json(selection_path, subset)
+    lock = {
+        "schemaVersion": 2,
+        "source": "WANDS",
+        "sourceCommit": WANDS_COMMIT,
+        "sourceSha256": WANDS_SOURCE_SHA256,
+        "selectionSha256": sha256_bytes(
+            json.dumps(
+                subset,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ),
+        **subset["counts"],
+        "judgmentAudit": subset["judgmentAudit"],
+        "selectionPolicy": subset["selectionPolicy"],
+        "labelScope": "full-catalog-incomplete-qrels",
+        "metricScope": (
+            "known-relevant recall, Judged@K, bpref and condensed ranking metrics; "
+            "unjudged full-catalog results are never treated as irrelevant"
+        ),
+        "selectionArtifact": "Git-ignored; reconstructed from fixed upstream SHA files",
+    }
+    atomic_write_json(lock_path, lock)
     return {"selection": subset, "lock": lock}

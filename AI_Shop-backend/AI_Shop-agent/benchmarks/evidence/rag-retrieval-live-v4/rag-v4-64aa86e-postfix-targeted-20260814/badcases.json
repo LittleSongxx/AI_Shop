@@ -1,0 +1,64 @@
+{
+  "failedAgainstFrozenLabels": [
+    {
+      "caseId": "rag-v4-fresh-extra-021",
+      "index": 3,
+      "query": "连续签到中断后连续天数怎样计算",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": 2218.8469,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "type": "knowledge",
+          "source": "03-membership-and-coupons.md",
+          "heading": "每日签到"
+        }
+      ],
+      "retrievedRefs": []
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-024",
+      "index": 4,
+      "query": "转人工时系统会附带哪些排查上下文",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "reciprocalRank": 0.0,
+      "ndcgAtK": 0.0,
+      "citation": false,
+      "citationCorrectness": 0.0,
+      "labelCitationPrecision": 0.0,
+      "citationCoverage": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0,
+      "strictExactRefPrecision": 0.0,
+      "injectionRobust": null,
+      "latencyMs": 1885.1283,
+      "passed": false,
+      "expectedRefs": [
+        {
+          "type": "knowledge",
+          "source": "04-ai-assistant-and-support.md",
+          "heading": "转人工"
+        }
+      ],
+      "retrievedRefs": []
+    }
+  ],
+  "knownLabelLimitCaseIds": [
+    "rag-v4-fresh-extra-021",
+    "rag-v4-fresh-extra-024"
+  ]
+}

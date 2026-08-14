@@ -4,7 +4,7 @@
 >
 > 本轮实施基线：`ef9aa0659a9275a99bb74cdb46e87770150dea0a` + 实施前 workspace diff SHA（见 [证据 manifest](docs/evidence-manifest.json)）
 >
-> 最后核验时间：2026-08-12（Asia/Shanghai）
+> 最后核验时间：2026-08-14（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
@@ -96,7 +96,7 @@ AI_Shop/
 
 - **ReAct Agent**：基于 LangGraph 的有状态对话，支持商品推荐、订单查询、物流查询、售后引导
 - **Workflow / Agent 分界**：确定性状态流使用规则或 Workflow；只有开放决策、职责隔离或可并行任务进入 bounded specialist，保留 legacy single-agent 回退
-- **RAG 知识库**：店铺公告、商品详情、退换货政策向量化，混合检索后注入上下文
+- **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用和有界 repair
 - **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
 - **输入防护**：NFKC 归一化 + 两级规则（硬阻断 / 可疑累积）+ Propose→用户确认→Java 执行，防 Prompt 注入
 - **强制工具回退**：模型跳过必要工具时，框架层自动补全并路由至 finalize，避免幻觉回复
@@ -237,13 +237,18 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 数据锁、结果 SHA 和“未采集”边界。
 
 当前 27 条 Commerce runtime、18 条 AI 安全和 162 条 Search/RAG 数据契约属于
-`SYNTHETIC + deterministic`。在 `SYNTHETIC + local-live` 层，成熟评测进一步覆盖中文 300 商品/120 查询、
-WANDS 4,960 商品/58 查询/5,733 条人工判断。冻结中文链路在 40 条 fresh holdout 上
-Recall@1/3/5 为 0.50/1.00/1.00、NDCG@5 为 0.9848，10 条冲突负例准确率为 1.0；WANDS Rerank 相对同预算
-RRF 的 NDCG@5 增益为 0.0471，bootstrap 95% CI [0.0184, 0.0766]。RAG v3 将知识库扩为 12 份/75 chunk，
-在 48 public + 64 regression + 32 一次性 fresh 上实跑；fresh Recall@1/3/5 为 0.9583/1.0/1.0、MRR@10
-为 0.9792、NDCG@5 为 0.9846，检索门禁通过。40 条 `deepseek-v4-flash` 生成仅 28/40 通过，按
-`FAILED_RETAINED` 留存，不能表述为生成层达标。
+`SYNTHETIC + deterministic`。在 `SYNTHETIC + local-live` 层，Search v2 覆盖中文 600 商品/240 查询、
+WANDS 42,994 商品全库/202 查询/32,919 条有效人工判断，以及 47 商品目录上的 45 条真实
+`ProductService` 路径。中文 fresh Recall@3/5 为 0.8896/0.9969、NDCG@5 为 0.9753；WANDS 只报告
+known-relevant、Judged@K、bpref 和 condensed 指标，不把未标注商品当成无关。首次 ProductService
+Recall@10 只有 0.3778，正式结果按 `FAILED_RETAINED` 保留；暴露后运行时回归为 45/45、Recall@3/5/10
+均 0.9778、MRR@10 0.9444，但明确标记 `freshEvidence=false`。
+
+RAG v4 在 12 份文档、75 chunk、6 FAQ 上实跑 72 public + 144 regression + 48 fresh，共 264 条检索；
+fresh Recall@3/5 为 0.8056、MRR@10 为 0.75、NDCG@5 为 0.7645，正式门禁未过。60 条
+`deepseek-v4-flash` 生成完整执行，0 runtime error、0 严重安全违规，但只通过 39 条；暴露后零 Provider
+重评为 49/60，仍低于 0.85 且不能冒充新 holdout。正式 Retrieval/Generation 均保留
+`FAILED_RETAINED`，人工盲评状态为 `HUMAN_REVIEW_PENDING`。
 这些结果不代表真实用户或生产效果；Agent 在线模型、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
 线上 SLO 与生产规模仍为“未采集”。详细分组指标、消融、失败 case、Provider 调用和诚实边界见证据总览。历史冻结会话及
 旧小样本结果只用于解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，

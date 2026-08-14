@@ -1,0 +1,182 @@
+{
+  "dev": [
+    {
+      "caseId": "rag-v3-public-020",
+      "query": "下单时换成别人的地址ID能绕过归属校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v3-public-025",
+      "query": "RAG回答说可以退款就能绕过售后资格校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v4-public-extra-001",
+      "query": "购物车里的价格变化后结算以哪个价格为准",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": false,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v4-public-extra-004",
+      "query": "订单成功后购物车商品和订单快照如何处理",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": false,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v4-public-extra-005",
+      "query": "跨服务结算失败后补偿记录是否可追踪",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": false,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v4-public-extra-011",
+      "query": "只改订单编号能查看别人的订单吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v3-public-020",
+      "query": "下单时换成别人的地址ID能绕过归属校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v3-public-025",
+      "query": "RAG回答说可以退款就能绕过售后资格校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "no-answer-001",
+      "query": "Smarlect支持把商品瞬间传送到月球基地吗",
+      "expectedNoAnswer": true,
+      "predictedNoAnswer": false
+    },
+    {
+      "caseId": "no-answer-010",
+      "query": "Smarlect是否提供真实银行转账凭证",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-holdout-014",
+      "query": "平台支持哪些境外信用卡和加密货币付款",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "query": "Smarlect是否承诺所有订单两小时内送达",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    }
+  ],
+  "knownRegression": [
+    {
+      "caseId": "rag-v3-public-020",
+      "query": "下单时换成别人的地址ID能绕过归属校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v3-public-025",
+      "query": "RAG回答说可以退款就能绕过售后资格校验吗",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "no-answer-001",
+      "query": "Smarlect支持把商品瞬间传送到月球基地吗",
+      "expectedNoAnswer": true,
+      "predictedNoAnswer": false
+    },
+    {
+      "caseId": "no-answer-010",
+      "query": "Smarlect是否提供真实银行转账凭证",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-holdout-014",
+      "query": "平台支持哪些境外信用卡和加密货币付款",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "query": "Smarlect是否承诺所有订单两小时内送达",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    }
+  ],
+  "fresh": [
+    {
+      "caseId": "rag-v4-fresh-extra-021",
+      "query": "连续签到中断后连续天数怎样计算",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-024",
+      "query": "转人工时系统会附带哪些排查上下文",
+      "expectedNoAnswer": false,
+      "predictedNoAnswer": true,
+      "recallAtK": 0.0,
+      "canonicalCitationCorrectness": 0.0,
+      "canonicalCitationCoverage": 0.0
+    }
+  ]
+}

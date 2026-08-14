@@ -1,0 +1,1351 @@
+{
+  "schemaVersion": "aishop-eval/v1",
+  "suite": "search-mature-v2",
+  "runId": "search-v2-64aa86e-postfix-regression-v5-20260814",
+  "evidenceKind": "POST_FIX_RUNTIME_REGRESSION",
+  "gitCommit": "64aa86e8fa67f6245247163a9477b63aaeb07baf",
+  "workspaceSha256": "25ef0fc32a4a2ad2bb23c1270386a064375463e6238db6368d85dd516def4fc4",
+  "evidenceSource": "SYNTHETIC",
+  "executionMode": "local-live",
+  "originalFinalRunId": "search-v2-64aa86e-final-20260814",
+  "holdoutExposed": true,
+  "freshEvidence": false,
+  "caseCount": 45,
+  "routeCounts": {
+    "out_of_stock": 1,
+    "shopping_decision_v2": 44
+  },
+  "catalogMetrics": {
+    "caseCount": 45,
+    "metricCurves": {
+      "1": {
+        "allRelevantRate": 0.688889,
+        "hitRate": 0.911111,
+        "map": 0.911111,
+        "mrr": 0.911111,
+        "ndcg": 0.898413,
+        "precision": 0.911111,
+        "recall": 0.785185,
+        "samples": 45
+      },
+      "10": {
+        "allRelevantRate": 0.977778,
+        "hitRate": 0.977778,
+        "map": 0.944444,
+        "mrr": 0.944444,
+        "ndcg": 0.949732,
+        "precision": 0.128889,
+        "recall": 0.977778,
+        "samples": 45
+      },
+      "2": {
+        "allRelevantRate": 0.888889,
+        "hitRate": 0.977778,
+        "map": 0.944444,
+        "mrr": 0.944444,
+        "ndcg": 0.945387,
+        "precision": 0.6,
+        "recall": 0.948148,
+        "samples": 45
+      },
+      "20": {
+        "allRelevantRate": 0.977778,
+        "hitRate": 0.977778,
+        "map": 0.944444,
+        "mrr": 0.944444,
+        "ndcg": 0.949732,
+        "precision": 0.064444,
+        "recall": 0.977778,
+        "samples": 45
+      },
+      "3": {
+        "allRelevantRate": 0.977778,
+        "hitRate": 0.977778,
+        "map": 0.944444,
+        "mrr": 0.944444,
+        "ndcg": 0.949732,
+        "precision": 0.429629,
+        "recall": 0.977778,
+        "samples": 45
+      },
+      "5": {
+        "allRelevantRate": 0.977778,
+        "hitRate": 0.977778,
+        "map": 0.944444,
+        "mrr": 0.944444,
+        "ndcg": 0.949732,
+        "precision": 0.257778,
+        "recall": 0.977778,
+        "samples": 45
+      }
+    },
+    "negativeCaseCount": 0,
+    "noResultAccuracy": null,
+    "rankDistribution": {
+      "firstRelevantP50": 1.0,
+      "firstRelevantP95": 2.0,
+      "lastRelevantP50": 1.0,
+      "lastRelevantP95": 3.0,
+      "recall90Coverage": 0.977778,
+      "recall90KP50": 1.0,
+      "recall90KP95": 3.0
+    },
+    "rankingCaseCount": 45
+  },
+  "availabilityAdjustedMetrics": {
+    "caseCount": 45,
+    "metricCurves": {
+      "1": {
+        "allRelevantRate": 0.704545,
+        "hitRate": 0.931818,
+        "map": 0.931818,
+        "mrr": 0.931818,
+        "ndcg": 0.918831,
+        "precision": 0.931818,
+        "recall": 0.80303,
+        "samples": 44
+      },
+      "10": {
+        "allRelevantRate": 1.0,
+        "hitRate": 1.0,
+        "map": 0.965909,
+        "mrr": 0.965909,
+        "ndcg": 0.971317,
+        "precision": 0.131818,
+        "recall": 1.0,
+        "samples": 44
+      },
+      "2": {
+        "allRelevantRate": 0.909091,
+        "hitRate": 1.0,
+        "map": 0.965909,
+        "mrr": 0.965909,
+        "ndcg": 0.966873,
+        "precision": 0.613636,
+        "recall": 0.969697,
+        "samples": 44
+      },
+      "20": {
+        "allRelevantRate": 1.0,
+        "hitRate": 1.0,
+        "map": 0.965909,
+        "mrr": 0.965909,
+        "ndcg": 0.971317,
+        "precision": 0.065909,
+        "recall": 1.0,
+        "samples": 44
+      },
+      "3": {
+        "allRelevantRate": 1.0,
+        "hitRate": 1.0,
+        "map": 0.965909,
+        "mrr": 0.965909,
+        "ndcg": 0.971317,
+        "precision": 0.439394,
+        "recall": 1.0,
+        "samples": 44
+      },
+      "5": {
+        "allRelevantRate": 1.0,
+        "hitRate": 1.0,
+        "map": 0.965909,
+        "mrr": 0.965909,
+        "ndcg": 0.971317,
+        "precision": 0.263636,
+        "recall": 1.0,
+        "samples": 44
+      }
+    },
+    "negativeCaseCount": 1,
+    "noResultAccuracy": 1.0,
+    "rankDistribution": {
+      "firstRelevantP50": 1.0,
+      "firstRelevantP95": 2.0,
+      "lastRelevantP50": 1.0,
+      "lastRelevantP95": 3.0,
+      "recall90Coverage": 1.0,
+      "recall90KP50": 1.0,
+      "recall90KP95": 3.0
+    },
+    "rankingCaseCount": 44
+  },
+  "availabilityFacts": {
+    "availableCount": 29,
+    "relevantProductCount": 30,
+    "source": "java-product-snapshot",
+    "status": "EXECUTED",
+    "unavailableCount": 1,
+    "unavailableProductIds": [
+      "158081823347974"
+    ],
+    "unknownCount": 0
+  },
+  "stageLatency": {
+    "bm25:100W车载充电器": {
+      "maxMs": 7.3513,
+      "p50Ms": 7.3513,
+      "p95Ms": 7.3513,
+      "p99Ms": 7.3513,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:2000元以内头戴式降噪耳机": {
+      "maxMs": 5.5701,
+      "p50Ms": 5.5701,
+      "p95Ms": 5.5701,
+      "p99Ms": 5.5701,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:M5芯片苹果笔记本": {
+      "maxMs": 8.4221,
+      "p50Ms": 8.4221,
+      "p95Ms": 8.4221,
+      "p99Ms": 8.4221,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:MacBook笔记本电脑": {
+      "maxMs": 6.5182,
+      "p50Ms": 6.5182,
+      "p95Ms": 6.5182,
+      "p99Ms": 6.5182,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:便携筋膜枪": {
+      "maxMs": 5.18,
+      "p50Ms": 5.18,
+      "p95Ms": 5.18,
+      "p99Ms": 5.18,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:健身用干湿分离旅行包": {
+      "maxMs": 8.3079,
+      "p50Ms": 8.3079,
+      "p95Ms": 8.3079,
+      "p99Ms": 8.3079,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:儿童毛绒公仔玩具": {
+      "maxMs": 6.7789,
+      "p50Ms": 6.7789,
+      "p95Ms": 6.7789,
+      "p99Ms": 6.7789,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:公司设计渲染台式机": {
+      "maxMs": 7.1304,
+      "p50Ms": 7.1304,
+      "p95Ms": 7.1304,
+      "p99Ms": 7.1304,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:初学者民谣吉他": {
+      "maxMs": 5.5943,
+      "p50Ms": 5.5943,
+      "p95Ms": 5.5943,
+      "p99Ms": 5.5943,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:办公台式电脑": {
+      "maxMs": 6.5455,
+      "p50Ms": 6.5455,
+      "p95Ms": 6.5455,
+      "p99Ms": 6.5455,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:办公室零食": {
+      "maxMs": 5.4152,
+      "p50Ms": 5.4152,
+      "p95Ms": 5.4152,
+      "p99Ms": 5.4152,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:包": {
+      "maxMs": 8.4421,
+      "p50Ms": 5.0289,
+      "p95Ms": 8.4421,
+      "p99Ms": 8.4421,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:厨房油盐酱醋调料套装": {
+      "maxMs": 5.6744,
+      "p50Ms": 5.6744,
+      "p95Ms": 5.6744,
+      "p99Ms": 5.6744,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:口红唇釉": {
+      "maxMs": 4.9585,
+      "p50Ms": 4.9585,
+      "p95Ms": 4.9585,
+      "p99Ms": 4.9585,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:台式电脑": {
+      "maxMs": 6.2467,
+      "p50Ms": 6.1614,
+      "p95Ms": 6.2467,
+      "p99Ms": 6.2467,
+      "p99Reliable": false,
+      "samples": 3
+    },
+    "bm25:台式电脑主机": {
+      "maxMs": 7.1704,
+      "p50Ms": 7.1704,
+      "p95Ms": 7.1704,
+      "p99Ms": 7.1704,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:吉他": {
+      "maxMs": 8.3111,
+      "p50Ms": 4.5951,
+      "p95Ms": 8.3111,
+      "p99Ms": 8.3111,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:商务旗舰手机": {
+      "maxMs": 6.3467,
+      "p50Ms": 6.3467,
+      "p95Ms": 6.3467,
+      "p99Ms": 6.3467,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:外套": {
+      "maxMs": 4.2857,
+      "p50Ms": 4.2857,
+      "p95Ms": 4.2857,
+      "p99Ms": 4.2857,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:大屏商务三星手机": {
+      "maxMs": 5.8838,
+      "p50Ms": 5.8838,
+      "p95Ms": 5.8838,
+      "p99Ms": 5.8838,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:女士生日香水礼盒": {
+      "maxMs": 5.4467,
+      "p50Ms": 5.4467,
+      "p95Ms": 5.4467,
+      "p99Ms": 5.4467,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:宝宝满月童装礼盒": {
+      "maxMs": 7.353,
+      "p50Ms": 7.353,
+      "p95Ms": 7.353,
+      "p99Ms": 7.353,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:家用反渗透净水器": {
+      "maxMs": 5.2524,
+      "p50Ms": 5.2524,
+      "p95Ms": 5.2524,
+      "p99Ms": 5.2524,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:家用餐具碗碟套装": {
+      "maxMs": 6.0739,
+      "p50Ms": 6.0739,
+      "p95Ms": 6.0739,
+      "p99Ms": 6.0739,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:家里做饭用油盐酱醋组合": {
+      "maxMs": 5.7436,
+      "p50Ms": 5.7436,
+      "p95Ms": 5.7436,
+      "p99Ms": 5.7436,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:家里做饭用的油盐酱醋组合": {
+      "maxMs": 6.2561,
+      "p50Ms": 6.2561,
+      "p95Ms": 6.2561,
+      "p99Ms": 6.2561,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:干湿分离旅行健身包": {
+      "maxMs": 6.2221,
+      "p50Ms": 6.2221,
+      "p95Ms": 6.2221,
+      "p99Ms": 6.2221,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:想找滋润抗皱护肤面霜": {
+      "maxMs": 6.2988,
+      "p50Ms": 6.2988,
+      "p95Ms": 6.2988,
+      "p99Ms": 6.2988,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:户外防风软壳外套": {
+      "maxMs": 5.2682,
+      "p50Ms": 5.2682,
+      "p95Ms": 5.2682,
+      "p99Ms": 5.2682,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:手机": {
+      "maxMs": 5.1625,
+      "p50Ms": 4.7317,
+      "p95Ms": 5.1625,
+      "p99Ms": 5.1625,
+      "p99Reliable": false,
+      "samples": 4
+    },
+    "bm25:折叠屏手机": {
+      "maxMs": 5.1333,
+      "p50Ms": 5.1333,
+      "p95Ms": 5.1333,
+      "p99Ms": 5.1333,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:新房除甲醛空气净化器": {
+      "maxMs": 7.7612,
+      "p50Ms": 7.7612,
+      "p95Ms": 7.7612,
+      "p99Ms": 7.7612,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:新生儿礼盒": {
+      "maxMs": 5.9683,
+      "p50Ms": 5.9683,
+      "p95Ms": 5.9683,
+      "p99Ms": 5.9683,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:新生儿衣服礼盒": {
+      "maxMs": 6.6666,
+      "p50Ms": 6.6666,
+      "p95Ms": 6.6666,
+      "p99Ms": 6.6666,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:无线降噪耳机": {
+      "maxMs": 140.7065,
+      "p50Ms": 140.7065,
+      "p95Ms": 140.7065,
+      "p99Ms": 140.7065,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:服饰": {
+      "maxMs": 6.2416,
+      "p50Ms": 4.8043,
+      "p95Ms": 6.2416,
+      "p99Ms": 6.2416,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:洗碗机可用的碗碟套装": {
+      "maxMs": 6.5936,
+      "p50Ms": 6.5936,
+      "p95Ms": 6.5936,
+      "p99Ms": 6.5936,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:洗碗机可用碗碟套装": {
+      "maxMs": 5.6327,
+      "p50Ms": 5.6327,
+      "p95Ms": 5.6327,
+      "p99Ms": 5.6327,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:滋润抗皱面霜": {
+      "maxMs": 6.3734,
+      "p50Ms": 6.3734,
+      "p95Ms": 6.3734,
+      "p99Ms": 6.3734,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:玩具": {
+      "maxMs": 5.645,
+      "p50Ms": 4.7998,
+      "p95Ms": 5.645,
+      "p99Ms": 5.645,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:电脑": {
+      "maxMs": 6.6315,
+      "p50Ms": 5.8659,
+      "p95Ms": 6.6315,
+      "p99Ms": 6.6315,
+      "p99Reliable": false,
+      "samples": 4
+    },
+    "bm25:百瓦多口车载充电器": {
+      "maxMs": 6.0363,
+      "p50Ms": 6.0363,
+      "p95Ms": 6.0363,
+      "p99Ms": 6.0363,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:空气净化器": {
+      "maxMs": 6.8221,
+      "p50Ms": 6.1942,
+      "p95Ms": 6.8221,
+      "p99Ms": 6.8221,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:空气净化器除甲醛": {
+      "maxMs": 7.4886,
+      "p50Ms": 7.4886,
+      "p95Ms": 7.4886,
+      "p99Ms": 7.4886,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:笔记本电脑": {
+      "maxMs": 8.1567,
+      "p50Ms": 5.5107,
+      "p95Ms": 8.1567,
+      "p99Ms": 8.1567,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:第一次学民谣吉他": {
+      "maxMs": 9.8664,
+      "p50Ms": 9.8664,
+      "p95Ms": 9.8664,
+      "p99Ms": 9.8664,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:索尼蓝牙耳机": {
+      "maxMs": 6.7798,
+      "p50Ms": 6.7798,
+      "p95Ms": 6.7798,
+      "p99Ms": 6.7798,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:给爸妈用便携筋膜枪": {
+      "maxMs": 6.6136,
+      "p50Ms": 6.6136,
+      "p95Ms": 6.6136,
+      "p99Ms": 6.6136,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:给爸妈用的便携筋膜枪": {
+      "maxMs": 7.7635,
+      "p50Ms": 7.7635,
+      "p95Ms": 7.7635,
+      "p99Ms": 7.7635,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:耳机": {
+      "maxMs": 8.814,
+      "p50Ms": 4.907,
+      "p95Ms": 8.814,
+      "p99Ms": 8.814,
+      "p99Reliable": false,
+      "samples": 5
+    },
+    "bm25:苹果手机": {
+      "maxMs": 5.3269,
+      "p50Ms": 5.3269,
+      "p95Ms": 5.3269,
+      "p99Ms": 5.3269,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:蒸烤一体机": {
+      "maxMs": 6.1574,
+      "p50Ms": 6.1574,
+      "p95Ms": 6.1574,
+      "p99Ms": 6.1574,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:蓝牙桌面音箱": {
+      "maxMs": 6.1135,
+      "p50Ms": 6.1135,
+      "p95Ms": 6.1135,
+      "p99Ms": 6.1135,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:蓝牙音箱": {
+      "maxMs": 6.1478,
+      "p50Ms": 6.1478,
+      "p95Ms": 6.1478,
+      "p99Ms": 6.1478,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:蔚来ES8汽车脚垫": {
+      "maxMs": 8.9012,
+      "p50Ms": 8.9012,
+      "p95Ms": 8.9012,
+      "p99Ms": 8.9012,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:设计渲染高性能电脑": {
+      "maxMs": 5.5227,
+      "p50Ms": 5.5227,
+      "p95Ms": 5.5227,
+      "p99Ms": 5.5227,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:车载充电器": {
+      "maxMs": 6.7851,
+      "p50Ms": 5.381,
+      "p95Ms": 6.7851,
+      "p99Ms": 6.7851,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:送学生的索尼无线耳机": {
+      "maxMs": 5.71,
+      "p50Ms": 5.71,
+      "p95Ms": 5.71,
+      "p99Ms": 5.71,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:送孩子的毛绒玩偶": {
+      "maxMs": 5.9168,
+      "p50Ms": 5.9168,
+      "p95Ms": 5.9168,
+      "p99Ms": 5.9168,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:适合办公的头戴式降噪耳机": {
+      "maxMs": 7.6392,
+      "p50Ms": 7.6392,
+      "p95Ms": 7.6392,
+      "p99Ms": 7.6392,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:铝合金维修工具箱": {
+      "maxMs": 6.3733,
+      "p50Ms": 6.3733,
+      "p95Ms": 6.3733,
+      "p99Ms": 6.3733,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:零食": {
+      "maxMs": 4.4585,
+      "p50Ms": 4.4269,
+      "p95Ms": 4.4585,
+      "p99Ms": 4.4585,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:面霜": {
+      "maxMs": 5.8653,
+      "p50Ms": 5.1788,
+      "p95Ms": 5.8653,
+      "p99Ms": 5.8653,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "bm25:音箱": {
+      "maxMs": 5.786,
+      "p50Ms": 5.786,
+      "p95Ms": 5.786,
+      "p99Ms": 5.786,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "bm25:饼干糕点零食": {
+      "maxMs": 5.5058,
+      "p50Ms": 5.5058,
+      "p95Ms": 5.5058,
+      "p99Ms": 5.5058,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "filter": {
+      "maxMs": 0.8013,
+      "p50Ms": 0.2887,
+      "p95Ms": 0.4895,
+      "p99Ms": 0.8013,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "productServiceTotal": {
+      "maxMs": 1387.8572,
+      "p50Ms": 543.0126,
+      "p95Ms": 1177.1016,
+      "p99Ms": 1387.8572,
+      "p99Reliable": false,
+      "samples": 44
+    },
+    "queryParse": {
+      "maxMs": 11.8668,
+      "p50Ms": 0.1954,
+      "p95Ms": 0.3395,
+      "p99Ms": 11.8668,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "rerank": {
+      "maxMs": 765.662,
+      "p50Ms": 199.9997,
+      "p95Ms": 530.0377,
+      "p99Ms": 765.662,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "rrf": {
+      "maxMs": 0.0441,
+      "p50Ms": 0.0176,
+      "p95Ms": 0.0299,
+      "p99Ms": 0.0441,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "runnerTotal": {
+      "maxMs": 1388.3258,
+      "p50Ms": 543.5406,
+      "p95Ms": 1177.5052,
+      "p99Ms": 1388.3258,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "shoppingDecision": {
+      "maxMs": 247.5981,
+      "p50Ms": 45.8777,
+      "p95Ms": 203.3745,
+      "p99Ms": 247.5981,
+      "p99Reliable": false,
+      "samples": 44
+    },
+    "snapshotLoad": {
+      "maxMs": 29.7336,
+      "p50Ms": 14.4671,
+      "p95Ms": 20.9794,
+      "p99Ms": 29.7336,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "total": {
+      "maxMs": 1139.4344,
+      "p50Ms": 479.2106,
+      "p95Ms": 1105.0988,
+      "p99Ms": 1139.4344,
+      "p99Reliable": false,
+      "samples": 45
+    },
+    "vector:100W车载充电器": {
+      "maxMs": 290.9956,
+      "p50Ms": 290.9956,
+      "p95Ms": 290.9956,
+      "p99Ms": 290.9956,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:2000元以内头戴式降噪耳机": {
+      "maxMs": 939.9392,
+      "p50Ms": 939.9392,
+      "p95Ms": 939.9392,
+      "p99Ms": 939.9392,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:M5芯片苹果笔记本": {
+      "maxMs": 244.7834,
+      "p50Ms": 244.7834,
+      "p95Ms": 244.7834,
+      "p99Ms": 244.7834,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:MacBook笔记本电脑": {
+      "maxMs": 313.4554,
+      "p50Ms": 313.4554,
+      "p95Ms": 313.4554,
+      "p99Ms": 313.4554,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:便携筋膜枪": {
+      "maxMs": 252.0441,
+      "p50Ms": 252.0441,
+      "p95Ms": 252.0441,
+      "p99Ms": 252.0441,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:健身用干湿分离旅行包": {
+      "maxMs": 226.5412,
+      "p50Ms": 226.5412,
+      "p95Ms": 226.5412,
+      "p99Ms": 226.5412,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:儿童毛绒公仔玩具": {
+      "maxMs": 224.66,
+      "p50Ms": 224.66,
+      "p95Ms": 224.66,
+      "p99Ms": 224.66,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:公司设计渲染台式机": {
+      "maxMs": 263.3483,
+      "p50Ms": 263.3483,
+      "p95Ms": 263.3483,
+      "p99Ms": 263.3483,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:初学者民谣吉他": {
+      "maxMs": 253.3243,
+      "p50Ms": 253.3243,
+      "p95Ms": 253.3243,
+      "p99Ms": 253.3243,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:办公台式电脑": {
+      "maxMs": 231.9624,
+      "p50Ms": 231.9624,
+      "p95Ms": 231.9624,
+      "p99Ms": 231.9624,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:办公室零食": {
+      "maxMs": 242.3594,
+      "p50Ms": 242.3594,
+      "p95Ms": 242.3594,
+      "p99Ms": 242.3594,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:包": {
+      "maxMs": 276.7183,
+      "p50Ms": 221.0481,
+      "p95Ms": 276.7183,
+      "p99Ms": 276.7183,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:厨房油盐酱醋调料套装": {
+      "maxMs": 326.2956,
+      "p50Ms": 326.2956,
+      "p95Ms": 326.2956,
+      "p99Ms": 326.2956,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:口红唇釉": {
+      "maxMs": 345.2832,
+      "p50Ms": 345.2832,
+      "p95Ms": 345.2832,
+      "p99Ms": 345.2832,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:台式电脑": {
+      "maxMs": 287.0493,
+      "p50Ms": 265.9372,
+      "p95Ms": 287.0493,
+      "p99Ms": 287.0493,
+      "p99Reliable": false,
+      "samples": 3
+    },
+    "vector:台式电脑主机": {
+      "maxMs": 296.1911,
+      "p50Ms": 296.1911,
+      "p95Ms": 296.1911,
+      "p99Ms": 296.1911,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:吉他": {
+      "maxMs": 281.3144,
+      "p50Ms": 279.0058,
+      "p95Ms": 281.3144,
+      "p99Ms": 281.3144,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:商务旗舰手机": {
+      "maxMs": 248.1532,
+      "p50Ms": 248.1532,
+      "p95Ms": 248.1532,
+      "p99Ms": 248.1532,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:外套": {
+      "maxMs": 255.3329,
+      "p50Ms": 255.3329,
+      "p95Ms": 255.3329,
+      "p99Ms": 255.3329,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:大屏商务三星手机": {
+      "maxMs": 221.7128,
+      "p50Ms": 221.7128,
+      "p95Ms": 221.7128,
+      "p99Ms": 221.7128,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:女士生日香水礼盒": {
+      "maxMs": 228.0517,
+      "p50Ms": 228.0517,
+      "p95Ms": 228.0517,
+      "p99Ms": 228.0517,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:宝宝满月童装礼盒": {
+      "maxMs": 237.5711,
+      "p50Ms": 237.5711,
+      "p95Ms": 237.5711,
+      "p99Ms": 237.5711,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:家用反渗透净水器": {
+      "maxMs": 219.614,
+      "p50Ms": 219.614,
+      "p95Ms": 219.614,
+      "p99Ms": 219.614,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:家用餐具碗碟套装": {
+      "maxMs": 258.4269,
+      "p50Ms": 258.4269,
+      "p95Ms": 258.4269,
+      "p99Ms": 258.4269,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:家里做饭用油盐酱醋组合": {
+      "maxMs": 271.2143,
+      "p50Ms": 271.2143,
+      "p95Ms": 271.2143,
+      "p99Ms": 271.2143,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:家里做饭用的油盐酱醋组合": {
+      "maxMs": 271.0565,
+      "p50Ms": 271.0565,
+      "p95Ms": 271.0565,
+      "p99Ms": 271.0565,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:干湿分离旅行健身包": {
+      "maxMs": 234.8396,
+      "p50Ms": 234.8396,
+      "p95Ms": 234.8396,
+      "p99Ms": 234.8396,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:想找滋润抗皱护肤面霜": {
+      "maxMs": 412.7046,
+      "p50Ms": 412.7046,
+      "p95Ms": 412.7046,
+      "p99Ms": 412.7046,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:户外防风软壳外套": {
+      "maxMs": 208.5135,
+      "p50Ms": 208.5135,
+      "p95Ms": 208.5135,
+      "p99Ms": 208.5135,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:手机": {
+      "maxMs": 352.5386,
+      "p50Ms": 247.1243,
+      "p95Ms": 352.5386,
+      "p99Ms": 352.5386,
+      "p99Reliable": false,
+      "samples": 4
+    },
+    "vector:折叠屏手机": {
+      "maxMs": 259.0719,
+      "p50Ms": 259.0719,
+      "p95Ms": 259.0719,
+      "p99Ms": 259.0719,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:新房除甲醛空气净化器": {
+      "maxMs": 266.3963,
+      "p50Ms": 266.3963,
+      "p95Ms": 266.3963,
+      "p99Ms": 266.3963,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:新生儿礼盒": {
+      "maxMs": 251.7,
+      "p50Ms": 251.7,
+      "p95Ms": 251.7,
+      "p99Ms": 251.7,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:新生儿衣服礼盒": {
+      "maxMs": 268.6098,
+      "p50Ms": 268.6098,
+      "p95Ms": 268.6098,
+      "p99Ms": 268.6098,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:无线降噪耳机": {
+      "maxMs": 521.0992,
+      "p50Ms": 521.0992,
+      "p95Ms": 521.0992,
+      "p99Ms": 521.0992,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:服饰": {
+      "maxMs": 275.8045,
+      "p50Ms": 237.2774,
+      "p95Ms": 275.8045,
+      "p99Ms": 275.8045,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:洗碗机可用的碗碟套装": {
+      "maxMs": 268.5469,
+      "p50Ms": 268.5469,
+      "p95Ms": 268.5469,
+      "p99Ms": 268.5469,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:洗碗机可用碗碟套装": {
+      "maxMs": 214.1971,
+      "p50Ms": 214.1971,
+      "p95Ms": 214.1971,
+      "p99Ms": 214.1971,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:滋润抗皱面霜": {
+      "maxMs": 242.1286,
+      "p50Ms": 242.1286,
+      "p95Ms": 242.1286,
+      "p99Ms": 242.1286,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:玩具": {
+      "maxMs": 236.418,
+      "p50Ms": 215.7026,
+      "p95Ms": 236.418,
+      "p99Ms": 236.418,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:电脑": {
+      "maxMs": 377.6024,
+      "p50Ms": 262.2229,
+      "p95Ms": 377.6024,
+      "p99Ms": 377.6024,
+      "p99Reliable": false,
+      "samples": 4
+    },
+    "vector:百瓦多口车载充电器": {
+      "maxMs": 319.0866,
+      "p50Ms": 319.0866,
+      "p95Ms": 319.0866,
+      "p99Ms": 319.0866,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:空气净化器": {
+      "maxMs": 259.36,
+      "p50Ms": 241.8201,
+      "p95Ms": 259.36,
+      "p99Ms": 259.36,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:空气净化器除甲醛": {
+      "maxMs": 216.1309,
+      "p50Ms": 216.1309,
+      "p95Ms": 216.1309,
+      "p99Ms": 216.1309,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:笔记本电脑": {
+      "maxMs": 252.7159,
+      "p50Ms": 212.8191,
+      "p95Ms": 252.7159,
+      "p99Ms": 252.7159,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:第一次学民谣吉他": {
+      "maxMs": 282.4303,
+      "p50Ms": 282.4303,
+      "p95Ms": 282.4303,
+      "p99Ms": 282.4303,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:索尼蓝牙耳机": {
+      "maxMs": 264.8506,
+      "p50Ms": 264.8506,
+      "p95Ms": 264.8506,
+      "p99Ms": 264.8506,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:给爸妈用便携筋膜枪": {
+      "maxMs": 478.3261,
+      "p50Ms": 478.3261,
+      "p95Ms": 478.3261,
+      "p99Ms": 478.3261,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:给爸妈用的便携筋膜枪": {
+      "maxMs": 478.0616,
+      "p50Ms": 478.0616,
+      "p95Ms": 478.0616,
+      "p99Ms": 478.0616,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:耳机": {
+      "maxMs": 988.4682,
+      "p50Ms": 264.9623,
+      "p95Ms": 988.4682,
+      "p99Ms": 988.4682,
+      "p99Reliable": false,
+      "samples": 5
+    },
+    "vector:苹果手机": {
+      "maxMs": 485.2526,
+      "p50Ms": 485.2526,
+      "p95Ms": 485.2526,
+      "p99Ms": 485.2526,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:蒸烤一体机": {
+      "maxMs": 203.0479,
+      "p50Ms": 203.0479,
+      "p95Ms": 203.0479,
+      "p99Ms": 203.0479,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:蓝牙桌面音箱": {
+      "maxMs": 243.0085,
+      "p50Ms": 243.0085,
+      "p95Ms": 243.0085,
+      "p99Ms": 243.0085,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:蓝牙音箱": {
+      "maxMs": 188.1061,
+      "p50Ms": 188.1061,
+      "p95Ms": 188.1061,
+      "p99Ms": 188.1061,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:蔚来ES8汽车脚垫": {
+      "maxMs": 220.1952,
+      "p50Ms": 220.1952,
+      "p95Ms": 220.1952,
+      "p99Ms": 220.1952,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:设计渲染高性能电脑": {
+      "maxMs": 181.954,
+      "p50Ms": 181.954,
+      "p95Ms": 181.954,
+      "p99Ms": 181.954,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:车载充电器": {
+      "maxMs": 318.478,
+      "p50Ms": 259.3687,
+      "p95Ms": 318.478,
+      "p99Ms": 318.478,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:送学生的索尼无线耳机": {
+      "maxMs": 220.5092,
+      "p50Ms": 220.5092,
+      "p95Ms": 220.5092,
+      "p99Ms": 220.5092,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:送孩子的毛绒玩偶": {
+      "maxMs": 237.5514,
+      "p50Ms": 237.5514,
+      "p95Ms": 237.5514,
+      "p99Ms": 237.5514,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:适合办公的头戴式降噪耳机": {
+      "maxMs": 202.0927,
+      "p50Ms": 202.0927,
+      "p95Ms": 202.0927,
+      "p99Ms": 202.0927,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:铝合金维修工具箱": {
+      "maxMs": 248.2895,
+      "p50Ms": 248.2895,
+      "p95Ms": 248.2895,
+      "p99Ms": 248.2895,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:零食": {
+      "maxMs": 299.724,
+      "p50Ms": 229.6485,
+      "p95Ms": 299.724,
+      "p99Ms": 299.724,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:面霜": {
+      "maxMs": 360.8123,
+      "p50Ms": 266.3467,
+      "p95Ms": 360.8123,
+      "p99Ms": 360.8123,
+      "p99Reliable": false,
+      "samples": 2
+    },
+    "vector:音箱": {
+      "maxMs": 220.1232,
+      "p50Ms": 220.1232,
+      "p95Ms": 220.1232,
+      "p99Ms": 220.1232,
+      "p99Reliable": false,
+      "samples": 1
+    },
+    "vector:饼干糕点零食": {
+      "maxMs": 238.763,
+      "p50Ms": 238.763,
+      "p95Ms": 238.763,
+      "p99Ms": 238.763,
+      "p99Reliable": false,
+      "samples": 1
+    }
+  },
+  "providerFacts": {
+    "embedding": {
+      "breakerRejections": 0,
+      "bypassCache": true,
+      "cacheHits": 0,
+      "providerFailures": 0,
+      "providerRequests": 86,
+      "providerSuccesses": 86,
+      "requests": 86
+    },
+    "rerank": {
+      "eligibleRequests": 30,
+      "fallbackCount": 0,
+      "fallbackReasons": {},
+      "providerFailures": 0,
+      "providerRequests": 30,
+      "providerSuccesses": 30
+    }
+  },
+  "qualityGates": {
+    "allCasesExecuted": true,
+    "catalogRecallAt10": true,
+    "catalogMrrAt10": true,
+    "catalogNdcgAt10": true,
+    "purchasableRecallAt10": true,
+    "availabilityNoResultAccuracy": true,
+    "embeddingCacheHitsZero": true,
+    "embeddingFailuresZero": true,
+    "rerankFailuresZero": true,
+    "rerankFallbackZero": true,
+    "runtimeFallbackZero": true,
+    "goldNeverUsedByRuntime": true,
+    "passed": true
+  },
+  "qualityGateState": "PASSED_POST_FIX_REGRESSION",
+  "badcases": [
+    {
+      "caseId": "graded-019",
+      "route": "out_of_stock",
+      "catalogRecallAt10": 0.0,
+      "unavailableRelevantIds": [
+        "158081823347974"
+      ],
+      "availabilityNoResultCorrect": true
+    }
+  ],
+  "rawArtifactSha256": "e98b6f693e67dcbe30c4bd0a428bd5b6d704f24ae156af15a58b9859b85f8007",
+  "honestBoundaries": [
+    "This regression reuses disclosed public/holdout cases and is not fresh holdout evidence.",
+    "The original Search v2 final run remains FAILED_RETAINED and is not overwritten.",
+    "Availability adjustment uses a Java-owned product snapshot only for scoring; gold labels never enter runtime retrieval.",
+    "SYNTHETIC + local-live is not real-user or production-traffic evidence.",
+    "No baseline was accepted or overwritten."
+  ]
+}

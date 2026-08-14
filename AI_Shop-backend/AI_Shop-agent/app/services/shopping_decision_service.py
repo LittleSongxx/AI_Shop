@@ -19,6 +19,7 @@ from app.services.final_offer_snapshot_service import (
 )
 from app.services.product_decision_feature_service import product_decision_feature_service
 from app.services.shopping_mission_service import mission_summary, schema_for
+from app.services.shopping_profile_service import shopping_profile_service
 
 logger = structlog.get_logger()
 
@@ -233,13 +234,21 @@ class ShoppingDecisionService:
         max_budget = _number(hard.get("budgetMax"))
         required_brands = {str(value).lower() for value in hard.get("requiredBrands") or []}
         excluded_brands = {str(value).lower() for value in exclusions.get("brands") or []}
+        brand_profile = {
+            "brands": list(hard.get("requiredBrands") or soft.get("brands") or []),
+            "excludedBrands": list(exclusions.get("brands") or []),
+        }
         eligible: list[dict[str, Any]] = []
         rejected: list[dict[str, str]] = []
         for raw in products:
             product = dict(raw)
             product_id = str(product.get("product_id") or product.get("productId") or "")
             price = _number(product.get("estimated_payable"))
-            brand = str(product.get("brand") or "").lower()
+            brand = str(
+                shopping_profile_service.resolve_known_brand(product, brand_profile) or ""
+            ).lower()
+            if brand:
+                product["brand"] = brand
             reason = None
             if str(product.get("status")) != "1" or product.get("in_stock") is False:
                 reason = "NOT_PURCHASABLE"

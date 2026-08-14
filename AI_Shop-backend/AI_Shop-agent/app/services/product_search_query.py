@@ -10,6 +10,9 @@ from typing import Any
 import yaml
 
 _TAXONOMY_PATH = Path(__file__).resolve().parents[1] / "config" / "search_taxonomy.yml"
+_RUNTIME_TAXONOMY_PATH = (
+    Path(__file__).resolve().parents[1] / "config" / "search_runtime_taxonomy.yml"
+)
 
 
 @lru_cache(maxsize=1)
@@ -28,6 +31,15 @@ def _topics() -> list[dict[str, Any]]:
     return [item for item in _taxonomy()["topics"] if isinstance(item, dict)]
 
 
+@lru_cache(maxsize=1)
+def _runtime_topics() -> list[dict[str, Any]]:
+    payload = yaml.safe_load(_RUNTIME_TAXONOMY_PATH.read_text(encoding="utf-8"))
+    topics = payload.get("topics") if isinstance(payload, dict) else None
+    if not isinstance(topics, list):
+        raise ValueError(f"invalid runtime product taxonomy: {_RUNTIME_TAXONOMY_PATH}")
+    return [item for item in topics if isinstance(item, dict)]
+
+
 def _topic_aliases(topic: dict[str, Any]) -> list[str]:
     values = [topic.get("canonical"), *(topic.get("aliases") or [])]
     return [str(value).strip() for value in values if str(value or "").strip()]
@@ -39,6 +51,49 @@ def _topic_exact_aliases(topic: dict[str, Any]) -> list[str]:
         for value in topic.get("exactAliases") or []
         if str(value or "").strip()
     ]
+
+
+def infer_product_category(text: str | None) -> str | None:
+    """Return the most specific managed catalog category named by the user.
+
+    Only canonical names and aliases participate.  Broad retrieval terms are
+    deliberately excluded because words such as "children" or "electric"
+    can describe an audience or feature without naming a product category.
+    """
+
+    value = (text or "").strip().lower()
+    if not value:
+        return None
+    # A comparison target is not necessarily the requested product.  For
+    # example, "buy Martian soil and use it as a phone" must not become a
+    # phone mission merely because the suffix names a managed category.
+    value = re.split(r"(?:并能|并可|能|可)?(?:当作|当成|作为)", value, maxsplit=1)[0]
+    cleaned_value = _clean_query(value).casefold()
+    matches: list[tuple[int, int, str]] = []
+    for position, topic in enumerate([*_runtime_topics(), *_topics()]):
+        category = str(
+            topic.get("runtimeCategory") or topic.get("canonical") or ""
+        ).strip()
+        if not category:
+            continue
+        for alias in _topic_aliases(topic):
+            if alias.lower() in value:
+                matches.append((len(alias), -position, category))
+        for alias in _topic_exact_aliases(topic):
+            if cleaned_value == alias.casefold():
+                matches.append((len(alias), -position, category))
+    if not matches:
+        return None
+    return max(matches)[2]
+
+
+def primary_product_request(text: str | None) -> str:
+    """Return the request span before an explicit comparison/use-as suffix."""
+
+    value = (text or "").strip()
+    return re.split(
+        r"(?:并能|并可|能|可)?(?:当作|当成|作为)", value, maxsplit=1
+    )[0].strip()
 
 
 def _clean_query(value: str) -> str:
@@ -70,6 +125,16 @@ def normalize_product_search_query(text: str | None) -> str:
             return canonical
 
     return cleaned or value
+
+
+def is_managed_search_keyword(value: str | None) -> bool:
+    """Return whether a normalized keyword is a historical taxonomy canonical."""
+
+    normalized = str(value or "").strip().casefold()
+    return bool(normalized) and any(
+        normalized == str(topic.get("canonical") or "").strip().casefold()
+        for topic in _topics()
+    )
 
 
 def match_terms_for_query(query: str | None) -> list[str]:

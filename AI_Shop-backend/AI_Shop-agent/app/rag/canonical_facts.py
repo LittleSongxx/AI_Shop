@@ -210,6 +210,31 @@ class CanonicalFactCatalog:
             for index, concept in enumerate(concepts):
                 if not _concept_aliases(concept):
                     errors.append(f"{case_id}: requiredConcepts[{index}] has no aliases")
+        claims = case.get("requiredClaims")
+        if claims is not None:
+            if not isinstance(claims, list):
+                errors.append(f"{case_id}: requiredClaims must be a list")
+            else:
+                claim_ids: set[str] = set()
+                allowed_facts = set(str(value) for value in relevant)
+                for index, claim in enumerate(claims):
+                    if not isinstance(claim, Mapping):
+                        errors.append(f"{case_id}: requiredClaims[{index}] must be an object")
+                        continue
+                    claim_id = str(claim.get("claimId") or "").strip()
+                    if not claim_id or claim_id in claim_ids:
+                        errors.append(f"{case_id}: requiredClaims has duplicate/missing claimId")
+                    claim_ids.add(claim_id)
+                    aliases = _concept_aliases(claim)
+                    if not aliases:
+                        errors.append(f"{case_id}: requiredClaims[{index}] has no aliases")
+                    fact_ids = {
+                        str(value) for value in claim.get("factIds") or [] if str(value)
+                    }
+                    if fact_ids - allowed_facts:
+                        errors.append(
+                            f"{case_id}: requiredClaims[{index}] references facts outside relevantFactIds"
+                        )
         no_answer = bool(case.get("noAnswer"))
         if no_answer != (behavior == "REFUSE"):
             errors.append(f"{case_id}: noAnswer must match expectedBehavior=REFUSE")

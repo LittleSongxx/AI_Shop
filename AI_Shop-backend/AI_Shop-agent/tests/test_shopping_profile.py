@@ -36,6 +36,23 @@ def test_extract_profile_parses_budget_brand_category_and_preferences():
     assert profile["features"] == ["续航"]
 
 
+def test_extract_profile_prefers_explicit_use_case_over_audience_substrings():
+    profile = extract_profile(
+        "预算2201元以内，想买荣耀品牌的咖啡机，用于办公室，适合上班族"
+    )
+
+    assert profile["scenarios"] == ["办公室"]
+
+
+def test_extract_profile_does_not_parse_age_attribute_as_budget_range():
+    profile = extract_profile(
+        "预算1000元以内的积木玩具，适合3-5岁儿童"
+    )
+
+    assert profile["budgetMin"] is None
+    assert profile["budgetMax"] == 1000
+
+
 def test_extract_profile_recognizes_bare_bag_as_a_product_category():
     profile = extract_profile(
         "我想买一个适合上班通勤的包，预算 500 元以内，请推荐"
@@ -217,6 +234,10 @@ def test_narrowing_signal_suppresses_clarification():
     assert not service.should_clarify("推荐华为手机", "华为手机", empty, None)
     assert not service.should_clarify("办公用的笔记本", "笔记本", empty, None)
     assert not service.should_clarify("轻薄的笔记本", "笔记本", empty, None)
+    assert not service.should_clarify("无线降噪耳机", "无线降噪耳机", empty, None)
+    assert not service.should_clarify("台式电脑主机", "台式电脑主机", empty, None)
+    assert not service.should_clarify("新生儿衣服礼盒", "新生儿衣服礼盒", empty, None)
+    assert not service.should_clarify("100W车载充电器", "100W车载充电器", empty, None)
 
     # A remembered budget also suppresses it, so we never ask the same thing twice.
     remembered = extract_profile("预算3000以内")

@@ -1,0 +1,11 @@
+[
+  {
+    "caseId": "graded-019",
+    "route": "out_of_stock",
+    "catalogRecallAt10": 0.0,
+    "unavailableRelevantIds": [
+      "158081823347974"
+    ],
+    "availabilityNoResultCorrect": true
+  }
+]

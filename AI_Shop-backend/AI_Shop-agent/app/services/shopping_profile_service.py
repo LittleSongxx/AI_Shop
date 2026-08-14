@@ -18,7 +18,12 @@ from app.services.redis_service import redis_service
 logger = structlog.get_logger()
 
 _AMOUNT = r"(\d+(?:\.\d+)?)\s*(万|千|k|K)?"
-_RANGE_RE = re.compile(rf"{_AMOUNT}\s*(?:-|~|～|至|到)\s*{_AMOUNT}\s*(?:元|块)?")
+_RANGE_RE = re.compile(
+    rf"(?:预算|价格|价位)\s*{_AMOUNT}\s*(?:-|~|～|至|到)\s*{_AMOUNT}\s*(?:元|块)?"
+)
+_BARE_CURRENCY_RANGE_RE = re.compile(
+    rf"{_AMOUNT}\s*(?:-|~|～|至|到)\s*{_AMOUNT}\s*(?:元|块)"
+)
 _UPPER_RE = re.compile(
     rf"(?:预算|价格|价位)?\s*(?:不超过|不高于|最多|低于|小于)\s*{_AMOUNT}\s*(?:元|块)?"
 )
@@ -56,6 +61,7 @@ _BRAND_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("联想", ("联想", "lenovo")),
     ("戴尔", ("戴尔", "dell")),
     ("惠普", ("惠普", "hp")),
+    ("索尼", ("索尼", "sony")),
     ("耐克", ("耐克", "nike")),
     ("阿迪达斯", ("阿迪达斯", "adidas")),
 )
@@ -66,6 +72,8 @@ _CATEGORY_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("电脑", ("电脑", "台式机", "主机")),
     ("平板", ("平板", "ipad")),
     ("零食", ("零食", "食品", "吃的")),
+    ("车载充电器", ("车载充电器", "车充", "车载快充")),
+    ("音箱", ("音箱", "音响", "蓝牙音箱", "桌面音箱")),
     ("家电", ("家电", "电器")),
     ("耳机", ("耳机", "降噪耳机")),
     ("箱包", ("箱包", "背包", "书包", "双肩包", "手提包", "斜挎包", "包包", "包")),
@@ -84,14 +92,19 @@ _SCENARIO_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("送礼", ("送礼", "礼物", "送人")),
     ("学生", ("学生", "上课")),
     ("老人", ("老人", "长辈")),
-    ("儿童", ("儿童", "孩子", "小孩")),
+    ("儿童", ("儿童", "孩子", "小孩", "新生儿", "婴儿", "宝宝")),
     ("通勤", ("通勤",)),
     ("旅行", ("旅行", "出差")),
     ("编程开发", ("编程", "写代码", "程序员", "开发")),
     ("视频创作", ("视频剪辑", "剪视频", "视频创作", "做视频")),
+    ("设计创作", ("设计", "渲染")),
+    ("商务办公", ("商务", "企业办公", "公司办公")),
     ("户外运动", ("户外", "登山", "徒步", "露营")),
     ("上学通勤", ("上学", "书包")),
     ("上班通勤", ("上班通勤", "职场通勤")),
+)
+_EXPLICIT_USE_CASE_RE = re.compile(
+    r"(?:主要)?(?:用于|用来|拿来)\s*([^\uff0c。；！？]{1,24}?)(?=\uff0c|。|；|！|？|适合|希望|$)"
 )
 
 _FEATURE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -101,6 +114,10 @@ _FEATURE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("大屏", ("大屏", "屏幕大")),
     ("高性能", ("高性能", "性能强", "配置高")),
     ("降噪", ("降噪", "anc")),
+    ("折叠屏", ("折叠屏", "折叠手机")),
+    ("头戴式", ("头戴式", "头戴耳机")),
+    ("台式主机", ("台式机", "台式电脑", "电脑主机", "台式主机")),
+    ("大功率快充", ("100w", "百瓦", "多口快充", "超级快充")),
     ("防水", ("防水",)),
     ("大容量", ("大容量", "能装", "收纳多")),
     ("轻量", ("轻量", "重量轻")),
@@ -306,7 +323,7 @@ def _budget_from_match(match: re.Match[str], first: int = 1) -> float:
 
 
 def _parse_budget(text: str) -> tuple[float | None, float | None]:
-    match = _RANGE_RE.search(text)
+    match = _RANGE_RE.search(text) or _BARE_CURRENCY_RANGE_RE.search(text)
     if match:
         left = _budget_from_match(match, 1)
         right = _budget_from_match(match, 3)
@@ -383,15 +400,20 @@ def extract_profile(text: str | None) -> dict[str, Any]:
             profile["category"] = canonical
             break
 
-    profile["scenarios"] = [
-        canonical
-        for canonical, aliases in _SCENARIO_HINTS
-        if any(alias in value for alias in aliases)
-    ]
+    explicit_use_case = _EXPLICIT_USE_CASE_RE.search(value)
+    profile["scenarios"] = (
+        [explicit_use_case.group(1).strip()]
+        if explicit_use_case and explicit_use_case.group(1).strip()
+        else [
+            canonical
+            for canonical, aliases in _SCENARIO_HINTS
+            if any(alias.casefold() in value.casefold() for alias in aliases)
+        ]
+    )
     profile["features"] = [
         canonical
         for canonical, aliases in _FEATURE_HINTS
-        if any(alias in value for alias in aliases)
+        if any(alias.casefold() in value.casefold() for alias in aliases)
     ]
     for pattern in _EXPLICIT_SPEC_PATTERNS:
         for match in pattern.finditer(value):
@@ -1343,6 +1365,11 @@ class ShoppingProfileService:
     ) -> str | None:
         existing = str(product.get("brand") or "").strip()
         if existing:
+            for canonical, aliases in _BRAND_ALIASES:
+                if canonical.casefold() == existing.casefold() or _brand_in_text(
+                    existing, aliases
+                ):
+                    return canonical
             return existing
         product_text = self._product_text(product).lower()
         preferred = list((profile or {}).get("brands") or [])

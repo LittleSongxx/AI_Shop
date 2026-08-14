@@ -154,10 +154,26 @@ def relevance_filter(
         category = str(constraints.get("category") or "")
         price_min = constraints.get("priceMin")
         price_max = constraints.get("priceMax")
+        required_brands = {
+            str(value).strip().casefold()
+            for value in constraints.get("requiredBrands") or []
+            if str(value).strip()
+        }
+        required_attributes = dict(constraints.get("attributes") or {})
+        if constraints.get("outOfDomain"):
+            return []
 
         def passes(product_id: str) -> bool:
             product = products_by_id.get(product_id, {})
-            if category and str(product.get("category") or "") != category:
+            product_categories = {
+                str(product.get(key) or "").strip().casefold()
+                for key in ("category", "categoryName", "category_name", "product_class")
+                if str(product.get(key) or "").strip()
+            }
+            if category and category.casefold() not in product_categories:
+                return False
+            brand = str(product.get("brand") or "").strip().casefold()
+            if required_brands and brand not in required_brands:
                 return False
             try:
                 price = float(product.get("price"))
@@ -167,11 +183,18 @@ def relevance_filter(
                 return False
             if price_max is not None and price > float(price_max):
                 return False
+            if required_attributes:
+                attributes = product.get("attributes") or {}
+                matched = sum(
+                    attributes.get(key) == value
+                    for key, value in required_attributes.items()
+                )
+                if matched < max(1, len(required_attributes) - 1):
+                    return False
             return True
 
-        # Category and numeric ranges are deterministic hard filters. Scenario,
-        # audience and semantic attributes remain ranking signals so grade-2
-        # acceptable alternatives are not erased before reranking.
+        # This path is a diagnostic oracle.  It mirrors the deterministic
+        # grade>=2 label contract and is never eligible for runtime selection.
         return [product_id for product_id in ranked_ids if passes(product_id)]
 
     terms = _query_terms(query)
@@ -293,13 +316,23 @@ class SearchCollector:
         query: str,
         candidate_ids: Sequence[str],
         products_by_id: Mapping[str, Mapping[str, Any]],
+        *,
+        request_char_budget: int | None = None,
     ) -> tuple[list[dict[str, Any]], float, dict[str, Any]]:
         if not candidate_ids:
             return [], 0.0, {"status": "NOT_APPLICABLE", "reason": "no_candidates"}
         settings = get_settings()
         if not settings.rerank_api_key.strip():
             raise RuntimeError("RERANK_API_KEY is required for cold Search collection")
-        documents = [_product_text(products_by_id[product_id])[:4000] for product_id in candidate_ids]
+        per_document_limit = 4000
+        if request_char_budget is not None:
+            if request_char_budget < len(candidate_ids):
+                raise ValueError("rerank request character budget is too small")
+            per_document_limit = max(1, request_char_budget // len(candidate_ids))
+        documents = [
+            _product_text(products_by_id[product_id])[:per_document_limit]
+            for product_id in candidate_ids
+        ]
         _provider_call("rerank")
         started = time.perf_counter()
         client = await get_client("mature_eval_rerank", timeout=settings.rerank_timeout)

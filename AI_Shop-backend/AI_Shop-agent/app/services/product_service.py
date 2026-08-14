@@ -1,5 +1,6 @@
 import json
 import re
+import time
 
 import structlog
 
@@ -15,11 +16,13 @@ from app.domain.intent.rules import (
     looks_like_hot_sale_recommend,
 )
 from app.rag.retriever import rag_retriever
-from app.rag.rrf import rrf_merge
 from app.services.episode_service import episode_service
 from app.services.java_internal_client import java_internal_client
+from app.services.product_search_pipeline import (
+    build_product_query_plan,
+    product_search_pipeline,
+)
 from app.services.product_search_query import (
-    filter_products_by_query_relevance,
     normalize_product_search_query,
 )
 from app.services.recommendation_attribution_service import (
@@ -96,6 +99,26 @@ def derive_search_keyword(
     # 「我要吃零食」→「零食」，提升关键词/向量命中率
     return normalize_product_search_query(kw) or kw
 
+
+def derive_raw_search_query(
+    keyword: str | None,
+    consult_product: dict | None,
+) -> str:
+    """Preserve the complete current-turn request for hybrid retrieval."""
+
+    value = (keyword or "").strip()
+    if consult_product and is_vague_search_keyword(value):
+        name = str(consult_product.get("productName") or consult_product.get("product_name") or "").strip()
+        if name:
+            cleaned = _NOISE_RE.sub(" ", name)
+            parts = [part.strip() for part in re.split(r"[\s/|]+", cleaned) if part.strip()]
+            if parts:
+                return " ".join(parts[:4])
+        category_id = consult_product.get("categoryId") or consult_product.get("category_id")
+        if category_id:
+            return f"category:{category_id}"
+    return value
+
 class ProductService:
 
     async def search_products(
@@ -106,7 +129,8 @@ class ProductService:
         consult_product: dict | None = None,
         exclude_product_id: str | None = None,
     ) -> tuple[str, str | None, str, list[dict], str]:
-        query = derive_search_keyword(keyword, consult_product)
+        search_started = time.perf_counter()
+        query = derive_raw_search_query(keyword, consult_product)
         if not query:
             query = (keyword or "").strip()
         profile = await shopping_profile_service.get_effective_profile(user_id)
@@ -115,14 +139,27 @@ class ProductService:
             user_text=user_text or keyword or "",
             profile=profile,
         )
+        query_plan_started = time.perf_counter()
+        query_plan = build_product_query_plan(query, mission)
+        query_parse_ms = round((time.perf_counter() - query_plan_started) * 1000, 4)
 
         # A concrete keyword is already enough to identify a shelf.  Otherwise
         # choose exactly one high-impact decision slot before spending model or
         # retrieval budget.  The choice is bounded to two turns in the mission.
         clarification = next_clarification(mission)
-        if clarification and not (
-            clarification.get("slot") == "category"
-            and self._has_concrete_query(query, consult_product)
+        should_ask_clarification = shopping_profile_service.should_clarify(
+            user_text or query,
+            query,
+            profile,
+            consult_product,
+        )
+        if (
+            clarification
+            and should_ask_clarification
+            and not (
+                clarification.get("slot") == "category"
+                and self._has_concrete_query(query_plan.raw_query, consult_product)
+            )
         ):
             episode_service.record_step(
                 "SHOPPING_CLARIFICATION_DECISION",
@@ -152,6 +189,7 @@ class ProductService:
                 or str(mission.get("category") or profile.get("category") or "").strip()
                 or query
             )
+            query_plan = build_product_query_plan(query, mission)
 
         product_ids: list[str] = []
         source = "none"
@@ -162,47 +200,34 @@ class ProductService:
             products = await search_recommend_service.load_by_category(category_id, 12)
             source = "category"
         elif query:
-
-            keyword_ids = await rag_retriever.search_product_keyword_ids(query, PRODUCT_CANDIDATE_SIZE)
-            vector_ids = await rag_retriever.search_product_vector_ids(query, PRODUCT_CANDIDATE_SIZE)
-            # Over-fetch to CANDIDATE_SIZE so term-filtering + reranking have
-            # enough headroom; we slice to RESULT_SIZE after reranking.
-            product_ids = rrf_merge(keyword_ids, vector_ids, PRODUCT_CANDIDATE_SIZE)
+            search_result = await product_search_pipeline.search(
+                query_plan,
+                candidate_size=PRODUCT_CANDIDATE_SIZE,
+                result_size=PRODUCT_RESULT_SIZE,
+                keyword_search=rag_retriever.search_product_keyword_ids,
+                vector_search=rag_retriever.search_product_vector_ids,
+                load_products=self._load_products_by_ids,
+                rerank=rag_retriever.rerank_products,
+            )
+            search_result.trace.stage_latency_ms["queryParse"] = query_parse_ms
+            product_ids = search_result.ranked_ids
+            products = search_result.products
             logger.info(
                 "hybrid_search",
-                query=query,
-                keyword_hits=len(keyword_ids),
-                vector_hits=len(vector_ids),
+                query=query_plan.raw_query,
+                variants=list(query_plan.retrieval_variants),
                 merged=len(product_ids),
+                results=len(products),
             )
-            products = await self._load_products_by_ids(product_ids)
             if products:
                 source = "hybrid"
-                # Vector/keyword often returns unrelated hot junk — drop non-matching titles.
-                relevant = filter_products_by_query_relevance(products, query)
-                if not relevant:
-                    logger.info(
-                        "hybrid_relevance_miss",
-                        query=query,
-                        candidates=len(products),
-                    )
-                    products = []
-                    source = "none"
-                elif len(relevant) < len(products):
-                    logger.info(
-                        "hybrid_relevance_filtered",
-                        query=query,
-                        before=len(products),
-                        after=len(relevant),
-                    )
-                    products = relevant
-                # Cross-encoder rerank before slicing to RESULT_SIZE.  The
-                # circuit breaker inside rerank_products guarantees silent
-                # fallback to original RRF order when the API is unavailable.
-                if products:
-                    products = await rag_retriever.rerank_products(
-                        query, products, PRODUCT_RESULT_SIZE
-                    )
+            episode_service.record_step(
+                "PRODUCT_SEARCH_PIPELINE",
+                node_name="product_search",
+                input_data={"queryPlan": query_plan.public()},
+                output_data={"trace": search_result.trace.public()},
+                latency_ms=round((time.perf_counter() - search_started) * 1000),
+            )
         else:
             products = []
 
@@ -265,6 +290,7 @@ class ProductService:
             return assistant, biz_data, "product_search", products, source
 
         recall_source = source
+        decision_started = time.perf_counter()
         decision = await shopping_decision_service.decide(
             user_id=user_id,
             mission=mission,
@@ -272,6 +298,14 @@ class ProductService:
             source=recall_source,
             user_text=user_text or keyword or "",
         )
+        if source == "hybrid":
+            search_result.trace.stage_latency_ms["shoppingDecision"] = round(
+                (time.perf_counter() - decision_started) * 1000, 4
+            )
+            search_result.trace.stage_latency_ms["productServiceTotal"] = round(
+                (time.perf_counter() - search_started) * 1000, 4
+            )
+            search_result.trace.result_source = decision.source
         products = decision.products
         if not products:
             return "[]", None, "shopping_decision_v2", [], decision.source

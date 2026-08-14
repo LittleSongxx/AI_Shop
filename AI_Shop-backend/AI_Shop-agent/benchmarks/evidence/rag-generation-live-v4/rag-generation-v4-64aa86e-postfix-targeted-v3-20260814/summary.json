@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "aishop-eval/v1",
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-targeted-v3-20260814",
+  "sourceRunId": "rag-generation-v4-64aa86e-postfix-targeted-v2-20260814",
+  "status": "POST_FIX_TARGETED_REGRESSION",
+  "metadata": {
+    "schemaVersion": "aishop-eval/v1",
+    "suite": "rag-generation-live-v4",
+    "runId": "rag-generation-v4-64aa86e-postfix-targeted-v3-20260814",
+    "sourceRunId": "rag-generation-v4-64aa86e-postfix-targeted-v2-20260814",
+    "gitCommit": "64aa86e8fa67f6245247163a9477b63aaeb07baf",
+    "workspaceSha256": "55d6ec5b534702bfd1d1cd14ac80f04b5b19d38b22d4abc44535d3c4bf365e95",
+    "datasetSha256": "3a61d763deeeefd47991ed4c511e0032af0889ba49d651f1ca3d2b2bd29c10c8",
+    "evidenceSource": "SYNTHETIC",
+    "executionMode": "local-live-targeted",
+    "status": "POST_FIX_TARGETED_REGRESSION",
+    "holdoutExposed": true,
+    "freshEvidence": false,
+    "model": {
+      "llm": "deepseek-v4-flash",
+      "embedding": "text-embedding-v4",
+      "rerank": "qwen3-rerank"
+    },
+    "parameters": {
+      "topK": 10,
+      "temperature": 0,
+      "maxCompletionTokens": 256,
+      "policy": {
+        "schemaVersion": "aishop-rag-retrieval-policy/v4",
+        "rerankTopN": 6,
+        "evidenceThreshold": 0.7,
+        "canonicalHintFloor": 0.55,
+        "topScoreMargin": 0.1,
+        "maxQueryVariants": 3,
+        "maxSubquestions": 3,
+        "maxEvidenceItems": 4,
+        "maxEvidenceChars": 6000,
+        "adaptiveExpansion": true,
+        "contextualRetrieval": true,
+        "fingerprint": "53467d7e8654da1a44ef17d10a7394c4fb4b53a48de295418589a773a9c7421c"
+      }
+    }
+  },
+  "summary": {
+    "caseCount": 1,
+    "executedCount": 1,
+    "runtimeErrorCount": 0,
+    "taskSuccessCount": 0,
+    "taskSuccessRate": 0.0,
+    "criticalSafetyViolationCount": 0,
+    "inputTokens": 240,
+    "outputTokens": 16,
+    "repairTriggeredCount": 0,
+    "providerFacts": {
+      "embedding": {
+        "bypassCache": true,
+        "requests": 2,
+        "cacheHits": 0,
+        "providerRequests": 2,
+        "providerSuccesses": 2,
+        "providerFailures": 0,
+        "breakerRejections": 0,
+        "responseRecords": [
+          {
+            "inputSha256": "07a4b71601700f5c4dc52f42b0b81c7d62b26de13cab0474dff717116e1ae241",
+            "dimensions": 1024,
+            "vectorSha256": "61bd268d94b0a2dbe6e2aa2c7dacd2dc94cc946b141eb53280ba4da54e2f4b96"
+          },
+          {
+            "inputSha256": "8a84010990e90f5d9169221211bd239b9dbf97c5460da5f18863986454b3997b",
+            "dimensions": 1024,
+            "vectorSha256": "65a2e5d304182807e8298c69544a5155bcae1f986854a2b143c1fbe1841d6625"
+          }
+        ]
+      },
+      "rerank": {
+        "eligibleRequests": 1,
+        "providerRequests": 1,
+        "providerSuccesses": 1,
+        "providerFailures": 0,
+        "fallbackCount": 0,
+        "fallbackReasons": {},
+        "responseRecords": [
+          {
+            "queryHash": "07a4b71601700f5c4dc52f42b0b81c7d62b26de13cab0474dff717116e1ae241",
+            "instructionHash": "55a199aaa13bd927beaf14d0ce7960458bc2978fe6884a85644657ee8e2bd6cf",
+            "candidateIds": [
+              "knowledge_2_1_1",
+              "faq9001",
+              "faq9002",
+              "knowledge_1_1_0",
+              "knowledge_2_1_2",
+              "knowledge_3_1_3",
+              "knowledge_10_1_0",
+              "knowledge_4_1_0",
+              "knowledge_8_1_3",
+              "knowledge_7_1_4"
+            ],
+            "results": [
+              {
+                "id": "knowledge_4_1_0",
+                "score": 0.59998972
+              },
+              {
+                "id": "knowledge_1_1_0",
+                "score": 0.55095526
+              },
+              {
+                "id": "knowledge_3_1_3",
+                "score": 0.48808086
+              },
+              {
+                "id": "knowledge_10_1_0",
+                "score": 0.48697725
+              },
+              {
+                "id": "faq9001",
+                "score": 0.45189992
+              },
+              {
+                "id": "knowledge_2_1_1",
+                "score": 0.44355463
+              }
+            ]
+          }
+        ]
+      },
+      "queryExpansion": {
+        "eligibleRequests": 1,
+        "providerRequests": 1,
+        "providerSuccesses": 1,
+        "providerFailures": 0
+      },
+      "generation": {
+        "providerCalls": 1,
+        "providerSuccesses": 1,
+        "providerFailures": 0
+      }
+    },
+    "providerCompleteness": {
+      "passed": true,
+      "checks": {
+        "embeddingCacheHitsZero": true,
+        "embeddingFailuresZero": true,
+        "embeddingCallsComplete": true,
+        "rerankFallbackZero": true,
+        "rerankFailuresZero": true,
+        "rerankCallsComplete": true,
+        "queryExpansionCallsComplete": true,
+        "generationFailuresZero": true,
+        "generationCallsComplete": true,
+        "usageComplete": true
+      }
+    },
+    "status": "COMPLETED_TARGETED",
+    "humanReviewStatus": "HUMAN_REVIEW_PENDING",
+    "costAccounting": {
+      "status": "UNPRICED"
+    }
+  },
+  "caseResults": [
+    {
+      "caseId": "rag-fresh-013",
+      "status": "FAILED",
+      "taskSuccess": false,
+      "metrics": {
+        "predictedNoAnswer": true,
+        "requiredClaimCompleteness": 0.0,
+        "claimCitationSupport": 0.0,
+        "canonicalCitationCorrectness": 0.0,
+        "canonicalCitationCoverage": 0.0,
+        "injectionRobust": null,
+        "invalidCitationIndexes": [],
+        "repairTriggered": false,
+        "repairReason": null,
+        "repairError": null
+      }
+    }
+  ],
+  "review": {
+    "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+    "passed": 0,
+    "failed": 1
+  },
+  "humanReviewStatus": "HUMAN_REVIEW_PENDING",
+  "honestBoundaries": [
+    "All cases were exposed by the source run; this is not fresh E3 evidence.",
+    "The source 60-case formal run remains FAILED_RETAINED and unchanged.",
+    "AI-assisted review is not independent human annotation.",
+    "All labels are SYNTHETIC; cost is UNPRICED; local latency is not an SLO."
+  ]
+}

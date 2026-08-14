@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from app.evaluation.ranking import incomplete_judgment_case_metrics
 from benchmarks.mature_eval.wands import (
     LABEL_GRADES,
     WANDS_COMMIT,
@@ -125,3 +126,44 @@ def test_validate_subset_does_not_allow_unlabelled_catalog_claims(tmp_path):
 
     with pytest.raises(ValueError, match="judged-pool"):
         validate_subset(payload, product_cap=5)
+
+
+def test_full_catalog_selector_excludes_conflicting_pairs_without_guessing(tmp_path):
+    query_path, product_path, label_path = _fixture(tmp_path)
+    with label_path.open("a", encoding="utf-8") as stream:
+        stream.write("7\t1\t2\tExact\n")
+
+    payload = select_subset(
+        query_path,
+        product_path,
+        label_path,
+        product_cap=6,
+        minimum_depth=2,
+        maximum_depth=3,
+        include_all_products=True,
+        exclude_conflicting_pairs=True,
+        label_scope="full-catalog-incomplete-qrels",
+    )
+
+    case = next(row for row in payload["queries"] if row["queryId"] == "1")
+    assert "2" not in case["relevanceGrades"]
+    assert payload["counts"]["products"] == 6
+    assert payload["judgmentAudit"]["ambiguousPairsExcluded"] == 1
+    validate_subset(
+        payload,
+        product_cap=6,
+        expected_label_scope="full-catalog-incomplete-qrels",
+    )
+
+
+def test_full_catalog_metrics_do_not_treat_unjudged_results_as_negative():
+    metrics = incomplete_judgment_case_metrics(
+        ["unjudged-a", "relevant", "irrelevant", "unjudged-b"],
+        {"relevant": 2, "irrelevant": 0},
+        k_values=(1, 2, 4),
+    )
+
+    assert metrics["metricsByK"]["1"]["judgedRate"] == 0.0
+    assert metrics["metricsByK"]["2"]["knownRelevantRecall"] == 1.0
+    assert metrics["metricsByK"]["4"]["unjudgedCount"] == 2
+    assert metrics["bpref"] == 1.0

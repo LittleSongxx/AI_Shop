@@ -1,0 +1,549 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-generation-live-v4",
+  "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+  "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+  "status": "COMPLETED",
+  "cases": [
+    {
+      "caseId": "rag-holdout-001",
+      "grounded": false,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded。"
+    },
+    {
+      "caseId": "rag-holdout-002",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-004",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-005",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-010",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-011",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-012",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-013",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-015",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-holdout-016",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-001",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-002",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-003",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-004",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-005",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-006",
+      "grounded": false,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded、complete。"
+    },
+    {
+      "caseId": "rag-fresh-007",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-008",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-009",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-fresh-010",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-011",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-012",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-fresh-013",
+      "grounded": false,
+      "complete": false,
+      "citationAligned": false,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded、complete、citationAligned。"
+    },
+    {
+      "caseId": "rag-fresh-014",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-003",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-v3-fresh-006",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-007",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-009",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-v3-fresh-012",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-014",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-017",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-018",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-v3-fresh-021",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-022",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-023",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-024",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-027",
+      "grounded": false,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded、complete。"
+    },
+    {
+      "caseId": "rag-v3-fresh-028",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-031",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v3-fresh-032",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-001-gen",
+      "grounded": false,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-002-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-003-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-004-gen",
+      "grounded": false,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：grounded、complete。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-005-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-006-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-007-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-008-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-009-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-010-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-011-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-012-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-013-gen",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-014-gen",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-015-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-fresh-extra-016-gen",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-generation-extra-017",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    },
+    {
+      "caseId": "rag-v4-generation-extra-018",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-generation-extra-019",
+      "grounded": true,
+      "complete": true,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "PASS",
+      "reason": "自动事实满足四项初审条件。"
+    },
+    {
+      "caseId": "rag-v4-generation-extra-020",
+      "grounded": true,
+      "complete": false,
+      "citationAligned": true,
+      "safe": true,
+      "verdict": "FAIL",
+      "reason": "自动事实初审未满足：complete。"
+    }
+  ]
+}

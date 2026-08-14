@@ -10,6 +10,7 @@ from benchmarks.mature_eval.search_pipeline import (
     replay_collection,
     rrf_merge_rankings,
 )
+from benchmarks.mature_eval.search_v2 import choose_v2_configuration, replay_v2_collection
 
 
 def _products():
@@ -110,6 +111,39 @@ def test_relevance_filter_applies_structured_category_and_price_constraints():
     ) == []
 
 
+def test_oracle_filter_accepts_category_name_and_grade_two_attributes():
+    products = {
+        "a": {
+            "id": "a",
+            "category": "coffee_machine",
+            "categoryName": "咖啡机",
+            "brand": "华为",
+            "price": 999,
+            "attributes": {"type": "全自动", "feature": "快速预热"},
+        },
+        "b": {
+            "id": "b",
+            "category": "coffee_machine",
+            "categoryName": "咖啡机",
+            "brand": "苹果",
+            "price": 999,
+            "attributes": {"type": "全自动", "feature": "快速预热"},
+        },
+    }
+
+    assert relevance_filter(
+        ["a", "b"],
+        products,
+        "华为咖啡机",
+        constraints={
+            "category": "咖啡机",
+            "priceMax": 1200,
+            "requiredBrands": ["华为"],
+            "attributes": {"type": "全自动", "feature": "奶泡"},
+        },
+    ) == ["a"]
+
+
 def test_replay_uses_zero_provider_calls_and_identical_collection():
     payload = _collection()
     before = deepcopy(payload)
@@ -155,6 +189,51 @@ def test_wands_replay_discards_unjudged_candidates_without_calling_them_irreleva
     assert report["labelScope"] == "judged-pool"
 
 
+def test_search_v2_wands_replay_keeps_unjudged_full_catalog_candidates():
+    payload = {
+        "schemaVersion": 2,
+        "kind": "search-v2-cold-collection",
+        "cases": [
+            {
+                "caseId": "w1",
+                "query": "chair",
+                "split": "external",
+                "labelScope": "full-catalog-incomplete-qrels",
+                "relevanceGrades": {"a": 2, "b": 0},
+                "queryPlan": {
+                    "rawQuery": "chair",
+                    "retrievalVariants": ["chair"],
+                    "runtimeConstraints": {},
+                },
+                "bm25ByVariant": {"chair": ["c", "a", "b"]},
+                "vectorByVariant": {"chair": ["c", "a", "b"]},
+                "rerankCandidatePool": ["c", "a", "b"],
+                "rerank": [
+                    {"productId": "c", "score": 0.9},
+                    {"productId": "a", "score": 0.8},
+                    {"productId": "b", "score": 0.1},
+                ],
+                "stageLatencyMs": {"rerank": 2},
+            }
+        ],
+    }
+
+    report = replay_v2_collection(
+        payload,
+        products=_products(),
+        variants=["raw_bm25", "full_rerank"],
+        candidate_counts=[3],
+        rrf_k_values=[60],
+        rerank_top_n_values=[3],
+        k_values=[1, 2, 3],
+    )
+
+    row = next(iter(report["cases"].values()))[0]
+    assert row["rankedIds"] == ["c", "a", "b"]
+    assert row["metrics"]["metricsByK"]["1"]["judgedRate"] == 0.0
+    assert report["labelScope"] == "full-catalog-incomplete-qrels"
+
+
 def test_configuration_selection_is_lexicographic():
     replay = {
         "stageLatency": {"rerank": {"p95Ms": 50}},
@@ -165,6 +244,42 @@ def test_configuration_selection_is_lexicographic():
     }
 
     assert choose_configuration(replay)["selectedVariant"] == "b"
+
+
+def test_v2_configuration_never_selects_diagnostic_oracle():
+    replay = {
+        "variantMetrics": {
+            "oracle_gold_filter:c24:rrf60:n24": {
+                "constraintViolationRate": 0,
+                "metricCurves": {
+                    "3": {"recall": 1.0},
+                    "5": {"ndcg": 1.0},
+                    "10": {"mrr": 1.0},
+                },
+            },
+            "runtime_filter:c24:rrf60:n24": {
+                "constraintViolationRate": 0,
+                "metricCurves": {
+                    "3": {"recall": 0.8},
+                    "5": {"ndcg": 0.8},
+                    "10": {"mrr": 0.8},
+                },
+            },
+            "full_rerank:c24:rrf60:n12": {
+                "constraintViolationRate": 0,
+                "metricCurves": {
+                    "3": {"recall": 0.9},
+                    "5": {"ndcg": 0.9},
+                    "10": {"mrr": 0.9},
+                },
+            },
+        }
+    }
+
+    selected = choose_v2_configuration(replay)
+
+    assert selected["selectedVariant"] == "full_rerank:c24:rrf60:n12"
+    assert selected["diagnosticOracleExcluded"] is True
 
 
 @pytest.mark.asyncio

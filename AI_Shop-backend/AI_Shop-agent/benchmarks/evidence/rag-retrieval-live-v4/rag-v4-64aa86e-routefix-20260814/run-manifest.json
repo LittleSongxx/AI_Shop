@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 4,
+  "suite": "rag-retrieval-live-v4",
+  "runId": "rag-v4-64aa86e-routefix-20260814",
+  "summaryPath": "benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/summary.json",
+  "summarySha256": "be1b3b0fb1bf2bb337eb38d100c57841f5643e865925e3e65c2d77a85effb29f",
+  "datasetSha256": "7a3a20f00627a939af490571c9471ac10ccd336a5692239453c9e57e5f976423",
+  "sourceArtifacts": {
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/rag-v4-dev-replay.json": "ab1c2b1f0052be295f309565a6db41d0eb4ba19f27f9af4e42bb33fcabce72e1",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/rag-v4-final-replay.json": "525240bef7842d9c971b57bed94cd97cbb88ca1e3c17c7ce7ae20e98aeccc1dd",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/frozen-config.json": "69fedd3c4725ae26d79102853c3e072862c0596f66dfcf2d93ddcc395b9d57b1",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/finalization.json": "9c049c1864b682464e5a895c64018fa6c88332c8a1375112757d914c9c0c84b9",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/raw/rag-v4-dev-collection.json.gz": "41f07d8a99a609aec1d21bfb3b9d89a1bbdc9419f2a15d4154fb7d1b5fd878bf",
+    "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/raw/rag-v4-final-collection.json.gz": "713d61f18910bb8e794a5140be5dd18752945727e9bddee95063fe5dbca68d71"
+  },
+  "humanReviewStatus": "NOT_APPLICABLE"
+}

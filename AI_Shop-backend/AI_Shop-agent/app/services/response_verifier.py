@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from app.rag.prompt_builder import RAG_REFUSAL_TEXT
+from app.rag.prompt_builder import RAG_REFUSAL_TEXT, uncited_grounded_sentences
 
 _DYNAMIC_BIZ_TOOLS = {
     "query_order": frozenset({"QUERY_ORDERS"}),
@@ -133,15 +133,17 @@ class ResponseVerifier:
         if rag_citation_required and source_count > 0 and text != RAG_REFUSAL_TEXT:
             citations = [int(value) for value in _RAG_CITATION_RE.findall(text)]
             invalid = sorted({value for value in citations if value < 1 or value > source_count})
-            if not citations or invalid:
+            uncited = uncited_grounded_sentences(text)
+            if not citations or invalid or uncited:
+                detail = "回答使用了 RAG 事实，但没有提供有效编号引用"
+                if invalid:
+                    detail = f"回答引用越界：{invalid}，可用编号为 1..{source_count}"
+                elif uncited:
+                    detail = f"存在未就近引用的事实句：{len(uncited)} 条"
                 issues.append(
                     VerificationIssue(
                         "INVALID_RAG_CITATION",
-                        (
-                            f"回答引用越界：{invalid}，可用编号为 1..{source_count}"
-                            if invalid
-                            else "回答使用了 RAG 事实，但没有提供有效编号引用"
-                        ),
+                        detail,
                     )
                 )
 

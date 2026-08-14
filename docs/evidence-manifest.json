@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-13T18:00:00+08:00",
+  "generatedAt": "2026-08-14T23:30:00+08:00",
   "project": "AI_Shop",
   "targetRoles": [
     "AI application / Agent backend",
@@ -316,6 +316,288 @@
       ]
     },
     {
+      "id": "search-mature-v2-formal",
+      "kind": "evaluation",
+      "suite": "search-mature-v2",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "qualityGateState": "FAILED_RETAINED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_v2_eval.py package --run-id search-v2-64aa86e-final-20260814",
+      "caseCount": 487,
+      "claim": "中文 v2 600 商品/240 查询、WANDS 42,994 商品全库/202 查询，以及 47 商品目录的 45 条 ProductService 路径均完成真实 Embedding/Rerank 评测；中文 fresh Recall@3/5 为 0.8896/0.9969，WANDS condensed NDCG@10 为 0.7953。",
+      "boundary": "正式质量门禁 FAILED_RETAINED：challenge no-result accuracy 为 0.80，首次 ProductService Recall@10 仅 0.3778。WANDS qrels 不完整，未标注商品不当负例，只报告 known-relevant、Judged@K、bpref 和 condensed 指标。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/summary.json",
+      "resultSha256": "64445a87f51fa63f140a35dae4d0f056b04a552edae4586fe7c48e6b8632e7ba",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/run-manifest.json",
+      "runManifestSha256": "6e62f595bd63f76b89e0c92a90971505e277de9516c3ffe12d6c7a92ac4513b9",
+      "resultAssertions": {
+        "runId": "search-v2-64aa86e-final-20260814",
+        "suite": "search-mature-v2",
+        "qualityGates.passed": false,
+        "datasets.chineseV2.counts.products": 600,
+        "datasets.chineseV2.counts.queries": 240,
+        "datasets.wandsFullCatalog.products": 42994,
+        "datasets.wandsFullCatalog.queries": 202,
+        "providerCompleteness.productService.passed": true
+      },
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.json",
+          "hashMode": "canonical-json"
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/wands/selection.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-mature-v2/raw/wands/selection.json",
+          "expectedField": "selectionSha256",
+          "hashMode": "canonical-json",
+          "optionalLocalDataset": true
+        }
+      ]
+    },
+    {
+      "id": "search-mature-v2-postfix-runtime",
+      "kind": "evaluation-regression",
+      "suite": "search-mature-v2",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_v2_eval.py package-runtime-regression --run-id search-v2-64aa86e-postfix-regression-v5-20260814 --original-final-run-id search-v2-64aa86e-final-20260814",
+      "caseCount": 45,
+      "claim": "修复后的真实 ProductService 路径完成 45/45；catalog Recall@3/5/10 为 0.9778，MRR@10 为 0.9444，availability-adjusted Recall@3/5/10 为 1.0；Embedding 86/86、Rerank 30/30，失败与 fallback 为 0。",
+      "boundary": "这是 POST_FIX_RUNTIME_REGRESSION；所有 case 已暴露，holdoutExposed=true、freshEvidence=false。它证明运行时 taxonomy、澄清、品牌/schema 和缺货修复命中已知问题，不覆盖正式失败或证明新鲜泛化。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-postfix-regression-v5-20260814/summary.json",
+      "resultSha256": "324a99789114d99e3addea4c6f1dd514fc834b3a8a74c1bca4aac4ab7dc8b62d",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-postfix-regression-v5-20260814/run-manifest.json",
+      "runManifestSha256": "3a024ec8cf995860b5562f4c1cf29b79fa77f4025bfbef902c20e98f72f7f876",
+      "resultAssertions": {
+        "runId": "search-v2-64aa86e-postfix-regression-v5-20260814",
+        "evidenceKind": "POST_FIX_RUNTIME_REGRESSION",
+        "originalFinalRunId": "search-v2-64aa86e-final-20260814",
+        "holdoutExposed": true,
+        "freshEvidence": false,
+        "caseCount": 45,
+        "qualityGateState": "PASSED_POST_FIX_REGRESSION",
+        "qualityGates.goldNeverUsedByRuntime": true
+      },
+      "datasetLocks": []
+    },
+    {
+      "id": "rag-retrieval-live-v4-formal",
+      "kind": "evaluation",
+      "suite": "rag-retrieval-live-v4",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "qualityGateState": "FAILED_RETAINED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py package --run-id rag-v4-64aa86e-routefix-20260814",
+      "caseCount": 264,
+      "claim": "72 public、144 known regression、48 一次性 fresh 共 264 条完成真实 Embedding/Rerank/按需 Expansion；fresh Recall@3/5 为 0.8056，MRR 为 0.75，NDCG@5 为 0.7645，no-answer 为 1.0。",
+      "boundary": "正式门禁 FAILED_RETAINED；fresh injection 为 0.9167，canonical correctness/coverage 为 0.7442/0.8056。Provider 完整不等于质量通过；两个 frozen label 还要求了已发布知识没有写出的细节。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/summary.json",
+      "resultSha256": "be1b3b0fb1bf2bb337eb38d100c57841f5643e865925e3e65c2d77a85effb29f",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/run-manifest.json",
+      "runManifestSha256": "2b0c1e1105a80bc5479dee4cff4bae3364422531eff92f51026d425a6bdb3720",
+      "resultAssertions": {
+        "runId": "rag-v4-64aa86e-routefix-20260814",
+        "caseCounts.total": 264,
+        "qualityGate.status": "FAILED_RETAINED",
+        "qualityGate.providerCompleteness.dev.passed": true,
+        "qualityGate.providerCompleteness.fresh.passed": true,
+        "selectedFreshMetrics.noAnswerAccuracy": 1.0,
+        "humanReviewStatus": "NOT_APPLICABLE"
+      },
+      "datasetLocks": [
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_public.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_known_regression.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_fresh_holdout.lock.json"
+      ]
+    },
+    {
+      "id": "rag-generation-live-v4-formal",
+      "kind": "evaluation",
+      "suite": "rag-generation-live-v4",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "qualityGateState": "FAILED_RETAINED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py --package --run-id rag-generation-v4-64aa86e-postfix-20260814",
+      "caseCount": 60,
+      "claim": "60/60 完成，runtime error 和严重安全违规均为 0；任务成功 39/60，known regression 29/40，claim completeness 0.8406，claim-citation support 0.8804，canonical coverage 0.9783，真实 token 为 23,125。",
+      "boundary": "正式质量门禁 FAILED_RETAINED。AI 辅助初审为 46 PASS/14 FAIL，不是独立人工标注；两位 reviewer 尚未提交，HUMAN_REVIEW_PENDING。成本 UNPRICED，本地分位数不是 SLO。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/summary.json",
+      "resultSha256": "b751ac463f97e43681d402b96d4795404e9a669a8b41186673223609ba77bfe0",
+      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/ai-review.json",
+      "reviewSha256": "205f31a3153b81c67dbe57e9100811f9c4f8b90449d075d6f4a7d5406c6d1824",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/run-manifest.json",
+      "runManifestSha256": "18786d733bc82b9d044584db9ab9cc0cddfb2368240ce241a62fe9906f49543e",
+      "resultAssertions": {
+        "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+        "summary.caseCount": 60,
+        "summary.executedCount": 60,
+        "summary.qualityGate.status": "FAILED_RETAINED",
+        "summary.providerCompleteness.passed": true,
+        "humanReviewStatus": "HUMAN_REVIEW_PENDING"
+      },
+      "reviewAssertions": {
+        "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+        "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
+        "status": "COMPLETED",
+        "cases.$length": 60
+      },
+      "datasetLocks": [
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v4.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_generation_known.lock.json",
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_generation_fresh.lock.json"
+      ]
+    },
+    {
+      "id": "rag-retrieval-v4-postfix-offline",
+      "kind": "offline-regression",
+      "suite": "rag-retrieval-live-v4",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "qualityGateState": "FAILED_RETAINED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py postfix-replay --source-run-id rag-v4-64aa86e-routefix-20260814 --run-id rag-v4-64aa86e-postfix-offline-v3-20260814",
+      "caseCount": 264,
+      "claim": "对正式 Provider 候选做 0 Provider 的修复后重放；fresh Recall@3/5、MRR、NDCG 均为 0.9444，canonical correctness/coverage 为 1.0/0.9444，known regression guard 通过。",
+      "boundary": "POST_FIX_OFFLINE_REPLAY，holdoutExposed=true、freshEvidence=false；两个超出知识事实范围的 frozen label 保持安全拒答，因此质量门禁仍 FAILED_RETAINED。该结果不是新的 E3 调用或 fresh holdout。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v3-20260814/summary.json",
+      "resultSha256": "d8e65dc7a5e98d80799a8523d9ac9656c26a42fba4e93b79b6311126e50c21de",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v3-20260814/run-manifest.json",
+      "runManifestSha256": "5230a0c10919df6c7abedbff5b730abfa119786342b7c4705cf07331c59b193c",
+      "resultAssertions": {
+        "runId": "rag-v4-64aa86e-postfix-offline-v3-20260814",
+        "sourceRunId": "rag-v4-64aa86e-routefix-20260814",
+        "status": "POST_FIX_OFFLINE_REPLAY",
+        "holdoutExposed": true,
+        "freshEvidence": false,
+        "providerFacts.embeddingRequests": 0,
+        "providerFacts.rerankRequests": 0,
+        "knownRegressionGuard.passed": true
+      },
+      "datasetLocks": []
+    },
+    {
+      "id": "rag-retrieval-v4-postfix-targeted",
+      "kind": "targeted-regression",
+      "suite": "rag-retrieval-live-v4",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py targeted-regression --source-run-id rag-v4-64aa86e-routefix-20260814 --run-id rag-v4-64aa86e-postfix-targeted-20260814 --knowledge-index aishop_eval_rag_context_v4",
+      "caseCount": 7,
+      "claim": "7/7 暴露坏例完成真实 Provider 回归；5/5 修复目标通过，2/2 已知标签限制继续返回证据不足；Embedding 16/16、Rerank 7/7、Expansion 5/5，失败/fallback 为 0。",
+      "boundary": "POST_FIX_TARGETED_REGRESSION，holdoutExposed=true、freshEvidence=false。只证明修复路径在已知坏例上有效，不能作为新 48 条 fresh 的替代成绩。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-targeted-20260814/summary.json",
+      "resultSha256": "2f4d3fc8bb6485c397af2510a5286959fa5e449b9a95e5d0073d24c902865f71",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-targeted-20260814/run-manifest.json",
+      "runManifestSha256": "aa0208b81b0d007cc8f1bb88ddb8f30c72580de81bc80b8509f8ab3a4a178d97",
+      "resultAssertions": {
+        "runId": "rag-v4-64aa86e-postfix-targeted-20260814",
+        "status": "POST_FIX_TARGETED_REGRESSION",
+        "holdoutExposed": true,
+        "freshEvidence": false,
+        "caseCount": 7,
+        "validation.status": "PASSED_TARGETED_WITH_KNOWN_LABEL_LIMITS",
+        "validation.checks.fiveFixTargetsPassed": true,
+        "validation.checks.twoUnsupportedLabelsRemainInsufficient": true
+      },
+      "datasetLocks": []
+    },
+    {
+      "id": "rag-generation-v4-postfix-rescore",
+      "kind": "offline-regression",
+      "suite": "rag-generation-live-v4",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "qualityGateState": "FAILED_RETAINED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py --rescore-source-run-id rag-generation-v4-64aa86e-postfix-20260814 --run-id rag-generation-v4-64aa86e-postfix-rescore-v3-20260814",
+      "caseCount": 60,
+      "claim": "不改答案、证据和 Provider 输出的 0 Provider 重评为 49/60，known regression 35/40，required-claim completeness 0.9674，claim-citation support 0.9565，canonical coverage 0.9783。",
+      "boundary": "POST_FIX_OFFLINE_RESCORE，holdoutExposed=true、freshEvidence=false；总成功率 0.8167 仍低于 0.85，正式 39/60 不变。HUMAN_REVIEW_PENDING。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-rescore-v3-20260814/summary.json",
+      "resultSha256": "f978888461d9b95aa64d0364308ec93cd9e2095996dad0b088dee0d8ba3dddbe",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-rescore-v3-20260814/run-manifest.json",
+      "runManifestSha256": "187b76a14722ce2a0b59e535fa60d8181cfbed3057989cd5b1b8a4eaf31575bb",
+      "resultAssertions": {
+        "runId": "rag-generation-v4-64aa86e-postfix-rescore-v3-20260814",
+        "status": "POST_FIX_OFFLINE_RESCORE",
+        "summary.rescore.providerRequests": 0,
+        "summary.rescore.holdoutExposed": true,
+        "summary.rescore.freshEvidence": false,
+        "summary.qualityGate.status": "FAILED_RETAINED",
+        "humanReviewStatus": "HUMAN_REVIEW_PENDING"
+      },
+      "datasetLocks": []
+    },
+    {
+      "id": "rag-generation-v4-postfix-targeted-chain",
+      "kind": "targeted-regression",
+      "suite": "rag-generation-live-v4",
+      "level": "E3_CONFIGURED_LIVE",
+      "state": "LOCAL_RESULT",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py --targeted-source-run-id rag-generation-v4-64aa86e-postfix-targeted-v4-20260814 --run-id rag-generation-v4-64aa86e-postfix-targeted-v5-20260814",
+      "caseCount": 1,
+      "claim": "保留 11 条、4 条、1 条、1 条、1 条的定向诊断链；最终 v5 使物流 SLA 坏例正确否定两小时承诺并引用模拟物流边界，Provider 完整。",
+      "boundary": "整条链均为 POST_FIX_TARGETED_REGRESSION，holdoutExposed=true、freshEvidence=false；不得把各轮结果拼成新的 60 条分数。人审仍为 HUMAN_REVIEW_PENDING。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v5-20260814/summary.json",
+      "resultSha256": "0404f1cb869415d6526a1317f29192a8a1da68cad9ae814580e089c5b3ba180b",
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v5-20260814/run-manifest.json",
+      "runManifestSha256": "66214e1b17d0b81301c64161a8964c2dfa6368d1a1dc004c16b333572aefcc59",
+      "resultAssertions": {
+        "runId": "rag-generation-v4-64aa86e-postfix-targeted-v5-20260814",
+        "status": "POST_FIX_TARGETED_REGRESSION",
+        "metadata.holdoutExposed": true,
+        "metadata.freshEvidence": false,
+        "summary.caseCount": 1,
+        "summary.taskSuccessCount": 1,
+        "summary.providerCompleteness.passed": true,
+        "humanReviewStatus": "HUMAN_REVIEW_PENDING"
+      },
+      "relatedArtifacts": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-20260814/summary.json",
+          "sha256": "23f1181ebe13164b51998d15e10696edfa5f74639e3659c21db8fa6f35dd35ed",
+          "assertions": {
+            "runId": "rag-generation-v4-64aa86e-postfix-targeted-20260814",
+            "summary.caseCount": 11
+          }
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/summary.json",
+          "sha256": "eb741159aee69e01b8c4076de765006e280f52de9599f520ed6f9c336979869a",
+          "assertions": {
+            "runId": "rag-generation-v4-64aa86e-postfix-targeted-v2-20260814",
+            "summary.caseCount": 4
+          }
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v3-20260814/summary.json",
+          "sha256": "5fcdcc9b66e4feb0f8b5194b88f0503bbd790c71e2dfcd3afd2484de4287c396",
+          "assertions": {
+            "runId": "rag-generation-v4-64aa86e-postfix-targeted-v3-20260814",
+            "summary.caseCount": 1,
+            "summary.taskSuccessCount": 0
+          }
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v4-20260814/summary.json",
+          "sha256": "b90f64063b7d15fdb1c1ef2d05258acb09c0a21186bfe6d674814ede2960e07a",
+          "assertions": {
+            "runId": "rag-generation-v4-64aa86e-postfix-targeted-v4-20260814",
+            "summary.caseCount": 1,
+            "summary.taskSuccessCount": 0
+          }
+        }
+      ],
+      "datasetLocks": []
+    },
+    {
       "id": "agent-live-model",
       "kind": "online-evaluation",
       "level": "E3_CONFIGURED_LIVE",
@@ -343,7 +625,9 @@
   "honestBoundaries": [
     "普通 benchmarks/results 目录被 Git 忽略；只有显式接受的 baseline lock 才能入库，本轮没有运行 --accept-baseline。",
     "SYNTHETIC、LOCAL_PILOT、REAL_USER 必须分开报告；REAL_USER 没有样本时固定为未采集。",
-    "Search/RAG 的 E3 configured-live 证据已经采集，但生成层最新自动门禁未全过；不得写成生成答案全部通过。",
+    "Search/RAG 的 E3 configured-live 证据已经采集；Search v2、RAG retrieval v4 和 generation v4 的正式门禁均未全过，不得用暴露后回归覆盖正式失败。",
+    "POST_FIX_OFFLINE_REPLAY、POST_FIX_OFFLINE_RESCORE 和 POST_FIX_TARGETED_REGRESSION 必须保持 holdoutExposed=true、freshEvidence=false，不得升级为 fresh E3。",
+    "RAG v4 人工盲评状态为 HUMAN_REVIEW_PENDING；AI_ASSISTED_INITIAL_REVIEW 不得表述为独立人工标注。",
     "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO；本轮 Search/RAG 各分组仍均小于 100。",
     "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
     "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。"
@@ -353,6 +637,56 @@
     "docs/AI应用求职项目证据总览.md",
     "docs/项目问题排查与修复复盘.md",
     "docs/Search与RAG成熟评测报告.md"
+  ],
+  "documentationConsistency": [
+    {
+      "path": "README.md",
+      "requiredTokens": [
+        "Search v2 覆盖中文 600 商品/240 查询",
+        "正式 Retrieval/Generation 均保留",
+        "HUMAN_REVIEW_PENDING"
+      ],
+      "forbiddenTokens": [
+        "RAG v3 将知识库扩为 12 份/75 chunk"
+      ]
+    },
+    {
+      "path": "docs/AI应用求职项目证据总览.md",
+      "requiredTokens": [
+        "Search v2 正式",
+        "RAG retrieval v4 正式",
+        "RAG generation v4 正式",
+        "39/60",
+        "HUMAN_REVIEW_PENDING"
+      ],
+      "forbiddenTokens": [
+        "RAG retrieval v3（当前）",
+        "RAG generation v3（当前）"
+      ]
+    },
+    {
+      "path": "docs/Search与RAG成熟评测报告.md",
+      "requiredTokens": [
+        "search-v2-64aa86e-final-20260814",
+        "rag-v4-64aa86e-routefix-20260814",
+        "rag-generation-v4-64aa86e-postfix-20260814",
+        "POST_FIX_OFFLINE_RESCORE",
+        "rag-v4-fresh-extra-021",
+        "HUMAN_REVIEW_PENDING"
+      ],
+      "forbiddenTokens": []
+    },
+    {
+      "path": "docs/项目问题排查与修复复盘.md",
+      "requiredTokens": [
+        "rag-v4-64aa86e-routefix-20260814",
+        "rag-generation-v4-64aa86e-postfix-20260814",
+        "gold 泄漏",
+        "PASSED_TARGETED_WITH_KNOWN_LABEL_LIMITS",
+        "HUMAN_REVIEW_PENDING"
+      ],
+      "forbiddenTokens": []
+    }
   ],
   "forbiddenCurrentClaims": [
     {

@@ -142,8 +142,8 @@ class Settings(BaseSettings):
     rerank_base_url: str = ""
     rerank_model: str = "qwen3-rerank"
     rerank_instruct: str = (
-        "Given an e-commerce shopping or support query, rank the candidate "
-        "passages by relevance to the user's intent."
+        "根据候选内容是否能直接回答、约束或明确否定用户命题排序。"
+        "仅主题相似但不能回答的内容必须低分。"
     )
     rerank_timeout: int = 20
     rerank_top_n: int = 6
@@ -299,14 +299,15 @@ class Settings(BaseSettings):
     # 商品召回比知识库召回更容忍噪声：搜出来的商品会再过一遍 rerank 和 MMR，
     # 而且用户能直接看出哪个不相关；知识库召回的噪声会被写进 prompt 当证据。
     rag_product_vector_min_cosine: float = 0.20
-    # rerank 之后的归一化相关性（0~1）。0.65 来自锁定的 34 条 RAG 集在
-    # 2026-08-06 的阈值扫描：Recall@10/MRR=0.9167，拒答 F1=0.9524。
-    # 完整数据哈希和回归下限见 scripts/rag_golden.lock.json。
-    rag_evidence_min_relevance: float = 0.65
-    # Disabled by default so an unvalidated experiment cannot alter production.
-    # When configured, reranked evidence must also be within this distance of the
-    # top relevance score. A value of 0 keeps only tied top-scoring passages.
-    rag_evidence_top_score_margin: OptionalFloat = None
+    # RAG v3 local-live retrieval selected 0.70 with a 0.10 top-score margin on
+    # public + known regression before the fresh holdout was opened. RAG v4
+    # keeps those values in one shared runtime/evaluation policy fingerprint.
+    rag_evidence_min_relevance: float = 0.70
+    # Deterministic canonical fact hints may recover a directly mapped passage
+    # below the global semantic threshold. The hint must come from runtime query
+    # parsing, never an evaluation label, and still has this conservative floor.
+    rag_evidence_canonical_hint_floor: float = 0.55
+    rag_evidence_top_score_margin: OptionalFloat = 0.10
     # 无 rerank 时的兜底闸门，单位是 RRF 融合分而不是任何引擎的原始分。
     # RRF 的全部意义就是丢掉不可比的原始分只留排名，所以这道闸门只能用排名表达：
     # "至少在某一路里进了前 N 名"。1/(60+N) 是 RRF 的定义式，N 越大越宽松。
@@ -455,6 +456,11 @@ class Settings(BaseSettings):
             and not 0 <= self.rag_evidence_top_score_margin <= 1
         ):
             raise ValueError("RAG_EVIDENCE_TOP_SCORE_MARGIN must be between 0 and 1")
+        if not 0 <= self.rag_evidence_canonical_hint_floor <= self.rag_evidence_min_relevance:
+            raise ValueError(
+                "RAG_EVIDENCE_CANONICAL_HINT_FLOOR must be between 0 and "
+                "RAG_EVIDENCE_MIN_RELEVANCE"
+            )
         for model, pricing in self.llm_pricing_cny_per_million_json.items():
             if not str(model).strip() or not isinstance(pricing, dict):
                 raise ValueError("LLM pricing requires a non-empty model and an object price")
