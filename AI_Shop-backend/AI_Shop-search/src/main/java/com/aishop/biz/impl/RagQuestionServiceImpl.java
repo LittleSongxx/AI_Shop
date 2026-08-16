@@ -6,7 +6,7 @@ import java.util.Locale;
 
 import com.aishop.biz.KnowledgeBaseService;
 import com.aishop.constants.RabbitMQConfig;
-import com.aishop.constants.ReliableMessageSender;
+import com.aishop.constants.TransactionalMqSender;
 import com.aishop.support.MqIdempotencyKeys;
 import com.aishop.entity.dto.RagDataDTO;
 import com.aishop.entity.enums.MessageReliabilityLevelEnum;
@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.aishop.entity.enums.PageSize;
 import com.aishop.entity.query.RagQuestionQuery;
@@ -35,7 +37,7 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 	@Resource
 	private RagQuestionMapper<RagQuestion, RagQuestionQuery> ragQuestionMapper;
 	@Resource
-	private ReliableMessageSender reliableMessageSender;
+	private TransactionalMqSender transactionalMqSender;
 	@Resource
 	private JdbcTemplate jdbcTemplate;
 	@Resource
@@ -107,6 +109,7 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public Integer deleteRagQuestionByQuestionId(Integer questionId) {
 		// 先从数据库删除
 		Integer result = this.ragQuestionMapper.deleteByQuestionId(questionId);
@@ -114,14 +117,14 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 		// 如果删除成功,再加入队列通知向量库删除
 		if (result > 0) {
 			RagDataDTO ragDataDTO = new RagDataDTO(questionId.toString(), RagDataTypeEnum.FAQ.getType());
-			reliableMessageSender.sendMessage(
+			transactionalMqSender.sendAfterCommit(
 					RabbitMQConfig.RAG_EXCHANGE,
 					RabbitMQConfig.RAG_QUEUE_KEY,
 					ragDataDTO,
 					MqIdempotencyKeys.ragFaq(String.valueOf(questionId), ragDataDTO.getVersion()),
 					MessageReliabilityLevelEnum.HIGH);
 			log.info("已添加删除任务到RAG队列, questionId: {}", questionId);
-			knowledgeBaseService.invalidateCaches();
+			invalidateCachesAfterCommit();
 		}
 		return result;
 	}
@@ -175,12 +178,25 @@ public class RagQuestionServiceImpl implements RagQuestionService {
 				input.getOwner(),
 				questionId);
 		RagDataDTO ragDataDTO = new RagDataDTO(questionId.toString(), RagDataTypeEnum.FAQ.getType());
-		reliableMessageSender.sendMessage(
+		transactionalMqSender.sendAfterCommit(
 				RabbitMQConfig.RAG_EXCHANGE,
 				RabbitMQConfig.RAG_QUEUE_KEY,
 				ragDataDTO,
 				MqIdempotencyKeys.ragFaq(String.valueOf(questionId), ragDataDTO.getVersion()),
 				MessageReliabilityLevelEnum.HIGH);
+		invalidateCachesAfterCommit();
+	}
+
+	private void invalidateCachesAfterCommit() {
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					knowledgeBaseService.invalidateCaches();
+				}
+			});
+			return;
+		}
 		knowledgeBaseService.invalidateCaches();
 	}
 

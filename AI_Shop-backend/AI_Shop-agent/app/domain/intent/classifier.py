@@ -734,6 +734,21 @@ async def classify_intent_by_llm(
     consult_card: dict | None = None,
     message_card: dict | None = None,
 ) -> IntentDecision | None:
+    settings = get_settings()
+    if not (settings.memory_llm_api_key or settings.llm_api_key).strip():
+        INTENT_SCHEMA_TOTAL.labels(result="unavailable").inc()
+        logger.debug(
+            "intent_llm_skipped",
+            reason="memory_llm_api_key_not_configured",
+        )
+        return _build_decision(
+            IntentKind.CHAT,
+            user_text,
+            confidence=0.0,
+            source="llm_unavailable",
+            next_action=NextAction.ASK_CLARIFICATION,
+        )
+
     template = await load_user_intent_classifier_prompt()
     if not template.strip():
         return None

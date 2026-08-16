@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -46,8 +47,13 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         if (StringTools.isEmpty(idempotencyKey) || StringTools.isEmpty(exchange) || StringTools.isEmpty(routingKey)) {
             throw new IllegalArgumentException("outbox 参数不完整");
         }
+        String payloadJson = JsonUtils.toJson(payload);
+        String reliabilityCode = (reliabilityLevel == null
+                ? MessageReliabilityLevelEnum.STANDARD
+                : reliabilityLevel).getCode();
         LocalMessageOutbox existing = localMessageOutboxMapper.selectByIdempotencyKey(idempotencyKey);
         if (existing != null) {
+            assertSameMessage(existing, exchange, routingKey, payloadJson, reliabilityCode);
             return existing.getId();
         }
         Date now = new Date();
@@ -55,10 +61,8 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         row.setIdempotencyKey(idempotencyKey);
         row.setExchangeName(exchange);
         row.setRoutingKey(routingKey);
-        row.setPayloadJson(JsonUtils.toJson(payload));
-        row.setReliabilityLevel(reliabilityLevel == null
-                ? MessageReliabilityLevelEnum.STANDARD.getCode()
-                : reliabilityLevel.getCode());
+        row.setPayloadJson(payloadJson);
+        row.setReliabilityLevel(reliabilityCode);
         row.setStatus(OutboxMessageStatusEnum.PENDING.getStatus());
         row.setRetryCount(0);
         row.setCreateTime(now);
@@ -68,7 +72,11 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
             return row.getId();
         } catch (DuplicateKeyException dup) {
             LocalMessageOutbox again = localMessageOutboxMapper.selectByIdempotencyKey(idempotencyKey);
-            return again == null ? null : again.getId();
+            if (again == null) {
+                return null;
+            }
+            assertSameMessage(again, exchange, routingKey, payloadJson, reliabilityCode);
+            return again.getId();
         }
     }
 
@@ -132,9 +140,21 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         if (batchSize <= 0) {
             batchSize = 20;
         }
+        if (maxRetries <= 0) {
+            maxRetries = 10;
+        }
         // 避开刚写入、即将由 afterCommit 处理的记录
         Date before = new Date(System.currentTimeMillis() - 3000L);
         Date now = new Date();
+        Integer exhausted = localMessageOutboxMapper.markRetriesExhausted(
+                OutboxMessageStatusEnum.FAILED.getStatus(),
+                OutboxMessageStatusEnum.SENDING.getStatus(),
+                OutboxMessageStatusEnum.EXHAUSTED.getStatus(),
+                maxRetries,
+                now);
+        if (exhausted != null && exhausted > 0) {
+            log.error("Outbox 有 {} 条消息重试耗尽，已转入 EXHAUSTED 等待人工处理", exhausted);
+        }
         List<LocalMessageOutbox> list = localMessageOutboxMapper.selectDispatchBatch(
                 OutboxMessageStatusEnum.PENDING.getStatus(),
                 OutboxMessageStatusEnum.FAILED.getStatus(),
@@ -165,6 +185,39 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         return ok;
     }
 
+    @Override
+    public int countExhausted() {
+        Integer count = localMessageOutboxMapper.countByStatus(
+                OutboxMessageStatusEnum.EXHAUSTED.getStatus());
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public List<LocalMessageOutbox> listExhausted(int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        List<LocalMessageOutbox> rows = localMessageOutboxMapper.selectByStatus(
+                OutboxMessageStatusEnum.EXHAUSTED.getStatus(), safeLimit);
+        return rows == null ? List.of() : rows;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public boolean replayExhausted(Long id) {
+        if (id == null) {
+            return false;
+        }
+        Integer requeued = localMessageOutboxMapper.requeueExhausted(
+                id,
+                OutboxMessageStatusEnum.EXHAUSTED.getStatus(),
+                OutboxMessageStatusEnum.PENDING.getStatus());
+        if (requeued == null || requeued != 1) {
+            return false;
+        }
+        log.warn("Outbox 人工重放已受理 id={}", id);
+        tryDispatch(id);
+        return true;
+    }
+
     private static String truncate(String msg) {
         if (msg == null) {
             return null;
@@ -179,5 +232,30 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         long backoff = Math.min(base * (1L << exponent), 5 * 60_000L);
         long jitter = ThreadLocalRandom.current().nextLong(Math.max(1L, base));
         return new Date(System.currentTimeMillis() + backoff + jitter);
+    }
+
+    private void assertSameMessage(
+            LocalMessageOutbox existing,
+            String exchange,
+            String routingKey,
+            String payloadJson,
+            String reliabilityCode) {
+        boolean samePayload = Objects.equals(existing.getPayloadJson(), payloadJson);
+        if (!samePayload) {
+            try {
+                samePayload = Objects.equals(
+                        JsonUtils.parseTree(existing.getPayloadJson()),
+                        JsonUtils.parseTree(payloadJson));
+            } catch (RuntimeException ignored) {
+                samePayload = false;
+            }
+        }
+        if (!Objects.equals(existing.getExchangeName(), exchange)
+                || !Objects.equals(existing.getRoutingKey(), routingKey)
+                || !samePayload
+                || !Objects.equals(existing.getReliabilityLevel(), reliabilityCode)) {
+            throw new IllegalStateException(
+                    "Outbox 幂等键已被不同消息占用, key=" + existing.getIdempotencyKey());
+        }
     }
 }

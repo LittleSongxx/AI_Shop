@@ -67,6 +67,12 @@ public class AppConfig {
     @Value("${alipay.serverUrl:}")
     private String alipayServerUrl;
 
+    @Value("${alipay.connectTimeoutMs:3000}")
+    private Integer alipayConnectTimeoutMs;
+
+    @Value("${alipay.readTimeoutMs:8000}")
+    private Integer alipayReadTimeoutMs;
+
     //订单超时（默认 15 分钟，对齐原 EShop）
     @Value("${order.expire.minute:15}")
     private Integer orderExpireMinute;
@@ -169,6 +175,25 @@ public class AppConfig {
 
     public String getAlipayServerUrl() {
         return alipayServerUrl;
+    }
+
+    public Integer getAlipayConnectTimeoutMs() {
+        return alipayConnectTimeoutMs;
+    }
+
+    public Integer getAlipayReadTimeoutMs() {
+        return alipayReadTimeoutMs;
+    }
+
+    public boolean isAlipayConfigured() {
+        return !StringTools.isEmpty(projectDomain)
+                && !StringTools.isEmpty(alipayAppid)
+                && !StringTools.isEmpty(alipaySellerId)
+                && !StringTools.isEmpty(alipayAppPrivateKey)
+                && !StringTools.isEmpty(alipayAppCertPath)
+                && !StringTools.isEmpty(alipayPublicCertPath)
+                && !StringTools.isEmpty(alipayRootCertPath)
+                && !StringTools.isEmpty(alipayServerUrl);
     }
 
     public Integer getOrderConfirmMinute() {

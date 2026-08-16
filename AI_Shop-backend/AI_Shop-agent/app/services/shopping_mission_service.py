@@ -523,9 +523,13 @@ def apply_explicit_turn(
     return mission
 
 
-def next_clarification(mission: dict[str, Any] | None) -> dict[str, Any] | None:
+def next_clarification(
+    mission: dict[str, Any] | None,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
     """Return one question selected by expected decision impact, or ``None``."""
-    if not mission_is_active(mission):
+    if not mission_is_active(mission, now=now):
         return None
     assert mission is not None
     if mission.get("clarificationDeclined") is True:
@@ -777,12 +781,16 @@ class ShoppingMissionService:
                     INSERT INTO agent_shopping_mission
                         (user_id, mission_id, status, mission_json, source_message_id,
                          revision, expires_at, created_at, updated_at)
-                    VALUES (%s,%s,%s,%s,%s,1,%s,NOW(3),NOW(3))
+                    VALUES (%s,%s,%s,%s,%s,1,%s,NOW(3),NOW(3)) AS incoming
                     ON DUPLICATE KEY UPDATE
-                        mission_id=VALUES(mission_id), status=VALUES(status),
-                        mission_json=VALUES(mission_json),
-                        source_message_id=COALESCE(VALUES(source_message_id), source_message_id),
-                        revision=revision+1, expires_at=VALUES(expires_at), updated_at=NOW(3)
+                        mission_id=incoming.mission_id, status=incoming.status,
+                        mission_json=incoming.mission_json,
+                        source_message_id=COALESCE(
+                            incoming.source_message_id,
+                            agent_shopping_mission.source_message_id
+                        ),
+                        revision=agent_shopping_mission.revision+1,
+                        expires_at=incoming.expires_at, updated_at=NOW(3)
                     """,
                     (
                         user_id,

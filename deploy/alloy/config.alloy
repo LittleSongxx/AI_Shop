@@ -1,0 +1,45 @@
+logging {
+	level  = "info"
+	format = "logfmt"
+}
+
+local.file_match "aishop_logs" {
+	path_targets = [
+		{
+			"__path__" = "/var/log/aishop/*.log",
+			"job"      = "aishop",
+		},
+	]
+	sync_period = "5s"
+}
+
+loki.source.file "aishop_logs" {
+	targets    = local.file_match.aishop_logs.targets
+	forward_to = [loki.relabel.aishop_logs.receiver]
+}
+
+loki.relabel "aishop_logs" {
+	forward_to = [loki.write.aishop.receiver]
+
+	rule {
+		source_labels = ["filename"]
+		regex         = ".*/([^/]+)\\.log"
+		target_label  = "service_name"
+		replacement   = "aishop-$1"
+	}
+
+	rule {
+		target_label = "environment"
+		replacement  = "local"
+	}
+}
+
+loki.write "aishop" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+
+	external_labels = {
+		project = "aishop",
+	}
+}

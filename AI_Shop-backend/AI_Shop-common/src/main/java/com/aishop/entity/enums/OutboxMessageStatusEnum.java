@@ -4,7 +4,8 @@ public enum OutboxMessageStatusEnum {
     PENDING(0, "待发送"),
     SENDING(1, "发送中"),
     SENT(2, "已发送"),
-    FAILED(3, "失败");
+    FAILED(3, "失败"),
+    EXHAUSTED(4, "重试耗尽");
 
     private final Integer status;
     private final String desc;

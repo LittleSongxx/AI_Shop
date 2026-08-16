@@ -14,8 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
-@ConditionalOnProperty(name = "mq.compensation.auto-replay-enabled", havingValue = "true", matchIfMissing = true)
-@ConditionalOnProperty(name = "app.common-scheduling.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "mq.compensation.auto-replay-enabled", havingValue = "true")
 public class MqCompensationAutoReplayTask {
 
     @Resource
@@ -29,10 +28,15 @@ public class MqCompensationAutoReplayTask {
     @Value("${mq.compensation.auto-replay-max-retries:5}")
     private int maxRetries;
 
+    @Value("${spring.application.name:unknown}")
+    private String applicationName;
+
     @Scheduled(fixedDelayString = "${mq.compensation.auto-replay-interval-ms:60000}")
     public void autoReplay() {
+        String lockKey = Constants.REDIS_KEY_MQ_COMPENSATE_AUTO_REPLAY_LOCK
+                + ":" + applicationName;
         if (!redisComponent.setIfAbsent(
-                Constants.REDIS_KEY_MQ_COMPENSATE_AUTO_REPLAY_LOCK,
+                lockKey,
                 "1",
                 55,
                 TimeUnit.SECONDS)) {

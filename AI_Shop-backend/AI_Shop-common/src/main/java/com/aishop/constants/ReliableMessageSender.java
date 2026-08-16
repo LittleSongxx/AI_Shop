@@ -2,7 +2,6 @@ package com.aishop.constants;
 
 import com.aishop.component.MqCompensationStore;
 import com.aishop.component.MqConsumerIdempotencyHelper;
-import com.aishop.component.MqIdempotencyGuard;
 import com.aishop.component.MqPublisherConfirmHelper;
 import com.aishop.entity.dto.MqCompensationRecord;
 import com.aishop.entity.enums.MessageReliabilityLevelEnum;
@@ -25,14 +24,8 @@ import java.util.concurrent.RejectedExecutionException;
 public class ReliableMessageSender {
 
     private static final int RETRY_MAX_COUNT = 3;
-    private static final long HIGH_IDEMPOTENCY_TTL_SECONDS = 30L;
-    private static final long STANDARD_IDEMPOTENCY_TTL_SECONDS = 24 * 3600L;
-
     @Resource
     private RabbitTemplate rabbitTemplate;
-
-    @Resource
-    private MqIdempotencyGuard mqIdempotencyGuard;
 
     @Resource
     private MqCompensationStore mqCompensationStore;
@@ -69,9 +62,6 @@ public class ReliableMessageSender {
     }
 
     private void sendHighConcurrency(String exchange, String routingKey, Object message, String idempotencyKey) {
-        if (!mqIdempotencyGuard.tryAcquireSend(idempotencyKey, HIGH_IDEMPOTENCY_TTL_SECONDS)) {
-            return;
-        }
         try {
             mqAsyncExecutor.execute(() -> {
                 try {
@@ -81,22 +71,17 @@ public class ReliableMessageSender {
                 } catch (Exception e) {
                     log.error("高并发 MQ 异步发送失败，写入补偿, exchange={}, routingKey={}, key={}",
                             exchange, routingKey, idempotencyKey, e);
-                    mqIdempotencyGuard.releaseSend(idempotencyKey);
                     saveCompensation(exchange, routingKey, message, idempotencyKey, e);
                 }
             });
         } catch (RejectedExecutionException e) {
             log.error("高并发 MQ 线程池已满，提交被拒绝，写入补偿, exchange={}, routingKey={}, key={}",
                     exchange, routingKey, idempotencyKey, e);
-            mqIdempotencyGuard.releaseSend(idempotencyKey);
             saveCompensation(exchange, routingKey, message, idempotencyKey, e);
         }
     }
 
     private void sendStandard(String exchange, String routingKey, Object message, String idempotencyKey) {
-        if (!mqIdempotencyGuard.tryAcquireSend(idempotencyKey, STANDARD_IDEMPOTENCY_TTL_SECONDS)) {
-            return;
-        }
         sendStandardInternal(exchange, routingKey, message, idempotencyKey);
     }
 
@@ -116,7 +101,6 @@ public class ReliableMessageSender {
                 log.warn("MQ 同步发送失败, key={}, retry={}/{}", idempotencyKey, i + 1, RETRY_MAX_COUNT, e);
             }
         }
-        mqIdempotencyGuard.releaseSend(idempotencyKey);
         log.error("MQ 同步发送重试耗尽, key={}", idempotencyKey, last);
         throw new AmqpException("消息发送失败，已重试 " + RETRY_MAX_COUNT + " 次", last);
     }

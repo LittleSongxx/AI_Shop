@@ -42,7 +42,7 @@ class SearchToolInternalControllerTest {
     void keywordOnlyRebuildDoesNotPublishEmbeddingTasks() {
         when(productFeignSupport.listOnSaleProductIds()).thenReturn(List.of("P000000000000001", "P000000000000002"));
 
-        ResponseVO<Void> response = controller.productData(false);
+        ResponseVO<Void> response = controller.productData(false, true);
 
         assertNotNull(response);
         verify(esSearchComponent).saveIndex("P000000000000001");
@@ -55,8 +55,24 @@ class SearchToolInternalControllerTest {
     void defaultRebuildStillPublishesEmbeddingTasks() {
         when(productFeignSupport.listOnSaleProductIds()).thenReturn(List.of("P000000000000001"));
 
-        controller.productData(true);
+        controller.productData(true, true);
 
+        verify(reliableMessageSender).sendMessage(
+                eq(RabbitMQConfig.RAG_EXCHANGE),
+                eq(RabbitMQConfig.RAG_QUEUE_KEY),
+                any(),
+                anyString(),
+                eq(MessageReliabilityLevelEnum.HIGH));
+    }
+
+    @Test
+    void vectorOnlyRebuildDoesNotRewriteKeywordIndex() {
+        when(productFeignSupport.listOnSaleProductIds())
+                .thenReturn(List.of("P000000000000001"));
+
+        controller.productData(true, false);
+
+        verify(esSearchComponent, never()).saveIndex(anyString());
         verify(reliableMessageSender).sendMessage(
                 eq(RabbitMQConfig.RAG_EXCHANGE),
                 eq(RabbitMQConfig.RAG_QUEUE_KEY),

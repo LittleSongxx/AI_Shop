@@ -17,23 +17,22 @@ networks:
 
 services:
   mysql:
-    image: mysql:8.3
+    image: mysql:8.4.11
     container_name: aishop-mysql
     networks: [aishop-net]
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_general_ci
-      - --default-authentication-plugin=caching_sha2_password
       - --innodb_buffer_pool_size=${MYSQL_INNODB_BUFFER_POOL_SIZE:-128M}
-      - --max_connections=${MYSQL_MAX_CONNECTIONS:-150}
+      - --max_connections=${MYSQL_MAX_CONNECTIONS:-100}
     volumes:
       - aishop_mysql:/var/lib/mysql
-    mem_limit: ${MYSQL_MEMORY_LIMIT:-640m}
+    mem_limit: ${MYSQL_MEMORY_LIMIT:-768m}
     healthcheck:
       test:
         [
@@ -46,43 +45,57 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.7-alpine
     container_name: aishop-redis
     networks: [aishop-net]
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # Leave headroom for AOF rewrite buffers, allocator overhead, and client
+      # output buffers. Redis must reach maxmemory before Docker cgroup OOM.
+      REDIS_MAXMEMORY: ${REDIS_MAXMEMORY:-192mb}
+      REDIS_MAXMEMORY_POLICY: ${REDIS_MAXMEMORY_POLICY:-noeviction}
     command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --maxmemory
-      - ${REDIS_MAXMEMORY:-256mb}
-      - --maxmemory-policy
-      - allkeys-lru
+      - /bin/sh
+      - -ec
+      - |
+        set -- redis-server \
+          --appendonly yes \
+          --maxmemory "$${REDIS_MAXMEMORY}" \
+          --maxmemory-policy "$${REDIS_MAXMEMORY_POLICY}"
+        if [ -n "$${REDIS_PASSWORD}" ]; then
+          set -- "$$@" --requirepass "$${REDIS_PASSWORD}"
+        fi
+        exec "$$@"
     volumes:
       - aishop_redis:/data
     mem_limit: ${REDIS_MEMORY_LIMIT:-384m}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi",
+        ]
       interval: 10s
       timeout: 3s
       retries: 10
     restart: unless-stopped
 
   rabbitmq:
-    image: rabbitmq:3.13-management
+    image: rabbitmq:4.2.9-management
     container_name: aishop-rabbitmq
     networks: [aishop-net]
     ports:
-      - "${RABBIT_PORT:-5673}:5672"
-      - "${RABBIT_MANAGEMENT_PORT:-15673}:15672"
+      - "127.0.0.1:${RABBIT_PORT:-5673}:5672"
+      - "127.0.0.1:${RABBIT_MANAGEMENT_PORT:-15673}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-aishop}
       RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:-aishop}
       RABBITMQ_DEFAULT_VHOST: ${RABBIT_VHOST:-/}
-      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-memory ${RABBITMQ_MEMORY_WATERMARK:-512M}"
     volumes:
       - aishop_rabbit:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-aishop.conf:ro
     mem_limit: ${RABBITMQ_MEMORY_LIMIT:-768m}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -91,29 +104,50 @@ services:
       retries: 20
     restart: unless-stopped
 
+  rabbitmq-init:
+    image: rabbitmq:4.2.9-management
+    container_name: aishop-rabbitmq-init
+    networks: [aishop-net]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBIT_USER: ${RABBIT_USER:-aishop}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD:-aishop}
+      RABBIT_VHOST: ${RABBIT_VHOST:-/}
+    volumes:
+      - ./rabbitmq/apply-policies.sh:/opt/aishop/apply-policies.sh:ro
+    entrypoint: ["/bin/sh", "/opt/aishop/apply-policies.sh"]
+    restart: "no"
+
   nacos:
-    image: nacos/nacos-server:v2.4.3
+    # Nacos 2.5.x is the compatibility bridge for the application's 3.0.x
+    # clients and Seata 2.5.0's embedded Nacos 1.4.x registry client.
+    image: nacos/nacos-server:v2.5.3
     container_name: aishop-nacos
     networks: [aishop-net]
     ports:
-      - "${NACOS_PORT:-8848}:8848"
-      - "${NACOS_GRPC_PORT:-9848}:9848"
+      - "127.0.0.1:${NACOS_PORT:-8848}:8848"
+      - "127.0.0.1:${NACOS_GRPC_PORT:-9848}:9848"
     depends_on:
       mysql:
         condition: service_healthy
     environment:
       MODE: standalone
       PREFER_HOST_MODE: hostname
-      JVM_XMS: ${NACOS_JVM_XMS:-192m}
-      JVM_XMX: ${NACOS_JVM_XMX:-384m}
-      JVM_XMN: ${NACOS_JVM_XMN:-96m}
-      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: ${NACOS_JVM_XMS:-128m}
+      JVM_XMX: ${NACOS_JVM_XMX:-256m}
+      JVM_XMN: ${NACOS_JVM_XMN:-64m}
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-QUlfU2hvcC1OYWNvcy1Mb2NhbC1Ub2tlbi1DaGFuZ2UtSW4tUHJvZHVjdGlvbi0yMDI2}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-aishop-server}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-aishop-local-identity}
       SPRING_DATASOURCE_PLATFORM: mysql
       MYSQL_SERVICE_HOST: mysql
       MYSQL_SERVICE_PORT: 3306
       MYSQL_SERVICE_DB_NAME: nacos
-      MYSQL_SERVICE_USER: root
-      MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_SERVICE_USER: ${NACOS_MYSQL_USER:?set NACOS_MYSQL_USER via start.sh}
+      MYSQL_SERVICE_PASSWORD: ${NACOS_MYSQL_PASSWORD:?set NACOS_MYSQL_PASSWORD via start.sh}
       MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=10000&socketTimeout=30000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     mem_limit: ${NACOS_MEMORY_LIMIT:-768m}
     healthcheck:
@@ -125,14 +159,16 @@ services:
     restart: unless-stopped
 
   elasticsearch:
+    # Local development only: loopback-bound and intentionally unauthenticated.
+    # Production startup validators require authenticated HTTPS Elasticsearch.
     build:
       context: ./elasticsearch
       dockerfile: Dockerfile
-    image: aishop-elasticsearch:9.2.1-ik
+    image: aishop-elasticsearch:8.19.19-ik
     container_name: aishop-es
     networks: [aishop-net]
     ports:
-      - "${ES_PORT:-9200}:9200"
+      - "127.0.0.1:${ES_PORT:-9200}:9200"
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
@@ -163,7 +199,7 @@ services:
     container_name: aishop-sentinel
     networks: [aishop-net]
     ports:
-      - "${SENTINEL_PORT:-8858}:8858"
+      - "127.0.0.1:${SENTINEL_PORT:-8858}:8858"
     environment:
       JAVA_OPT_EXT: "-Xms${SENTINEL_JVM_XMS:-128m} -Xmx${SENTINEL_JVM_XMX:-256m} -Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858"
     mem_limit: ${SENTINEL_MEMORY_LIMIT:-384m}
@@ -173,26 +209,30 @@ services:
     build:
       context: ./seata
       dockerfile: Dockerfile
-    image: aishop-seata-server:2.2.0
+    image: aishop-seata-server:2.5.0
     container_name: aishop-seata
     networks: [aishop-net]
     ports:
-      - "${SEATA_PORT:-8092}:${SEATA_PORT:-8092}"
-      - "${SEATA_CONSOLE_PORT:-7092}:7091"
+      # Seata refuses to register 127.0.0.1. The launchers choose a reachable
+      # local address and bind the published port to that exact interface.
+      - "${SEATA_IP:?set SEATA_IP via start.sh or start-middleware.ps1}:${SEATA_PORT:-8092}:${SEATA_PORT:-8092}"
     depends_on:
       mysql:
         condition: service_healthy
       nacos:
         condition: service_healthy
     environment:
-      # start.sh sets this to the WSL host's reachable non-loopback address.
-      SEATA_IP: ${SEATA_IP:-host.docker.internal}
+      # This is the address the TC registers in Nacos.
+      SEATA_IP: ${SEATA_IP:?set SEATA_IP via start.sh or start-middleware.ps1}
       SEATA_PORT: ${SEATA_PORT:-8092}
       STORE_MODE: db
       TZ: Asia/Shanghai
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      SEATA_CONSOLE_USERNAME: ${SEATA_CONSOLE_USERNAME:-seata}
-      SEATA_CONSOLE_PASSWORD: ${SEATA_CONSOLE_PASSWORD:-seata}
+      SEATA_MYSQL_USER: ${SEATA_MYSQL_USER:?set SEATA_MYSQL_USER via start.sh}
+      SEATA_MYSQL_PASSWORD: ${SEATA_MYSQL_PASSWORD:?set SEATA_MYSQL_PASSWORD via start.sh}
+      SEATA_DB_MIN_CONN: ${SEATA_DB_MIN_CONN:-1}
+      SEATA_DB_MAX_CONN: ${SEATA_DB_MAX_CONN:-8}
+      NACOS_USERNAME: ${NACOS_USERNAME:-nacos}
+      NACOS_PASSWORD: ${NACOS_PASSWORD:-nacos}
       SEATA_SECURITY_SECRET_KEY: ${SEATA_SECURITY_SECRET_KEY:-SeataSecretKey0c382ef121d778043159209298fd40bf3850a017}
       JVM_XMX: ${SEATA_JVM_XMX:-384m}
       JVM_XMS: ${SEATA_JVM_XMS:-192m}
@@ -205,6 +245,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: ${SEATA_MEMORY_LIMIT:-640m}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/$${SEATA_PORT}'"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

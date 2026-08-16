@@ -15,6 +15,12 @@ async def check() -> dict:
     settings = get_settings()
     if not settings.visual_search_enabled:
         return {"state": "DISABLED"}
+    if not settings.visual_api_key.strip():
+        return {
+            "queueState": "DISABLED",
+            "state": "DEGRADED",
+            "reason": "VISUAL_API_KEY_NOT_CONFIGURED",
+        }
 
     status = await visual_product_index.status()
     if not settings.visual_index_consumer_enabled:
@@ -35,12 +41,7 @@ async def check() -> dict:
         status["queue"] = settings.visual_index_queue
         status["queueMessages"] = queue.declaration_result.message_count
         status["queueConsumers"] = queue.declaration_result.consumer_count
-        if not settings.visual_api_key.strip():
-            status.update(
-                state="DEGRADED",
-                reason="VISUAL_API_KEY_NOT_CONFIGURED",
-            )
-        elif not status.get("servingCurrentModel"):
+        if not status.get("servingCurrentModel"):
             status.update(
                 state="DEGRADED",
                 reason="VISUAL_INDEX_BACKFILL_PENDING",

@@ -8,6 +8,7 @@ import com.aishop.api.dto.UserCouponCreateDTO;
 import com.aishop.api.dto.UserCouponIdDTO;
 import com.aishop.api.dto.UserCouponStatusChangeDTO;
 import com.aishop.api.vo.CouponBriefVO;
+import com.aishop.api.vo.CouponGrantResultVO;
 import com.aishop.api.vo.CouponLockResultVO;
 import com.aishop.api.vo.DiscountCouponVO;
 import com.aishop.api.vo.StockChangeResultVO;
@@ -62,6 +63,11 @@ public class CouponFeignSupport implements UserCouponStatusCompensatePort {
 
     public void createUserCoupon(UserCouponCreateDTO dto) {
         feignResponseSupport.run(() -> couponFeignClient.createUserCoupon(dto), "创建用户券失败");
+    }
+
+    public CouponGrantResultVO grantCoupon(UserCouponCreateDTO dto) {
+        return feignResponseSupport.call(
+                () -> couponFeignClient.grantCoupon(dto), "发放用户券失败");
     }
 
     public int deductStock(String couponId) {

@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Annotated, Literal
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from pydantic import AliasChoices, BeforeValidator, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -127,6 +127,14 @@ class Settings(BaseSettings):
     memory_llm_timeout: OptionalInt = None
 
     embedding_api_key: str = ""
+    embedding_provider: Literal["local", "openai"] = Field(
+        default="openai",
+        validation_alias=AliasChoices(
+            "EMBEDDING_PROVIDER",
+            "SPRING_AI_MODEL_EMBEDDING",
+            "embedding_provider",
+        ),
+    )
     embedding_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     embedding_model: str = "text-embedding-v4"
     embedding_dimensions: int = 1024
@@ -212,14 +220,19 @@ class Settings(BaseSettings):
 
     mysql_host: str = "localhost"
     mysql_port: int = 3306
-    mysql_user: str = "root"
-    mysql_password: str = "123456"
+    mysql_user: str = "aishop"
+    mysql_password: str = ""
     mysql_database: str = "aishop_agent"
+    mysql_pool_min_size: int = 1
+    mysql_pool_max_size: int = 8
+    mysql_pool_recycle_seconds: int = 1800
     analytics_mysql_host: str = "localhost"
     analytics_mysql_port: int = 3306
     analytics_mysql_user: str = ""
     analytics_mysql_password: str = ""
     analytics_mysql_database: str = "aishop_admin"
+    analytics_mysql_pool_min_size: int = 1
+    analytics_mysql_pool_max_size: int = 2
     agent_auto_migrate: bool = True
 
     redis_host: str = "127.0.0.1"
@@ -227,17 +240,35 @@ class Settings(BaseSettings):
     # 默认值必须指向项目的容器，否则会静默连上本机那个 Redis（连得通但是错的库）。
     redis_port: int = 6380
     redis_db: int = 0
+    redis_username: str = ""
+    redis_password: str = ""
+    redis_ssl_enabled: bool = False
 
     es_hosts: str = "http://localhost:9200"
-    es_index: str = "aishop_vectorstore"
+    es_username: str = ""
+    es_password: str = ""
+    es_verify_ssl: bool = True
+    es_index: str = Field(
+        default="aishop_vectorstore",
+        validation_alias=AliasChoices("VECTOR_INDEX", "ES_INDEX", "es_index"),
+    )
     es_vector_field: str = Field(
         default="embedding",
         validation_alias=AliasChoices("VECTOR_FIELD", "ES_VECTOR_FIELD", "es_vector_field"),
     )
-    es_vector_dimensions: int = 1024
+    es_vector_dimensions: int = Field(
+        default=1024,
+        validation_alias=AliasChoices(
+            "EMBEDDING_DIMENSIONS",
+            "ES_VECTOR_DIMENSIONS",
+            "es_vector_dimensions",
+        ),
+    )
+    vector_index_schema_version: int = 1
 
     # 账号和端口都跟 compose 对齐：aishop/aishop + 5673。
     rabbitmq_url: str = "amqp://aishop:aishop@localhost:5673/"
+    rabbitmq_queue_type: Literal["classic", "quorum"] = "quorum"
     agent_queue_exchange: str = "agent.tasks"
     agent_worker_high_concurrency: int = 4
     agent_worker_fast_concurrency: int = 4
@@ -401,6 +432,34 @@ class Settings(BaseSettings):
             raise ValueError("AI_Shop vector contract requires 1024 dimensions")
         if not self.es_vector_field.strip():
             raise ValueError("VECTOR_FIELD must not be empty")
+        if not 1 <= self.mysql_pool_min_size <= self.mysql_pool_max_size <= 64:
+            raise ValueError(
+                "MYSQL_POOL_MIN_SIZE and MYSQL_POOL_MAX_SIZE must satisfy "
+                "1 <= min <= max <= 64"
+            )
+        if not 60 <= self.mysql_pool_recycle_seconds <= 86_400:
+            raise ValueError(
+                "MYSQL_POOL_RECYCLE_SECONDS must be between 60 and 86400"
+            )
+        if not (
+            1
+            <= self.analytics_mysql_pool_min_size
+            <= self.analytics_mysql_pool_max_size
+            <= 16
+        ):
+            raise ValueError(
+                "ANALYTICS_MYSQL_POOL_MIN_SIZE and ANALYTICS_MYSQL_POOL_MAX_SIZE "
+                "must satisfy 1 <= min <= max <= 16"
+            )
+        es_hosts = [host.strip() for host in self.es_hosts.split(",") if host.strip()]
+        if not es_hosts:
+            raise ValueError("ES_HOSTS must contain at least one endpoint")
+        for host in es_hosts:
+            parsed_es = urlparse(host)
+            if parsed_es.scheme not in {"http", "https"} or not parsed_es.netloc:
+                raise ValueError("ES_HOSTS entries must be absolute HTTP(S) URLs")
+        if bool(self.es_username.strip()) != bool(self.es_password):
+            raise ValueError("ES_USERNAME and ES_PASSWORD must be configured together")
         if self.compress_token_threshold >= self.working_token_budget:
             raise ValueError("COMPRESS_TOKEN_THRESHOLD must be less than WORKING_TOKEN_BUDGET")
         if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
@@ -602,26 +661,61 @@ class Settings(BaseSettings):
             errors.append("PRIVACY_EXPORT_SIGNING_SECRET must be configured")
         if not self.llm_api_key.strip():
             errors.append("LLM_API_KEY must be configured")
+        if self.embedding_provider != "openai":
+            errors.append("EMBEDDING_PROVIDER must be openai in production")
         if not self.embedding_api_key.strip():
             errors.append("EMBEDDING_API_KEY must be configured")
+        if self.mysql_user.strip().lower() == "root":
+            errors.append("MYSQL_USER must not use the MySQL root identity in production")
+        if not self.mysql_user.strip() or not self.mysql_password:
+            errors.append("MYSQL_USER and MYSQL_PASSWORD must be configured")
+        if not self.redis_password:
+            errors.append("REDIS_PASSWORD must be configured")
+        if any(
+            urlparse(host.strip()).scheme != "https"
+            for host in self.es_hosts.split(",")
+            if host.strip()
+        ):
+            errors.append("ES_HOSTS must use HTTPS in production")
+        if not self.es_username.strip() or not self.es_password:
+            errors.append("ES_USERNAME and ES_PASSWORD must be configured in production")
+        if not self.es_verify_ssl:
+            errors.append("ES_VERIFY_SSL must remain true in production")
         if self.rerank_required and not self.rerank_api_key.strip():
             errors.append("RERANK_API_KEY must be configured (RERANK_REQUIRED=true)")
+        if self.visual_search_enabled and not self.visual_api_key.strip():
+            errors.append(
+                "VISUAL_API_KEY must be configured when VISUAL_SEARCH_ENABLED=true"
+            )
         errors.extend(analytics_errors)
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
 
     @property
     def mysql_dsn(self) -> str:
-
+        username = quote(self.mysql_user, safe="")
+        password = quote(self.mysql_password, safe="")
+        host = self.mysql_host
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
         return (
-            f"mysql+aiomysql://{self.mysql_user}:{self.mysql_password}"
-            f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
+            f"mysql+aiomysql://{username}:{password}"
+            f"@{host}:{self.mysql_port}/{self.mysql_database}"
         )
 
     @property
     def redis_url(self) -> str:
+        scheme = "rediss" if self.redis_ssl_enabled else "redis"
+        host = self.redis_host
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
 
-        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        credentials = ""
+        if self.redis_username or self.redis_password:
+            username = quote(self.redis_username or "default", safe="")
+            password = quote(self.redis_password, safe="")
+            credentials = f"{username}:{password}@"
+        return f"{scheme}://{credentials}{host}:{self.redis_port}/{self.redis_db}"
 
 
 @lru_cache

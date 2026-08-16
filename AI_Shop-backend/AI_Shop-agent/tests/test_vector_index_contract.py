@@ -1,7 +1,12 @@
 import pytest
 
 from app.config.settings import Settings
-from app.rag.index_contract import index_mapping_body, validate_mapping
+from app.rag import index_contract as index_contract_module
+from app.rag.index_contract import (
+    embedding_contract,
+    index_mapping_body,
+    validate_mapping,
+)
 
 
 def test_validate_mapping_accepts_shared_contract():
@@ -9,7 +14,17 @@ def test_validate_mapping_accepts_shared_contract():
         "aishop_vectorstore": {
             "mappings": {
                 "properties": {
-                    "embedding": {"type": "dense_vector", "dims": 1024},
+                    "embedding": {
+                        "type": "dense_vector",
+                        "dims": 1024,
+                        "index": True,
+                        "similarity": "cosine",
+                        "index_options": {
+                            "type": "int8_hnsw",
+                            "m": 16,
+                            "ef_construction": 100,
+                        },
+                    },
                 }
             }
         }
@@ -45,15 +60,67 @@ def test_validate_mapping_rejects_non_contract_field_and_dimension():
     )
 
     assert result["ok"] is False
-    assert len(result["errors"]) == 2
+    assert len(result["errors"]) == 5
 
 
 def test_mapping_body_uses_configured_field():
-    settings = Settings(es_vector_field="embedding")
-    field = index_mapping_body(settings)["mappings"]["properties"]["embedding"]
+    settings = Settings(
+        es_vector_field="embedding",
+        embedding_provider="local",
+        vector_index_schema_version=3,
+    )
+    mapping = index_mapping_body(settings)
+    field = mapping["mappings"]["properties"]["embedding"]
 
     assert field["type"] == "dense_vector"
     assert field["dims"] == 1024
+    assert field["index"] is True
+    assert field["similarity"] == "cosine"
+    assert field["index_options"] == {
+        "type": "int8_hnsw",
+        "m": 16,
+        "ef_construction": 100,
+    }
+    assert mapping["mappings"]["_meta"]["aishopEmbeddingContract"] == {
+        "embeddingProvider": "local",
+        "embeddingModel": "local-hash-v1",
+        "embeddingDimensions": 1024,
+        "contractVersion": 3,
+    }
+
+
+def test_validate_mapping_rejects_a_same_dimension_model_mismatch():
+    settings = Settings(
+        embedding_provider="local",
+        vector_index_schema_version=1,
+    )
+    mapping = {"aishop_vectorstore": index_mapping_body(settings)}
+
+    result = validate_mapping(
+        mapping,
+        index="aishop_vectorstore",
+        field="embedding",
+        dimensions=1024,
+        embedding_provider="openai",
+        embedding_model="text-embedding-v4",
+        contract_version=1,
+    )
+
+    assert result["ok"] is False
+    assert "embedding contract mismatch" in result["errors"][0]
+    assert embedding_contract(settings)["embeddingModel"] == "local-hash-v1"
+
+
+@pytest.mark.asyncio
+async def test_production_rebuild_requires_versioned_index_and_alias(monkeypatch):
+    monkeypatch.setattr(
+        index_contract_module,
+        "get_settings",
+        lambda: Settings(_env_file=None, app_env="production"),
+    )
+
+    with pytest.raises(RuntimeError, match="atomic alias switch"):
+        await index_contract_module.VectorIndexContract().rebuild()
 
 
 def test_context_threshold_must_be_below_budget():

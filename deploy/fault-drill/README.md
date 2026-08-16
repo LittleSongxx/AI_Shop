@@ -14,7 +14,8 @@ bash deploy/fault-drill/run_fault_drill.sh
 ```
 
 脚本使用独立的 Compose project、容器、网络、卷、MySQL schema、RabbitMQ
-vhost、Redis DB、端口和测试用户。它会真实执行 Worker kill/租约接管、MQ
+vhost、Redis DB 和测试用户。中间件不向宿主机发布端口；Agent API 与本地 LLM
+stub 仅绑定 Docker 随机分配的回环端口，避免和其他项目冲突。它会真实执行 Worker kill/租约接管、MQ
 发布失败恢复、重复投递 fencing，以及 checkpoint Redis 写失败四个场景。
 
 业务负载由 `fault_drill.worker.FaultDrillWorker` 确定性实现，但队列消费、MySQL

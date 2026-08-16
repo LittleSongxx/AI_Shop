@@ -20,6 +20,7 @@ import com.aishop.exception.BusinessException;
 import com.aishop.mappers.ProductInfoMapper;
 import com.aishop.mappers.ProductPropertyValueMapper;
 import com.aishop.mappers.ProductSkuMapper;
+import com.aishop.utils.ProductIndexTextSanitizer;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
@@ -139,7 +140,7 @@ public class ProductInternalService {
         ProductSearchIndexVO vo = new ProductSearchIndexVO();
         vo.setProductId(product.getProductId());
         vo.setProductName(product.getProductName());
-        vo.setProductDesc(product.getProductDesc());
+        vo.setProductDesc(ProductIndexTextSanitizer.sanitize(product.getProductDesc()));
         vo.setCover(product.getCover());
         vo.setCategoryId(product.getCategoryId());
         vo.setMinPrice(product.getMinPrice());
@@ -160,7 +161,7 @@ public class ProductInternalService {
         ProductRagIndexVO vo = new ProductRagIndexVO();
         vo.setProductId(product.getProductId());
         vo.setProductName(product.getProductName());
-        vo.setProductDesc(product.getProductDesc());
+        vo.setProductDesc(ProductIndexTextSanitizer.sanitize(product.getProductDesc()));
         vo.setCategoryId(product.getCategoryId());
         vo.setParentCategoryId(product.getpCategoryId());
         vo.setStatus(product.getStatus());

@@ -3,7 +3,7 @@ package com.aishop.biz;
 import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.enums.OrderItemStatusEnum;
 import com.aishop.api.enums.OrderStatusEnum;
-import com.aishop.api.support.UserFeignSupport;
+import com.aishop.component.OrderNotificationPublisher;
 import com.aishop.constants.RabbitMQConfig;
 import com.aishop.constants.TransactionalMqSender;
 import com.aishop.integration.CommerceOutcomeClient;
@@ -41,7 +41,7 @@ public class RefundSagaTransactionService {
     @Resource
     private CommerceOutcomeClient commerceOutcomeClient;
     @Resource
-    private UserFeignSupport userFeignSupport;
+    private OrderNotificationPublisher orderNotificationPublisher;
 
     @Value("${refund.saga.retry-seconds:60}")
     private int retrySeconds;
@@ -190,12 +190,12 @@ public class RefundSagaTransactionService {
         if (!newlyCompleted) {
             return;
         }
-        transactionalMqSender.sendAfterCommit(() -> userFeignSupport.sendNotifyAsync(
+        orderNotificationPublisher.send(
                 request.getUserId(),
                 "退款已完成",
                 "订单 " + request.getOrderId() + " 的退款已完成，款项将按支付渠道到账。",
                 "refund_complete",
-                request.getRefundRequestId()));
+                request.getRefundRequestId());
         OrderItem item = orderItemMapper.selectByOrderItemId(request.getOrderItemId());
         if (item == null) {
             return;

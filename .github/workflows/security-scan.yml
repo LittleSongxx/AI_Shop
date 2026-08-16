@@ -32,7 +32,7 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: AI_Shop-backend/AI_Shop-agent/requirements.lock
-      - run: python -m pip install pip-audit==2.9.0
+      - run: python -m pip install pip-audit==2.10.1
       - run: pip-audit --requirement requirements.lock
 
   npm-audit:
@@ -67,12 +67,17 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+      - run: python ../scripts/generate_dependency_check_suppressions.py
       - run: >-
           mvn --batch-mode --no-transfer-progress
           org.owasp:dependency-check-maven:12.1.8:aggregate
           -DskipTests
           -DfailBuildOnCVSS=7
           -DossindexAnalyzerEnabled=false
+          -DassemblyAnalyzerEnabled=false
+          -DretireJsAnalyzerEnabled=false
+          -Dformats=HTML,JSON
+          -DsuppressionFile=../security/dependency-check-suppression.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:

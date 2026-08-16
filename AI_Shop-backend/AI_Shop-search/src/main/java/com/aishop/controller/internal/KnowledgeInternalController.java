@@ -29,6 +29,12 @@ public class KnowledgeInternalController extends ABaseController {
         return getSuccessResponseVO(knowledgeBaseService.releaseCatalog());
     }
 
+    @PostMapping("/reindexAll")
+    public ResponseVO<Map<String, Object>> reindexAll() {
+        return getSuccessResponseVO(
+                knowledgeBaseService.rebuildAllPublishedVectors());
+    }
+
     @PostMapping("/topFaq")
     public ResponseVO<List<Map<String, Object>>> topFaq(
             @RequestBody(required = false) Map<String, Object> body) {

@@ -736,13 +736,14 @@ class EpisodeService:
                             evidence_source = pilot.get("evidence_source")
                     await cur.execute(
                         """
-                        INSERT IGNORE INTO agent_run
+                        INSERT INTO agent_run
                             (run_id, message_id, user_id, session_id, otel_trace_id,
                              status, intent, queue_name, version_json, experiment_json,
                              capture_level, started_at, agent_id, agent_version,
                              parent_run_id, handoff_id, actor_type,pilot_batch_id,
                              evidence_source)
                         VALUES (%s,%s,%s,%s,%s,'QUEUED',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON DUPLICATE KEY UPDATE run_id=agent_run.run_id
                         """,
                         (
                             event["run_id"],
@@ -826,12 +827,12 @@ class EpisodeService:
                         INSERT INTO agent_handoff
                             (handoff_id,parent_run_id,child_run_id,source_agent,target_agent,
                              status,input_summary_json,artifact_summary_json,latency_ms,error_code,completed_at)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                        ON DUPLICATE KEY UPDATE status=VALUES(status),
-                            artifact_summary_json=COALESCE(VALUES(artifact_summary_json),artifact_summary_json),
-                            latency_ms=COALESCE(VALUES(latency_ms),latency_ms),
-                            error_code=COALESCE(VALUES(error_code),error_code),
-                            completed_at=COALESCE(VALUES(completed_at),completed_at)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) AS incoming
+                        ON DUPLICATE KEY UPDATE status=incoming.status,
+                            artifact_summary_json=COALESCE(incoming.artifact_summary_json,agent_handoff.artifact_summary_json),
+                            latency_ms=COALESCE(incoming.latency_ms,agent_handoff.latency_ms),
+                            error_code=COALESCE(incoming.error_code,agent_handoff.error_code),
+                            completed_at=COALESCE(incoming.completed_at,agent_handoff.completed_at)
                         """,
                         tuple(event.get(key) for key in (
                             "handoff_id", "parent_run_id", "child_run_id", "source_agent",

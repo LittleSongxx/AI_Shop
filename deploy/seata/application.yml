@@ -1,19 +1,18 @@
 server:
-  port: 7091
+  port: ${SEATA_PORT:8091}
 
 spring:
   application:
     name: seata-server
+  main:
+    # Seata 2.4+ moved the web console to the standalone Naming Server.
+    # The TC image intentionally has no embedded servlet container.
+    web-application-type: none
 
 logging:
   config: classpath:logback-spring.xml
   file:
     path: /seata-server/logs
-
-console:
-  user:
-    username: ${SEATA_CONSOLE_USERNAME:seata}
-    password: ${SEATA_CONSOLE_PASSWORD:seata}
 
 seata:
   config:
@@ -26,8 +25,8 @@ seata:
       group: SEATA_GROUP
       namespace: ""
       cluster: default
-      username: ""
-      password: ""
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
   server:
     # Seata publishes this address through Nacos, so its container listener
     # and the Compose host mapping must use the same dynamic port.
@@ -43,10 +42,10 @@ seata:
       db-type: mysql
       driver-class-name: com.mysql.cj.jdbc.Driver
       url: jdbc:mysql://mysql:3306/seata?rewriteBatchedStatements=true&useUnicode=true&characterEncoding=utf8&connectTimeout=10000&socketTimeout=30000&autoReconnect=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
-      user: root
-      password: ${MYSQL_ROOT_PASSWORD:root}
-      min-conn: 5
-      max-conn: 30
+      user: ${SEATA_MYSQL_USER}
+      password: ${SEATA_MYSQL_PASSWORD}
+      min-conn: ${SEATA_DB_MIN_CONN:1}
+      max-conn: ${SEATA_DB_MAX_CONN:8}
       global-table: global_table
       branch-table: branch_table
       lock-table: lock_table

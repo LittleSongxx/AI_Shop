@@ -52,12 +52,13 @@ public class UserBrowseHistoryServiceImpl implements UserBrowseHistoryService {
         BrowseHistoryMessageDTO message = new BrowseHistoryMessageDTO();
         message.setUserId(userId);
         message.setProductId(productId);
-        message.setBrowseTime(System.currentTimeMillis());
+        long browseTime = System.currentTimeMillis();
+        message.setBrowseTime(browseTime);
         reliableMessageSender.sendMessage(
                 RabbitMQConfig.BROWSE_EXCHANGE,
                 RabbitMQConfig.BROWSE_RECORD_KEY,
                 message,
-                MqIdempotencyKeys.browseRecord(userId, productId),
+                MqIdempotencyKeys.browseRecord(userId, productId, browseTime),
                 MessageReliabilityLevelEnum.HIGH);
     }
 

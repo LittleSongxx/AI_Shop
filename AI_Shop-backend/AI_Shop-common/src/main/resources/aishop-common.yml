@@ -1,4 +1,22 @@
 spring:
+  datasource:
+    hikari:
+      # Ten local services share one MySQL container. Conservative defaults
+      # prevent idle pools from exhausting max_connections and container RAM;
+      # production can raise them after measuring per-service concurrency.
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:4}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:5000}
+      validation-timeout: ${DB_POOL_VALIDATION_TIMEOUT_MS:3000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:300000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:1800000}
+  rabbitmq:
+    connection-timeout: ${RABBIT_CONNECTION_TIMEOUT_MS:5000}
+    requested-heartbeat: ${RABBIT_REQUESTED_HEARTBEAT_SECONDS:30s}
+    listener:
+      simple:
+        concurrency: ${RABBIT_LISTENER_CONCURRENCY:1}
+        max-concurrency: ${RABBIT_LISTENER_MAX_CONCURRENCY:4}
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     baseline-on-migrate: true
@@ -28,6 +46,8 @@ alipay:
   alipayPublicCertPath: ${ALIPAY_PUBLIC_CERT_PATH:}
   alipayRootCertPath: ${ALIPAY_ROOT_CERT_PATH:}
   serverUrl: ${ALIPAY_SERVER_URL:https://openapi.alipay.com/gateway.do}
+  connectTimeoutMs: ${ALIPAY_CONNECT_TIMEOUT_MS:3000}
+  readTimeoutMs: ${ALIPAY_READ_TIMEOUT_MS:8000}
 
 order:
   expire:
@@ -52,6 +72,8 @@ aishop:
   dev-login-bypass: ${AISHOP_DEV_LOGIN_BYPASS:false}
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}
+    # 高风险运维接口使用独立令牌；空值时接口保持关闭。
+    ops-token: ${AISHOP_INTERNAL_OPS_TOKEN:}
     auth-enabled: ${AISHOP_INTERNAL_AUTH_ENABLED:true}
   feign:
     connect-timeout-ms: ${AISHOP_FEIGN_CONNECT_TIMEOUT_MS:3000}
@@ -75,6 +97,10 @@ seata:
     type: nacos
     nacos:
       server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      # Keep the empty namespace explicit for the bundled Nacos 2.5.x
+      # compatibility bridge: Nacos 3.x clients otherwise default to "public".
       namespace: ${NACOS_NAMESPACE:}
       group: SEATA_GROUP
       application: seata-server

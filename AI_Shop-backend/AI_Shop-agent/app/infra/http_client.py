@@ -35,6 +35,22 @@ _clients: dict[tuple[str, int], httpx.AsyncClient] = {}
 _lock = threading.Lock()
 
 
+def _dependency_client_options(name: str) -> dict[str, object]:
+    if name not in {"es", "visual_es"}:
+        return {}
+    # Import lazily to keep Settings independent from the HTTP client module.
+    from app.config.settings import get_settings
+
+    settings = get_settings()
+    options: dict[str, object] = {"verify": settings.es_verify_ssl}
+    if settings.es_username.strip():
+        options["auth"] = httpx.BasicAuth(
+            settings.es_username,
+            settings.es_password,
+        )
+    return options
+
+
 def _loop_key(name: str) -> tuple[str, int]:
     try:
         loop_id = id(asyncio.get_running_loop())
@@ -59,7 +75,11 @@ async def get_client(
         existing = _clients.get(key)
         if existing is not None and not existing.is_closed:
             return existing
-        client = httpx.AsyncClient(timeout=timeout, limits=limits or DEFAULT_LIMITS)
+        client = httpx.AsyncClient(
+            timeout=timeout,
+            limits=limits or DEFAULT_LIMITS,
+            **_dependency_client_options(name),
+        )
         _clients[key] = client
         return client
 

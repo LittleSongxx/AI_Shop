@@ -1,6 +1,6 @@
 package com.aishop.task;
 
-import com.aishop.api.support.UserFeignSupport;
+import com.aishop.component.OrderNotificationPublisher;
 import com.aishop.entity.po.OrderInfo;
 import com.aishop.mappers.OrderInfoMapper;
 import com.aishop.utils.StringTools;
@@ -20,7 +20,7 @@ public class OrderLifecycleNotificationTask {
     @Resource
     private OrderInfoMapper<OrderInfo, ?> orderInfoMapper;
     @Resource
-    private UserFeignSupport userFeignSupport;
+    private OrderNotificationPublisher orderNotificationPublisher;
 
     @Value("${order.notification.delay-enabled:true}")
     private boolean delayEnabled;
@@ -46,7 +46,7 @@ public class OrderLifecycleNotificationTask {
                     || StringTools.isEmpty(order.getOrderId())) {
                 continue;
             }
-            userFeignSupport.sendNotifyAsync(
+            orderNotificationPublisher.send(
                     order.getUserId(),
                     "订单发货延迟提醒",
                     "订单 " + order.getOrderId() + " 尚未发货，我们已记录延迟状态，请留意后续物流更新。",

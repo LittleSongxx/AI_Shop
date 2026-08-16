@@ -22,6 +22,7 @@ from app.exceptions import BusinessException
 from app.graph.checkpoint.redis_saver import close_checkpointer
 from app.infra.http_client import close_clients as close_http_clients
 from app.memory.session_memory_service import session_memory_service
+from app.observability.logging import configure_structured_logging
 from app.observability.telemetry import configure_telemetry, shutdown_telemetry
 from app.rag.retriever import (
     KNOWLEDGE_RELEASE_TOPIC,
@@ -36,9 +37,7 @@ from app.services.privacy_job_service import privacy_job_service
 from app.services.redis_service import redis_service
 from app.services.shopping_mission_service import initialize_category_need_schemas
 
-structlog.configure(
-    processors=[structlog.processors.TimeStamper(fmt="iso"), structlog.processors.JSONRenderer()]
-)
+configure_structured_logging()
 
 logger = structlog.get_logger()
 _knowledge_listener_task: asyncio.Task | None = None

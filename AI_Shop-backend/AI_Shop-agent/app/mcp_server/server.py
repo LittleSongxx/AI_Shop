@@ -3,22 +3,31 @@ from __future__ import annotations
 import asyncio
 import os
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import Settings as FastMCPSettings
 from starlette.responses import JSONResponse
 
 from app.config.settings import get_settings
 from app.db.migrations import run_migrations
 from app.db.pool import close_pool, init_pool
+from app.observability.logging import configure_structured_logging
 from app.services import mcp_tools_service as tools
+from app.services.java_internal_client import delegated_user_scope
 from app.services.redis_service import redis_service
 from app.services.shopping_mission_service import initialize_category_need_schemas
 from app.services.tool_invoke_result import ToolInvokeResult
 
 _MCP_HOST = os.getenv("FASTMCP_HOST", "127.0.0.1")
 _MCP_PORT = int(os.getenv("FASTMCP_PORT", "7060"))
+configure_structured_logging()
+
+# mcp 1.28.1 defines Settings before FastMCP and leaves its lifespan forward
+# reference unresolved under pydantic-settings 2.15.
+FastMCPSettings.model_rebuild()
 
 
 @asynccontextmanager
@@ -60,6 +69,17 @@ def _text(result) -> str:
     ).to_wire()
 
 
+async def _run_as_delegated_user(
+    user_id: str,
+    operation: Awaitable[Any],
+) -> Any:
+    # The Agent router replaces model-supplied userId with the authenticated
+    # message owner before crossing MCP. Rebind it in this process so calls to
+    # Java carry the required X-Agent-User-Id header.
+    with delegated_user_scope(user_id):
+        return await operation
+
+
 @mcp.tool(name="MCP_CONTRACT", description="[SYSTEM] report the AI_Shop tool contract version")
 async def mcp_contract() -> str:
     return _text(ToolInvokeResult(content="ok"))
@@ -71,7 +91,12 @@ async def search_products(
     keyword: str,
     excludeProductId: str | None = None,
 ) -> str:
-    return _text(await tools.tool_search_products(userId, keyword, excludeProductId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.tool_search_products(userId, keyword, excludeProductId),
+        )
+    )
 
 
 @mcp.tool(
@@ -79,12 +104,22 @@ async def search_products(
     description="[READ] 查询当前用户的订单列表或订单状态；自然语言目标由系统解析器先定位",
 )
 async def query_orders(userId: str, orderId: str | None = None) -> str:
-    return _text(await tools.tool_query_orders(userId, orderId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.tool_query_orders(userId, orderId),
+        )
+    )
 
 
 @mcp.tool(name="GET_PRODUCT_DETAIL", description="[READ] 查询商品详情")
 async def get_product_detail(userId: str, productId: str) -> str:
-    return _text(await tools.tool_get_product_detail(userId, productId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.tool_get_product_detail(userId, productId),
+        )
+    )
 
 
 @mcp.tool(
@@ -92,17 +127,32 @@ async def get_product_detail(userId: str, productId: str) -> str:
     description="[READ] 使用实时商品快照比较 2 到 4 个当前或近期推荐候选",
 )
 async def compare_products(userId: str, productIds: list[str]) -> str:
-    return _text(await tools.tool_compare_products(userId, productIds))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.tool_compare_products(userId, productIds),
+        )
+    )
 
 
 @mcp.tool(name="QUERY_LOGISTICS", description="[READ] 查询订单物流轨迹（不是查订单列表）")
 async def query_logistics(userId: str, orderId: str, runId: str | None = None) -> str:
-    return _text(await tools.query_logistics(userId, orderId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.query_logistics(userId, orderId),
+        )
+    )
 
 
 @mcp.tool(name="QUERY_COMMENT", description="[READ] 查看订单已提交的评价内容（不是写评价）")
 async def query_comment(userId: str, orderId: str, runId: str | None = None) -> str:
-    return _text(await tools.query_comment(userId, orderId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.query_comment(userId, orderId),
+        )
+    )
 
 
 @mcp.tool(name="QUERY_REFUND_STATUS", description="[READ] 查询当前用户订单或订单项的退款进度")
@@ -112,12 +162,22 @@ async def query_refund_status(
     orderItemId: str | None = None,
     runId: str | None = None,
 ) -> str:
-    return _text(await tools.query_refund_status(userId, orderId, orderItemId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.query_refund_status(userId, orderId, orderItemId),
+        )
+    )
 
 
 @mcp.tool(name="QUERY_USER_COUPONS", description="[READ] 查询用户优惠券")
 async def query_user_coupons(userId: str, status: int | None = None) -> str:
-    return _text(await tools.query_user_coupons(userId, status))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.query_user_coupons(userId, status),
+        )
+    )
 
 
 @mcp.tool(
@@ -127,7 +187,12 @@ async def query_user_coupons(userId: str, status: int | None = None) -> str:
 async def propose_confirm_receipt(
     userId: str, orderId: str, runId: str | None = None
 ) -> str:
-    return _text(await tools.propose_confirm_receipt(userId, orderId, runId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.propose_confirm_receipt(userId, orderId, runId),
+        )
+    )
 
 
 @mcp.tool(
@@ -137,7 +202,12 @@ async def propose_confirm_receipt(
 async def propose_cancel_order(
     userId: str, orderId: str, runId: str | None = None
 ) -> str:
-    return _text(await tools.propose_cancel_order(userId, orderId, runId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.propose_cancel_order(userId, orderId, runId),
+        )
+    )
 
 
 @mcp.tool(
@@ -159,19 +229,22 @@ async def propose_create_support_case(
     priority: str = "NORMAL",
 ) -> str:
     return _text(
-        await tools.propose_create_support_case(
+        await _run_as_delegated_user(
             userId,
-            category,
-            description,
-            orderId,
-            orderItemId,
-            imageAssetId,
-            imageUnderstanding,
-            imageUnderstandingStatus,
-            runId,
-            sourceMessageId,
-            forcedHandoff,
-            priority,
+            tools.propose_create_support_case(
+                userId,
+                category,
+                description,
+                orderId,
+                orderItemId,
+                imageAssetId,
+                imageUnderstanding,
+                imageUnderstandingStatus,
+                runId,
+                sourceMessageId,
+                forcedHandoff,
+                priority,
+            ),
         )
     )
 
@@ -183,7 +256,12 @@ async def propose_create_support_case(
 async def query_support_cases(
     userId: str, caseId: str | None = None, runId: str | None = None
 ) -> str:
-    return _text(await tools.query_support_cases(userId, caseId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.query_support_cases(userId, caseId),
+        )
+    )
 
 
 @mcp.tool(
@@ -193,7 +271,12 @@ async def query_support_cases(
 async def propose_refund(
     userId: str, orderItemId: str, runId: str | None = None
 ) -> str:
-    return _text(await tools.propose_refund(userId, orderItemId, runId))
+    return _text(
+        await _run_as_delegated_user(
+            userId,
+            tools.propose_refund(userId, orderItemId, runId),
+        )
+    )
 
 
 @mcp.tool(
@@ -208,8 +291,11 @@ async def propose_product_review(
     runId: str | None = None,
 ) -> str:
     return _text(
-        await tools.propose_product_review(
-            userId, orderId, commentContent, star, runId
+        await _run_as_delegated_user(
+            userId,
+            tools.propose_product_review(
+                userId, orderId, commentContent, star, runId
+            ),
         )
     )
 
@@ -222,7 +308,10 @@ async def propose_recomment(
     runId: str | None = None,
 ) -> str:
     return _text(
-        await tools.propose_recomment(userId, orderId, reCommentContent, runId)
+        await _run_as_delegated_user(
+            userId,
+            tools.propose_recomment(userId, orderId, reCommentContent, runId),
+        )
     )
 
 

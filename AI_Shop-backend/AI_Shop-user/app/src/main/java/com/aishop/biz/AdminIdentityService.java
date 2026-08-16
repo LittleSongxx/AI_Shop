@@ -59,9 +59,13 @@ public class AdminIdentityService {
                 INSERT INTO admin_account
                     (account, password_hash, display_name, status, session_version,
                      migrated_from_config, created_at, updated_at)
-                VALUES (?, ?, ?, 1, 1, 1, NOW(3), NOW(3))
+                VALUES (?, ?, ?, 1, 1, 1, NOW(3), NOW(3)) AS incoming
                 ON DUPLICATE KEY UPDATE
-                    password_hash = IF(migrated_from_config = 1, VALUES(password_hash), password_hash),
+                    password_hash = IF(
+                        admin_account.migrated_from_config = 1,
+                        incoming.password_hash,
+                        admin_account.password_hash
+                    ),
                     migrated_from_config = 1
                 """,
                 account.trim(), appConfig.getAdminPasswordHash(), account.trim());
@@ -69,8 +73,10 @@ public class AdminIdentityService {
                 "SELECT admin_id FROM admin_account WHERE account = ?", Long.class, account.trim());
         jdbcTemplate.update(
                 """
-                INSERT IGNORE INTO admin_account_role (admin_id, role_id)
+                INSERT INTO admin_account_role (admin_id, role_id)
                 SELECT ?, role_id FROM admin_role WHERE role_code = ?
+                ON DUPLICATE KEY UPDATE
+                    admin_id = admin_account_role.admin_id
                 """,
                 adminId, AdminPermissions.SUPER_ADMIN_ROLE);
     }

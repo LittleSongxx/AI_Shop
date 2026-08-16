@@ -8,6 +8,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -31,6 +32,9 @@ import java.util.Map;
  * only text allowed as rerank/generation evidence.
  */
 @Component
+@ConditionalOnProperty(
+        name = "aishop.rag.context-enrichment.enabled",
+        havingValue = "true")
 @Slf4j
 public class ContextPrefixEnricher {
 

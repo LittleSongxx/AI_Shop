@@ -4,9 +4,11 @@ import com.aishop.api.dto.CouponValidateAndLockDTO;
 import com.aishop.api.dto.UserCouponCreateDTO;
 import com.aishop.api.dto.UserCouponStatusChangeDTO;
 import com.aishop.api.vo.CouponBriefVO;
+import com.aishop.api.vo.CouponGrantResultVO;
 import com.aishop.api.vo.CouponLockResultVO;
 import com.aishop.api.vo.DiscountCouponVO;
 import com.aishop.api.vo.UserCouponVO;
+import com.aishop.api.enums.CouponStatusEnum;
 import com.aishop.api.enums.CouponTypeEnum;
 import com.aishop.api.enums.UserCouponStatusEnum;
 import com.aishop.entity.po.DiscountCoupon;
@@ -22,15 +24,19 @@ import com.aishop.biz.DiscountCouponService;
 import com.aishop.utils.OrderPayAmountUtil;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
 
 @Service
+@Slf4j
 public class CouponInternalService {
 
     @Resource
@@ -154,6 +160,42 @@ public class CouponInternalService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public CouponGrantResultVO grantCoupon(UserCouponCreateDTO dto) {
+        if (dto == null
+                || StringTools.isEmpty(dto.getUserCouponId())
+                || StringTools.isEmpty(dto.getUserId())
+                || StringTools.isEmpty(dto.getCouponId())
+                || !UserCouponStatusEnum.NOUSE.getStatus().equals(dto.getStatus())) {
+            throw new BusinessException("发券参数不完整");
+        }
+        DiscountCoupon locked = discountCouponMapper.selectByCouponIdForUpdate(dto.getCouponId());
+        if (locked == null) {
+            throw new BusinessException("优惠券不存在");
+        }
+        UserCoupon existing = userCouponMapper.selectByUserCouponId(dto.getUserCouponId());
+        if (existing != null) {
+            if (!dto.getUserId().equals(existing.getUserId())
+                    || !dto.getCouponId().equals(existing.getCouponId())) {
+                throw new BusinessException("用户券业务键冲突");
+            }
+            return grantResult(true, false, dto.getUserCouponId(), locked.getCouponName());
+        }
+        assertGrantable(locked, new Date());
+        Integer affected = discountCouponMapper.deductStock(dto.getCouponId());
+        if (affected == null || affected != 1) {
+            return grantResult(false, false, dto.getUserCouponId(), locked.getCouponName());
+        }
+        UserCoupon userCoupon = new UserCoupon();
+        userCoupon.setUserCouponId(dto.getUserCouponId());
+        userCoupon.setUserId(dto.getUserId());
+        userCoupon.setCouponId(dto.getCouponId());
+        userCoupon.setStatus(dto.getStatus());
+        userCouponMapper.insertGranted(userCoupon);
+        invalidateCacheAfterCommit(dto.getCouponId());
+        return grantResult(true, true, dto.getUserCouponId(), locked.getCouponName());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public int deductStock(String couponId) {
         if (StringTools.isEmpty(couponId)) {
             throw new BusinessException("优惠券ID为空");
@@ -164,6 +206,51 @@ public class CouponInternalService {
         }
         Integer affected = discountCouponMapper.deductStock(couponId);
         return affected == null ? 0 : affected;
+    }
+
+    private CouponGrantResultVO grantResult(
+            boolean granted,
+            boolean newlyGranted,
+            String userCouponId,
+            String couponName) {
+        CouponGrantResultVO result = new CouponGrantResultVO();
+        result.setGranted(granted);
+        result.setNewlyGranted(newlyGranted);
+        result.setUserCouponId(userCouponId);
+        result.setCouponName(couponName);
+        return result;
+    }
+
+    private void assertGrantable(DiscountCoupon coupon, Date now) {
+        if (!CouponStatusEnum.NORMAL.getStatus().equals(coupon.getStatus())) {
+            throw new BusinessException("优惠券当前不可发放");
+        }
+        if (coupon.getValidStartTime() != null && now.before(coupon.getValidStartTime())) {
+            throw new BusinessException("优惠券未到发放时间");
+        }
+        if (coupon.getValidEndTime() != null && now.after(coupon.getValidEndTime())) {
+            throw new BusinessException("优惠券已过期");
+        }
+    }
+
+    private void invalidateCacheAfterCommit(String couponId) {
+        Runnable action = () -> {
+            try {
+                discountCouponCacheComponent.invalidateAfterWrite(couponId);
+            } catch (Exception e) {
+                log.warn("发券后优惠券缓存失效失败，数据库库存仍为权威来源 couponId={}", couponId, e);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+            return;
+        }
+        action.run();
     }
 
     public void assertRushNotBlocked(String couponId) {

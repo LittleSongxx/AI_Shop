@@ -738,6 +738,17 @@ def _task_tools_for_specialist(
     if intent == IntentKind.QUERY_COUPON.value:
         return ["QUERY_USER_COUPONS"]
 
+    # A write proposal needs the authoritative order/item state even when the
+    # user's wording mentions shipping.  An unshipped order legitimately has
+    # no logistics record, so making QUERY_LOGISTICS the required first call
+    # would turn a valid refund/cancel flow into ORDER_EVIDENCE_INSUFFICIENT.
+    if (
+        str(state.get("request_mode") or "")
+        == RequestMode.ACTION_PROPOSAL.value
+        and state.get("verified_order_context")
+    ):
+        return ["QUERY_ORDERS"]
+
     primary = "QUERY_ORDERS"
     if intent == IntentKind.REFUND_STATUS.value:
         primary = "QUERY_REFUND_STATUS"
@@ -1294,9 +1305,30 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
             status = "FAILED"
             warnings.append("专家在取得可信证据前超时，Supervisor 将使用其他分支降级回答。")
     except Exception as exc:
-        status = "FAILED"
-        error_code = type(exc).__name__
-        warnings.append("专家调用失败，Supervisor 将基于其他证据回答。")
+        successful_tools = {
+            str(item.get("tool") or "")
+            for item in evidence
+            if item.get("type") == "tool_result" and item.get("success") is True
+        }
+        # A credential-free local stack deliberately has no chat model. Once
+        # every required deterministic tool has succeeded, its sanitized
+        # observations are sufficient for a typed artifact and the root
+        # Supervisor can still create a confirmation-gated proposal. Do not
+        # apply this fallback to a configured model: provider failures must
+        # remain visible as specialist failures.
+        if (
+            not get_settings().llm_api_key.strip()
+            and verified_tool_outputs
+            and set(task.required_tools).issubset(successful_tools)
+        ):
+            status = "SUCCESS"
+            error_code = None
+            draft = "\n".join(verified_tool_outputs)[-4000:]
+            warnings.append("DETERMINISTIC_SPECIALIST_SUMMARY")
+        else:
+            status = "FAILED"
+            error_code = type(exc).__name__
+            warnings.append("专家调用失败，Supervisor 将基于其他证据回答。")
 
     if not draft and status == "SUCCESS":
         status = "DEGRADED"

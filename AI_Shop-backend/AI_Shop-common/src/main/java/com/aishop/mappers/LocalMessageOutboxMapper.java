@@ -35,6 +35,21 @@ public interface LocalMessageOutboxMapper {
                        @Param("errorMessage") String errorMessage,
                        @Param("nextRetryTime") Date nextRetryTime);
 
+    Integer markRetriesExhausted(@Param("failedStatus") Integer failedStatus,
+                                 @Param("sendingStatus") Integer sendingStatus,
+                                 @Param("exhaustedStatus") Integer exhaustedStatus,
+                                 @Param("maxRetries") int maxRetries,
+                                 @Param("now") Date now);
+
+    Integer requeueExhausted(@Param("id") Long id,
+                             @Param("exhaustedStatus") Integer exhaustedStatus,
+                             @Param("pendingStatus") Integer pendingStatus);
+
+    Integer countByStatus(@Param("status") Integer status);
+
+    List<LocalMessageOutbox> selectByStatus(@Param("status") Integer status,
+                                            @Param("limit") int limit);
+
     List<LocalMessageOutbox> selectDispatchBatch(@Param("pendingStatus") Integer pendingStatus,
                                                  @Param("failedStatus") Integer failedStatus,
                                                  @Param("sendingStatus") Integer sendingStatus,

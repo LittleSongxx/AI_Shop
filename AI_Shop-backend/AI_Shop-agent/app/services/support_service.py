@@ -484,9 +484,9 @@ class SupportService:
                 """
                 INSERT INTO agent_message_feedback
                     (message_id, user_id, rating, reason, detail, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE rating=VALUES(rating), reason=VALUES(reason),
-                    detail=VALUES(detail), updated_at=NOW()
+                VALUES (%s, %s, %s, %s, %s, NOW(), NOW()) AS incoming
+                ON DUPLICATE KEY UPDATE rating=incoming.rating, reason=incoming.reason,
+                    detail=incoming.detail, updated_at=NOW()
                 """,
                 (message_id, user_id, rating, reason, detail),
             )

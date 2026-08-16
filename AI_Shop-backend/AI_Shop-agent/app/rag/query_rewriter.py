@@ -69,6 +69,13 @@ async def rewrite_for_rag(user_text: str, memory: SessionMemory) -> str:
         return user_text  # 第一轮，没有可利用的上下文
 
     settings = get_settings()
+    if not settings.llm_api_key.strip():
+        logger.debug(
+            "rag_query_rewrite_skipped",
+            reason="llm_api_key_not_configured",
+        )
+        return user_text
+
     breaker = circuit_registry.get_or_create(
         "llm_rewriter", failure_threshold=3, recovery_timeout=60
     )

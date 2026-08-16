@@ -299,11 +299,11 @@ class AgentMessageService:
                 """
                 INSERT INTO agent_session_memory
                     (user_id, history_cleared_through_message_id)
-                VALUES (%s, %s)
+                VALUES (%s, %s) AS incoming
                 ON DUPLICATE KEY UPDATE
                     history_cleared_through_message_id=GREATEST(
-                        history_cleared_through_message_id,
-                        VALUES(history_cleared_through_message_id)
+                        agent_session_memory.history_cleared_through_message_id,
+                        incoming.history_cleared_through_message_id
                     )
                 """,
                 (user_id, requested_cursor),

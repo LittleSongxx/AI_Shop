@@ -18,6 +18,7 @@ import com.aishop.mappers.ProductInfoMapper;
 import com.aishop.mappers.ProductPropertyValueMapper;
 import com.aishop.mappers.ProductSkuMapper;
 import com.aishop.exception.BusinessException;
+import com.aishop.utils.ProductIndexTextSanitizer;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
@@ -139,8 +140,10 @@ public class ProductAgentInternalController extends ABaseController {
         Map<String, Object> m = toAgentProductCard(p);
         m.put("status", p.getStatus());
         m.put("maxPrice", p.getMaxPrice());
-        m.put("description", p.getProductDesc());
-        m.put("productDesc", p.getProductDesc());
+        String searchableDescription =
+                ProductIndexTextSanitizer.sanitize(p.getProductDesc());
+        m.put("description", searchableDescription);
+        m.put("productDesc", searchableDescription);
 
         ProductSkuQuery skuQuery = new ProductSkuQuery();
         skuQuery.setProductId(productId);

@@ -54,6 +54,13 @@ class CompressService:
         memory.state["estimatedTokens"] = estimated
         if estimated < settings.compress_token_threshold:
             return
+        if not (settings.memory_llm_api_key or settings.llm_api_key).strip():
+            logger.debug(
+                "session_compress_skipped",
+                user_id=user_id,
+                reason="memory_llm_api_key_not_configured",
+            )
+            return
 
         asyncio.create_task(
             self._compress_async(user_id, memory.summary_last_message_id, working_oldest_id)
@@ -69,13 +76,15 @@ class CompressService:
         # 异步调度任务从父 task 继承 contextvar：与对话路径的 per-request
         # 成本累计隔离，压缩成本不计入触发它的那次请求摘要。
         reset_run_cost()
+        settings = get_settings()
+        if not (settings.memory_llm_api_key or settings.llm_api_key).strip():
+            return
         if working_oldest_id is None or working_oldest_id <= summary_last_message_id + 1:
             return
 
         if not await session_memory_service.try_acquire_compress_lock(user_id, redis_service.client):
             return
 
-        settings = get_settings()
         try:
             memory = await session_memory_service.load(user_id, redis_service.client)
             turns = await agent_message_service.load_turns_for_memory(user_id)

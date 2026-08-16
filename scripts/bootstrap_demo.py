@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -52,6 +53,7 @@ def load_environment() -> dict[str, str]:
         for key, value in dotenv_values(path).items():
             if value is not None:
                 values[str(key)] = str(value)
+    values.update({str(key): str(value) for key, value in os.environ.items()})
     return values
 
 
@@ -821,7 +823,11 @@ def run(args: argparse.Namespace) -> None:
     redis_client = redis.Redis(
         host=env.get("REDIS_HOST", "127.0.0.1"),
         port=int(required(env, "REDIS_PORT")),
+        db=int(env.get("REDIS_DB", "0")),
+        username=env.get("REDIS_USERNAME") or None,
         password=env.get("REDIS_PASSWORD") or None,
+        ssl=env.get("REDIS_SSL_ENABLED", "false").strip().lower()
+        in {"1", "true", "yes", "on"},
         decode_responses=True,
         socket_connect_timeout=5,
         socket_timeout=5,

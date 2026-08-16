@@ -99,12 +99,14 @@ public class ProductController extends ABaseController {
             BrowseHistoryMessageDTO message = new BrowseHistoryMessageDTO();
             message.setUserId(tokenUserInfo.getUserId());
             message.setProductId(productId);
-            message.setBrowseTime(System.currentTimeMillis());
+            long browseTime = System.currentTimeMillis();
+            message.setBrowseTime(browseTime);
             reliableMessageSender.sendMessage(
                     RabbitMQConfig.BROWSE_EXCHANGE,
                     RabbitMQConfig.BROWSE_RECORD_KEY,
                     message,
-                    MqIdempotencyKeys.browseRecord(tokenUserInfo.getUserId(), productId),
+                    MqIdempotencyKeys.browseRecord(
+                            tokenUserInfo.getUserId(), productId, browseTime),
                     MessageReliabilityLevelEnum.HIGH);
         }
         return getSuccessResponseVO(product);

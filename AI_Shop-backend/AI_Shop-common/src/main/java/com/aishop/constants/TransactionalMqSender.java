@@ -14,8 +14,6 @@ public class TransactionalMqSender {
 
     @Resource
     private OutboxMessageService outboxMessageService;
-    @Resource
-    private ReliableMessageSender reliableMessageSender;
 
     public void sendAfterCommit(String exchange, String routingKey, Object message,
                                 String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel) {
@@ -38,7 +36,16 @@ public class TransactionalMqSender {
             });
             return;
         }
-        reliableMessageSender.sendMessage(exchange, routingKey, message, idempotencyKey, level);
+        Long id = outboxMessageService.savePending(
+                exchange, routingKey, message, idempotencyKey, level);
+        if (id == null) {
+            return;
+        }
+        try {
+            outboxMessageService.tryDispatch(id);
+        } catch (Exception e) {
+            log.error("Outbox 即时投递失败，已保留记录等待定时重试 id={}", id, e);
+        }
     }
 
     public void sendAfterCommit(Runnable sendAction) {

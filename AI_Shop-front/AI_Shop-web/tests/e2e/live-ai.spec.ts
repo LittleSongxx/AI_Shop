@@ -2,8 +2,24 @@ import { execFileSync } from 'node:child_process';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 const liveEnabled = process.env.AISHOP_LIVE_E2E === 'true';
+const demoUserId = '9000000001';
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const redisCli = (...args: string[]) =>
+  execFileSync(
+    'docker',
+    [
+      'exec',
+      'aishop-redis',
+      'sh',
+      '-ec',
+      'REDISCLI_AUTH="$REDIS_PASSWORD" exec redis-cli --no-auth-warning "$@"',
+      'aishop-live-e2e',
+      ...args
+    ],
+    { encoding: 'utf8' }
+  );
 
 const unwrap = async (response: Awaited<ReturnType<APIRequestContext['get']>>) => {
   expect(response.ok()).toBe(true);
@@ -16,11 +32,7 @@ const loginDemoUser = async (request: APIRequestContext) => {
   const captcha = await unwrap(await request.get('/api/account/checkCode'));
   const key = String(captcha?.checkCodeKey || '');
   expect(key).toMatch(/^[0-9a-f-]{36}$/i);
-  const raw = execFileSync(
-    'docker',
-    ['exec', 'aishop-redis', 'redis-cli', '--raw', 'GET', `mall:checkcode:${key}`],
-    { encoding: 'utf8' }
-  ).trim();
+  const raw = redisCli('--raw', 'GET', `mall:checkcode:${key}`).trim();
   const code = raw.startsWith('"') ? JSON.parse(raw) : raw;
   const login = await request.post('/api/account/login', {
     multipart: {
@@ -31,6 +43,10 @@ const loginDemoUser = async (request: APIRequestContext) => {
     }
   });
   await unwrap(login);
+};
+
+const resetIntentRepeatCounter = (intent: string) => {
+  redisCli('DEL', `mall:agent:intent:repeat:${intent}:${demoUserId}`);
 };
 
 const productResult = (row: Record<string, unknown>, excludedProductIds = new Set<string>()) => {
@@ -62,6 +78,7 @@ test.describe('explicit local full-stack AI flow', () => {
     testInfo.setTimeout(150_000);
     test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
     await loginDemoUser(context.request);
+    resetIntentRepeatCounter('REFUND');
 
     const query = '没发货的耳机我要退款';
     const sent = await unwrap(await context.request.post('/api/agent/sendMessage', {
@@ -120,6 +137,7 @@ test.describe('explicit local full-stack AI flow', () => {
     testInfo.setTimeout(150_000);
     test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
     await loginDemoUser(context.request);
+    resetIntentRepeatCounter('DAMAGED_OR_WRONG_ITEM');
 
     const query = '我收到的东西坏了';
     const sent = await unwrap(await context.request.post('/api/agent/sendMessage', {
@@ -168,6 +186,7 @@ test.describe('explicit local full-stack AI flow', () => {
     expect(selectedMessageId).toBeGreaterThan(0);
     await expect(group.last().getByRole('button', { name: '已选择' })).toBeDisabled();
 
+    let supportAction: Record<string, unknown> | null = null;
     await expect.poll(async () => {
       const history = await unwrap(await context.request.post('/api/agent/loadHistoryMessage', {
         multipart: { pageNo: '1' }
@@ -176,11 +195,26 @@ test.describe('explicit local full-stack AI flow', () => {
       const row = rows.find(
         (item: Record<string, unknown>) => Number(item.messageId) === selectedMessageId
       );
-      return Number(row?.status) === 2 ? String(row?.assistantMessage || '') : 'pending';
+      if (Number(row?.status) !== 2) return 'pending';
+      try {
+        const parsed = JSON.parse(String(row?.assistantMessage || ''));
+        supportAction = parsed?.type === 'ACTION_CONFIRM' ? parsed : null;
+      } catch {
+        supportAction = null;
+      }
+      return supportAction ? 'ACTION_CONFIRM' : String(row?.assistantMessage || 'invalid');
     }, {
       timeout: 120_000,
       intervals: [1_000, 2_000, 3_000]
-    }).toContain('暂无破损、错发或漏发工单工具');
+    }).toBe('ACTION_CONFIRM');
+
+    expect(supportAction).toMatchObject({
+      type: 'ACTION_CONFIRM',
+      actionType: 'CREATE_SUPPORT_CASE',
+      orderId: String(first.orderId),
+      status: 0
+    });
+    expect(String(supportAction?.summary || '')).toContain(String(first.productName));
 
     const repeat = await unwrap(await context.request.post('/api/agent/selectOrderCandidate', {
       multipart: {

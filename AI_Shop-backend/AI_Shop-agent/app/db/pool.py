@@ -28,9 +28,11 @@ async def init_pool() -> None:
 
         autocommit=True,
 
-        minsize=2,
+        minsize=settings.mysql_pool_min_size,
 
-        maxsize=20,
+        maxsize=settings.mysql_pool_max_size,
+
+        pool_recycle=settings.mysql_pool_recycle_seconds,
     )
 
 async def close_pool() -> None:

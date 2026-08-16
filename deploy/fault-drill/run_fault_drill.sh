@@ -7,8 +7,10 @@ COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.fault-drill.yml"
 STARTED_AT=$(date '+%Y-%m-%dT%H:%M:%S%z')
 EVIDENCE_STAMP=$(date '+%Y%m%d_%H%M%S_%z')
 EVIDENCE_DIR="${REPO_ROOT}/run/evidence/${EVIDENCE_STAMP}"
-BASELINE_COMMIT="f639599e335b97f6156cc41923d53948bcbf6549"
+BASELINE_COMMIT=$(git -C "${REPO_ROOT}" rev-parse HEAD)
 RESULT="FAIL"
+AGENT_API_URL=""
+LLM_STUB_URL=""
 COMPOSE=(docker compose -f "${COMPOSE_FILE}")
 
 mkdir -p "${EVIDENCE_DIR}"
@@ -30,7 +32,7 @@ wait_for_state() {
   local attempt
   for ((attempt = 1; attempt <= timeout_seconds; attempt++)); do
     if curl --fail --silent --show-error \
-      "http://127.0.0.1:17050/tasks/${message_id}" \
+      "${AGENT_API_URL}/tasks/${message_id}" \
       >"${destination}.tmp" 2>/dev/null; then
       mv "${destination}.tmp" "${destination}"
       if jq -e "${expression}" "${destination}" >/dev/null; then
@@ -46,11 +48,11 @@ wait_for_state() {
 post_task() {
   local destination=$1
   local body=$2
-  record_command "curl POST http://127.0.0.1:17050/tasks body=${body}"
+  record_command "curl POST ${AGENT_API_URL}/tasks body=${body}"
   curl --fail --silent --show-error \
     -H 'Content-Type: application/json' \
     -d "${body}" \
-    http://127.0.0.1:17050/tasks >"${destination}"
+    "${AGENT_API_URL}/tasks" >"${destination}"
 }
 
 assert_json() {
@@ -75,6 +77,8 @@ collect_evidence() {
     printf 'timezone=%s\n' "$(date '+%Z %z')"
     printf 'baseline_commit=%s\n' "${BASELINE_COMMIT}"
     printf 'current_head=%s\n' "$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null)"
+    printf 'agent_api_url=%s\n' "${AGENT_API_URL:-unassigned}"
+    printf 'llm_stub_url=%s\n' "${LLM_STUB_URL:-unassigned}"
     printf 'compose_project=aishop-fault-drill\n'
     printf 'result=%s\n' "${RESULT}"
   } >"${EVIDENCE_DIR}/metadata.txt"
@@ -120,11 +124,16 @@ compose --profile workers down --volumes --remove-orphans
 compose build llm-stub
 compose up -d --wait mysql redis checkpoint-redis rabbitmq llm-stub agent-api
 
-record_command "curl POST http://127.0.0.1:17080/v1/chat/completions"
+AGENT_API_URL="http://$(compose port agent-api 7050)"
+LLM_STUB_URL="http://$(compose port llm-stub 8080)"
+record_command "resolved agent-api endpoint ${AGENT_API_URL}"
+record_command "resolved llm-stub endpoint ${LLM_STUB_URL}"
+
+record_command "curl POST ${LLM_STUB_URL}/v1/chat/completions"
 curl --fail --silent --show-error \
   -H 'Content-Type: application/json' \
   -d '{"model":"fault-drill-model","messages":[{"role":"user","content":"ping"}]}' \
-  http://127.0.0.1:17080/v1/chat/completions \
+  "${LLM_STUB_URL}/v1/chat/completions" \
   >"${EVIDENCE_DIR}/llm-stub-response.json"
 assert_json "${EVIDENCE_DIR}/llm-stub-response.json" \
   '.choices[0].message.content == "fault-drill deterministic response"' \

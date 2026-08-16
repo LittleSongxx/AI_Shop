@@ -76,6 +76,47 @@ async def test_visual_consumer_ignores_non_product_without_indexing(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_visual_consumer_removes_derived_queues_when_inactive(monkeypatch):
+    consumer = VisualIndexConsumer()
+    channels = [
+        SimpleNamespace(
+            queue_delete=AsyncMock(),
+            close=AsyncMock(),
+            is_closed=False,
+        )
+        for _ in range(2)
+    ]
+    declare_channel = AsyncMock(side_effect=channels)
+    monkeypatch.setattr(
+        "app.visual.consumer.agent_queue_service.declare_channel",
+        declare_channel,
+    )
+    monkeypatch.setattr(
+        "app.visual.consumer.get_settings",
+        lambda: SimpleNamespace(
+            visual_index_queue="visual.index.queue",
+            visual_index_dead_letter_queue="visual.index.dlq",
+        ),
+    )
+
+    removed = await consumer.remove_derived_queues()
+
+    assert removed == ["visual.index.queue", "visual.index.dlq"]
+    channels[0].queue_delete.assert_awaited_once_with(
+        "visual.index.queue",
+        if_unused=False,
+        if_empty=False,
+    )
+    channels[1].queue_delete.assert_awaited_once_with(
+        "visual.index.dlq",
+        if_unused=False,
+        if_empty=False,
+    )
+    for channel in channels:
+        channel.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_visual_consumer_dead_letters_after_bounded_retries(monkeypatch):
     consumer = VisualIndexConsumer()
     message = _message(

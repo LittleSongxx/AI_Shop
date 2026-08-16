@@ -32,6 +32,8 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         prefer-ip-address: true
@@ -47,10 +49,18 @@ spring:
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:your-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    user: ${FLYWAY_USER:aishop_flyway}
+    password: ${FLYWAY_PASSWORD:}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6380}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
   rabbitmq:
     host: ${RABBIT_HOST:127.0.0.1}
     port: ${RABBIT_PORT:5673}
@@ -77,7 +87,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 app:
   # 打开后 CouponRushReconcileTask 才注册；多实例部署时任务本身有 Redis 锁，
@@ -116,6 +126,8 @@ seata:
     type: nacos
     nacos:
       server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
       namespace: ${NACOS_NAMESPACE:}
       group: SEATA_GROUP
       application: seata-server

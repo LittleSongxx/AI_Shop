@@ -32,6 +32,8 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         prefer-ip-address: true
@@ -47,10 +49,18 @@ spring:
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:your-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    user: ${FLYWAY_USER:aishop_flyway}
+    password: ${FLYWAY_PASSWORD:}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6380}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
   rabbitmq:
     host: ${RABBIT_HOST:127.0.0.1}
     port: ${RABBIT_PORT:5673}
@@ -77,16 +87,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 app:
-  # 保持现状（关闭），但这是个待决事项而不是终态：本库有 mq_compensation_log，
-  # 代码也确实在往里写（见 ProductController 的补偿记录），只是重放任务从未注册过，
-  # 所以这些记录一直在堆积、没人重放。打开之前要先看一眼 PENDING 积压：
-  # 任务会把 retry_count < 5 的记录重新发出去，其中可能有很久以前的消息，
-  # 重放旧消息等于重新触发一次当时的业务动作。确认积压可安全重放后再改成 true。
   common-scheduling:
     enabled: false
+
+mq:
+  outbox:
+    dispatch-enabled: true
+  compensation:
+    auto-replay-enabled: true
 
 aishop:
   internal:

@@ -47,14 +47,12 @@ public class UserMemberController extends ABaseController {
     }
 
     @GetMapping("/getMemberCenter")
-    @PostMapping("/getMemberCenter")
     @GlobalInterceptor(checkLogin = true)
     public ResponseVO getMemberCenter() {
         return getSuccessResponseVO(userMemberProfileService.getMemberCenter(getCurrentUserId()));
     }
 
     @GetMapping("/loadMemberCenter")
-    @PostMapping("/loadMemberCenter")
     @GlobalInterceptor(checkLogin = true)
     public ResponseVO loadMemberCenter() {
         return getSuccessResponseVO(userMemberProfileService.getMemberCenter(getCurrentUserId()));

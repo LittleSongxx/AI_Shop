@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -7,6 +8,7 @@ from app.rag.retriever import (
     RagRetriever,
     _promote_canonical_hint_docs,
     _rerank_query_with_fact_hints,
+    rerank_evaluation_scope,
 )
 
 
@@ -171,7 +173,7 @@ async def test_multi_domain_query_expands_at_most_once(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_required_rerank_fallback_fails_closed(monkeypatch):
+async def test_optional_rerank_fallback_keeps_bounded_rrf_candidates(monkeypatch):
     retriever = RagRetriever()
     docs = [_doc("a"), _doc("b")]
     monkeypatch.setattr(retriever, "_keyword_search_docs", AsyncMock(return_value=docs))
@@ -185,5 +187,60 @@ async def test_required_rerank_fallback_fails_closed(monkeypatch):
         active_document_ids=["1"],
         planned_query=plan_rag_query("查询物流"),
     )
+
+    assert [doc["id"] for doc in result] == ["a"]
+
+
+@pytest.mark.asyncio
+async def test_required_rerank_fallback_fails_closed(monkeypatch):
+    retriever = RagRetriever()
+    docs = [_doc("a"), _doc("b")]
+    monkeypatch.setattr(retriever, "_keyword_search_docs", AsyncMock(return_value=docs))
+    monkeypatch.setattr(retriever, "_vector_search", AsyncMock(return_value=docs))
+    monkeypatch.setattr(
+        retriever,
+        "_rerank",
+        AsyncMock(return_value=[dict(docs[0], source="rrf")]),
+    )
+    monkeypatch.setattr(
+        "app.rag.retriever.get_settings",
+        lambda: SimpleNamespace(
+            rerank_required=True,
+            rerank_top_n=6,
+            rag_top_k=10,
+        ),
+    )
+
+    result = await retriever._search_knowledge_docs(
+        "查询物流",
+        10,
+        version_filter=1,
+        active_document_ids=["1"],
+        planned_query=plan_rag_query("查询物流"),
+    )
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_evaluation_rerank_fallback_fails_closed_even_when_optional(monkeypatch):
+    retriever = RagRetriever()
+    docs = [_doc("a"), _doc("b")]
+    monkeypatch.setattr(retriever, "_keyword_search_docs", AsyncMock(return_value=docs))
+    monkeypatch.setattr(retriever, "_vector_search", AsyncMock(return_value=docs))
+    monkeypatch.setattr(
+        retriever,
+        "_rerank",
+        AsyncMock(return_value=[dict(docs[0], source="rrf")]),
+    )
+
+    with rerank_evaluation_scope():
+        result = await retriever._search_knowledge_docs(
+            "查询物流",
+            10,
+            version_filter=1,
+            active_document_ids=["1"],
+            planned_query=plan_rag_query("查询物流"),
+        )
 
     assert result == []

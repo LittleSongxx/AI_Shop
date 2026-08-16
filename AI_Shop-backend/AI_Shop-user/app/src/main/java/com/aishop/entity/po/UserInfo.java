@@ -35,6 +35,8 @@ public class UserInfo implements Serializable {
 
 	private Integer status;
 
+	private Long tempBanUntilMs;
+
 	public void setUserId(String userId){
 		this.userId = userId;
 	}
@@ -115,8 +117,16 @@ public class UserInfo implements Serializable {
 		return this.status;
 	}
 
+	public void setTempBanUntilMs(Long tempBanUntilMs) {
+		this.tempBanUntilMs = tempBanUntilMs;
+	}
+
+	public Long getTempBanUntilMs() {
+		return tempBanUntilMs;
+	}
+
 	@Override
 	public String toString (){
-		return "用户id:"+(userId == null ? "空" : userId)+"，昵称:"+(nickName == null ? "空" : nickName)+"，头像:"+(avatar == null ? "空" : avatar)+"，邮箱:"+(email == null ? "空" : email)+"，密码:"+(password == null ? "空" : password)+"，0:女 1:男 2:未知:"+(sex == null ? "空" : sex)+"，加入时间:"+(joinTime == null ? "空" : DateUtil.format(joinTime, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()))+"，最后登录时间:"+(lastLoginTime == null ? "空" : DateUtil.format(lastLoginTime, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()))+"，最后登录IP:"+(lastLoginIp == null ? "空" : lastLoginIp)+"，0:禁用 1:正常:"+(status == null ? "空" : status);
+		return "用户id:"+(userId == null ? "空" : userId)+"，昵称:"+(nickName == null ? "空" : nickName)+"，头像:"+(avatar == null ? "空" : avatar)+"，邮箱:"+(email == null ? "空" : email)+"，性别(0:女 1:男 2:未知):"+(sex == null ? "空" : sex)+"，加入时间:"+(joinTime == null ? "空" : DateUtil.format(joinTime, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()))+"，最后登录时间:"+(lastLoginTime == null ? "空" : DateUtil.format(lastLoginTime, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()))+"，最后登录IP:"+(lastLoginIp == null ? "空" : lastLoginIp)+"，状态(0:禁用 1:正常):"+(status == null ? "空" : status);
 	}
 }

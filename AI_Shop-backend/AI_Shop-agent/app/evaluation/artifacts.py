@@ -36,18 +36,18 @@ def workspace_sha256(repo_root: Path) -> str:
         capture_output=True,
     ).stdout
     untracked = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
         cwd=repo_root,
         check=True,
         capture_output=True,
-        text=True,
-    ).stdout.splitlines()
+    ).stdout.split(b"\0")
     digest = hashlib.sha256(tracked)
-    for relative in sorted(untracked):
+    for relative_bytes in sorted(item for item in untracked if item):
+        relative = os.fsdecode(relative_bytes)
         path = repo_root / relative
         if not path.is_file():
             continue
-        digest.update(relative.encode("utf-8"))
+        digest.update(relative_bytes)
         digest.update(b"\0")
         digest.update(path.read_bytes())
         digest.update(b"\0")

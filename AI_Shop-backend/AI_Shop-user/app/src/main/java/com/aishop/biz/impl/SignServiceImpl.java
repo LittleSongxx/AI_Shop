@@ -1,32 +1,24 @@
 package com.aishop.biz.impl;
 
-import com.aishop.component.RedisComponent;
 import com.aishop.component.SignRedisComponent;
-import com.aishop.constants.Constants;
-import com.aishop.constants.RabbitMQConfig;
-import com.aishop.constants.ReliableMessageSender;
-import com.aishop.support.MqIdempotencyKeys;
 import com.aishop.entity.dto.SignRewardConfigDTO;
 import com.aishop.api.dto.SignRecordMessageDTO;
-import com.aishop.entity.enums.MessageReliabilityLevelEnum;
 import com.aishop.entity.enums.ResponseCodeEnum;
 import com.aishop.api.dto.UserCouponCreateDTO;
 import com.aishop.api.support.CouponFeignSupport;
-import com.aishop.api.vo.DiscountCouponVO;
+import com.aishop.api.vo.CouponGrantResultVO;
 import com.aishop.api.enums.UserCouponStatusEnum;
 import com.aishop.utils.StringTools;
 import com.aishop.api.vo.SignDataVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.biz.SignCalendarCacheService;
+import com.aishop.biz.SignEventPersistenceService;
 import com.aishop.biz.SignRewardConfigService;
 import com.aishop.biz.SignRecordSyncService;
 import com.aishop.biz.SignService;
-import com.aishop.biz.UserMemberProfileService;
 import com.aishop.biz.UserNotificationService;
 import com.aishop.utils.DateUtil;
 import jakarta.annotation.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -35,19 +27,12 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class SignServiceImpl implements SignService {
 
-    private static final Logger log = LoggerFactory.getLogger(SignServiceImpl.class);
-
-    @Resource
-    private RedisComponent redisComponent;
     @Resource
     private SignRedisComponent signRedisComponent;
-    @Resource
-    private UserMemberProfileService userMemberProfileService;
     @Resource
     private UserNotificationService userNotificationService;
     @Resource
@@ -55,14 +40,13 @@ public class SignServiceImpl implements SignService {
     @Resource
     private CouponFeignSupport couponFeignSupport;
     @Resource
-    private ReliableMessageSender reliableMessageSender;
-    @Resource
     private SignRecordSyncService signRecordSyncService;
     @Resource
     private SignCalendarCacheService signCalendarCacheService;
+    @Resource
+    private SignEventPersistenceService signEventPersistenceService;
 
     private static final int SIGN_GROWTH = 5;
-    private static final String SIGN_COUPON_DEDUP = "sign:streak:coupon:";
 
     @Override
     public SignDataVO getSignCalendar(String userId, String yyyyMM) {
@@ -95,61 +79,72 @@ public class SignServiceImpl implements SignService {
         String yyyyMM = DateUtil.getTimeOnParttern(0, "yyyyMM");
         LocalDateTime now = LocalDateTime.now();
         int dayOfMonth = now.getDayOfMonth();
-        if (signRedisComponent.isSign(userId, yyyyMM, dayOfMonth)) {
-            throw new BusinessException("今天已经签到过了哦~");
+        boolean alreadySigned = signRedisComponent.isSign(userId, yyyyMM, dayOfMonth);
+        if (!alreadySigned) {
+            try {
+                signRedisComponent.sign(userId);
+            } catch (BusinessException duplicate) {
+                if (!signRedisComponent.isSign(userId, yyyyMM, dayOfMonth)) {
+                    throw duplicate;
+                }
+                alreadySigned = true;
+            }
         }
-        signRedisComponent.sign(userId);
-        userMemberProfileService.addGrowth(userId, SIGN_GROWTH);
         int continuousDays = signRedisComponent.getContinuousDays(userId);
         int totalSignDays = signRedisComponent.totalSignDays(userId);
         int usedCount = signRedisComponent.getUsedCount(userId);
-        sendSignRecordToMQ(userId, continuousDays, totalSignDays, usedCount,
+        SignRecordMessageDTO event = new SignRecordMessageDTO(
+                userId, continuousDays, totalSignDays, usedCount,
                 DateUtil.getTimeOnParttern(0, "yyyyMMdd"), 0);
+        boolean persisted = signEventPersistenceService.persist(event, SIGN_GROWTH);
+        if (alreadySigned && !persisted) {
+            tryGrantStreakCoupon(userId, continuousDays);
+            throw new BusinessException("今天已经签到过了哦~");
+        }
         tryGrantStreakCoupon(userId, continuousDays);
     }
 
     @Override
     public void msign(String userId, String yyyyMMdd) {
         signRecordSyncService.ensureHashHydrated(userId);
-        if (signRedisComponent.getRemainSignCount(userId) <= 0) {
-            throw new BusinessException("补签次数不足");
-        }
-        if (yyyyMMdd.length() != 8) {
+        LocalDate supplementDate;
+        try {
+            supplementDate = LocalDate.parse(yyyyMMdd, DateTimeFormatter.BASIC_ISO_DATE);
+        } catch (Exception e) {
             throw new BusinessException("日期格式错误");
         }
-        String yyyyMM = yyyyMMdd.substring(0, 6);
-        int dayOfMonth = Integer.parseInt(yyyyMMdd.substring(6, 8));
-        if (signRedisComponent.isSign(userId, yyyyMM, dayOfMonth)) {
-            throw new BusinessException("该日期已经签到过了哦~");
+        if (!supplementDate.isBefore(LocalDate.now())) {
+            throw new BusinessException("只能补签今天之前的日期");
         }
-        signRedisComponent.supplementSign(userId, yyyyMM, dayOfMonth);
-        userMemberProfileService.addGrowth(userId, SIGN_GROWTH);
+        String yyyyMM = supplementDate.format(DateTimeFormatter.ofPattern("yyyyMM"));
+        int dayOfMonth = supplementDate.getDayOfMonth();
+        boolean alreadySigned = signRedisComponent.isSign(userId, yyyyMM, dayOfMonth);
+        if (!alreadySigned) {
+            if (signRedisComponent.getRemainSignCount(userId) <= 0) {
+                throw new BusinessException("补签次数不足");
+            }
+            try {
+                signRedisComponent.supplementSign(userId, yyyyMM, dayOfMonth);
+            } catch (BusinessException duplicate) {
+                if (!signRedisComponent.isSign(userId, yyyyMM, dayOfMonth)) {
+                    throw duplicate;
+                }
+                alreadySigned = true;
+            }
+        }
         int continuousDays = signRedisComponent.getContinuousDays(userId);
         int totalSignDays = signRedisComponent.totalSignDays(userId);
         int usedCount = signRedisComponent.getUsedCount(userId);
-        sendSignRecordToMQ(userId, continuousDays, totalSignDays, usedCount, yyyyMMdd, 1);
+        SignRecordMessageDTO event = new SignRecordMessageDTO(
+                userId, continuousDays, totalSignDays, usedCount, yyyyMMdd, 1);
+        boolean persisted = signEventPersistenceService.persist(event, SIGN_GROWTH);
+        if (alreadySigned && !persisted) {
+            tryGrantStreakCoupon(userId, continuousDays);
+            throw new BusinessException("该日期已经签到过了哦~");
+        }
         tryGrantStreakCoupon(userId, continuousDays);
         userNotificationService.sendAsync(userId, "补签成功",
                 "补签已获得 " + SIGN_GROWTH + " 成长值", "sign", yyyyMMdd);
-    }
-
-    private void sendSignRecordToMQ(String userId, int continuousDays, int totalSignDays, int usedCount,
-                                    String signDate, int signType) {
-        try {
-            SignRecordMessageDTO message = new SignRecordMessageDTO(
-                    userId, continuousDays, totalSignDays, usedCount, signDate, signType);
-            reliableMessageSender.sendMessage(
-                    RabbitMQConfig.SIGN_RECORD_EXCHANGE,
-                    RabbitMQConfig.SIGN_RECORD_KEY,
-                    message,
-                    MqIdempotencyKeys.signRecord(userId, signDate),
-                    MessageReliabilityLevelEnum.HIGH);
-            log.info("签到记录已发送到MQ, userId: {}, continuousDays: {}, totalSignDays: {}, usedCount: {}",
-                    userId, continuousDays, totalSignDays, usedCount);
-        } catch (Exception e) {
-            log.error("发送签到记录到MQ失败, userId: {}", userId, e);
-            throw e;
-        }
     }
 
     private void tryGrantStreakCoupon(String userId, int continuousDays) {
@@ -165,37 +160,21 @@ public class SignServiceImpl implements SignService {
         if (StringTools.isEmpty(couponId)) {
             return;
         }
-        String dedupKey = SIGN_COUPON_DEDUP + userId + ":" + continuousDays;
-        if (!redisComponent.setIfAbsent(dedupKey, "1", 60, TimeUnit.DAYS)) {
-            return;
-        }
-        DiscountCouponVO coupon;
-        try {
-            coupon = couponFeignSupport.getCoupon(couponId);
-        } catch (Exception e) {
-            log.warn("签到发券查询失败 couponId={}", couponId, e);
-            return;
-        }
-        if (coupon == null) {
-            return;
-        }
-        boolean unlimited = coupon.getTotalCount() != null && coupon.getTotalCount() == 0;
-        if (!unlimited && (coupon.getRemainCount() == null || coupon.getRemainCount() <= 0)) {
-            return;
-        }
-        int affected = couponFeignSupport.deductStock(couponId);
-        if (affected == 0) {
-            return;
-        }
-        String userCouponId = StringTools.createUserCouponId();
+        String userCouponId = StringTools.createStableUserCouponId(
+                "sign_reward", userId, continuousDays + ":" + couponId);
         UserCouponCreateDTO createDTO = new UserCouponCreateDTO();
         createDTO.setUserCouponId(userCouponId);
         createDTO.setUserId(userId);
         createDTO.setCouponId(couponId);
         createDTO.setStatus(UserCouponStatusEnum.NOUSE.getStatus());
-        couponFeignSupport.createUserCoupon(createDTO);
+        CouponGrantResultVO grant = couponFeignSupport.grantCoupon(createDTO);
+        if (grant == null || !Boolean.TRUE.equals(grant.getGranted())) {
+            return;
+        }
+        String couponName = StringTools.isEmpty(grant.getCouponName())
+                ? "签到奖励券" : grant.getCouponName();
         userNotificationService.sendAsync(userId, "签到奖励",
-                "连续签到 " + continuousDays + " 天，已发放优惠券「" + coupon.getCouponName() + "」",
+                "连续签到 " + continuousDays + " 天，已发放优惠券「" + couponName + "」",
                 "sign_reward", userCouponId);
     }
 

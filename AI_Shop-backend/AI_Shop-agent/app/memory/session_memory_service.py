@@ -84,12 +84,12 @@ class SessionMemoryService:
         async with acquire() as cur:
             await cur.execute(
                 """INSERT INTO agent_session_memory (user_id, summary_json, state_json, turn_count, updated_at)
-                   VALUES (%s, %s, %s, %s, %s)
+                   VALUES (%s, %s, %s, %s, %s) AS incoming
                    ON DUPLICATE KEY UPDATE
-                     summary_json=VALUES(summary_json),
-                     state_json=VALUES(state_json),
-                     turn_count=VALUES(turn_count),
-                     updated_at=VALUES(updated_at)""",
+                     summary_json=incoming.summary_json,
+                     state_json=incoming.state_json,
+                     turn_count=incoming.turn_count,
+                     updated_at=incoming.updated_at""",
                 (
                     memory.user_id,
                     json.dumps(memory.summary, ensure_ascii=False),

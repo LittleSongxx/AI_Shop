@@ -114,11 +114,20 @@ class HealthService:
             self._check_mcp(),
             self._check_visual_search(),
         )
+        embedding_provider = getattr(settings, "embedding_provider", "openai")
+        embedding_available = (
+            embedding_provider == "local" or bool(settings.embedding_api_key.strip())
+        )
         # Model providers are intentionally diagnostic-only. Their outage must
         # not make the process disappear from service discovery.
         return {
             "llm": bool(settings.llm_api_key.strip()),
-            "embedding": bool(settings.embedding_api_key.strip()),
+            "embedding": embedding_available,
+            "embeddingProvider": embedding_provider,
+            "embeddingProductionReady": (
+                embedding_provider == "openai"
+                and bool(settings.embedding_api_key.strip())
+            ),
             "rerank": bool(settings.rerank_api_key.strip()),
             "elasticsearch": mapping,
             "visualSearch": visual,

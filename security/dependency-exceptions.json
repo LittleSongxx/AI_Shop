@@ -1,4 +1,189 @@
 {
   "schemaVersion": 1,
-  "exceptions": []
+  "exceptions": [
+    {
+      "cve": "CVE-2025-37731",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The PKI realm flaw is implemented by Elasticsearch server code; these artifacts are HTTP clients and contain no realm implementation.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2025-68384",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The oversized user-settings allocation flaw is server-side; Dependency-Check matched the Elasticsearch product CPE to client artifacts.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2025-68390",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The snapshot restore resource-allocation flaw is server-side and is not present in the Java REST clients.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-56144",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The ingest simulation authorization check runs in Elasticsearch server; the scanned dependencies are generated and low-level clients.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-56145",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The EQL memory-consumption flaw executes in Elasticsearch server and is not client-library code.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-56148",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The query recursion flaw executes in Elasticsearch server and is not client-library code.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-56149",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The machine-learning request allocation flaw executes in Elasticsearch server and is not client-library code.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-63136",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The search heap-exhaustion flaw executes in Elasticsearch data nodes and is not client-library code.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-63140",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The fatal query assertion executes in Elasticsearch server and is not client-library code.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-63263",
+      "packageUrlRegex": "^pkg:maven/(co\\.elastic\\.clients/elasticsearch-java|org\\.elasticsearch\\.client/elasticsearch-rest-client)@.*$",
+      "reason": "The ES|QL CPU-exhaustion flaw executes in Elasticsearch server and is not client-library code.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2020-19676",
+      "packageUrlRegex": "^pkg:maven/com\\.alibaba\\.nacos/logback-adapter@.*$",
+      "reason": "The advisory concerns Nacos server 1.1.4; logback-adapter 1.1.4 is a separate logging bridge artifact.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2021-29441",
+      "packageUrlRegex": "^pkg:maven/com\\.alibaba\\.nacos/logback-adapter@.*$",
+      "reason": "The user-agent authentication bypass concerns old Nacos servers, not the client logging adapter.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2021-29442",
+      "packageUrlRegex": "^pkg:maven/com\\.alibaba\\.nacos/logback-adapter@.*$",
+      "reason": "The Derby ConfigOps endpoint concerns old Nacos servers, not the client logging adapter.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2021-43116",
+      "packageUrlRegex": "^pkg:maven/com\\.alibaba\\.nacos/logback-adapter@.*$",
+      "reason": "The console access-control flaw concerns Nacos server 2.0.3, not the client logging adapter.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-0994",
+      "packageUrlRegex": "^pkg:maven/com\\.google\\.protobuf/protobuf-java@.*$",
+      "reason": "The advisory explicitly affects Python json_format.ParseDict; this dependency is the Java runtime.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2014-6439",
+      "packageUrlRegex": "^pkg:maven/org\\.springframework\\.ai/spring-ai-(elasticsearch-store|starter-vector-store-elasticsearch|autoconfigure-vector-store-elasticsearch)@.*$",
+      "reason": "Dependency-Check matched historical Elasticsearch server CPEs to Spring AI's vector-store integration library.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2015-3337",
+      "packageUrlRegex": "^pkg:maven/org\\.springframework\\.ai/spring-ai-(elasticsearch-store|starter-vector-store-elasticsearch|autoconfigure-vector-store-elasticsearch)@.*$",
+      "reason": "Dependency-Check matched a historical Elasticsearch site-plugin server flaw to the Spring AI integration library.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2015-5531",
+      "packageUrlRegex": "^pkg:maven/org\\.springframework\\.ai/spring-ai-(elasticsearch-store|starter-vector-store-elasticsearch|autoconfigure-vector-store-elasticsearch)@.*$",
+      "reason": "Dependency-Check matched a historical Elasticsearch snapshot server flaw to the Spring AI integration library.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-23907",
+      "packageUrlRegex": "^pkg:maven/org\\.apache\\.pdfbox/jbig2-imageio@.*$",
+      "reason": "The advisory affects the optional PDFBox ExtractEmbeddedFiles example. The project neither packages nor copies that example, and the report attached it to jbig2-imageio.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-33929",
+      "packageUrlRegex": "^pkg:maven/org\\.apache\\.pdfbox/jbig2-imageio@.*$",
+      "reason": "The advisory affects the optional PDFBox ExtractEmbeddedFiles example. The project uses PDFBox 3.0.8 and contains no copied extraction example.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2020-29582",
+      "packageUrlRegex": "^pkg:maven/org\\.jetbrains\\.kotlin/kotlin-stdlib(-common|-jdk7|-jdk8)?@.*$",
+      "reason": "The issue was fixed in Kotlin 1.4.21; the runtime stdlib is 1.9.25 and Dependency-Check applied an unbounded product CPE.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-53914",
+      "packageUrlRegex": "^pkg:maven/org\\.jetbrains\\.kotlin/kotlin-stdlib(-common|-jdk7|-jdk8)?@.*$",
+      "reason": "The flaw is in Kotlin compiler build-cache metadata deserialization. This Maven project only receives kotlin-stdlib as an OkHttp runtime dependency and does not use Kotlin build caches.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    },
+    {
+      "cve": "CVE-2026-66299",
+      "packageUrlRegex": "^pkg:maven/org\\.apache\\.tomcat\\.embed/tomcat-embed-(core|websocket)@.*$",
+      "reason": "The advisory affects Tomcat's examples web application, specifically its WebSocket chat example. Embedded Tomcat does not package or deploy that application.",
+      "owner": "platform",
+      "createdAt": "2026-08-16",
+      "expiresAt": "2026-11-13"
+    }
+  ]
 }

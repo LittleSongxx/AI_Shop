@@ -67,7 +67,7 @@ create table if not exists local_message_outbox
     routing_key       varchar(64)                     not null comment '路由键',
     payload_json      mediumtext                      not null comment '消息体 JSON',
     reliability_level varchar(16) default 'STANDARD'  not null comment 'HIGH/STANDARD',
-    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败',
+    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败 4重试耗尽',
     retry_count       int         default 0           not null comment '重试次数',
     error_message     varchar(512)                    null comment '最近失败原因',
     lease_owner       varchar(64)                     null comment '当前投递实例',

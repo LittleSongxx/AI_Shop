@@ -126,9 +126,9 @@ class ProductDecisionFeatureService:
                              evidence_json, confidence, review_status, version,
                              valid_from, created_at, updated_at)
                         VALUES (%s,%s,%s,'STRUCTURED_ATTRIBUTE',%s,1.0000,'VERIFIED','v1',
-                                NOW(3),NOW(3),NOW(3))
+                                NOW(3),NOW(3),NOW(3)) AS incoming
                         ON DUPLICATE KEY UPDATE
-                            evidence_json=VALUES(evidence_json), confidence=VALUES(confidence),
+                            evidence_json=incoming.evidence_json, confidence=incoming.confidence,
                             review_status='VERIFIED', valid_until=NULL, updated_at=NOW(3)
                         """,
                         (

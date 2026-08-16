@@ -12,7 +12,10 @@ x-agent-environment: &agent-environment
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   REDIS_DB: "9"
+  REDIS_USERNAME: default
+  REDIS_PASSWORD: fault-redis
   RABBITMQ_URL: amqp://fault-drill:fault-drill@rabbitmq:5672/%2Ffault-drill
+  RABBITMQ_QUEUE_TYPE: quorum
   AGENT_QUEUE_EXCHANGE: fault-drill.agent.tasks
   AGENT_TASK_DEADLINE_SECONDS: "120"
   AGENT_TASK_LEASE_SECONDS: "30"
@@ -22,6 +25,7 @@ x-agent-environment: &agent-environment
   AGENT_USER_LOCK_TTL_SECONDS: "30"
   AGENT_WORKER_HEARTBEAT_TTL_SECONDS: "10"
   PENDING_ACTION_RECONCILE_INTERVAL_SECONDS: "300"
+  DATA_ANALYST_ENABLED: "false"
   LLM_API_KEY: fault-drill-key
   LLM_BASE_URL: http://llm-stub:8080/v1
   LLM_MODEL: fault-drill-model
@@ -29,7 +33,7 @@ x-agent-environment: &agent-environment
   EMBEDDING_API_KEY: fault-drill-key
   EMBEDDING_BASE_URL: http://llm-stub:8080/v1
   EMBEDDING_MODEL: fault-drill-embedding
-  FAULT_CHECKPOINT_REDIS_URL: redis://checkpoint-redis:6379/11
+  FAULT_CHECKPOINT_REDIS_URL: redis://default:fault-checkpoint@checkpoint-redis:6379/11
   TZ: UTC
 
 networks:
@@ -45,11 +49,9 @@ volumes:
 
 services:
   mysql:
-    image: mysql:8.3
+    image: mysql:8.4.11
     container_name: aishop-fault-drill-mysql
     networks: [fault-drill-net]
-    ports:
-      - "13316:3306"
     environment:
       MYSQL_ROOT_PASSWORD: fault-root
       MYSQL_DATABASE: aishop_agent_fault_drill
@@ -57,7 +59,6 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_general_ci
-      - --default-authentication-plugin=caching_sha2_password
     volumes:
       - fault-drill-mysql:/var/lib/mysql
     healthcheck:
@@ -68,44 +69,47 @@ services:
     restart: "no"
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.7-alpine
     container_name: aishop-fault-drill-redis
     networks: [fault-drill-net]
-    ports:
-      - "16380:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - fault-redis
     volumes:
       - fault-drill-redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "fault-redis", "ping"]
       interval: 2s
       timeout: 2s
       retries: 30
     restart: "no"
 
   checkpoint-redis:
-    image: redis:7-alpine
+    image: redis:7.4.7-alpine
     container_name: aishop-fault-drill-checkpoint-redis
     networks: [fault-drill-net]
-    ports:
-      - "16381:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - fault-checkpoint
     volumes:
       - fault-drill-checkpoint-redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "fault-checkpoint", "ping"]
       interval: 2s
       timeout: 2s
       retries: 30
     restart: "no"
 
   rabbitmq:
-    image: rabbitmq:3.13-management
+    image: rabbitmq:4.2.9-management
     container_name: aishop-fault-drill-rabbitmq
     networks: [fault-drill-net]
-    ports:
-      - "15674:5672"
-      - "25674:15672"
     environment:
       RABBITMQ_DEFAULT_USER: fault-drill
       RABBITMQ_DEFAULT_PASS: fault-drill
@@ -127,7 +131,7 @@ services:
     container_name: aishop-fault-drill-llm-stub
     networks: [fault-drill-net]
     ports:
-      - "17080:8080"
+      - "127.0.0.1::8080"
     command:
       - uvicorn
       - fault_drill.llm_stub:app
@@ -147,7 +151,7 @@ services:
     container_name: aishop-fault-drill-agent-api
     networks: [fault-drill-net]
     ports:
-      - "17050:7050"
+      - "127.0.0.1::7050"
     environment:
       <<: *agent-environment
     command:
@@ -179,8 +183,6 @@ services:
     image: aishop-agent-fault-drill:local
     container_name: aishop-fault-drill-worker-a
     networks: [fault-drill-net]
-    ports:
-      - "17051:7051"
     environment:
       <<: *agent-environment
       WORKER_METRICS_PORT: "7051"
@@ -200,8 +202,6 @@ services:
     image: aishop-agent-fault-drill:local
     container_name: aishop-fault-drill-worker-b
     networks: [fault-drill-net]
-    ports:
-      - "17052:7052"
     environment:
       <<: *agent-environment
       WORKER_METRICS_PORT: "7052"

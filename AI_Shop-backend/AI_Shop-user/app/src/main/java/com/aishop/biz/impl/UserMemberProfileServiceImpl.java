@@ -3,7 +3,7 @@ package com.aishop.biz.impl;
 import com.aishop.api.dto.UserCouponCreateDTO;
 import com.aishop.api.dto.OrderGrowthEventDTO;
 import com.aishop.api.support.CouponFeignSupport;
-import com.aishop.api.vo.DiscountCouponVO;
+import com.aishop.api.vo.CouponGrantResultVO;
 import com.aishop.component.RedisComponent;
 import com.aishop.entity.enums.ResponseCodeEnum;
 import com.aishop.api.enums.UserCouponStatusEnum;
@@ -13,24 +13,30 @@ import com.aishop.entity.vo.MemberCenterVO;
 import com.aishop.api.vo.MemberLevelRewardVO;
 import com.aishop.exception.BusinessException;
 import com.aishop.mappers.UserMemberProfileMapper;
+import com.aishop.mappers.UserMemberLevelRewardClaimMapper;
 import com.aishop.mappers.UserOrderGrowthMapper;
 import com.aishop.biz.MemberLevelRewardConfigService;
 import com.aishop.biz.UserMemberProfileService;
 import com.aishop.biz.UserNotificationService;
 import com.aishop.utils.StringTools;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
 @Service("userMemberProfileService")
+@Slf4j
 public class UserMemberProfileServiceImpl implements UserMemberProfileService {
 
     private static final int SILVER_GROWTH = 1000;
@@ -50,6 +56,8 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
     private UserMemberProfileMapper<UserMemberProfile, com.aishop.entity.query.UserMemberProfileQuery> userMemberProfileMapper;
     @Resource
     private UserOrderGrowthMapper userOrderGrowthMapper;
+    @Resource
+    private UserMemberLevelRewardClaimMapper userMemberLevelRewardClaimMapper;
 
     @Override
     public UserMemberProfile getOrInitProfile(String userId) {
@@ -71,7 +79,14 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
     @Override
     public MemberCenterVO getMemberCenter(String userId) {
         UserMemberProfile profile = getOrInitProfile(userId);
-        Set<Integer> claimed = redisComponent.getMemberLevelClaimed(userId);
+        Set<Integer> cachedClaims = redisComponent.getMemberLevelClaimed(userId);
+        Set<Integer> claimed = new HashSet<>(
+                cachedClaims == null ? Set.of() : cachedClaims);
+        List<Integer> persistedClaims =
+                userMemberLevelRewardClaimMapper.selectClaimedLevels(userId);
+        if (persistedClaims != null) {
+            claimed.addAll(persistedClaims);
+        }
         int growth = profile.getGrowthValue() == null ? 0 : profile.getGrowthValue();
         int levelCode = profile.getLevelCode() == null ? 1 : profile.getLevelCode();
 
@@ -127,47 +142,48 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
         if (growth < threshold) {
             throw new BusinessException("成长值未达标，暂无法领取");
         }
-        Set<Integer> claimed = redisComponent.getMemberLevelClaimed(userId);
-        if (claimed.contains(levelCode)) {
+        List<Integer> persistedClaims =
+                userMemberLevelRewardClaimMapper.selectClaimedLevels(userId);
+        Set<Integer> cachedClaims = redisComponent.getMemberLevelClaimed(userId);
+        if ((persistedClaims != null && persistedClaims.contains(levelCode))
+                || (cachedClaims != null && cachedClaims.contains(levelCode))) {
             throw new BusinessException("该等级奖励已领取");
         }
         String couponId = memberLevelRewardConfigService.resolveLevelCouponId(levelCode);
         String levelName = levelCode == 2 ? "银卡会员" : "金卡会员";
         int bonusGrowth = levelCode == 2 ? BONUS_GROWTH_SILVER : BONUS_GROWTH_GOLD;
-        String couponName = tryGrantCoupon(userId, couponId, levelCode);
+        CouponGrantResultVO couponGrant = tryGrantCoupon(userId, couponId, levelCode);
+        String userCouponId = couponGrant == null ? null : couponGrant.getUserCouponId();
+        int inserted = userMemberLevelRewardClaimMapper.insertIgnore(
+                userId, levelCode, userCouponId, bonusGrowth);
+        if (inserted != 1) {
+            throw new BusinessException("该等级奖励已领取");
+        }
         addGrowth(userId, bonusGrowth);
-        redisComponent.addMemberLevelClaimed(userId, levelCode);
+        runAfterCommit(() -> cacheClaimBestEffort(userId, levelCode));
         String content = "恭喜升级为「" + levelName + "」！已发放 " + bonusGrowth + " 成长值";
-        if (!StringTools.isEmpty(couponName)) {
-            content += "，优惠券「" + couponName + "」已放入「我的优惠券」";
+        if (couponGrant != null && !StringTools.isEmpty(couponGrant.getCouponName())) {
+            content += "，优惠券「" + couponGrant.getCouponName() + "」已放入「我的优惠券」";
         }
         userNotificationService.sendAsync(userId, "会员升级礼", content, "member_level", String.valueOf(levelCode));
     }
 
-    private String tryGrantCoupon(String userId, String couponId, int levelCode) {
+    private CouponGrantResultVO tryGrantCoupon(String userId, String couponId, int levelCode) {
         if (StringTools.isEmpty(couponId)) {
             return null;
         }
-        DiscountCouponVO coupon = couponFeignSupport.getCoupon(couponId);
-        if (coupon == null) {
-            throw new BusinessException("升级礼券不存在，请联系管理员配置");
-        }
-        boolean unlimited = coupon.getTotalCount() != null && coupon.getTotalCount() == 0;
-        if (!unlimited && (coupon.getRemainCount() == null || coupon.getRemainCount() <= 0)) {
-            throw new BusinessException("升级礼券库存不足，请联系管理员补充");
-        }
-        int affected = couponFeignSupport.deductStock(couponId);
-        if (affected == 0) {
-            throw new BusinessException("升级礼券发放失败，请稍后重试");
-        }
-        String userCouponId = StringTools.createUserCouponId();
+        String userCouponId = StringTools.createStableUserCouponId(
+                "member_level", userId, levelCode + ":" + couponId);
         UserCouponCreateDTO createDTO = new UserCouponCreateDTO();
         createDTO.setUserCouponId(userCouponId);
         createDTO.setUserId(userId);
         createDTO.setCouponId(couponId);
         createDTO.setStatus(UserCouponStatusEnum.NOUSE.getStatus());
-        couponFeignSupport.createUserCoupon(createDTO);
-        return coupon.getCouponName();
+        CouponGrantResultVO result = couponFeignSupport.grantCoupon(createDTO);
+        if (result == null || !Boolean.TRUE.equals(result.getGranted())) {
+            throw new BusinessException("升级礼券发放失败，请稍后重试");
+        }
+        return result;
     }
 
     @Override
@@ -236,6 +252,28 @@ public class UserMemberProfileServiceImpl implements UserMemberProfileService {
                 && existing.getPayAmount() != null
                 && existing.getPayAmount().compareTo(event.getPayAmount()) == 0
                 && Objects.equals(existing.getGrowthValue(), points);
+    }
+
+    private void cacheClaimBestEffort(String userId, Integer levelCode) {
+        try {
+            redisComponent.addMemberLevelClaimed(userId, levelCode);
+        } catch (Exception e) {
+            log.warn("会员等级奖励领取缓存写入失败，数据库账本仍为权威来源 userId={}, levelCode={}",
+                    userId, levelCode, e);
+        }
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+            return;
+        }
+        action.run();
     }
 
     private void refreshLevel(UserMemberProfile profile) {

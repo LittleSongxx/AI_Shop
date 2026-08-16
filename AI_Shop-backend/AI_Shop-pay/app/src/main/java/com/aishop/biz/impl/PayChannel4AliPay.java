@@ -41,12 +41,6 @@ import java.util.Map;
 @Slf4j
 public class PayChannel4AliPay implements PayChannel {
 
-    static {
-        // 设置SSL协议版本
-        System.setProperty("https.protocols", "TLSv1.2");
-        System.setProperty("jdk.tls.client.protocols", "TLSv1.2");
-    }
-
     private static final String TRADE_STATE_SUCCESS = "TRADE_SUCCESS";
     private static final String TRADE_STATE_FINISHED = "TRADE_FINISHED";
 
@@ -61,6 +55,7 @@ public class PayChannel4AliPay implements PayChannel {
     private PayOrderRedisComponent payOrderRedisComponent;
     @Override
     public PayInfoDTO getPayUrl(PayChannelEnum payChannelEnum, String payOrderId, String subject, BigDecimal amount) {
+        requireConfigured();
         try {
             BigDecimal payAmount = OrderPayAmountUtil.normalizeChannelPayAmount(amount);
             String payAmountText = OrderPayAmountUtil.formatChannelPayAmount(amount);
@@ -118,8 +113,8 @@ public class PayChannel4AliPay implements PayChannel {
             return new PayInfoDTO(payInfo, payOrderId, payAmount);
         } catch (BusinessException e) {
             throw e;
-        }catch (Exception e){
-            log.error("支付宝获取支付信息失败");
+        } catch (Exception e) {
+            log.error("支付宝获取支付信息失败, payOrderId={}", payOrderId, e);
             throw new BusinessException("获取支付信息失败");
         }
     }
@@ -142,13 +137,14 @@ public class PayChannel4AliPay implements PayChannel {
         config.setSignType("RSA2");
         config.setFormat("json");
         // 设置超时时间（毫秒）
-        config.setConnectTimeout(30000);  // 连接超时30秒
-        config.setReadTimeout(30000);     // 读取超时30秒
+        config.setConnectTimeout(appConfig.getAlipayConnectTimeoutMs());
+        config.setReadTimeout(appConfig.getAlipayReadTimeoutMs());
         return config;
     }
 
     @Override
     public PayOrderNotifyDTO payNotify(Map<String, String> requestParams, String jsonBody) {
+        requireConfigured();
         try {
             requestParams.remove("sign_type");
             Boolean signCheckResult = AlipaySignature.rsaCertCheckV2(requestParams, appConfig.getProjectFolder() + appConfig.getAlipayPublicCertPath(), "UTF-8", "RSA2");
@@ -172,6 +168,7 @@ public class PayChannel4AliPay implements PayChannel {
 
     @Override
     public PayOrderNotifyDTO queryOrder(String payOrderId) {
+        requireConfigured();
         try {
             // 初始化SDK
             AlipayClient alipayClient = new DefaultAlipayClient(getAlipayConfig());
@@ -206,6 +203,7 @@ public class PayChannel4AliPay implements PayChannel {
 
     @Override
     public void refund(String sourcePayOrderId, String payOrderId, BigDecimal refundAmount) {
+        requireConfigured();
         try {
             // 初始化SDK
             AlipayClient alipayClient = new DefaultAlipayClient(getAlipayConfig());
@@ -231,6 +229,7 @@ public class PayChannel4AliPay implements PayChannel {
 
     @Override
     public void closeOrder(String payOrderId) {
+        requireConfigured();
         try {
             AlipayClient alipayClient = new DefaultAlipayClient(getAlipayConfig());
             AlipayTradeCloseRequest request = new AlipayTradeCloseRequest();
@@ -251,6 +250,12 @@ public class PayChannel4AliPay implements PayChannel {
             throw e;
         } catch (Exception e) {
             log.error("支付宝订单关闭失败, payOrderId={}", payOrderId, e);
+        }
+    }
+
+    private void requireConfigured() {
+        if (!appConfig.isAlipayConfigured()) {
+            throw new BusinessException("支付宝支付未配置");
         }
     }
 }

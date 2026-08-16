@@ -52,7 +52,7 @@ public class EsSearchComponent {
             if (Boolean.TRUE.equals(success)) {
                 log.info("索引创建成功（IK 分词）");
             } else {
-                log.error("创建索引失败：ES 返回 false。请确认已安装 analysis-ik（镜像 aishop-elasticsearch:9.2.1-ik）");
+                log.error("创建索引失败：ES 返回 false。请确认已安装 analysis-ik（镜像 aishop-elasticsearch:8.19.19-ik）");
             }
         } catch (Exception e) {
             log.error("创建索引失败（常见原因：ES 未安装 IK 插件 ik_max_word）。"

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aishop.mappers.UserMemberLevelRewardClaimMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO user_member_level_reward_claim
+            (user_id, level_code, user_coupon_id, bonus_growth, create_time)
+        VALUES
+            (#{userId}, #{levelCode}, #{userCouponId}, #{bonusGrowth}, NOW())
+    </insert>
+
+    <select id="selectClaimedLevels" resultType="java.lang.Integer">
+        SELECT level_code
+        FROM user_member_level_reward_claim
+        WHERE user_id = #{userId}
+        ORDER BY level_code
+    </select>
+</mapper>

@@ -1,4 +1,6 @@
 import contextvars
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import structlog
@@ -23,6 +25,16 @@ def set_delegated_user_id(user_id: str | None) -> None:
 
 def clear_delegated_user_id() -> None:
     _delegated_user_id.set("")
+
+
+@contextmanager
+def delegated_user_scope(user_id: str | None) -> Iterator[None]:
+    """Bind one trusted user identity and restore any outer binding."""
+    token = _delegated_user_id.set((user_id or "").strip())
+    try:
+        yield
+    finally:
+        _delegated_user_id.reset(token)
 
 
 def _camel_to_snake(name: str) -> str:

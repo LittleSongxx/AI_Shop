@@ -32,6 +32,8 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         prefer-ip-address: true
@@ -50,12 +52,17 @@ spring:
   # Admin owns cross-schema analytics views. Keep their definer privileges on
   # a migration-only identity instead of widening the Admin runtime account.
   flyway:
-    user: ${FLYWAY_USER:${MYSQL_USER:root}}
-    password: ${FLYWAY_PASSWORD:${MYSQL_PASSWORD:your-password}}
+    user: ${FLYWAY_USER:aishop_flyway}
+    password: ${FLYWAY_PASSWORD:}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6380}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
   rabbitmq:
     host: ${RABBIT_HOST:127.0.0.1}
     port: ${RABBIT_PORT:5673}
@@ -94,10 +101,10 @@ app:
     enabled: true
 
 mq:
-  compensation:
-    auto-replay-enabled: true
   outbox:
     dispatch-enabled: true
+  compensation:
+    auto-replay-enabled: true
 
 mybatis:
   mapper-locations: classpath*:com/aishop/mappers/*.xml
@@ -109,4 +116,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus

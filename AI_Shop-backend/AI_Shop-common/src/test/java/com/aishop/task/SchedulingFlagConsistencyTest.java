@@ -37,7 +37,9 @@ class SchedulingFlagConsistencyTest {
 
     private static final String SCHEDULING_FLAG = "app.common-scheduling.enabled";
     private static final String AUTO_REPLAY_FLAG = "mq.compensation.auto-replay-enabled";
+    private static final String OUTBOX_DISPATCH_FLAG = "mq.outbox.dispatch-enabled";
     private static final String COMPENSATION_TABLE = "mq_compensation_log";
+    private static final String OUTBOX_TABLE = "local_message_outbox";
 
     /** 一个业务服务：application.yml 与建表脚本 */
     private record Service(String name, Path config, Path schema) {
@@ -86,13 +88,17 @@ class SchedulingFlagConsistencyTest {
         return node;
     }
 
-    private static boolean hasCompensationTable(Path schema) throws IOException {
+    private static boolean hasTable(Path schema, String table) throws IOException {
         if (!Files.exists(schema)) {
             return false;
         }
         return Files.readString(schema, StandardCharsets.UTF_8)
                 .toLowerCase()
-                .contains(COMPENSATION_TABLE);
+                .contains(table);
+    }
+
+    private static boolean hasCompensationTable(Path schema) throws IOException {
+        return hasTable(schema, COMPENSATION_TABLE);
     }
 
     @Test
@@ -143,5 +149,21 @@ class SchedulingFlagConsistencyTest {
         // 反向约束：显式打开了却没建表，说明补偿日志根本没落库，重放任务是空转
         assertTrue(offenders.isEmpty(),
                 "以下服务打开了 " + AUTO_REPLAY_FLAG + " 但库里没有 " + COMPENSATION_TABLE + ": " + offenders);
+    }
+
+    @Test
+    void outboxDispatchEnabledServicesActuallyHaveTheTable() throws IOException {
+        List<String> offenders = new ArrayList<>();
+        for (Service s : services()) {
+            if (!Boolean.TRUE.equals(flatGet(s.config(), OUTBOX_DISPATCH_FLAG))) {
+                continue;
+            }
+            if (!hasTable(s.schema(), OUTBOX_TABLE)) {
+                offenders.add(s.name());
+            }
+        }
+        assertTrue(offenders.isEmpty(),
+                "以下服务打开了 " + OUTBOX_DISPATCH_FLAG + " 但库里没有 "
+                        + OUTBOX_TABLE + ": " + offenders);
     }
 }

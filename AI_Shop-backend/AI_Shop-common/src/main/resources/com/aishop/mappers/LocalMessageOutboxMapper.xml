@@ -87,6 +87,48 @@
           and lease_owner = #{leaseOwner}
     </update>
 
+    <update id="markRetriesExhausted">
+        update local_message_outbox
+        set status = #{exhaustedStatus},
+            update_time = now(),
+            lease_owner = null,
+            lease_until = null,
+            next_retry_time = null
+        where ifnull(retry_count, 0) &gt;= #{maxRetries}
+          and (
+            status = #{failedStatus}
+            or (
+              status = #{sendingStatus}
+              and (lease_until is null or lease_until &lt;= #{now})
+            )
+          )
+    </update>
+
+    <update id="requeueExhausted">
+        update local_message_outbox
+        set status = #{pendingStatus},
+            retry_count = 0,
+            error_message = null,
+            update_time = now(),
+            lease_owner = null,
+            lease_until = null,
+            next_retry_time = null,
+            sent_time = null
+        where id = #{id}
+          and status = #{exhaustedStatus}
+    </update>
+
+    <select id="countByStatus" resultType="java.lang.Integer">
+        select count(*) from local_message_outbox where status = #{status}
+    </select>
+
+    <select id="selectByStatus" resultMap="base_result_map">
+        select * from local_message_outbox
+        where status = #{status}
+        order by update_time desc, id desc
+        limit #{limit}
+    </select>
+
     <select id="selectDispatchBatch" resultMap="base_result_map">
         select * from local_message_outbox
         where create_time &lt;= #{beforeTime}

@@ -60,6 +60,12 @@ public class CouponInternalController extends ABaseController {
         return getSuccessResponseVO(null);
     }
 
+    @PostMapping("/grantCoupon")
+    public ResponseVO<com.aishop.api.vo.CouponGrantResultVO> grantCoupon(
+            @Valid @RequestBody UserCouponCreateDTO dto) {
+        return getSuccessResponseVO(couponInternalService.grantCoupon(dto));
+    }
+
     @PostMapping("/deductStock")
     public ResponseVO<StockChangeResultVO> deductStock(@Valid @RequestBody CouponIdDTO dto) {
         return getSuccessResponseVO(new StockChangeResultVO(couponInternalService.deductStock(dto.getCouponId())));

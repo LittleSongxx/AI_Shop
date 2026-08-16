@@ -1,4 +1,8 @@
 -- Current schema owned by the admin service.
+-- Analytics views apply utf8mb4 collations to literals and cross-schema columns.
+-- Pin the session charset so manual/bootstrap execution does not inherit latin1.
+SET NAMES utf8mb4 COLLATE utf8mb4_general_ci;
+
 create table if not exists admin_audit_log
 (
     id             bigint auto_increment comment '主键' primary key,
@@ -72,7 +76,7 @@ create table if not exists local_message_outbox
     routing_key       varchar(64)                     not null comment '路由键',
     payload_json      mediumtext                      not null comment '消息体 JSON',
     reliability_level varchar(16) default 'STANDARD'  not null comment 'HIGH/STANDARD',
-    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败',
+    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败 4重试耗尽',
     retry_count       int         default 0           not null comment '重试次数',
     error_message     varchar(512)                    null comment '最近失败原因',
     lease_owner       varchar(64)                     null comment '当前投递实例',

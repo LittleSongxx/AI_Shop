@@ -51,8 +51,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers
 class MiddlewareIT {
 
+    private static final String DEFAULT_ELASTICSEARCH_IMAGE =
+            "docker.elastic.co/elasticsearch/elasticsearch:8.19.19";
+
     @Container
-    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.36")
+    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11")
             .withDatabaseName("aishop")
             .withUsername("aishop")
             .withPassword("aishop");
@@ -64,18 +67,24 @@ class MiddlewareIT {
 
     @Container
     static final RabbitMQContainer RABBITMQ = new RabbitMQContainer(
-            DockerImageName.parse("rabbitmq:3.13-management-alpine"))
+            DockerImageName.parse("rabbitmq:4.2-management-alpine"))
             .withAdminUser("aishop")
             .withAdminPassword("aishop");
 
     @Container
     static final GenericContainer<?> ELASTICSEARCH = new GenericContainer<>(
-            DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:8.15.3"))
+            DockerImageName.parse(testImage("AISHOP_TEST_ELASTICSEARCH_IMAGE",
+                    DEFAULT_ELASTICSEARCH_IMAGE)))
             .withEnv("discovery.type", "single-node")
             .withEnv("xpack.security.enabled", "false")
             .withEnv("xpack.license.self_generated.type", "basic")
             .withEnv("ES_JAVA_OPTS", "-Xms512m -Xmx512m")
             .withExposedPorts(9200);
+
+    private static String testImage(String environmentVariable, String defaultImage) {
+        String configured = System.getenv(environmentVariable);
+        return configured == null || configured.isBlank() ? defaultImage : configured.trim();
+    }
 
     @Test
     void mysqlEnforcesIdempotencyAndAtomicStockUnderConcurrency() throws Exception {

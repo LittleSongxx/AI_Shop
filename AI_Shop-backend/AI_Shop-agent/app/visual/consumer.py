@@ -90,6 +90,7 @@ class VisualIndexConsumer:
         dead_queue = await channel.declare_queue(
             settings.visual_index_dead_letter_queue,
             durable=True,
+            arguments={"x-queue-type": settings.rabbitmq_queue_type},
         )
         await dead_queue.bind(
             dead_exchange,
@@ -99,6 +100,7 @@ class VisualIndexConsumer:
             settings.visual_index_queue,
             durable=True,
             arguments={
+                "x-queue-type": settings.rabbitmq_queue_type,
                 "x-dead-letter-exchange": dead_exchange_name,
                 "x-dead-letter-routing-key": settings.visual_index_dead_letter_queue,
             },
@@ -113,6 +115,35 @@ class VisualIndexConsumer:
             dead_letter_queue=settings.visual_index_dead_letter_queue,
         )
         return channel, queue, consumer_tag
+
+    async def remove_derived_queues(self) -> list[str]:
+        """Remove durable visual queues while the provider is unavailable.
+
+        The visual index is rebuilt from the product source of truth when the
+        capability is enabled again. Keeping its fan-out queue bound without a
+        usable provider only creates an unrecoverable-looking backlog and DLQ.
+        """
+        settings = get_settings()
+        removed: list[str] = []
+        for queue_name in (
+            settings.visual_index_queue,
+            settings.visual_index_dead_letter_queue,
+        ):
+            channel = await agent_queue_service.declare_channel()
+            try:
+                await channel.queue_delete(
+                    queue_name,
+                    if_unused=False,
+                    if_empty=False,
+                )
+                removed.append(queue_name)
+            except aio_pika.exceptions.ChannelNotFoundEntity:
+                pass
+            finally:
+                if not channel.is_closed:
+                    await channel.close()
+        logger.info("visual_index_derived_queues_removed", queues=removed)
+        return removed
 
     async def bootstrap_if_needed(self) -> dict[str, Any] | None:
         """Build a new model-version index asynchronously when credentials exist.

@@ -72,13 +72,17 @@ class AgentQueueService:
         dead_exchange = await channel.declare_exchange(
             f"{settings.agent_queue_exchange}.dlx", ExchangeType.DIRECT, durable=True
         )
-        dead_queue = await channel.declare_queue(AGENT_QUEUE_DEAD, durable=True)
+        queue_type = {"x-queue-type": settings.rabbitmq_queue_type}
+        dead_queue = await channel.declare_queue(
+            AGENT_QUEUE_DEAD, durable=True, arguments=queue_type
+        )
         await dead_queue.bind(dead_exchange, routing_key=AGENT_QUEUE_DEAD)
         for queue_name in (AGENT_QUEUE_HIGH, AGENT_QUEUE_FAST, AGENT_QUEUE_LOW):
             queue = await channel.declare_queue(
                 queue_name,
                 durable=True,
                 arguments={
+                    **queue_type,
                     "x-dead-letter-exchange": f"{settings.agent_queue_exchange}.dlx",
                     "x-dead-letter-routing-key": AGENT_QUEUE_DEAD,
                 },

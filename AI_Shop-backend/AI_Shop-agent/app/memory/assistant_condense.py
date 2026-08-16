@@ -35,6 +35,12 @@ async def condense_assistant_for_history(text: str, max_len: int | None = None) 
     stripped = (text or "").strip()
     if not stripped or len(stripped) <= limit:
         return stripped
+    if not (settings.memory_llm_api_key or settings.llm_api_key).strip():
+        logger.debug(
+            "assistant_condense_skipped",
+            reason="memory_llm_api_key_not_configured",
+        )
+        return stripped[:limit]
 
     try:
         llm = create_memory_llm()

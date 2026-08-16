@@ -26,6 +26,7 @@ from app.harness.metrics.runtime_sensors import (
 )
 from app.infra.http_client import close_clients as close_http_clients
 from app.observability.llm_metrics import reset_run_cost, snapshot_cost_summary
+from app.observability.logging import configure_structured_logging
 from app.observability.telemetry import shutdown_telemetry
 from app.services.agent_queue_service import agent_queue_service
 from app.services.agent_service import agent_orchestrator
@@ -42,6 +43,7 @@ from app.services.task_service import agent_task_service
 from app.utils.product_consult import parse_consult_card
 from app.visual.consumer import visual_index_consumer
 
+configure_structured_logging()
 logger = structlog.get_logger()
 TERMINAL_ERROR = "服务暂时不可用，已为您保留本次咨询记录，请稍后重试或转人工客服。"
 _EPISODE_FULL_INTENTS = frozenset(
@@ -117,7 +119,12 @@ class AgentWorker:
             await self._start_consumer(
                 AGENT_QUEUE_LOW, settings.agent_worker_low_concurrency
             )
-            if settings.visual_index_consumer_enabled:
+            visual_index_active = (
+                settings.visual_search_enabled
+                and settings.visual_index_consumer_enabled
+                and bool(settings.visual_api_key.strip())
+            )
+            if visual_index_active:
                 try:
                     channel, queue, consumer_tag = await visual_index_consumer.start()
                 except Exception as exc:
@@ -136,6 +143,27 @@ class AgentWorker:
                     )
                     bootstrap_task.add_done_callback(self._log_background_task_result)
                     self._background_tasks.append(bootstrap_task)
+            else:
+                if not settings.visual_search_enabled:
+                    reason = "VISUAL_SEARCH_DISABLED"
+                elif not settings.visual_index_consumer_enabled:
+                    reason = "VISUAL_INDEX_CONSUMER_DISABLED"
+                else:
+                    reason = "VISUAL_API_KEY_NOT_CONFIGURED"
+                try:
+                    removed = await visual_index_consumer.remove_derived_queues()
+                except Exception as exc:
+                    logger.warning(
+                        "visual_index_queue_cleanup_failed",
+                        reason=reason,
+                        error=type(exc).__name__,
+                    )
+                else:
+                    logger.warning(
+                        "visual_index_consumer_inactive",
+                        reason=reason,
+                        removed_queues=removed,
+                    )
             await redis_service.set_worker_heartbeat(
                 self._worker_id,
                 settings.agent_worker_heartbeat_ttl_seconds,
@@ -397,7 +425,13 @@ class AgentWorker:
             payload = json.loads(message.body.decode("utf-8"))
             message_id = int(payload["messageId"])
             user_id = str(payload["userId"])
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as exc:
             logger.warning("agent_task_invalid_payload", queue=queue_name, error=str(exc))
             await message.reject(requeue=False)
             return

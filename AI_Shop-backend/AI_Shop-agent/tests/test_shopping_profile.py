@@ -428,6 +428,23 @@ async def test_corrupt_db_json_degrades_to_empty_profile(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_profile_upsert_qualifies_the_existing_row_for_mysql_84():
+    cur, cm = _db_cursor()
+    cur.rowcount = 1
+    service = ShoppingProfileService()
+    profile = {**empty_profile(), "revision": 2, "category": "耳机"}
+
+    with patch("app.services.shopping_profile_service.acquire", return_value=cm):
+        saved = await service._save_db("u1", profile)
+
+    assert saved is True
+    sql = cur.execute.await_args.args[0]
+    assert "agent_shopping_profile.revision" in sql
+    assert "agent_shopping_profile.profile_json" in sql
+    assert "agent_shopping_profile.updated_at" in sql
+
+
+@pytest.mark.asyncio
 async def test_db_outage_does_not_break_an_ordinary_chat_turn(monkeypatch):
     """MySQL 挂了，取档案要返回空档案让对话继续，不能抛。"""
     service = ShoppingProfileService()

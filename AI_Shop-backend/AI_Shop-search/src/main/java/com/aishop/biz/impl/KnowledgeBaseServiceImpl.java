@@ -19,6 +19,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -65,7 +66,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private TransactionalMqSender transactionalMqSender;
-    @Resource
+    @Autowired(required = false)
     private ContextPrefixEnricher contextPrefixEnricher;
     @Resource
     private InjectionScanner injectionScanner;
@@ -199,6 +200,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             String title = String.valueOf(document.get("title"));
             registerAfterCommit(() -> {
                 publishVersionBestEffort(releaseVersion, "知识发布");
+                if (contextPrefixEnricher == null) {
+                    return;
+                }
                 // 只有数据库提交后才允许异步上下文增强。若事务回滚，后台任务
                 // 不能把已清理的失败切片重新写回 ES。
                 for (Document doc : toEnrich) {
@@ -298,6 +302,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             String title = String.valueOf(document.get("title"));
             registerAfterCommit(() -> {
                 publishVersionBestEffort(releaseVersion, "知识索引契约升级");
+                if (contextPrefixEnricher == null) {
+                    return;
+                }
                 for (Document indexed : toEnrich) {
                     try {
                         contextPrefixEnricher.enrichAsync(
@@ -314,6 +321,120 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         } catch (RuntimeException e) {
             markReindexJobFailed(jobId, e);
             throw new BusinessException("知识文档重建索引失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> rebuildAllPublishedVectors() {
+        List<Long> documentIds = jdbcTemplate.queryForList(
+                """
+                SELECT document_id
+                FROM knowledge_document
+                WHERE status='PUBLISHED'
+                ORDER BY document_id
+                """,
+                Long.class);
+        if (documentIds.isEmpty()) {
+            return Map.of(
+                    "documents", 0,
+                    "chunks", 0,
+                    "releaseVersion", releaseVersion());
+        }
+
+        long currentRelease = lockReleaseVersion();
+        List<String> writtenIds = new ArrayList<>();
+        List<EnrichmentCandidate> enrichmentCandidates = new ArrayList<>();
+        int totalChunks = 0;
+        try {
+            for (Long documentId : documentIds) {
+                Map<String, Object> document = requireDocumentForUpdate(documentId);
+                int version = number(document.get("version"), 1);
+                List<Map<String, Object>> chunks = jdbcTemplate.queryForList(
+                        """
+                        SELECT chunk_id, chunk_index, heading, content, token_count
+                        FROM knowledge_chunk
+                        WHERE document_id=? AND version=? AND status='PUBLISHED'
+                        ORDER BY chunk_index
+                        """,
+                        documentId, version);
+                if (chunks.isEmpty()) {
+                    throw new BusinessException(
+                            "已发布知识文档没有可重建的切片, documentId=" + documentId);
+                }
+
+                long jobId = insertJob(documentId, "RUNNING", "MODEL_REINDEX", 85);
+                List<Document> batch = new ArrayList<>();
+                String title = String.valueOf(document.get("title"));
+                for (Map<String, Object> chunk : chunks) {
+                    String originalContent = String.valueOf(chunk.get("content"));
+                    Document indexed = new Document(
+                            String.valueOf(chunk.get("chunk_id")),
+                            originalContent,
+                            knowledgeMetadata(
+                                    document, chunk, currentRelease, originalContent));
+                    batch.add(indexed);
+                    writtenIds.add(indexed.getId());
+                    enrichmentCandidates.add(new EnrichmentCandidate(title, indexed));
+                    if (batch.size() == 10) {
+                        vectorStore.add(batch);
+                        batch = new ArrayList<>();
+                    }
+                }
+                if (!batch.isEmpty()) {
+                    vectorStore.add(batch);
+                }
+                jdbcTemplate.update(
+                        """
+                        UPDATE knowledge_document
+                        SET index_schema_version=?, updated_at=NOW()
+                        WHERE document_id=?
+                        """,
+                        INDEX_SCHEMA_VERSION, documentId);
+                jdbcTemplate.update(
+                        """
+                        UPDATE knowledge_ingest_job
+                        SET status='SUCCESS', stage='MODEL_REINDEXED', progress=100,
+                            chunk_count=?, updated_at=NOW()
+                        WHERE job_id=?
+                        """,
+                        chunks.size(), jobId);
+                totalChunks += chunks.size();
+            }
+
+            long releaseVersion = advanceReleaseVersion(currentRelease);
+            registerAfterCommit(() -> {
+                publishVersionBestEffort(releaseVersion, "知识向量模型重建");
+                if (contextPrefixEnricher == null) {
+                    return;
+                }
+                for (EnrichmentCandidate candidate : enrichmentCandidates) {
+                    Document indexed = candidate.document();
+                    try {
+                        contextPrefixEnricher.enrichAsync(
+                                indexed.getId(),
+                                candidate.title(),
+                                indexed.getText(),
+                                indexed.getMetadata());
+                    } catch (RuntimeException e) {
+                        log.warn("知识模型重建后上下文增强调度失败, chunkId={}",
+                                indexed.getId(), e);
+                    }
+                }
+            });
+            return Map.of(
+                    "documents", documentIds.size(),
+                    "chunks", totalChunks,
+                    "releaseVersion", releaseVersion);
+        } catch (RuntimeException e) {
+            if (!writtenIds.isEmpty()) {
+                try {
+                    vectorStore.delete(writtenIds);
+                } catch (RuntimeException cleanup) {
+                    log.warn("知识向量模型重建失败后清理不完整", cleanup);
+                }
+            }
+            throw new BusinessException("已发布知识向量全量重建失败：" + e.getMessage(), e);
         }
     }
 
@@ -1082,5 +1203,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private String time(LocalDateTime value) {
         return value == null ? null : TIME_FORMATTER.format(value);
+    }
+
+    private record EnrichmentCandidate(String title, Document document) {
     }
 }

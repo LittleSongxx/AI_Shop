@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import operator
+from types import SimpleNamespace
 from typing import Annotated
 from unittest.mock import AsyncMock
 
@@ -191,6 +192,15 @@ def test_specialist_tool_scope_is_task_specific_and_bounded():
         },
         "order_fulfillment_specialist",
     ) == ["QUERY_USER_COUPONS"]
+    assert _task_tools_for_specialist(
+        {
+            "intent": "REFUND",
+            "request_mode": "ACTION_PROPOSAL",
+            "user_text": "没发货的耳机我要退款",
+            "verified_order_context": {"orderId": "o1", "orderItemId": "i1"},
+        },
+        "order_fulfillment_specialist",
+    ) == ["QUERY_ORDERS"]
 
 
 def test_visual_specialist_tool_args_are_bound_to_supervisor_context():
@@ -879,6 +889,93 @@ async def test_specialist_sanitizes_protocol_after_required_tools_succeed(monkey
     assert artifact.draft_answer == "SEARCH_KNOWLEDGE: 【知识证据】退款申请需在订单详情发起。"
     assert "MODEL_SUMMARY_PROTOCOL_SANITIZED" in artifact.warnings
     assert "DSML" not in artifact.draft_answer
+
+
+@pytest.mark.asyncio
+async def test_specialist_uses_verified_summary_when_local_chat_model_is_unconfigured(monkeypatch):
+    async def unavailable_llm(*_args, **_kwargs):
+        raise RuntimeError("chat model is not configured")
+
+    async def verified_tool(name, *_args, **_kwargs):
+        if name == "CHECK_AFTER_SALES_ELIGIBILITY":
+            decision = {
+                "decision": "ELIGIBLE",
+                "decisionId": "decision-local",
+                "policyId": "system-refund-state",
+                "policyVersion": "v1",
+            }
+            return ToolInvokeResult(
+                content=json.dumps(decision, ensure_ascii=False),
+                biz_type="after_sales_eligibility",
+                biz_data=json.dumps(decision, ensure_ascii=False),
+                source_refs=[
+                    {
+                        "type": "policy",
+                        "policyId": "system-refund-state",
+                        "decisionId": "decision-local",
+                    }
+                ],
+            )
+        assert name == "SEARCH_KNOWLEDGE"
+        return ToolInvokeResult(
+            content="【知识证据】待发货订单可以提交退款申请。",
+            source_refs=[{"type": "knowledge", "documentId": "policy-local"}],
+        )
+
+    monkeypatch.setattr(
+        "app.graph.multi_agent.get_settings",
+        lambda: SimpleNamespace(llm_api_key=""),
+    )
+    monkeypatch.setattr(
+        "app.graph.multi_agent.rt.bind_agent_llm",
+        lambda **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "app.graph.multi_agent.invoke_llm_with_metrics",
+        unavailable_llm,
+    )
+    monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", verified_tool)
+    for name in ("record_step", "record_handoff", "finish_run"):
+        monkeypatch.setattr(
+            f"app.graph.multi_agent.episode_service.{name}",
+            lambda *args, **kwargs: None,
+        )
+
+    result = await specialist_runner_node(
+        {
+            "specialist_task": {
+                "handoff_id": "handoff-local-summary",
+                "child_run_id": "child-local-summary",
+                "parent_run_id": "root-local-summary",
+                "agent_id": "after_sales_policy_specialist",
+                "goal": "核验待发货订单退款资格",
+                "user_id": "u1",
+                "user_text": "没发货的耳机我要退款",
+                "tool_scope": [
+                    "CHECK_AFTER_SALES_ELIGIBILITY",
+                    "SEARCH_KNOWLEDGE",
+                ],
+                "required_tools": [
+                    "CHECK_AFTER_SALES_ELIGIBILITY",
+                    "SEARCH_KNOWLEDGE",
+                ],
+                "verified_context": {
+                    "order": {
+                        "orderId": "o1",
+                        "orderItemId": "i1",
+                    }
+                },
+                "max_rounds": 1,
+                "timeout_seconds": 2,
+            }
+        }
+    )
+
+    artifact = _validate_artifact(result["specialist_artifacts"][0])
+    assert artifact.status == "SUCCESS"
+    assert "DETERMINISTIC_SPECIALIST_SUMMARY" in artifact.warnings
+    assert "decision-local" in artifact.biz_data
+    assert "待发货订单可以提交退款申请" in artifact.draft_answer
 
 
 @pytest.mark.asyncio

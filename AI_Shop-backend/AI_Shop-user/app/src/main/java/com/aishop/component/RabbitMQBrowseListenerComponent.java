@@ -25,11 +25,13 @@ public class RabbitMQBrowseListenerComponent {
     public void handleBrowseRecord(BrowseHistoryMessageDTO message, Channel channel, Message mqMessage) throws IOException {
         Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
         if (!mqListenerHelper.tryBeginConsume(mqMessage, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_HIGH_SECONDS)) {
-            channel.basicAck(deliveryTag, false);
+            mqListenerHelper.ackCompletedOrDeferBusy(
+                    channel, deliveryTag, mqMessage, RabbitMQConfig.BROWSE_RECORD_QUEUE);
             return;
         }
         try {
             if (message == null || message.getUserId() == null || message.getProductId() == null) {
+                mqListenerHelper.clearConsumeRetry(RabbitMQConfig.BROWSE_RECORD_QUEUE, mqMessage);
                 channel.basicAck(deliveryTag, false);
                 return;
             }

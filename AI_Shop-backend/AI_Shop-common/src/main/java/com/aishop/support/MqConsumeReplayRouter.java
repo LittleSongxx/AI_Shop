@@ -28,6 +28,12 @@ public final class MqConsumeReplayRouter {
                     new Target(RabbitMQConfig.NOTIFY_EXCHANGE, RabbitMQConfig.NOTIFY_KEY);
             case RabbitMQConfig.USER_GROWTH_QUEUE, RabbitMQConfig.USER_GROWTH_DEAD_QUEUE ->
                     new Target(RabbitMQConfig.USER_GROWTH_EXCHANGE, RabbitMQConfig.USER_GROWTH_KEY);
+            case RabbitMQConfig.REFUND_STOCK_QUEUE, RabbitMQConfig.REFUND_STOCK_DEAD_QUEUE ->
+                    new Target(RabbitMQConfig.REFUND_EXCHANGE, RabbitMQConfig.REFUND_STOCK_KEY);
+            case RabbitMQConfig.REFUND_RESULT_QUEUE, RabbitMQConfig.REFUND_RESULT_DEAD_QUEUE ->
+                    new Target(RabbitMQConfig.REFUND_EXCHANGE, RabbitMQConfig.REFUND_RESULT_KEY);
+            case RabbitMQConfig.RUSHING_ORDER_QUEUE ->
+                    new Target(RabbitMQConfig.RUSHING_EXCHANGE, RabbitMQConfig.RUSHING_ORDER_KEY);
             // 支付/物流/确认：死信队列本身即业务消费队列，重放回同一路由
             case RabbitMQConfig.PAY_TIMEOUT_DEAD_QUEUE ->
                     new Target(RabbitMQConfig.PAY_EXCHANGE, RabbitMQConfig.PAY_TIMEOUT_DEAD_KEY);

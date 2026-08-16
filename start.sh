@@ -3,14 +3,20 @@
 # Usage: ./start.sh [--build] [--middleware-only]
 set -Eeuo pipefail
 
+# Both Compose files intentionally use the same project name. Partial `up`
+# commands otherwise report the services from the other file as orphans.
+export COMPOSE_IGNORE_ORPHANS=true
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND="$ROOT/AI_Shop-backend"
 DEPLOY="$ROOT/deploy"
 FRONT="$ROOT/AI_Shop-front"
 COMPOSE_FILE="$DEPLOY/docker-compose.middleware.yml"
+OBSERVABILITY_COMPOSE_FILE="$DEPLOY/docker-compose.observability.yml"
 PIDS="$ROOT/run/pids"
 LOGS="$ROOT/run/logs"
 RUNTIME_ENV="$ROOT/run/runtime.env"
+GRAFANA_ENV="$ROOT/run/secrets/grafana.env"
 JAVA_BUILD_STAMP="$ROOT/run/java-build.stamp"
 LOCAL_ENV="$ROOT/.env.local"
 DEFAULT_PROJECT_FOLDER="$ROOT/run/data/aishop/upload"
@@ -27,6 +33,7 @@ die() { echo -e "${RED}[✗]${NC} $*" >&2; exit 1; }
 BUILD=false
 MIDDLEWARE_ONLY=false
 CATALOG_CHANGED=false
+VECTOR_INDEX_REBUILD_REQUIRED=false
 STARTED_SERVICES=()
 for arg in "$@"; do
   case "$arg" in
@@ -230,9 +237,9 @@ wait_container_healthy() {
   die "$label 没有在 ${timeout}s 内就绪"
 }
 
-ensure_host_ports() {
-  local service=$1 label=$2 container=$3 port
-  shift 3
+ensure_compose_host_ports() {
+  local compose_file=$1 service=$2 label=$3 container=$4 port
+  shift 4
   local missing=false
   local -a ports=("$@")
 
@@ -256,12 +263,16 @@ ensure_host_ports() {
   done
 
   if $missing; then
-    docker compose -f "$COMPOSE_FILE" up -d --force-recreate "$service"
+    docker compose -f "$compose_file" up -d --force-recreate "$service"
     wait_container_healthy "$container" "$label" 180
     for port in "${ports[@]}"; do
       wait_port "$port" "$label" 60
     done
   fi
+}
+
+ensure_host_ports() {
+  ensure_compose_host_ports "$COMPOSE_FILE" "$@"
 }
 
 wait_managed_service() {
@@ -339,16 +350,33 @@ wait_managed_service() {
   die "$label 进程没有在 ${timeout}s 内监听端口 $port"
 }
 
-project_container_uses_port() {
-  local port=$1 container mappings
-  for container in aishop-mysql aishop-redis aishop-rabbitmq aishop-nacos aishop-es aishop-sentinel aishop-seata; do
-    [[ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true)" == "true" ]] || continue
-    mappings=$(docker port "$container" 2>/dev/null || true)
-    if grep -Eq ":${port}([[:space:]]|$)" <<<"$mappings"; then
-      return 0
-    fi
+declare -A PROJECT_CONTAINER_PORTS=()
+PROJECT_CONTAINER_PORTS_LOADED=false
+
+load_project_container_ports() {
+  local container mapping endpoint host_port running_names
+  local -a containers=(
+    aishop-mysql aishop-redis aishop-rabbitmq aishop-nacos aishop-es aishop-sentinel aishop-seata
+    aishop-tempo aishop-otel-collector aishop-loki aishop-alloy aishop-prometheus aishop-grafana
+  )
+  running_names=$(docker ps --format '{{.Names}}')
+  for container in "${containers[@]}"; do
+    grep -Fxq "$container" <<<"$running_names" || continue
+    while IFS= read -r mapping; do
+      [[ "$mapping" == *" -> "* ]] || continue
+      endpoint=${mapping##* -> }
+      host_port=${endpoint##*:}
+      [[ "$host_port" =~ ^[0-9]+$ ]] || continue
+      PROJECT_CONTAINER_PORTS["$host_port"]=1
+    done < <(docker port "$container" 2>/dev/null || true)
   done
-  return 1
+  PROJECT_CONTAINER_PORTS_LOADED=true
+}
+
+project_container_uses_port() {
+  local port=$1
+  $PROJECT_CONTAINER_PORTS_LOADED || load_project_container_ports
+  [[ -n "${PROJECT_CONTAINER_PORTS[$port]+x}" ]]
 }
 
 managed_service_uses_port() {
@@ -485,24 +513,39 @@ assign_nacos_ports() {
 
 PORT_VARIABLES=(
   MYSQL_PORT REDIS_PORT RABBIT_PORT RABBIT_MANAGEMENT_PORT
-  NACOS_PORT NACOS_GRPC_PORT ES_PORT SENTINEL_PORT SEATA_PORT SEATA_CONSOLE_PORT
+  NACOS_PORT NACOS_GRPC_PORT ES_PORT SENTINEL_PORT SEATA_PORT
+  PROMETHEUS_PORT GRAFANA_PORT TEMPO_PORT LOKI_PORT ALLOY_PORT OTEL_GRPC_PORT OTEL_HTTP_PORT
   GATEWAY_PORT USER_PORT PRODUCT_PORT STOCK_PORT CART_PORT ORDER_PORT PAY_PORT COUPON_PORT SEARCH_PORT ADMIN_PORT
   AGENT_PORT AGENT_WORKER_METRICS_PORT MCP_PORT WEB_PORT ADMIN_WEB_PORT
 )
 RUNTIME_CREDENTIAL_VARIABLES=(
   AISHOP_INTERNAL_TOKEN
+  AISHOP_INTERNAL_OPS_TOKEN
+  ADMIN_ACCOUNT ADMIN_PASSWORD
   MYSQL_ROOT_PASSWORD MYSQL_USER MYSQL_PASSWORD
+  FLYWAY_USER FLYWAY_PASSWORD
+  NACOS_MYSQL_USER NACOS_MYSQL_PASSWORD
+  SEATA_MYSQL_USER SEATA_MYSQL_PASSWORD
   ANALYTICS_MYSQL_USER ANALYTICS_MYSQL_PASSWORD
+  NACOS_USERNAME NACOS_PASSWORD
+  NACOS_AUTH_TOKEN NACOS_AUTH_IDENTITY_KEY NACOS_AUTH_IDENTITY_VALUE
+  REDIS_USERNAME REDIS_PASSWORD
   RABBIT_USER RABBIT_PASSWORD RABBIT_VHOST
-  SEATA_CONSOLE_USERNAME SEATA_CONSOLE_PASSWORD SEATA_SECURITY_SECRET_KEY
+  SEATA_SECURITY_SECRET_KEY
 )
 RUNTIME_SETTING_VARIABLES=(
   ES_INDEX_REPLICAS
+  NACOS_NAMESPACE
+  SEATA_IP
+  AISHOP_SPRING_DEBUG
+  OBSERVABILITY_ENABLED
+  OTEL_ENABLED OTEL_OTLP_ENDPOINT TEMPO_QUERY_URL
   MULTI_AGENT_ENABLED DATA_ANALYST_ENABLED
   SHOPPING_DECISION_V2_ENABLED OUTCOME_LEDGER_ENABLED
   AFTER_SALES_POLICY_ENGINE_ENABLED INVENTORY_OPS_ENABLED
   VISUAL_SEARCH_ENABLED VISUAL_INDEX_CONSUMER_ENABLED VISUAL_INDEX_BACKFILL_ON_START
   ANALYTICS_MYSQL_HOST ANALYTICS_MYSQL_PORT ANALYTICS_MYSQL_DATABASE
+  REDIS_DB REDIS_SSL_ENABLED
 )
 RUNTIME_VARIABLES=(
   "${PORT_VARIABLES[@]}"
@@ -549,7 +592,14 @@ prepare_ports() {
   assign_port ES_PORT 9200 "Elasticsearch"
   assign_port SENTINEL_PORT 8858 "Sentinel"
   assign_port SEATA_PORT 8092 "Seata TC"
-  assign_port SEATA_CONSOLE_PORT 7092 "Seata 控制台"
+
+  assign_port PROMETHEUS_PORT 9090 "Prometheus"
+  assign_port GRAFANA_PORT 3000 "Grafana"
+  assign_port TEMPO_PORT 3200 "Tempo"
+  assign_port LOKI_PORT 3100 "Loki"
+  assign_port ALLOY_PORT 12345 "Alloy"
+  assign_port OTEL_GRPC_PORT 4317 "OTLP gRPC"
+  assign_port OTEL_HTTP_PORT 4318 "OTLP HTTP"
 
   assign_port GATEWAY_PORT 8080 "Gateway"
   assign_port USER_PORT 8105 "User 服务"
@@ -576,6 +626,10 @@ random_token() {
   fi
 }
 
+random_base64_token() {
+  random_token | base64 -w0
+}
+
 normalize_boolean_setting() {
   local variable=$1 default_value=$2 value=${!1:-$2}
   case "${value,,}" in
@@ -587,29 +641,74 @@ normalize_boolean_setting() {
   export "$variable"
 }
 
-detect_host_ip() {
+host_has_ipv4() {
+  local candidate=$1
+  command -v ip >/dev/null 2>&1 || return 1
+  ip -4 -o addr show | awk -v candidate="$candidate" '
+    {
+      split($4, parts, "/")
+      if (parts[1] == candidate) {
+        found = 1
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  '
+}
+
+seata_ip_is_local_alias() {
+  local candidate=$1
+  command -v ip >/dev/null 2>&1 || return 1
+  ip -4 -o addr show dev lo | awk -v candidate="$candidate" '
+    {
+      split($4, parts, "/")
+      if (parts[1] == candidate) {
+        found = 1
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  '
+}
+
+detect_seata_ip() {
   local detected=""
   if command -v ip >/dev/null 2>&1; then
-    detected=$(ip -4 route get 1.1.1.1 2>/dev/null \
-      | awk '{for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')
+    # WSL commonly provides a non-127 loopback alias. Prefer it so the TC is
+    # reachable from host processes without exposing the port on the LAN NIC.
+    detected=$(ip -4 -o addr show dev lo scope global 2>/dev/null \
+      | awk '{
+          split($4, parts, "/")
+          if (parts[1] !~ /^127\./) {
+            print parts[1]
+            exit
+          }
+        }')
+    if [[ -z "$detected" ]]; then
+      detected=$(ip -4 route get 1.1.1.1 2>/dev/null \
+        | awk '{for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')
+    fi
   fi
   if [[ -z "$detected" ]]; then
-    detected=$(hostname -I 2>/dev/null | awk '{print $1}')
+    detected=$(hostname -I 2>/dev/null \
+      | awk '{for (i = 1; i <= NF; i++) if ($i !~ /^127\./) {print $i; exit}}')
   fi
-  [[ "$detected" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-    || die "无法确定供 Seata 注册到 Nacos 的 WSL 宿主地址；请显式设置 SEATA_IP"
+  [[ "$detected" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
+     && "$detected" != "0.0.0.0" \
+     && "$detected" != 127.* ]] \
+    || die "无法确定 Seata 可注册地址；请显式设置本机非 127/8 的 SEATA_IP"
   printf '%s\n' "$detected"
 }
 
 write_runtime_env() {
   local temp="$RUNTIME_ENV.tmp.$$" variable
-  umask 077
-  : >"$temp"
-  for variable in "${RUNTIME_VARIABLES[@]}"; do
-    printf '%s=%q\n' "$variable" "${!variable}" >>"$temp"
-  done
-  mv -f "$temp" "$RUNTIME_ENV"
-  chmod 600 "$RUNTIME_ENV"
+  (
+    umask 077
+    : >"$temp"
+    for variable in "${RUNTIME_VARIABLES[@]}"; do
+      printf '%s=%q\n' "$variable" "${!variable}" >>"$temp"
+    done
+    mv -f "$temp" "$RUNTIME_ENV"
+    chmod 600 "$RUNTIME_ENV"
+  )
 }
 
 prepare_environment() {
@@ -621,15 +720,116 @@ prepare_environment() {
   # Java Search and the Python Agent share AI provider settings. The Agent
   # reads dotenv itself, while Spring Boot only sees the process environment.
   load_agent_ai_env "$BACKEND/AI_Shop-agent/.env"
+  if [[ -z "${SPRING_AI_MODEL_EMBEDDING:-}" ]]; then
+    if [[ -n "${EMBEDDING_API_KEY:-}" ]]; then
+      SPRING_AI_MODEL_EMBEDDING=openai
+    else
+      SPRING_AI_MODEL_EMBEDDING=local
+    fi
+  fi
+  case "$SPRING_AI_MODEL_EMBEDDING" in
+    local|openai) ;;
+    *) die "SPRING_AI_MODEL_EMBEDDING 必须是 local/openai，当前值: $SPRING_AI_MODEL_EMBEDDING" ;;
+  esac
+  export SPRING_AI_MODEL_EMBEDDING
+  export EMBEDDING_MODEL="${EMBEDDING_MODEL:-text-embedding-v4}"
+  export EMBEDDING_DIMENSIONS="${EMBEDDING_DIMENSIONS:-1024}"
+  [[ "$EMBEDDING_DIMENSIONS" =~ ^[0-9]+$ ]] \
+    || die "EMBEDDING_DIMENSIONS 必须是 64..4096 的整数，当前值: $EMBEDDING_DIMENSIONS"
+  EMBEDDING_DIMENSIONS=$((10#$EMBEDDING_DIMENSIONS))
+  ((EMBEDDING_DIMENSIONS >= 64 && EMBEDDING_DIMENSIONS <= 4096)) \
+    || die "EMBEDDING_DIMENSIONS 必须是 64..4096 的整数，当前值: $EMBEDDING_DIMENSIONS"
+  export EMBEDDING_DIMENSIONS
+  export VECTOR_INDEX_SCHEMA_VERSION="${VECTOR_INDEX_SCHEMA_VERSION:-1}"
+  [[ "$VECTOR_INDEX_SCHEMA_VERSION" =~ ^[1-9][0-9]*$ ]] \
+    || die "VECTOR_INDEX_SCHEMA_VERSION 必须是正整数，当前值: $VECTOR_INDEX_SCHEMA_VERSION"
+  export VECTOR_INDEX="${VECTOR_INDEX:-aishop_vectorstore}"
+  export VECTOR_FIELD="${VECTOR_FIELD:-embedding}"
+  [[ "$VECTOR_FIELD" =~ ^[A-Za-z0-9_.-]+$ ]] \
+    || die "VECTOR_FIELD 只能包含字母、数字、点、下划线和连字符"
+  if [[ -z "${SPRING_AI_MODEL_CHAT:-}" ]]; then
+    if [[ -n "${LLM_API_KEY:-}" ]]; then
+      SPRING_AI_MODEL_CHAT=openai
+    else
+      SPRING_AI_MODEL_CHAT=none
+    fi
+  fi
+  case "$SPRING_AI_MODEL_CHAT" in
+    none|openai) ;;
+    *) die "SPRING_AI_MODEL_CHAT 必须是 none/openai，当前值: $SPRING_AI_MODEL_CHAT" ;;
+  esac
+  export SPRING_AI_MODEL_CHAT
+  if [[ -z "${RAG_CONTEXT_ENRICHMENT_ENABLED:-}" ]]; then
+    [[ "$SPRING_AI_MODEL_CHAT" == "openai" ]] \
+      && RAG_CONTEXT_ENRICHMENT_ENABLED=true \
+      || RAG_CONTEXT_ENRICHMENT_ENABLED=false
+  fi
+  case "${RAG_CONTEXT_ENRICHMENT_ENABLED,,}" in
+    1|true|yes|on) RAG_CONTEXT_ENRICHMENT_ENABLED=true ;;
+    0|false|no|off) RAG_CONTEXT_ENRICHMENT_ENABLED=false ;;
+    *) die "RAG_CONTEXT_ENRICHMENT_ENABLED 必须是 true/false，当前值: $RAG_CONTEXT_ENRICHMENT_ENABLED" ;;
+  esac
+  export RAG_CONTEXT_ENRICHMENT_ENABLED
 
   export MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
-  # The bundled local stack uses MySQL root for both schema initialization and
-  # Java services. On a fresh setup, accepting MYSQL_PASSWORD as the fallback
-  # keeps the container and clients aligned for callers that only set the
-  # application-facing variable. MYSQL_ROOT_PASSWORD remains authoritative.
-  export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}"
-  export MYSQL_USER="${MYSQL_USER:-root}"
-  export MYSQL_PASSWORD="${MYSQL_PASSWORD:-$MYSQL_ROOT_PASSWORD}"
+  # Root is reserved for local schema/bootstrap administration. Business
+  # services use a separately provisioned account persisted in runtime.env.
+  export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
+  local migrated_legacy_mysql_identity=false
+  if [[ -z "${CALLER_VALUES[MYSQL_USER]+x}" && "${MYSQL_USER:-}" == "root" ]]; then
+    MYSQL_USER=aishop
+    migrated_legacy_mysql_identity=true
+    warn "检测到旧版业务 root 账号，迁移为本地最小权限账号 aishop"
+  fi
+  export MYSQL_USER="${MYSQL_USER:-aishop}"
+  [[ "$MYSQL_USER" =~ ^[A-Za-z0-9_]+$ ]] \
+    || die "MYSQL_USER 只能包含字母、数字和下划线"
+  [[ "${MYSQL_USER,,}" != "root" ]] \
+    || die "业务服务禁止使用 MySQL root；root 仅用于本地初始化"
+  if $migrated_legacy_mysql_identity \
+     && [[ -z "${CALLER_VALUES[MYSQL_PASSWORD]+x}" ]]; then
+    MYSQL_PASSWORD=""
+  fi
+  if [[ -z "${MYSQL_PASSWORD:-}" || "$MYSQL_PASSWORD" == "$MYSQL_ROOT_PASSWORD" ]]; then
+    MYSQL_PASSWORD=$(random_token)
+  fi
+  export MYSQL_PASSWORD
+  export FLYWAY_USER="${FLYWAY_USER:-aishop_flyway}"
+  [[ "$FLYWAY_USER" =~ ^[A-Za-z0-9_]+$ ]] \
+    || die "FLYWAY_USER 只能包含字母、数字和下划线"
+  [[ "${FLYWAY_USER,,}" != "root" && "$FLYWAY_USER" != "$MYSQL_USER" ]] \
+    || die "Flyway 必须使用独立于 root 和业务运行账号的 MySQL 身份"
+  if [[ -z "${FLYWAY_PASSWORD:-}" \
+        || "$FLYWAY_PASSWORD" == "$MYSQL_ROOT_PASSWORD" \
+        || "$FLYWAY_PASSWORD" == "$MYSQL_PASSWORD" ]]; then
+    FLYWAY_PASSWORD=$(random_token)
+  fi
+  export FLYWAY_PASSWORD
+  export NACOS_MYSQL_USER="${NACOS_MYSQL_USER:-nacos_app}"
+  [[ "$NACOS_MYSQL_USER" =~ ^[A-Za-z0-9_]+$ && "${NACOS_MYSQL_USER,,}" != "root" ]] \
+    || die "NACOS_MYSQL_USER 必须是非 root 的字母、数字或下划线账号"
+  if [[ -z "${NACOS_MYSQL_PASSWORD:-}" || "$NACOS_MYSQL_PASSWORD" == "$MYSQL_ROOT_PASSWORD" ]]; then
+    NACOS_MYSQL_PASSWORD=$(random_token)
+  fi
+  export NACOS_MYSQL_PASSWORD
+  export SEATA_MYSQL_USER="${SEATA_MYSQL_USER:-seata_app}"
+  [[ "$SEATA_MYSQL_USER" =~ ^[A-Za-z0-9_]+$ && "${SEATA_MYSQL_USER,,}" != "root" ]] \
+    || die "SEATA_MYSQL_USER 必须是非 root 的字母、数字或下划线账号"
+  [[ "$SEATA_MYSQL_USER" != "$NACOS_MYSQL_USER" ]] \
+    || die "Nacos 与 Seata 必须使用不同的 MySQL 账号"
+  if [[ -z "${SEATA_MYSQL_PASSWORD:-}" || "$SEATA_MYSQL_PASSWORD" == "$MYSQL_ROOT_PASSWORD" ]]; then
+    SEATA_MYSQL_PASSWORD=$(random_token)
+  fi
+  export SEATA_MYSQL_PASSWORD
+  export ADMIN_ACCOUNT="${ADMIN_ACCOUNT:-admin}"
+  if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASSWORD=$(random_token)
+  fi
+  export ADMIN_PASSWORD
+  # Spring Boot treats any inherited DEBUG value as its global debug switch.
+  # Developer shells commonly use DEBUG for unrelated tools, so isolate the
+  # Java services behind a project-specific boolean and pass it explicitly.
+  normalize_boolean_setting AISHOP_SPRING_DEBUG false
   normalize_boolean_setting MULTI_AGENT_ENABLED true
   normalize_boolean_setting DATA_ANALYST_ENABLED true
   normalize_boolean_setting SHOPPING_DECISION_V2_ENABLED true
@@ -639,6 +839,8 @@ prepare_environment() {
   normalize_boolean_setting VISUAL_SEARCH_ENABLED true
   normalize_boolean_setting VISUAL_INDEX_CONSUMER_ENABLED true
   normalize_boolean_setting VISUAL_INDEX_BACKFILL_ON_START true
+  normalize_boolean_setting OBSERVABILITY_ENABLED true
+  normalize_boolean_setting REDIS_SSL_ENABLED false
   if [[ -z "${CALLER_VALUES[ANALYTICS_MYSQL_HOST]+x}" ]]; then
     ANALYTICS_MYSQL_HOST="$MYSQL_HOST"
   fi
@@ -653,17 +855,63 @@ prepare_environment() {
   fi
   export ANALYTICS_MYSQL_PASSWORD="${ANALYTICS_MYSQL_PASSWORD:-}"
   export REDIS_HOST="127.0.0.1"
+  export REDIS_USERNAME="${REDIS_USERNAME:-default}"
+  [[ "$REDIS_USERNAME" == "default" ]] \
+    || die "start.sh 管理的本地 Redis 仅启用 default ACL 用户；自定义用户请使用外部 Redis 部署"
+  if [[ -z "${REDIS_PASSWORD:-}" ]]; then
+    REDIS_PASSWORD=$(random_token)
+  fi
+  export REDIS_PASSWORD
+  REDIS_DB="${REDIS_DB:-0}"
+  [[ "$REDIS_DB" =~ ^[0-9]+$ ]] \
+    || die "REDIS_DB 必须是非负整数，当前值: $REDIS_DB"
+  export REDIS_DB
+  [[ "$REDIS_SSL_ENABLED" == "false" ]] \
+    || die "start.sh 管理的本地 Redis 未配置 TLS；托管 Redis 请使用独立生产部署"
   export RABBIT_HOST="127.0.0.1"
   export RABBIT_USER="${RABBIT_USER:-aishop}"
   export RABBIT_PASSWORD="${RABBIT_PASSWORD:-aishop}"
   export RABBIT_VHOST="${RABBIT_VHOST:-/}"
-  export SEATA_CONSOLE_USERNAME="${SEATA_CONSOLE_USERNAME:-seata}"
-  export SEATA_CONSOLE_PASSWORD="${SEATA_CONSOLE_PASSWORD:-seata}"
   export SEATA_SECURITY_SECRET_KEY="${SEATA_SECURITY_SECRET_KEY:-SeataSecretKey0c382ef121d778043159209298fd40bf3850a017}"
+  export NACOS_USERNAME="${NACOS_USERNAME:-nacos}"
+  [[ "$NACOS_USERNAME" == "nacos" ]] \
+    || die "start.sh 管理的本地 Nacos 仅引导 nacos 管理员；自定义用户请使用外部 Nacos 部署"
+  if [[ -z "${NACOS_PASSWORD:-}" || "$NACOS_PASSWORD" == "nacos" ]]; then
+    NACOS_PASSWORD=$(random_token)
+  fi
+  export NACOS_PASSWORD
+  # The bundled Nacos 2.5.x server is a bridge between the application's
+  # Nacos 3.x clients and Seata 2.5's embedded Nacos 1.4 client.  Keep the
+  # legacy default namespace explicit; a Nacos 3 client otherwise uses
+  # "public", which older servers do not interpret as the empty namespace.
+  export NACOS_NAMESPACE="${NACOS_NAMESPACE:-}"
+  if [[ -z "${NACOS_AUTH_TOKEN:-}" ]]; then
+    NACOS_AUTH_TOKEN=$(random_base64_token)
+  fi
+  export NACOS_AUTH_TOKEN
+  export NACOS_AUTH_IDENTITY_KEY="${NACOS_AUTH_IDENTITY_KEY:-aishop-server}"
+  if [[ -z "${NACOS_AUTH_IDENTITY_VALUE:-}" ]]; then
+    NACOS_AUTH_IDENTITY_VALUE=$(random_token)
+  fi
+  export NACOS_AUTH_IDENTITY_VALUE
   export NACOS_ADDR="127.0.0.1:$NACOS_PORT"
   export SENTINEL_DASHBOARD="127.0.0.1:$SENTINEL_PORT"
   export SEATA_SERVER_ADDR="127.0.0.1:$SEATA_PORT"
-  export SEATA_IP="${SEATA_IP:-$(detect_host_ip)}"
+  if [[ -z "${CALLER_VALUES[SEATA_IP]+x}" ]] \
+     && { [[ -z "${SEATA_IP:-}" ]] || ! host_has_ipv4 "$SEATA_IP"; }; then
+    SEATA_IP=$(detect_seata_ip)
+  fi
+  [[ "$SEATA_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
+     && "$SEATA_IP" != "0.0.0.0" \
+     && "$SEATA_IP" != 127.* ]] \
+    || die "SEATA_IP 必须是本机非 127/8 的 IPv4 地址，当前值: $SEATA_IP"
+  if command -v ip >/dev/null 2>&1 && ! host_has_ipv4 "$SEATA_IP"; then
+    die "SEATA_IP 不是本机地址，Docker 无法安全发布 TC 端口: $SEATA_IP"
+  fi
+  if ! seata_ip_is_local_alias "$SEATA_IP"; then
+    warn "Seata 2.5 不接受 127.0.0.1 注册；TC 将绑定 $SEATA_IP:$SEATA_PORT，请仅允许可信网络访问"
+  fi
+  export SEATA_IP
   export ES_URIS="http://127.0.0.1:$ES_PORT"
   export ES_HOSTS="$ES_URIS"
   export SPRING_ELASTICSEARCH_URIS="$ES_URIS"
@@ -701,6 +949,19 @@ prepare_environment() {
   export MCP_SERVER_URL="http://127.0.0.1:$MCP_PORT"
   export APP_ENV="${APP_ENV:-development}"
   export AISHOP_PRODUCTION_READY="${AISHOP_PRODUCTION_READY:-false}"
+  normalize_boolean_setting OTEL_ENABLED false
+  if [[ "$OTEL_ENABLED" == "true" ]]; then
+    if [[ -z "${CALLER_VALUES[OTEL_OTLP_ENDPOINT]+x}" ]]; then
+      OTEL_OTLP_ENDPOINT="http://127.0.0.1:$OTEL_GRPC_PORT"
+    fi
+    export OTEL_OTLP_ENDPOINT
+  else
+    export OTEL_OTLP_ENDPOINT=""
+  fi
+  if [[ -z "${CALLER_VALUES[TEMPO_QUERY_URL]+x}" ]]; then
+    TEMPO_QUERY_URL="http://127.0.0.1:$GRAFANA_PORT/explore"
+  fi
+  export TEMPO_QUERY_URL
   # Ten Spring Boot processes share the WSL VM with existing user workloads.
   # Keep the local default conservative; callers may override JAVA_OPTS when RAM is available.
   export JAVA_OPTS="${JAVA_OPTS:--Xms64m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:MaxDirectMemorySize=96m -Xss512k -XX:TieredStopAtLevel=1}"
@@ -715,6 +976,10 @@ prepare_environment() {
     AISHOP_INTERNAL_TOKEN=$(random_token)
   fi
   export AISHOP_INTERNAL_TOKEN
+  if [[ -z "${AISHOP_INTERNAL_OPS_TOKEN:-}" ]]; then
+    AISHOP_INTERNAL_OPS_TOKEN=$(random_token)
+  fi
+  export AISHOP_INTERNAL_OPS_TOKEN
   write_runtime_env
 }
 
@@ -736,6 +1001,12 @@ resolve_python() {
     || die "未找到 Conda shop 环境；请先创建该环境，或用 AISHOP_PYTHON 显式指定解释器"
   export AISHOP_PYTHON="$PYTHON"
   info "Agent Python: $PYTHON"
+}
+
+render_prometheus_targets() {
+  "$PYTHON" "$ROOT/scripts/render_prometheus_targets.py" \
+    --runtime-env "$RUNTIME_ENV" \
+    --output-dir "$ROOT/run/observability"
 }
 
 validate_agent_config() {
@@ -874,29 +1145,188 @@ configure_elasticsearch_indexes() {
   info "Elasticsearch 项目索引副本数已设为 $ES_INDEX_REPLICAS"
 }
 
+apply_rabbitmq_policies() {
+  info "应用 RabbitMQ quorum 死信可靠性策略..."
+  docker compose -f "$COMPOSE_FILE" run --rm --no-deps rabbitmq-init
+  info "RabbitMQ 策略已应用"
+}
+
+initialize_nacos_admin() {
+  local login_url admin_url response_file status
+  login_url="http://127.0.0.1:$NACOS_PORT/nacos/v1/auth/users/login"
+  admin_url="http://127.0.0.1:$NACOS_PORT/nacos/v1/auth/users/admin"
+  response_file=$(mktemp)
+
+  nacos_login_succeeds() {
+    local login_status
+    login_status=$(curl --noproxy '*' -sS --max-time 15 \
+      -o "$response_file" -w '%{http_code}' \
+      -X POST \
+      --data-urlencode "username=$NACOS_USERNAME" \
+      --data-urlencode "password=$NACOS_PASSWORD" \
+      "$login_url") || return 1
+    [[ "$login_status" == "200" ]] \
+      && grep -Eq '"accessToken"[[:space:]]*:' "$response_file"
+  }
+
+  if nacos_login_succeeds; then
+    rm -f "$response_file"
+    info "Nacos 管理员凭证已验证"
+    return 0
+  fi
+
+  status=$(curl --noproxy '*' -sS --max-time 15 \
+    -o "$response_file" -w '%{http_code}' \
+    -X POST \
+    --data-urlencode "password=$NACOS_PASSWORD" \
+    "$admin_url") || {
+      rm -f "$response_file"
+      die "Nacos 管理员初始化请求失败"
+    }
+  if [[ "$status" != "200" ]] || ! nacos_login_succeeds; then
+    warn "Nacos 管理员初始化响应（HTTP $status）：$(tr '\n' ' ' <"$response_file" | head -c 500)"
+    rm -f "$response_file"
+    die "Nacos 管理员凭证不可用；若复用了外部数据库，请提供与其一致的 NACOS_PASSWORD"
+  fi
+  rm -f "$response_file"
+  info "Nacos 管理员已使用随机本地密码初始化"
+}
+
+migrate_notify_queue_contract() {
+  local vhost_encoded queue_encoded response_file status metrics ttl messages consumers
+  vhost_encoded=$("$PYTHON" -c \
+    'from urllib.parse import quote; import sys; print(quote(sys.argv[1], safe=""))' \
+    "$RABBIT_VHOST")
+  queue_encoded=$("$PYTHON" -c \
+    'from urllib.parse import quote; import sys; print(quote(sys.argv[1], safe=""))' \
+    "notify.queue")
+  response_file=$(mktemp)
+  status=$(curl --noproxy '*' -sS --max-time 15 \
+    -u "$RABBIT_USER:$RABBIT_PASSWORD" \
+    -o "$response_file" -w '%{http_code}' \
+    "http://127.0.0.1:$RABBIT_MANAGEMENT_PORT/api/queues/$vhost_encoded/$queue_encoded") \
+    || {
+      rm -f "$response_file"
+      die "读取 RabbitMQ notify.queue 契约失败"
+    }
+  if [[ "$status" == "404" ]]; then
+    rm -f "$response_file"
+    return 0
+  fi
+  if [[ "$status" != "200" ]]; then
+    rm -f "$response_file"
+    die "读取 RabbitMQ notify.queue 契约失败，HTTP $status"
+  fi
+
+  metrics=$("$PYTHON" - "$response_file" <<'PY'
+import json
+import sys
+
+queue = json.load(open(sys.argv[1], encoding="utf-8"))
+ttl = (queue.get("arguments") or {}).get("x-message-ttl")
+print(
+    "absent" if ttl is None else ttl,
+    int(queue.get("messages") or 0),
+    int(queue.get("consumers") or 0),
+)
+PY
+)
+  rm -f "$response_file"
+  read -r ttl messages consumers <<<"$metrics"
+  [[ "$ttl" != "absent" ]] || return 0
+  if ((messages > 0 || consumers > 0)); then
+    die "notify.queue 仍带旧 TTL 且 messages=$messages consumers=$consumers；请先停服并清空或转储消息后重试"
+  fi
+
+  curl --noproxy '*' -fsS --max-time 15 \
+    -u "$RABBIT_USER:$RABBIT_PASSWORD" \
+    -X DELETE \
+    "http://127.0.0.1:$RABBIT_MANAGEMENT_PORT/api/queues/$vhost_encoded/$queue_encoded" \
+    >/dev/null \
+    || die "删除旧版 notify.queue 失败"
+  info "已删除空的旧版 notify.queue（TTL=$ttl），服务启动后将按无过期契约重建"
+}
+
 start_middleware() {
   info "启动 MySQL 并初始化元数据库..."
   docker compose -f "$COMPOSE_FILE" up -d mysql
   ensure_host_ports mysql "MySQL" aishop-mysql "$MYSQL_PORT"
   wait_container_healthy aishop-mysql "MySQL" 180
   "$DEPLOY/init-mysql-meta.sh"
+  provision_infrastructure_mysql_users
+  provision_flyway_mysql_user
+  provision_application_mysql_user
 
-  info "启动其余 Docker 中间件..."
-  docker compose -f "$COMPOSE_FILE" up -d redis rabbitmq nacos elasticsearch sentinel seata-server
+  info "启动 Redis、RabbitMQ、Nacos、Elasticsearch 与 Sentinel..."
+  docker compose -f "$COMPOSE_FILE" up -d redis rabbitmq nacos elasticsearch sentinel
   ensure_host_ports redis "Redis" aishop-redis "$REDIS_PORT"
   ensure_host_ports rabbitmq "RabbitMQ" aishop-rabbitmq "$RABBIT_PORT" "$RABBIT_MANAGEMENT_PORT"
   ensure_host_ports nacos "Nacos" aishop-nacos "$NACOS_PORT" "$NACOS_GRPC_PORT"
   ensure_host_ports elasticsearch "Elasticsearch" aishop-es "$ES_PORT"
   ensure_host_ports sentinel "Sentinel" aishop-sentinel "$SENTINEL_PORT"
-  ensure_host_ports seata-server "Seata TC" aishop-seata "$SEATA_PORT" "$SEATA_CONSOLE_PORT"
   wait_container_healthy aishop-redis "Redis" 120
   wait_container_healthy aishop-rabbitmq "RabbitMQ" 180
+  apply_rabbitmq_policies
+  if ! $MIDDLEWARE_ONLY; then
+    migrate_notify_queue_contract
+  fi
   wait_container_healthy aishop-nacos "Nacos" 240
+  wait_http "http://127.0.0.1:$NACOS_PORT/nacos/" "Nacos API" 60
+  initialize_nacos_admin
   wait_container_healthy aishop-es "Elasticsearch" 300
   configure_elasticsearch_indexes
   wait_port "$SENTINEL_PORT" "Sentinel" 120
+
+  info "启动 Seata..."
+  docker compose -f "$COMPOSE_FILE" up -d seata-server
+  ensure_host_ports seata-server "Seata TC" aishop-seata "$SEATA_PORT"
   wait_port "$SEATA_PORT" "Seata TC" 180
-  wait_http "http://127.0.0.1:$NACOS_PORT/nacos/" "Nacos HTTP" 60
+}
+
+prepare_grafana_credentials() {
+  local caller_user="${GRAFANA_ADMIN_USER:-}" caller_password="${GRAFANA_ADMIN_PASSWORD:-}"
+  mkdir -p "$(dirname "$GRAFANA_ENV")"
+  chmod 700 "$(dirname "$GRAFANA_ENV")"
+  if [[ -r "$GRAFANA_ENV" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$GRAFANA_ENV"
+    set +a
+  fi
+  [[ -z "$caller_user" ]] || GRAFANA_ADMIN_USER="$caller_user"
+  [[ -z "$caller_password" ]] || GRAFANA_ADMIN_PASSWORD="$caller_password"
+  export GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
+  if [[ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]]; then
+    GRAFANA_ADMIN_PASSWORD=$(random_token)
+  fi
+  export GRAFANA_ADMIN_PASSWORD
+  (
+    umask 077
+    printf 'GRAFANA_ADMIN_USER=%q\n' "$GRAFANA_ADMIN_USER"
+    printf 'GRAFANA_ADMIN_PASSWORD=%q\n' "$GRAFANA_ADMIN_PASSWORD"
+  ) >"$GRAFANA_ENV"
+  chmod 600 "$GRAFANA_ENV"
+}
+
+start_observability() {
+  prepare_grafana_credentials
+  info "启动 Prometheus、Grafana、Tempo、Loki、Alloy 与 OTel Collector..."
+  docker compose --env-file "$GRAFANA_ENV" -f "$OBSERVABILITY_COMPOSE_FILE" up -d
+
+  ensure_compose_host_ports "$OBSERVABILITY_COMPOSE_FILE" tempo "Tempo" aishop-tempo "$TEMPO_PORT"
+  ensure_compose_host_ports "$OBSERVABILITY_COMPOSE_FILE" otel-collector "OTel Collector" \
+    aishop-otel-collector "$OTEL_GRPC_PORT" "$OTEL_HTTP_PORT"
+  ensure_compose_host_ports "$OBSERVABILITY_COMPOSE_FILE" loki "Loki" aishop-loki "$LOKI_PORT"
+  ensure_compose_host_ports "$OBSERVABILITY_COMPOSE_FILE" alloy "Alloy" aishop-alloy "$ALLOY_PORT"
+  ensure_compose_host_ports "$OBSERVABILITY_COMPOSE_FILE" prometheus "Prometheus" \
+    aishop-prometheus "$PROMETHEUS_PORT"
+  ensure_compose_host_ports "$OBSERVABILITY_COMPOSE_FILE" grafana "Grafana" aishop-grafana "$GRAFANA_PORT"
+
+  wait_http "http://127.0.0.1:$TEMPO_PORT/ready" "Tempo 健康检查" 120
+  wait_http "http://127.0.0.1:$LOKI_PORT/ready" "Loki 健康检查" 120
+  wait_http "http://127.0.0.1:$ALLOY_PORT/-/ready" "Alloy 健康检查" 120
+  wait_http "http://127.0.0.1:$PROMETHEUS_PORT/-/ready" "Prometheus 健康检查" 120
+  wait_http "http://127.0.0.1:$GRAFANA_PORT/api/health" "Grafana 健康检查" 120
 }
 
 ensure_port_free() {
@@ -942,10 +1372,12 @@ start_java() {
       SPRING_CLOUD_NACOS_DISCOVERY_WATCH_ENABLED="${SPRING_CLOUD_NACOS_DISCOVERY_WATCH_ENABLED:-true}" \
       SPRING_CLOUD_NACOS_DISCOVERY_NAMING_LOAD_CACHE_AT_START="${SPRING_CLOUD_NACOS_DISCOVERY_NAMING_LOAD_CACHE_AT_START:-true}" \
       setsid nohup java "${java_opts[@]}" -jar "$jar" \
+      "--debug=$AISHOP_SPRING_DEBUG" \
       9>&- </dev/null >"$LOGS/$name.log" 2>&1 &
   else
     SERVER_PORT="$port" AISHOP_MANAGED_SERVICE="$name" \
       setsid nohup java "${java_opts[@]}" -jar "$jar" \
+      "--debug=$AISHOP_SPRING_DEBUG" \
       9>&- </dev/null >"$LOGS/$name.log" 2>&1 &
   fi
   local pid=$!
@@ -969,6 +1401,7 @@ start_mcp() {
   (
     cd "$BACKEND/AI_Shop-agent"
     export AISHOP_MANAGED_SERVICE=mcp
+    export OTEL_SERVICE_NAME="${OTEL_MCP_SERVICE_NAME:-aishop-mcp}"
     exec setsid nohup "$PYTHON" -m app.mcp_server
   ) 9>&- </dev/null >"$LOGS/mcp.log" 2>&1 &
   local pid=$!
@@ -992,6 +1425,7 @@ start_agent_api() {
   (
     cd "$BACKEND/AI_Shop-agent"
     export AISHOP_MANAGED_SERVICE=agent
+    export OTEL_SERVICE_NAME="${OTEL_AGENT_SERVICE_NAME:-aishop-agent}"
     exec setsid nohup "$PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port "$AGENT_PORT"
   ) 9>&- </dev/null >"$LOGS/agent.log" 2>&1 &
   local pid=$!
@@ -1016,6 +1450,7 @@ start_agent_worker() {
   (
     cd "$BACKEND/AI_Shop-agent"
     export AISHOP_MANAGED_SERVICE=agent-worker
+    export OTEL_SERVICE_NAME="${OTEL_WORKER_SERVICE_NAME:-aishop-agent-worker}"
     exec setsid nohup "$PYTHON" -m app.worker
   ) 9>&- </dev/null >"$LOGS/agent-worker.log" 2>&1 &
   local pid=$!
@@ -1028,7 +1463,8 @@ migrate_agent_schema() {
   info "在 Admin 创建治理视图前迁移 Agent 数据库..."
   (
     cd "$BACKEND/AI_Shop-agent"
-    "$PYTHON" scripts/migrate.py
+    MYSQL_USER="$FLYWAY_USER" MYSQL_PASSWORD="$FLYWAY_PASSWORD" \
+      "$PYTHON" scripts/migrate.py
   ) || die "Agent 数据库迁移失败"
   local schema_count
   schema_count=$(mysql_query aishop_agent -e \
@@ -1190,6 +1626,39 @@ refresh_dynamic_runtime_services() {
   write_runtime_env
 }
 
+provision_application_mysql_user() {
+  info "配置仅含 DML 权限的业务数据库账号..."
+  MYSQL_CONTAINER=aishop-mysql \
+    MYSQL_ADMIN_USER=root \
+    MYSQL_ADMIN_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+    MYSQL_USER="$MYSQL_USER" \
+    MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+    "$DEPLOY/provision-app-mysql-user.sh"
+}
+
+provision_flyway_mysql_user() {
+  info "配置独立 Flyway/Alembic 迁移账号..."
+  MYSQL_CONTAINER=aishop-mysql \
+    MYSQL_ADMIN_USER=root \
+    MYSQL_ADMIN_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+    MYSQL_USER="$MYSQL_USER" \
+    FLYWAY_USER="$FLYWAY_USER" \
+    FLYWAY_PASSWORD="$FLYWAY_PASSWORD" \
+    "$DEPLOY/provision-flyway-identity.sh"
+}
+
+provision_infrastructure_mysql_users() {
+  info "配置 Nacos 与 Seata 独立数据库账号..."
+  MYSQL_CONTAINER=aishop-mysql \
+    MYSQL_ADMIN_USER=root \
+    MYSQL_ADMIN_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+    NACOS_MYSQL_USER="$NACOS_MYSQL_USER" \
+    NACOS_MYSQL_PASSWORD="$NACOS_MYSQL_PASSWORD" \
+    SEATA_MYSQL_USER="$SEATA_MYSQL_USER" \
+    SEATA_MYSQL_PASSWORD="$SEATA_MYSQL_PASSWORD" \
+    "$DEPLOY/provision-infrastructure-mysql-users.sh"
+}
+
 provision_analytics_reader() {
   [[ "$DATA_ANALYST_ENABLED" == "true" ]] || return 0
   if [[ "$ANALYTICS_MYSQL_HOST" != "127.0.0.1" && "$ANALYTICS_MYSQL_HOST" != "localhost" ]]; then
@@ -1261,15 +1730,103 @@ seed_product_data() {
   info "商品镜像导入完成"
 }
 
+assert_destructive_index_reset_allowed() {
+  local reason="${1:-索引契约变化}"
+  if [[ "${APP_ENV,,}" == "production" || "${AISHOP_PRODUCTION_READY,,}" == "true" ]]; then
+    die "生产模式禁止由 start.sh 删除 Elasticsearch 索引（$reason）。请创建版本化物理索引，完成回填校验后原子切换 alias。"
+  fi
+}
+
 reset_catalog_indexes() {
   local index status
-  for index in aishop-index aishop_vectorstore; do
+  assert_destructive_index_reset_allowed "商品目录变化"
+  for index in aishop-index "$VECTOR_INDEX"; do
     status=$(curl --noproxy '*' -sS --max-time 30 -o /dev/null -w '%{http_code}' \
       -X DELETE "$ES_URIS/$index")
     [[ "$status" == "200" || "$status" == "404" ]] \
       || die "删除 Elasticsearch 索引 $index 失败，HTTP $status"
   done
+  VECTOR_INDEX_REBUILD_REQUIRED=true
   info "已清理旧商品关键词/向量索引"
+}
+
+reconcile_vector_index_contract() {
+  local status mapping state expected_model count
+  status=$(curl --noproxy '*' -sS --max-time 15 -o /dev/null -w '%{http_code}' \
+    "$ES_URIS/$VECTOR_INDEX")
+  if [[ "$status" == "404" ]]; then
+    stop_managed_service_for_restart search
+    VECTOR_INDEX_REBUILD_REQUIRED=true
+    info "向量索引尚未创建，将在 Search 就绪后全量构建"
+    return 0
+  fi
+  [[ "$status" == "200" ]] \
+    || die "读取 Elasticsearch 向量索引失败，HTTP $status"
+
+  if [[ "$SPRING_AI_MODEL_EMBEDDING" == "local" ]]; then
+    expected_model="local-hash-v1"
+  else
+    expected_model="$EMBEDDING_MODEL"
+  fi
+  mapping=$(curl --noproxy '*' -fsS --max-time 15 \
+    "$ES_URIS/$VECTOR_INDEX/_mapping")
+  state=$(printf '%s' "$mapping" | "$PYTHON" -c '
+import json
+import sys
+
+provider, model, dimensions, version, index, field_name = sys.argv[1:]
+root = json.load(sys.stdin)
+node = root.get(index)
+if not isinstance(node, dict) and len(root) == 1:
+    node = next(iter(root.values()))
+mapping = (node or {}).get("mappings") or {}
+contract = (mapping.get("_meta") or {}).get(
+    "aishopEmbeddingContract"
+)
+field = ((mapping.get("properties") or {}).get(field_name) or {})
+expected = {
+    "embeddingProvider": provider,
+    "embeddingModel": model,
+    "embeddingDimensions": int(dimensions),
+    "contractVersion": int(version),
+}
+expected_field = {
+    "type": "dense_vector",
+    "dims": int(dimensions),
+    "index": True,
+    "similarity": "cosine",
+    "index_options": {
+        "type": "int8_hnsw",
+        "m": 16,
+        "ef_construction": 100,
+    },
+}
+actual_field = {key: field.get(key) for key in expected_field}
+print("MATCH" if contract == expected and actual_field == expected_field else "MISMATCH")
+' "$SPRING_AI_MODEL_EMBEDDING" "$expected_model" "$EMBEDDING_DIMENSIONS" \
+    "$VECTOR_INDEX_SCHEMA_VERSION" "$VECTOR_INDEX" "$VECTOR_FIELD")
+
+  if [[ "$state" != "MATCH" ]]; then
+    warn "向量索引 embedding 契约缺失或已变化，准备重建全部商品、FAQ 与知识向量"
+    assert_destructive_index_reset_allowed "embedding 契约不匹配"
+    stop_managed_service_for_restart search
+    status=$(curl --noproxy '*' -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+      -X DELETE "$ES_URIS/$VECTOR_INDEX")
+    [[ "$status" == "200" || "$status" == "404" ]] \
+      || die "删除不兼容向量索引失败，HTTP $status"
+    VECTOR_INDEX_REBUILD_REQUIRED=true
+    return 0
+  fi
+
+  count=$(curl --noproxy '*' -fsS --max-time 15 \
+    "$ES_URIS/$VECTOR_INDEX/_count" \
+    | "$PYTHON" -c 'import json,sys; print(json.load(sys.stdin).get("count", -1))')
+  if [[ "$count" == "0" ]]; then
+    VECTOR_INDEX_REBUILD_REQUIRED=true
+    info "向量索引契约正确但尚无文档，将执行全量构建"
+  else
+    info "向量索引 embedding 契约匹配（$count 个文档）"
+  fi
 }
 
 rebuild_catalog_search_index() {
@@ -1277,7 +1834,7 @@ rebuild_catalog_search_index() {
   info "低负载重建商品关键词索引（不生成向量）..."
   response=$(curl --noproxy '*' -fsS --max-time 240 -X POST \
     -H "X-Internal-Token: $AISHOP_INTERNAL_TOKEN" \
-    "http://127.0.0.1:$SEARCH_PORT/internal/search/tool/productData?includeVector=false") \
+    "http://127.0.0.1:$SEARCH_PORT/internal/search/tool/productData?includeVector=false&includeKeyword=true") \
     || die "商品关键词索引重建请求失败"
   [[ "$response" == *'"code":200'* ]] || die "商品关键词索引重建返回异常: $response"
 
@@ -1295,12 +1852,112 @@ rebuild_catalog_search_index() {
   die "商品关键词索引数量不一致：数据库=$expected Elasticsearch=$actual"
 }
 
+rebuild_vector_indexes_if_needed() {
+  $VECTOR_INDEX_REBUILD_REQUIRED || return 0
+  local response expected_products expected_faq expected_knowledge
+  local actual_products=0 actual_faq=0 actual_knowledge=0 queued=-1
+  local counts queues end
+
+  info "按当前 embedding 契约重建商品、FAQ 与已发布知识向量..."
+  response=$(curl --noproxy '*' -fsS --max-time 240 -X POST \
+    -H "X-Internal-Token: $AISHOP_INTERNAL_TOKEN" \
+    "http://127.0.0.1:$SEARCH_PORT/internal/search/tool/productData?includeVector=true&includeKeyword=false") \
+    || die "商品向量重建请求失败"
+  [[ "$response" == *'"code":200'* ]] \
+    || die "商品向量重建返回异常: $response"
+
+  response=$(curl --noproxy '*' -fsS --max-time 240 -X POST \
+    -H "X-Internal-Token: $AISHOP_INTERNAL_TOKEN" \
+    "http://127.0.0.1:$SEARCH_PORT/internal/search/tool/ragData") \
+    || die "FAQ 向量重建请求失败"
+  [[ "$response" == *'"code":200'* ]] \
+    || die "FAQ 向量重建返回异常: $response"
+
+  response=$(curl --noproxy '*' -fsS --max-time 600 -X POST \
+    -H "X-Internal-Token: $AISHOP_INTERNAL_TOKEN" \
+    "http://127.0.0.1:$SEARCH_PORT/internal/search/knowledge/reindexAll") \
+    || die "知识文档向量重建请求失败"
+  [[ "$response" == *'"code":200'* ]] \
+    || die "知识文档向量重建返回异常: $response"
+
+  expected_products=$(mysql_query aishop_product -e \
+    'SELECT COUNT(*) FROM product_info WHERE status=1;' | tr -d '[:space:]')
+  expected_faq=$(mysql_query aishop_search -e \
+    "SELECT COUNT(*) FROM rag_question WHERE publish_status='PUBLISHED' AND (effective_start IS NULL OR effective_start<=NOW()) AND (effective_end IS NULL OR effective_end>NOW());" \
+    | tr -d '[:space:]')
+  expected_knowledge=$(mysql_query aishop_search -e \
+    "SELECT COUNT(*) FROM knowledge_chunk WHERE status='PUBLISHED';" \
+    | tr -d '[:space:]')
+
+  end=$((SECONDS + 420))
+  while [[ $SECONDS -lt $end ]]; do
+    counts=$(curl --noproxy '*' -fsS --max-time 20 \
+      -X POST -H 'Content-Type: application/json' \
+      --data '{
+        "size": 0,
+        "aggs": {
+          "products": {
+            "filter": {"term": {"metadata.dataType.keyword": "product"}},
+            "aggs": {
+              "ids": {
+                "terms": {"field": "metadata.productId.keyword", "size": 10000}
+              }
+            }
+          },
+          "faq": {
+            "filter": {"term": {"metadata.dataType.keyword": "faq"}}
+          },
+          "knowledge": {
+            "filter": {"term": {"metadata.dataType.keyword": "knowledge"}}
+          }
+        }
+      }' \
+      "$ES_URIS/$VECTOR_INDEX/_search" \
+      | "$PYTHON" -c '
+import json
+import sys
+
+aggs = json.load(sys.stdin).get("aggregations", {})
+print(
+    len((((aggs.get("products") or {}).get("ids") or {}).get("buckets") or [])),
+    (aggs.get("faq") or {}).get("doc_count", -1),
+    (aggs.get("knowledge") or {}).get("doc_count", -1),
+)
+')
+    read -r actual_products actual_faq actual_knowledge <<<"$counts"
+    queues=$(curl --noproxy '*' -fsS --max-time 15 \
+      -u "$RABBIT_USER:$RABBIT_PASSWORD" \
+      "http://127.0.0.1:$RABBIT_MANAGEMENT_PORT/api/queues/%2F")
+    queued=$(printf '%s' "$queues" | "$PYTHON" -c '
+import json
+import sys
+
+total = 0
+for queue in json.load(sys.stdin):
+    name = str(queue.get("name") or "")
+    if name == "rag.queue" or name.startswith("rag.queue.retry."):
+        total += int(queue.get("messages") or 0)
+print(total)
+')
+    if [[ "$actual_products" == "$expected_products" \
+       && "$actual_faq" == "$expected_faq" \
+       && "$actual_knowledge" == "$expected_knowledge" \
+       && "$queued" == "0" ]]; then
+      VECTOR_INDEX_REBUILD_REQUIRED=false
+      info "向量索引已就绪（商品=$actual_products FAQ=$actual_faq 知识切片=$actual_knowledge）"
+      return 0
+    fi
+    sleep 2
+  done
+  die "向量索引重建超时：期望 商品=$expected_products FAQ=$expected_faq 知识=$expected_knowledge；实际 商品=$actual_products FAQ=$actual_faq 知识=$actual_knowledge；RAG队列=$queued"
+}
+
 check_visual_index_runtime() {
   [[ "$VISUAL_SEARCH_ENABLED" == "true" ]] || return 0
   info "检查视觉商品索引与独立消费队列..."
   if ! (
     cd "$BACKEND/AI_Shop-agent"
-    "$PYTHON" scripts/check_visual_index.py
+    "$PYTHON" -m scripts.check_visual_index
   ); then
     warn "视觉商品搜索处于降级状态；商城和其他 Agent 能力将继续启动"
   fi
@@ -1315,6 +1972,8 @@ print_summary() {
   printf "  %-16s %s\n" "Gateway" "http://127.0.0.1:$GATEWAY_PORT"
   printf "  %-16s %s\n" "Agent" "http://127.0.0.1:$AGENT_PORT/health"
   printf "  %-16s %s\n" "Agent Worker 指标" "http://127.0.0.1:$AGENT_WORKER_METRICS_PORT/metrics"
+  printf "  %-16s %s\n" "OTLP Trace" "${OTEL_ENABLED}（${OTEL_OTLP_ENDPOINT}）"
+  printf "  %-16s %s\n" "管理员账号" "${ADMIN_ACCOUNT}（密码见 runtime.env）"
   printf "  %-16s %s\n" "Multi-Agent" "$MULTI_AGENT_ENABLED"
   printf "  %-16s %s\n" "DataAnalyst" "$DATA_ANALYST_ENABLED"
   printf "  %-16s %s\n" "导购决策 v2" "$SHOPPING_DECISION_V2_ENABLED"
@@ -1322,11 +1981,17 @@ print_summary() {
   printf "  %-16s %s\n" "售后规则引擎" "$AFTER_SALES_POLICY_ENGINE_ENABLED"
   printf "  %-16s %s\n" "InventoryOps" "$INVENTORY_OPS_ENABLED"
   printf "  %-16s %s\n" "视觉商品搜索" "$VISUAL_SEARCH_ENABLED"
-  printf "  %-16s %s\n" "Nacos" "http://127.0.0.1:$NACOS_PORT/nacos/"
+  printf "  %-16s %s\n" "Nacos 控制台" "http://127.0.0.1:$NACOS_PORT/nacos/"
   printf "  %-16s %s\n" "RabbitMQ" "http://127.0.0.1:$RABBIT_MANAGEMENT_PORT"
   printf "  %-16s %s\n" "Elasticsearch" "http://127.0.0.1:$ES_PORT"
   printf "  %-16s %s\n" "Sentinel" "http://127.0.0.1:$SENTINEL_PORT"
-  printf "  %-16s %s\n" "Seata 控制台" "http://127.0.0.1:$SEATA_CONSOLE_PORT"
+  printf "  %-16s %s\n" "Seata TC" "${SEATA_IP}:${SEATA_PORT}"
+  if [[ "$OBSERVABILITY_ENABLED" == "true" ]]; then
+    printf "  %-16s %s\n" "Prometheus" "http://127.0.0.1:$PROMETHEUS_PORT"
+    printf "  %-16s %s\n" "Grafana" "http://127.0.0.1:$GRAFANA_PORT"
+    printf "  %-16s %s\n" "Tempo" "http://127.0.0.1:$TEMPO_PORT"
+    printf "  %-16s %s\n" "Loki" "http://127.0.0.1:$LOKI_PORT"
+  fi
   printf "  %-16s %s\n" "商品目录" "$(<"$SIMLECT_VERSION")"
   printf "  %-16s %s\n" "图片目录" "${PROJECT_FOLDER}file/"
   printf "  %-16s %s\n" "本地运行配置" "$RUNTIME_ENV"
@@ -1351,6 +2016,7 @@ prepare_environment
 # conda environment or AI credentials.
 if ! $MIDDLEWARE_ONLY; then
   resolve_python
+  render_prometheus_targets
   validate_agent_config
   # Build before starting memory-heavy middleware on a clean machine. Existing
   # healthy containers remain untouched, but a stale JAR can no longer run by
@@ -1365,7 +2031,12 @@ if $MIDDLEWARE_ONLY; then
   exit 0
 fi
 
+if [[ "$OBSERVABILITY_ENABLED" == "true" ]]; then
+  start_observability
+fi
+
 install_catalog_assets
+reconcile_vector_index_contract
 
 # Admin owns cross-database analytics views that reference Agent decision
 # artifacts. Create the Agent schema before Admin Flyway validates those views.
@@ -1391,6 +2062,7 @@ seed_product_data
 if $CATALOG_CHANGED; then
   # Product loaded its Bloom filter before the new rows existed. Search may be
   # left over from a previous invocation, so stop it before deleting indexes.
+  assert_destructive_index_reset_allowed "商品目录变化"
   stop_managed_service_for_restart product
   stop_managed_service_for_restart search
   reset_catalog_indexes
@@ -1418,6 +2090,7 @@ done
 provision_analytics_reader
 
 rebuild_catalog_search_index
+rebuild_vector_indexes_if_needed
 
 refresh_dynamic_runtime_services
 

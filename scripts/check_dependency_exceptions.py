@@ -30,17 +30,28 @@ def validate_exceptions(payload: dict[str, Any], *, today: date | None = None) -
     rows = payload.get("exceptions")
     if not isinstance(rows, list):
         return [*errors, "exceptions must be an array"]
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             errors.append(f"exceptions[{index}] must be an object")
             continue
         cve = str(row.get("cve") or "").upper()
+        package_url_regex = str(row.get("packageUrlRegex") or "").strip()
         if not CVE_PATTERN.fullmatch(cve):
             errors.append(f"exceptions[{index}].cve must be a CVE identifier")
-        elif cve in seen:
-            errors.append(f"duplicate exception: {cve}")
-        seen.add(cve)
+        if not package_url_regex:
+            errors.append(f"exceptions[{index}].packageUrlRegex is required")
+        else:
+            try:
+                re.compile(package_url_regex)
+            except re.error as exc:
+                errors.append(
+                    f"exceptions[{index}].packageUrlRegex is invalid: {exc}"
+                )
+        exception_key = (cve, package_url_regex)
+        if exception_key in seen:
+            errors.append(f"duplicate exception: {cve} / {package_url_regex}")
+        seen.add(exception_key)
         for field in ("reason", "owner"):
             if not str(row.get(field) or "").strip():
                 errors.append(f"exceptions[{index}].{field} is required")

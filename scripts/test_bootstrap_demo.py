@@ -9,11 +9,30 @@ from scripts.bootstrap_demo import (
     AI_DEMO_MESSAGE,
     BootstrapError,
     find_demo_ai_message,
+    load_environment,
     load_knowledge_catalog,
     normalize_agent_message,
     publish_knowledge,
     wait_for_knowledge_contract,
 )
+
+
+def test_load_environment_prefers_process_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = tmp_path / "runtime.env"
+    local = tmp_path / ".env.local"
+    runtime.write_text("ADMIN_ACCOUNT=runtime-admin\nADMIN_PASSWORD=runtime-secret\n")
+    local.write_text("ADMIN_ACCOUNT=local-admin\n")
+    monkeypatch.setitem(load_environment.__globals__, "RUNTIME_ENV", runtime)
+    monkeypatch.setitem(load_environment.__globals__, "LOCAL_ENV", local)
+    monkeypatch.setenv("ADMIN_ACCOUNT", "process-admin")
+
+    values = load_environment()
+
+    assert values["ADMIN_ACCOUNT"] == "process-admin"
+    assert values["ADMIN_PASSWORD"] == "runtime-secret"
 
 
 def test_normalize_agent_message_matches_agent_input_guard() -> None:

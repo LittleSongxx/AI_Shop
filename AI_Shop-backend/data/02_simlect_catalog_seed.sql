@@ -1001,11 +1001,11 @@ INSERT INTO simlect_catalog_product (product_id, catalog_version) VALUES
 
 INSERT INTO simlect_catalog_meta
     (catalog_key, catalog_version, source_origin, product_count, installed_at)
-VALUES ('default', 'simlect-mirror-a7d6063f05a397a6', 'https://www.simlect.com', 47, NOW())
-ON DUPLICATE KEY UPDATE catalog_version = VALUES(catalog_version),
-                        source_origin = VALUES(source_origin),
-                        product_count = VALUES(product_count),
-                        installed_at = VALUES(installed_at);
+VALUES ('default', 'simlect-mirror-a7d6063f05a397a6', 'https://www.simlect.com', 47, NOW()) AS incoming
+ON DUPLICATE KEY UPDATE catalog_version = incoming.catalog_version,
+                        source_origin = incoming.source_origin,
+                        product_count = incoming.product_count,
+                        installed_at = incoming.installed_at;
 COMMIT;
 SET FOREIGN_KEY_CHECKS = 1;
 

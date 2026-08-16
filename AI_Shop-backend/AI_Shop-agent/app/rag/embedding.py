@@ -10,6 +10,7 @@ import structlog
 
 from app.config.settings import get_settings
 from app.infra.http_client import get_client
+from app.rag.local_embedding import local_hash_embedding
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.redis_service import redis_service
 
@@ -72,8 +73,11 @@ async def embed_text(text: str) -> list[float] | None:
     evaluation = _EVALUATION_STATS.get()
     if evaluation is not None:
         evaluation.requests += 1
+    provider = getattr(settings, "embedding_provider", "openai")
+    if provider == "local":
+        return local_hash_embedding(query, settings.embedding_dimensions)
     cache_key = (
-        f"mall:rag:embedding:{settings.embedding_model}:"
+        f"mall:rag:embedding:{provider}:{settings.embedding_model}:"
         f"{settings.embedding_dimensions}:{_sha256(query)}"
     )
     # Cache is consulted before the breaker: a cached vector is still valid while
@@ -160,6 +164,8 @@ async def embed_texts(texts: list[str], *, batch_size: int = 10) -> list[list[fl
     values = [str(text or "").strip() for text in texts]
     if not values:
         return []
+    if getattr(get_settings(), "embedding_provider", "openai") == "local":
+        return [await embed_text(value) for value in values]
     if _EVALUATION_STATS.get() is None:
         return [await embed_text(value) for value in values]
     if not 1 <= batch_size <= 10:

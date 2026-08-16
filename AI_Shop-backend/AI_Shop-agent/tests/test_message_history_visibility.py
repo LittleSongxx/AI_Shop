@@ -45,6 +45,7 @@ async def test_clear_visible_history_moves_cursor_but_preserves_memory():
     writes = [sql for sql, _params in cursor.calls if "INSERT INTO" in sql]
     assert len(writes) == 1
     assert "history_cleared_through_message_id" in writes[0]
+    assert "agent_session_memory.history_cleared_through_message_id" in writes[0]
     assert "summary_json" not in writes[0]
     assert "state_json" not in writes[0]
 

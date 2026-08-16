@@ -1,6 +1,7 @@
 import pytest
 from langchain_core.messages import AIMessage
 
+from app.config.settings import get_settings
 from app.domain.intent.classifier import (
     FUND_AT_RISK,
     PAYMENT_ISSUE_HINTS,
@@ -134,6 +135,9 @@ def test_recomment_content_continues_the_selected_order_flow():
 
 @pytest.mark.asyncio
 async def test_llm_intent_prefers_provider_structured_output(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    get_settings.cache_clear()
+
     class StructuredLlm:
         async def ainvoke(self, _messages):
             return {
@@ -163,7 +167,10 @@ async def test_llm_intent_prefers_provider_structured_output(monkeypatch):
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
     monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
 
-    decision = await classify_intent_by_llm("u1", "查物流")
+    try:
+        decision = await classify_intent_by_llm("u1", "查物流")
+    finally:
+        get_settings.cache_clear()
 
     assert decision is not None
     assert decision.intent == IntentKind.QUERY_LOGISTICS
@@ -173,6 +180,9 @@ async def test_llm_intent_prefers_provider_structured_output(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_llm_intent_falls_back_to_text_json_when_schema_unsupported(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    get_settings.cache_clear()
+
     class FakeLlm:
         def with_structured_output(self, *_args, **_kwargs):
             raise NotImplementedError("provider has no schema mode")
@@ -188,7 +198,10 @@ async def test_llm_intent_falls_back_to_text_json_when_schema_unsupported(monkey
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
     monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
 
-    decision = await classify_intent_by_llm("u1", "查优惠券")
+    try:
+        decision = await classify_intent_by_llm("u1", "查优惠券")
+    finally:
+        get_settings.cache_clear()
 
     assert decision is not None
     assert decision.intent == IntentKind.QUERY_COUPON
@@ -197,6 +210,9 @@ async def test_llm_intent_falls_back_to_text_json_when_schema_unsupported(monkey
 
 @pytest.mark.asyncio
 async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    get_settings.cache_clear()
+
     class StructuredLlm:
         async def ainvoke(self, _messages):
             return {
@@ -218,12 +234,39 @@ async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monke
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
     monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
 
-    decision = await classify_intent_by_llm("u1", "随便操作")
+    try:
+        decision = await classify_intent_by_llm("u1", "随便操作")
+    finally:
+        get_settings.cache_clear()
 
     assert decision is not None
     assert decision.intent == IntentKind.CHAT
     assert decision.next_action == NextAction.ASK_CLARIFICATION
     assert decision.source == "llm_invalid"
+
+
+@pytest.mark.asyncio
+async def test_missing_llm_key_uses_explicit_unavailable_fallback(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.setenv("MEMORY_LLM_API_KEY", "")
+    get_settings.cache_clear()
+
+    def fail_create():
+        raise AssertionError("LLM factory must not run without credentials")
+
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.create_memory_llm",
+        fail_create,
+    )
+    try:
+        decision = await classify_intent_by_llm("u1", "帮我看看这个")
+    finally:
+        get_settings.cache_clear()
+
+    assert decision is not None
+    assert decision.intent == IntentKind.CHAT
+    assert decision.next_action == NextAction.ASK_CLARIFICATION
+    assert decision.source == "llm_unavailable"
 
 @pytest.mark.asyncio
 async def test_resolve_intent_llm_primary(monkeypatch):

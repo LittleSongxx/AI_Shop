@@ -7,6 +7,16 @@ datasources:
     url: http://tempo:3200
     jsonData:
       tracesToLogsV2:
+        datasourceUid: aishop-loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        tags:
+          - key: service.name
+            value: service_name
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: false
+      tracesToMetrics:
         datasourceUid: aishop-prometheus
       serviceMap:
         datasourceUid: aishop-prometheus

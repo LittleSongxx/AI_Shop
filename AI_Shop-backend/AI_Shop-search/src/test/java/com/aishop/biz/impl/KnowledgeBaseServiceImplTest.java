@@ -250,6 +250,67 @@ class KnowledgeBaseServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void fullModelRebuildReindexesCurrentPublishedDocuments() {
+        Map<String, Object> published = document(42L, "PUBLISHED");
+        published.put("domain", "LOGISTICS");
+        when(jdbcTemplate.queryForList(
+                argThat((String sql) -> sql != null
+                        && sql.contains("SELECT document_id")
+                        && sql.contains("status='PUBLISHED'")),
+                eq(Long.class)))
+                .thenReturn(List.of(42L));
+        lenient().when(jdbcTemplate.update(
+                argThat((String sql) -> sql != null
+                        && sql.contains("INSERT INTO knowledge_release"))))
+                .thenReturn(1);
+        when(jdbcTemplate.queryForObject(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_release")
+                        && sql.contains("FOR UPDATE")),
+                eq(Long.class)))
+                .thenReturn(5L);
+        when(jdbcTemplate.query(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_document")
+                        && sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(published));
+        when(jdbcTemplate.queryForList(
+                argThat((String sql) -> sql != null
+                        && sql.contains("knowledge_chunk")
+                        && sql.contains("status='PUBLISHED'")),
+                eq(42L),
+                eq(1)))
+                .thenReturn(List.of(Map.of(
+                        "chunk_id", "knowledge_42_1_0",
+                        "chunk_index", 0,
+                        "heading", "物流异常",
+                        "content", "请从订单详情联系人工客服。",
+                        "token_count", 14)));
+        lenient().when(jdbcTemplate.update(
+                argThat((String sql) -> sql != null
+                        && sql.contains("SET current_version=?")),
+                eq(6L),
+                eq(5L)))
+                .thenReturn(1);
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        Map<String, Object> result = service.rebuildAllPublishedVectors();
+
+        assertEquals(1, result.get("documents"));
+        assertEquals(1, result.get("chunks"));
+        assertEquals(6L, result.get("releaseVersion"));
+        verify(vectorStore).add(argThat(documents -> {
+            Document indexed = documents.get(0);
+            return "knowledge_42_1_0".equals(indexed.getId())
+                    && "knowledge".equals(indexed.getMetadata().get("dataType"))
+                    && "LOGISTICS".equals(indexed.getMetadata().get("domain"));
+        }));
+    }
+
+    @Test
     void publicationSqlUsesCrossJvmLocksAndCompareAndSet() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/aishop/biz/impl/KnowledgeBaseServiceImpl.java"));

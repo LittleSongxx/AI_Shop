@@ -7,7 +7,9 @@ import org.springframework.util.DigestUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 
 public class StringTools {
@@ -107,6 +109,17 @@ public class StringTools {
     public static String createUserCouponId() {
         // 30位的随机字符串
         return getRandomString(Constants.LENGTH_30);
+    }
+
+    public static String createStableUserCouponId(
+            String namespace, String userId, String businessId) {
+        if (isEmpty(namespace) || isEmpty(userId) || isEmpty(businessId)) {
+            throw new IllegalArgumentException("稳定用户券ID参数不能为空");
+        }
+        String source = namespace + ":" + userId + ":" + businessId;
+        return UUID.nameUUIDFromBytes(source.getBytes(StandardCharsets.UTF_8))
+                .toString()
+                .replace("-", "");
     }
 
     public static String createNotificationId() {

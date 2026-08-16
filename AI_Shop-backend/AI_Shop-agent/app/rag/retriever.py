@@ -789,6 +789,7 @@ class RagRetriever:
             span.set_attribute("rag.query_length", len(query))
             span.set_attribute("rag.limit", limit)
 
+            settings = get_settings()
             policy = runtime_rag_policy()
             plan = planned_query or plan_rag_query(
                 query, max_subquestions=policy.max_subquestions
@@ -1028,8 +1029,24 @@ class RagRetriever:
             if result and any(doc.get("source") != "rerank" for doc in result):
                 if runtime_trace is not None:
                     runtime_trace.fallback("rerank_not_completed")
-                logger.error("rag_rerank_required_but_fallback_returned")
-                return []
+                # Production can deliberately run without a reranker (for
+                # example, a credential-free local environment).  Keep the
+                # bounded RRF candidates in that mode, but make the degraded
+                # path explicit.  Live evaluation scopes remain strict so a
+                # fallback cannot be reported as provider-quality evidence.
+                rerank_required = bool(getattr(settings, "rerank_required", False))
+                evaluation_strict = _RERANK_EVALUATION_STATS.get() is not None
+                if rerank_required or evaluation_strict:
+                    logger.error(
+                        "rag_rerank_required_but_fallback_returned",
+                        rerankRequired=rerank_required,
+                        evaluationStrict=evaluation_strict,
+                    )
+                    return []
+                logger.warning(
+                    "rag_rerank_optional_fallback_returned",
+                    rerankRequired=False,
+                )
             if runtime_trace is not None:
                 runtime_trace.observations.setdefault("candidateChannels", {})[
                     "rerank"

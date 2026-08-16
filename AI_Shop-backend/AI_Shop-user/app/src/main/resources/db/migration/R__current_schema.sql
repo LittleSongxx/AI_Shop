@@ -69,8 +69,8 @@ insert into admin_role (role_code, role_name, description) values
     ('AI_OPERATOR', 'AI运营', 'AI配置、评测和试用批次'),
     ('SUPPORT_AGENT', '客服专员', '脱敏客服查询与处置'),
     ('DATA_ANALYST', '数据分析', '聚合指标和匿名报告'),
-    ('AUDITOR', '审计员', '只读审计')
-on duplicate key update role_name = values(role_name), description = values(description);
+    ('AUDITOR', '审计员', '只读审计') as incoming
+on duplicate key update role_name = incoming.role_name, description = incoming.description;
 
 insert into admin_permission (permission_code, description) values
     ('admin:manage', '管理员、角色和会话治理'),
@@ -82,8 +82,8 @@ insert into admin_permission (permission_code, description) values
     ('support:write', '客服认领、回复和结案'),
     ('analytics:read', '聚合指标读取'),
     ('analytics:export', '匿名指标导出'),
-    ('audit:read', '只读审计')
-on duplicate key update description = values(description);
+    ('audit:read', '只读审计') as incoming
+on duplicate key update description = incoming.description;
 
 insert ignore into admin_role_permission (role_id, permission_id)
 select r.role_id, p.permission_id from admin_role r cross join admin_permission p
@@ -121,9 +121,41 @@ create table if not exists user_info
     last_login_time datetime             null comment '最后登录时间',
     last_login_ip   varchar(100)         null comment '最后登录IP',
     status          tinyint(1) default 1 not null comment '0:禁用 1:正常',
+    temp_ban_until_ms bigint              null comment '临时封禁到期 epoch millis；NULL 表示非临时封禁',
     constraint idx_key_email unique (email),
-    constraint idx_nick_name unique (nick_name)
+    constraint idx_nick_name unique (nick_name),
+    key idx_user_temp_ban_due (status, temp_ban_until_ms)
 ) comment '用户信息' collate = utf8mb4_general_ci row_format = DYNAMIC;
+
+SET @sql = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'user_info'
+          AND column_name = 'temp_ban_until_ms'
+    ),
+    'SELECT 1',
+    'ALTER TABLE user_info ADD COLUMN temp_ban_until_ms bigint NULL COMMENT ''temporary ban expiry epoch millis'''
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (
+        SELECT 1
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = 'user_info'
+          AND index_name = 'idx_user_temp_ban_due'
+    ),
+    'SELECT 1',
+    'ALTER TABLE user_info ADD INDEX idx_user_temp_ban_due (status, temp_ban_until_ms)'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 create table if not exists user_address
 (
@@ -144,6 +176,16 @@ create table if not exists user_member_profile
     update_time  datetime          null
 ) comment '会员成长' collate = utf8mb4_general_ci row_format = DYNAMIC;
 
+create table if not exists user_member_level_reward_claim
+(
+    user_id        varchar(15)  not null,
+    level_code     tinyint      not null,
+    user_coupon_id varchar(32)  null,
+    bonus_growth   int default 0 not null,
+    create_time    datetime     not null,
+    primary key (user_id, level_code)
+) comment '会员等级奖励领取幂等账本' collate = utf8mb4_general_ci row_format = DYNAMIC;
+
 create table if not exists user_order_growth
 (
     order_id     varchar(32)                         not null primary key,
@@ -153,6 +195,28 @@ create table if not exists user_order_growth
     create_time  datetime default current_timestamp  not null,
     key idx_user_order_growth_user (user_id, create_time)
 ) comment '订单完成成长值幂等账本' collate = utf8mb4_general_ci row_format = DYNAMIC;
+
+create table if not exists local_message_outbox
+(
+    id                bigint auto_increment comment '主键' primary key,
+    idempotency_key   varchar(128)                    not null comment '发送幂等键',
+    exchange_name     varchar(64)                     not null comment '交换机',
+    routing_key       varchar(64)                     not null comment '路由键',
+    payload_json      mediumtext                      not null comment '消息体 JSON',
+    reliability_level varchar(16) default 'STANDARD'  not null comment 'HIGH/STANDARD',
+    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败 4重试耗尽',
+    retry_count       int         default 0           not null comment '重试次数',
+    error_message     varchar(512)                    null comment '最近失败原因',
+    lease_owner       varchar(64)                     null comment '当前投递实例',
+    lease_until       datetime                        null comment '发送租约截止时间',
+    next_retry_time   datetime                        null comment '下次可重试时间',
+    create_time       datetime                        not null comment '创建时间',
+    update_time       datetime                        null comment '更新时间',
+    sent_time         datetime                        null comment '成功发送时间',
+    constraint uk_outbox_idempotency unique (idempotency_key),
+    key idx_outbox_status_ctime (status, create_time),
+    key idx_outbox_dispatch (status, next_retry_time, lease_until, id)
+) comment '本地消息 Outbox（用户通知与临时封禁）' charset = utf8mb4;
 
 -- 公共 MQ 消费失败审查组件使用用户库数据源；确保最终死信仍可落库审计。
 create table if not exists mq_compensation_log

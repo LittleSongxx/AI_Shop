@@ -12,16 +12,19 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class RefundStockListenerTest {
 
     private final SkuStockService skuStockService = mock(SkuStockService.class);
     private final ReliableMessageSender reliableMessageSender = mock(ReliableMessageSender.class);
+    private final MqListenerHelper mqListenerHelper = mock(MqListenerHelper.class);
     private final Channel channel = mock(Channel.class);
     private RefundStockListener listener;
 
@@ -30,13 +33,16 @@ class RefundStockListenerTest {
         listener = new RefundStockListener();
         ReflectionTestUtils.setField(listener, "skuStockService", skuStockService);
         ReflectionTestUtils.setField(listener, "reliableMessageSender", reliableMessageSender);
+        ReflectionTestUtils.setField(listener, "mqListenerHelper", mqListenerHelper);
+        when(mqListenerHelper.tryBeginConsume(any(), anyLong())).thenReturn(true);
     }
 
     @Test
     void successfulRestorePublishesIdempotentResultBeforeAck() throws Exception {
         RefundStockRestoreDTO payload = payload();
+        Message message = message(17L);
 
-        listener.restore(payload, channel, message(17L));
+        listener.restore(payload, channel, message);
 
         verify(skuStockService).restoreRefundStock(payload);
         verify(reliableMessageSender).replaySend(
@@ -44,6 +50,7 @@ class RefundStockListenerTest {
                 eq(RabbitMQConfig.REFUND_RESULT_KEY),
                 any(),
                 eq("refund:result:r1"));
+        verify(mqListenerHelper).clearConsumeRetry(RabbitMQConfig.REFUND_STOCK_QUEUE, message);
         verify(channel).basicAck(17L, false);
         verify(channel, never()).basicNack(17L, false, false);
     }
@@ -51,25 +58,31 @@ class RefundStockListenerTest {
     @Test
     void restoreFailureNacksWithoutPublishingFalseSuccess() throws Exception {
         RefundStockRestoreDTO payload = payload();
+        Message message = message(18L);
         doThrow(new IllegalStateException("db unavailable"))
                 .when(skuStockService).restoreRefundStock(payload);
 
-        listener.restore(payload, channel, message(18L));
+        listener.restore(payload, channel, message);
 
         verify(reliableMessageSender, never()).replaySend(any(), any(), any(), any());
-        verify(channel).basicNack(18L, false, false);
+        verify(mqListenerHelper).nackWithRetryOrDlq(
+                eq(channel), eq(18L), eq(message), eq(RabbitMQConfig.REFUND_STOCK_QUEUE),
+                eq(payload), any(IllegalStateException.class));
         verify(channel, never()).basicAck(18L, false);
     }
 
     @Test
     void resultPublishFailureAlsoNacksForBrokerDeadLetterHandling() throws Exception {
         RefundStockRestoreDTO payload = payload();
+        Message message = message(19L);
         doThrow(new IllegalStateException("publisher confirm failed"))
                 .when(reliableMessageSender).replaySend(any(), any(), any(), any());
 
-        listener.restore(payload, channel, message(19L));
+        listener.restore(payload, channel, message);
 
-        verify(channel).basicNack(19L, false, false);
+        verify(mqListenerHelper).nackWithRetryOrDlq(
+                eq(channel), eq(19L), eq(message), eq(RabbitMQConfig.REFUND_STOCK_QUEUE),
+                eq(payload), any(IllegalStateException.class));
         verify(channel, never()).basicAck(19L, false);
     }
 

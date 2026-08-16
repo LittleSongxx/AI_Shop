@@ -2,7 +2,6 @@ package com.aishop.entity.enums;
 
 
 import java.util.Arrays;
-import java.util.Optional;
 
 public enum RagDataTypeEnum {
     PRODUCT("product", "商品数据"),
@@ -26,7 +25,9 @@ public enum RagDataTypeEnum {
     }
 
     public static RagDataTypeEnum getByType(String type) {
-        Optional<RagDataTypeEnum> result = Arrays.stream(RagDataTypeEnum.values()).filter(value -> value.getType().equals(type)).findFirst();
-        return result == null ? null : result.get();
+        return Arrays.stream(RagDataTypeEnum.values())
+                .filter(value -> value.getType().equals(type))
+                .findFirst()
+                .orElse(null);
     }
 }

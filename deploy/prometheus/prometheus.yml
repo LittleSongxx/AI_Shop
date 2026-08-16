@@ -19,51 +19,27 @@ global:
     project: aishop
 
 scrape_configs:
-  # ---- 网关：唯一对外入口，QPS 和限流指标看这里 ----
-  - job_name: aishop-gateway
+  # ---- Java 服务：端口由 start.sh 根据 run/runtime.env 生成 ----
+  # 不能把端口永久写死在这里：WSL 端口冲突时 start.sh 会顺延端口。
+  - job_name: aishop-java
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["host.docker.internal:8080"]
-        labels:
-          tier: gateway
+    file_sd_configs:
+      - files: ["/etc/prometheus/runtime/java.json"]
+        refresh_interval: 15s
 
-  # ---- 业务服务：端口与各模块 application.yml 的 server.port 一一对应 ----
-  - job_name: aishop-services
-    metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["host.docker.internal:8084"]
-        labels: { service: aishop-cart, tier: business }
-      - targets: ["host.docker.internal:8087"]
-        labels: { service: aishop-coupon, tier: business }
-      - targets: ["host.docker.internal:8093"]
-        labels: { service: aishop-order, tier: business }
-      - targets: ["host.docker.internal:8096"]
-        labels: { service: aishop-pay, tier: business }
-      - targets: ["host.docker.internal:8099"]
-        labels: { service: aishop-product, tier: business }
-      - targets: ["host.docker.internal:8102"]
-        labels: { service: aishop-stock, tier: business }
-      - targets: ["host.docker.internal:8105"]
-        labels: { service: aishop-user, tier: business }
-      - targets: ["host.docker.internal:8108"]
-        labels: { service: aishop-search, tier: business }
-      - targets: ["host.docker.internal:8111"]
-        labels: { service: aishop-admin, tier: business }
-
-  # ---- Python Agent：prometheus_client 直接挂在 /metrics，不是 actuator 那套路径 ----
+  # ---- Python Agent：prometheus_client 直接挂在 /metrics ----
   - job_name: aishop-agent
     metrics_path: /metrics
-    static_configs:
-      - targets: ["host.docker.internal:7050"]
-        labels: { service: aishop-agent, tier: ai }
+    file_sd_configs:
+      - files: ["/etc/prometheus/runtime/agent.json"]
+        refresh_interval: 15s
 
   # ---- Python Agent Worker：独立进程，任务/队列、阶段时延、LLM token/成本在此更新 ----
-  # （app/worker.py 启动时 start_http_server，默认端口 7051，可用 WORKER_METRICS_PORT 覆盖）
   - job_name: aishop-agent-worker
     metrics_path: /metrics
-    static_configs:
-      - targets: ["host.docker.internal:7051"]
-        labels: { service: aishop-agent-worker, tier: ai }
+    file_sd_configs:
+      - files: ["/etc/prometheus/runtime/worker.json"]
+        refresh_interval: 15s
 
   # ---- Prometheus 自监控：抓取失败、样本堆积先从这里看 ----
   - job_name: prometheus

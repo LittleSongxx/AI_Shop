@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TransactionPersistenceIT {
 
     @Container
-    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.36")
+    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11")
             .withDatabaseName("aishop_transaction_it")
             .withUsername("aishop")
             .withPassword("aishop");

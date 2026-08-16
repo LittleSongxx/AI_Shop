@@ -88,6 +88,23 @@ async def test_worker_retries_the_initial_queue_connection_with_bounded_backoff(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("body", [b"{invalid-json", b"\xff\xfe"])
+async def test_invalid_queue_payload_is_rejected_exactly_once(body: bytes):
+    worker = AgentWorker()
+    message = MagicMock()
+    message.body = body
+    message.reject = AsyncMock()
+    message.ack = AsyncMock()
+    message.nack = AsyncMock()
+
+    await worker._process_message_inner("q", message)
+
+    message.reject.assert_awaited_once_with(requeue=False)
+    message.ack.assert_not_awaited()
+    message.nack.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_mark_failed_writes_dead_atomically_at_retry_limit():
     cursor = _Cursor(one={"retry_count": 5, "status": "DEAD"})
     with patch("app.services.task_service.acquire", _acquire_for(cursor)):

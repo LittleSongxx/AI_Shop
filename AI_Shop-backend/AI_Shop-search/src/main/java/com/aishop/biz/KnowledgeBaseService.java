@@ -14,6 +14,8 @@ public interface KnowledgeBaseService {
 
     Map<String, Object> reindexPublished(long documentId, String owner);
 
+    Map<String, Object> rebuildAllPublishedVectors();
+
     Map<String, Object> archive(long documentId);
 
     Map<String, Object> listDocuments(int pageNo, int pageSize, String status);

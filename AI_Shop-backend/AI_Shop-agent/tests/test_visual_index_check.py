@@ -81,15 +81,8 @@ async def test_check_reports_queue_counts_from_aio_pika_declaration(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_check_without_cloud_key_is_degraded_but_successful(monkeypatch):
-    queue = SimpleNamespace(
-        declaration_result=SimpleNamespace(message_count=0, consumer_count=1)
-    )
-    connection = SimpleNamespace(
-        channel=AsyncMock(
-            return_value=SimpleNamespace(declare_queue=AsyncMock(return_value=queue))
-        ),
-        close=AsyncMock(),
-    )
+    status = AsyncMock(return_value={"servingCurrentModel": True})
+    connect = AsyncMock()
     monkeypatch.setattr(
         check_visual_index,
         "get_settings",
@@ -98,18 +91,23 @@ async def test_check_without_cloud_key_is_degraded_but_successful(monkeypatch):
     monkeypatch.setattr(
         check_visual_index.visual_product_index,
         "status",
-        AsyncMock(return_value={"servingCurrentModel": True}),
+        status,
     )
     monkeypatch.setattr(
         check_visual_index.aio_pika,
         "connect_robust",
-        AsyncMock(return_value=connection),
+        connect,
     )
 
     result = await check_visual_index.check()
 
-    assert result["state"] == "DEGRADED"
-    assert result["reason"] == "VISUAL_API_KEY_NOT_CONFIGURED"
+    assert result == {
+        "queueState": "DISABLED",
+        "state": "DEGRADED",
+        "reason": "VISUAL_API_KEY_NOT_CONFIGURED",
+    }
+    status.assert_not_awaited()
+    connect.assert_not_awaited()
 
 
 @pytest.mark.asyncio

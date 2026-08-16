@@ -57,6 +57,12 @@ public class CouponFeignFallbackFactory implements FallbackFactory<CouponFeignCl
             }
 
             @Override
+            public ResponseVO<com.aishop.api.vo.CouponGrantResultVO> grantCoupon(
+                    UserCouponCreateDTO dto) {
+                return FeignFallbackResponses.unavailable("优惠券服务");
+            }
+
+            @Override
             public ResponseVO<StockChangeResultVO> deductStock(CouponIdDTO dto) {
                 return FeignFallbackResponses.unavailable("优惠券服务");
             }

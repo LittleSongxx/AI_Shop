@@ -118,8 +118,8 @@ create table if not exists knowledge_release
 ) comment '知识缓存失效版本' collate = utf8mb4_general_ci;
 
 insert into knowledge_release (release_key, current_version)
-values ('global', 1)
-on duplicate key update release_key = values(release_key);
+values ('global', 1) as incoming
+on duplicate key update release_key = incoming.release_key;
 
 create table if not exists local_message_outbox
 (
@@ -129,7 +129,7 @@ create table if not exists local_message_outbox
     routing_key       varchar(64)                     not null comment '路由键',
     payload_json      mediumtext                      not null comment '消息体 JSON',
     reliability_level varchar(16) default 'STANDARD'  not null comment 'HIGH/STANDARD',
-    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败',
+    status            tinyint     default 0           not null comment '0待发送 1发送中 2已发送 3失败 4重试耗尽',
     retry_count       int         default 0           not null comment '重试次数',
     error_message     varchar(512)                    null comment '最近失败原因',
     lease_owner       varchar(64)                     null comment '当前投递实例',

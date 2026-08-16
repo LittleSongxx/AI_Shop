@@ -11,6 +11,7 @@ import com.aishop.entity.enums.RagDataTypeEnum;
 import com.aishop.entity.po.RagQuestion;
 import com.aishop.exception.BusinessException;
 import com.aishop.biz.RagQuestionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,8 @@ public class RabbitMQRagListenerComponent {
     @Resource
     private RestClient restClient;
     @Resource
+    private ObjectMapper objectMapper;
+    @Resource
     private MqListenerHelper mqListenerHelper;
     @Resource
     private MqConsumeFailureRecorder mqConsumeFailureRecorder;
@@ -57,13 +60,15 @@ public class RabbitMQRagListenerComponent {
     public void handleRagData(RagDataDTO ragDataDTO, Channel channel, Message message) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
         if (!mqListenerHelper.tryBeginConsume(message, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_HIGH_SECONDS)) {
-            channel.basicAck(deliveryTag, false);
+            mqListenerHelper.ackCompletedOrDeferBusy(
+                    channel, deliveryTag, message, RabbitMQConfig.RAG_QUEUE);
             return;
         }
         if (ragDataDTO == null) {
             log.error("RAG同步失败，数据为空");
             mqConsumeFailureRecorder.record(RabbitMQConfig.RAG_QUEUE, message, null,
                     new BusinessException("RAG 消息体为空"));
+            mqListenerHelper.releaseConsume(message);
             channel.basicNack(deliveryTag, false, false);
             return;
         }
@@ -72,6 +77,7 @@ public class RabbitMQRagListenerComponent {
                 log.warn("获取到的dataId为空，跳过处理");
                 mqConsumeFailureRecorder.record(RabbitMQConfig.RAG_QUEUE, message, ragDataDTO,
                         new BusinessException("RAG dataId 为空"));
+                mqListenerHelper.releaseConsume(message);
                 channel.basicNack(deliveryTag, false, false);
                 return;
             }
@@ -80,6 +86,7 @@ public class RabbitMQRagListenerComponent {
                 log.error("未知的数据类型: {}", ragDataDTO.getType());
                 mqConsumeFailureRecorder.record(RabbitMQConfig.RAG_QUEUE, message, ragDataDTO,
                         new BusinessException("未知 RAG 类型"));
+                mqListenerHelper.releaseConsume(message);
                 channel.basicNack(deliveryTag, false, false);
                 return;
             }
@@ -321,18 +328,13 @@ public class RabbitMQRagListenerComponent {
         }
         try {
             String endpoint = "/" + indexName + "/_delete_by_query";
-            String idsJson = keepIds.stream()
-                    .map(id -> "\"" + id + "\"")
-                    .collect(Collectors.joining(","));
-            String body = "{ \"query\": { \"bool\": { "
-                    + "\"must\": ["
-                    + "{ \"term\": { \"metadata.productId\": \"" + productId + "\" } },"
-                    + "{ \"term\": { \"metadata.dataType\": \"" + RagDataTypeEnum.PRODUCT.getType() + "\" } }"
-                    + "],"
-                    + "\"must_not\": [{ \"ids\": { \"values\": [" + idsJson + "] }}]"
-                    + "}}}";
             Request request = new Request("POST", endpoint);
-            request.setJsonEntity(body);
+            request.setJsonEntity(objectMapper.writeValueAsString(Map.of(
+                    "query", Map.of(
+                            "bool", Map.of(
+                                    "must", productIdentityFilters(productId),
+                                    "must_not", List.of(Map.of(
+                                            "ids", Map.of("values", keepIds))))))));
             restClient.performRequest(request);
             log.info("已清理商品 {} 的旧文档, 保留 {} 条", productId, keepIds.size());
         } catch (IOException e) {
@@ -344,18 +346,25 @@ public class RabbitMQRagListenerComponent {
     private void deleteByProductId(String productId) {
         try {
             String endpoint = "/" + indexName + "/_delete_by_query";
-            String body = "{ \"query\": { \"bool\": { \"must\": ["
-                    + "{ \"term\": { \"metadata.productId\": \"" + productId + "\" } },"
-                    + "{ \"term\": { \"metadata.dataType\": \"" + RagDataTypeEnum.PRODUCT.getType() + "\" } }"
-                    + "]}}}";
             Request request = new Request("POST", endpoint);
-            request.setJsonEntity(body);
+            request.setJsonEntity(objectMapper.writeValueAsString(Map.of(
+                    "query", Map.of(
+                            "bool", Map.of(
+                                    "must", productIdentityFilters(productId))))));
             restClient.performRequest(request);
             log.info("已删除商品 {} 的所有向量文档", productId);
         } catch (IOException e) {
             log.error("删除商品向量文档失败, productId: {}", productId, e);
             throw new BusinessException("删除商品向量文档失败", e);
         }
+    }
+
+    private List<Map<String, Object>> productIdentityFilters(String productId) {
+        return List.of(
+                Map.of("term", Map.of("metadata.productId", productId)),
+                Map.of(
+                        "term",
+                        Map.of("metadata.dataType", RagDataTypeEnum.PRODUCT.getType())));
     }
 
     private List<Document> filterValidDocuments(List<Document> documents) {

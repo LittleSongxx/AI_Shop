@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.4</version>
+    <version>3.5.16</version>
     <relativePath/>
   </parent>
 
@@ -38,27 +38,41 @@
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.test.skip>false</maven.test.skip>
-    <spring-cloud.version>2025.0.0</spring-cloud.version>
+    <spring-cloud.version>2025.0.3</spring-cloud.version>
     <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
-    <spring.ai.version>1.1.2</spring.ai.version>
-    <springboot.version>3.5.4</springboot.version>
+    <spring.ai.version>1.1.8</spring.ai.version>
+    <springboot.version>3.5.16</springboot.version>
+    <tomcat.version>10.1.57</tomcat.version>
+    <jackson-bom.version>2.21.5</jackson-bom.version>
     <maven.surefire.version>3.5.3</maven.surefire.version>
     <jacoco.version>0.8.13</jacoco.version>
-    <flyway.version>11.7.2</flyway.version>
+    <flyway.version>11.20.3</flyway.version>
     <mybatis-spring.version>3.0.5</mybatis-spring.version>
-    <mysql.version>8.3.0</mysql.version>
-    <logback.version>1.5.18</logback.version>
+    <mysql.version>8.4.0</mysql.version>
+    <logback.version>1.5.34</logback.version>
+    <log4j2.version>2.26.1</log4j2.version>
+    <netty.version>4.1.137.Final</netty.version>
+    <httpclient5.version>5.6.4</httpclient5.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
     <lombok.version>1.18.36</lombok.version>
     <okhttp.version>4.12.0</okhttp.version>
-    <commons-lang3.version>3.14.0</commons-lang3.version>
+    <commons-lang3.version>3.20.0</commons-lang3.version>
+    <commons-compress.version>1.28.0</commons-compress.version>
+    <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-codec.version>1.16.1</commons-codec.version>
-    <!-- Apache Tika 3.3.0 calls Commons IO builder APIs introduced after 2.11. -->
+    <!-- Apache Tika 3.3.x calls Commons IO builder APIs introduced after 2.11. -->
     <commons-io.version>2.21.0</commons-io.version>
+    <protobuf-java.version>3.25.9</protobuf-java.version>
+    <bouncycastle.version>1.85.2</bouncycastle.version>
+    <dom4j.version>2.2.0</dom4j.version>
+    <icu4j.version>78.3</icu4j.version>
+    <pdfbox.version>3.0.8</pdfbox.version>
+    <jbig2-imageio.version>3.0.5</jbig2-imageio.version>
+    <junrar.version>7.6.1</junrar.version>
     <captcha.version>1.6.2</captcha.version>
     <captcha-plus.version>2.0.1</captcha-plus.version>
     <redisson.version>4.0.0</redisson.version>
-    <alipay.version>4.40.576.ALL</alipay.version>
-    <elasticsearch.version>9.2.1</elasticsearch.version>
+    <alipay.version>4.40.961.ALL</alipay.version>
     <rabbitmq.version>5.22.0</rabbitmq.version>
     <thumbnailator.version>0.4.20</thumbnailator.version>
     <twelvemonkeys.imageio.version>3.12.0</twelvemonkeys.imageio.version>
@@ -86,6 +100,20 @@
         <version>${spring.ai.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba.cloud</groupId>
+        <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
+        <version>${spring-cloud-alibaba.version}</version>
+        <exclusions>
+          <!-- This project uses OpenFeign, not Dubbo. Keep the unused RPC
+               adapter and its additional deserialization surface off the
+               runtime classpath. -->
+          <exclusion>
+            <groupId>org.apache.dubbo.extensions</groupId>
+            <artifactId>dubbo-filter-seata</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <dependency>
@@ -175,6 +203,16 @@
         <version>${commons-lang3.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>${commons-compress.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-fileupload</groupId>
+        <artifactId>commons-fileupload</artifactId>
+        <version>${commons-fileupload.version}</version>
+      </dependency>
+      <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
         <version>${commons-codec.version}</version>
@@ -208,6 +246,41 @@
         <groupId>com.alipay.sdk</groupId>
         <artifactId>alipay-sdk-java</artifactId>
         <version>${alipay.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java</artifactId>
+        <version>${protobuf-java.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.dom4j</groupId>
+        <artifactId>dom4j</artifactId>
+        <version>${dom4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.ibm.icu</groupId>
+        <artifactId>icu4j</artifactId>
+        <version>${icu4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pdfbox</groupId>
+        <artifactId>pdfbox</artifactId>
+        <version>${pdfbox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pdfbox</groupId>
+        <artifactId>jbig2-imageio</artifactId>
+        <version>${jbig2-imageio.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.junrar</groupId>
+        <artifactId>junrar</artifactId>
+        <version>${junrar.version}</version>
       </dependency>
       <dependency>
         <groupId>com.rabbitmq</groupId>

@@ -37,6 +37,8 @@ groups:
         title: 服务实例抓取失败
         condition: THRESHOLD
         for: 2m
+        noDataState: Alerting
+        execErrState: Alerting
         annotations:
           summary: "{{ $labels.job }} / {{ $labels.instance }} 已连续 2 分钟抓不到指标"
           description: >-
@@ -67,6 +69,41 @@ groups:
               conditions:
                 - evaluator: { type: lt, params: [1] }
 
+      - uid: aishop-outbox-exhausted
+        title: Outbox 消息重试耗尽
+        condition: THRESHOLD
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "{{ $labels.application }} 存在需要人工重放的 Outbox 消息"
+          description: >-
+            local_message_outbox 已有消息达到最大自动重试次数并进入 EXHAUSTED。
+            先修复 RabbitMQ、路由或消息数据问题，再通过同时受 X-Internal-Token
+            和 X-Internal-Ops-Token 保护的 /internal/mq/outbox/{id}/replay 接口重放。
+        labels:
+          severity: critical
+          tier: commerce
+        data:
+          - refId: QUERY
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: aishop-prometheus
+            model:
+              refId: QUERY
+              editorMode: code
+              expr: max by (application) (aishop_mq_outbox_exhausted)
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
   # ======================================================================== #
   # 二、依赖降级：熔断器                                                       #
   #                                                                          #
@@ -83,6 +120,8 @@ groups:
         title: 熔断器打开（检索链路已降级）
         condition: THRESHOLD
         for: 1m
+        noDataState: OK
+        execErrState: Error
         annotations:
           summary: "熔断器 {{ $labels.breaker }} 打开，对应依赖正在被跳过"
           description: >-
@@ -116,8 +155,10 @@ groups:
         title: RAG 未命中率偏高
         condition: THRESHOLD
         for: 10m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "RAG 未命中率 {{ humanizePercentage $values.QUERY.Value }}，超过 30%"
+          summary: "RAG 未命中率连续超过 30%"
           description: >-
             检索有返回但命不中，说明知识库覆盖不足、切分不合理，或者阈值被调得过严
             （见 settings.py 的 rag_vector_min_cosine / rag_evidence_min_relevance）。
@@ -157,6 +198,8 @@ groups:
         title: 订单自然语言解析依赖连续失败
         condition: THRESHOLD
         for: 5m
+        noDataState: OK
+        execErrState: Error
         annotations:
           summary: "最近 10 分钟订单解析依赖失败超过 2 次"
           description: >-
@@ -200,8 +243,10 @@ groups:
         title: LLM p95 延迟超过 10s
         condition: THRESHOLD
         for: 5m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "LLM p95 {{ $values.QUERY.Value }}s，超过 10s"
+          summary: "LLM p95 延迟连续超过 10s"
           description: >-
             10s 取在 histogram bucket 边界上（上一档 5s，下一档 30s）。
             首 token 有流式兜着，但工具调用那一跳是阻塞的，这里慢就是整轮慢。
@@ -236,8 +281,10 @@ groups:
         title: RAG 检索 p95 延迟超过 2s
         condition: THRESHOLD
         for: 5m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "RAG 检索 p95 {{ $values.QUERY.Value }}s，超过 2s"
+          summary: "RAG 检索 p95 延迟连续超过 2s"
           description: >-
             检索发生在 LLM 之前，这一段的延迟会原封不动加到用户等待时间上。
             混合检索是 BM25 + kNN + rerank 三段，先看是哪一段：
@@ -272,8 +319,10 @@ groups:
         title: Agent 端到端 p95 延迟超过 30s
         condition: THRESHOLD
         for: 5m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "Agent 端到端 p95 {{ $values.QUERY.Value }}s，超过 30s"
+          summary: "Agent 端到端 p95 延迟连续超过 30s"
           description: >-
             total 从消息入队起算，覆盖排队、意图、检索、工具和生成；旧任务载荷没有入队时间时
             才退化为 Worker 实际处理时长。先按 stage 面板定位慢点，再检查 Worker 积压、
@@ -305,14 +354,17 @@ groups:
                 - evaluator: { type: gt, params: [30] }
 
       - uid: aishop-http-5xx
-        title: 网关 5xx 比例超过 1%
+        title: Java 服务 5xx 比例超过 1%
         condition: THRESHOLD
         for: 5m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "{{ $labels.application }} 5xx 占比 {{ humanizePercentage $values.QUERY.Value }}"
+          summary: "{{ $labels.application }} 5xx 比例连续超过 1%"
           description: >-
             按 application 分组，直接指向出错的服务。5xx 是服务端自己的问题，
-            和 4xx 不同，不会因为客户端行为变化而升高。
+            和 4xx 不同，不会因为客户端行为变化而升高。启动期 readiness
+            探测产生的 /actuator 503 不纳入业务错误率。
         labels:
           severity: critical
           tier: business
@@ -325,10 +377,12 @@ groups:
               editorMode: code
               expr: >-
                 sum by (application) (
-                  rate(http_server_requests_seconds_count{job=~"aishop-gateway|aishop-services",status=~"5.."}[10m]))
+                  rate(http_server_requests_seconds_count{
+                    job="aishop-java",status=~"5..",uri!~"/actuator/.*"}[10m]))
                 / clamp_min(
                     sum by (application) (
-                      rate(http_server_requests_seconds_count{job=~"aishop-gateway|aishop-services"}[10m])),
+                      rate(http_server_requests_seconds_count{
+                        job="aishop-java",uri!~"/actuator/.*"}[10m])),
                     0.001)
               instant: true
               intervalMs: 60000
@@ -356,8 +410,10 @@ groups:
         title: Agent 任务积压
         condition: THRESHOLD
         for: 10m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "任务积压 {{ $values.QUERY.Value }} 条，持续 10 分钟未消化"
+          summary: "Agent 任务积压超过 100 条且持续 10 分钟"
           description: >-
             积压量持续不降说明消费速率跟不上生产速率，或者 worker 卡在某个任务上。
             对照 agent_task_inflight：inflight 不为 0 但 backlog 不降 = 卡住；
@@ -390,8 +446,10 @@ groups:
         title: Agent 任务进死信率偏高
         condition: THRESHOLD
         for: 10m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "{{ $labels.queue }} 队列死信率 {{ humanizePercentage $values.QUERY.Value }}"
+          summary: "{{ $labels.queue }} 队列死信率连续超过 10%"
           description: >-
             result="dead" 是重试用尽或超过 deadline 后的终态（worker.py:246），
             意味着这个任务不会再自己被处理了——工单类任务落到这里就是用户提交了没人管。
@@ -432,8 +490,10 @@ groups:
         title: 工具调用失败率偏高
         condition: THRESHOLD
         for: 10m
+        noDataState: OK
+        execErrState: Error
         annotations:
-          summary: "工具 {{ $labels.tool }} 失败率 {{ humanizePercentage $values.QUERY.Value }}"
+          summary: "工具 {{ $labels.tool }} 失败率连续超过 10%"
           description: >-
             工具调用打的是 Java 侧内部接口。这里升高通常不是 Agent 的问题，
             而是下游服务或内部鉴权（InternalApiAuthFilter）出了状况。
@@ -482,6 +542,8 @@ groups:
         title: LLM 存在未定价 token
         condition: THRESHOLD
         for: 10m
+        noDataState: OK
+        execErrState: Error
         annotations:
           summary: "最近 10 分钟仍有未定价 token，人民币成本口径不完整"
           description: >-

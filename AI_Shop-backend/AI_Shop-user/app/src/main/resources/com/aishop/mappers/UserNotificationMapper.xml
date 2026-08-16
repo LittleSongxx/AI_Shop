@@ -266,11 +266,20 @@
 		 where notification_id=#{notificationId}
 	</update>
 
-	<insert id="insertBatch">
-		INSERT INTO user_notification(notification_id, user_id, title, content, biz_type, biz_id, read_status, create_time) VALUES
-		<foreach collection="list" item="item" separator=",">
-			(#{item.notificationId}, #{item.userId}, #{item.title}, #{item.content}, #{item.bizType}, #{item.bizId}, #{item.readStatus}, #{item.createTime})
-		</foreach>
-	</insert>
+		<insert id="insertBatch">
+			INSERT INTO user_notification(notification_id, user_id, title, content, biz_type, biz_id, read_status, create_time) VALUES
+			<foreach collection="list" item="item" separator=",">
+				(#{item.notificationId}, #{item.userId}, #{item.title}, #{item.content}, #{item.bizType}, #{item.bizId}, #{item.readStatus}, #{item.createTime})
+			</foreach>
+		</insert>
 
-</mapper>
+		<insert id="insertIgnore">
+			INSERT IGNORE INTO user_notification(
+				notification_id, user_id, title, content, biz_type, biz_id, read_status, create_time
+			) VALUES (
+				#{bean.notificationId}, #{bean.userId}, #{bean.title}, #{bean.content},
+				#{bean.bizType}, #{bean.bizId}, #{bean.readStatus}, #{bean.createTime}
+			)
+		</insert>
+
+	</mapper>

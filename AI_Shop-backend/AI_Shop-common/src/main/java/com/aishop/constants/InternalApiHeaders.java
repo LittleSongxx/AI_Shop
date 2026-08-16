@@ -3,6 +3,7 @@ package com.aishop.constants;
 public final class InternalApiHeaders {
 
     public static final String INTERNAL_TOKEN = "X-Internal-Token";
+    public static final String INTERNAL_OPS_TOKEN = "X-Internal-Ops-Token";
     /**
      * Agent 内部调用的委托用户身份。由 Agent worker 从会话身份（系统信道）写入，
      * 与 body 里模型可见的 userId 分离：body 可被模型输出或提示注入改写，头不能。

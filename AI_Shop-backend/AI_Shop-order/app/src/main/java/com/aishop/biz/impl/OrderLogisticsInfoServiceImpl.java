@@ -4,8 +4,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import com.aishop.component.OrderNotificationPublisher;
 import com.aishop.constants.RabbitMQConfig;
-import com.aishop.constants.ReliableMessageSender;
+import com.aishop.constants.TransactionalMqSender;
 import com.aishop.api.dto.PayOrderMessageDTO;
 import com.aishop.entity.enums.MessageReliabilityLevelEnum;
 import com.aishop.api.enums.LogisticsStatusEnum;
@@ -15,7 +16,6 @@ import com.aishop.entity.po.OrderLogisticsInfoRecord;
 import com.aishop.entity.query.OrderInfoQuery;
 import com.aishop.entity.query.OrderLogisticsInfoRecordQuery;
 import com.aishop.exception.BusinessException;
-import com.aishop.api.support.UserFeignSupport;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderLogisticsInfoRecordService;
 import com.aishop.support.MqIdempotencyKeys;
@@ -46,10 +46,10 @@ public class OrderLogisticsInfoServiceImpl implements OrderLogisticsInfoService 
 	private OrderInfoService orderInfoService;
 
 	@Resource
-	private UserFeignSupport userFeignSupport;
+	private OrderNotificationPublisher orderNotificationPublisher;
 
 	@Resource
-	private ReliableMessageSender reliableMessageSender;
+	private TransactionalMqSender transactionalMqSender;
 
 	@Override
 	public List<OrderLogisticsInfo> findListByParam(OrderLogisticsInfoQuery param) {
@@ -169,7 +169,7 @@ public class OrderLogisticsInfoServiceImpl implements OrderLogisticsInfoService 
 		record.setRecordAddress(orderLogisticsInfo.getSenderAddress());
 		orderLogisticsInfoRecordService.add(record);
 		PayOrderMessageDTO confirmDto = new PayOrderMessageDTO(orderLogisticsInfo.getOrderId());
-		reliableMessageSender.sendMessage(
+		transactionalMqSender.sendAfterCommit(
 				RabbitMQConfig.PAY_EXCHANGE,
 				RabbitMQConfig.PAY_CONFIRM_DELAY_KEY,
 				confirmDto,
@@ -177,7 +177,7 @@ public class OrderLogisticsInfoServiceImpl implements OrderLogisticsInfoService 
 				MessageReliabilityLevelEnum.STANDARD);
 		OrderInfo shippedOrder = orderInfoService.getOrderInfoByOrderId(orderLogisticsInfo.getOrderId());
 		if (shippedOrder != null && !StringTools.isEmpty(shippedOrder.getUserId())) {
-			userFeignSupport.sendNotifyAsync(shippedOrder.getUserId(), "订单已发货",
+			orderNotificationPublisher.send(shippedOrder.getUserId(), "订单已发货",
 					"您的订单 " + orderLogisticsInfo.getOrderId() + " 已发货，物流单号："
 							+ (orderLogisticsInfo.getLogisticsNo() == null ? "待更新" : orderLogisticsInfo.getLogisticsNo()),
 					"logistics", orderLogisticsInfo.getOrderId());

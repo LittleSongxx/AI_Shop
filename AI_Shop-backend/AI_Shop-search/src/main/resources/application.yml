@@ -32,6 +32,8 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         prefer-ip-address: true
@@ -47,6 +49,9 @@ spring:
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:your-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    user: ${FLYWAY_USER:aishop_flyway}
+    password: ${FLYWAY_PASSWORD:}
   servlet:
     multipart:
       max-file-size: 10MB
@@ -55,6 +60,11 @@ spring:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6380}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
   rabbitmq:
     host: ${RABBIT_HOST:127.0.0.1}
     port: ${RABBIT_PORT:5673}
@@ -72,8 +82,16 @@ spring:
         default-requeue-rejected: false
   elasticsearch:
     uris: ${ES_URIS:http://127.0.0.1:9200}
+    username: ${ES_USERNAME:}
+    password: ${ES_PASSWORD:}
   ai:
     model:
+      # Search only needs an EmbeddingModel. Local development uses the
+      # deterministic in-process model below; start.sh selects OpenAI-compatible
+      # embeddings automatically when EMBEDDING_API_KEY is configured.
+      chat: ${SPRING_AI_MODEL_CHAT:none}
+      embedding: ${SPRING_AI_MODEL_EMBEDDING:local}
+      moderation: none
       audio:
         speech: none
         transcription: none
@@ -94,11 +112,11 @@ spring:
         embeddings-path: ${EMBEDDING_PATH:/embeddings}
         options:
           model: ${EMBEDDING_MODEL:text-embedding-v4}
-          dimensions: 1024
+          dimensions: ${EMBEDDING_DIMENSIONS:1024}
     vectorstore:
       elasticsearch:
-        initialize-schema: true
-        dimensions: 1024
+        initialize-schema: ${VECTOR_INITIALIZE_SCHEMA:true}
+        dimensions: ${EMBEDDING_DIMENSIONS:1024}
         index-name: ${VECTOR_INDEX:aishop_vectorstore}
         embedding-field-name: ${VECTOR_FIELD:embedding}
 
@@ -113,20 +131,31 @@ management:
     health:
       probes:
         enabled: true
-      show-details: always
+      show-details: never
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 app:
-  # 与 product 同因：本库有 mq_compensation_log 且 RAG 相关的消费/发送失败会往里写，
-  # 但重放任务从未注册，记录只堆不消。打开前先确认 PENDING 积压里没有不该重放的旧消息
-  # （重放会把当时的 RAG 处理再触发一遍）。
   common-scheduling:
     enabled: false
 
+mq:
+  outbox:
+    dispatch-enabled: true
+  compensation:
+    auto-replay-enabled: true
+
 aishop:
+  search:
+    local-embedding:
+      dimensions: ${EMBEDDING_DIMENSIONS:1024}
+    vector-contract:
+      version: ${VECTOR_INDEX_SCHEMA_VERSION:1}
+  rag:
+    context-enrichment:
+      enabled: ${RAG_CONTEXT_ENRICHMENT_ENABLED:false}
   internal:
     token: ${AISHOP_INTERNAL_TOKEN:your-token}
     auth-enabled: true

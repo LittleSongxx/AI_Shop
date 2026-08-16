@@ -26,16 +26,18 @@ public class AGlobalExceptionHandlerController extends ABaseController {
 
     @ExceptionHandler(value = Exception.class)
     Object handleException(Exception e, HttpServletRequest request, HttpServletResponse response) {
-        logger.error("请求错误，请求地址{},错误信息:", request.getRequestURL(), e);
         ResponseVO ajaxResponse = new ResponseVO();
         //404
         if (e instanceof NoHandlerFoundException || e instanceof NoResourceFoundException) {
+            logger.debug("请求资源不存在, url={}, message={}", request.getRequestURL(), e.getMessage());
             ajaxResponse.setCode(ResponseCodeEnum.CODE_404.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_404.getMsg());
             ajaxResponse.setStatus(STATUC_ERROR);
         } else if (e instanceof BusinessException) {
             //业务错误
             BusinessException biz = (BusinessException) e;
+            logger.warn("业务请求未完成, url={}, code={}, message={}",
+                    request.getRequestURL(), biz.getCode(), biz.getMessage());
             if (biz instanceof HttpBusinessException httpBusinessException) {
                 response.setStatus(httpBusinessException.getHttpStatus());
             } else if (biz.getCode() != null
@@ -52,15 +54,19 @@ public class AGlobalExceptionHandlerController extends ABaseController {
             ajaxResponse.setStatus(STATUC_ERROR);
         } else if (e instanceof BindException|| e instanceof MethodArgumentTypeMismatchException || e instanceof HandlerMethodValidationException) {
             //参数类型错误
+            logger.warn("请求参数无效, url={}, type={}, message={}",
+                    request.getRequestURL(), e.getClass().getSimpleName(), e.getMessage());
             ajaxResponse.setCode(ResponseCodeEnum.CODE_600.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_600.getMsg());
             ajaxResponse.setStatus(STATUC_ERROR);
         } else if (e instanceof DuplicateKeyException) {
             //主键冲突
+            logger.warn("请求触发唯一键冲突, url={}, message={}", request.getRequestURL(), e.getMessage());
             ajaxResponse.setCode(ResponseCodeEnum.CODE_601.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_601.getMsg());
             ajaxResponse.setStatus(STATUC_ERROR);
         } else {
+            logger.error("请求处理异常, url={}", request.getRequestURL(), e);
             ajaxResponse.setCode(ResponseCodeEnum.CODE_500.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_500.getMsg());
             ajaxResponse.setStatus(STATUC_ERROR);

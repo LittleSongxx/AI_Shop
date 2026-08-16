@@ -724,11 +724,23 @@ class ShoppingProfileService:
                 await cur.execute(
                     """INSERT INTO agent_shopping_profile
                            (user_id, profile_json, revision, updated_at)
-                       VALUES (%s, %s, %s, NOW())
+                       VALUES (%s, %s, %s, NOW()) AS incoming
                        ON DUPLICATE KEY UPDATE
-                         profile_json=IF(revision=%s, VALUES(profile_json), profile_json),
-                         updated_at=IF(revision=%s, VALUES(updated_at), updated_at),
-                         revision=IF(revision=%s, VALUES(revision), revision)""",
+                         profile_json=IF(
+                           agent_shopping_profile.revision=%s,
+                           incoming.profile_json,
+                           agent_shopping_profile.profile_json
+                         ),
+                         updated_at=IF(
+                           agent_shopping_profile.revision=%s,
+                           incoming.updated_at,
+                           agent_shopping_profile.updated_at
+                         ),
+                         revision=IF(
+                           agent_shopping_profile.revision=%s,
+                           incoming.revision,
+                           agent_shopping_profile.revision
+                         )""",
                     (
                         user_id,
                         json.dumps(profile, ensure_ascii=False),
@@ -882,9 +894,9 @@ class ShoppingProfileService:
             current["revision"] = int(current.get("revision") or 0) + 1
             await cur.execute(
                 "INSERT INTO agent_shopping_profile "
-                "(user_id, profile_json, revision, updated_at) VALUES (%s,%s,%s,NOW()) "
-                "ON DUPLICATE KEY UPDATE profile_json=VALUES(profile_json), "
-                "revision=VALUES(revision), updated_at=NOW()",
+                "(user_id, profile_json, revision, updated_at) VALUES (%s,%s,%s,NOW()) AS incoming "
+                "ON DUPLICATE KEY UPDATE profile_json=incoming.profile_json, "
+                "revision=incoming.revision, updated_at=NOW()",
                 (
                     user_id,
                     json.dumps(current, ensure_ascii=False),
@@ -937,9 +949,9 @@ class ShoppingProfileService:
             current["revision"] = current_revision + 1
             await cur.execute(
                 "INSERT INTO agent_shopping_profile "
-                "(user_id, profile_json, revision, updated_at) VALUES (%s,%s,%s,NOW()) "
-                "ON DUPLICATE KEY UPDATE profile_json=VALUES(profile_json), "
-                "revision=VALUES(revision), updated_at=NOW()",
+                "(user_id, profile_json, revision, updated_at) VALUES (%s,%s,%s,NOW()) AS incoming "
+                "ON DUPLICATE KEY UPDATE profile_json=incoming.profile_json, "
+                "revision=incoming.revision, updated_at=NOW()",
                 (
                     user_id,
                     json.dumps(current, ensure_ascii=False),

@@ -2,7 +2,7 @@ package com.aishop.component;
 
 import com.aishop.constants.Constants;
 import com.aishop.constants.RabbitMQConfig;
-import com.aishop.constants.ReliableMessageSender;
+import com.aishop.constants.TransactionalMqSender;
 import com.aishop.entity.config.AppConfig;
 import com.aishop.api.dto.PayOrderMessageDTO;
 import com.aishop.api.enums.LogisticsStatusEnum;
@@ -77,7 +77,7 @@ public class RabbitMQPayOrderDeadListenerComponent {
     @Resource
     private OrderLogisticsInfoRecordService orderLogisticsInfoRecordService;
     @Resource
-    private ReliableMessageSender reliableMessageSender;
+    private TransactionalMqSender transactionalMqSender;
     @Resource
     private AppConfig appConfig;
     @Resource
@@ -92,7 +92,8 @@ public class RabbitMQPayOrderDeadListenerComponent {
             return;
         }
         if (!mqListenerHelper.tryBeginConsume(mqMessage, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_STANDARD_SECONDS)) {
-            channel.basicAck(deliveryTag, false);
+            mqListenerHelper.ackCompletedOrDeferBusy(
+                    channel, deliveryTag, mqMessage, RabbitMQConfig.PAY_TIMEOUT_DEAD_QUEUE);
             return;
         }
         log.info("支付超时死信队列收到订单: {}", message.getOrderId());
@@ -122,7 +123,8 @@ public class RabbitMQPayOrderDeadListenerComponent {
                 return;
             }
             if (!mqListenerHelper.tryBeginConsume(mqMessage, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_STANDARD_SECONDS)) {
-                channel.basicAck(deliveryTag, false);
+                mqListenerHelper.ackCompletedOrDeferBusy(
+                        channel, deliveryTag, mqMessage, RabbitMQConfig.PAY_CONFIRM_DEAD_QUEUE);
                 return;
             }
             log.info("确认收货死信队列收到订单: {}", message.getOrderId());
@@ -133,11 +135,16 @@ public class RabbitMQPayOrderDeadListenerComponent {
             log.error("自动确认收货处理失败", e);
             try {
                 if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-                    mqListenerHelper.releaseConsume(mqMessage);
-                    channel.basicNack(deliveryTag, false, false);
+                    mqListenerHelper.nackWithRetryOrDlq(
+                            channel,
+                            deliveryTag,
+                            mqMessage,
+                            RabbitMQConfig.PAY_CONFIRM_DEAD_QUEUE,
+                            message,
+                            e);
                 }
             } catch (Exception ex) {
-                log.error("兜底NACK失败", ex);
+                log.error("自动确认收货进入重试队列失败", ex);
             }
         }
     }
@@ -164,7 +171,8 @@ public class RabbitMQPayOrderDeadListenerComponent {
                 return;
             }
             if (!mqListenerHelper.tryBeginConsume(mqMessage, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_STANDARD_SECONDS)) {
-                channel.basicAck(deliveryTag, false);
+                mqListenerHelper.ackCompletedOrDeferBusy(
+                        channel, deliveryTag, mqMessage, RabbitMQConfig.PAY_LOGISTICS_DEAD_QUEUE);
                 return;
             }
             log.info("模拟物流死信队列收到订单: {}, step={}", message.getOrderId(), message.getLogisticsStep());
@@ -175,11 +183,16 @@ public class RabbitMQPayOrderDeadListenerComponent {
             log.error("模拟物流处理失败", e);
             try {
                 if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-                    mqListenerHelper.releaseConsume(mqMessage);
-                    channel.basicNack(deliveryTag, false, false);
+                    mqListenerHelper.nackWithRetryOrDlq(
+                            channel,
+                            deliveryTag,
+                            mqMessage,
+                            RabbitMQConfig.PAY_LOGISTICS_DEAD_QUEUE,
+                            message,
+                            e);
                 }
             } catch (Exception ex) {
-                log.error("兜底NACK失败", ex);
+                log.error("模拟物流进入重试队列失败", ex);
             }
         }
     }
@@ -188,98 +201,123 @@ public class RabbitMQPayOrderDeadListenerComponent {
     public void processOrderLogistics(PayOrderMessageDTO message, Long deliveryTag, Channel channel, Message mqMessage) {
         final boolean[] sendConfirm = {false};
         final Integer[] nextLogisticsStep = {null};
-        registerAckSync(deliveryTag, channel, mqMessage, () -> {
-            if (sendConfirm[0]) {
-                PayOrderMessageDTO confirmDto = new PayOrderMessageDTO(message.getOrderId());
-                reliableMessageSender.sendMessage(
-                        RabbitMQConfig.PAY_EXCHANGE,
-                        RabbitMQConfig.PAY_CONFIRM_DELAY_KEY,
-                        confirmDto,
-                        MqIdempotencyKeys.payConfirm(message.getOrderId()),
-                        MessageReliabilityLevelEnum.STANDARD);
-            }
-            if (nextLogisticsStep[0] != null) {
-                PayOrderMessageDTO nextDto = new PayOrderMessageDTO(message.getOrderId());
-                nextDto.setLogisticsStep(nextLogisticsStep[0]);
-                reliableMessageSender.sendMessage(
-                        RabbitMQConfig.PAY_EXCHANGE,
-                        RabbitMQConfig.PAY_LOGISTICS_DELAY_KEY,
-                        nextDto,
-                        MqIdempotencyKeys.payLogistics(message.getOrderId(), nextLogisticsStep[0]),
-                        MessageReliabilityLevelEnum.STANDARD);
-            }
-        });
-
-        int step = message.getLogisticsStep() == null ? 0 : message.getLogisticsStep();
-        String orderId = message.getOrderId();
-        OrderInfo orderInfo = orderInfoService.getOrderInfoByOrderId(orderId);
-        if (orderInfo == null) {
-            return;
-        }
-        OrderLogisticsInfo orderLogisticsInfo = orderLogisticsInfoService.getOrderLogisticsInfoByOrderId(orderId);
-        if (orderLogisticsInfo == null) {
-            log.warn("物流信息不存在，orderId: {}", orderId);
-            return;
-        }
-
-        OrderLogisticsInfoRecordQuery recordQuery = new OrderLogisticsInfoRecordQuery();
-        recordQuery.setOrderId(orderId);
-        Integer recordCount = orderLogisticsInfoRecordService.findCountByParam(recordQuery);
-        int count = recordCount == null ? 0 : recordCount;
-        if (count > step) {
-            log.info("物流步骤幂等跳过 orderId={}, step={}, recordCount={}", orderId, step, count);
-            scheduleNextIfNeeded(orderInfo, orderLogisticsInfo, count, sendConfirm, nextLogisticsStep);
-            return;
-        }
-        if (count < step) {
-            log.warn("物流步骤乱序 orderId={}, step={}, recordCount={}", orderId, step, count);
-            return;
-        }
-
-        OrderLogisticsInfoRecord orderLogisticsInfoRecord = new OrderLogisticsInfoRecord();
-        orderLogisticsInfoRecord.setOrderId(orderId);
-        orderLogisticsInfoRecord.setRecordTime(StringTools.getCurrentDate());
-
-        if (step == 0) {
-            if (!Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.PAID.getStatus())) {
-                if (Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.SHIPPED.getStatus())
-                        || Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.PARTIALLY_REFUNDED.getStatus())
-                        || Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.COMPLETED.getStatus())) {
-                    scheduleNextIfNeeded(orderInfo, orderLogisticsInfo, count, sendConfirm, nextLogisticsStep);
-                }
+        registerAckSync(deliveryTag, channel, mqMessage);
+        try {
+            int step = message.getLogisticsStep() == null ? 0 : message.getLogisticsStep();
+            String orderId = message.getOrderId();
+            OrderInfo orderInfo = orderInfoService.getOrderInfoByOrderId(orderId);
+            if (orderInfo == null) {
                 return;
             }
-            orderLogisticsInfoRecord.setRecordAddress(orderLogisticsInfo.getSenderAddress());
-            orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.IN_TRANSIT.getStatus());
-            orderLogisticsInfo.setLogisticsCompany("顺丰");
-            orderLogisticsInfo.setLogisticsNo("SF" + StringTools.getRandomNumber(Constants.LENGTH_30));
-            orderInfo.setOrderStatus(OrderStatusEnum.SHIPPED.getStatus());
-            orderInfoService.updateOrderInfoByOrderId(orderInfo, orderId);
-            OrderLogisticsInfoQuery logisticsQuery = new OrderLogisticsInfoQuery();
-            logisticsQuery.setOrderId(orderId);
-            orderLogisticsInfoService.updateByParam(orderLogisticsInfo, logisticsQuery);
-            sendConfirm[0] = true;
-        } else if (Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.SHIPPED.getStatus())
-                || Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.PARTIALLY_REFUNDED.getStatus())
-                || Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.COMPLETED.getStatus())) {
-            orderLogisticsInfoRecord.setRecordAddress(RECORD_ADDRESSES[new Random().nextInt(RECORD_ADDRESSES.length)]);
-        } else {
-            return;
-        }
+            OrderLogisticsInfo orderLogisticsInfo =
+                    orderLogisticsInfoService.getOrderLogisticsInfoByOrderId(orderId);
+            if (orderLogisticsInfo == null) {
+                log.warn("物流信息不存在，orderId: {}", orderId);
+                return;
+            }
 
-        int maxStations = appConfig.getLogisticsSimulateMaxStations();
-        int countAfter = count + 1;
-        if (countAfter >= maxStations) {
-            orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.DELIVERED.getStatus());
-            orderLogisticsInfoRecord.setRecordAddress(orderLogisticsInfo.getReceiverAddress());
-        } else {
-            nextLogisticsStep[0] = step + 1;
-        }
+            OrderLogisticsInfoRecordQuery recordQuery = new OrderLogisticsInfoRecordQuery();
+            recordQuery.setOrderId(orderId);
+            Integer recordCount = orderLogisticsInfoRecordService.findCountByParam(recordQuery);
+            int count = recordCount == null ? 0 : recordCount;
+            if (count > step) {
+                log.info("物流步骤幂等跳过 orderId={}, step={}, recordCount={}",
+                        orderId, step, count);
+                scheduleNextIfNeeded(
+                        orderInfo, orderLogisticsInfo, count, sendConfirm, nextLogisticsStep);
+                return;
+            }
+            if (count < step) {
+                log.warn("物流步骤乱序 orderId={}, step={}, recordCount={}",
+                        orderId, step, count);
+                return;
+            }
 
-        OrderLogisticsInfoQuery updateQuery = new OrderLogisticsInfoQuery();
-        updateQuery.setOrderId(orderId);
-        orderLogisticsInfoService.updateByParam(orderLogisticsInfo, updateQuery);
-        orderLogisticsInfoRecordService.add(orderLogisticsInfoRecord);
+            OrderLogisticsInfoRecord orderLogisticsInfoRecord = new OrderLogisticsInfoRecord();
+            orderLogisticsInfoRecord.setOrderId(orderId);
+            orderLogisticsInfoRecord.setRecordTime(StringTools.getCurrentDate());
+
+            if (step == 0) {
+                if (!Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.PAID.getStatus())) {
+                    if (Objects.equals(orderInfo.getOrderStatus(), OrderStatusEnum.SHIPPED.getStatus())
+                            || Objects.equals(
+                                    orderInfo.getOrderStatus(),
+                                    OrderStatusEnum.PARTIALLY_REFUNDED.getStatus())
+                            || Objects.equals(
+                                    orderInfo.getOrderStatus(),
+                                    OrderStatusEnum.COMPLETED.getStatus())) {
+                        scheduleNextIfNeeded(
+                                orderInfo,
+                                orderLogisticsInfo,
+                                count,
+                                sendConfirm,
+                                nextLogisticsStep);
+                    }
+                    return;
+                }
+                orderLogisticsInfoRecord.setRecordAddress(orderLogisticsInfo.getSenderAddress());
+                orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.IN_TRANSIT.getStatus());
+                orderLogisticsInfo.setLogisticsCompany("顺丰");
+                orderLogisticsInfo.setLogisticsNo(
+                        "SF" + StringTools.getRandomNumber(Constants.LENGTH_30));
+                orderInfo.setOrderStatus(OrderStatusEnum.SHIPPED.getStatus());
+                orderInfoService.updateOrderInfoByOrderId(orderInfo, orderId);
+                OrderLogisticsInfoQuery logisticsQuery = new OrderLogisticsInfoQuery();
+                logisticsQuery.setOrderId(orderId);
+                orderLogisticsInfoService.updateByParam(orderLogisticsInfo, logisticsQuery);
+                sendConfirm[0] = true;
+            } else if (Objects.equals(
+                            orderInfo.getOrderStatus(), OrderStatusEnum.SHIPPED.getStatus())
+                    || Objects.equals(
+                            orderInfo.getOrderStatus(),
+                            OrderStatusEnum.PARTIALLY_REFUNDED.getStatus())
+                    || Objects.equals(
+                            orderInfo.getOrderStatus(), OrderStatusEnum.COMPLETED.getStatus())) {
+                orderLogisticsInfoRecord.setRecordAddress(
+                        RECORD_ADDRESSES[new Random().nextInt(RECORD_ADDRESSES.length)]);
+            } else {
+                return;
+            }
+
+            int maxStations = appConfig.getLogisticsSimulateMaxStations();
+            int countAfter = count + 1;
+            if (countAfter >= maxStations) {
+                orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.DELIVERED.getStatus());
+                orderLogisticsInfoRecord.setRecordAddress(orderLogisticsInfo.getReceiverAddress());
+            } else {
+                nextLogisticsStep[0] = step + 1;
+            }
+
+            OrderLogisticsInfoQuery updateQuery = new OrderLogisticsInfoQuery();
+            updateQuery.setOrderId(orderId);
+            orderLogisticsInfoService.updateByParam(orderLogisticsInfo, updateQuery);
+            orderLogisticsInfoRecordService.add(orderLogisticsInfoRecord);
+        } finally {
+            queueLogisticsFollowUps(message.getOrderId(), sendConfirm[0], nextLogisticsStep[0]);
+        }
+    }
+
+    private void queueLogisticsFollowUps(
+            String orderId, boolean sendConfirm, Integer nextLogisticsStep) {
+        if (sendConfirm) {
+            PayOrderMessageDTO confirmDto = new PayOrderMessageDTO(orderId);
+            transactionalMqSender.sendAfterCommit(
+                    RabbitMQConfig.PAY_EXCHANGE,
+                    RabbitMQConfig.PAY_CONFIRM_DELAY_KEY,
+                    confirmDto,
+                    MqIdempotencyKeys.payConfirm(orderId),
+                    MessageReliabilityLevelEnum.STANDARD);
+        }
+        if (nextLogisticsStep != null) {
+            PayOrderMessageDTO nextDto = new PayOrderMessageDTO(orderId);
+            nextDto.setLogisticsStep(nextLogisticsStep);
+            transactionalMqSender.sendAfterCommit(
+                    RabbitMQConfig.PAY_EXCHANGE,
+                    RabbitMQConfig.PAY_LOGISTICS_DELAY_KEY,
+                    nextDto,
+                    MqIdempotencyKeys.payLogistics(orderId, nextLogisticsStep),
+                    MessageReliabilityLevelEnum.STANDARD);
+        }
     }
 
     private void scheduleNextIfNeeded(OrderInfo orderInfo, OrderLogisticsInfo orderLogisticsInfo, int recordCount,
@@ -301,20 +339,19 @@ public class RabbitMQPayOrderDeadListenerComponent {
     }
 
     private void registerAckSync(Long deliveryTag, Channel channel, Message mqMessage) {
-        registerAckSync(deliveryTag, channel, mqMessage, null);
-    }
-
-    private void registerAckSync(Long deliveryTag, Channel channel, Message mqMessage, Runnable afterCommitExtra) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 try {
-                    if (afterCommitExtra != null) {
-                        afterCommitExtra.run();
-                    }
+                    mqListenerHelper.clearConsumeRetry(
+                            mqMessage.getMessageProperties().getConsumerQueue(), mqMessage);
+                } catch (Exception e) {
+                    log.warn("事务已提交，但 MQ 消费完成标记写入失败，将依赖业务幂等兜底", e);
+                }
+                try {
                     channel.basicAck(deliveryTag, false);
                 } catch (IOException e) {
-                    log.error("ACK失败", e);
+                    log.error("事务提交后的 ACK 失败，消息将由 Broker 重投", e);
                 }
             }
 
@@ -323,9 +360,8 @@ public class RabbitMQPayOrderDeadListenerComponent {
                 if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
                     try {
                         mqListenerHelper.releaseConsume(mqMessage);
-                        channel.basicNack(deliveryTag, false, false);
-                    } catch (IOException e) {
-                        log.error("NACK失败", e);
+                    } catch (Exception e) {
+                        log.warn("事务回滚后的消费租约释放失败，将等待租约自然过期", e);
                     }
                 }
             }

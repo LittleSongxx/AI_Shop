@@ -1,7 +1,11 @@
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from app.services.shopping_mission_service import (
     _CATEGORY_SCHEMAS,
+    ShoppingMissionService,
     _validated_category_schema,
     apply_explicit_turn,
     empty_shopping_mission,
@@ -79,6 +83,24 @@ def test_speaker_category_is_not_misclassified_as_luggage():
     assert next_clarification(mission) is None
 
 
+def test_clarification_uses_injected_clock_for_deterministic_evaluation():
+    fixed_now = datetime(2026, 8, 12, 8, 0, tzinfo=timezone.utc)
+    mission = empty_shopping_mission(
+        {
+            **empty_profile(),
+            "category": "箱包",
+            "budgetMax": 500.0,
+        }
+    )
+    mission["expiresAt"] = (fixed_now + timedelta(hours=1)).isoformat()
+
+    clarification = next_clarification(mission, now=fixed_now)
+
+    assert clarification is not None
+    assert clarification["slot"] == "useCase"
+    assert clarification["options"] == ["上学通勤", "上班通勤", "旅行出差", "户外运动"]
+
+
 def test_category_schema_rejects_weights_that_do_not_sum_to_one():
     invalid = {
         **_CATEGORY_SCHEMAS["computer"],
@@ -118,3 +140,34 @@ def test_explicit_bag_turn_replaces_an_active_headphones_mission():
     assert updated["hardConstraints"]["budgetMax"] == 500.0
     assert updated["useCases"] == ["办公", "通勤", "上班通勤"]
     assert updated["candidateProducts"] == []
+
+
+@pytest.mark.asyncio
+async def test_mission_upsert_qualifies_existing_columns_for_mysql_84(monkeypatch):
+    cur = AsyncMock()
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=cur)
+    cm.__aexit__ = AsyncMock(return_value=None)
+    memory = MagicMock()
+    memory.state = {}
+
+    monkeypatch.setattr(
+        "app.services.shopping_mission_service.session_memory_service.load",
+        AsyncMock(return_value=memory),
+    )
+    monkeypatch.setattr(
+        "app.services.shopping_mission_service.session_memory_service.save",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "app.services.shopping_mission_service.redis_service._client",
+        MagicMock(),
+    )
+
+    mission = empty_shopping_mission(empty_profile())
+    with patch("app.services.shopping_mission_service.acquire", return_value=cm):
+        await ShoppingMissionService()._save("u1", mission, source_message_id=42)
+
+    sql = cur.execute.await_args.args[0]
+    assert "agent_shopping_mission.source_message_id" in sql
+    assert "agent_shopping_mission.revision+1" in sql

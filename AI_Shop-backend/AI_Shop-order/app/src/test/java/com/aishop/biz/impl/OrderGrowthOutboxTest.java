@@ -3,6 +3,7 @@ package com.aishop.biz.impl;
 import com.aishop.api.dto.OrderGrowthEventDTO;
 import com.aishop.api.enums.OrderStatusEnum;
 import com.aishop.api.support.UserFeignSupport;
+import com.aishop.component.OrderNotificationPublisher;
 import com.aishop.constants.RabbitMQConfig;
 import com.aishop.constants.TransactionalMqSender;
 import com.aishop.entity.enums.MessageReliabilityLevelEnum;
@@ -43,6 +44,8 @@ class OrderGrowthOutboxTest {
     private TransactionalMqSender transactionalMqSender;
     @Mock
     private UserFeignSupport userFeignSupport;
+    @Mock
+    private OrderNotificationPublisher orderNotificationPublisher;
     @InjectMocks
     private OrderInfoServiceImpl service;
 
@@ -89,7 +92,7 @@ class OrderGrowthOutboxTest {
         service.onOrderConfirmed("user-1", "order-1");
 
         verify(userFeignSupport, never()).addGrowthOnPay(any(), any());
-        verify(userFeignSupport).sendNotifyAsync(
+        verify(orderNotificationPublisher).send(
                 eq("user-1"), eq("确认收货成功"), any(), eq("order"), eq("order-1"));
     }
 

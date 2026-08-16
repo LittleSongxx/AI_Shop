@@ -282,7 +282,7 @@
         },
         {
           "refId": "B",
-          "expr": "max(agent_task_backlog{job=\"aishop-agent\"})",
+          "expr": "max(agent_task_backlog{job=~\"aishop-agent(-worker)?\"})",
           "legendFormat": "数据库积压"
         }
       ]

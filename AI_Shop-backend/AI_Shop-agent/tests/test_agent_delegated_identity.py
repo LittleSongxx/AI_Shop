@@ -9,6 +9,7 @@ import asyncio
 
 from app.services.java_internal_client import (
     clear_delegated_user_id,
+    delegated_user_scope,
     java_internal_client,
     set_delegated_user_id,
 )
@@ -35,6 +36,16 @@ def test_set_trims_and_ignores_empty():
     set_delegated_user_id(None)
     assert "X-Agent-User-Id" not in java_internal_client._headers()
     clear_delegated_user_id()
+
+
+def test_delegated_scope_restores_outer_identity():
+    set_delegated_user_id("outer")
+    try:
+        with delegated_user_scope("inner"):
+            assert java_internal_client._headers()["X-Agent-User-Id"] == "inner"
+        assert java_internal_client._headers()["X-Agent-User-Id"] == "outer"
+    finally:
+        clear_delegated_user_id()
 
 
 async def test_delegation_is_isolated_per_task():

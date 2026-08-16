@@ -25,13 +25,15 @@
 		<result column="last_login_ip" property="lastLoginIp"  />
 		<!--0:禁用 1:正常-->
 		<result column="status" property="status"  />
+		<!--临时封禁到期时间；NULL 表示非临时封禁-->
+		<result column="temp_ban_until_ms" property="tempBanUntilMs" />
 	</resultMap>
 
 
 	<!-- 通用查询结果列-->
 	<sql id="base_column_list">
 		 u.user_id,u.nick_name,u.avatar,u.email,u.password,
-		 u.sex,u.join_time,u.last_login_time,u.last_login_ip,u.status
+		 u.sex,u.join_time,u.last_login_time,u.last_login_ip,u.status,u.temp_ban_until_ms
 	</sql>
 
 	<sql id="base_condition_filed">
@@ -552,6 +554,58 @@
 		<foreach collection="userIds" item="id" open="(" separator="," close=")">
 			#{id}
 		</foreach>
+	</select>
+
+	<update id="applyTemporaryBan">
+		update user_info
+		set status = 0,
+		    temp_ban_until_ms = #{unbanAtMs}
+		where user_id = #{userId}
+	</update>
+
+	<update id="clearTemporaryBanIfDue">
+		update user_info
+		set status = 1,
+		    temp_ban_until_ms = null
+		where user_id = #{userId}
+		  and status = 0
+		  and temp_ban_until_ms is not null
+		  and temp_ban_until_ms &lt;= #{nowMs}
+		  and (
+		    #{expectedUnbanAtMs} is null
+		    or temp_ban_until_ms = #{expectedUnbanAtMs}
+		  )
+	</update>
+
+	<update id="clearTemporaryBanManually">
+		update user_info
+		set status = 1,
+		    temp_ban_until_ms = null
+		where user_id = #{userId}
+		  and temp_ban_until_ms is not null
+	</update>
+
+	<update id="clearTemporaryBanMarker">
+		update user_info
+		set temp_ban_until_ms = null
+		where user_id = #{userId}
+	</update>
+
+	<update id="setPermanentBan">
+		update user_info
+		set status = 0,
+		    temp_ban_until_ms = null
+		where user_id = #{userId}
+	</update>
+
+	<select id="selectExpiredTemporaryBanUserIds" resultType="java.lang.String">
+		select user_id
+		from user_info
+		where status = 0
+		  and temp_ban_until_ms is not null
+		  and temp_ban_until_ms &lt;= #{nowMs}
+		order by temp_ban_until_ms asc
+		limit #{limit}
 	</select>
 
 </mapper>

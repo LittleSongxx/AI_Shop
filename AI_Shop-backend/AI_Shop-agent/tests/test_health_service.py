@@ -39,6 +39,7 @@ async def test_model_provider_health_is_diagnostic_only(monkeypatch):
     settings = SimpleNamespace(
         llm_api_key="",
         embedding_api_key="",
+        embedding_provider="openai",
         rerank_api_key="",
     )
     monkeypatch.setattr("app.services.health_service.get_settings", lambda: settings)
@@ -55,3 +56,24 @@ async def test_model_provider_health_is_diagnostic_only(monkeypatch):
     assert dependencies["visualSearch"] == {"state": "DISABLED"}
     assert dependencies["javaGateway"] is True
     assert dependencies["mcp"] is True
+
+
+@pytest.mark.asyncio
+async def test_local_embedding_is_available_but_not_production_ready(monkeypatch):
+    service = HealthService()
+    settings = SimpleNamespace(
+        llm_api_key="",
+        embedding_api_key="",
+        embedding_provider="local",
+        rerank_api_key="",
+    )
+    monkeypatch.setattr("app.services.health_service.get_settings", lambda: settings)
+    monkeypatch.setattr(service, "_check_es_mapping", AsyncMock(return_value={"ok": True}))
+    monkeypatch.setattr(service, "_check_java_gateway", AsyncMock(return_value=True))
+    monkeypatch.setattr(service, "_check_mcp", AsyncMock(return_value=True))
+
+    dependencies = await service.check_dependencies()
+
+    assert dependencies["embedding"] is True
+    assert dependencies["embeddingProvider"] == "local"
+    assert dependencies["embeddingProductionReady"] is False

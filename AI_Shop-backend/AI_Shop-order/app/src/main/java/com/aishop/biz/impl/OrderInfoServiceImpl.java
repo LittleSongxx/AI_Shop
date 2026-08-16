@@ -8,6 +8,7 @@ import com.aishop.biz.CouponRushOrderService;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderRequestIdempotencyService;
 import com.aishop.biz.RefundSagaService;
+import com.aishop.component.OrderNotificationPublisher;
 import com.aishop.component.RedisComponent;
 import com.aishop.component.PayOrderRedisComponent;
 import com.aishop.component.RemoteCompensateRecorder;
@@ -100,6 +101,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	private CouponRushOrderService couponRushOrderService;
 	@Resource
 	private CommerceOutcomeClient commerceOutcomeClient;
+	@Resource
+	private OrderNotificationPublisher orderNotificationPublisher;
 
 	@Override
 	public List<OrderInfo> findListByParam(OrderInfoQuery param) {
@@ -1264,10 +1267,10 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	public void onOrderConfirmed(String userId, String orderId) {
 		OrderInfo orderInfo = orderInfoMapper.selectByOrderId(orderId);
 		if (orderInfo != null && OrderCommentStatusEnum.EVALUATED.getStatus().equals(orderInfo.getCommentStatus())) {
-			userFeignSupport.sendNotifyAsync(userId, "追评提醒",
+			orderNotificationPublisher.send(userId, "追评提醒",
 					"订单已完成，欢迎追加评价分享购物体验", "comment_re", orderId);
 		} else {
-			userFeignSupport.sendNotifyAsync(userId, "确认收货成功",
+			orderNotificationPublisher.send(userId, "确认收货成功",
 					"订单已完成，欢迎评价商品获取成长值", "order", orderId);
 		}
 	}

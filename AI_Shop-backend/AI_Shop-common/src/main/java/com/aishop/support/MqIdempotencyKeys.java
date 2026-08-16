@@ -43,8 +43,11 @@ public final class MqIdempotencyKeys {
         return "order:growth:" + require(orderId);
     }
 
-    public static String browseRecord(String userId, String productId) {
-        return "browse:" + require(userId) + ":" + require(productId);
+    public static String browseRecord(String userId, String productId, long browseTime) {
+        if (browseTime <= 0) {
+            throw new IllegalArgumentException("浏览事件时间必须为正数");
+        }
+        return "browse:" + require(userId) + ":" + require(productId) + ":at:" + browseTime;
     }
 
     public static String signRecord(String userId, String yyyyMMdd) {

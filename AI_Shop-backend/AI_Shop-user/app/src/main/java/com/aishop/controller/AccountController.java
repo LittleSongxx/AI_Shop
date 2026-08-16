@@ -73,13 +73,18 @@ public class AccountController extends ABaseController{
     @Resource
     private PasswordService passwordService;
 
-    private void throwIfAccountDisabled(String userId) {
-        Long unbanAt = userTempBanService.getUnbanAtMs(userId);
+    private UserInfo refreshDisabledAccount(UserInfo userInfo) {
+        Long unbanAt = userTempBanService.getUnbanAtMs(userInfo.getUserId());
         if (unbanAt != null) {
             Map<String, Object> data = new HashMap<>();
             data.put("errorType", "ACCOUNT_TEMP_BANNED");
             data.put("unbanAt", unbanAt);
             throw new BusinessException(600, userTempBanService.buildTempBanMessage(unbanAt), data);
+        }
+        UserInfo refreshed = userInfoService.getUserInfoByUserId(userInfo.getUserId());
+        if (refreshed != null
+                && UserStatusEnum.ENABLE.getStatus().equals(refreshed.getStatus())) {
+            return refreshed;
         }
         throw new BusinessException("账号被禁用！");
     }
@@ -102,7 +107,13 @@ public class AccountController extends ABaseController{
         // 判断当前用户是否被封禁：status=0为封禁
         // 根据userId查询用户（Redis 残留 token / 库重导后用户不存在时勿 NPE）
         UserInfo userInfo = userInfoService.getUserInfoByUserId(validUserInfo.getUserId());
-        if (userInfo == null || Objects.equals(userInfo.getStatus(), UserStatusEnum.DISABLE.getStatus())){
+        if (userInfo != null
+                && Objects.equals(userInfo.getStatus(), UserStatusEnum.DISABLE.getStatus())
+                && userTempBanService.getUnbanAtMs(userInfo.getUserId()) == null) {
+            userInfo = userInfoService.getUserInfoByUserId(validUserInfo.getUserId());
+        }
+        if (userInfo == null
+                || Objects.equals(userInfo.getStatus(), UserStatusEnum.DISABLE.getStatus())){
             return getSuccessResponseVO(null);
         }
         validUserInfo.setEmail(userInfo.getEmail());
@@ -164,7 +175,7 @@ public class AccountController extends ABaseController{
                 userInfoService.updateByParam(upgrade, upgradeQuery);
             }
             if (UserStatusEnum.DISABLE.getStatus().equals(userInfo.getStatus())){
-                throwIfAccountDisabled(userInfo.getUserId());
+                userInfo = refreshDisabledAccount(userInfo);
             }
             // 登录成功，返回userId,nickName,avatar,token:TokenUserInfoDTO
             TokenUserInfoDTO tokenUserInfoDTO = new TokenUserInfoDTO();

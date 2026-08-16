@@ -25,6 +25,8 @@ public interface UserNotificationService {
 
     void batchInsert(List<UserNotification> notifications);
 
+    boolean insertIfAbsent(UserNotification notification);
+
     UserNotification getPopupNotification(String userId);
 
     void clearPopupNotification(String userId, String notificationId);

@@ -50,7 +50,8 @@
 
 ### 基础设施
 
-Docker Compose：MySQL 8 · Redis 7 · RabbitMQ 3 · Nacos 2 · Elasticsearch 9 · Sentinel · Seata 2
+Docker Compose：MySQL 8.4.11 · Redis 7.4.7 · RabbitMQ 4.2.9 · Nacos 2.5.3 ·
+Elasticsearch 8.19.19（IK）· Sentinel 1.8.8 · Seata 2.5.0
 
 ---
 
@@ -130,14 +131,15 @@ AI_Shop/
 ### 0. 一键起停（推荐）
 
 ```bash
-./start.sh --build          # 首次：Maven 打包 + 中间件 + Java 微服务 + Agent
+./start.sh --build          # 首次：构建 + 中间件 + 可观测栈 + Java 微服务 + Agent
 ./start.sh                  # 后续：复用最新 JAR；源码较新时自动串行重建
 ./start.sh --middleware-only  # 只起 Docker 中间件
 ./stop.sh                   # 停 Java + Agent（中间件保留）
 ./stop.sh --middleware      # 一并停中间件
 ```
 
-`start.sh` 会自动将冲突端口向后顺延，实际端口写入 `run/runtime.env`；随后等待
+`start.sh` 会自动将业务与可观测组件的冲突端口向后顺延，实际端口写入
+`run/runtime.env`；随后等待
 MySQL / Nacos / Seata 就绪，再串行拉起 Java 服务以控制 WSL 峰值内存。非
 `--middleware-only` 启动还会预检 Agent `.env`：填写 `RERANK_API_KEY` 后，必须同时把
 `RERANK_BASE_URL` 中的 `YOUR_WORKSPACE_ID` 换成真实百炼业务空间 ID。PID 和日志落在
@@ -146,15 +148,15 @@ MySQL / Nacos / Seata 就绪，再串行拉起 Java 服务以控制 WSL 峰值�
 ### 1. 启动中间件
 
 ```bash
-cd deploy
-docker compose -f docker-compose.middleware.yml up -d
+./start.sh --middleware-only
 ```
 
 等待 Nacos（8848）、MySQL（3306）、Redis（**6380**）、RabbitMQ（**5673**）、ES（9200）全部就绪。
 
 > Redis / RabbitMQ / Seata 的宿主机端口是 +1 偏移（6380 / 5673 / 8092），避免和本机已装的同类服务冲突。
-> 配置里的默认值已经是偏移后的端口，所以不传环境变量也能连上；手工起服务时唯一必须给的是
-> `MYSQL_PASSWORD`。详见 [deploy/本地中间件启动指南.md](deploy/本地中间件启动指南.md)。
+> Seata 2.5 还要求注册地址不能是 `127.0.0.1`，因此不要绕过启动脚本直接执行裸 Compose；
+> 跨主机部署时显式设置可达且受防火墙保护的 `SEATA_IP`。详见
+> [deploy/本地中间件启动指南.md](deploy/本地中间件启动指南.md)。
 
 ### 2. 初始化数据库
 
@@ -202,14 +204,17 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 | 变量名 | 说明 |
 |--------|------|
 | `AISHOP_INTERNAL_TOKEN` | 服务间调用 `/internal/**` 的共享密钥（全服务一致） |
+| `AISHOP_INTERNAL_OPS_TOKEN` | Outbox 人工重放等高风险运维接口的独立密钥 |
 | `AISHOP_ADMIN_ASSERTION_CURRENT_SECRET` | Java 管理端到 Python Agent 的管理员断言签名密钥 |
 | `PILOT_IDENTITY_HMAC_SECRET` | 试用参与者稳定伪名匹配密钥，不随请求签名密钥轮换 |
 | `PRIVACY_EXPORT_SIGNING_SECRET` | AI 数据删除后保留事实匿名化使用的独立密钥 |
 | `ADMIN_PASSWORD` | 管理后台初始管理员密码；生产环境必须替换默认值 |
-| `MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` | 本地中间件 root 密码与 Java 数据库密码；一键脚本会安全持久化选定值 |
-| `RABBIT_PASSWORD` / `REDIS_PASSWORD` | RabbitMQ 与 Redis 凭据；本地 Redis 默认不启用密码 |
-| `SEATA_CONSOLE_PASSWORD` / `SEATA_SECURITY_SECRET_KEY` | Seata 控制台密码与 Token 签名密钥 |
-| `GRAFANA_ADMIN_PASSWORD` | 仅启动可观测性 Compose 时需要 |
+| `MYSQL_ROOT_PASSWORD` / `MYSQL_USER` / `MYSQL_PASSWORD` | root 仅用于本地引导；业务服务使用只有 DML 权限的非 root 运行账号 |
+| `FLYWAY_USER` / `FLYWAY_PASSWORD` | Java Flyway 与 Agent Alembic 共用的独立迁移身份，不得与业务运行账号复用 |
+| `NACOS_MYSQL_*` / `SEATA_MYSQL_*` | Nacos、Seata 各自的 schema 级数据库账号；一键脚本自动生成并持久化 |
+| `RABBIT_PASSWORD` / `REDIS_PASSWORD` | RabbitMQ 与 Redis 凭据；`start.sh` 会为本地 Redis 生成并持久化随机密码 |
+| `SEATA_SECURITY_SECRET_KEY` | Seata TC Token 签名密钥 |
+| `GRAFANA_ADMIN_PASSWORD` | 可选；一键脚本未收到显式值时自动生成并保存到 `run/secrets/grafana.env` |
 | `APP_ENV` / `AISHOP_PRODUCTION_READY` | 生产环境分别设为 `production` / `true`，触发 Python Agent 与 Java 服务的安全校验 |
 | `AISHOP_DEV_LOGIN_BYPASS` | 本地调试开关，**禁止生产开启** |
 | `ALLOW_DEVELOPMENT_AUTH_BYPASS` | Python Agent 的开发认证绕过开关，**禁止生产开启** |

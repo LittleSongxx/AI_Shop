@@ -31,8 +31,9 @@ async def init_analytics_pool() -> None:
         db=settings.analytics_mysql_database,
         charset="utf8mb4",
         autocommit=True,
-        minsize=1,
-        maxsize=4,
+        minsize=settings.analytics_mysql_pool_min_size,
+        maxsize=settings.analytics_mysql_pool_max_size,
+        pool_recycle=settings.mysql_pool_recycle_seconds,
         init_command="SET SESSION TRANSACTION READ ONLY",
     )
     try:

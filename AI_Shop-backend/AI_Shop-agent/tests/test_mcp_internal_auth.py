@@ -1,7 +1,11 @@
+import ast
+from pathlib import Path
+
 import pytest
 
 from app.config.settings import Settings
-from app.mcp_server.server import InternalTokenMiddleware
+from app.mcp_server.server import InternalTokenMiddleware, _run_as_delegated_user
+from app.services.java_internal_client import JavaInternalClient
 from app.services.mcp_streamable_client import McpStreamableClient
 
 
@@ -39,6 +43,49 @@ def test_mcp_client_always_sends_internal_token(monkeypatch):
     client = McpStreamableClient()
     assert client._headers == {"X-Internal-Token": "secret"}
     get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_mcp_rebinds_the_verified_user_for_java_calls(monkeypatch):
+    monkeypatch.setenv("AISHOP_INTERNAL_TOKEN", "secret")
+    from app.config.settings import get_settings
+
+    get_settings.cache_clear()
+    client = JavaInternalClient()
+
+    async def inspect_headers():
+        return client._headers()
+
+    headers = await _run_as_delegated_user("u1", inspect_headers())
+
+    assert headers == {
+        "X-Internal-Token": "secret",
+        "Content-Type": "application/json",
+        "X-Agent-User-Id": "u1",
+    }
+    assert "X-Agent-User-Id" not in client._headers()
+    get_settings.cache_clear()
+
+
+def test_every_user_scoped_mcp_tool_rebinds_delegated_identity():
+    server_path = Path(__file__).parents[1] / "app" / "mcp_server" / "server.py"
+    module = ast.parse(server_path.read_text(encoding="utf-8"))
+
+    missing: list[str] = []
+    for node in module.body:
+        if not isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
+            continue
+        if not any(arg.arg == "userId" for arg in node.args.args):
+            continue
+        if not any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "_run_as_delegated_user"
+            for child in ast.walk(node)
+        ):
+            missing.append(node.name)
+
+    assert missing == []
 
 
 @pytest.mark.asyncio

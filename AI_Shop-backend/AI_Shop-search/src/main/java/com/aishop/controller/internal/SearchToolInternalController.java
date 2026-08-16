@@ -37,10 +37,13 @@ public class SearchToolInternalController extends ABaseController {
 
     @PostMapping("/productData")
     public ResponseVO<Void> productData(
-            @RequestParam(name = "includeVector", defaultValue = "true") boolean includeVector) {
+            @RequestParam(name = "includeVector", defaultValue = "true") boolean includeVector,
+            @RequestParam(name = "includeKeyword", defaultValue = "true") boolean includeKeyword) {
         List<String> productIds = productFeignSupport.listOnSaleProductIds();
         for (String productId : productIds) {
-            esSearchComponent.saveIndex(productId);
+            if (includeKeyword) {
+                esSearchComponent.saveIndex(productId);
+            }
             if (includeVector) {
                 RagDataDTO ragDataDTO = new RagDataDTO(productId, RagDataTypeEnum.PRODUCT.getType());
                 reliableMessageSender.sendMessage(
@@ -51,7 +54,11 @@ public class SearchToolInternalController extends ABaseController {
                         MessageReliabilityLevelEnum.HIGH);
             }
         }
-        log.info("product_index_rebuild_completed count={} includeVector={}", productIds.size(), includeVector);
+        log.info(
+                "product_index_rebuild_completed count={} includeKeyword={} includeVector={}",
+                productIds.size(),
+                includeKeyword,
+                includeVector);
         return getSuccessResponseVO(null);
     }
 

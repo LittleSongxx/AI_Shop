@@ -145,7 +145,7 @@ def _mission_case(row: dict[str, Any]) -> CaseExecution:
         now=_FIXED_NOW,
     )
     assert mission is not None
-    clarification = next_clarification(mission)
+    clarification = next_clarification(mission, now=_FIXED_NOW)
     actual_slot = clarification.get("slot") if clarification else None
     assertions = [
         _assertion(

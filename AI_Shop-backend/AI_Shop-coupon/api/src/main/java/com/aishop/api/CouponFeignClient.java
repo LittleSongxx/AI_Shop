@@ -6,6 +6,7 @@ import com.aishop.api.dto.UserCouponCreateDTO;
 import com.aishop.api.dto.UserCouponIdDTO;
 import com.aishop.api.dto.UserCouponStatusChangeDTO;
 import com.aishop.api.vo.CouponBriefVO;
+import com.aishop.api.vo.CouponGrantResultVO;
 import com.aishop.api.vo.CouponLockResultVO;
 import com.aishop.api.vo.DiscountCouponVO;
 import com.aishop.api.vo.StockChangeResultVO;
@@ -37,6 +38,9 @@ public interface CouponFeignClient {
 
     @PostMapping("/createUserCoupon")
     ResponseVO<Void> createUserCoupon(@RequestBody UserCouponCreateDTO dto);
+
+    @PostMapping("/grantCoupon")
+    ResponseVO<CouponGrantResultVO> grantCoupon(@RequestBody UserCouponCreateDTO dto);
 
     @PostMapping("/deductStock")
     ResponseVO<StockChangeResultVO> deductStock(@RequestBody CouponIdDTO dto);

@@ -23,8 +23,6 @@ class TransactionalMqSenderTest {
 
     @Mock
     private OutboxMessageService outboxMessageService;
-    @Mock
-    private ReliableMessageSender reliableMessageSender;
     @InjectMocks
     private TransactionalMqSender sender;
 
@@ -67,6 +65,20 @@ class TransactionalMqSenderTest {
                 TransactionSynchronizationManager.getSynchronizations(),
                 TransactionSynchronization.STATUS_ROLLED_BACK);
         verify(outboxMessageService, never()).tryDispatch(any());
-        verify(reliableMessageSender, never()).sendMessage(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void callWithoutTransactionStillPersistsOutboxBeforeDispatch() {
+        when(outboxMessageService.savePending(
+                eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
+                eq(MessageReliabilityLevelEnum.HIGH))).thenReturn(43L);
+
+        sender.sendAfterCommit(
+                "exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.HIGH);
+
+        verify(outboxMessageService).savePending(
+                eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
+                eq(MessageReliabilityLevelEnum.HIGH));
+        verify(outboxMessageService).tryDispatch(43L);
     }
 }

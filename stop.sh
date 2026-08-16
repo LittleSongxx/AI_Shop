@@ -4,6 +4,8 @@
 #   --middleware  同时停止 Docker 中间件（默认保留运行）
 set -euo pipefail
 
+export COMPOSE_IGNORE_ORPHANS=true
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND="$ROOT/AI_Shop-backend"
 DEPLOY="$ROOT/deploy"
