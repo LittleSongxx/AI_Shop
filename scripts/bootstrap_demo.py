@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ENV = ROOT / "run" / "runtime.env"
 LOCAL_ENV = ROOT / ".env.local"
 SEED_SQL = ROOT / "AI_Shop-backend" / "data" / "03_smarlect_demo_seed.sql"
-KNOWLEDGE_DIR = ROOT / "AI_Shop-backend" / "data" / "demo_knowledge"
-KNOWLEDGE_CATALOG = KNOWLEDGE_DIR / "catalog.v1.json"
+KNOWLEDGE_DIR = ROOT / "AI_Shop-backend" / "data" / "demo_knowledge_v2"
+KNOWLEDGE_CATALOG = KNOWLEDGE_DIR / "catalog.v2.json"
 
 DEMO_USER_EMAIL = "demo@smarlect.local"
 DEMO_USER_PASSWORD = "Demo1234"
@@ -418,6 +418,8 @@ def load_knowledge_catalog(path: Path = KNOWLEDGE_CATALOG) -> dict[str, Any]:
 def publish_knowledge(
     client: httpx.Client,
     catalog: dict[str, Any] | None = None,
+    *,
+    document_ids: list[int] | None = None,
 ) -> tuple[int, int]:
     contract = catalog or load_knowledge_catalog()
     published = 0
@@ -434,6 +436,8 @@ def publish_knowledge(
         )
         if not isinstance(data, dict) or not data.get("documentId"):
             raise BootstrapError(f"上传 {path.name} 未返回 documentId")
+        if document_ids is not None:
+            document_ids.append(int(data["documentId"]))
         if str(data.get("sourceName") or "") != path.name:
             raise BootstrapError(f"上传 {path.name} 后 sourceName 回读不一致：{data}")
         if str(data.get("domain") or "") != item["domain"]:
@@ -474,6 +478,48 @@ def publish_knowledge(
             raise BootstrapError(f"知识文档 {path.name} 索引契约版本异常：{result}")
         published += 1
     return published, existing
+
+
+def activate_knowledge_release(
+    client: httpx.Client,
+    catalog: dict[str, Any],
+    document_ids: list[int],
+    *,
+    catalog_path: Path = KNOWLEDGE_CATALOG,
+) -> dict[str, Any]:
+    expected_count = int(catalog.get("expectedDocumentCount") or 0)
+    unique_ids = list(dict.fromkeys(int(value) for value in document_ids))
+    if len(unique_ids) != expected_count:
+        raise BootstrapError(
+            "知识发布集合文档数不一致："
+            f"期望 {expected_count}，实际 {len(unique_ids)}"
+        )
+    catalog_sha = _sha256(catalog_path)
+    catalog_version = int(catalog.get("catalogVersion") or 0)
+    release_name = f"demo-knowledge-v{catalog_version}-{catalog_sha[:12]}"
+    result = response_data(
+        client.post(
+            "/admin-api/knowledge/activateRelease",
+            json={
+                "releaseName": release_name,
+                "catalogSha256": catalog_sha,
+                "documentIds": unique_ids,
+            },
+        ),
+        "激活知识发布快照",
+    )
+    if not isinstance(result, dict):
+        raise BootstrapError("激活知识发布快照未返回对象")
+    if str(result.get("catalogSha256") or "").lower() != catalog_sha:
+        raise BootstrapError(f"知识发布快照 catalog SHA 回读不一致：{result}")
+    if str(result.get("releaseName") or "") != release_name:
+        raise BootstrapError(f"知识发布快照名称回读不一致：{result}")
+    active_ids = {str(value) for value in result.get("activeDocumentIds") or []}
+    if active_ids != {str(value) for value in unique_ids}:
+        raise BootstrapError(f"知识发布快照文档集合回读不一致：{result}")
+    if int(result.get("releaseVersion") or 0) < 1:
+        raise BootstrapError(f"知识发布快照版本无效：{result}")
+    return result
 
 
 def sync_faq_vectors(env: dict[str, str]) -> None:
@@ -539,10 +585,27 @@ def wait_for_knowledge_contract(
     env: dict[str, str],
     catalog: dict[str, Any],
     wait_seconds: int,
+    *,
+    catalog_path: Path = KNOWLEDGE_CATALOG,
 ) -> dict[str, Any]:
     """Verify the database release catalog and active ES knowledge snapshot."""
 
     remote = _remote_knowledge_catalog(env)
+    expected_catalog_sha = _sha256(catalog_path)
+    if str(remote.get("catalogSha256") or "").lower() != expected_catalog_sha:
+        raise BootstrapError(
+            "知识发布目录 catalog SHA 不一致："
+            f"期望 {expected_catalog_sha}，实际 {remote.get('catalogSha256')}"
+        )
+    expected_release_name = (
+        f"demo-knowledge-v{int(catalog.get('catalogVersion') or 0)}-"
+        f"{expected_catalog_sha[:12]}"
+    )
+    if str(remote.get("releaseName") or "") != expected_release_name:
+        raise BootstrapError(
+            "知识发布目录 releaseName 不一致："
+            f"期望 {expected_release_name}，实际 {remote.get('releaseName')}"
+        )
     expected_docs = {str(item["file"]): item for item in catalog["documents"]}
     documents = remote.get("documents")
     active_ids = remote.get("activeDocumentIds")
@@ -853,8 +916,18 @@ def run(args: argparse.Namespace) -> None:
         sync_sign_cache(admin_client)
 
         print("[4/8] 上传并发布 Smarlect 知识文档")
-        published, existing = publish_knowledge(admin_client, catalog)
+        document_ids: list[int] = []
+        published, existing = publish_knowledge(
+            admin_client, catalog, document_ids=document_ids
+        )
         print(f"      新发布 {published} 份，已存在 {existing} 份")
+        release = activate_knowledge_release(
+            admin_client, catalog, document_ids
+        )
+        print(
+            "      已激活知识快照 "
+            f"{release['releaseVersion']}（{release['releaseName']}）"
+        )
 
     print("[5/8] 同步 FAQ 向量并等待索引完成")
     sync_faq_vectors(env)

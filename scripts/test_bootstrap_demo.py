@@ -8,6 +8,7 @@ import pytest
 from scripts.bootstrap_demo import (
     AI_DEMO_MESSAGE,
     BootstrapError,
+    activate_knowledge_release,
     find_demo_ai_message,
     load_environment,
     load_knowledge_catalog,
@@ -49,6 +50,7 @@ def test_find_demo_ai_message_accepts_nfkc_stored_punctuation() -> None:
 def test_repository_knowledge_catalog_locks_twelve_documents_and_75_sections() -> None:
     catalog = load_knowledge_catalog()
 
+    assert catalog["catalogVersion"] == 2
     assert catalog["expectedDocumentCount"] == 12
     assert catalog["expectedKnowledgeChunkCount"] == 75
     assert catalog["expectedFaqCount"] == 6
@@ -56,6 +58,36 @@ def test_repository_knowledge_catalog_locks_twelve_documents_and_75_sections() -
     assert sum(len(item["sections"]) for item in catalog["documents"]) == 75
     assert all(len(item["sha256"]) == 64 for item in catalog["documents"])
     assert all(len(item["normalizedSha256"]) == 64 for item in catalog["documents"])
+
+
+def test_activate_knowledge_release_binds_exact_documents_and_catalog_sha() -> None:
+    catalog = load_knowledge_catalog()
+    expected_ids = list(range(1, 13))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/admin-api/knowledge/activateRelease"
+        body = json.loads(request.read())
+        assert body["documentIds"] == expected_ids
+        assert body["releaseName"].startswith("demo-knowledge-v2-")
+        return httpx.Response(
+            200,
+            json={
+                "code": 200,
+                "data": {
+                    "releaseVersion": 17,
+                    "releaseName": body["releaseName"],
+                    "catalogSha256": body["catalogSha256"],
+                    "activeDocumentIds": [str(value) for value in expected_ids],
+                },
+            },
+        )
+
+    with httpx.Client(
+        base_url="http://example.test", transport=httpx.MockTransport(handler)
+    ) as client:
+        result = activate_knowledge_release(client, catalog, expected_ids)
+
+    assert result["releaseVersion"] == 17
 
 
 def test_knowledge_contract_uses_keyword_subfields_for_exact_es_filters() -> None:
