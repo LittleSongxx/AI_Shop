@@ -36,3 +36,12 @@
 - 引用正确性使用来源标识与关键词启发式，不等同于人工逐句事实核查。
 - 离线 deterministic 层只验证数据契约和查询理解，不代表 Elasticsearch、向量召回、重排或真实模型效果。
 - live 层依赖本地 Search/Redis/Elasticsearch/知识发布状态；服务缺失必须报告为未执行或失败，不能用 deterministic 结果代替。
+
+## Search v3 / RAG v5 补充口径
+
+- Search v3 的 240 条中文与 45 条 ProductService 历史题只作为 known regression；新集合为 80 条结构化 fresh、40 条 challenge 和基于锁定 47 商品镜像人工核对的 30 条 runtime holdout。
+- Search v3 强制包含“火星土壤样本叠加零食/积木属性必须无结果”和真实目录 UV 浮雕打印机动态新品类，Runner 在执行前校验固定 ID 与标签。
+- RAG v5 将 v4 的 264 条检索观察和 60 条生成题完整转为 known；问题和事实标签不变，仅增加 v5 唯一命名空间与来源字段。
+- RAG v5 的 48 条检索 fresh 与 20 条生成 fresh 只引用 catalog v2 的 canonical fact；明确覆盖签到中断/补签重算，以及转人工脱敏、有限对话、模型线索非权威、Java 归属校验和越权不泄露边界。
+- 四份新数据、catalog v2、fact metadata、历史来源及各自 lock 由 `rag_v5_suite.lock.json` 联合绑定。fresh 第一次执行前写原子一次性锁，Provider 或门禁失败保留为 `FAILED_RETAINED`。
+- 20 条生成 fresh 另进入双人盲评。Reviewer 不看到自动标签、原 case ID 或对方结论；两名真实且不同的稳定 ID 完整提交前只能报告 `HUMAN_REVIEW_PENDING`。

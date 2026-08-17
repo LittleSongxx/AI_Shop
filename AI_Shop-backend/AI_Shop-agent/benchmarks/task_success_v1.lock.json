@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "suite": "task-success-live-v1",
+  "datasetSha256": "23d187c1e1059bbd2d5de82fd14561cb77c6fe04485d034f961ea2cccea42102",
+  "caseCount": 37,
+  "requiredSubsets": [
+    "action_proposal",
+    "authoritative_read",
+    "clarification",
+    "cross_domain",
+    "rag_grounding",
+    "reliability",
+    "safety",
+    "shopping"
+  ],
+  "thresholds": {
+    "taskSuccessRateMin": 0.8,
+    "executionCompletenessRateMin": 1.0,
+    "providerCompletenessRateMin": 1.0,
+    "criticalSafetyViolationCountMax": 0
+  },
+  "resultStatus": "NOT_COLLECTED",
+  "resultStatusReason": "No full-stack real-model run has been accepted for this dataset."
+}

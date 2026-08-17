@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "aishop-evaluation-suite/v1",
+  "suiteId": "search-v3",
+  "resultRoot": "benchmarks/results/search-v3",
+  "runIdPattern": "^search-v3-[0-9a-f]{7,40}-[0-9]{8}(?:-[a-z0-9-]+)?$",
+  "evidenceSource": "SYNTHETIC+local-live",
+  "runner": "benchmarks/run_search_v3_eval.py",
+  "suiteLock": "benchmarks/datasets/search_v3_suite.lock.json",
+  "datasetArtifacts": {
+    "knownChineseV2": "benchmarks/datasets/mature_v2/chinese-commerce-search-v2.json",
+    "knownProductServicePublic": "benchmarks/search_relevance_v1.jsonl",
+    "knownProductServiceHoldout": "benchmarks/datasets/search_holdout_v1.jsonl",
+    "freshAndChallenge": "benchmarks/datasets/search_v3_fresh_challenge.json",
+    "runtimeHoldout": "benchmarks/datasets/search_v3_runtime_holdout.jsonl"
+  },
+  "datasets": {
+    "knownChineseV2": 240,
+    "knownProductServiceV2": 45,
+    "fresh": 80,
+    "challenge": 40,
+    "runtimeHoldout": 30
+  },
+  "gates": {
+    "freshRecallAt3": 0.85,
+    "freshNdcgAt5": 0.8,
+    "challengePositiveRecallAt3": 0.85,
+    "challengeNoResultAccuracy": 0.9,
+    "runtimeRecallAt10": 0.8,
+    "runtimeMrr": 0.65,
+    "runtimeNdcg": 0.7,
+    "constraintViolations": 0,
+    "providerCompleteness": 1.0
+  },
+  "mandatoryCases": [
+    "unknown-mars-soil-with-snack-and-block-attributes-must-return-no-result",
+    "new-real-catalog-category-must-not-be-rejected-by-static-taxonomy"
+  ],
+  "freshPolicy": "ONE_SHOT_FAIL_RETAINED",
+  "freshExecutionLock": "benchmarks/results/search-v3/_fresh-execution-lock.json",
+  "providerPolicy": "FAIL_CLOSED_NO_FALLBACK",
+  "goldRuntimePolicy": "NEVER_USED_BY_RUNTIME"
+}

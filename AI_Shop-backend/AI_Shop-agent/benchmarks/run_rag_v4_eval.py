@@ -17,9 +17,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.evaluation.artifacts import git_commit, workspace_sha256  # noqa: E402
-from app.rag.canonical_facts import DEFAULT_CATALOG_PATH  # noqa: E402
-from app.rag.fact_metadata import DEFAULT_FACT_METADATA_PATH  # noqa: E402
+from app.rag.canonical_facts import (  # noqa: E402
+    LEGACY_V1_CATALOG_PATH,
+    canonical_fact_catalog_scope,
+)
+from app.rag.fact_metadata import LEGACY_V1_FACT_METADATA_PATH  # noqa: E402
 from app.rag.policy import RagRetrievalPolicy, runtime_rag_policy  # noqa: E402
+from app.rag.retriever import evaluation_knowledge_release_scope  # noqa: E402
 from app.services.redis_service import redis_service  # noqa: E402
 from benchmarks.mature_eval.common import (  # noqa: E402
     atomic_write_bytes,
@@ -39,6 +43,8 @@ from benchmarks.mature_eval.rag_v4_pipeline import (  # noqa: E402
 )
 
 SUITE = "rag-retrieval-live-v4"
+V4_CATALOG_PATH = LEGACY_V1_CATALOG_PATH
+V4_FACT_METADATA_PATH = LEGACY_V1_FACT_METADATA_PATH
 DATASETS_ROOT = PROJECT_ROOT / "benchmarks" / "datasets"
 PUBLIC_PATH = DATASETS_ROOT / "rag_v4_public.jsonl"
 KNOWN_PATH = DATASETS_ROOT / "rag_v4_known_regression.jsonl"
@@ -87,9 +93,9 @@ def prepare(_args: argparse.Namespace) -> dict[str, Any]:
         "knownRegression": _verify_lock(KNOWN_PATH, 144, "known_regression"),
         "freshHoldout": _verify_lock(FRESH_PATH, 48, "fresh_holdout"),
     }
-    fact_metadata = _load_json(DEFAULT_FACT_METADATA_PATH)
+    fact_metadata = _load_json(V4_FACT_METADATA_PATH)
     if fact_metadata.get("canonicalCatalogSha256") != sha256_file(
-        DEFAULT_CATALOG_PATH
+        V4_CATALOG_PATH
     ):
         raise ValueError("fact metadata is not bound to the active canonical catalog")
     return {
@@ -276,8 +282,8 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
                 PUBLIC_PATH.with_suffix(".lock.json"),
                 KNOWN_PATH,
                 KNOWN_PATH.with_suffix(".lock.json"),
-                DEFAULT_CATALOG_PATH,
-                DEFAULT_FACT_METADATA_PATH,
+                V4_CATALOG_PATH,
+                V4_FACT_METADATA_PATH,
             ],
             relative_to=REPO_ROOT,
         ),
@@ -977,8 +983,8 @@ def package(args: argparse.Namespace) -> dict[str, Any]:
                 KNOWN_PATH.with_suffix(".lock.json"),
                 FRESH_PATH,
                 FRESH_PATH.with_suffix(".lock.json"),
-                DEFAULT_CATALOG_PATH,
-                DEFAULT_FACT_METADATA_PATH,
+                V4_CATALOG_PATH,
+                V4_FACT_METADATA_PATH,
             ],
             relative_to=REPO_ROOT,
         ),
@@ -1037,6 +1043,13 @@ def build_parser() -> argparse.ArgumentParser:
         )
         if phase == "collect-final":
             child.add_argument("--finalize-holdout", action="store_true")
+        if phase in {"collect-dev", "collect-final"}:
+            child.add_argument(
+                "--release-version",
+                type=int,
+                required=True,
+                help="immutable Java knowledge release containing catalog v1",
+            )
     postfix_parser = subparsers.add_parser(
         "postfix-replay",
         help="replay retained live candidates after fixes without Provider calls",
@@ -1058,6 +1071,12 @@ def build_parser() -> argparse.ArgumentParser:
     targeted_parser.add_argument(
         "--knowledge-index", default="aishop_eval_rag_context_v4"
     )
+    targeted_parser.add_argument(
+        "--release-version",
+        type=int,
+        required=True,
+        help="immutable Java knowledge release containing catalog v1",
+    )
     return parser
 
 
@@ -1067,24 +1086,28 @@ async def async_main(args: argparse.Namespace) -> dict[str, Any]:
     if args.phase == "prepare-context":
         return await prepare_context(args)
     if args.phase == "collect-dev":
-        return await collect_dev(args)
+        with evaluation_knowledge_release_scope(args.release_version):
+            return await collect_dev(args)
     if args.phase == "replay":
         return replay(args)
     if args.phase == "collect-final":
-        return await collect_final(args)
+        with evaluation_knowledge_release_scope(args.release_version):
+            return await collect_final(args)
     if args.phase == "package":
         return package(args)
     if args.phase == "postfix-replay":
         return postfix_replay(args)
     if args.phase == "targeted-regression":
-        return await targeted_regression(args)
+        with evaluation_knowledge_release_scope(args.release_version):
+            return await targeted_regression(args)
     raise ValueError(f"unsupported RAG v4 phase: {args.phase}")
 
 
 def main() -> None:
     args = build_parser().parse_args()
     try:
-        result = asyncio.run(async_main(args))
+        with canonical_fact_catalog_scope(V4_CATALOG_PATH):
+            result = asyncio.run(async_main(args))
     except Exception as exc:
         run_id = getattr(args, "run_id", None)
         if run_id:

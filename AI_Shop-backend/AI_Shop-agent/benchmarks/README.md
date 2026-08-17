@@ -2,9 +2,9 @@
 
 > 内容状态：当前有效
 >
-> 本轮实施基线：`ef9aa0659a9275a99bb74cdb46e87770150dea0a`
+> 本轮实施基线：`6eb8e8eb822a20394e6cc05958d72823379614cc`
 >
-> 最后核验时间：2026-08-13（Asia/Shanghai）
+> 最后核验时间：2026-08-17（Asia/Shanghai）
 >
 > 适用环境：确定性回归、本地集成和可选 live 评测；不是生产效果或真实用户报告
 
@@ -12,6 +12,131 @@
 
 - `aishop_convo_v1` 等历史冻结集保留项目演进和规则回归证据。
 - `aishop-eval/v1` 统一 Runner 输出 case、summary 和 Markdown 报告，覆盖 Commerce runtime、AI 安全、Search/RAG 与进程隔离消融。
+
+## Agent v2 真实全栈任务成功率
+
+`task_success_v2.jsonl` 是当前冻结契约：前 37 条与 `task_success_v1.jsonl` 逐对象相同，另有 7 条多步 sequence，共 44 条。sequence 覆盖 Mission 覆盖长期 Profile、候选比较与报价刷新、单/多主体视觉搜索、点击防伪、加购/两次成交/复购，以及退款、低分评价、售后联系和幂等。v1 数据、lock 与历史结果保持只读。
+
+先做无凭据、无服务调用的哈希和结构校验：
+
+```bash
+.venv/bin/python benchmarks/run_task_success_v2_eval.py --validate-only
+```
+
+正式运行没有模拟器或进程内 Graph 快捷路径。单轮请求必须经过 Agent API、RabbitMQ、Worker、LangGraph、MCP、Java 和数据库；sequence 还通过现有鉴权接口执行选图主体、点击、加购、下单、内部支付成功、退款、评价和 Agent 确认。判分读取持久 Episode、Mission、Profile、报价快照、推荐事件、Outcome Ledger、pending action、Java 购物车/订单终态。Preflight 会强制检查真实 LLM、生产 embedding、rerank、Java Gateway 和 MCP，缺失状态或 Provider 证据一律 fail-closed。
+
+运行前需要满足以下契约：
+
+- 以 `task_success_v2_bindings.example.json` 为字段模板，在 Git 忽略的本地文件中绑定真实 token、user、order、order item、SKU、地址和已审核图片资产；不得提交该文件。
+- `AISHOP_EVAL_ISOLATED` 必须为 `enabled`；多主体降级用例还要求 `FAULT_PROFILE_VISUAL_PROVIDER_UNAVAILABLE=enabled`。这些标志只声明已经恢复隔离 fixture，不会在 Runner 内注入故障或创建公开测试后门。
+- `FAULT_PROFILE_UNKNOWN_OUTCOME` 必须显式绑定为 `enabled`，并由测试环境为对应 fixture 注入未知远端结果。
+- `AISHOP_INTERNAL_TOKEN` 只从环境变量或 CLI 私密参数读取，不写入 bindings、数据集或结果报告。
+- API 与 Worker 必须使用同一个 `ORCHESTRATION_MODE`，修改模式后同时重启两个进程。
+- 写操作会改变业务状态。每个模式运行前恢复同一份业务 fixture，并使用相同的 `--fixture-snapshot-id`。
+- 真实 Provider、模型版本或依赖指纹不同的报告不得比较。
+
+一次 adaptive 运行示例：
+
+```bash
+.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+  --bindings benchmarks/task_success_v2_bindings.local.json \
+  --run-id agent-v2-adaptive-6eb8e8e-20260817 \
+  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --expected-orchestration-mode adaptive
+```
+
+三模式 live 消融需要分别把服务端 `ORCHESTRATION_MODE` 设为 `workflow`、`single_agent`、`multi_agent`，每次恢复同一 fixture、重启 API/Worker 后运行：
+
+```bash
+.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+  --bindings benchmarks/task_success_v2_bindings.local.json \
+  --run-id agent-v2-workflow-6eb8e8e-20260817 \
+  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --expected-orchestration-mode workflow
+
+.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+  --bindings benchmarks/task_success_v2_bindings.local.json \
+  --run-id agent-v2-single-agent-6eb8e8e-20260817 \
+  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --expected-orchestration-mode single_agent
+
+.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+  --bindings benchmarks/task_success_v2_bindings.local.json \
+  --run-id agent-v2-multi-agent-6eb8e8e-20260817 \
+  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --expected-orchestration-mode multi_agent
+```
+
+只有三份报告都达到 100% 执行与 Provider 完整性，且 dataset、case、fixture、模型集合和 Provider 指纹一致时，比较器才会输出配对差值与 bootstrap 95% CI：
+
+```bash
+.venv/bin/python benchmarks/compare_live_orchestration_ablation.py \
+  --workflow benchmarks/results/task-success-live-v2/agent-v2-workflow-6eb8e8e-20260817/summary.json \
+  --single-agent benchmarks/results/task-success-live-v2/agent-v2-single-agent-6eb8e8e-20260817/summary.json \
+  --multi-agent benchmarks/results/task-success-live-v2/agent-v2-multi-agent-6eb8e8e-20260817/summary.json \
+  --run-id agent-v2-ablation-20260817
+```
+
+正式面试 Trace 只能从已存在的真实 Episode 导出。一条必须是用户已确认且远端结果已知的 `CONFIRMED` 退款，另一条必须是用户已确认但远端结果未知、MySQL 处于 `INCONCLUSIVE` 或 `MANUAL_REVIEW` 的运行：
+
+```bash
+.venv/bin/python scripts/export_interview_traces.py \
+  --success-refund-run-id <confirmed-run-id> \
+  --unknown-outcome-run-id <unknown-run-id> \
+  --bundle-id interview-20260817
+```
+
+当前 lock 的 `resultStatus` 为 `NOT_COLLECTED`。在上述完整条件实际满足前，不得把门禁阈值、单元测试或历史确定性结果写成 Agent live TSR、真实消融或正式 Trace。
+
+## Search v3 与 RAG v5 正式门禁
+
+两套新评测都使用带代码 SHA 和日期的 Run ID，先执行 known 并冻结配置，再显式打开一次性 fresh。下面的 `<release-version-v2>` 必须是管理端已激活且包含 `demo_knowledge_v2` 精确文档集合的不可变知识快照版本；运行期间不得切换 release、模型或 Provider。
+
+Search v3：
+
+```bash
+.venv/bin/python benchmarks/run_search_v3_eval.py prepare
+.venv/bin/python benchmarks/run_search_v3_eval.py collect-known \
+  --run-id search-v3-6eb8e8e-20260817
+.venv/bin/python benchmarks/run_search_v3_eval.py collect-final \
+  --run-id search-v3-6eb8e8e-20260817 --finalize-holdout
+.venv/bin/python benchmarks/run_search_v3_eval.py package \
+  --run-id search-v3-6eb8e8e-20260817
+```
+
+RAG v5 必须先准备 catalog v2 的隔离索引并完成检索门禁，再运行生成：
+
+```bash
+.venv/bin/python benchmarks/run_rag_v5_eval.py prepare
+.venv/bin/python benchmarks/run_rag_v5_eval.py prepare-context \
+  --source-index <catalog-v2-published-index>
+.venv/bin/python benchmarks/run_rag_v5_eval.py collect-known \
+  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2>
+.venv/bin/python benchmarks/run_rag_v5_eval.py collect-final \
+  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2> \
+  --finalize-holdout
+.venv/bin/python benchmarks/run_rag_v5_eval.py package \
+  --run-id rag-v5-6eb8e8e-20260817
+
+.venv/bin/python benchmarks/run_rag_generation_v5.py collect-known \
+  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2>
+.venv/bin/python benchmarks/run_rag_generation_v5.py collect-final \
+  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2> \
+  --finalize-holdout
+.venv/bin/python benchmarks/run_rag_generation_v5.py package \
+  --run-id rag-v5-6eb8e8e-20260817
+```
+
+生成完成后，`results/rag-v5/<run-id>/generation/human-review/` 中只有 20 条 fresh 的盲评材料。两名真人分别填写 `reviewer-a.csv` 与 `reviewer-b.csv`，再合并：
+
+```bash
+.venv/bin/python benchmarks/human_review/rag_v5_review.py merge \
+  --package-dir benchmarks/results/rag-v5/rag-v5-6eb8e8e-20260817/generation/human-review \
+  --reviewer-a <reviewer-a.csv> --reviewer-b <reviewer-b.csv> \
+  --output benchmarks/results/rag-v5/rag-v5-6eb8e8e-20260817/generation/human-review/merged-review.json
+```
+
+fresh 执行锁位于对应 `results/` 根目录。它不是可删除后重试的缓存；失败时保留原 Run，将该集合转为下一版 known，并为下一版另建未见集。
 
 统一 Runner：
 

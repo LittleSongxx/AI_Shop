@@ -26,7 +26,12 @@ from app.evaluation.artifacts import (  # noqa: E402
     workspace_sha256,
 )
 from app.evaluation.contracts import percentile  # noqa: E402
-from app.rag.canonical_facts import canonical_citation_metrics, concept_coverage  # noqa: E402
+from app.rag.canonical_facts import (  # noqa: E402
+    LEGACY_V1_CATALOG_PATH,
+    canonical_citation_metrics,
+    canonical_fact_catalog_scope,
+    concept_coverage,
+)
 from app.rag.claim_metrics import required_claim_metrics  # noqa: E402
 from app.rag.embedding import embedding_evaluation_scope  # noqa: E402
 from app.rag.policy import rag_policy_scope, runtime_rag_policy  # noqa: E402
@@ -36,7 +41,11 @@ from app.rag.prompt_builder import (  # noqa: E402
     grounding_repair_reason,
 )
 from app.rag.query_expander import query_expansion_evaluation_scope  # noqa: E402
-from app.rag.retriever import rag_retriever, rerank_evaluation_scope  # noqa: E402
+from app.rag.retriever import (  # noqa: E402
+    evaluation_knowledge_release_scope,
+    rag_retriever,
+    rerank_evaluation_scope,
+)
 from app.services.redis_service import redis_service  # noqa: E402
 from benchmarks.human_review.rag_v4_review import (  # noqa: E402
     prepare_review_package,
@@ -1563,6 +1572,11 @@ def main() -> None:
     parser.add_argument("--run-id")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument(
+        "--release-version",
+        type=int,
+        help="immutable Java knowledge release containing catalog v1",
+    )
+    parser.add_argument(
         "--package",
         action="store_true",
         help="package an existing run instead of invoking Providers",
@@ -1590,26 +1604,35 @@ def main() -> None:
                 "--package, --rescore-source-run-id and --targeted-source-run-id "
                 "are mutually exclusive"
             )
-        if args.package:
-            if not args.run_id:
-                parser.error("--package requires --run-id")
-            result = package_v4_evidence(args.run_id)
-        elif args.rescore_source_run_id:
-            if not args.run_id:
-                parser.error("--rescore-source-run-id requires --run-id")
-            result = rescore_v4_evidence(args.rescore_source_run_id, args.run_id)
-        elif args.targeted_source_run_id:
-            if not args.run_id:
-                parser.error("--targeted-source-run-id requires --run-id")
-            result = asyncio.run(
-                run_targeted_v4_regression(
-                    args.targeted_source_run_id,
-                    args.run_id,
-                    top_k=args.top_k,
+        with canonical_fact_catalog_scope(LEGACY_V1_CATALOG_PATH):
+            if args.package:
+                if not args.run_id:
+                    parser.error("--package requires --run-id")
+                result = package_v4_evidence(args.run_id)
+            elif args.rescore_source_run_id:
+                if not args.run_id:
+                    parser.error("--rescore-source-run-id requires --run-id")
+                result = rescore_v4_evidence(
+                    args.rescore_source_run_id, args.run_id
                 )
-            )
-        else:
-            result = asyncio.run(run(run_id=args.run_id, top_k=args.top_k))
+            elif args.targeted_source_run_id:
+                if not args.run_id:
+                    parser.error("--targeted-source-run-id requires --run-id")
+                if args.release_version is None:
+                    parser.error("live RAG v4 runs require --release-version")
+                with evaluation_knowledge_release_scope(args.release_version):
+                    result = asyncio.run(
+                        run_targeted_v4_regression(
+                            args.targeted_source_run_id,
+                            args.run_id,
+                            top_k=args.top_k,
+                        )
+                    )
+            else:
+                if args.release_version is None:
+                    parser.error("live RAG v4 runs require --release-version")
+                with evaluation_knowledge_release_scope(args.release_version):
+                    result = asyncio.run(run(run_id=args.run_id, top_k=args.top_k))
     except Exception as exc:
         if args.run_id:
             failure_dir = RESULTS_ROOT / args.run_id

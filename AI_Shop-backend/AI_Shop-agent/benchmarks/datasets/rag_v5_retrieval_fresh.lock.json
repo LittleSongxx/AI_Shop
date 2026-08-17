@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 5,
+  "dataset": "rag_v5_retrieval_fresh.jsonl",
+  "datasetSha256": "7a1dd222e3d8a4414950d6bb09fa561daf9a654e3f2c969bfcc2c4f452008cbc",
+  "caseCount": 48,
+  "split": "fresh_holdout",
+  "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+  "factMetadataSha256": "5cc105b36a811a0d97e901c0098b7eb717132f873b256a680275dc805db1b641",
+  "labelPolicy": "canonical v2 fact IDs and deterministic aliases; no LLM relevance grading",
+  "source": "48 developer-authored v2 knowledge paraphrases and safety probes",
+  "freshPolicy": "ONE_SHOT_FAIL_RETAINED"
+}

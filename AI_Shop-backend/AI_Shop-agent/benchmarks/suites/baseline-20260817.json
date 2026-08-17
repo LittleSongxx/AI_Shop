@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "aishop-evaluation-baseline/v1",
+  "capturedAt": "2026-08-17T00:00:00+08:00",
+  "gitHead": "6eb8e8eb822a20394e6cc05958d72823379614cc",
+  "workingTreePolicy": "PRESERVE_USER_CHANGES",
+  "historicalEvidence": [
+    {
+      "suiteId": "search-v2",
+      "runId": "search-v2-64aa86e-final-20260814",
+      "path": "benchmarks/results/search-mature-v2/search-v2-64aa86e-final-20260814",
+      "status": "FAILED_RETAINED",
+      "failures": {
+        "challengeNoResultAccuracy": 0.8,
+        "challengeNoResultThreshold": 0.9,
+        "firstProductServiceRecallAt10": 0.3778
+      }
+    },
+    {
+      "suiteId": "rag-v4-retrieval",
+      "runId": "rag-v4-64aa86e-routefix-20260814",
+      "path": "benchmarks/results/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814",
+      "status": "FAILED_RETAINED",
+      "failures": {
+        "freshRecallAt5": 0.8056
+      }
+    },
+    {
+      "suiteId": "rag-v4-generation",
+      "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+      "path": "benchmarks/results/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814",
+      "status": "FAILED_RETAINED",
+      "failures": {
+        "passedCases": 39,
+        "totalCases": 60
+      }
+    }
+  ],
+  "immutability": {
+    "overwriteHistoricalRuns": false,
+    "acceptBaselineToEraseFailure": false,
+    "reuseFreshDataAfterTuning": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 3,
+  "suite": "search-v3",
+  "caseCounts": {
+    "knownChineseV2": 240,
+    "knownProductServiceV2": 45,
+    "fresh": 80,
+    "challenge": 40,
+    "runtimeHoldout": 30
+  },
+  "mandatoryCases": [
+    "unknown-mars-soil-with-snack-and-block-attributes-must-return-no-result",
+    "new-real-catalog-category-must-not-be-rejected-by-static-taxonomy"
+  ],
+  "inputs": {
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.json": "fbc32a8fd58db86946ec16fb73d3a81a218e5f2031d42050779c77a34613fde6",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.lock.json": "387ef045b20bc22303ba8d317ea4c08781d6241cdf4c794e9c0a688fc87b1009",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/search_relevance_v1.jsonl": "504dcc80e8cda371256fba94690083a5bd49369156dc81f15f9f6efcf5078af8",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/search_relevance_v1.lock.json": "4cd0249d297863246c1ddb94010d3edd0a37256b5bfa12e7c98c81a68cf1b43a",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.jsonl": "3213425c1616b496557eb06d9047b6ee2a4221ce8499307a81b15de408e01b39",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.lock.json": "bd46e5ab00ffd1911fb96faa12c261954e0b988519efc587587dad246b4a2777",
+    "AI_Shop-backend/data/simlect_catalog/catalog.json": "fd40ec1288682e508ab4a6c325d67e00186960f16a006c30bc7238370e40cbc3",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_v3_fresh_challenge.json": "4effee1b379f13502c6b2b167b5dc8385ecfeee06c98b3dfe43c163e2e05ad07",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_v3_fresh_challenge.lock.json": "f56eeb48bbacd0c37207defc21bb970aa50a32514582d1c74c7e76979bcf985a",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_v3_runtime_holdout.jsonl": "d4d43bc0633cb61c77154af0f2eea6542703ec7d1bf27e427515becd1134ed51",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_v3_runtime_holdout.lock.json": "fbcd643dddb2b30fed4a578dde72f057608901245336cfa7fddfe6e9ee908853"
+  },
+  "inputSetSha256": "af92c5beb82777a437a13367eb24a004533604b367db53c9b59a692e8bef2cfa",
+  "freshPolicy": "ONE_SHOT_FAIL_RETAINED"
+}
