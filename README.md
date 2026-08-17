@@ -2,13 +2,13 @@
 
 > 内容状态：当前有效
 >
-> 本轮实施基线：`ef9aa0659a9275a99bb74cdb46e87770150dea0a` + 实施前 workspace diff SHA（见 [证据 manifest](docs/evidence-manifest.json)）
+> 本轮实施基线：`6eb8e8eb822a20394e6cc05958d72823379614cc` + 工作区边界说明（见 [证据 manifest](docs/evidence-manifest.json)）
 >
-> 最后核验时间：2026-08-14（Asia/Shanghai）
+> 最后核验时间：2026-08-17（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
-基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，集成 AI 购物导购、智能客服与 RAG 知识库。工程化基础扎实：分布式事务、消息可靠投递、分布式锁、安全过滤均有具体实现。
+基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，重点是一条“自然语言订单定位 -> RAG 政策 -> MCP/Java 权威事实 -> 用户确认 -> Java 幂等执行 -> 未知结果人工复核”的受控售后 Agent 闭环，而不是让模型直接修改交易状态。
 
 ---
 
@@ -95,8 +95,9 @@ AI_Shop/
 
 ### AI 购物导购与客服
 
-- **ReAct Agent**：基于 LangGraph 的有状态对话，支持商品推荐、订单查询、物流查询、售后引导
-- **Workflow / Agent 分界**：确定性状态流使用规则或 Workflow；只有开放决策、职责隔离或可并行任务进入 bounded specialist，保留 legacy single-agent 回退
+- **自然语言订单定位**：根据订单号、相对时间、金额和商品描述筛选权威订单；零候选、多候选、无可操作项和依赖失败分别处理，歧义上下文可跨轮持久化
+- **自适应编排**：简单权威查询或参数完整提案走 Workflow，开放/单域 RAG 走单 Agent，订单事实与政策等跨域复合请求才走 bounded multi-agent；支持四种固定模式做真实配对消融
+- **受控写操作**：模型只能生成 `PROPOSE_*` 提案；用户确认后 Java 重新校验身份、归属、状态与幂等键，未知远端结果进入 `INCONCLUSIVE`，核对到边界后转 `MANUAL_REVIEW`
 - **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用和有界 repair
 - **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
 - **输入防护**：NFKC 归一化 + 两级规则（硬阻断 / 可疑累积）+ Propose→用户确认→Java 执行，防 Prompt 注入
@@ -104,10 +105,10 @@ AI_Shop/
 - **工具结果 Observation 层**：所有进上下文的工具输出统一脱敏（手机号/邮箱/身份证）、长度裁剪，被省略部分写入 trace
 - **通道污染检疫**：与输入防护共用规则表；RAG 片段在组装点逐条剔除，工具结果命中注入话术即替换为隔离占位符，污染项计数入指标，隔离不等于整链拒绝
 - **Prompt 单一事实源**：fragment 注册表统一管理全部提示词片段（redis 覆盖可观测），每轮对话记录 selectedFragments 到决策 trace
-- **per-request 成本摘要**：contextvar 隔离的轻/重路径成本累计（LLM 调用数、token、金额、模型），异步调度任务与对话路径隔离
+- **逐运行预算**：ContextVar 隔离 token、人民币成本、节点步数与 monotonic deadline，80% 预警，超限进入明确受控终态；异步任务与对话互不污染
 - **委托身份信道**：`X-Agent-User-Id` 系统信道头为权威（模型不可见），body userId 仅作参考；缺失 401、不一致 403、归属不符 403，fail-closed
-- **统一评测与消融**：Commerce、安全、Search/RAG 统一输出 case/summary/report；单 Agent、多 Agent、Workflow 由独立进程对照，临时结果不入库，baseline 只能显式接受
-- **熔断降级**：Circuit Breaker 包装外部 LLM 调用，超时自动降级
+- **统一评测与消融**：除 Commerce、安全和 Search/RAG 外，新增 37 条真实全栈 Agent 任务契约；Runner 无模拟捷径，逐条核验 Episode、业务终态和 LLM/Embedding/Rerank 证据，三模式报告必须同数据/fixture/模型后才能比较
+- **熔断降级**：外部 Provider 使用 CLOSED/OPEN/HALF_OPEN 熔断与受控 fallback；未知写结果不会被通用重试自动重放
 - **速率限制**：用户级别双窗口限流，防止滥用
 
 ### 治理与用户闭环
@@ -254,7 +255,9 @@ fresh Recall@3/5 为 0.8056、MRR@10 为 0.75、NDCG@5 为 0.7645，正式门禁
 `deepseek-v4-flash` 生成完整执行，0 runtime error、0 严重安全违规，但只通过 39 条；暴露后零 Provider
 重评为 49/60，仍低于 0.85 且不能冒充新 holdout。正式 Retrieval/Generation 均保留
 `FAILED_RETAINED`，人工盲评状态为 `HUMAN_REVIEW_PENDING`。
-这些结果不代表真实用户或生产效果；Agent 在线模型、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
+Agent 另有 37 条、8 个子集的冻结真实全栈任务契约，覆盖订单权威查询、写提案、RAG、跨域、安全、澄清、购物和未知结果；当前 lock 明确为 `resultStatus=NOT_COLLECTED`，80% 只是门禁，不是已取得 TSR。正式运行还要求完整 API/Worker/MCP/Java/DB、私有 fixture bindings、真实 Provider 和可恢复业务快照。
+
+这些结果不代表真实用户或生产效果；Agent 在线模型 TSR/三模式消融/正式 Trace、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
 线上 SLO 与生产规模仍为“未采集”。详细分组指标、消融、失败 case、Provider 调用和诚实边界见证据总览。历史冻结会话及
 旧小样本结果只用于解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，
 不再作为 README 的当前成绩。

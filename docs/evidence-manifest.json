@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-14T23:30:00+08:00",
+  "generatedAt": "2026-08-17T15:30:00+08:00",
   "project": "AI_Shop",
   "targetRoles": [
     "AI application / Agent backend",
@@ -9,9 +9,9 @@
     "RAG / search application engineering"
   ],
   "implementationBaseline": {
-    "gitHead": "ef9aa0659a9275a99bb74cdb46e87770150dea0a",
+    "gitHead": "6eb8e8eb822a20394e6cc05958d72823379614cc",
     "workspaceDiffSha256": "672b4d3e73b5b67ed21378a04ccee7962c27f3a3928878f59e6e71af1dc0fd13",
-    "workspaceDiffScope": "实施开始时已有五份删除文档、项目复盘修改、多智能体复盘和面经报告；该 SHA 仅用于保留用户已有工作区边界",
+    "workspaceDiffScope": "历史实施前工作区边界保留值；本轮继续保留用户已有删除文档、求职材料和复盘修改，不把当前未提交实现冒充 commit 内容",
     "branch": "feat/multi-agent-harness"
   },
   "protocol": {
@@ -598,16 +598,88 @@
       "datasetLocks": []
     },
     {
+      "id": "agent-adaptive-orchestration",
+      "kind": "source-and-test-contract",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_orchestration_policy.py tests/test_order_reference_flow.py tests/test_forced_tools.py -q",
+      "claim": "自适应策略按任务证据选择 workflow、single_agent 或 multi_agent，并支持四种固定配置；只读退款解释不能产生退款提案，Workflow 缺参会留下显式 fallback。",
+      "boundary": "这是源码和确定性测试证据；尚未证明真实模型下多 Agent 的质量、延迟或成本收益。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/app/graph/orchestration_policy.py",
+      "datasetLocks": []
+    },
+    {
+      "id": "agent-runtime-guardrails",
+      "kind": "source-and-test-contract",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_budget_guard.py tests/test_circuit_breaker.py -q",
+      "claim": "逐运行预算守卫覆盖 token、人民币成本、节点步数和 monotonic deadline；熔断器覆盖 CLOSED/OPEN/HALF_OPEN、并发 probe 和恢复。",
+      "boundary": "预算与熔断保护资源和依赖，不替代写操作幂等；人民币成本只有命中可信价格表时才可报告。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/app/graph/budget_guard.py",
+      "datasetLocks": []
+    },
+    {
+      "id": "agent-live-task-contract",
+      "kind": "evaluation-contract",
+      "suite": "task-success-live-v1",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python benchmarks/run_task_success_eval.py --validate-only",
+      "caseCount": 37,
+      "claim": "37 条、8 个子集的任务集已冻结；Runner 只允许 LIVE_FULL_STACK 路径，并从持久 Episode、消息和 pending-action 状态判分。",
+      "boundary": "这是数据与 Runner 契约，不是正式成绩；lock 的 resultStatus 为 NOT_COLLECTED，不能声称已有 TSR、延迟或成本。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/run_task_success_eval.py",
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.jsonl"
+        }
+      ]
+    },
+    {
+      "id": "agent-live-ablation-contract",
+      "kind": "evaluation-contract",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_live_orchestration_ablation.py -q",
+      "claim": "三模式比较器只接受同数据 SHA、case、fixture、模型集合和 Provider 指纹的完整 LIVE_FULL_STACK 报告，并计算配对差值与 bootstrap 95% CI。",
+      "boundary": "比较能力已测试，但三份真实模型报告尚未采集；不得用旧确定性消融替代。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/compare_live_orchestration_ablation.py",
+      "datasetLocks": []
+    },
+    {
+      "id": "agent-trace-export-contract",
+      "kind": "evidence-export-contract",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_export_interview_traces.py -q",
+      "claim": "导出器只接受真实已确认退款与真实未知结果两类 Episode/MySQL 组合，并生成脱敏报告、manifest 和 SHA256SUMS。",
+      "boundary": "导出能力有测试；由于缺少两条合格 live run，正式 Trace bundle 尚未采集。",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/scripts/export_interview_traces.py",
+      "datasetLocks": []
+    },
+    {
       "id": "agent-live-model",
       "kind": "online-evaluation",
       "level": "E3_CONFIGURED_LIVE",
       "state": "NOT_COLLECTED",
-      "command": "Run .github/workflows/online-ai-eval.yml with configured provider secrets for Agent runtime and ablation",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python benchmarks/run_task_success_eval.py --bindings benchmarks/task_success_bindings.local.json --fixture-snapshot-id <snapshot> --expected-orchestration-mode adaptive",
       "claim": "未采集。",
-      "boundary": "本轮只采集 Search/RAG E3；真实模型 Agent runtime、在线消融及其 token/成本仍未冻结，不能用 deterministic Runner 或本轮 RAG 结果替代。",
+      "boundary": "真实模型 Agent TSR、在线消融、正式 Trace 及其 token/成本仍未采集；不能用单元测试、deterministic Runner 或 Search/RAG 结果替代。",
       "resultLocation": "not-collected",
       "resultPath": null,
-      "datasetLocks": []
+      "datasetLocks": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.jsonl"
+        }
+      ]
     },
     {
       "id": "real-user-pilot",
@@ -622,12 +694,120 @@
       "datasetLocks": []
     }
   ],
+  "requiredEvidenceIds": [
+    "java-domain-integration",
+    "agent-adaptive-orchestration",
+    "agent-runtime-guardrails",
+    "agent-live-task-contract",
+    "agent-live-ablation-contract",
+    "agent-trace-export-contract",
+    "agent-live-model",
+    "real-user-pilot"
+  ],
+  "implementationArtifacts": [
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.lock.json",
+      "requiredTokens": [
+        "\"caseCount\": 37",
+        "\"resultStatus\": \"NOT_COLLECTED\""
+      ],
+      "forbiddenTokens": []
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/run_task_success_eval.py",
+      "requiredTokens": [
+        "EXECUTION_MODE = \"LIVE_FULL_STACK\"",
+        "def _rag_provider_facts",
+        "POST /api/agent/sendMessage"
+      ],
+      "forbiddenTokens": [
+        "def simulate_case"
+      ]
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/compare_live_orchestration_ablation.py",
+      "requiredTokens": [
+        "EXPECTED_MODES = (\"workflow\", \"single_agent\", \"multi_agent\")",
+        "LIVE_FULL_STACK_PAIRED",
+        "taskSuccessDelta95Ci"
+      ],
+      "forbiddenTokens": []
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/scripts/export_interview_traces.py",
+      "requiredTokens": [
+        "def validate_trace_pair",
+        "unknown_outcome_manual_review",
+        "SHA256SUMS"
+      ],
+      "forbiddenTokens": []
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/app/graph/orchestration_policy.py",
+      "requiredTokens": [
+        "ConfiguredMode = Literal[\"adaptive\", \"workflow\", \"single_agent\", \"multi_agent\"]",
+        "def _workflow_eligible",
+        "cross_domain_request"
+      ],
+      "forbiddenTokens": []
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/app/graph/budget_guard.py",
+      "requiredTokens": [
+        "class BudgetGuard",
+        "time.monotonic",
+        "ContextVar[BudgetGuard"
+      ],
+      "forbiddenTokens": []
+    },
+    {
+      "path": "docs/个人技术贡献边界_项目卡片格式.md",
+      "requiredTokens": [
+        "Java 交易底座 + Python 受控售后 Agent",
+        "LangGraph Checkpoint 持久化在 Redis",
+        "resultStatus=NOT_COLLECTED"
+      ],
+      "forbiddenTokens": [
+        "AI_Shop-agent/app/services/rag/",
+        "app/agents/orchestrator.py",
+        "Vue 3 + Vite + Vant 4",
+        "官方PostgreSQL checkpointer"
+      ]
+    },
+    {
+      "path": "优化完成总结.md",
+      "requiredTokens": [
+        "37 个唯一 case",
+        "真实模型 Agent 全栈结果",
+        "不存在伪造的正式 Trace 包"
+      ],
+      "forbiddenTokens": [
+        "12个测试用例",
+        "GraphRunner集成",
+        "所有实现遵循2026年AI Agent生产标准"
+      ]
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
+      "requiredTokens": [
+        "Agent v2 真实全栈任务成功率",
+        "task_success_v2_bindings.local.json",
+        "每个模式运行前恢复同一份业务 fixture",
+        "compare_live_orchestration_ablation.py",
+        "resultStatus` 为 `NOT_COLLECTED"
+      ],
+      "forbiddenTokens": [
+        "12个测试用例"
+      ]
+    }
+  ],
   "honestBoundaries": [
     "普通 benchmarks/results 目录被 Git 忽略；只有显式接受的 baseline lock 才能入库，本轮没有运行 --accept-baseline。",
     "SYNTHETIC、LOCAL_PILOT、REAL_USER 必须分开报告；REAL_USER 没有样本时固定为未采集。",
     "Search/RAG 的 E3 configured-live 证据已经采集；Search v2、RAG retrieval v4 和 generation v4 的正式门禁均未全过，不得用暴露后回归覆盖正式失败。",
     "POST_FIX_OFFLINE_REPLAY、POST_FIX_OFFLINE_RESCORE 和 POST_FIX_TARGETED_REGRESSION 必须保持 holdoutExposed=true、freshEvidence=false，不得升级为 fresh E3。",
     "RAG v4 人工盲评状态为 HUMAN_REVIEW_PENDING；AI_ASSISTED_INITIAL_REVIEW 不得表述为独立人工标注。",
+    "Agent 37 条 live 任务、三模式真实消融和两条正式 Trace 当前均为 NOT_COLLECTED；门禁、单测或旧 deterministic 结果不能替代正式成绩。",
     "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO；本轮 Search/RAG 各分组仍均小于 100。",
     "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
     "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。"
@@ -636,7 +816,9 @@
     "README.md",
     "docs/AI应用求职项目证据总览.md",
     "docs/项目问题排查与修复复盘.md",
-    "docs/Search与RAG成熟评测报告.md"
+    "docs/Search与RAG成熟评测报告.md",
+    "docs/个人技术贡献边界_项目卡片格式.md",
+    "优化完成总结.md"
   ],
   "documentationConsistency": [
     {
@@ -644,7 +826,10 @@
       "requiredTokens": [
         "Search v2 覆盖中文 600 商品/240 查询",
         "正式 Retrieval/Generation 均保留",
-        "HUMAN_REVIEW_PENDING"
+        "HUMAN_REVIEW_PENDING",
+        "自适应编排",
+        "resultStatus=NOT_COLLECTED",
+        "INCONCLUSIVE"
       ],
       "forbiddenTokens": [
         "RAG v3 将知识库扩为 12 份/75 chunk"
@@ -657,7 +842,10 @@
         "RAG retrieval v4 正式",
         "RAG generation v4 正式",
         "39/60",
-        "HUMAN_REVIEW_PENDING"
+        "HUMAN_REVIEW_PENDING",
+        "Agent live 任务契约",
+        "resultStatus=NOT_COLLECTED",
+        "INCONCLUSIVE"
       ],
       "forbiddenTokens": [
         "RAG retrieval v3（当前）",
@@ -686,6 +874,29 @@
         "HUMAN_REVIEW_PENDING"
       ],
       "forbiddenTokens": []
+    },
+    {
+      "path": "docs/个人技术贡献边界_项目卡片格式.md",
+      "requiredTokens": [
+        "受控售后闭环",
+        "INCONCLUSIVE -> 对账 -> MANUAL_REVIEW",
+        "正式 Agent 模型结果",
+        "RAG v4 正式 fresh `Recall@5=0.8056`"
+      ],
+      "forbiddenTokens": [
+        "推荐归因持久化和不可变Outcome Ledger"
+      ]
+    },
+    {
+      "path": "优化完成总结.md",
+      "requiredTokens": [
+        "resultStatus=NOT_COLLECTED",
+        "旧确定性消融",
+        "正式 fresh `Recall@5=0.8056`"
+      ],
+      "forbiddenTokens": [
+        "生产就绪度"
+      ]
     }
   ],
   "forbiddenCurrentClaims": [

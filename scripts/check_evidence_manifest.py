@@ -80,8 +80,7 @@ def _check_assertions(
             errors.append(f"{label} assertion path is missing: {dotted_path}")
         elif actual != expected:
             errors.append(
-                f"{label} assertion failed for {dotted_path}: "
-                f"expected {expected!r}, got {actual!r}"
+                f"{label} assertion failed for {dotted_path}: expected {expected!r}, got {actual!r}"
             )
 
 
@@ -121,15 +120,9 @@ def _check_dataset_lock(
     dataset = dataset_override or lock.get("dataset") or lock.get("datasetPath")
     expected = lock.get(expected_field)
     if not isinstance(dataset, str) or not isinstance(expected, str):
-        errors.append(
-            f"dataset lock lacks dataset/{expected_field}: {lock_relative}"
-        )
+        errors.append(f"dataset lock lacks dataset/{expected_field}: {lock_relative}")
         return
-    dataset_path = (
-        _resolve(dataset)
-        if dataset_override
-        else (lock_path.parent / dataset).resolve()
-    )
+    dataset_path = _resolve(dataset) if dataset_override else (lock_path.parent / dataset).resolve()
     if not dataset_path.is_file() and not dataset_path.suffix:
         jsonl_candidate = dataset_path.with_suffix(".jsonl")
         if jsonl_candidate.is_file():
@@ -189,7 +182,9 @@ def _check_result(evidence: dict[str, Any], path: Path, errors: list[str]) -> No
             summary.get("criticalSafetyViolationCount") not in (None, 0)
             and evidence.get("qualityGateState") != "FAILED_RETAINED"
         ):
-            errors.append(f"evaluation contains critical safety violations: {path.relative_to(REPO_ROOT)}")
+            errors.append(
+                f"evaluation contains critical safety violations: {path.relative_to(REPO_ROOT)}"
+            )
         if not isinstance(result.get("cases"), list) or not result["cases"]:
             errors.append(f"evaluation has no case results: {path.relative_to(REPO_ROOT)}")
     elif evidence.get("kind") == "ablation":
@@ -234,9 +229,7 @@ def _check_ai_review(
     if len(case_ids) != len(rows) or "" in case_ids or len(case_ids) != len(set(case_ids)):
         errors.append(f"AI-assisted review case IDs are invalid: {path.relative_to(REPO_ROOT)}")
     result_case_ids = {
-        str(row.get("caseId") or "")
-        for row in result.get("cases") or []
-        if isinstance(row, dict)
+        str(row.get("caseId") or "") for row in result.get("cases") or [] if isinstance(row, dict)
     }
     if set(case_ids) != result_case_ids:
         errors.append(f"AI-assisted review cases differ from result: {path.relative_to(REPO_ROOT)}")
@@ -277,6 +270,49 @@ def _check_markdown_links(relative: str, errors: list[str]) -> None:
             continue
         if not candidate.exists():
             errors.append(f"broken link in {relative}: {raw_target}")
+
+
+def _check_text_contracts(field_name: str, contracts: Any, errors: list[str]) -> None:
+    if contracts is None:
+        return
+    if not isinstance(contracts, list) or not contracts:
+        errors.append(f"{field_name} must be a non-empty array")
+        return
+    for index, contract in enumerate(contracts):
+        label = f"{field_name}[{index}]"
+        if not isinstance(contract, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        relative = contract.get("path")
+        if not isinstance(relative, str) or not relative:
+            errors.append(f"{label}.path is required")
+            continue
+        path = _resolve(relative)
+        if not path.is_file():
+            errors.append(f"{label} path missing: {relative}")
+            continue
+        required = contract.get("requiredTokens") or []
+        forbidden = contract.get("forbiddenTokens") or []
+        if not isinstance(required, list) or not all(
+            isinstance(token, str) and token for token in required
+        ):
+            errors.append(f"{label}.requiredTokens must contain non-empty strings")
+            continue
+        if not isinstance(forbidden, list) or not all(
+            isinstance(token, str) and token for token in forbidden
+        ):
+            errors.append(f"{label}.forbiddenTokens must contain non-empty strings")
+            continue
+        if not required and not forbidden:
+            errors.append(f"{label} must define requiredTokens or forbiddenTokens")
+            continue
+        content = path.read_text(encoding="utf-8")
+        for token in required:
+            if token not in content:
+                errors.append(f"{label} missing required token: {token}")
+        for token in forbidden:
+            if token in content:
+                errors.append(f"{label} contains forbidden token: {token}")
 
 
 def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> list[str]:
@@ -328,9 +364,7 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
             tracked_result = _resolve(result_path)
             if not tracked_result.exists():
                 errors.append(f"tracked evidence path missing: {result_path}")
-            elif row.get("resultSha256") and _sha256(tracked_result) != row.get(
-                "resultSha256"
-            ):
+            elif row.get("resultSha256") and _sha256(tracked_result) != row.get("resultSha256"):
                 errors.append(f"result hash mismatch: {result_path}")
         elif location == "local-ignored" and check_local_results:
             path = _resolve(result_path)
@@ -349,7 +383,9 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                         else:
                             expected_review_sha = row.get("reviewSha256")
                             if expected_review_sha and _sha256(review_path) != expected_review_sha:
-                                errors.append(f"AI-assisted review hash mismatch: {review_relative}")
+                                errors.append(
+                                    f"AI-assisted review hash mismatch: {review_relative}"
+                                )
                             try:
                                 result_payload = _json(path)
                             except (OSError, json.JSONDecodeError, ValueError):
@@ -460,6 +496,19 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                 require_optional_local=check_local_results,
             )
 
+    required_ids = payload.get("requiredEvidenceIds")
+    if required_ids is not None:
+        if (
+            not isinstance(required_ids, list)
+            or not required_ids
+            or not all(isinstance(evidence_id, str) and evidence_id for evidence_id in required_ids)
+        ):
+            errors.append("requiredEvidenceIds must contain non-empty strings")
+        else:
+            missing_ids = sorted(set(required_ids) - seen)
+            if missing_ids:
+                errors.append(f"required evidence IDs are missing: {missing_ids}")
+
     boundaries = payload.get("honestBoundaries")
     if not isinstance(boundaries, list) or not boundaries:
         errors.append("honestBoundaries must be a non-empty array")
@@ -472,6 +521,10 @@ def validate_manifest(payload: dict[str, Any], *, check_local_results: bool) -> 
                 errors.append("claimDocuments must contain paths")
             else:
                 _check_markdown_links(document, errors)
+    _check_text_contracts(
+        "documentationConsistency", payload.get("documentationConsistency"), errors
+    )
+    _check_text_contracts("implementationArtifacts", payload.get("implementationArtifacts"), errors)
     for rule in payload.get("forbiddenCurrentClaims") or []:
         if not isinstance(rule, dict) or not rule.get("pattern"):
             errors.append("forbiddenCurrentClaims entries require pattern and paths")
@@ -515,7 +568,9 @@ def main() -> None:
             text=True,
         ).stdout.strip()
         if current != (payload.get("implementationBaseline") or {}).get("gitHead"):
-            errors.append(f"manifest HEAD {payload['implementationBaseline']['gitHead']} != {current}")
+            errors.append(
+                f"manifest HEAD {payload['implementationBaseline']['gitHead']} != {current}"
+            )
     if errors:
         raise SystemExit("evidence manifest is invalid:\n- " + "\n- ".join(errors))
     print(f"evidence manifest valid: {len(payload['evidence'])} entries")

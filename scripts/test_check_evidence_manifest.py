@@ -48,18 +48,14 @@ def _manifest(tmp_path: Path) -> dict:
 
 class EvidenceManifestTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(
-            dir=Path(__file__).resolve().parents[1]
-        )
+        self.temporary = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1])
         self.root = Path(self.temporary.name)
 
     def tearDown(self):
         self.temporary.cleanup()
 
     def test_valid_minimum_manifest(self):
-        self.assertEqual(
-            validate_manifest(_manifest(self.root), check_local_results=False), []
-        )
+        self.assertEqual(validate_manifest(_manifest(self.root), check_local_results=False), [])
 
     def test_not_collected_cannot_have_result_path(self):
         manifest = _manifest(self.root)
@@ -79,6 +75,34 @@ class EvidenceManifestTest(unittest.TestCase):
         manifest["evidence"].append(dict(manifest["evidence"][0]))
         errors = validate_manifest(manifest, check_local_results=False)
         self.assertTrue(any("duplicate evidence id" in error for error in errors))
+
+    def test_required_evidence_ids_are_enforced(self):
+        manifest = _manifest(self.root)
+        manifest["requiredEvidenceIds"] = ["source", "live-task-contract"]
+
+        errors = validate_manifest(manifest, check_local_results=False)
+
+        self.assertTrue(any("live-task-contract" in error for error in errors))
+
+    def test_text_contracts_require_and_forbid_tokens(self):
+        manifest = _manifest(self.root)
+        artifact = self.root / "artifact.py"
+        artifact.write_text("EXECUTION_MODE = 'LIVE_FULL_STACK'\n", encoding="utf-8")
+        relative = str(artifact.relative_to(Path(__file__).resolve().parents[1]))
+        manifest["implementationArtifacts"] = [
+            {
+                "path": relative,
+                "requiredTokens": ["LIVE_FULL_STACK"],
+                "forbiddenTokens": ["SIMULATED_RESULT"],
+            }
+        ]
+
+        self.assertEqual(validate_manifest(manifest, check_local_results=False), [])
+
+        artifact.write_text("SIMULATED_RESULT = True\n", encoding="utf-8")
+        errors = validate_manifest(manifest, check_local_results=False)
+        self.assertTrue(any("missing required token" in error for error in errors))
+        self.assertTrue(any("contains forbidden token" in error for error in errors))
 
     def test_ai_assisted_review_requires_complete_consistent_rubric(self):
         manifest = _manifest(self.root)
@@ -150,9 +174,7 @@ class EvidenceManifestTest(unittest.TestCase):
         payload = json.loads(review.read_text(encoding="utf-8"))
         payload["cases"][0]["verdict"] = "FAIL"
         review.write_text(json.dumps(payload), encoding="utf-8")
-        manifest["evidence"][0]["reviewSha256"] = hashlib.sha256(
-            review.read_bytes()
-        ).hexdigest()
+        manifest["evidence"][0]["reviewSha256"] = hashlib.sha256(review.read_bytes()).hexdigest()
         errors = validate_manifest(manifest, check_local_results=True)
         self.assertTrue(any("verdict is inconsistent" in error for error in errors))
 
