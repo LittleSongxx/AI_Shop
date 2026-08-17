@@ -153,6 +153,46 @@ async def test_create_is_idempotent_for_repeated_confirmation(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_verified_order_item_support_case_records_idempotent_outcome(monkeypatch):
+    service = SupportCaseService()
+    record = AsyncMock(return_value={"accepted": True, "status": "RECORDED"})
+    monkeypatch.setattr(
+        "app.services.support_case_service.commerce_outcome_ledger_service.record_support_contact",
+        record,
+    )
+    case = {
+        "caseId": 41,
+        "caseNo": "SC20260817ABC123",
+        "userId": "u1",
+        "orderId": "order-1",
+        "orderItemId": "item-1",
+        "category": "DAMAGED",
+        "runId": "run-1",
+    }
+
+    await service._record_support_contact_outcome(
+        "u1",
+        case,
+        item={
+            "order_id": "order-1",
+            "product_id": "p1",
+            "property_value_id_hash": "sku-1",
+        },
+    )
+
+    record.assert_awaited_once_with(
+        user_id="u1",
+        case_id="SC20260817ABC123",
+        category="DAMAGED",
+        order_id="order-1",
+        order_item_id="item-1",
+        product_id="p1",
+        sku_key="sku-1",
+        run_id="run-1",
+    )
+
+
+@pytest.mark.asyncio
 async def test_normal_proposal_requires_confirmation_but_forced_handoff_creates_now(monkeypatch):
     proposal = {
         "category": "INVOICE",

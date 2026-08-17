@@ -182,8 +182,30 @@ async def forced_tool_for_intent(
     if not forced:
         return None
     tool_name, tool_args = forced
+    return await invoke_deterministic_tool(
+        messages=messages,
+        user_id=user_id,
+        tool_name=tool_name,
+        tool_args=tool_args,
+        intent=intent,
+        call_id="forced_mcp",
+    )
+
+
+async def invoke_deterministic_tool(
+    *,
+    messages: list,
+    user_id: str,
+    tool_name: str,
+    tool_args: dict,
+    intent: str | None,
+    call_id: str,
+) -> dict:
+    """Invoke a framework-selected tool and produce a finalize-ready update."""
     try:
-        result = await mcp_tool_router.invoke(tool_name, tool_args, user_id)
+        result = await mcp_tool_router.invoke(
+            tool_name, tool_args, user_id, call_id=call_id
+        )
     except Exception as exc:
         return _finalize_tool_failure(messages, exc, intent=intent)
     if failed := _failed_result(messages, result, intent=intent):
@@ -193,12 +215,13 @@ async def forced_tool_for_intent(
     obs = build_tool_result_observation(result, fallback="未查询到相关记录。")
     if obs.contaminated:
         return _finalize_quarantined(messages, tool_name, obs)
-    messages.append(ToolMessage(content=obs.text, tool_call_id="forced_mcp"))
-    logger.warning(
-        "forced_mcp_after_llm_skip",
+    messages.append(ToolMessage(content=obs.text, tool_call_id=call_id))
+    logger.info(
+        "deterministic_tool_invoked",
         user_id=user_id,
         intent=intent,
         tool=tool_name,
+        call_id=call_id,
         has_cards=bool(result.assistant_cards),
         has_act_token="act_" in tool_text.lower(),
     )

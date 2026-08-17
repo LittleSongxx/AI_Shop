@@ -9,10 +9,17 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
-from app.rag.canonical_facts import DEFAULT_CATALOG_PATH, get_canonical_fact_catalog
+from app.rag.canonical_facts import (
+    DEFAULT_CATALOG_PATH,
+    LEGACY_V1_CATALOG_PATH,
+    get_canonical_fact_catalog,
+)
 
 FACT_METADATA_SCHEMA = "aishop-fact-metadata/v1"
-DEFAULT_FACT_METADATA_PATH = DEFAULT_CATALOG_PATH.with_name("fact-metadata.v1.json")
+DEFAULT_FACT_METADATA_PATH = DEFAULT_CATALOG_PATH.with_name("fact-metadata.v2.json")
+LEGACY_V1_FACT_METADATA_PATH = LEGACY_V1_CATALOG_PATH.with_name(
+    "fact-metadata.v1.json"
+)
 FACT_POLARITIES = frozenset({"AFFIRMATIVE", "NEGATIVE", "MIXED"})
 
 
@@ -50,12 +57,19 @@ class FactMetadataCatalog:
 
     @classmethod
     def load(
-        cls, path: Path = DEFAULT_FACT_METADATA_PATH
+        cls,
+        path: Path = DEFAULT_FACT_METADATA_PATH,
+        *,
+        canonical_catalog_path: Path | None = None,
     ) -> "FactMetadataCatalog":
         payload = json.loads(path.read_text(encoding="utf-8"))
         if payload.get("schemaVersion") != FACT_METADATA_SCHEMA:
             raise ValueError("unsupported fact metadata schema")
-        catalog_sha = _sha256(DEFAULT_CATALOG_PATH)
+        metadata_version = int(payload.get("metadataVersion") or 0)
+        catalog_path = canonical_catalog_path or path.with_name(
+            f"catalog.v{metadata_version}.json"
+        )
+        catalog_sha = _sha256(catalog_path)
         if payload.get("canonicalCatalogSha256") != catalog_sha:
             raise ValueError("fact metadata canonical catalog SHA mismatch")
         rows = payload.get("facts")
@@ -94,7 +108,7 @@ class FactMetadataCatalog:
                 aliases=aliases,
                 atomic_claims=claims,
             )
-        expected = set(get_canonical_fact_catalog().fact_to_refs)
+        expected = set(get_canonical_fact_catalog(catalog_path).fact_to_refs)
         if set(facts) != expected:
             missing = sorted(expected - set(facts))
             extra = sorted(set(facts) - expected)
@@ -104,6 +118,22 @@ class FactMetadataCatalog:
         return cls(path=path, catalog_sha256=catalog_sha, facts=facts)
 
 
-@lru_cache(maxsize=1)
-def get_fact_metadata_catalog() -> FactMetadataCatalog:
-    return FactMetadataCatalog.load()
+@lru_cache(maxsize=None)
+def _load_fact_metadata_catalog(
+    path: str, canonical_catalog_path: str
+) -> FactMetadataCatalog:
+    return FactMetadataCatalog.load(
+        Path(path), canonical_catalog_path=Path(canonical_catalog_path)
+    )
+
+
+def get_fact_metadata_catalog(
+    path: Path | None = None,
+) -> FactMetadataCatalog:
+    canonical = get_canonical_fact_catalog()
+    metadata_path = Path(path) if path else canonical.path.with_name(
+        f"fact-metadata.v{canonical.catalog_version}.json"
+    )
+    return _load_fact_metadata_catalog(
+        str(metadata_path.resolve()), str(canonical.path.resolve())
+    )

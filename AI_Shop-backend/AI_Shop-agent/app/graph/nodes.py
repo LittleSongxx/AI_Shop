@@ -18,7 +18,9 @@ from app.graph.forced_tools import (
     forced_order_list,
     forced_product_search,
     forced_tool_for_intent,
+    invoke_deterministic_tool,
 )
+from app.graph.orchestration_policy import select_orchestration
 from app.graph.order_reference_flow import resolve_order_reference_turn
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
@@ -901,6 +903,75 @@ async def order_reference_node(state: AgentGraphState) -> dict:
     if state.get("cancelled") or state.get("finished"):
         return {"route": "end"}
     return await resolve_order_reference_turn(state)
+
+
+async def orchestration_router_node(state: AgentGraphState) -> dict:
+    settings = get_settings()
+    decision = select_orchestration(
+        state,
+        configured_mode=settings.orchestration_mode,
+        multi_agent_enabled=settings.multi_agent_enabled,
+    )
+    detail = {
+        "mode": decision.mode,
+        "reason": decision.reason,
+        "configuredMode": settings.orchestration_mode,
+        "multiAgentAvailable": settings.multi_agent_enabled,
+    }
+    episode_service.record_step(
+        "ORCHESTRATION_DECISION",
+        node_name="orchestration_router",
+        output_data=detail,
+    )
+    episode_service.update_run(experiment={"orchestration": detail})
+    return {
+        "orchestration_mode": decision.mode,
+        "orchestration_reason": decision.reason,
+        "route": decision.route,
+    }
+
+
+async def deterministic_workflow_node(state: AgentGraphState) -> dict:
+    messages = list(state.get("llm_messages") or [])
+    user_id = state["user_id"]
+    intent = state.get("intent")
+    resolved = state.get("resolved_order_tool") or {}
+    tool_name = str(resolved.get("name") or "")
+    tool_args = resolved.get("args")
+    if tool_name and isinstance(tool_args, dict):
+        return await invoke_deterministic_tool(
+            messages=messages,
+            user_id=user_id,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            intent=intent,
+            call_id=f"workflow:{state['message_id']}",
+        )
+
+    update = await forced_tool_for_intent(
+        messages=messages,
+        user_id=user_id,
+        intent=intent,
+        intent_data=state.get("intent_data"),
+        user_text=str(state.get("user_text") or ""),
+    )
+    if update is not None:
+        return update
+
+    # A deterministic path must never guess missing business parameters. Hand
+    # the request to one agent for clarification and preserve that fallback in
+    # the trace so workflow-only ablations cannot silently count it as workflow.
+    episode_service.record_step(
+        "ORCHESTRATION_FALLBACK",
+        node_name="deterministic_workflow",
+        status="FALLBACK",
+        output_data={"from": "workflow", "to": "single_agent", "reason": "missing_args"},
+    )
+    return {
+        "orchestration_mode": "single_agent",
+        "orchestration_reason": "workflow_missing_args",
+        "route": "agent_loop",
+    }
 
 
 def _rag_rejection_code(

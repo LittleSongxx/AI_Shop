@@ -307,7 +307,9 @@ class ShoppingDecisionService:
             # It cannot become a hard filter and is ignored when personalization
             # is disabled; current-turn mission constraints remain authoritative.
             inferred_adjustment = 0.0
-            product_key = str(product.get("product_id") or product.get("productId") or "")
+            product_key = str(
+                product.get("product_id") or product.get("productId") or ""
+            ).lower()
             product_text = text
             for signal in implicit_signals[:20]:
                 if not isinstance(signal, dict):
@@ -320,9 +322,16 @@ class ShoppingDecisionService:
                 if not value or weight <= 0:
                     continue
                 kind = str(signal.get("kind") or "")
-                matches = value == product_key if kind == "product" else value in product_text
+                normalized_kind = kind.casefold()
+                matches = (
+                    value == product_key
+                    if normalized_kind in {"product", "negativeproduct"}
+                    else value in product_text
+                )
                 if matches:
-                    inferred_adjustment += (0.15 if not kind.startswith("negative") else -0.15) * weight
+                    inferred_adjustment += (
+                        0.15 if not normalized_kind.startswith("negative") else -0.15
+                    ) * weight
             explicit_score = min(1.0, max(0.0, explicit_score + inferred_adjustment))
             diversity_score = 1.0 / recall_rank
             score = (

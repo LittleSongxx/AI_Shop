@@ -972,13 +972,44 @@ class AgentOrchestrator:
                     intent=intent,
                     error=type(exc).__name__,
                 )
-        summary = support_service.build_summary(safe_message, decision)
+        try:
+            history = await agent_message_service.load_recent_history(
+                agent_msg["userId"], limit=6
+            )
+        except Exception as exc:
+            logger.warning(
+                "support_handoff_history_unavailable", error=type(exc).__name__
+            )
+            history = []
+        verified_refs = (
+            {
+                "orderId": support_case.get("orderId"),
+                "orderItemId": support_case.get("orderItemId"),
+            }
+            if support_case
+            else {}
+        )
+        try:
+            handoff_context = await support_service.build_handoff_context(
+                agent_msg["userId"],
+                safe_message,
+                decision,
+                history=history,
+                verified_order_refs=verified_refs,
+            )
+        except Exception as exc:
+            logger.warning(
+                "support_handoff_context_build_failed", error=type(exc).__name__
+            )
+            handoff_context = None
+        summary = support_service.build_summary(safe_message, decision, history)
         session = await support_service.create_or_get(
             agent_msg["userId"],
             agent_msg["messageId"],
             decision,
             decision.get("handoff_reason") or "AI_HANDOFF",
             summary,
+            handoff_context,
         )
         await agent_message_service.bind_session(
             agent_msg["messageId"], session["session_id"]
@@ -1120,9 +1151,29 @@ class AgentOrchestrator:
             )
         payload = decision.model_dump(mode="json")
         payload["handoff_reason"] = "USER_REQUEST"
-        summary = support_service.build_summary(reason or "用户主动申请人工客服", payload)
+        try:
+            history = await agent_message_service.load_recent_history(user_id, limit=6)
+        except Exception as exc:
+            logger.warning(
+                "support_request_history_unavailable", error=type(exc).__name__
+            )
+            history = []
+        handoff_context = await support_service.build_handoff_context(
+            user_id,
+            reason or "用户主动申请人工客服",
+            payload,
+            history=history,
+        )
+        summary = support_service.build_summary(
+            reason or "用户主动申请人工客服", payload, history
+        )
         session = await support_service.create_or_get(
-            user_id, source_message_id, payload, "USER_REQUEST", summary
+            user_id,
+            source_message_id,
+            payload,
+            "USER_REQUEST",
+            summary,
+            handoff_context,
         )
         return support_service.public_session(session)
 

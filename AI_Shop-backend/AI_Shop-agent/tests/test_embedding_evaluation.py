@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.rag.embedding import embed_text, embed_texts, embedding_evaluation_scope
+from app.rag.runtime_trace import rag_runtime_trace_scope
 
 
 def _settings():
@@ -44,10 +45,14 @@ async def test_embedding_evaluation_bypasses_cache_and_records_provider(monkeypa
         "app.rag.embedding.get_client", AsyncMock(return_value=client)
     )
 
-    with embedding_evaluation_scope(bypass_cache=True) as stats:
-        vector = await embed_text("查询")
+    with rag_runtime_trace_scope() as runtime_trace:
+        with embedding_evaluation_scope(bypass_cache=True) as stats:
+            vector = await embed_text("查询")
 
     assert vector == [0.1, 0.2, 0.3]
+    assert runtime_trace.public()["providerCalls"] == {"embedding": 1}
+    assert runtime_trace.public()["providerSuccesses"] == {"embedding": 1}
+    assert runtime_trace.public()["providerFailures"] == {}
     cached.assert_not_awaited()
     assert stats.snapshot() == {
         "bypassCache": True,
@@ -75,11 +80,14 @@ async def test_embedding_cache_behavior_is_unchanged_outside_evaluation(monkeypa
     provider = AsyncMock()
     monkeypatch.setattr("app.rag.embedding.get_client", provider)
 
-    vector = await embed_text("查询")
+    with rag_runtime_trace_scope() as runtime_trace:
+        vector = await embed_text("查询")
 
     assert vector == [0.4, 0.5, 0.6]
     cached.assert_awaited_once()
     provider.assert_not_awaited()
+    assert runtime_trace.public()["providerCalls"] == {}
+    assert runtime_trace.public()["providerCacheHits"] == {"embedding": 1}
 
 
 @pytest.mark.asyncio

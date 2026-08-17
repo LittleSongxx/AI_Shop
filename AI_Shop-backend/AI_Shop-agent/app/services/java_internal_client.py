@@ -455,14 +455,21 @@ class JavaInternalClient:
             raise ValueError("knowledge release version must be positive")
         return version
 
-    async def knowledge_catalog(self) -> dict[str, Any]:
+    async def knowledge_catalog(
+        self, release_version: int | None = None
+    ) -> dict[str, Any]:
         """Return the Java release snapshot used to gate knowledge retrieval.
 
         The catalog is intentionally validated at the boundary. A partial or
         malformed response must never be treated as an empty catalog, because
         that would make a failed Java request look like a successful archive.
         """
-        data = await self.post_json("/internal/search/knowledge/catalog", {})
+        body: dict[str, Any] = {}
+        if release_version is not None:
+            if int(release_version) < 1:
+                raise ValueError("knowledge catalog release version must be positive")
+            body["releaseVersion"] = int(release_version)
+        data = await self.post_json("/internal/search/knowledge/catalog", body)
         if not isinstance(data, dict):
             raise ValueError("invalid knowledge catalog response")
         normalized = normalize_keys(data)
@@ -508,11 +515,23 @@ class JavaInternalClient:
                     ),
                 }
             )
-        return {
+        result = {
             "version": version,
             "active_document_ids": active_ids,
             "documents": normalized_documents,
         }
+        release_name = str(normalized.get("release_name") or "").strip()
+        catalog_sha = str(normalized.get("catalog_sha256") or "").strip().lower()
+        if release_name:
+            result["release_name"] = release_name
+        if catalog_sha:
+            if len(catalog_sha) != 64:
+                raise ValueError("knowledge catalog SHA-256 is invalid")
+            result["catalog_sha256"] = catalog_sha
+        source_release = normalized.get("source_release_version")
+        if source_release is not None:
+            result["source_release_version"] = int(source_release)
+        return result
 
     async def exact_faq(
         self,

@@ -3,9 +3,6 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
-from langchain_core.messages import ToolMessage
-
-from app.config.settings import get_settings
 from app.constants import (
     ORDER_STATUS_PAID,
     ORDER_STATUS_SHIPPED,
@@ -15,9 +12,7 @@ from app.domain.intent.classifier import classify_request_mode
 from app.domain.intent.types import IntentKind, RequestMode
 from app.domain.intent.write_args import extract_review_content, extract_review_star
 from app.graph.state import AgentGraphState
-from app.harness.observation import build_tool_result_observation
 from app.memory.session_memory_service import session_memory_service
-from app.services.mcp_tool_router import mcp_tool_router
 from app.services.order_reference_resolver import (
     ORDER_REFERENCE_INTENTS,
     OrderReferenceOutcome,
@@ -42,11 +37,11 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         RequestMode.INFORMATIONAL.value,
         RequestMode.HUMAN_SUPPORT.value,
     }:
-        return {"route": "agent_loop"}
+        return {"route": "orchestration_router"}
     if intent not in ORDER_REFERENCE_INTENTS:
-        return {"route": "agent_loop"}
+        return {"route": "orchestration_router"}
     if intent == IntentKind.QUERY_ORDER.value and not _has_specific_order_clue(user_text):
-        return {"route": "agent_loop"}
+        return {"route": "orchestration_router"}
 
     decision = state.get("intent_decision") or {}
     resolution = await order_reference_resolver.resolve(
@@ -96,62 +91,22 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         }
 
     tool_name, args = tool
-    # In the multi-agent graph this node is an identity and ownership boundary:
-    # it verifies the target, but every read is delegated to a specialist and
-    # every proposal is created by the single root action executor after join.
-    if get_settings().multi_agent_enabled:
-        await _clear_reference(state)
-        return {
-            **base,
-            "verified_order_context": dict(target),
-            "route": "multi_agent_plan",
-        }
-
     direct = await _direct_response(state, intent, target)
     if direct is not None:
         return {**base, **direct}
-
-    result = await mcp_tool_router.invoke(tool_name, args, state["user_id"])
-    observation = build_tool_result_observation(result, fallback="未查询到相关记录。")
-    messages = list(state.get("llm_messages") or [])
-    messages.append(
-        ToolMessage(
-            content=observation.text,
-            tool_call_id="resolved_order_reference",
-        )
-    )
-    if observation.contaminated:
-        return {
-            **base,
-            "llm_messages": messages,
-            "tools_called": [tool_name],
-            "tool_biz": None,
-            "biz_type": "agent",
-            "biz_data": None,
-            "assistant_cards": None,
-            "chunks": [observation.text],
-            "route": "finalize",
-        }
-    if not result.success:
-        return {
-            **base,
-            "llm_messages": messages,
-            "tools_called": [tool_name],
-            "chunks": [observation.text or "业务查询失败，请稍后重试。"],
-            "biz_type": result.biz_type or "agent",
-            "route": "finalize",
-        }
     await _clear_reference(state)
+    if tool_name.startswith("PROPOSE_") and request_mode != RequestMode.ACTION_PROPOSAL.value:
+        return {
+            **base,
+            "verified_order_context": dict(target),
+            "resolved_order_tool": None,
+            "route": "orchestration_router",
+        }
     return {
         **base,
-        "llm_messages": messages,
-        "tools_called": [tool_name],
-        "tool_biz": result.to_biz_dict() or None,
-        "biz_type": result.biz_type,
-        "biz_data": result.biz_data,
-        "assistant_cards": result.assistant_cards,
-        "chunks": [] if result.assistant_cards else [observation.text],
-        "route": "finalize",
+        "verified_order_context": dict(target),
+        "resolved_order_tool": {"name": tool_name, "args": args},
+        "route": "orchestration_router",
     }
 
 

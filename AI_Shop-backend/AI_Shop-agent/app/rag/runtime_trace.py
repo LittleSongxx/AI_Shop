@@ -12,6 +12,9 @@ from typing import Any, Iterator
 class RagRuntimeTrace:
     stage_samples_ms: dict[str, list[float]] = field(default_factory=dict)
     provider_calls: dict[str, int] = field(default_factory=dict)
+    provider_successes: dict[str, int] = field(default_factory=dict)
+    provider_failures: dict[str, int] = field(default_factory=dict)
+    provider_cache_hits: dict[str, int] = field(default_factory=dict)
     cache_hits: int = 0
     fallbacks: list[str] = field(default_factory=list)
     route: str = "GENERAL"
@@ -23,6 +26,22 @@ class RagRuntimeTrace:
 
     def called(self, provider: str, count: int = 1) -> None:
         self.provider_calls[provider] = self.provider_calls.get(provider, 0) + count
+
+    def succeeded(self, provider: str, count: int = 1) -> None:
+        self.provider_successes[provider] = (
+            self.provider_successes.get(provider, 0) + count
+        )
+
+    def failed(self, provider: str, count: int = 1) -> None:
+        self.provider_failures[provider] = (
+            self.provider_failures.get(provider, 0) + count
+        )
+
+    def cache_hit(self, provider: str, count: int = 1) -> None:
+        self.cache_hits += count
+        self.provider_cache_hits[provider] = (
+            self.provider_cache_hits.get(provider, 0) + count
+        )
 
     def fallback(self, reason: str) -> None:
         if reason not in self.fallbacks:
@@ -39,6 +58,9 @@ class RagRuntimeTrace:
                 for stage, values in sorted(self.stage_samples_ms.items())
             },
             "providerCalls": dict(sorted(self.provider_calls.items())),
+            "providerSuccesses": dict(sorted(self.provider_successes.items())),
+            "providerFailures": dict(sorted(self.provider_failures.items())),
+            "providerCacheHits": dict(sorted(self.provider_cache_hits.items())),
             "cacheHits": self.cache_hits,
             "fallbacks": list(self.fallbacks),
             "route": self.route,

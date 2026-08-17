@@ -611,6 +611,18 @@ async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") 
     )
     await stream_service.push_error(user_id, message_id, "服务暂时不可用，请稍后重试", prompt_type)
 
+
+async def push_budget_error(agent_msg: dict) -> None:
+    """Persist a controlled terminal response when a run reaches its safety cap."""
+    user_id = agent_msg["userId"]
+    message_id = agent_msg["messageId"]
+    message = "本次请求已达到安全执行上限，请缩小问题范围后重试。"
+    await agent_message_service.complete_message(
+        message_id, message, "agent_budget", None
+    )
+    await stream_service.push_error(user_id, message_id, message, "agent_budget")
+
+
 @lru_cache(maxsize=32)
 def _agent_llm_with_tools(
     config: ChatLLMConfig,

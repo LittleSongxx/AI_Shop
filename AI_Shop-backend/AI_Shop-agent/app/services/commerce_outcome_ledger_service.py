@@ -244,6 +244,42 @@ class CommerceOutcomeLedgerService:
         )
         await self.record(event)
 
+    async def record_support_contact(
+        self,
+        *,
+        user_id: str,
+        case_id: str,
+        category: str,
+        order_id: str,
+        order_item_id: str,
+        product_id: str,
+        sku_key: str | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Project one Java-verified support case into the immutable ledger."""
+
+        event = CommerceOutcomeEvent(
+            eventId=_stable_event_id(
+                "SUPPORT_CONTACT", case_id, order_id, order_item_id
+            ),
+            source="SUPPORT",
+            idempotencyKey=(
+                f"support-contact:{case_id}:{order_item_id}"
+            )[:160],
+            eventType="SUPPORT_CONTACT",
+            userId=user_id,
+            runId=run_id,
+            productId=product_id,
+            skuKey=sku_key,
+            orderId=order_id,
+            payload={
+                "category": category,
+                "channel": "AGENT_SUPPORT_CASE",
+                "resolutionStatus": "OPEN",
+            },
+        )
+        return await self.record(event)
+
     async def _verified_impression(
         self, event: CommerceOutcomeEvent
     ) -> dict[str, Any] | None:
@@ -345,10 +381,11 @@ class CommerceOutcomeLedgerService:
             "REPEAT_PURCHASE": 1.0,
             "REFUND": 0.65,
             "RETURN": 0.80,
+            "SUPPORT_CONTACT": 0.35,
         }
         strength = strength_by_event.get(event.eventType)
         kind = "product"
-        if event.eventType in {"REFUND", "RETURN"}:
+        if event.eventType in {"REFUND", "RETURN", "SUPPORT_CONTACT"}:
             kind = "negativeProduct"
         elif event.eventType == "REVIEW":
             try:

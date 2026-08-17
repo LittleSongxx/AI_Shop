@@ -174,6 +174,9 @@ _RERANK_EVALUATION_STATS: contextvars.ContextVar[RerankEvaluationStats | None] =
 _ES_KNOWLEDGE_INDEX_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "rag_knowledge_index_override", default=None
 )
+_KNOWLEDGE_RELEASE_VERSION_OVERRIDE: contextvars.ContextVar[int | None] = (
+    contextvars.ContextVar("rag_knowledge_release_version", default=None)
+)
 
 
 @contextmanager
@@ -197,6 +200,22 @@ def evaluation_es_index_scope(index_name: str | None) -> Iterator[str | None]:
         yield value
     finally:
         _ES_KNOWLEDGE_INDEX_OVERRIDE.reset(token)
+
+
+@contextmanager
+def evaluation_knowledge_release_scope(
+    release_version: int | None,
+) -> Iterator[int | None]:
+    """Pin a live evaluation to one immutable Java knowledge release."""
+
+    if release_version is not None and int(release_version) < 1:
+        raise ValueError("evaluation knowledge release version must be positive")
+    value = int(release_version) if release_version is not None else None
+    token = _KNOWLEDGE_RELEASE_VERSION_OVERRIDE.set(value)
+    try:
+        yield value
+    finally:
+        _KNOWLEDGE_RELEASE_VERSION_OVERRIDE.reset(token)
 
 
 def _knowledge_index_name(settings: Any) -> str:
@@ -1149,8 +1168,6 @@ class RagRetriever:
                 runtime_trace.fallback("vector_breaker_open")
             return []
         runtime_trace = active_rag_runtime_trace()
-        if runtime_trace is not None:
-            runtime_trace.called("embedding")
         embedding_started = time.perf_counter()
         vector = await embed_text(query)
         if runtime_trace is not None:
@@ -1327,6 +1344,7 @@ class RagRetriever:
             breaker.record_success()
             if runtime_trace is not None:
                 runtime_trace.observe("rerank", (time.perf_counter() - rerank_started) * 1000)
+                runtime_trace.succeeded("rerank")
             if evaluation is not None:
                 evaluation.provider_successes += 1
                 evaluation.response_records.append(
@@ -1352,6 +1370,7 @@ class RagRetriever:
             logger.warning("rerank_failed_fallback_rrf", error=str(exc))
             if runtime_trace is not None:
                 runtime_trace.observe("rerank", (time.perf_counter() - rerank_started) * 1000)
+                runtime_trace.failed("rerank")
                 runtime_trace.fallback("rerank_provider_error")
             return fallback
 
@@ -1512,6 +1531,43 @@ class RagRetriever:
         unavailable, an LKG is accepted only when the successfully-read hint does
         not prove it stale. ``None`` means the knowledge branch must be disabled.
         """
+        pinned_release = _KNOWLEDGE_RELEASE_VERSION_OVERRIDE.get()
+        if pinned_release is not None:
+            try:
+                raw_catalog = await java_internal_client.knowledge_catalog(
+                    release_version=pinned_release
+                )
+                if int(raw_catalog.get("version") or 0) != pinned_release:
+                    raise ValueError(
+                        "Java knowledge catalog does not match pinned release"
+                    )
+                return {
+                    "version": pinned_release,
+                    "active_document_ids": list(
+                        raw_catalog.get("active_document_ids") or []
+                    ),
+                    "documents": self._normalize_catalog_documents(
+                        raw_catalog.get("documents") or []
+                    ),
+                    **(
+                        {"release_name": raw_catalog["release_name"]}
+                        if raw_catalog.get("release_name")
+                        else {}
+                    ),
+                    **(
+                        {"catalog_sha256": raw_catalog["catalog_sha256"]}
+                        if raw_catalog.get("catalog_sha256")
+                        else {}
+                    ),
+                }
+            except Exception as exc:
+                logger.error(
+                    "pinned_knowledge_catalog_unavailable_fail_closed",
+                    release_version=pinned_release,
+                    error=str(exc),
+                )
+                return None
+
         hint, hint_ok = await self._read_release_hint()
         lkg = await self._read_last_known_good_catalog()
 
@@ -1600,6 +1656,9 @@ class RagRetriever:
         must not select an exact-FAQ cache namespace: doing so could serve an old
         answer for the full six-hour cache TTL after a failed broadcast.
         """
+        pinned_release = _KNOWLEDGE_RELEASE_VERSION_OVERRIDE.get()
+        if pinned_release is not None:
+            return pinned_release
         hint, _hint_ok = await self._read_release_hint()
         lkg = await self._read_last_known_good_catalog()
         try:

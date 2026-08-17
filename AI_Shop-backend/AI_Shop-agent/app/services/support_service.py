@@ -5,6 +5,7 @@ import re
 import uuid
 from collections import Counter
 from datetime import datetime
+from typing import Any
 
 import structlog
 from aiomysql import IntegrityError
@@ -18,11 +19,17 @@ from app.constants import (
     WS_MESSAGE_TYPE_SUPPORT,
 )
 from app.db.pool import acquire
-from app.services.java_internal_client import java_internal_client
+from app.services.java_internal_client import delegated_user_scope, java_internal_client
 from app.services.redis_service import redis_service
 
 logger = structlog.get_logger()
 _ACTIVE_STATUSES = (SUPPORT_STATUS_QUEUED, SUPPORT_STATUS_ASSIGNED, SUPPORT_STATUS_ACTIVE)
+_HANDOFF_SCHEMA = "aishop-support-handoff/v1"
+_HANDOFF_HISTORY_LIMIT = 6
+_HANDOFF_MESSAGE_LIMIT = 200
+_HANDOFF_CONTEXT_MAX_BYTES = 8192
+_HANDOFF_ORDER_LIMIT = 3
+_HANDOFF_ITEM_LIMIT = 5
 
 
 class SupportService:
@@ -47,19 +54,25 @@ class SupportService:
         decision: dict,
         reason: str,
         summary: str,
+        context: dict[str, Any] | None = None,
     ) -> dict:
         active = await self.get_active(user_id)
         if active:
+            if context:
+                await self._update_context(active["session_id"], context)
+                return await self.get_by_id(active["session_id"]) or active
             return active
         session_id = str(uuid.uuid4())
+        context_json = self._encode_context(context)
         try:
             async with acquire() as cur:
                 await cur.execute(
                     """
                     INSERT INTO support_session
-                        (session_id, user_id, status, trigger_reason, summary, intent, sentiment,
-                         urgency, risk_level, source_message_id, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        (session_id, user_id, status, trigger_reason, summary, context_json,
+                         intent, sentiment, urgency, risk_level, source_message_id,
+                         created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                     """,
                     (
                         session_id,
@@ -67,6 +80,7 @@ class SupportService:
                         SUPPORT_STATUS_QUEUED,
                         reason,
                         summary,
+                        context_json,
                         decision.get("intent"),
                         decision.get("sentiment"),
                         decision.get("urgency"),
@@ -107,6 +121,20 @@ class SupportService:
             {"event": "support.created", "session": self._public_session(session)}
         )
         return session or {"session_id": session_id, "status": SUPPORT_STATUS_QUEUED}
+
+    async def _update_context(
+        self, session_id: str, context: dict[str, Any]
+    ) -> None:
+        encoded = self._encode_context(context)
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                UPDATE support_session
+                SET context_json=%s, updated_at=NOW()
+                WHERE session_id=%s AND status IN ('QUEUED','ASSIGNED','ACTIVE')
+                """,
+                (encoded, session_id),
+            )
 
     async def route_user_message(self, session: dict, user_id: str, content: str, message_id: int) -> None:
         async with acquire() as cur:
@@ -364,7 +392,7 @@ class SupportService:
             "pageNo": page_no,
             "pageSize": page_size,
             "pageTotal": (count + page_size - 1) // page_size if count else 0,
-            "list": [self._public_session(row) for row in rows],
+            "list": [self._admin_session(row) for row in rows],
         }
 
     async def list_sessions(
@@ -407,7 +435,7 @@ class SupportService:
             "pageNo": page_no,
             "pageSize": page_size,
             "pageTotal": (total + page_size - 1) // page_size if total else 0,
-            "list": [self._public_session(item) for item in rows],
+            "list": [self._admin_session(item) for item in rows],
         }
 
     async def sla_stats(
@@ -618,11 +646,215 @@ class SupportService:
             ))
         return "\n".join(lines)[:1800]
 
+    async def build_handoff_context(
+        self,
+        user_id: str,
+        user_text: str,
+        decision: dict[str, Any],
+        *,
+        history: list[dict[str, Any]] | None = None,
+        verified_order_refs: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        entities = decision.get("entities")
+        unverified = self._sanitize_hint(entities if isinstance(entities, dict) else {})
+        authoritative = await self._authoritative_orders(
+            user_id,
+            entities if isinstance(entities, dict) else {},
+            verified_order_refs or {},
+        )
+        recent: list[dict[str, str]] = []
+        for item in (history or [])[-_HANDOFF_HISTORY_LIMIT:]:
+            role = str(item.get("role") or item.get("senderType") or "UNKNOWN").upper()
+            if role not in {"USER", "ASSISTANT", "ADMIN", "SYSTEM"}:
+                role = "UNKNOWN"
+            content = self.desensitize(str(item.get("content") or "")).strip()
+            if content:
+                recent.append(
+                    {"role": role, "content": content[:_HANDOFF_MESSAGE_LIMIT]}
+                )
+        context: dict[str, Any] = {
+            "schemaVersion": _HANDOFF_SCHEMA,
+            "request": self.desensitize(user_text or "")[:500],
+            "recentConversation": recent,
+            "triage": {
+                "intent": str(decision.get("intent") or "UNKNOWN")[:40],
+                "confidence": self._safe_confidence(decision.get("confidence")),
+                "sentiment": str(decision.get("sentiment") or "NEUTRAL")[:20],
+                "urgency": str(decision.get("urgency") or "NORMAL")[:20],
+                "riskLevel": str(decision.get("risk_level") or "LOW")[:20],
+            },
+            "handoffReason": str(
+                decision.get("handoff_reason") or "AI_HANDOFF"
+            )[:64],
+            "unverifiedHints": unverified,
+            "authoritativeOrders": authoritative,
+        }
+        self._encode_context(context)
+        return context
+
+    async def _authoritative_orders(
+        self,
+        user_id: str,
+        entities: dict[str, Any],
+        verified_order_refs: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        unverified_orders, unverified_items = self._order_hints(entities)
+        verified_orders, verified_items = self._order_hints(verified_order_refs)
+        resolved: dict[str, dict[str, Any]] = {}
+        try:
+            with delegated_user_scope(user_id):
+                verified_item_orders: list[str] = []
+                unverified_item_orders: list[str] = []
+                item_ids = list(
+                    dict.fromkeys([*verified_items, *unverified_items])
+                )[: _HANDOFF_ORDER_LIMIT * 2]
+                verified_item_set = set(verified_items)
+                for item_id in item_ids:
+                    item = await java_internal_client.get_order_item(item_id)
+                    order_id = str((item or {}).get("order_id") or "").strip()
+                    if not order_id:
+                        continue
+                    target = (
+                        verified_item_orders
+                        if item_id in verified_item_set
+                        else unverified_item_orders
+                    )
+                    if order_id not in target:
+                        target.append(order_id)
+                order_ids = list(
+                    dict.fromkeys(
+                        [
+                            *verified_orders,
+                            *verified_item_orders,
+                            *unverified_orders,
+                            *unverified_item_orders,
+                        ]
+                    )
+                )
+                for order_id in order_ids[:_HANDOFF_ORDER_LIMIT]:
+                    order = await java_internal_client.get_order(order_id)
+                    if not order:
+                        continue
+                    if str(order.get("user_id") or "") != str(user_id):
+                        logger.warning("support_handoff_order_owner_mismatch")
+                        continue
+                    normalized = self._public_authoritative_order(order)
+                    if normalized:
+                        resolved[normalized["orderId"]] = normalized
+        except Exception as exc:
+            logger.warning(
+                "support_handoff_authoritative_order_unavailable",
+                error=type(exc).__name__,
+            )
+        return list(resolved.values())[:_HANDOFF_ORDER_LIMIT]
+
+    @staticmethod
+    def _public_authoritative_order(order: dict[str, Any]) -> dict[str, Any] | None:
+        order_id = str(order.get("order_id") or "").strip()
+        if not order_id:
+            return None
+        items: list[dict[str, Any]] = []
+        for item in (order.get("items") or [])[:_HANDOFF_ITEM_LIMIT]:
+            if not isinstance(item, dict):
+                continue
+            items.append(
+                {
+                    "orderItemId": str(item.get("order_item_id") or "")[:64],
+                    "productId": str(item.get("product_id") or "")[:64],
+                    "productName": SupportService.desensitize(
+                        str(item.get("product_name") or "")
+                    )[:160],
+                    "propertyInfo": SupportService.desensitize(
+                        str(item.get("property_info") or "")
+                    )[:160],
+                    "quantity": item.get("buy_count"),
+                    "orderItemStatus": item.get("order_item_status"),
+                }
+            )
+        return {
+            "authority": "JAVA_ORDER_SERVICE",
+            "ownershipVerified": True,
+            "orderId": order_id[:64],
+            "orderStatus": order.get("order_status"),
+            "orderTime": str(order.get("order_time") or "")[:32] or None,
+            "subject": SupportService.desensitize(
+                str(order.get("subject") or "")
+            )[:160],
+            "items": items,
+        }
+
+    @staticmethod
+    def _order_hints(value: Any) -> tuple[list[str], list[str]]:
+        orders: list[str] = []
+        items: list[str] = []
+
+        def visit(current: Any, key: str = "") -> None:
+            normalized_key = re.sub(r"[^a-z]", "", key.lower())
+            if isinstance(current, dict):
+                for child_key, child in list(current.items())[:20]:
+                    visit(child, str(child_key))
+                return
+            if isinstance(current, list):
+                for child in current[:5]:
+                    visit(child, key)
+                return
+            text = str(current or "").strip()
+            if not text or len(text) > 64:
+                return
+            if normalized_key == "orderid":
+                orders.append(text)
+            elif normalized_key == "orderitemid":
+                items.append(text)
+
+        visit(value)
+        return list(dict.fromkeys(orders)), list(dict.fromkeys(items))
+
+    @classmethod
+    def _sanitize_hint(cls, value: Any, depth: int = 0) -> Any:
+        if depth > 3:
+            return "[TRUNCATED]"
+        if isinstance(value, dict):
+            return {
+                str(key)[:64]: cls._sanitize_hint(item, depth + 1)
+                for key, item in list(value.items())[:12]
+            }
+        if isinstance(value, list):
+            return [cls._sanitize_hint(item, depth + 1) for item in value[:5]]
+        if isinstance(value, (bool, int, float)) or value is None:
+            return value
+        return cls.desensitize(str(value))[:160]
+
+    @staticmethod
+    def _safe_confidence(value: Any) -> float:
+        try:
+            return round(max(0.0, min(1.0, float(value))), 4)
+        except (TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
+    def _encode_context(context: dict[str, Any] | None) -> str | None:
+        if not context:
+            return None
+        encoded = json.dumps(
+            context,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        if len(encoded.encode("utf-8")) > _HANDOFF_CONTEXT_MAX_BYTES:
+            raise ValueError("转人工上下文超过安全上限")
+        return encoded
+
     @staticmethod
     def desensitize(value: str) -> str:
         value = re.sub(r"[\w.+-]+@[\w.-]+\.\w+", "***@***", value)
         value = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "***********", value)
         value = re.sub(r"\b\d{15,19}\b", "****************", value)
+        value = re.sub(
+            r"(地址(?:是|为|[:：])?)\s*[^，。；;\n]{4,80}",
+            r"\1***",
+            value,
+        )
         return value
 
     @staticmethod
@@ -657,6 +889,20 @@ class SupportService:
             "sourceMessageId": row.get("source_message_id"),
             "createdAt": _format_time(row.get("created_at")),
         }
+
+    @staticmethod
+    def _admin_session(row: dict | None) -> dict:
+        public = SupportService._public_session(row)
+        if not row:
+            return public
+        context = row.get("context_json")
+        if isinstance(context, str):
+            try:
+                context = json.loads(context)
+            except json.JSONDecodeError:
+                context = None
+        public["handoffContext"] = context if isinstance(context, dict) else None
+        return public
 
     @staticmethod
     def public_session(row: dict | None) -> dict:

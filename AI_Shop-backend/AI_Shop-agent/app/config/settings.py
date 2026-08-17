@@ -389,7 +389,21 @@ class Settings(BaseSettings):
     circuit_llm_recovery_timeout: int = 60
 
     graph_max_react_rounds: int = 5
-    # Multi-Agent Harness and governed admin analytics are the primary runtime.
+    # Per-run guard. Session/day quotas protect aggregate spend; this guard bounds
+    # one graph execution and therefore also catches runaway tool loops.
+    agent_budget_enabled: bool = True
+    agent_budget_max_tokens: int = 40_000
+    agent_budget_max_cost_cny: float = 1.0
+    agent_budget_max_steps: int = 24
+    agent_budget_deadline_seconds: float = 120.0
+    agent_budget_warn_threshold: float = 0.8
+    orchestration_mode: Literal[
+        "adaptive", "workflow", "single_agent", "multi_agent"
+    ] = "adaptive"
+
+    # Multi-Agent is available to the adaptive router, not the default for every
+    # request. Deterministic reads use a workflow and ordinary open tasks use one
+    # agent; bounded specialists are reserved for cross-domain requests.
     multi_agent_enabled: bool = True
     data_analyst_enabled: bool = True
     # Agentic Commerce v2 is deliberately a single serving path. These switches
@@ -462,6 +476,16 @@ class Settings(BaseSettings):
             raise ValueError("ES_USERNAME and ES_PASSWORD must be configured together")
         if self.compress_token_threshold >= self.working_token_budget:
             raise ValueError("COMPRESS_TOKEN_THRESHOLD must be less than WORKING_TOKEN_BUDGET")
+        if not 1_000 <= self.agent_budget_max_tokens <= 1_000_000:
+            raise ValueError("AGENT_BUDGET_MAX_TOKENS must be between 1000 and 1000000")
+        if not 0 < self.agent_budget_max_cost_cny <= 100:
+            raise ValueError("AGENT_BUDGET_MAX_COST_CNY must be in (0, 100]")
+        if not 4 <= self.agent_budget_max_steps <= 100:
+            raise ValueError("AGENT_BUDGET_MAX_STEPS must be between 4 and 100")
+        if not 5 <= self.agent_budget_deadline_seconds <= 600:
+            raise ValueError("AGENT_BUDGET_DEADLINE_SECONDS must be between 5 and 600")
+        if not 0 < self.agent_budget_warn_threshold < 1:
+            raise ValueError("AGENT_BUDGET_WARN_THRESHOLD must be between 0 and 1")
         if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
             raise ValueError("ANALYTICS_MAX_ROWS must be between 1 and 200")
         if self.analytics_max_days < 1 or self.analytics_max_days > 90:

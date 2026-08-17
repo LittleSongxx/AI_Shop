@@ -19,14 +19,7 @@ class CircuitState(str, Enum):
 
 
 class CircuitBreaker:
-    """Circuit breaker with single-probe half-open recovery.
-
-    All public methods are synchronous and internally guarded by a lock, so they
-    are safe to call from coroutines as well as from worker threads. The
-    half-open state admits exactly one trial request: letting the full load
-    through the moment the recovery window elapses is what re-opens a breaker
-    against a backend that was only just coming back.
-    """
+    """Thread-safe circuit breaker with single-probe half-open recovery."""
 
     def __init__(
         self,
@@ -35,7 +28,6 @@ class CircuitBreaker:
         recovery_timeout: int = 60,
         probe_timeout: float = DEFAULT_PROBE_TIMEOUT,
     ):
-
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -48,9 +40,9 @@ class CircuitBreaker:
         self._lock = threading.Lock()
 
     def _resolve_state(self) -> CircuitState:
-        """Advance OPEN -> HALF_OPEN once the recovery window has elapsed.
+        """Advance OPEN to HALF_OPEN after the recovery window.
 
-        Caller must hold the lock.
+        The caller must hold ``self._lock``.
         """
         if self._state == CircuitState.OPEN:
             if time.time() - self._last_failure_time >= self.recovery_timeout:
@@ -62,16 +54,14 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-
         with self._lock:
             return self._resolve_state()
 
     def allow_request(self) -> bool:
-        """Return True when the call may proceed.
+        """Return whether a request may proceed.
 
-        In HALF_OPEN only one probe is admitted at a time. A probe that never
-        reports back (caller crashed before record_success/record_failure) is
-        reclaimed after probe_timeout so the breaker cannot wedge shut.
+        A half-open breaker admits one probe. A caller that never records an
+        outcome cannot wedge the breaker because stale probes are reclaimed.
         """
         with self._lock:
             state = self._resolve_state()
@@ -97,7 +87,6 @@ class CircuitBreaker:
             return True
 
     def record_success(self) -> None:
-
         with self._lock:
             self._failure_count = 0
             if self._state != CircuitState.CLOSED:
@@ -108,26 +97,18 @@ class CircuitBreaker:
             self._set_metric(self._state)
 
     def release_probe(self) -> None:
-        """Give back a half-open probe slot without recording an outcome.
-
-        For callers that were admitted but then aborted before actually hitting
-        the dependency (missing input, upstream returned nothing). Without this
-        the slot would stay reserved until probe_timeout reclaims it.
-        """
+        """Release an admitted probe that did not reach the dependency."""
         with self._lock:
             self._probe_inflight = False
             self._probe_started_at = 0
 
     def record_failure(self) -> None:
-
         with self._lock:
             self._last_failure_time = time.time()
             self._probe_inflight = False
             self._probe_started_at = 0
 
             if self._state == CircuitState.HALF_OPEN:
-                # A failed probe means the dependency is still down: re-open
-                # immediately rather than waiting for the threshold again.
                 self._state = CircuitState.OPEN
                 logger.warning("circuit_reopened", breaker=self.name)
                 self._set_metric(self._state)
@@ -152,7 +133,6 @@ class CircuitBreaker:
         CIRCUIT_STATE.labels(breaker=self.name).set(value)
 
     async def sync_to_redis(self, redis_client, key: str) -> None:
-
         with self._lock:
             mapping = {
                 "state": self._state.value,
@@ -162,7 +142,6 @@ class CircuitBreaker:
         await redis_client.hset(key, mapping=mapping)
 
     async def load_from_redis(self, redis_client, key: str) -> None:
-
         data = await redis_client.hgetall(key)
         if not data:
             return
@@ -175,7 +154,6 @@ class CircuitBreaker:
 
 
 class CircuitBreakerRegistry:
-
     def __init__(self):
         self._breakers: dict[str, CircuitBreaker] = {}
         self._lock = threading.Lock()
@@ -186,7 +164,6 @@ class CircuitBreakerRegistry:
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
     ) -> CircuitBreaker:
-
         with self._lock:
             if name not in self._breakers:
                 self._breakers[name] = CircuitBreaker(

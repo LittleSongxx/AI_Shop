@@ -1,10 +1,29 @@
 from app.rag.canonical_facts import (
+    DEFAULT_CATALOG_PATH,
+    LEGACY_V1_CATALOG_PATH,
     canonical_citation_metrics,
+    canonical_fact_catalog_scope,
     concept_coverage,
     get_canonical_fact_catalog,
     normalize_concept_text,
     reference_key,
 )
+from app.rag.fact_metadata import get_fact_metadata_catalog
+
+
+def test_runtime_uses_v2_while_legacy_scope_keeps_v1_catalog_and_metadata():
+    runtime = get_canonical_fact_catalog()
+
+    assert runtime.catalog_version == 2
+    assert runtime.path.resolve() == DEFAULT_CATALOG_PATH.resolve()
+    assert get_fact_metadata_catalog().path.name == "fact-metadata.v2.json"
+
+    with canonical_fact_catalog_scope(LEGACY_V1_CATALOG_PATH) as legacy:
+        assert legacy.catalog_version == 1
+        assert get_canonical_fact_catalog() is legacy
+        assert get_fact_metadata_catalog().path.name == "fact-metadata.v1.json"
+
+    assert get_canonical_fact_catalog() is runtime
 
 
 def test_catalog_maps_faq_and_markdown_equivalent_evidence_to_same_fact():

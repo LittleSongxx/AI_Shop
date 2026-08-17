@@ -143,3 +143,38 @@ async def test_retained_commerce_facts_are_anonymized_and_detached():
     assert "payload_json=JSON_OBJECT('privacyAnonymized',TRUE)" in sql
     assert params == ("anon-1", "u1")
     assert result == {"anonymizedOutcomes": 1}
+
+
+@pytest.mark.asyncio
+async def test_export_v2_includes_support_session_rows_with_structured_context():
+    cursor = _Cursor([[] for _ in range(32)])
+    service = PrivacyJobService()
+    with patch("app.services.privacy_job_service.transaction", _context(cursor)):
+        result = await service._collect_export("u1")
+
+    assert result["schema"] == "aishop-user-ai-export/v2"
+    assert "supportSessions" in result["data"]
+    support_query = next(
+        sql for sql, _ in cursor.calls if "FROM support_session WHERE user_id" in sql
+    )
+    assert "SELECT *" in support_query
+
+
+@pytest.mark.asyncio
+async def test_support_deletion_removes_children_before_context_owning_session():
+    cursor = _Cursor([])
+    service = PrivacyJobService()
+    with patch("app.services.privacy_job_service.transaction", _context(cursor)):
+        await service._delete_support_data("privacy-1", "u1")
+
+    statements = [sql for sql, _ in cursor.calls]
+    message_index = next(
+        index for index, sql in enumerate(statements) if "DELETE m FROM support_message" in sql
+    )
+    case_index = next(
+        index for index, sql in enumerate(statements) if "DELETE FROM support_case" in sql
+    )
+    session_index = next(
+        index for index, sql in enumerate(statements) if "DELETE FROM support_session" in sql
+    )
+    assert message_index < case_index < session_index

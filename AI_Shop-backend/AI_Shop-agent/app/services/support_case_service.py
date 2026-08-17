@@ -10,6 +10,9 @@ import structlog
 from aiomysql import IntegrityError
 
 from app.db.pool import acquire
+from app.services.commerce_outcome_ledger_service import (
+    commerce_outcome_ledger_service,
+)
 from app.services.episode_service import (
     current_episode,
     episode_service,
@@ -273,6 +276,7 @@ class SupportCaseService:
         if idempotency_key:
             existing = await self.get_by_idempotency(user_id, idempotency_key)
             if existing:
+                await self._record_support_contact_outcome(user_id, existing)
                 return existing
         evidence = await self._retain_case_evidence(user_id, evidence)
         _order, _item, order_id = await self._verify_order_owner(
@@ -316,6 +320,7 @@ class SupportCaseService:
         result = await self.get(case_id)
         if not result:
             raise RuntimeError("工单写入后无法读取")
+        await self._record_support_contact_outcome(user_id, result, item=_item)
         episode_service.update_run(
             run_id=run_id,
             scenario="ORDER_AFTERSALES",
@@ -339,6 +344,62 @@ class SupportCaseService:
         )
         await self._publish("support_case.created", result)
         return result
+
+    async def _record_support_contact_outcome(
+        self,
+        user_id: str,
+        case: dict,
+        *,
+        item: dict | None = None,
+    ) -> None:
+        order_id = str(case.get("orderId") or "").strip()
+        order_item_id = str(case.get("orderItemId") or "").strip()
+        if not order_id or not order_item_id:
+            return
+        verified_item = item
+        if verified_item is None:
+            try:
+                _order, verified_item, verified_order_id = (
+                    await self._verify_order_owner(
+                        user_id, order_id, order_item_id
+                    )
+                )
+                if verified_order_id != order_id:
+                    return
+            except Exception as exc:
+                logger.warning(
+                    "support_contact_outcome_verification_failed",
+                    error=type(exc).__name__,
+                )
+                return
+        product_id = str(
+            (verified_item or {}).get("product_id")
+            or (verified_item or {}).get("productId")
+            or ""
+        ).strip()
+        if not product_id:
+            return
+        try:
+            await commerce_outcome_ledger_service.record_support_contact(
+                user_id=user_id,
+                case_id=str(case.get("caseNo") or case.get("caseId") or ""),
+                category=str(case.get("category") or "OTHER"),
+                order_id=order_id,
+                order_item_id=order_item_id,
+                product_id=product_id,
+                sku_key=str(
+                    (verified_item or {}).get("property_value_id_hash")
+                    or (verified_item or {}).get("propertyValueIdHash")
+                    or ""
+                ).strip()
+                or None,
+                run_id=str(case.get("runId") or "").strip() or None,
+            )
+        except Exception as exc:
+            logger.warning(
+                "support_contact_outcome_projection_failed",
+                error=type(exc).__name__,
+            )
 
     async def _retain_case_evidence(
         self, user_id: str, evidence: dict | None

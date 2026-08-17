@@ -13,7 +13,7 @@ import hmac
 import json
 import os
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -554,8 +554,10 @@ class PrivacyJobService:
                 await cur.execute(sql, params)
                 data[section] = [dict(row) for row in await cur.fetchall()]
         return {
-            "schema": "aishop-user-ai-export/v1",
-            "generatedAt": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+            "schema": "aishop-user-ai-export/v2",
+            "generatedAt": datetime.now(timezone.utc)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z"),
             "scope": "Agent-domain data owned by the authenticated user",
             "retainedDataNotice": (
                 "Orders, payments, invoices and other legally or operationally required "

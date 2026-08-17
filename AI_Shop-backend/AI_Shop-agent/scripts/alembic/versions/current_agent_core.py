@@ -345,6 +345,7 @@ def upgrade() -> None:
             status varchar(16) NOT NULL,
             trigger_reason varchar(64) NULL,
             summary text NULL,
+            context_json json NULL,
             intent varchar(40) NULL,
             sentiment varchar(20) NULL,
             urgency varchar(20) NULL,
@@ -392,6 +393,20 @@ def upgrade() -> None:
                     CASE WHEN status IN ('QUEUED','ASSIGNED','ACTIVE') THEN user_id ELSE NULL END
                 ) STORED
             """
+        )
+    has_context_col = bind.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'support_session'
+              AND column_name = 'context_json'
+            """
+        )
+    ).scalar()
+    if not has_context_col:
+        op.execute(
+            "ALTER TABLE support_session ADD COLUMN context_json json NULL AFTER summary"
         )
     # 历史数据里可能已有同一用户的多个活跃会话。优先保留已经 ACTIVE、
     # 其次 ASSIGNED、最后 QUEUED；同状态才取最早创建的一条。只按创建时间

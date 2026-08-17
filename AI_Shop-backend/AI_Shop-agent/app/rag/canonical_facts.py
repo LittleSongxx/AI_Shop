@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 import unicodedata
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path, PurePath
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 CATALOG_SCHEMA = "aishop-knowledge-catalog/v1"
-DEFAULT_CATALOG_PATH = (
+LEGACY_V1_CATALOG_PATH = (
     Path(__file__).resolve().parents[3] / "data" / "demo_knowledge" / "catalog.v1.json"
+)
+DEFAULT_CATALOG_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "data"
+    / "demo_knowledge_v2"
+    / "catalog.v2.json"
+)
+_CATALOG_PATH_OVERRIDE: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
+    "canonical_fact_catalog_path", default=None
 )
 
 FAQ_FACT_IDS: dict[str, str] = {
@@ -243,9 +254,31 @@ class CanonicalFactCatalog:
         return errors
 
 
-@lru_cache(maxsize=1)
-def get_canonical_fact_catalog() -> CanonicalFactCatalog:
-    return CanonicalFactCatalog.load()
+def active_canonical_catalog_path() -> Path:
+    return _CATALOG_PATH_OVERRIDE.get() or DEFAULT_CATALOG_PATH
+
+
+@contextmanager
+def canonical_fact_catalog_scope(path: Path) -> Iterator[CanonicalFactCatalog]:
+    resolved = Path(path).resolve()
+    catalog = _load_canonical_fact_catalog(str(resolved))
+    token = _CATALOG_PATH_OVERRIDE.set(resolved)
+    try:
+        yield catalog
+    finally:
+        _CATALOG_PATH_OVERRIDE.reset(token)
+
+
+@lru_cache(maxsize=None)
+def _load_canonical_fact_catalog(path: str) -> CanonicalFactCatalog:
+    return CanonicalFactCatalog.load(Path(path))
+
+
+def get_canonical_fact_catalog(
+    path: Path | None = None,
+) -> CanonicalFactCatalog:
+    resolved = Path(path or active_canonical_catalog_path()).resolve()
+    return _load_canonical_fact_catalog(str(resolved))
 
 
 def relevant_fact_ids(case: Mapping[str, Any]) -> list[str]:

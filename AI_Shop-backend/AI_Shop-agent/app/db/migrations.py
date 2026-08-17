@@ -181,6 +181,7 @@ _REQUIRED_COLUMNS = {
         "session_id",
         "user_id",
         "status",
+        "context_json",
         "created_at",
         "updated_at",
         # P0-6：active_user 生成列（QUEUED/ASSIGNED/ACTIVE 时 = user_id）。

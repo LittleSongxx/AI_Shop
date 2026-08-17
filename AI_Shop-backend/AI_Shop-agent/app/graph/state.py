@@ -10,6 +10,8 @@ RouteKind = Literal[
     "multi_agent_plan",
     "multi_agent_fanout",
     "multi_agent_synthesis",
+    "orchestration_router",
+    "deterministic_workflow",
     "finalize",
     "post_turn",
     "end",
@@ -82,6 +84,9 @@ class AgentGraphState(TypedDict, total=False):
     specialist_artifacts: Annotated[list[dict], operator.add]
     action_proposal: dict | None
     verifier_fallback: str | None
+    orchestration_mode: str | None
+    orchestration_reason: str | None
+    resolved_order_tool: dict | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -143,6 +148,9 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "specialist_artifacts": [],
         "action_proposal": None,
         "verifier_fallback": None,
+        "orchestration_mode": None,
+        "orchestration_reason": None,
+        "resolved_order_tool": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

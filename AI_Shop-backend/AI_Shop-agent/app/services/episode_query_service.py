@@ -181,6 +181,7 @@ class EpisodeQueryService:
             "outputTokens": int(row.get("output_tokens") or 0),
             "costCny": float(row.get("cost_cny") or 0),
             "latencyMs": row.get("latency_ms"),
+            "ttftMs": row.get("ttft_ms"),
             "captureLevel": row.get("capture_level"),
             "datasetEligible": row.get("dataset_eligible"),
             "datasetReviewedBy": row.get("dataset_reviewed_by"),

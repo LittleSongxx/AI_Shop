@@ -20,7 +20,7 @@ def record_invoke(monkeypatch):
     calls: list[tuple[str, dict, str]] = []
     result_box: dict[str, ToolInvokeResult] = {"result": ToolInvokeResult(content="ok")}
 
-    async def fake_invoke(tool_name, args, user_id):
+    async def fake_invoke(tool_name, args, user_id, call_id=None):
         calls.append((tool_name, args, user_id))
         return result_box["result"]
 

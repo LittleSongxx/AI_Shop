@@ -13,6 +13,7 @@ from app.rag.retriever import (
     KnowledgeCatalogUnavailable,
     RagRetriever,
     cosine_to_es_score,
+    evaluation_knowledge_release_scope,
     knn_num_candidates,
     rerank_evaluation_scope,
 )
@@ -788,6 +789,60 @@ async def test_java_catalog_is_saved_as_agent_owned_last_known_good(monkeypatch)
     assert catalog == {"version": 7, "active_document_ids": ["11", "12"]}
     save.assert_awaited_once_with(catalog)
     assert KNOWLEDGE_VERSION_CACHE_KEY != KNOWLEDGE_CATALOG_LKG_CACHE_KEY
+
+
+@pytest.mark.asyncio
+async def test_pinned_release_reads_exact_snapshot_without_lkg_fallback(monkeypatch):
+    retriever = RagRetriever()
+    java_catalog = AsyncMock(
+        return_value={
+            "version": 5,
+            "active_document_ids": ["11"],
+            "documents": [
+                {
+                    "document_id": "11",
+                    "source_name": "04-ai-assistant-and-support.md",
+                    "content_hash": "a" * 64,
+                    "version": 3,
+                    "domain": "GENERAL",
+                    "chunk_count": 5,
+                }
+            ],
+            "release_name": "catalog-v1",
+            "catalog_sha256": "b" * 64,
+        }
+    )
+    monkeypatch.setattr(java_internal_client, "knowledge_catalog", java_catalog)
+    read_lkg = AsyncMock(return_value={"version": 99, "active_document_ids": ["99"]})
+    monkeypatch.setattr(retriever, "_read_last_known_good_catalog", read_lkg)
+
+    with evaluation_knowledge_release_scope(5):
+        catalog = await retriever._knowledge_catalog()
+        version = await retriever._knowledge_version()
+
+    assert catalog is not None
+    assert catalog["version"] == 5
+    assert catalog["active_document_ids"] == ["11"]
+    assert version == 5
+    java_catalog.assert_awaited_once_with(release_version=5)
+    read_lkg.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pinned_release_fails_closed_instead_of_using_current_lkg(monkeypatch):
+    retriever = RagRetriever()
+    monkeypatch.setattr(
+        java_internal_client,
+        "knowledge_catalog",
+        AsyncMock(side_effect=OSError("historical snapshot unavailable")),
+    )
+    read_lkg = AsyncMock(return_value={"version": 99, "active_document_ids": ["99"]})
+    monkeypatch.setattr(retriever, "_read_last_known_good_catalog", read_lkg)
+
+    with evaluation_knowledge_release_scope(5):
+        assert await retriever._knowledge_catalog() is None
+
+    read_lkg.assert_not_awaited()
 
 
 @pytest.mark.asyncio

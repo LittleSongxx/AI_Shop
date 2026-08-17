@@ -51,6 +51,7 @@ def test_multi_agent_and_data_analyst_are_enabled_by_default(monkeypatch):
     settings = Settings(_env_file=None)
 
     assert settings.multi_agent_enabled is True
+    assert settings.orchestration_mode == "adaptive"
     assert settings.data_analyst_enabled is True
     assert settings.multi_agent_specialist_timeout_seconds == 12
 

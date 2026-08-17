@@ -59,6 +59,7 @@ def test_current_schema_contract_includes_support_and_episode_training_gates():
         "resolution_summary",
         "resolved_at",
     }.issubset(_REQUIRED_COLUMNS["support_case"])
+    assert "context_json" in _REQUIRED_COLUMNS["support_session"]
     assert {
         "run_id",
         "dataset_eligible",

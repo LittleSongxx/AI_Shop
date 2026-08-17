@@ -11,6 +11,7 @@ import structlog
 from app.config.settings import get_settings
 from app.infra.http_client import get_client
 from app.rag.local_embedding import local_hash_embedding
+from app.rag.runtime_trace import active_rag_runtime_trace
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.redis_service import redis_service
 
@@ -91,14 +92,23 @@ async def embed_text(text: str) -> list[float] | None:
     if cached:
         if evaluation is not None:
             evaluation.cache_hits += 1
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.cache_hit("embedding")
         return cached
     breaker = circuit_registry.get_or_create("embedding", failure_threshold=3, recovery_timeout=30)
     if not breaker.allow_request():
         if evaluation is not None:
             evaluation.provider_failures += 1
             evaluation.breaker_rejections += 1
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.fallback("embedding_breaker_open")
         return None
     try:
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            runtime_trace.called("embedding")
         if evaluation is not None:
             evaluation.provider_requests += 1
         client = await get_client("embedding", timeout=30)
@@ -117,6 +127,8 @@ async def embed_text(text: str) -> list[float] | None:
 
         vector = data["data"][0]["embedding"]
         breaker.record_success()
+        if runtime_trace is not None:
+            runtime_trace.succeeded("embedding")
         if evaluation is not None:
             evaluation.provider_successes += 1
             evaluation.response_records.append(
@@ -135,6 +147,8 @@ async def embed_text(text: str) -> list[float] | None:
         return vector
     except httpx.HTTPStatusError as e:
         breaker.record_failure()
+        if runtime_trace is not None:
+            runtime_trace.failed("embedding")
         if evaluation is not None:
             evaluation.provider_failures += 1
         detail = e.response.text[:300] if e.response is not None else str(e)
@@ -142,6 +156,8 @@ async def embed_text(text: str) -> list[float] | None:
         return None
     except Exception as e:
         breaker.record_failure()
+        if runtime_trace is not None:
+            runtime_trace.failed("embedding")
         if evaluation is not None:
             evaluation.provider_failures += 1
         logger.warning("embedding_failed", error=str(e))
@@ -186,8 +202,14 @@ async def embed_texts(texts: list[str], *, batch_size: int = 10) -> list[list[fl
         if not breaker.allow_request():
             evaluation.provider_failures += 1
             evaluation.breaker_rejections += 1
+            runtime_trace = active_rag_runtime_trace()
+            if runtime_trace is not None:
+                runtime_trace.fallback("embedding_breaker_open")
             continue
         try:
+            runtime_trace = active_rag_runtime_trace()
+            if runtime_trace is not None:
+                runtime_trace.called("embedding")
             evaluation.provider_requests += 1
             client = await get_client("embedding", timeout=30)
             response = await client.post(
@@ -219,6 +241,8 @@ async def embed_texts(texts: list[str], *, batch_size: int = 10) -> list[list[fl
                     f"embedding batch returned {len(vectors)}/{len(non_empty)} vectors"
                 )
             breaker.record_success()
+            if runtime_trace is not None:
+                runtime_trace.succeeded("embedding")
             evaluation.provider_successes += 1
             for provider_index, vector in vectors.items():
                 original_index, value = non_empty[provider_index]
@@ -238,6 +262,8 @@ async def embed_texts(texts: list[str], *, batch_size: int = 10) -> list[list[fl
                 )
         except Exception as exc:
             breaker.record_failure()
+            if runtime_trace is not None:
+                runtime_trace.failed("embedding")
             evaluation.provider_failures += 1
             logger.warning("embedding_batch_failed", error=str(exc), batchSize=len(non_empty))
     return output

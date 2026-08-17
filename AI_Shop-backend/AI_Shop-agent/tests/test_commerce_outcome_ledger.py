@@ -186,3 +186,47 @@ async def test_agent_impression_events_are_deterministic_and_privacy_bounded(mon
         "recallSource": "rrf",
         "modelVersion": "embedding-v1",
     }
+
+
+@pytest.mark.asyncio
+async def test_support_contact_event_is_deterministic_and_projects_weak_negative_signal(
+    monkeypatch,
+):
+    service = CommerceOutcomeLedgerService()
+    record = AsyncMock(return_value={"accepted": True, "status": "RECORDED"})
+    monkeypatch.setattr(service, "record", record)
+
+    await service.record_support_contact(
+        user_id="u1",
+        case_id="SC20260817ABC123",
+        category="DAMAGED",
+        order_id="order-1",
+        order_item_id="item-1",
+        product_id="p1",
+        sku_key="sku-1",
+        run_id="run-1",
+    )
+    event = record.await_args.args[0]
+    assert event.source == "SUPPORT"
+    assert event.eventType == "SUPPORT_CONTACT"
+    assert event.idempotencyKey == "support-contact:SC20260817ABC123:item-1"
+    assert event.payload == {
+        "category": "DAMAGED",
+        "channel": "AGENT_SUPPORT_CASE",
+        "resolutionStatus": "OPEN",
+    }
+
+    project = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.shopping_profile_service.shopping_profile_service.record_implicit_signal",
+        project,
+    )
+    await service._project_profile_signal(event, event.payload)
+
+    project.assert_awaited_once_with(
+        "u1",
+        kind="negativeProduct",
+        value="p1",
+        source="SUPPORT_CONTACT",
+        strength=0.35,
+    )
