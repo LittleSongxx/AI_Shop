@@ -163,8 +163,72 @@
     </el-tabs>
   </el-card>
 
-  <el-drawer v-model="supportDrawer.show" :title="supportDrawer.title" size="520px">
+  <el-drawer v-model="supportDrawer.show" :title="supportDrawer.title" size="680px">
     <div class="support-session-panel">
+      <section v-if="supportDrawer.context" class="handoff-context">
+        <div class="handoff-title-row">
+          <strong>AI 转人工上下文</strong>
+          <el-tag type="success" size="small">已脱敏</el-tag>
+        </div>
+        <p class="handoff-request">{{ supportDrawer.context.request || '—' }}</p>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="意图">
+            {{ intentLabel(supportDrawer.context.triage.intent) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="置信度">
+            {{ formatRate(supportDrawer.context.triage.confidence) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="情绪">
+            {{ sentimentLabel(supportDrawer.context.triage.sentiment) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="紧急度">
+            {{ urgencyLabel(supportDrawer.context.triage.urgency) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="风险">
+            {{ supportDrawer.context.triage.riskLevel }}
+          </el-descriptions-item>
+          <el-descriptions-item label="转人工原因">
+            {{ supportDrawer.context.handoffReason }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <div class="handoff-subsection">
+          <div class="handoff-subtitle">
+            <strong>权威订单事实</strong>
+            <el-tag type="success" size="small">Java 归属校验</el-tag>
+          </div>
+          <el-table
+            v-if="supportDrawer.context.authoritativeOrders.length"
+            :data="supportDrawer.context.authoritativeOrders"
+            size="small"
+          >
+            <el-table-column prop="orderId" label="订单ID" min-width="150" />
+            <el-table-column prop="orderStatus" label="状态" width="70" />
+            <el-table-column label="商品" min-width="180">
+              <template #default="{ row }">{{ handoffOrderProducts(row) }}</template>
+            </el-table-column>
+          </el-table>
+          <p v-else class="empty-inline">暂无经归属校验的订单事实</p>
+        </div>
+
+        <div class="handoff-subsection">
+          <div class="handoff-subtitle">
+            <strong>未核验模型线索</strong>
+            <el-tag type="warning" size="small">不可作为订单事实</el-tag>
+          </div>
+          <pre class="handoff-hints">{{ formatHandoffHints(supportDrawer.context.unverifiedHints) }}</pre>
+        </div>
+
+        <div v-if="supportDrawer.context.recentConversation.length" class="handoff-subsection">
+          <strong>近期对话</strong>
+          <div class="handoff-recent">
+            <p v-for="(item, index) in supportDrawer.context.recentConversation" :key="index">
+              <span>{{ senderText(item.role) }}</span>{{ item.content }}
+            </p>
+          </div>
+        </div>
+      </section>
+      <el-divider content-position="left">当前人工会话</el-divider>
       <div class="support-history">
         <div
           v-for="item in supportDrawer.history"
@@ -208,6 +272,11 @@ import {
   statusLabel,
   urgencyLabel,
 } from '@/utils/agentDisplay.js'
+import {
+  formatHandoffHints,
+  handoffOrderProducts,
+  normalizeHandoffContext,
+} from '@/utils/handoffContext.js'
 
 import {
   canActivateSupport,
@@ -233,6 +302,7 @@ const supportDrawer = ref({
   sessionId: '',
   reply: '',
   history: [],
+  context: null,
 })
 
 const clipText = (text, len = 120) => {
@@ -383,6 +453,7 @@ const openSupport = async (row) => {
   supportDrawer.value.title = `人工会话 ${row.sessionId}`
   supportDrawer.value.sessionId = row.sessionId
   supportDrawer.value.reply = ''
+  supportDrawer.value.context = normalizeHandoffContext(row.handoffContext)
   await loadSupportHistory()
 }
 
@@ -469,6 +540,7 @@ const senderText = (sender) => ({
   ADMIN: '人工客服',
   SYSTEM: '系统',
   AI: 'AI',
+  ASSISTANT: 'AI',
 }[sender] || sender || '未知')
 
 const delRow = (row) => {
@@ -574,6 +646,69 @@ const delRow = (row) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.handoff-context {
+  max-height: 46%;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.handoff-title-row,
+.handoff-subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.handoff-request {
+  margin: 8px 0 12px;
+  color: #303133;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.handoff-subsection {
+  margin-top: 14px;
+}
+
+.handoff-hints {
+  max-height: 120px;
+  margin: 8px 0 0;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background: #f7f8fa;
+  color: #606266;
+  font: 12px/1.5 monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.handoff-recent {
+  margin-top: 6px;
+
+  p {
+    margin: 4px 0;
+    color: #606266;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  span {
+    display: inline-block;
+    min-width: 58px;
+    color: #909399;
+  }
+}
+
+.empty-inline {
+  margin: 8px 0 0;
+  color: #909399;
+  font-size: 13px;
 }
 
 .support-history {
