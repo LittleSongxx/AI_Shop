@@ -25,8 +25,13 @@ public class KnowledgeInternalController extends ABaseController {
     }
 
     @PostMapping("/catalog")
-    public ResponseVO<Map<String, Object>> catalog() {
-        return getSuccessResponseVO(knowledgeBaseService.releaseCatalog());
+    public ResponseVO<Map<String, Object>> catalog(
+            @RequestBody(required = false) Map<String, Object> body) {
+        Long releaseVersion = body != null
+                && body.get("releaseVersion") instanceof Number number
+                ? number.longValue() : null;
+        return getSuccessResponseVO(
+                knowledgeBaseService.releaseCatalog(releaseVersion));
     }
 
     @PostMapping("/reindexAll")

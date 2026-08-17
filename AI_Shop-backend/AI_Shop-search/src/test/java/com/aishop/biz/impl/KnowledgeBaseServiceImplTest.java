@@ -28,7 +28,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -75,7 +74,7 @@ class KnowledgeBaseServiceImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void archiveCommitIsNotReportedAsFailureWhenVectorCleanupFails() {
+    void archiveRetainsVectorsAndCreatesANewImmutableSnapshot() {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(jdbcTemplate.query(
                 argThat(sql -> sql.contains("knowledge_document") && sql.contains("FOR UPDATE")),
@@ -83,57 +82,73 @@ class KnowledgeBaseServiceImplTest {
                 eq(42L)))
                 .thenReturn(List.of(document(42L, "PUBLISHED")));
         when(jdbcTemplate.queryForList(
-                argThat(sql -> sql.contains("knowledge_chunk")),
-                eq(String.class),
-                eq(42L)))
-                .thenReturn(List.of("knowledge_42_1_0"));
+                argThat(sql -> sql.contains("FROM knowledge_document d")
+                        && sql.contains("COUNT(c.chunk_id)"))))
+                .thenReturn(List.of());
         when(jdbcTemplate.queryForObject(
                 argThat(sql -> sql.contains("knowledge_release") && sql.contains("FOR UPDATE")),
                 eq(Long.class)))
                 .thenReturn(5L);
         lenient().when(jdbcTemplate.update(
-                argThat(sql -> sql.contains("SET current_version=?")),
+                argThat(sql -> sql != null && sql.contains("SET current_version=?")),
                 eq(6L),
                 eq(5L)))
                 .thenReturn(1);
-        doThrow(new IllegalStateException("ES unavailable"))
-                .when(vectorStore).delete(List.of("knowledge_42_1_0"));
-
         Map<String, Object> result = service.archive(42L);
 
         assertEquals("ARCHIVED", result.get("status"));
         assertEquals(6L, result.get("releaseVersion"));
+        assertEquals(true, result.get("vectorsRetainedForHistoricalRelease"));
+        verify(vectorStore, never()).delete(anyList());
         verify(jdbcTemplate).update(
-                argThat(sql -> sql.contains("status='FAILED'")
-                        && sql.contains("stage='ARCHIVE_CLEANUP'")),
-                eq("ES unavailable"),
-                eq(0L));
+                argThat(sql -> sql.contains("INSERT INTO knowledge_release_snapshot")),
+                eq(6L),
+                eq("archive-document-42"),
+                any(String.class),
+                eq(null),
+                eq("system"));
     }
 
     @Test
-    void catalogContainsOnlyPublishedDocumentIdsFromTheCatalogQuery() {
+    void catalogReadsTheExactImmutableReleaseMembership() {
         when(jdbcTemplate.queryForObject(
                 argThat(sql -> sql.contains("current_version")),
                 eq(Long.class)))
                 .thenReturn(9L);
         when(jdbcTemplate.queryForList(
-                argThat(sql -> sql.contains("status='PUBLISHED'")),
-                eq(Long.class)))
-                .thenReturn(List.of(11L, 12L));
-        when(jdbcTemplate.queryForList(
-                argThat(sql -> sql.contains("source_name") && sql.contains("content_hash"))))
+                argThat(sql -> sql != null && sql.contains("knowledge_release_snapshot")),
+                eq(9L)))
                 .thenReturn(List.of(Map.of(
+                        "release_version", 9L,
+                        "release_name", "knowledge-v2",
+                        "catalog_sha256", "b".repeat(64),
+                        "activated_by", "admin")));
+        when(jdbcTemplate.queryForList(
+                argThat(sql -> sql != null && sql.contains("knowledge_release_document")),
+                eq(9L)))
+                .thenReturn(List.of(
+                    Map.of(
                         "document_id", 11L,
                         "source_name", "shipping.md",
                         "content_hash", "a".repeat(64),
                         "version", 2,
                         "domain", "LOGISTICS",
                         "index_schema_version", 1,
-                        "chunk_count", 7L)));
+                        "chunk_count", 7L),
+                    Map.of(
+                        "document_id", 12L,
+                        "source_name", "support.md",
+                        "content_hash", "c".repeat(64),
+                        "version", 1,
+                        "domain", "SUPPORT",
+                        "index_schema_version", 1,
+                        "chunk_count", 4L)));
 
         Map<String, Object> catalog = service.releaseCatalog();
 
         assertEquals(9L, catalog.get("version"));
+        assertEquals("knowledge-v2", catalog.get("releaseName"));
+        assertEquals("b".repeat(64), catalog.get("catalogSha256"));
         assertEquals(List.of("11", "12"), catalog.get("activeDocumentIds"));
         assertEquals("shipping.md", ((List<Map<String, Object>>) catalog.get("documents"))
                 .get(0).get("sourceName"));
@@ -143,6 +158,49 @@ class KnowledgeBaseServiceImplTest {
                 .get(0).get("chunkCount"));
         assertEquals(1, ((List<Map<String, Object>>) catalog.get("documents"))
                 .get(0).get("indexSchemaVersion"));
+    }
+
+    @Test
+    void rollbackCopiesOldMembershipIntoAHigherRelease() {
+        when(jdbcTemplate.queryForObject(
+                argThat(sql -> sql.contains("knowledge_release") && sql.contains("FOR UPDATE")),
+                eq(Long.class)))
+                .thenReturn(9L);
+        when(jdbcTemplate.queryForList(
+                argThat(sql -> sql != null && sql.contains("SELECT catalog_sha256")),
+                eq(4L)))
+                .thenReturn(List.of(Map.of("catalog_sha256", "a".repeat(64))));
+        when(jdbcTemplate.queryForList(
+                argThat(sql -> sql != null && sql.contains("knowledge_release_document")),
+                eq(4L)))
+                .thenReturn(List.of(Map.of(
+                        "document_id", 11L,
+                        "source_name", "shipping.md",
+                        "content_hash", "b".repeat(64),
+                        "version", 1,
+                        "domain", "LOGISTICS",
+                        "index_schema_version", 1,
+                        "chunk_count", 7L)));
+        lenient().when(jdbcTemplate.update(
+                argThat(sql -> sql != null && sql.contains("SET current_version=?")),
+                eq(10L),
+                eq(9L)))
+                .thenReturn(1);
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        Map<String, Object> result = service.activateRelease(
+                "rollback-to-v1", "", List.of(), 4L, "admin");
+
+        assertEquals(10L, result.get("releaseVersion"));
+        assertEquals(4L, result.get("sourceReleaseVersion"));
+        assertEquals(List.of("11"), result.get("activeDocumentIds"));
+        verify(jdbcTemplate).update(
+                argThat(sql -> sql.contains("INSERT INTO knowledge_release_snapshot")),
+                eq(10L),
+                eq("rollback-to-v1"),
+                eq("a".repeat(64)),
+                eq(4L),
+                eq("admin"));
     }
 
     @Test

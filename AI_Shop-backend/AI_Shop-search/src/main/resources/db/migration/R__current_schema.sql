@@ -121,6 +121,67 @@ insert into knowledge_release (release_key, current_version)
 values ('global', 1) as incoming
 on duplicate key update release_key = incoming.release_key;
 
+create table if not exists knowledge_release_snapshot
+(
+    release_version bigint primary key,
+    release_name varchar(100) not null,
+    catalog_sha256 char(64) not null,
+    source_release_version bigint null,
+    activated_by varchar(100) null,
+    created_at datetime(3) default current_timestamp(3) not null,
+    key idx_knowledge_release_snapshot_source (source_release_version),
+    key idx_knowledge_release_snapshot_created (created_at)
+) comment '不可变知识发布快照' collate = utf8mb4_general_ci;
+
+create table if not exists knowledge_release_document
+(
+    release_version bigint not null,
+    document_id bigint not null,
+    document_version int not null,
+    source_name varchar(255) not null,
+    content_hash char(64) not null,
+    domain varchar(64) not null,
+    index_schema_version int not null,
+    chunk_count int not null,
+    primary key (release_version, document_id),
+    key idx_knowledge_release_document_id (document_id, release_version)
+) comment '知识发布快照的精确文档集合' collate = utf8mb4_general_ci;
+
+-- Existing installations predate immutable snapshots. Preserve their current
+-- published set once; repeatable migrations must never rewrite that snapshot.
+insert ignore into knowledge_release_snapshot
+    (release_version, release_name, catalog_sha256, source_release_version,
+     activated_by, created_at)
+select current_version,
+       'bootstrap-current',
+       sha2(concat('bootstrap:', current_version), 256),
+       null,
+       'flyway-migration',
+       now(3)
+from knowledge_release
+where release_key = 'global';
+
+insert ignore into knowledge_release_document
+    (release_version, document_id, document_version, source_name, content_hash,
+     domain, index_schema_version, chunk_count)
+select r.current_version,
+       d.document_id,
+       d.version,
+       coalesce(d.source_name, concat('document-', d.document_id)),
+       d.content_hash,
+       d.domain,
+       d.index_schema_version,
+       count(c.chunk_id)
+from knowledge_release r
+join knowledge_document d on d.status = 'PUBLISHED'
+left join knowledge_chunk c
+  on c.document_id = d.document_id
+ and c.version = d.version
+ and c.status = 'PUBLISHED'
+where r.release_key = 'global'
+group by r.current_version, d.document_id, d.version, d.source_name,
+         d.content_hash, d.domain, d.index_schema_version;
+
 create table if not exists local_message_outbox
 (
     id                bigint auto_increment comment '主键' primary key,

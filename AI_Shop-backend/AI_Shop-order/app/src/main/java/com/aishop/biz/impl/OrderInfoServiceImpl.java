@@ -1384,6 +1384,10 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			return;
 		}
 		Date occurredAt = new Date();
+		List<String> currentOrderIds = orders.stream()
+				.map(OrderInfo::getOrderId)
+				.filter(Objects::nonNull)
+				.toList();
 		for (OrderInfo order : orders) {
 			List<OrderItem> items = loadOrderItems(order.getOrderId());
 			if (items.isEmpty()) {
@@ -1393,6 +1397,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			BigDecimal remaining = normalizeMoney(order.getAmount());
 			for (int index = 0; index < items.size(); index++) {
 				OrderItem item = items.get(index);
+				boolean repeatPurchase = hasPriorSuccessfulPurchase(
+						order.getUserId(), item.getProductId(), currentOrderIds);
 				BigDecimal paidAmount = allocateLineAmount(
 						remaining, item.getItemAmount(), grossTotal, index == items.size() - 1);
 				remaining = remaining.subtract(paidAmount).max(BigDecimal.ZERO);
@@ -1416,8 +1422,50 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 						order.getOrderId(),
 						payload,
 						occurredAt));
+				if (repeatPurchase) {
+					Map<String, Object> repeatPayload = new LinkedHashMap<>();
+					if (item.getBuyCount() != null) {
+						repeatPayload.put("quantity", item.getBuyCount());
+					}
+					repeatPayload.put("paidAmount", paidAmount);
+					repeatPayload.put("currency", "CNY");
+					commerceOutcomeClient.recordAfterCommit(
+							CommerceOutcomeClient.fromVerifiedCarrier(
+									CommerceOutcomeClient.stableEventId(
+											"repeat-purchase", payOrderId,
+											order.getOrderId(), item.getOrderItemId()),
+									"ORDER",
+									CommerceOutcomeClient.stableIdempotencyKey(
+											"repeat-purchase", payOrderId,
+											order.getOrderId(), item.getOrderItemId()),
+									"REPEAT_PURCHASE",
+									order.getUserId(),
+									item,
+									item.getPropertyValueIdHash(),
+									order.getOrderId(),
+									repeatPayload,
+									occurredAt));
+				}
 			}
 		}
+	}
+
+	private boolean hasPriorSuccessfulPurchase(
+			String userId, String productId, List<String> currentOrderIds) {
+		if (StringTools.isEmpty(userId) || StringTools.isEmpty(productId)) {
+			return false;
+		}
+		Integer count = orderItemMapper.countPriorSuccessfulPurchases(
+				userId,
+				productId,
+				currentOrderIds,
+				List.of(
+						OrderStatusEnum.PAID.getStatus(),
+						OrderStatusEnum.SHIPPED.getStatus(),
+						OrderStatusEnum.COMPLETED.getStatus(),
+						OrderStatusEnum.PARTIALLY_REFUNDED.getStatus(),
+						OrderStatusEnum.WAIT_COMMENT.getStatus()));
+		return count != null && count > 0;
 	}
 
 	private void recordCancellationOutcomes(

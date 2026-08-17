@@ -8,10 +8,15 @@ import com.aishop.security.AdminSecurityContext;
 import com.aishop.security.RequireAdminPermission;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/knowledge")
@@ -54,6 +59,35 @@ public class KnowledgeBaseController extends com.aishop.controller.admin.ABaseCo
     @RequireAdminPermission(AdminPermissions.AI_CONFIG)
     public ResponseVO archive(Long documentId) {
         return getSuccessResponseVO(knowledgeBaseService.archive(documentId));
+    }
+
+    @PostMapping("/activateRelease")
+    @RequireAdminPermission(AdminPermissions.AI_CONFIG)
+    public ResponseVO activateRelease(@RequestBody Map<String, Object> body) {
+        String releaseName = text(body.get("releaseName"));
+        String catalogSha256 = text(body.get("catalogSha256"));
+        Long sourceReleaseVersion = body.get("sourceReleaseVersion") instanceof Number number
+                ? number.longValue() : null;
+        List<Long> documentIds = new ArrayList<>();
+        if (body.get("documentIds") instanceof List<?> values) {
+            for (Object value : values) {
+                if (value instanceof Number number) {
+                    documentIds.add(number.longValue());
+                } else if (value != null && !String.valueOf(value).isBlank()) {
+                    try {
+                        documentIds.add(Long.parseLong(String.valueOf(value)));
+                    } catch (NumberFormatException e) {
+                        throw new BusinessException("documentIds包含无效文档ID");
+                    }
+                }
+            }
+        }
+        return getSuccessResponseVO(knowledgeBaseService.activateRelease(
+                releaseName,
+                catalogSha256,
+                documentIds,
+                sourceReleaseVersion,
+                currentAdmin()));
     }
 
     @PostMapping("/documents")
@@ -105,5 +139,9 @@ public class KnowledgeBaseController extends com.aishop.controller.admin.ABaseCo
 
     private String currentAdmin() {
         return AdminSecurityContext.requirePrincipal().getAccount();
+    }
+
+    private String text(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 }

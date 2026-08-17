@@ -604,4 +604,22 @@
 		order by o.order_item_id
 	</select>
 
+	<select id="countPriorSuccessfulPurchases" resultType="java.lang.Integer">
+		SELECT COUNT(1)
+		FROM order_item i
+		INNER JOIN order_info o ON o.order_id = i.order_id
+		WHERE o.user_id = #{userId}
+		  AND i.product_id = #{productId}
+		  AND o.order_status IN
+		<foreach collection="successfulStatuses" item="status" open="(" separator="," close=")">
+			#{status}
+		</foreach>
+		<if test="excludedOrderIds != null and excludedOrderIds.size() > 0">
+		  AND o.order_id NOT IN
+			<foreach collection="excludedOrderIds" item="orderId" open="(" separator="," close=")">
+				#{orderId}
+			</foreach>
+		</if>
+	</select>
+
 </mapper>

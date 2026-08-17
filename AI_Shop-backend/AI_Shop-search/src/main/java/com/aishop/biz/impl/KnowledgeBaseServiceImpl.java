@@ -40,9 +40,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -197,6 +199,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                     """,
                     chunks.size(), jobId);
             long releaseVersion = advanceReleaseVersion(currentRelease);
+            snapshotCurrentRelease(
+                    releaseVersion,
+                    "publish-document-" + documentId,
+                    owner,
+                    null);
             String title = String.valueOf(document.get("title"));
             registerAfterCommit(() -> {
                 publishVersionBestEffort(releaseVersion, "知识发布");
@@ -299,6 +306,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                     """,
                     chunks.size(), jobId);
             long releaseVersion = advanceReleaseVersion(currentRelease);
+            snapshotCurrentRelease(
+                    releaseVersion,
+                    "reindex-document-" + documentId,
+                    owner,
+                    null);
             String title = String.valueOf(document.get("title"));
             registerAfterCommit(() -> {
                 publishVersionBestEffort(releaseVersion, "知识索引契约升级");
@@ -403,6 +415,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             }
 
             long releaseVersion = advanceReleaseVersion(currentRelease);
+            snapshotCurrentRelease(
+                    releaseVersion,
+                    "rebuild-published-vectors",
+                    "system",
+                    null);
             registerAfterCommit(() -> {
                 publishVersionBestEffort(releaseVersion, "知识向量模型重建");
                 if (contextPrefixEnricher == null) {
@@ -442,16 +459,10 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> archive(long documentId) {
         Map<String, Object> document = requireDocumentForUpdate(documentId);
-        List<String> ids = jdbcTemplate.queryForList(
-                "SELECT chunk_id FROM knowledge_chunk WHERE document_id=?",
-                String.class, documentId);
         if ("ARCHIVED".equals(document.get("status"))) {
-            // 归档本身幂等；再次调用只重试物理清理，不重复 bump 版本。
-            long cleanupJobId = insertJob(documentId, "RUNNING", "ARCHIVE_CLEANUP", 95);
-            registerAfterCommit(() -> cleanupArchivedVectors(
-                    documentId, ids, cleanupJobId));
             Map<String, Object> result = new LinkedHashMap<>(document);
             result.put("releaseVersion", releaseVersion());
+            result.put("vectorsRetainedForHistoricalRelease", true);
             return result;
         }
 
@@ -463,15 +474,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         jdbcTemplate.update(
                 "UPDATE knowledge_chunk SET status='ARCHIVED', updated_at=NOW() WHERE document_id=?",
                 documentId);
-        long cleanupJobId = insertJob(documentId, "RUNNING", "ARCHIVE_CLEANUP", 95);
+        snapshotCurrentRelease(
+                version,
+                "archive-document-" + documentId,
+                "system",
+                null);
         Map<String, Object> result = new LinkedHashMap<>(document);
         result.put("status", "ARCHIVED");
         result.put("releaseVersion", version);
+        result.put("vectorsRetainedForHistoricalRelease", true);
         registerAfterCommit(() -> {
             publishVersionBestEffort(version, "知识归档");
-            // 先提交 ARCHIVED 再做 ES 删除。删除部分失败时 DB 不回滚，活跃
-            // 文档目录已经排除该文档，检索正确性不依赖物理清理成功。
-            cleanupArchivedVectors(documentId, ids, cleanupJobId);
         });
         return result;
     }
@@ -627,7 +640,13 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 MessageReliabilityLevelEnum.HIGH);
         // FAQ 与文档发布共享同一条数据库版本行锁；Redis 只是永久提示键，
         // 广播失败不能把已经提交的 FAQ 伪装成发布失败。
-        long version = bumpReleaseVersionDb();
+        long currentVersion = lockReleaseVersion();
+        long version = advanceReleaseVersion(currentVersion);
+        snapshotCurrentRelease(
+                version,
+                "publish-faq-" + questionId,
+                reviewer,
+                null);
         registerAfterCommit(() -> publishVersionBestEffort(version, "FAQ发布"));
         return Map.of(
                 "candidateId", candidateId,
@@ -706,37 +725,45 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> releaseCatalog() {
-        // 先读取版本，在 MySQL REPEATABLE READ 下由这次查询建立一致性快照。
-        // 文档 ID 使用字符串，与 ES metadata.documentId 的实际类型保持一致。
-        long version = releaseVersion();
-        List<String> activeDocumentIds = jdbcTemplate.queryForList(
-                        """
-                        SELECT document_id
-                        FROM knowledge_document
-                        WHERE status='PUBLISHED'
-                        ORDER BY document_id
-                        """,
-                        Long.class)
-                .stream()
-                .map(String::valueOf)
-                .toList();
-        List<Map<String, Object>> documents = camelRows(jdbcTemplate.queryForList(
+        return releaseCatalog(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> releaseCatalog(Long requestedReleaseVersion) {
+        // Reading the version first establishes the REPEATABLE READ snapshot used
+        // by both metadata and membership queries.
+        long currentVersion = releaseVersion();
+        long version = requestedReleaseVersion == null
+                ? currentVersion : requestedReleaseVersion;
+        if (version < 1 || version > currentVersion) {
+            throw new BusinessException("知识发布快照不存在: " + version);
+        }
+        List<Map<String, Object>> snapshots = jdbcTemplate.queryForList(
                 """
-                SELECT d.document_id, d.source_name, d.content_hash, d.version, d.domain,
-                       d.index_schema_version,
-                       COUNT(c.chunk_id) AS chunk_count
-                FROM knowledge_document d
-                LEFT JOIN knowledge_chunk c
-                  ON c.document_id=d.document_id
-                 AND c.version=d.version
-                 AND c.status='PUBLISHED'
-                WHERE d.status='PUBLISHED'
-                GROUP BY d.document_id, d.source_name, d.content_hash, d.version, d.domain,
-                         d.index_schema_version
-                ORDER BY d.document_id
-                """));
+                SELECT release_version, release_name, catalog_sha256,
+                       source_release_version, activated_by, created_at
+                FROM knowledge_release_snapshot
+                WHERE release_version=?
+                """,
+                version);
+        if (snapshots.isEmpty()) {
+            if (requestedReleaseVersion != null) {
+                throw new BusinessException("知识发布快照不存在: " + version);
+            }
+            return legacyCurrentCatalog(version);
+        }
+        List<Map<String, Object>> rawDocuments = loadReleaseDocuments(version);
+        List<Map<String, Object>> documents = camelRows(rawDocuments);
+        List<String> activeDocumentIds = rawDocuments.stream()
+                .map(row -> String.valueOf(row.get("document_id")))
+                .toList();
+        Map<String, Object> snapshot = snapshots.get(0);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version", version);
+        result.put("releaseName", snapshot.get("release_name"));
+        result.put("catalogSha256", snapshot.get("catalog_sha256"));
+        result.put("sourceReleaseVersion", snapshot.get("source_release_version"));
         result.put("activeDocumentIds", activeDocumentIds);
         result.put("documents", documents);
         return result;
@@ -744,8 +771,90 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> activateRelease(
+            String releaseName,
+            String catalogSha256,
+            List<Long> documentIds,
+            Long sourceReleaseVersion,
+            String owner) {
+        String name = text(releaseName);
+        if (name.isBlank() || name.length() > 100) {
+            throw new BusinessException("releaseName不能为空且不能超过100字符");
+        }
+        Set<Long> selectedIds = new LinkedHashSet<>();
+        for (Long documentId : documentIds == null ? List.<Long>of() : documentIds) {
+            if (documentId == null || documentId < 1) {
+                throw new BusinessException("documentIds包含无效文档ID");
+            }
+            selectedIds.add(documentId);
+        }
+        boolean copiesSource = sourceReleaseVersion != null;
+        if (copiesSource == !selectedIds.isEmpty()) {
+            throw new BusinessException(
+                    "sourceReleaseVersion与documentIds必须且只能提供一个");
+        }
+
+        long currentVersion = lockReleaseVersion();
+        List<Map<String, Object>> documents;
+        String resolvedCatalogSha;
+        if (copiesSource) {
+            if (sourceReleaseVersion < 1 || sourceReleaseVersion > currentVersion) {
+                throw new BusinessException("源知识发布快照不存在");
+            }
+            List<Map<String, Object>> sourceSnapshots = jdbcTemplate.queryForList(
+                    """
+                    SELECT catalog_sha256
+                    FROM knowledge_release_snapshot
+                    WHERE release_version=?
+                    """,
+                    sourceReleaseVersion);
+            if (sourceSnapshots.isEmpty()) {
+                throw new BusinessException("源知识发布快照不存在");
+            }
+            documents = loadReleaseDocuments(sourceReleaseVersion);
+            resolvedCatalogSha = String.valueOf(
+                    sourceSnapshots.get(0).get("catalog_sha256"));
+            if (!text(catalogSha256).isBlank()
+                    && !resolvedCatalogSha.equalsIgnoreCase(text(catalogSha256))) {
+                throw new BusinessException("catalogSha256与源快照不一致");
+            }
+        } else {
+            resolvedCatalogSha = normalizeCatalogSha(catalogSha256);
+            documents = loadSelectableDocuments(selectedIds);
+            if (documents.size() != selectedIds.size()) {
+                throw new BusinessException("发布集合包含不存在或尚未索引的知识文档");
+            }
+        }
+        long nextVersion = currentVersion + 1;
+        applyActiveMembership(documents);
+        insertReleaseSnapshot(
+                nextVersion,
+                name,
+                resolvedCatalogSha,
+                sourceReleaseVersion,
+                owner,
+                documents);
+        advanceReleaseVersion(currentVersion);
+        registerAfterCommit(() -> publishVersionBestEffort(
+                nextVersion,
+                copiesSource ? "知识快照回滚" : "知识快照激活"));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("releaseVersion", nextVersion);
+        result.put("releaseName", name);
+        result.put("catalogSha256", resolvedCatalogSha);
+        result.put("sourceReleaseVersion", sourceReleaseVersion);
+        result.put("activeDocumentIds", documents.stream()
+                .map(row -> String.valueOf(row.get("document_id")))
+                .toList());
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public long invalidateCaches() {
-        long version = bumpReleaseVersionDb();
+        long currentVersion = lockReleaseVersion();
+        long version = advanceReleaseVersion(currentVersion);
+        snapshotCurrentRelease(version, "manual-cache-invalidation", "system", null);
         registerAfterCommit(() -> publishVersionBestEffort(version, "手工缓存失效"));
         return version;
     }
@@ -1035,9 +1144,212 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         return nextVersion;
     }
 
-    private long bumpReleaseVersionDb() {
-        long currentVersion = lockReleaseVersion();
-        return advanceReleaseVersion(currentVersion);
+    private Map<String, Object> legacyCurrentCatalog(long version) {
+        List<String> activeDocumentIds = jdbcTemplate.queryForList(
+                        """
+                        SELECT document_id
+                        FROM knowledge_document
+                        WHERE status='PUBLISHED'
+                        ORDER BY document_id
+                        """,
+                        Long.class)
+                .stream()
+                .map(String::valueOf)
+                .toList();
+        List<Map<String, Object>> rawDocuments = loadCurrentPublishedDocuments();
+        List<Map<String, Object>> documents = camelRows(rawDocuments);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("version", version);
+        result.put("releaseName", "legacy-current");
+        result.put("catalogSha256", catalogMembershipSha(rawDocuments));
+        result.put("sourceReleaseVersion", null);
+        result.put("activeDocumentIds", activeDocumentIds);
+        result.put("documents", documents);
+        return result;
+    }
+
+    private List<Map<String, Object>> loadCurrentPublishedDocuments() {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT d.document_id, d.source_name, d.content_hash, d.version,
+                       d.domain, d.index_schema_version,
+                       COUNT(c.chunk_id) AS chunk_count
+                FROM knowledge_document d
+                LEFT JOIN knowledge_chunk c
+                  ON c.document_id=d.document_id
+                 AND c.version=d.version
+                 AND c.status='PUBLISHED'
+                WHERE d.status='PUBLISHED'
+                GROUP BY d.document_id, d.source_name, d.content_hash, d.version,
+                         d.domain, d.index_schema_version
+                ORDER BY d.document_id
+                """);
+    }
+
+    private List<Map<String, Object>> loadReleaseDocuments(long releaseVersion) {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT document_id, source_name, content_hash,
+                       document_version AS version, domain, index_schema_version,
+                       chunk_count
+                FROM knowledge_release_document
+                WHERE release_version=?
+                ORDER BY document_id
+                """,
+                releaseVersion);
+    }
+
+    private List<Map<String, Object>> loadSelectableDocuments(Set<Long> documentIds) {
+        String placeholders = String.join(",", documentIds.stream()
+                .map(ignored -> "?")
+                .toList());
+        return jdbcTemplate.queryForList(
+                """
+                SELECT d.document_id, d.source_name, d.content_hash, d.version,
+                       d.domain, d.index_schema_version,
+                       COUNT(c.chunk_id) AS chunk_count
+                FROM knowledge_document d
+                JOIN knowledge_chunk c
+                  ON c.document_id=d.document_id
+                 AND c.version=d.version
+                 AND c.status IN ('PUBLISHED','ARCHIVED')
+                WHERE d.document_id IN (%s)
+                  AND d.index_schema_version > 0
+                GROUP BY d.document_id, d.source_name, d.content_hash, d.version,
+                         d.domain, d.index_schema_version
+                HAVING COUNT(c.chunk_id) > 0
+                ORDER BY d.document_id
+                """.formatted(placeholders),
+                documentIds.toArray());
+    }
+
+    private void snapshotCurrentRelease(
+            long releaseVersion,
+            String releaseName,
+            String owner,
+            Long sourceReleaseVersion) {
+        List<Map<String, Object>> documents = loadCurrentPublishedDocuments();
+        insertReleaseSnapshot(
+                releaseVersion,
+                releaseName,
+                catalogMembershipSha(documents),
+                sourceReleaseVersion,
+                owner,
+                documents);
+    }
+
+    private void applyActiveMembership(List<Map<String, Object>> documents) {
+        List<Object> documentIds = documents.stream()
+                .map(row -> row.get("document_id"))
+                .toList();
+        if (documentIds.isEmpty()) {
+            jdbcTemplate.update(
+                    "UPDATE knowledge_chunk SET status='ARCHIVED', updated_at=NOW() "
+                            + "WHERE status='PUBLISHED'");
+            jdbcTemplate.update(
+                    "UPDATE knowledge_document SET status='ARCHIVED', updated_at=NOW() "
+                            + "WHERE status='PUBLISHED'");
+            return;
+        }
+        String placeholders = String.join(",", documentIds.stream()
+                .map(ignored -> "?")
+                .toList());
+        jdbcTemplate.update(
+                ("""
+                UPDATE knowledge_chunk c
+                JOIN knowledge_document d ON d.document_id=c.document_id
+                SET c.status='ARCHIVED', c.updated_at=NOW()
+                WHERE d.status='PUBLISHED' AND d.document_id NOT IN (%s)
+                """).formatted(placeholders),
+                documentIds.toArray());
+        jdbcTemplate.update(
+                ("""
+                UPDATE knowledge_document
+                SET status='ARCHIVED', updated_at=NOW()
+                WHERE status='PUBLISHED' AND document_id NOT IN (%s)
+                """).formatted(placeholders),
+                documentIds.toArray());
+        jdbcTemplate.update(
+                ("""
+                UPDATE knowledge_document
+                SET status='PUBLISHED', updated_at=NOW()
+                WHERE document_id IN (%s)
+                """).formatted(placeholders),
+                documentIds.toArray());
+        jdbcTemplate.update(
+                ("""
+                UPDATE knowledge_chunk
+                SET status='PUBLISHED', updated_at=NOW()
+                WHERE document_id IN (%s)
+                """).formatted(placeholders),
+                documentIds.toArray());
+    }
+
+    private void insertReleaseSnapshot(
+            long releaseVersion,
+            String releaseName,
+            String catalogSha256,
+            Long sourceReleaseVersion,
+            String owner,
+            List<Map<String, Object>> documents) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO knowledge_release_snapshot
+                    (release_version, release_name, catalog_sha256,
+                     source_release_version, activated_by, created_at)
+                VALUES (?, ?, ?, ?, ?, NOW(3))
+                """,
+                releaseVersion,
+                releaseName,
+                catalogSha256,
+                sourceReleaseVersion,
+                text(owner));
+        if (documents.isEmpty()) {
+            return;
+        }
+        List<Object[]> rows = new ArrayList<>();
+        for (Map<String, Object> document : documents) {
+            rows.add(new Object[] {
+                    document.get("document_id"),
+                    number(document.get("version"), 1),
+                    text(document.get("source_name")),
+                    text(document.get("content_hash")),
+                    text(document.get("domain")),
+                    number(document.get("index_schema_version"), 0),
+                    number(document.get("chunk_count"), 0),
+                    releaseVersion
+            });
+        }
+        jdbcTemplate.batchUpdate(
+                """
+                INSERT INTO knowledge_release_document
+                    (document_id, document_version, source_name, content_hash,
+                     domain, index_schema_version, chunk_count, release_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows);
+    }
+
+    private String catalogMembershipSha(List<Map<String, Object>> documents) {
+        StringBuilder canonical = new StringBuilder();
+        for (Map<String, Object> document : documents) {
+            canonical.append(document.get("document_id")).append('|')
+                    .append(document.get("version")).append('|')
+                    .append(document.get("source_name")).append('|')
+                    .append(document.get("content_hash")).append('|')
+                    .append(document.get("domain")).append('|')
+                    .append(document.get("index_schema_version")).append('|')
+                    .append(document.get("chunk_count")).append('\n');
+        }
+        return sha256(canonical.toString());
+    }
+
+    private String normalizeCatalogSha(String value) {
+        String normalized = text(value).toLowerCase(Locale.ROOT);
+        if (!normalized.matches("[0-9a-f]{64}")) {
+            throw new BusinessException("catalogSha256必须是64位SHA-256");
+        }
+        return normalized;
     }
 
     private void registerAfterCommit(Runnable action) {
@@ -1052,42 +1364,6 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                         action.run();
                     }
                 });
-    }
-
-    private void cleanupArchivedVectors(long documentId, List<String> ids, long jobId) {
-        try {
-            if (!ids.isEmpty()) {
-                vectorStore.delete(ids);
-            }
-            jdbcTemplate.update(
-                    """
-                    UPDATE knowledge_ingest_job
-                    SET status='SUCCESS', stage='ARCHIVE_CLEANUP', progress=100,
-                        chunk_count=?, error_message=NULL, updated_at=NOW()
-                    WHERE job_id=?
-                    """,
-                    ids.size(), jobId);
-        } catch (RuntimeException e) {
-            String error = text(e.getMessage());
-            if (error.length() > 500) {
-                error = error.substring(0, 500);
-            }
-            try {
-                jdbcTemplate.update(
-                        """
-                        UPDATE knowledge_ingest_job
-                        SET status='FAILED', stage='ARCHIVE_CLEANUP', error_message=?,
-                            updated_at=NOW()
-                        WHERE job_id=?
-                        """,
-                        error, jobId);
-            } catch (RuntimeException persistenceError) {
-                log.error("归档清理失败状态无法落库, documentId={}, jobId={}",
-                        documentId, jobId, persistenceError);
-            }
-            log.warn("归档切片物理清理失败，活跃目录已隔离残留, documentId={}, jobId={}",
-                    documentId, jobId, e);
-        }
     }
 
     private void publishVersionBestEffort(long version, String operation) {

@@ -41,6 +41,15 @@ public interface KnowledgeBaseService {
 
     Map<String, Object> releaseCatalog();
 
+    Map<String, Object> releaseCatalog(Long releaseVersion);
+
+    Map<String, Object> activateRelease(
+            String releaseName,
+            String catalogSha256,
+            List<Long> documentIds,
+            Long sourceReleaseVersion,
+            String owner);
+
     long invalidateCaches();
 
     List<Map<String, Object>> topFaq(int limit);
