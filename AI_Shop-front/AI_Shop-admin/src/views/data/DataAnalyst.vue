@@ -22,6 +22,15 @@
       <el-button type="primary" :icon="Search" :loading="loading" @click="ask">
         分析
       </el-button>
+      <el-button
+        v-if="lastQuestion"
+        type="success"
+        plain
+        :loading="exporting"
+        @click="requestExport"
+      >
+        异步导出
+      </el-button>
     </div>
     <div v-else class="inventory-toolbar">
       <el-tag type="info" effect="plain">固定 28 天 EWMA · 14 天复核周期</el-tag>
@@ -297,6 +306,8 @@ const question = ref('')
 const lastQuestion = ref('')
 const lookbackDays = ref(28)
 const loading = ref(false)
+const exporting = ref(false)
+const exportJob = ref(null)
 const analysisResult = ref(null)
 const inventoryResult = ref(null)
 const result = computed(() => mode.value === 'analysis' ? analysisResult.value : inventoryResult.value)
@@ -375,6 +386,53 @@ const ask = async () => {
   if (shouldRender) {
     await nextTick()
     renderChart()
+  }
+}
+
+const requestExport = async () => {
+  const normalized = (lastQuestion.value || question.value).trim()
+  if (!normalized || exporting.value) return
+  exporting.value = true
+  try {
+    const response = await proxy.Request({
+      url: proxy.Api.dataAnalystExport,
+      params: { question: normalized },
+      showLoading: false,
+      timeout: 15000,
+    })
+    exportJob.value = response?.data || null
+    if (exportJob.value?.jobId) void pollExport(exportJob.value.jobId)
+  } finally {
+    exporting.value = false
+  }
+}
+
+const pollExport = async (jobId) => {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    const response = await proxy.Request({
+      url: proxy.Api.dataAnalystExportStatus,
+      params: { jobId },
+      showLoading: false,
+    })
+    exportJob.value = response?.data || exportJob.value
+    if (exportJob.value?.status === 'COMPLETED') {
+      const blob = await proxy.Request({
+        url: proxy.Api.dataAnalystExportDownload,
+        params: { jobId },
+        responseType: 'blob',
+        showLoading: false,
+      })
+      if (blob) {
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `${jobId}.json`
+        link.click()
+        URL.revokeObjectURL(link.href)
+      }
+      return
+    }
+    if (exportJob.value?.status === 'FAILED') return
   }
 }
 

@@ -6,7 +6,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from .contracts import FailureClass
+from .contracts import FailureClass, classify_exception
 
 
 @dataclass(frozen=True)
@@ -66,11 +66,12 @@ async def _call_check(
             detail,
         )
     except Exception as exc:  # diagnostics must continue through every check
+        failure_class = classify_exception(exc)
         return PreflightCheck(
             name,
             required,
             "FAIL",
-            FailureClass.DEPENDENCY_ERROR,
+            failure_class,
             f"{type(exc).__name__}: {str(exc)[:240]}",
         )
 
@@ -169,6 +170,15 @@ async def _mcp_probe() -> tuple[bool, str]:
     return bool(ok), "contract ok" if ok else "contract unavailable"
 
 
+async def _analytics_probe() -> tuple[bool, str]:
+    from app.db.analytics_pool import acquire_analytics
+
+    async with acquire_analytics() as cursor:
+        await cursor.execute("SELECT 1")
+        row = await cursor.fetchone()
+    return bool(row), "analytics reader ok" if row else "analytics reader returned no row"
+
+
 async def build_suite_preflight(
     suite: str,
     run_id: str,
@@ -183,26 +193,78 @@ async def build_suite_preflight(
     settings = get_settings()
     checks: list[tuple[str, bool, Callable[[], Awaitable[Any] | Any]]] = []
     checks.append(("redis", suite in {"search-v3", "rag-v5", "agent-v2"}, _redis_probe))
-    checks.append(("elasticsearch", suite in {"search-v3", "rag-v5"}, _elasticsearch_probe))
+    checks.append(
+        (
+            "elasticsearch",
+            suite in {"search-v3", "rag-v5", "visual-v1"},
+            _elasticsearch_probe,
+        )
+    )
 
-    provider_required = suite in {"search-v3", "rag-v5"}
-    embedding_ready = settings.embedding_provider == "local" or bool(settings.embedding_api_key.strip())
+    embedding_required = suite in {"search-v3", "rag-v5", "visual-v1"}
+    embedding_ready = (
+        settings.embedding_provider == "openai"
+        and bool(settings.embedding_api_key.strip())
+    )
+    llm_ready = bool(settings.llm_api_key.strip())
     checks.append(
         (
             "embedding-configuration",
-            provider_required,
-            lambda: (embedding_ready, "local" if settings.embedding_provider == "local" else "api key configured"),
+            embedding_required,
+            lambda: (
+                embedding_ready,
+                "remote provider configured"
+                if embedding_ready
+                else "formal live evaluation forbids local hash embedding",
+            ),
+        )
+    )
+    checks.append(
+        (
+            "llm-configuration",
+            suite in {"rag-v5", "text2sql-v1"},
+            lambda: (llm_ready, "api key configured" if llm_ready else "missing api key"),
         )
     )
     checks.append(
         (
             "rerank-configuration",
-            provider_required and bool(settings.rerank_required),
+            suite in {"search-v3", "rag-v5"},
             lambda: (bool(settings.rerank_api_key.strip()), "api key configured"),
+        )
+    )
+    observability_ready = bool(
+        settings.otel_enabled and settings.otel_otlp_endpoint.strip()
+    )
+    checks.append(
+        (
+            "evaluation-observability",
+            suite in {"search-v3", "rag-v5", "agent-v2", "visual-v1", "text2sql-v1"},
+            lambda: (
+                observability_ready,
+                "OTel enabled with OTLP endpoint"
+                if observability_ready
+                else "OTel must be enabled for formal evaluation",
+            ),
         )
     )
 
     java_required = suite == "search-v3" if require_java is None else require_java
+    if suite == "visual-v1":
+        checks.append(
+            (
+                "visual-provider-configuration",
+                True,
+                lambda: (
+                    bool(settings.visual_search_enabled)
+                    and bool(settings.visual_api_key.strip())
+                    and bool(settings.visual_rerank_api_key.strip()),
+                    "visual embedding and rerank providers configured",
+                ),
+            )
+        )
+    if suite == "text2sql-v1":
+        checks.append(("analytics-reader", True, _analytics_probe))
     checks.append(("java-gateway", java_required, _java_probe))
     checks.append(("java-snapshot-batch", java_required, _java_snapshot_probe))
     if suite == "agent-v2":

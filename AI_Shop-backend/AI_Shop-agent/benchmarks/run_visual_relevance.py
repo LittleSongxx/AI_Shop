@@ -59,9 +59,14 @@ async def _retrieve(case) -> dict[str, Any]:
         .visual_embedding_min_cosine,
     )
     if not merged:
-        return {"rankedProductIds": [], "unavailableProductIds": []}
+        return {
+            "rankedProductIds": [],
+            "unavailableProductIds": [],
+            "providerComplete": True,
+            "fallbackUsed": False,
+        }
     exact_ids = {hit.product_id for hit in exact}
-    reranked, _rerank_trace = await VisualProductSearchService()._rerank(
+    reranked, rerank_trace = await VisualProductSearchService()._rerank(
         query_image, merged[:12]
     )
     reranked = [
@@ -75,6 +80,9 @@ async def _retrieve(case) -> dict[str, Any]:
     return {
         "rankedProductIds": ranked_ids[:5],
         "unavailableProductIds": [],
+        "providerComplete": not bool(rerank_trace.get("degraded")),
+        "fallbackUsed": bool(rerank_trace.get("degraded")),
+        "rerankTrace": rerank_trace,
     }
 
 
@@ -95,7 +103,18 @@ async def run_live(limit: int | None = None) -> dict[str, Any]:
     finally:
         await close_clients()
     report = evaluate_predictions(selected, predictions)
-    return {"contract": contract, "index": status, "report": report, "predictions": predictions}
+    provider_complete = all(
+        bool(item.get("providerComplete", False)) for item in predictions.values()
+    )
+    fallback_used = any(bool(item.get("fallbackUsed")) for item in predictions.values())
+    return {
+        "contract": contract,
+        "index": status,
+        "report": report,
+        "predictions": predictions,
+        "providerComplete": provider_complete,
+        "fallbackUsed": fallback_used,
+    }
 
 
 def main() -> int:

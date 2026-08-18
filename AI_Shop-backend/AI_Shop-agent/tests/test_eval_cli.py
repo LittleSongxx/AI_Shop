@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +24,13 @@ def _run(*args: str) -> dict:
 
 def test_unified_cli_lists_only_formal_suites() -> None:
     result = _run("list")
-    assert result["suites"] == ["agent-v2", "rag-v5", "search-v3"]
+    assert result["suites"] == [
+        "agent-v2",
+        "rag-v5",
+        "search-v3",
+        "text2sql-v1",
+        "visual-v1",
+    ]
 
 
 def test_legacy_suite_is_not_in_formal_list() -> None:
@@ -61,3 +69,27 @@ def test_unified_cli_validates_all_formal_suites() -> None:
         result = _run("validate", "--suite", suite)
         assert result["status"] == "VALID"
         assert result["suite"] == suite
+
+
+def test_legacy_deterministic_run_reports_terminal_lifecycle() -> None:
+    run_id = f"ci-test-terminal-lifecycle-{uuid.uuid4().hex[:12]}"
+    try:
+        result = _run(
+            "run",
+            "--suite",
+            "deterministic-search-rag",
+            "--stage",
+            "deterministic",
+            "--run-id",
+            run_id,
+        )
+    finally:
+        shutil.rmtree(ROOT / "benchmarks" / "results" / run_id, ignore_errors=True)
+        shutil.rmtree(
+            ROOT / "benchmarks" / "results" / "search-rag-v1" / run_id,
+            ignore_errors=True,
+        )
+
+    assert result["status"] == "COMPLETE"
+    assert result["lifecycle"]["phase"] == "PACKAGED"
+    assert result["lifecycle"]["state"] == "COMPLETE"

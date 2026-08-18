@@ -22,6 +22,10 @@ class AgentGraphState(TypedDict, total=False):
     agent_msg: dict
     user_id: str
     message_id: int
+    request_id: str
+    run_id: str
+    episode_id: str
+    traceparent: str | None
     user_message: str
     user_text: str
     verified_image_context: dict | None
@@ -96,6 +100,13 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "agent_msg": agent_msg,
         "user_id": agent_msg["userId"],
         "message_id": agent_msg["messageId"],
+        "request_id": str(
+            agent_msg.get("requestId")
+            or f"req_{agent_msg.get('runId') or agent_msg['messageId']}"
+        ),
+        "run_id": str(agent_msg.get("runId") or ""),
+        "episode_id": str(agent_msg.get("episodeId") or agent_msg.get("runId") or ""),
+        "traceparent": agent_msg.get("traceparent"),
         "user_message": agent_msg.get("userMessage") or "",
         "user_text": user_text,
         "verified_image_context": image_context,

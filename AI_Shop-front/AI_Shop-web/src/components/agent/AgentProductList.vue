@@ -85,11 +85,13 @@ const onProductClick = async (item: Record<string, any>, position = 0) => {
   const userId = String(authStore.userInfo?.userId || '');
   if (requestId && userId) {
     try {
-      const attribution = await agentApi.reportClick(
-      String(item.productId),
-      requestId,
-      position + 1
-      );
+      const productId = String(item.productId);
+      const productPosition = position + 1;
+      const runId = item.runId ? String(item.runId) : undefined;
+      const modelVersion = item.modelVersion ? String(item.modelVersion) : undefined;
+      const attribution = runId
+        ? await agentApi.reportClick(productId, requestId, productPosition, runId, modelVersion)
+        : await agentApi.reportClick(productId, requestId, productPosition);
       saveRecommendationAttribution(attribution, userId);
     } catch {
       // Navigation is the primary action; attribution is best effort.

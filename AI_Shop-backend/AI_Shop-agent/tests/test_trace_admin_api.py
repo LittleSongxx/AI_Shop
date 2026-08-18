@@ -134,7 +134,25 @@ def test_admin_agents_require_and_forward_java_session_identity(monkeypatch):
 
     assert analysis.json()["data"]["runId"] == "analysis-1"
     assert inventory.json()["data"]["runId"] == "inventory-1"
-    ask.assert_awaited_once_with("最近七天销售额", admin_id="admin-session")
+    ask.assert_awaited_once_with(
+        "最近七天销售额",
+        admin_id="admin-session",
+        permissions=frozenset(
+            {
+                "ai:config",
+                "ai:evaluate",
+                "ai:pilot",
+                "analytics:read",
+                "analytics:export",
+                "audit:read",
+                "support:read",
+                "support:write",
+            }
+        ),
+        tenant_id=None,
+        cursor=None,
+        page_size=None,
+    )
     suggestions.assert_awaited_once_with(
         admin_id="admin-session",
         lookback_days=30,

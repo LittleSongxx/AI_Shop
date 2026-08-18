@@ -12,14 +12,16 @@ import structlog
 
 from app.config.settings import get_settings
 from app.constants import RRF_K
+from app.domain.recommendation.contracts import RecommendationRequest
 from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.rag.retriever import rag_retriever
-from app.services.episode_service import episode_service
+from app.services.episode_service import current_episode, episode_service
 from app.services.java_internal_client import java_internal_client
 from app.services.product_service import product_service
 from app.services.recommendation_attribution_service import (
     recommendation_attribution_service,
 )
+from app.services.recommendation_contract_service import build_response
 from app.services.shopping_decision_service import shopping_decision_service
 from app.services.shopping_mission_service import (
     apply_explicit_turn,
@@ -64,6 +66,8 @@ class VisualProductSearchService:
         image_context: VerifiedImageContext,
         query_text: str,
         source_message_id: int | None,
+        request_id: str | None = None,
+        runtime_constraints: dict[str, Any] | None = None,
     ) -> ToolInvokeResult:
         started = time.perf_counter()
         settings = get_settings()
@@ -116,19 +120,27 @@ class VisualProductSearchService:
                     },
                 )
                 if len(grounding.subjects) > 1:
-                    if not source_message_id:
+                    selection_source_message_id = source_message_id or await self._create_selection_source_message(
+                        user_id=user_id,
+                        image_context=image_context,
+                        query_text=query_text,
+                        request_id=request_id,
+                    )
+                    if not selection_source_message_id:
                         return ToolInvokeResult(
-                            content="检测到多个商品主体，但当前会话无法创建选择卡，请重新发送图片。",
+                            content="检测到多个商品主体，但选择会话持久化失败，请稍后重试。",
                             success=False,
-                            error_code="VISUAL_SELECTION_CONTEXT_MISSING",
+                            error_code="VISUAL_SELECTION_PERSISTENCE_UNAVAILABLE",
                         )
                     card = await visual_selection_store.create(
                         user_id=user_id,
-                        source_message_id=source_message_id,
+                        source_message_id=selection_source_message_id,
                         image_asset_id=image_context.asset_id,
                         original_text=query_text,
                         subjects=grounding.subjects,
-                        constraints=await self._filters(user_id, query_text),
+                        constraints=await self._filters(
+                            user_id, query_text, runtime_constraints
+                        ),
                     )
                     episode_service.record_step(
                         "VISUAL_SUBJECT_SELECTION_REQUIRED",
@@ -157,7 +169,7 @@ class VisualProductSearchService:
                 self._record_degraded("grounding", exc.code)
 
         query_image = normalize_query_image(content, selected_subject)
-        filters = await self._filters(user_id, query_text)
+        filters = await self._filters(user_id, query_text, runtime_constraints)
         constraints_text = _constraints_text(query_text)
         trace: dict[str, Any] = {
             "mode": "visual",
@@ -219,6 +231,9 @@ class VisualProductSearchService:
                     trace=trace,
                     selected_subject=selected_subject,
                     started=started,
+                    request_id=request_id,
+                    image_asset_id=image_context.asset_id,
+                    runtime_constraints=runtime_constraints,
                 )
             return await self._understanding_fallback(
                 user_id=user_id,
@@ -227,6 +242,9 @@ class VisualProductSearchService:
                 trace=trace,
                 selected_subject=selected_subject,
                 started=started,
+                request_id=request_id,
+                image_asset_id=image_context.asset_id,
+                runtime_constraints=runtime_constraints,
             )
 
         try:
@@ -262,6 +280,9 @@ class VisualProductSearchService:
                     trace=trace,
                     selected_subject=selected_subject,
                     started=started,
+                    request_id=request_id,
+                    image_asset_id=image_context.asset_id,
+                    runtime_constraints=runtime_constraints,
                 )
             return await self._understanding_fallback(
                 user_id=user_id,
@@ -270,6 +291,9 @@ class VisualProductSearchService:
                 trace=trace,
                 selected_subject=selected_subject,
                 started=started,
+                request_id=request_id,
+                image_asset_id=image_context.asset_id,
+                runtime_constraints=runtime_constraints,
             )
 
         image_hits, fused_hits, text_hits = recalls
@@ -308,6 +332,9 @@ class VisualProductSearchService:
             trace=trace,
             selected_subject=selected_subject,
             started=started,
+            request_id=request_id,
+            image_asset_id=image_context.asset_id,
+            runtime_constraints=runtime_constraints,
         )
 
     async def _finalize_hits(
@@ -321,6 +348,9 @@ class VisualProductSearchService:
         trace: dict[str, Any],
         selected_subject: VisualSubject | None,
         started: float,
+        request_id: str | None = None,
+        image_asset_id: str = "img_00000000000000000000000000000000",
+        runtime_constraints: dict[str, Any] | None = None,
     ) -> ToolInvokeResult:
         settings = get_settings()
         candidates = hits[: settings.visual_rerank_candidate_size]
@@ -401,6 +431,9 @@ class VisualProductSearchService:
             started=started,
             exact_product_ids=exact_product_ids,
             model_version=settings.visual_index_model_version,
+            request_id=request_id,
+            image_asset_id=image_asset_id,
+            runtime_constraints=runtime_constraints,
         )
 
     async def _rerank(
@@ -468,6 +501,9 @@ class VisualProductSearchService:
         trace: dict[str, Any],
         selected_subject: VisualSubject | None,
         started: float,
+        request_id: str | None = None,
+        image_asset_id: str = "img_00000000000000000000000000000000",
+        runtime_constraints: dict[str, Any] | None = None,
     ) -> ToolInvokeResult:
         attributes = ""
         try:
@@ -532,6 +568,9 @@ class VisualProductSearchService:
             started=started,
             exact_product_ids=set(),
             model_version=settings.visual_grounding_model,
+            request_id=request_id,
+            image_asset_id=image_asset_id,
+            runtime_constraints=runtime_constraints,
             fallback_intro=(
                 "视觉向量服务暂时不可用，以下是按图片内容理解生成的候选，"
                 "并非视觉同款。"
@@ -539,12 +578,17 @@ class VisualProductSearchService:
         )
 
     async def _mission_for_visual_request(
-        self, user_id: str, query_text: str
+        self,
+        user_id: str,
+        query_text: str,
+        runtime_constraints: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Use the same mission contract as text search for visual recall."""
         mission = await shopping_mission_service.load(user_id)
         if mission_is_active(mission):
-            return mission
+            from app.services.product_service import merge_runtime_constraints
+
+            return merge_runtime_constraints(mission, runtime_constraints)
         profile = await shopping_profile_service.get_effective_profile(user_id)
         derived = apply_explicit_turn(
             None,
@@ -552,7 +596,10 @@ class VisualProductSearchService:
             user_text=query_text,
             message_id=0,
         )
-        return derived if mission_is_active(derived) else empty_shopping_mission(profile)
+        resolved = derived if mission_is_active(derived) else empty_shopping_mission(profile)
+        from app.services.product_service import merge_runtime_constraints
+
+        return merge_runtime_constraints(resolved, runtime_constraints)
 
     async def _decide_visual_candidates(
         self,
@@ -567,6 +614,9 @@ class VisualProductSearchService:
         started: float,
         exact_product_ids: set[str],
         model_version: str,
+        request_id: str | None = None,
+        image_asset_id: str = "img_00000000000000000000000000000000",
+        runtime_constraints: dict[str, Any] | None = None,
         fallback_intro: str | None = None,
     ) -> ToolInvokeResult:
         """Apply final offer and utility policy after visual-only recall.
@@ -575,12 +625,15 @@ class VisualProductSearchService:
         independently determines price, sellability, suitability or what the
         user ultimately sees.
         """
-        mission = await self._mission_for_visual_request(user_id, query_text)
+        mission = await self._mission_for_visual_request(
+            user_id, query_text, runtime_constraints
+        )
         decision = await shopping_decision_service.decide(
             user_id=user_id,
             mission=mission,
             candidates=candidates,
             source=source,
+            request_id=request_id,
             user_text=query_text,
         )
         if not decision.products:
@@ -609,6 +662,21 @@ class VisualProductSearchService:
                 biz_type="shopping_decision_v2",
                 assistant_cards="[]",
                 retrieval_trace=trace,
+                contract_data=build_response(
+                    RecommendationRequest(
+                        requestId=request_id or decision.request_id,
+                        mode="IMAGE",
+                        imageAssetId=image_asset_id,
+                        query=query_text or None,
+                        modelVersion=model_version,
+                    ),
+                    run_id=(current_episode().run_id if current_episode() else decision.request_id),
+                    products=[],
+                    status="BLOCKED" if decision.source == "offer_unavailable" else "NO_RESULT",
+                    degradation=("OFFER_SNAPSHOT_UNAVAILABLE" if decision.source == "offer_unavailable" else None),
+                    trace=trace,
+                    message=message,
+                ).model_dump(mode="json", by_alias=True),
             )
 
         products = decision.products
@@ -672,6 +740,20 @@ class VisualProductSearchService:
             }
             for product in products
         ]
+        contract = build_response(
+            RecommendationRequest(
+                requestId=request_id or decision.request_id,
+                mode="IMAGE",
+                imageAssetId=image_asset_id,
+                query=query_text or None,
+                modelVersion=model_version,
+            ),
+            run_id=(current_episode().run_id if current_episode() else decision.request_id),
+            products=products,
+            status="COMPLETED",
+            fallback_used=bool(trace.get("understandingFallback") or trace.get("rerank", {}).get("degraded")),
+            trace=trace,
+        ).model_dump(mode="json", by_alias=True)
         return ToolInvokeResult(
             content=intro,
             biz_type="shopping_decision_v2",
@@ -681,9 +763,15 @@ class VisualProductSearchService:
             product_names=[str(product.get("product_name") or "") for product in products],
             source_refs=source_refs,
             retrieval_trace=trace,
+            contract_data=contract,
         )
 
-    async def _filters(self, user_id: str, query_text: str) -> dict[str, Any]:
+    async def _filters(
+        self,
+        user_id: str,
+        query_text: str,
+        runtime_constraints: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         durable_profile = await shopping_profile_service.get_effective_profile(user_id)
         explicit_profile = extract_profile(query_text)
         profile = merge_profiles(durable_profile, explicit_profile)
@@ -718,7 +806,86 @@ class VisualProductSearchService:
         explicit_category = str(explicit_profile.get("category") or "").strip()
         if explicit_category:
             filters["category"] = explicit_category[:80]
+        constraints = runtime_constraints or {}
+        explicit_budget_max = _optional_number(
+            constraints.get("budgetMax", constraints.get("budget_max"))
+        )
+        explicit_budget_min = _optional_number(
+            constraints.get("budgetMin", constraints.get("budget_min"))
+        )
+        if explicit_budget_max is not None:
+            filters["budgetMax"] = explicit_budget_max
+        if explicit_budget_min is not None:
+            filters["budgetMin"] = explicit_budget_min
+        required_brands = _normalized_terms(
+            constraints.get("requiredBrands", constraints.get("required_brands"))
+        )
+        if required_brands:
+            filters["brands"] = required_brands
+        explicit_excluded_brands = _normalized_terms(
+            constraints.get("excludedBrands", constraints.get("excluded_brands"))
+        )
+        if explicit_excluded_brands:
+            filters["excludedBrands"] = explicit_excluded_brands
+        explicit_excluded_terms = _normalized_terms(
+            constraints.get("excludedTerms", constraints.get("excluded_terms"))
+        )
+        if explicit_excluded_terms:
+            filters["excludedTerms"] = explicit_excluded_terms
+        explicit_category = str(constraints.get("category") or "").strip()
+        if explicit_category:
+            filters["category"] = explicit_category[:80]
         return filters
+
+    async def _create_selection_source_message(
+        self,
+        *,
+        user_id: str,
+        image_context: VerifiedImageContext,
+        query_text: str,
+        request_id: str | None,
+    ) -> int | None:
+        episode = current_episode()
+        if episode is None:
+            return None
+        try:
+            from app.services.message_service import agent_message_service
+
+            message = await agent_message_service.save_user_message(
+                user_id,
+                query_text or "查找图中同款或相似商品",
+                queue_name="recommendation-v1",
+                run_id=episode.run_id,
+                image_asset_id=image_context.asset_id,
+                image_snapshot={
+                    "assetId": image_context.asset_id,
+                    "contentSha256": image_context.content_sha256,
+                    "mimeType": image_context.mime_type,
+                    "width": image_context.width,
+                    "height": image_context.height,
+                    "scene": image_context.scene,
+                    "moderationStatus": image_context.moderation_status,
+                    "expiresAt": image_context.expires_at,
+                },
+            )
+            message_id = int(message["messageId"])
+            episode_service.attach_message(run_id=episode.run_id, message_id=message_id)
+            episode_service.update_run(
+                run_id=episode.run_id,
+                experiment={
+                    "contract": "recommendation/v1",
+                    "requestId": request_id,
+                    "selectionSession": True,
+                },
+            )
+            return message_id
+        except Exception as exc:
+            logger.warning(
+                "visual_selection_source_message_failed",
+                request_id=request_id,
+                error=type(exc).__name__,
+            )
+            return None
 
     def _no_match(self, trace: dict[str, Any], started: float) -> ToolInvokeResult:
         trace["outcome"] = "NO_CONFIDENT_MATCH"
@@ -857,6 +1024,20 @@ def _constraints_text(query_text: str) -> str:
 def _match_number(pattern: re.Pattern[str], text: str) -> float | None:
     match = pattern.search(str(text or ""))
     return float(match.group(1)) if match else None
+
+
+def _normalized_terms(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = str(item or "").strip()
+        key = text.casefold()
+        if text and key not in seen:
+            seen.add(key)
+            result.append(text[:100])
+    return result
 
 
 def _optional_number(value: object) -> float | None:

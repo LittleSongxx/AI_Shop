@@ -185,6 +185,19 @@ EPISODE_WRITE_LATENCY = Histogram(
     "Episode batch persistence latency",
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
 )
+EPISODE_SAMPLE_RATE = Gauge(
+    "agent_episode_sample_rate",
+    "当前 Episode 成功流量的有效采样率",
+)
+EPISODE_WRITER_UP = Gauge(
+    "agent_episode_writer_up",
+    "Episode 持久化 writer 是否运行中",
+)
+EPISODE_WRITE_FAILURE_TOTAL = Counter(
+    "agent_episode_write_failure_total",
+    "Episode 批量写入失败次数（独立于主动丢弃）",
+    ["reason"],
+)
 
 JUDGE_EVALUATION_TOTAL = Counter(
     "agent_judge_evaluation_total",

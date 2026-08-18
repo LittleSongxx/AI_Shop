@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "aishop-evaluation-suite/v1",
+  "suiteId": "visual-v1",
+  "resultRoot": "benchmarks/results/visual-v1",
+  "runIdPattern": "^visual-v1-[0-9a-f]{7,40}-[0-9]{8}(?:-[a-z0-9-]+)?$",
+  "evidenceSource": "SYNTHETIC+local-live",
+  "dataset": "benchmarks/visual_relevance_v1.jsonl",
+  "suiteLock": "benchmarks/visual_relevance_v1.lock.json",
+  "runner": "benchmarks/eval.py",
+  "adapter": "visual-v1",
+  "profile": "local-live",
+  "stages": ["execute", "package"],
+  "providerPolicy": "FAIL_CLOSED_NO_FALLBACK",
+  "gates": {
+    "exactTop1": 1.0,
+    "robustnessRecallAt5": 0.9,
+    "alternateViewRecallAt5": 0.8,
+    "mrr": 0.8,
+    "ndcgAt5": 0.75,
+    "rejectionAccuracy": 0.8,
+    "crossCategoryFalsePositiveRate": 0.05,
+    "unavailableProductRate": 0.0,
+    "fallbackSuccessRate": 1.0,
+    "providerCompleteness": 1.0
+  },
+  "freshPolicy": "ONE_SHOT_FAIL_RETAINED",
+  "note": "视觉搜索纳入推荐主线；正式 live 评测禁止 VLM/Embedding/Rerank fallback。"
+}

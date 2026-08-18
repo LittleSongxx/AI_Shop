@@ -34,7 +34,12 @@ class AgentQueueService:
     async def publish(self, queue_name: str, payload: dict[str, Any]) -> None:
         await self.connect()
         assert self._channel is not None
-        headers = {"x-message-id": str(payload.get("messageId") or "")}
+        headers = {
+            "x-message-id": str(payload.get("messageId") or ""),
+            "x-request-id": str(payload.get("requestId") or ""),
+            "x-run-id": str(payload.get("runId") or ""),
+            "x-episode-id": str(payload.get("episodeId") or payload.get("runId") or ""),
+        }
         # P0-3: W3C traceparent 随消息传播，Worker 消费时据此续接父 span。
         # OTel 未启用时当前 span 不 recording，inject 是空操作。
         from opentelemetry import trace

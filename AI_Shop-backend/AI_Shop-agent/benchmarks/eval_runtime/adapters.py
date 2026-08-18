@@ -27,6 +27,75 @@ def _result_payload(result: Any) -> dict[str, Any]:
     return result if isinstance(result, dict) else {"value": result}
 
 
+def _provider_violation(payload: Any, *, path: str = "result") -> str | None:
+    """Return the first fail-closed provider/fallback violation in a payload."""
+
+    if isinstance(payload, list):
+        for index, item in enumerate(payload):
+            violation = _provider_violation(item, path=f"{path}[{index}]")
+            if violation:
+                return violation
+        return None
+    if not isinstance(payload, dict):
+        return None
+    for key, value in payload.items():
+        normalized = str(key).replace("_", "").casefold()
+        current = f"{path}.{key}"
+        if normalized in {"fallbackused", "fallback"} and value is True:
+            return f"{current}=true"
+        if normalized == "fallbackcount":
+            try:
+                if int(value or 0) > 0:
+                    return f"{current}={value}"
+            except (TypeError, ValueError):
+                return f"{current}=invalid"
+        if normalized == "executionmode" and str(value).strip().lower() in {
+            "deterministic",
+            "replay",
+            "fallback",
+        }:
+            return f"{current}={value}"
+        if normalized in {"providercomplete", "providercompleteness"}:
+            if value is False:
+                return f"{current}=false"
+            if isinstance(value, dict):
+                status = str(value.get("status") or "").upper()
+                if value.get("passed") is False or value.get("complete") is False:
+                    return f"{current}=incomplete"
+                if status in {"BLOCKED", "FAILED", "INCOMPLETE", "NOT_COLLECTED"}:
+                    return f"{current}.status={status}"
+                if any(item is False for item in value.values() if isinstance(item, bool)):
+                    return f"{current}=incomplete"
+        if normalized == "provider" and isinstance(value, dict):
+            if value.get("complete") is False:
+                return f"{current}.complete=false"
+        violation = _provider_violation(value, path=current)
+        if violation:
+            return violation
+    return None
+
+
+def _blocked_provider_result(
+    suite: SuiteDefinition,
+    *,
+    stage: str,
+    payload: dict[str, Any],
+) -> StageResult | None:
+    if suite.contract.get("providerPolicy") != "FAIL_CLOSED_NO_FALLBACK":
+        return None
+    violation = _provider_violation(payload)
+    if not violation:
+        return None
+    return StageResult(
+        stage=stage,
+        status="BLOCKED",
+        result=payload,
+        failure_class=FailureClass.PROVIDER_ERROR,
+        error_type="ProviderEvidenceViolation",
+        error_message=f"formal live provider evidence is incomplete: {violation}",
+    )
+
+
 async def run_stage(suite: SuiteDefinition, *, stage: str, run_id: str, options: dict[str, Any]) -> StageResult:
     """Dispatch one stage to the existing versioned domain implementation."""
 
@@ -45,10 +114,20 @@ async def run_stage(suite: SuiteDefinition, *, stage: str, run_id: str, options:
             else:
                 raise ValueError(f"unsupported Search v3 stage: {stage}")
             payload = _result_payload(result)
+            provider_block = _blocked_provider_result(
+                suite, stage=stage, payload=payload
+            )
+            if provider_block:
+                return provider_block
             # Interpret Search v3 quality gate status
             gate_status = payload.get("qualityGates", {}).get("status")
             if gate_status == "FAILED_RETAINED":
-                return StageResult(stage=stage, status="FAILED", result=payload)
+                return StageResult(
+                    stage=stage,
+                    status="FAILED",
+                    result=payload,
+                    failure_class=FailureClass.QUALITY_FAIL,
+                )
             return StageResult(stage=stage, result=payload)
 
         if suite.adapter == "rag-v5":
@@ -76,12 +155,22 @@ async def run_stage(suite: SuiteDefinition, *, stage: str, run_id: str, options:
                     "retrieval": retrieval_result,
                     "generation": generation_result,
                 }
+                provider_block = _blocked_provider_result(
+                    suite, stage=stage, payload=payload
+                )
+                if provider_block:
+                    return provider_block
                 # Interpret RAG v5 quality gate and human review status
                 retrieval_gate = retrieval_result.get("qualityGate", {}).get("status")
                 generation_gate = generation_result.get("qualityGate", {}).get("status")
                 human_review = generation_result.get("humanReviewStatus")
                 if retrieval_gate == "FAILED_RETAINED" or generation_gate == "FAILED_RETAINED":
-                    return StageResult(stage=stage, status="FAILED", result=payload)
+                    return StageResult(
+                        stage=stage,
+                        status="FAILED",
+                        result=payload,
+                        failure_class=FailureClass.QUALITY_FAIL,
+                    )
                 if human_review == "HUMAN_REVIEW_PENDING":
                     return StageResult(stage=stage, status="REVIEW_PENDING", result=payload)
                 return StageResult(stage=stage, result=payload)
@@ -142,24 +231,126 @@ async def run_stage(suite: SuiteDefinition, *, stage: str, run_id: str, options:
                     run_id=run_id,
                 )
                 report, output_dir = await module.run_live(args)
+                payload = {"report": report, "resultDir": str(output_dir)}
+                provider_block = _blocked_provider_result(
+                    suite, stage=stage, payload=payload
+                )
+                if provider_block:
+                    return provider_block
                 # Interpret Agent v2 quality gates
                 gate_failures = report.get("gateFailures", [])
                 if gate_failures:
                     return StageResult(
                         stage=stage,
                         status="FAILED",
-                        result={"report": report, "resultDir": str(output_dir)},
-                        error_message=f"Quality gates failed: {'; '.join(gate_failures)}"
+                        result=payload,
+                        failure_class=FailureClass.QUALITY_FAIL,
+                        error_message=f"Quality gates failed: {'; '.join(gate_failures)}",
                     )
-                return StageResult(stage=stage, result={"report": report, "resultDir": str(output_dir)})
+                return StageResult(stage=stage, result=payload)
             raise ValueError(f"unsupported Agent v2 stage: {stage}")
+
+        if suite.adapter == "visual-v1":
+            module = importlib.import_module("benchmarks.run_visual_relevance")
+            if stage == "validate":
+                cases = module.load_cases()
+                return StageResult(
+                    stage=stage,
+                    result={"contract": module.validate_contract(cases)},
+                )
+            if stage == "execute":
+                if options.get("predictions"):
+                    raise ValueError(
+                        "formal visual-v1 execution does not accept replay predictions"
+                    )
+                payload = await module.run_live(options.get("limit"))
+                provider_block = _blocked_provider_result(
+                    suite, stage=stage, payload=payload
+                )
+                if provider_block:
+                    return provider_block
+                failures = module.gate_failures(
+                    payload["report"], module.json.loads(module.LOCK_PATH.read_text())
+                    .get("thresholds")
+                    or {},
+                )
+                if failures:
+                    return StageResult(
+                        stage=stage,
+                        status="FAILED",
+                        result=payload,
+                        failure_class=FailureClass.QUALITY_FAIL,
+                        error_message="; ".join(failures),
+                    )
+                return StageResult(stage=stage, result=payload)
+            if stage == "package":
+                return StageResult(stage=stage, result={"packaged": True})
+            raise ValueError(f"unsupported Visual v1 stage: {stage}")
+
+        if suite.adapter == "text2sql-v1":
+            module = importlib.import_module("benchmarks.text2sql_eval")
+            dataset = Path(options.get("dataset") or module.DATASET_PATH)
+            lock = Path(options.get("lock") or module.LOCK_PATH)
+            if stage == "validate":
+                cases = module.load_cases(dataset)
+                return StageResult(
+                    stage=stage,
+                    result={"contract": module.validate_contract(cases, dataset, lock)},
+                )
+            if stage == "execute":
+                predictions_path = options.get("predictions")
+                if not predictions_path:
+                    return StageResult(
+                        stage=stage,
+                        status="BLOCKED",
+                        failure_class=FailureClass.PROVIDER_ERROR,
+                        error_type="ProviderEvidenceMissing",
+                        error_message=(
+                            "Text2SQL real provider predictions were not collected; "
+                            "deterministic output is not accepted as live evidence"
+                        ),
+                    )
+                cases = module.load_cases(dataset)
+                predictions = json.loads(Path(predictions_path).read_text(encoding="utf-8"))
+                report = module.evaluate_predictions(cases, predictions, lock_path=lock)
+                payload = {"contract": module.validate_contract(cases, dataset, lock), "report": report}
+                if report.get("providerCompleteness", 0.0) < 1.0:
+                    return StageResult(
+                        stage=stage,
+                        status="BLOCKED",
+                        result=payload,
+                        failure_class=FailureClass.PROVIDER_ERROR,
+                        error_type="ProviderEvidenceIncomplete",
+                        error_message="Text2SQL provider trace completeness is below 1.0",
+                    )
+                if report.get("gateFailures"):
+                    return StageResult(
+                        stage=stage,
+                        status="FAILED",
+                        result=payload,
+                        failure_class=FailureClass.QUALITY_FAIL,
+                        error_message="; ".join(report["gateFailures"]),
+                    )
+                return StageResult(stage=stage, result=payload)
+            if stage == "package":
+                return StageResult(stage=stage, result={"packaged": True})
+            raise ValueError(f"unsupported Text2SQL v1 stage: {stage}")
 
         raise ValueError(f"no adapter implementation for suite {suite.suite_id}")
     except Exception as exc:
         failure = classify_exception(exc)
+        blocking_failures = {
+            FailureClass.SERVICE_UNAVAILABLE,
+            FailureClass.DEPENDENCY_ERROR,
+            FailureClass.PROVIDER_ERROR,
+            FailureClass.RATE_LIMITED,
+            FailureClass.CIRCUIT_OPEN,
+            FailureClass.TIMEOUT,
+            FailureClass.BUDGET_EXCEEDED,
+        }
         return StageResult(
             stage=stage,
-            status="BLOCKED" if failure in {FailureClass.SERVICE_UNAVAILABLE, FailureClass.DEPENDENCY_ERROR} else "FAILED",
+            status="BLOCKED" if failure in blocking_failures else "FAILED",
             failure_class=failure,
             error_type=type(exc).__name__,
             error_message=str(exc)[:1000],

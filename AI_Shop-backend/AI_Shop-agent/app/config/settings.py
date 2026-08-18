@@ -423,6 +423,9 @@ class Settings(BaseSettings):
     multi_agent_specialist_max_rounds: int = 2
     multi_agent_specialist_timeout_seconds: int = 12
     analytics_max_rows: int = 200
+    analytics_max_result_bytes: int = 1_000_000
+    analytics_cursor_ttl_seconds: int = 900
+    analytics_export_max_rows: int = 10_000
     analytics_max_days: int = 90
     analytics_query_timeout_ms: int = 3000
     analytics_model_timeout_seconds: int = 10
@@ -488,6 +491,18 @@ class Settings(BaseSettings):
             raise ValueError("AGENT_BUDGET_WARN_THRESHOLD must be between 0 and 1")
         if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
             raise ValueError("ANALYTICS_MAX_ROWS must be between 1 and 200")
+        if not 16_384 <= self.analytics_max_result_bytes <= 10_000_000:
+            raise ValueError(
+                "ANALYTICS_MAX_RESULT_BYTES must be between 16384 and 10000000"
+            )
+        if not 60 <= self.analytics_cursor_ttl_seconds <= 86_400:
+            raise ValueError(
+                "ANALYTICS_CURSOR_TTL_SECONDS must be between 60 and 86400"
+            )
+        if not self.analytics_max_rows <= self.analytics_export_max_rows <= 1_000_000:
+            raise ValueError(
+                "ANALYTICS_EXPORT_MAX_ROWS must be between ANALYTICS_MAX_ROWS and 1000000"
+            )
         if self.analytics_max_days < 1 or self.analytics_max_days > 90:
             raise ValueError("ANALYTICS_MAX_DAYS must be between 1 and 90")
         if self.analytics_query_timeout_ms < 100 or self.analytics_query_timeout_ms > 10_000:

@@ -7,6 +7,8 @@ import structlog
 
 from app.config.settings import get_settings
 from app.infra.http_client import get_client
+from app.observability.telemetry import current_traceparent
+from app.services.episode_service import current_episode
 
 logger = structlog.get_logger()
 
@@ -70,6 +72,15 @@ class JavaInternalClient:
         delegated = _delegated_user_id.get()
         if delegated:
             headers["X-Agent-User-Id"] = delegated
+        episode = current_episode()
+        if episode is not None:
+            headers["X-Run-Id"] = episode.run_id
+            headers["X-Episode-Id"] = episode.episode_id or episode.run_id
+            if episode.request_id:
+                headers["X-Request-Id"] = episode.request_id
+        traceparent = (episode.traceparent if episode else None) or current_traceparent()
+        if traceparent:
+            headers["traceparent"] = traceparent
         return headers
 
     def _base(self) -> str:

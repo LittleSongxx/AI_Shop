@@ -229,6 +229,11 @@ class McpToolRouter:
                 risk=policy.risk.value,
                 user_id=user_id,
             )
+        else:
+            context = current_episode()
+            if context and context.run_id:
+                raw.setdefault("runId", context.run_id)
+                raw.setdefault("requestId", f"req_{context.run_id}")
 
         # P3-1: in-process tools are handled locally, never forwarded to the
         # MCP Streamable HTTP server.
@@ -446,12 +451,20 @@ class McpToolRouter:
             query_text = str(args.get("queryText") or args.get("query_text") or "").strip()
             from app.visual.search_service import visual_product_search_service
 
-            result = await visual_product_search_service.search(
-                user_id=user_id,
-                image_context=context,
-                query_text=query_text or "查找图中同款或相似商品",
-                source_message_id=source_message_id,
-            )
+            search_kwargs = {
+                "user_id": user_id,
+                "image_context": context,
+                "query_text": query_text or "查找图中同款或相似商品",
+                "source_message_id": source_message_id,
+            }
+            request_id = str(
+                args.get("requestId")
+                or args.get("request_id")
+                or (current_episode().run_id if current_episode() else "")
+            ).strip()
+            if request_id:
+                search_kwargs["request_id"] = request_id
+            result = await visual_product_search_service.search(**search_kwargs)
             TOOL_CALL_TOTAL.labels(
                 tool="SEARCH_PRODUCTS_BY_IMAGE",
                 status="success" if result.success else "business_rejected",
@@ -488,6 +501,12 @@ class McpToolRouter:
         uid = g("userId", "user_id")
         if tool_name == "SEARCH_PRODUCTS":
             out = {"userId": uid, "keyword": g("keyword") or ""}
+            request_id = g("requestId", "request_id")
+            run_id = g("runId", "run_id")
+            if request_id is not None:
+                out["requestId"] = request_id
+            if run_id is not None:
+                out["runId"] = run_id
             ex = g("excludeProductId", "exclude_product_id")
             if ex is not None:
                 out["excludeProductId"] = ex
@@ -498,6 +517,8 @@ class McpToolRouter:
                 "imageAssetId": g("imageAssetId", "image_asset_id"),
                 "queryText": g("queryText", "query_text"),
                 "selectedSubjectId": g("selectedSubjectId", "selected_subject_id"),
+                "requestId": g("requestId", "request_id"),
+                "runId": g("runId", "run_id"),
             }
             return {key: value for key, value in out.items() if value is not None}
         if tool_name == "QUERY_ORDERS":

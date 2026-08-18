@@ -1,6 +1,9 @@
+import copy
 import json
 import re
 import time
+from collections.abc import Mapping
+from typing import Any
 
 import structlog
 
@@ -119,7 +122,112 @@ def derive_raw_search_query(
             return f"category:{category_id}"
     return value
 
+
+def _constraint_value(constraints: Mapping[str, Any], *keys: str) -> Any:
+    return next(
+        (
+            constraints[key]
+            for key in keys
+            if key in constraints and constraints[key] is not None
+        ),
+        None,
+    )
+
+
+def _constraint_terms(constraints: Mapping[str, Any], *keys: str) -> list[str]:
+    value = _constraint_value(constraints, *keys)
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = str(item or "").strip()
+        key = text.casefold()
+        if text and key not in seen:
+            seen.add(key)
+            result.append(text)
+    return result
+
+
+def merge_runtime_constraints(
+    mission: dict,
+    constraints: Mapping[str, Any] | None,
+) -> dict:
+    """Overlay explicit v1 request constraints without mutating durable memory."""
+    if not constraints:
+        return mission
+    resolved = copy.deepcopy(mission)
+    hard = dict(resolved.get("hardConstraints") or {})
+    soft = dict(resolved.get("softPreferences") or {})
+    exclusions = dict(resolved.get("exclusions") or {})
+
+    category = _constraint_value(constraints, "category")
+    if str(category or "").strip():
+        resolved["category"] = str(category).strip()
+    budget_min = _constraint_value(constraints, "budgetMin", "budget_min")
+    budget_max = _constraint_value(constraints, "budgetMax", "budget_max")
+    if budget_min is not None:
+        hard["budgetMin"] = budget_min
+    if budget_max is not None:
+        hard["budgetMax"] = budget_max
+    required_brands = _constraint_terms(
+        constraints, "requiredBrands", "required_brands"
+    )
+    if required_brands:
+        hard["requiredBrands"] = required_brands
+    excluded_brands = _constraint_terms(
+        constraints, "excludedBrands", "excluded_brands"
+    )
+    if excluded_brands:
+        exclusions["brands"] = excluded_brands
+    excluded_terms = _constraint_terms(
+        constraints, "excludedTerms", "excluded_terms"
+    )
+    if excluded_terms:
+        exclusions["terms"] = excluded_terms
+    use_cases = _constraint_terms(constraints, "useCases", "use_cases")
+    if use_cases:
+        resolved["useCases"] = use_cases
+    preferred_features = _constraint_terms(
+        constraints, "preferredFeatures", "preferred_features"
+    )
+    if preferred_features:
+        soft["features"] = preferred_features
+
+    resolved["hardConstraints"] = hard
+    resolved["softPreferences"] = soft
+    resolved["exclusions"] = exclusions
+    resolved["runtimeConstraintSource"] = "recommendation/v1"
+    return resolved
+
 class ProductService:
+
+    async def decide_verified_candidates(
+        self,
+        *,
+        user_id: str,
+        candidates: list[dict],
+        user_text: str,
+        request_id: str,
+        runtime_constraints: Mapping[str, Any] | None = None,
+        source: str = "verified_candidates",
+    ) -> tuple[list[dict], str]:
+        profile = await shopping_profile_service.get_effective_profile(user_id)
+        mission = await self._mission_for_request(
+            user_id=user_id,
+            user_text=user_text,
+            profile=profile,
+            runtime_constraints=runtime_constraints,
+        )
+        decision = await shopping_decision_service.decide(
+            user_id=user_id,
+            mission=mission,
+            candidates=candidates,
+            source=source,
+            request_id=request_id,
+            user_text=user_text,
+        )
+        return decision.products, decision.source
 
     async def search_products(
         self,
@@ -128,6 +236,8 @@ class ProductService:
         user_text: str = "",
         consult_product: dict | None = None,
         exclude_product_id: str | None = None,
+        request_id: str | None = None,
+        runtime_constraints: Mapping[str, Any] | None = None,
     ) -> tuple[str, str | None, str, list[dict], str]:
         search_started = time.perf_counter()
         query = derive_raw_search_query(keyword, consult_product)
@@ -138,6 +248,7 @@ class ProductService:
             user_id=user_id,
             user_text=user_text or keyword or "",
             profile=profile,
+            runtime_constraints=runtime_constraints,
         )
         query_plan_started = time.perf_counter()
         query_plan = build_product_query_plan(query, mission)
@@ -286,7 +397,7 @@ class ProductService:
         if not get_settings().shopping_decision_v2_enabled:
             # This is an operational escape hatch only. New default traffic
             # always travels through the v2 decision contract below.
-            assistant, biz_data = build_product_payload(products)
+            assistant, biz_data = build_product_payload(products, request_id=request_id)
             return assistant, biz_data, "product_search", products, source
 
         recall_source = source
@@ -296,6 +407,7 @@ class ProductService:
             mission=mission,
             candidates=products,
             source=recall_source,
+            request_id=request_id,
             user_text=user_text or keyword or "",
         )
         if source == "hybrid":
@@ -331,6 +443,7 @@ class ProductService:
         user_id: str,
         user_text: str,
         profile: dict,
+        runtime_constraints: Mapping[str, Any] | None = None,
     ) -> dict:
         """Resolve the single active shopping state without reviving ShoppingNeed.
 
@@ -340,14 +453,15 @@ class ProductService:
         """
         mission = await shopping_mission_service.load(user_id)
         if mission_is_active(mission):
-            return mission
+            return merge_runtime_constraints(mission, runtime_constraints)
         derived = apply_explicit_turn(
             None,
             profile=profile,
             user_text=user_text,
             message_id=0,
         )
-        return derived if mission_is_active(derived) else empty_shopping_mission(profile)
+        resolved = derived if mission_is_active(derived) else empty_shopping_mission(profile)
+        return merge_runtime_constraints(resolved, runtime_constraints)
 
     @staticmethod
     def _has_concrete_query(query: str, consult_product: dict | None) -> bool:

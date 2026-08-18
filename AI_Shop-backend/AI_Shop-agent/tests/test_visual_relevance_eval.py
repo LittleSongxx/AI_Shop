@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -12,6 +13,40 @@ from benchmarks.visual_eval import (
     load_cases,
     validate_contract,
 )
+
+
+@pytest.mark.asyncio
+async def test_live_retrieve_marks_real_provider_no_match_explicitly(monkeypatch):
+    from app.visual.contracts import VisualEmbeddingResult, VisualProviderMetadata
+    from benchmarks.run_visual_relevance import _retrieve
+
+    case = next(case for case in load_cases() if case.subset == "no_match")
+    embedding = VisualEmbeddingResult(
+        vector=[0.1] * 8,
+        metadata=VisualProviderMetadata(
+            capability="embedding",
+            model="test-embedding",
+            request_id="embedding-request",
+        ),
+    )
+    monkeypatch.setattr(
+        "app.visual.search_service.visual_provider.embed_image",
+        AsyncMock(return_value=embedding),
+    )
+    monkeypatch.setattr(
+        "app.visual.index.visual_product_index.exact_hash_hits",
+        AsyncMock(return_value=[]),
+    )
+    monkeypatch.setattr(
+        "app.visual.index.visual_product_index.search_knn",
+        AsyncMock(return_value=[]),
+    )
+
+    result = await _retrieve(case)
+
+    assert result["rankedProductIds"] == []
+    assert result["providerComplete"] is True
+    assert result["fallbackUsed"] is False
 
 
 def test_frozen_visual_dataset_matches_catalog_assets_and_lock():

@@ -22,8 +22,11 @@ from app.harness.metrics.runtime_sensors import (
     EPISODE_DROPPED_TOTAL,
     EPISODE_EVENT_TOTAL,
     EPISODE_QUEUE_DEPTH,
+    EPISODE_SAMPLE_RATE,
     EPISODE_TERMINAL_TOTAL,
+    EPISODE_WRITE_FAILURE_TOTAL,
     EPISODE_WRITE_LATENCY,
+    EPISODE_WRITER_UP,
 )
 from app.observability.telemetry import current_span_id, current_trace_id
 from app.services.pilot_batch_service import participant_user_hash
@@ -135,6 +138,9 @@ class EpisodeContext:
     message_id: int | None
     user_id: str
     force_keep: bool = False
+    request_id: str | None = None
+    episode_id: str | None = None
+    traceparent: str | None = None
 
 
 _CURRENT_EPISODE: ContextVar[EpisodeContext | None] = ContextVar(
@@ -153,6 +159,9 @@ def bind_episode(
     message_id: int | None,
     user_id: str,
     force_keep: bool = False,
+    request_id: str | None = None,
+    episode_id: str | None = None,
+    traceparent: str | None = None,
 ) -> Iterator[EpisodeContext | None]:
     if not run_id:
         yield None
@@ -162,6 +171,9 @@ def bind_episode(
         message_id=message_id,
         user_id=str(user_id),
         force_keep=bool(force_keep),
+        request_id=str(request_id).strip() if request_id else None,
+        episode_id=str(episode_id or run_id).strip() if episode_id or run_id else None,
+        traceparent=str(traceparent).strip() if traceparent else None,
     )
     token: Token = _CURRENT_EPISODE.set(context)
     try:
@@ -315,14 +327,49 @@ class EpisodeService:
         self._queue: asyncio.Queue[dict[str, Any] | object] | None = None
         self._writer: asyncio.Task[None] | None = None
 
+    def status(self) -> dict[str, Any]:
+        """Return explicit capture state for health and evidence manifests."""
+        settings = get_settings()
+        enabled = bool(getattr(settings, "episode_enabled", False))
+        configured_rate = float(
+            getattr(settings, "episode_success_sample_rate", 0.0) or 0.0
+        )
+        app_env = str(getattr(settings, "app_env", "") or "").lower()
+        effective_rate = (
+            1.0
+            if app_env in {"development", "local", "test"}
+            else configured_rate
+        )
+        queue = self._queue
+        writer = self._writer
+        writer_up = bool(writer is not None and not writer.done())
+        return {
+            "enabled": enabled,
+            "writerUp": writer_up,
+            "queueDepth": queue.qsize() if queue is not None else 0,
+            "queueCapacity": queue.maxsize if queue is not None else 0,
+            "configuredSampleRate": configured_rate if enabled else 0.0,
+            "effectiveSampleRate": effective_rate if enabled else 0.0,
+            "evidenceEligible": bool(enabled and writer_up),
+        }
+
     async def start(self) -> None:
         settings = get_settings()
-        if not settings.episode_enabled or self._writer is not None:
+        if not settings.episode_enabled:
+            EPISODE_SAMPLE_RATE.set(0)
+            EPISODE_WRITER_UP.set(0)
+            EPISODE_QUEUE_DEPTH.set(0)
+            return
+        if self._writer is not None and not self._writer.done():
             return
         self._queue = asyncio.Queue(maxsize=settings.episode_queue_size)
         self._writer = asyncio.create_task(
             self._writer_loop(), name="agent-episode-writer"
         )
+        self._writer.add_done_callback(self._writer_done)
+        EPISODE_SAMPLE_RATE.set(self._effective_success_sample_rate())
+        EPISODE_WRITER_UP.set(1)
+        EPISODE_QUEUE_DEPTH.set(0)
         try:
             await self.purge_expired()
         except Exception as exc:
@@ -332,6 +379,8 @@ class EpisodeService:
         queue = self._queue
         writer = self._writer
         if queue is None or writer is None:
+            EPISODE_WRITER_UP.set(0)
+            EPISODE_QUEUE_DEPTH.set(0)
             return
         try:
             queue.put_nowait(self._STOP)
@@ -346,7 +395,18 @@ class EpisodeService:
         finally:
             self._queue = None
             self._writer = None
+            EPISODE_WRITER_UP.set(0)
             EPISODE_QUEUE_DEPTH.set(0)
+
+    @staticmethod
+    def _writer_done(task: asyncio.Task[None]) -> None:
+        EPISODE_WRITER_UP.set(0)
+        if task.cancelled():
+            return
+        try:
+            task.exception()
+        except Exception:
+            return
 
     async def purge_expired(self) -> None:
         days = get_settings().episode_retention_days
@@ -435,6 +495,20 @@ class EpisodeService:
             parent_run_id=kwargs.get("parent_run_id"),
             handoff_id=kwargs.get("handoff_id"),
             actor_type=str(kwargs.get("actor_type") or "USER"),
+        )
+
+    def attach_message(self, *, run_id: str | None, message_id: int) -> None:
+        """Attach a message created after an Episode run was already queued."""
+
+        resolved_run_id = self._resolve_run_id(run_id)
+        if not resolved_run_id:
+            return
+        self._enqueue(
+            {
+                "op": "attach_message",
+                "run_id": resolved_run_id,
+                "message_id": int(message_id),
+            }
         )
 
     def record_handoff(
@@ -632,6 +706,11 @@ class EpisodeService:
     def _enqueue(self, event: dict[str, Any]) -> None:
         queue = self._queue
         if queue is None or self._writer is None:
+            if get_settings().episode_enabled:
+                EPISODE_DROPPED_TOTAL.labels(reason="writer_unavailable").inc()
+                EPISODE_EVENT_TOTAL.labels(
+                    event=event["op"], result="writer_unavailable"
+                ).inc()
             return
         try:
             queue.put_nowait(event)
@@ -678,6 +757,7 @@ class EpisodeService:
                 raise
             except Exception as exc:
                 EPISODE_DROPPED_TOTAL.labels(reason="db_error").inc(len(batch))
+                EPISODE_WRITE_FAILURE_TOTAL.labels(reason="db_error").inc()
                 for event in batch:
                     EPISODE_EVENT_TOTAL.labels(
                         event=event["op"], result="db_error"
@@ -857,6 +937,15 @@ class EpisodeService:
                             event["model_name"],
                             event["run_id"],
                         ),
+                    )
+                elif op == "attach_message":
+                    await cur.execute(
+                        """
+                        UPDATE agent_run
+                        SET message_id=COALESCE(message_id,%s)
+                        WHERE run_id=%s
+                        """,
+                        (event["message_id"], event["run_id"]),
                     )
                 elif op == "ttft":
                     await cur.execute(

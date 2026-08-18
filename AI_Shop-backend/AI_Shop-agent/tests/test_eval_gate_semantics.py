@@ -183,3 +183,152 @@ def test_deterministic_stage_maps_to_lifecycle_packaged():
     )
     phase = _stage_phase(suite, "deterministic")
     assert phase == RunPhase.PACKAGED
+
+
+def test_legacy_completion_sets_terminal_state(tmp_path):
+    from benchmarks.eval_runtime.contracts import RunPhase, RunState
+    from benchmarks.eval_runtime.lifecycle import RunLifecycle
+
+    lifecycle = RunLifecycle(
+        tmp_path / "lifecycle.json",
+        suite="deterministic-search-rag",
+        run_id="ci-test-lifecycle-search-rag",
+    )
+    snapshot = lifecycle.complete_legacy(details={"stage": "deterministic"})
+
+    assert snapshot["phase"] == RunPhase.PACKAGED
+    assert snapshot["state"] == RunState.COMPLETE
+    assert snapshot["history"][-1]["compatibility"] == "legacy-deterministic"
+
+
+def test_visual_provider_missing_is_blocked():
+    import asyncio
+    from pathlib import Path
+
+    from benchmarks.eval_runtime import adapters
+    from benchmarks.eval_runtime.registry import SuiteDefinition
+
+    visual = SimpleNamespace(
+        run_live=lambda _limit=None: asyncio.sleep(
+            0,
+            result={
+                "report": {},
+                "providerComplete": False,
+                "fallbackUsed": False,
+            },
+        )
+    )
+    original_import = adapters.importlib.import_module
+    adapters.importlib.import_module = lambda name: (
+        visual if name.endswith("run_visual_relevance") else original_import(name)
+    )
+    try:
+        suite = SuiteDefinition(
+            "visual-v1",
+            {
+                "adapter": "visual-v1",
+                "providerPolicy": "FAIL_CLOSED_NO_FALLBACK",
+            },
+            Path("benchmarks/suites/visual-v1.json"),
+        )
+        result = asyncio.run(
+            adapters.run_stage(suite, stage="execute", run_id="visual-v1-test", options={})
+        )
+        assert result.status == "BLOCKED"
+    finally:
+        adapters.importlib.import_module = original_import
+
+
+def test_text2sql_without_real_predictions_is_blocked():
+    import asyncio
+    from pathlib import Path
+
+    from benchmarks.eval_runtime import adapters
+    from benchmarks.eval_runtime.registry import SuiteDefinition
+
+    suite = SuiteDefinition(
+        "text2sql-v1",
+        {
+            "adapter": "text2sql-v1",
+            "providerPolicy": "FAIL_CLOSED_NO_FALLBACK",
+        },
+        Path("benchmarks/suites/text2sql-v1.json"),
+    )
+    result = asyncio.run(
+        adapters.run_stage(suite, stage="execute", run_id="text2sql-v1-test", options={})
+    )
+    assert result.status == "BLOCKED"
+
+
+def test_text2sql_provider_trace_cannot_be_overridden_by_top_level_flag():
+    from benchmarks import text2sql_eval
+
+    prediction = {
+        "providerComplete": True,
+        "resultCorrect": True,
+        "narrativeConsistent": True,
+        "trace": {
+            "traceId": "trace-1",
+            "modelVersion": "model-1",
+            "inputTokens": 10,
+            "outputTokens": 10,
+            "costCny": 0.01,
+            "sqlHash": "hash-1",
+            "providerComplete": False,
+        },
+    }
+    case = text2sql_eval.load_cases()[0]
+    report = text2sql_eval.evaluate_predictions([case], {case.case_id: prediction})
+    assert report["providerCompleteness"] == 0.0
+    assert report["traceCompleteness"] == 0.0
+
+
+def test_visual_and_text2sql_successful_execute_can_be_packaged(tmp_path, monkeypatch):
+    import argparse
+    import asyncio
+    from pathlib import Path
+
+    from benchmarks import eval as eval_module
+    from benchmarks.eval_runtime.contracts import RunPhase, StageResult
+    from benchmarks.eval_runtime.registry import SuiteDefinition
+
+    suite = SuiteDefinition(
+        "visual-v1",
+        {
+            "adapter": "visual-v1",
+            "resultRoot": str(tmp_path / "results"),
+            "stages": ["execute", "package"],
+        },
+        Path("benchmarks/suites/visual-v1.json"),
+    )
+    run_id = "visual-v1-abcdef0-20260818"
+    lifecycle = eval_module._lifecycle(suite, run_id)
+    lifecycle.transition(RunPhase.PREFLIGHTED, details={"preflight": "PASS"})
+    preflight = eval_module._run_root(suite, run_id) / "preflight.json"
+    preflight.write_text('{"status":"READY"}\n', encoding="utf-8")
+    monkeypatch.setattr(eval_module, "load_suite", lambda _name: suite)
+    monkeypatch.setattr(eval_module, "_ensure_manifest", lambda *_args: {})
+    monkeypatch.setattr(eval_module, "_write_terminal_manifest", lambda *_args: {})
+
+    async def fake_run_stage(_suite, *, stage, run_id, options):
+        return StageResult(stage=stage, result={"ok": True})
+
+    monkeypatch.setattr(eval_module, "run_stage", fake_run_stage)
+    execute_args = argparse.Namespace(
+        command="run",
+        suite="visual-v1",
+        stage="execute",
+        run_id=run_id,
+        release_version=0,
+        fixture_snapshot_id=None,
+    )
+    executed = asyncio.run(eval_module.command_run(execute_args))
+    assert executed["lifecycle"]["phase"] == "FINAL_COLLECTED"
+    assert executed["lifecycle"]["state"] == "IN_PROGRESS"
+
+    package_values = vars(execute_args).copy()
+    package_values["stage"] = "package"
+    package_args = argparse.Namespace(**package_values)
+    packaged = asyncio.run(eval_module.command_run(package_args))
+    assert packaged["lifecycle"]["phase"] == "PACKAGED"
+    assert packaged["lifecycle"]["state"] == "COMPLETE"

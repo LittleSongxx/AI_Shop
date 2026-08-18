@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hashlib
+import hmac
 import json
 import re
 import time
@@ -9,7 +12,7 @@ import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from numbers import Number
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -20,7 +23,11 @@ from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.analytics_catalog import CATALOG, allowed_plan_fields, catalog_prompt
 from app.services.episode_service import bind_episode, episode_service
 from app.services.llm_factory import create_memory_llm
-from app.services.sql_guard import SqlGuardResult, validate_sql
+from app.services.sql_guard import (
+    AnalyticsAccessPolicy,
+    SqlGuardResult,
+    validate_sql,
+)
 
 
 class DataAnalysisBranch(BaseModel):
@@ -92,6 +99,7 @@ _AMBIGUOUS_SALES = re.compile(r"(销量最高|最畅销|最好卖|销售最好|�
 _EXPLICIT_SALES_METRIC = re.compile(r"(销售额|金额|件数|数量|订单数|订单量)")
 _CAUSAL_QUESTION = re.compile(r"(为什么|原因|导致|归因|怎么下降|为何|影响因素)")
 _CAUSAL_CAUTION = "相关性不等于因果关系；以下结果只用于定位待验证假设。"
+_DEFAULT_ANALYTICS_PAGE_SIZE = 50
 
 
 def _question_dates(question: str) -> tuple[date, date]:
@@ -193,6 +201,118 @@ def _normalize_analytics_rows(rows: list[dict]) -> list[dict]:
                 item[key] = value
         normalized.append(item)
     return normalized
+
+
+def _json_size(value: object) -> int:
+    return len(
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    )
+
+
+def _cursor_secret(settings: object) -> bytes:
+    return str(getattr(settings, "internal_token", "aishop-development-cursor-secret")).encode(
+        "utf-8"
+    )
+
+
+def _encode_result_cursor(
+    *,
+    settings: object,
+    admin_id: str,
+    sql_hash: str,
+    offset: int,
+) -> str:
+    payload = {
+        "v": 1,
+        "owner": hashlib.sha256(admin_id.encode("utf-8")).hexdigest(),
+        "sqlHash": sql_hash,
+        "offset": max(0, int(offset)),
+        "expiresAt": int(time.time())
+        + int(getattr(settings, "analytics_cursor_ttl_seconds", 900)),
+    }
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(
+        _cursor_secret(settings), encoded.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _decode_result_cursor(
+    token: str,
+    *,
+    settings: object,
+    admin_id: str,
+    sql_hash: str,
+) -> tuple[int | None, str | None]:
+    encoded, separator, signature = str(token or "").partition(".")
+    if not separator or not encoded or not signature:
+        return None, "CURSOR_INVALID"
+    try:
+        expected = hmac.new(
+            _cursor_secret(settings), encoded.encode("ascii"), hashlib.sha256
+        ).hexdigest()
+    except UnicodeEncodeError:
+        return None, "CURSOR_INVALID"
+    if not hmac.compare_digest(expected, signature):
+        return None, "CURSOR_INVALID"
+    try:
+        padded = encoded + "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+    except (
+        binascii.Error,
+        UnicodeDecodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+    ):
+        return None, "CURSOR_INVALID"
+    if not isinstance(payload, dict):
+        return None, "CURSOR_INVALID"
+    if payload.get("v") != 1:
+        return None, "CURSOR_INVALID"
+    try:
+        expires_at = int(payload.get("expiresAt") or 0)
+    except (TypeError, ValueError, OverflowError):
+        return None, "CURSOR_INVALID"
+    if expires_at < int(time.time()):
+        return None, "CURSOR_EXPIRED"
+    if payload.get("owner") != hashlib.sha256(admin_id.encode("utf-8")).hexdigest():
+        return None, "CURSOR_OWNER_MISMATCH"
+    if payload.get("sqlHash") != sql_hash:
+        return None, "CURSOR_QUERY_MISMATCH"
+    try:
+        offset = int(payload.get("offset"))
+    except (TypeError, ValueError):
+        return None, "CURSOR_INVALID"
+    return (offset if offset >= 0 else None), (None if offset >= 0 else "CURSOR_INVALID")
+
+
+def _page_result_rows(
+    rows: list[dict],
+    *,
+    offset: int,
+    page_size: int,
+    max_bytes: int,
+) -> tuple[list[dict], bool, bool]:
+    """Return rows bounded by both page size and serialized byte budget."""
+    page: list[dict] = []
+    byte_limited = False
+    for row in rows[offset : offset + page_size]:
+        candidate = [*page, row]
+        if _json_size(candidate) > max_bytes:
+            if not page:
+                return [], False, True
+            byte_limited = True
+            break
+        page.append(row)
+    return page, byte_limited, False
 
 
 _METRIC_LABELS = {
@@ -555,6 +675,7 @@ class DataAnalystService:
         branch: DataAnalysisBranch,
         *,
         run_id: str,
+        access_policy: AnalyticsAccessPolicy | None = None,
     ) -> dict[str, Any]:
         settings = get_settings()
         branch_plan = self._branch_plan(plan, branch)
@@ -594,6 +715,7 @@ class DataAnalystService:
                 expected_view=branch.semantic_view,
                 expected_start_date=branch.start_date,
                 expected_end_date=branch.end_date,
+                access_policy=access_policy,
             )
             episode_service.record_step(
                 "DATA_ANALYST_SQL_GUARD",
@@ -758,15 +880,16 @@ class DataAnalystService:
         *,
         run_id: str,
         started: float,
+        access_policy: AnalyticsAccessPolicy | None = None,
     ) -> dict[str, Any]:
         async def execute_safely(branch: DataAnalysisBranch) -> dict[str, Any]:
             """Keep one failed branch from cancelling independent diagnostics."""
             try:
+                branch_kwargs = {"run_id": run_id}
+                if access_policy is not None:
+                    branch_kwargs["access_policy"] = access_policy
                 return await self._execute_metric_branch(
-                    question,
-                    plan,
-                    branch,
-                    run_id=run_id,
+                    question, plan, branch, **branch_kwargs
                 )
             except asyncio.CancelledError:
                 raise
@@ -918,7 +1041,16 @@ class DataAnalystService:
             "latencyMs": latency_ms,
         }
 
-    async def ask(self, question: str, *, admin_id: str) -> dict:
+    async def ask(
+        self,
+        question: str,
+        *,
+        admin_id: str,
+        permissions: Iterable[str] | None = None,
+        tenant_id: str | None = None,
+        cursor: str | None = None,
+        page_size: int | None = None,
+    ) -> dict:
         settings = get_settings()
         if not settings.data_analyst_enabled:
             return {"status": "DISABLED", "warnings": ["DATA_ANALYST_ENABLED=false"]}
@@ -928,11 +1060,31 @@ class DataAnalystService:
 
         run_id = uuid.uuid4().hex
         started = time.perf_counter()
+        access_policy = (
+            AnalyticsAccessPolicy.from_permissions(permissions, tenant_id=tenant_id)
+            if permissions is not None
+            else None
+        )
+        requested_page_size = page_size or _DEFAULT_ANALYTICS_PAGE_SIZE
+        try:
+            requested_page_size = int(requested_page_size)
+        except (TypeError, ValueError):
+            requested_page_size = _DEFAULT_ANALYTICS_PAGE_SIZE
+        requested_page_size = max(
+            1,
+            min(
+                requested_page_size,
+                int(getattr(settings, "analytics_max_rows", 200)),
+            ),
+        )
         try:
             return await asyncio.wait_for(
                 self._ask_within_budget(
                     question,
                     admin_id=admin_id,
+                    access_policy=access_policy,
+                    cursor=cursor,
+                    page_size=requested_page_size,
                     run_id=run_id,
                     started=started,
                 ),
@@ -968,6 +1120,9 @@ class DataAnalystService:
         question: str,
         *,
         admin_id: str,
+        access_policy: AnalyticsAccessPolicy | None = None,
+        cursor: str | None = None,
+        page_size: int = _DEFAULT_ANALYTICS_PAGE_SIZE,
         run_id: str,
         started: float,
     ) -> dict:
@@ -1016,6 +1171,7 @@ class DataAnalystService:
                         plan,
                         run_id=run_id,
                         started=started,
+                        access_policy=access_policy,
                     )
             except Exception as exc:
                 code = (
@@ -1066,6 +1222,7 @@ class DataAnalystService:
                     expected_view=plan.semantic_view,
                     expected_start_date=plan.start_date,
                     expected_end_date=plan.end_date,
+                    access_policy=access_policy,
                 )
                 episode_service.record_step(
                     "DATA_ANALYST_SQL_GUARD",
@@ -1243,24 +1400,87 @@ class DataAnalystService:
                 run_id=run_id,
             )
 
-            columns = list(rows[0]) if rows else [*plan.dimensions, *plan.metrics]
-            narrative = await self._narrative(question, plan, rows)
+            sql_hash = hashlib.sha256(sql.encode()).hexdigest()
+            offset = 0
+            if cursor:
+                offset, cursor_error = _decode_result_cursor(
+                    cursor,
+                    settings=settings,
+                    admin_id=admin_id,
+                    sql_hash=sql_hash,
+                )
+                if cursor_error:
+                    episode_service.record_step(
+                        "DATA_ANALYST_RESULT",
+                        node_name="data_analyst_result",
+                        status="BLOCKED",
+                        error_code=cursor_error,
+                        output_data={"sqlHash": sql_hash},
+                        agent_id="data_analyst",
+                        run_id=run_id,
+                    )
+                    episode_service.finish_run(
+                        "invalid_cursor", run_id=run_id, status="FAILED", force_keep=True
+                    )
+                    return {
+                        "runId": run_id,
+                        "status": cursor_error,
+                        "warnings": [cursor_error],
+                    }
+            page_rows, byte_limited, row_too_large = _page_result_rows(
+                rows,
+                offset=offset or 0,
+                page_size=page_size,
+                max_bytes=int(getattr(settings, "analytics_max_result_bytes", 1_000_000)),
+            )
+            if row_too_large:
+                episode_service.finish_run(
+                    "result_too_large", run_id=run_id, status="FAILED", force_keep=True
+                )
+                return {
+                    "runId": run_id,
+                    "status": "RESULT_TOO_LARGE",
+                    "sql": sql,
+                    "warnings": ["单行结果超过 analytics_max_result_bytes"],
+                }
+            warnings = list(warnings)
+            if byte_limited:
+                warnings.append("RESULT_BYTES_TRUNCATED")
+            if len(rows) >= settings.analytics_max_rows and not byte_limited:
+                warnings.append("ANALYTICS_MAX_ROWS_REACHED")
+            next_offset = (offset or 0) + len(page_rows)
+            has_more = next_offset < len(rows)
+            next_cursor = (
+                _encode_result_cursor(
+                    settings=settings,
+                    admin_id=admin_id,
+                    sql_hash=sql_hash,
+                    offset=next_offset,
+                )
+                if has_more
+                else None
+            )
+
+            columns = list(page_rows[0]) if page_rows else [*plan.dimensions, *plan.metrics]
+            narrative = await self._narrative(question, plan, page_rows)
             causal_caution = _CAUSAL_CAUTION if _CAUSAL_QUESTION.search(question) else None
             answer = narrative.answer
             if causal_caution and causal_caution not in answer:
                 answer = f"{answer}\n{causal_caution}"
-            status = "SUCCEEDED" if rows else "EMPTY_RESULT"
             latency_ms = round((time.perf_counter() - started) * 1000)
             episode_service.record_step(
                 "DATA_ANALYST_RESULT",
                 node_name="data_analyst_result",
                 status="OK",
                 output_data={
-                    "rowCount": len(rows),
-                    "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
+                    "rowCount": len(page_rows),
+                    "totalRowCount": len(rows),
+                    "resultBytes": _json_size(page_rows),
+                    "sqlHash": sql_hash,
                     "lineage": list(guard.tables if guard else ()),
                     "latencyMs": latency_ms,
                     "answerVersion": "v1",
+                    "cursorIssued": bool(next_cursor),
                 },
                 agent_id="data_analyst",
                 run_id=run_id,
@@ -1277,16 +1497,23 @@ class DataAnalystService:
                 "highlights": narrative.highlights,
                 "sql": sql,
                 "columns": columns[:20],
-                "rows": rows,
-                "chart": self._chart(columns, rows),
+                "rows": page_rows,
+                "chart": self._chart(columns, page_rows),
                 "metricDefinitions": _metric_definitions(plan),
                 "interpretation": plan.interpretation,
                 "lineage": list(guard.tables if guard else ()),
-                "warnings": warnings,
-                "status": status,
+                "warnings": list(dict.fromkeys(warnings)),
+                "status": "SUCCEEDED" if page_rows else "EMPTY_RESULT",
                 "explain": explain[:10],
                 "causalCaution": causal_caution,
                 "latencyMs": latency_ms,
+                "nextCursor": next_cursor,
+                "page": {
+                    "offset": offset or 0,
+                    "size": len(page_rows),
+                    "hasMore": bool(next_cursor),
+                    "maxRows": settings.analytics_max_rows,
+                },
             }
 
 

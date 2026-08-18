@@ -1208,6 +1208,11 @@ async def tools_node(state: AgentGraphState) -> dict:
             verified_image_context = image_context or None
             source_message_id = message_id
 
+        if state.get("request_id"):
+            tool_args.setdefault("requestId", state["request_id"])
+        if state.get("run_id"):
+            tool_args.setdefault("runId", state["run_id"])
+
         result = await mcp_tool_router.invoke(
             tc["name"],
             tool_args,

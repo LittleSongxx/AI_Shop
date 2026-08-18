@@ -192,6 +192,45 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 		return getSuccessResponseVO(agentMessageService.callSupport("dataAnalyst/ask", body));
 	}
 
+	@PostMapping("/dataAnalyst/export")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
+	public ResponseVO dataAnalystExport(String question, HttpServletRequest request) {
+		if (StringTools.isEmpty(question) || question.trim().length() > 500) {
+			throw new BusinessException("问题不能为空且不能超过500字");
+		}
+		Map<String, Object> body = new HashMap<>();
+		body.put("question", question.trim());
+		body.put("adminId", currentAdmin(request));
+		return getSuccessResponseVO(agentMessageService.callSupport("dataAnalyst/export", body));
+	}
+
+	@PostMapping("/dataAnalyst/export/status")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
+	public ResponseVO dataAnalystExportStatus(String jobId) {
+		if (StringTools.isEmpty(jobId)) {
+			throw new BusinessException("jobId不能为空");
+		}
+		return getSuccessResponseVO(agentMessageService.callSupport(
+				"dataAnalyst/export/status", Map.of("jobId", jobId.trim())));
+	}
+
+	@PostMapping("/dataAnalyst/export/download")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
+	public ResponseEntity<byte[]> dataAnalystExportDownload(String jobId) {
+		if (StringTools.isEmpty(jobId)) {
+			throw new BusinessException("jobId不能为空");
+		}
+		byte[] content = agentMessageService.callReport(
+				"dataAnalyst/export/download", Map.of("jobId", jobId.trim()));
+		ContentDisposition disposition = ContentDisposition.attachment()
+				.filename(jobId.trim() + ".json")
+				.build();
+		return ResponseEntity.ok()
+				.contentType(MediaType.APPLICATION_JSON)
+				.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+				.body(content);
+	}
+
 	@PostMapping("/inventoryOps/suggestions")
 	@RequireAdminPermission(AdminPermissions.AI_CONFIG)
 	public ResponseVO inventoryOpsSuggestions(

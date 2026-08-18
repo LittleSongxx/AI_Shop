@@ -374,6 +374,10 @@ class AgentWorker:
             "agent.task.consume", context=ctx
         ) as span:
             run_id = str(episode_payload.get("runId") or "") or None
+            request_id = str(episode_payload.get("requestId") or "") or None
+            episode_id = str(
+                episode_payload.get("episodeId") or episode_payload.get("runId") or ""
+            ) or None
             raw_message_id = episode_payload.get("messageId")
             try:
                 message_id = int(raw_message_id) if raw_message_id is not None else None
@@ -384,6 +388,10 @@ class AgentWorker:
                 span.set_attribute("agent.message_id", message_id)
             if run_id:
                 span.set_attribute("agent.run_id", run_id)
+            if request_id:
+                span.set_attribute("agent.request_id", request_id)
+            if episode_id:
+                span.set_attribute("agent.episode_id", episode_id)
             force_keep = bool(episode_payload.get("episodeKeep")) or str(
                 episode_payload.get("intent") or ""
             ) in _EPISODE_FULL_INTENTS
@@ -392,6 +400,9 @@ class AgentWorker:
                 message_id=message_id,
                 user_id=user_id,
                 force_keep=force_keep,
+                request_id=request_id,
+                episode_id=episode_id,
+                traceparent=str(episode_payload.get("traceparent") or "") or None,
             ):
                 if run_id and message_id is not None and user_id:
                     episode_service.start_run(

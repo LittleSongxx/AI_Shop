@@ -90,11 +90,19 @@ async def search_products(
     userId: str,
     keyword: str,
     excludeProductId: str | None = None,
+    requestId: str | None = None,
+    runId: str | None = None,
 ) -> str:
     return _text(
         await _run_as_delegated_user(
             userId,
-            tools.tool_search_products(userId, keyword, excludeProductId),
+            tools.tool_search_products(
+                userId,
+                keyword,
+                excludeProductId,
+                request_id=requestId,
+                run_id=runId,
+            ),
         )
     )
 

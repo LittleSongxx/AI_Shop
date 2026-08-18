@@ -15,6 +15,7 @@ def test_tool_result_round_trip_preserves_contract_and_business_data():
         product_ids=["1001"],
         source_refs=[{"chunkId": "c1", "knowledgeVersion": 2}],
         retrieval_trace={"hit": True, "candidateCount": 3},
+        contract_data={"contractVersion": "recommendation/v1", "status": "COMPLETED"},
     )
 
     restored = parse_tool_wire(source.to_wire())
@@ -26,6 +27,7 @@ def test_tool_result_round_trip_preserves_contract_and_business_data():
     assert restored.product_ids == ["1001"]
     assert restored.source_refs[0]["chunkId"] == "c1"
     assert restored.retrieval_trace["candidateCount"] == 3
+    assert restored.contract_data["status"] == "COMPLETED"
     assert restored.protocol_version == MCP_PROTOCOL
     assert restored.contract_version == MCP_TOOL_CONTRACT
 

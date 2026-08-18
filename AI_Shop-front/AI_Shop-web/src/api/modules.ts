@@ -175,8 +175,27 @@ export const couponApi = {
 const reportAgentProductClick = async (
   productId: string,
   requestId: string,
-  position: number
+  position: number,
+  runId?: string,
+  modelVersion?: string
 ): Promise<RecommendationAttribution> => {
+  if (runId) {
+    const result = await request.post<RecommendationAttribution>('/agent/v1/recommendations/events', {
+      eventId: `evt_${Date.now()}_${position}`.slice(0, 128),
+      idempotencyKey: `click:${requestId}:${position}`.slice(0, 160),
+      eventType: 'CLICK',
+      requestId,
+      runId: runId.slice(0, 64),
+      productId,
+      position,
+      modelVersion: (modelVersion || 'unknown').slice(0, 128),
+      payload: { source: 'web-v1' }
+    });
+    if (!result?.requestId || result.productId !== productId) {
+      throw new Error('Click attribution response mismatch');
+    }
+    return result;
+  }
   const payload = new FormData();
   payload.append('productId', productId);
   payload.append('requestId', requestId);
@@ -210,6 +229,34 @@ const reportAgentProductClick = async (
   } finally {
     window.clearTimeout(timeout);
   }
+};
+
+export interface RecommendationRequestV1 {
+  requestId?: string;
+  runId?: string;
+  mode: 'TEXT' | 'IMAGE' | 'MIXED';
+  query?: string;
+  imageAssetId?: string;
+  selectionId?: string;
+  selectedSubjectId?: string;
+  constraints?: Record<string, unknown>;
+  candidateProductIds?: string[];
+  modelVersion?: string;
+  catalogVersion?: string;
+  idempotencyKey?: string;
+}
+
+export const agentV1Api = {
+  recommend: (payload: RecommendationRequestV1) =>
+    request.post('/agent/v1/recommendations', payload),
+  recordEvent: (payload: Record<string, unknown>) =>
+    request.post('/agent/v1/recommendations/events', payload),
+  createSupportTask: (payload: Record<string, unknown>) =>
+    request.post('/agent/v1/support/tasks', payload),
+  getSupportAction: (token: string) =>
+    request.get(`/agent/v1/support/actions/${encodeURIComponent(token)}`),
+  confirmSupportAction: (payload: Record<string, unknown>) =>
+    request.post('/agent/v1/support/actions/confirm', payload)
 };
 
 export const agentApi = {

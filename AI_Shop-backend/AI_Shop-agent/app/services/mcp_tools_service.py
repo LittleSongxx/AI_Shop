@@ -583,9 +583,14 @@ async def tool_search_products(
     user_id: str,
     keyword: str,
     exclude_product_id: str | None = None,
+    request_id: str | None = None,
+    run_id: str | None = None,
 ) -> "ToolInvokeResult":
 
+    from app.domain.recommendation.contracts import RecommendationRequest
+    from app.services.episode_service import current_episode
     from app.services.product_service import product_service
+    from app.services.recommendation_contract_service import build_response
     from app.services.redis_service import redis_service
     from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -599,6 +604,7 @@ async def tool_search_products(
         user_text=keyword or "",
         consult_product=consult,
         exclude_product_id=exclude_product_id,
+        request_id=request_id,
     )
     from app.services.product_service import format_search_tool_message
     from app.services.shopping_mission_service import shopping_mission_service
@@ -613,11 +619,49 @@ async def tool_search_products(
         profile=await shopping_profile_service.get_effective_profile(user_id),
         mission=mission,
     )
+    request_id = str(
+        request_id
+        or
+        next(
+            (
+                product.get("request_id") or product.get("requestId")
+                for product in products
+                if product.get("request_id") or product.get("requestId")
+            ),
+            "",
+        )
+        or f"req_{(current_episode().run_id if current_episode() else 'unbound')}"
+    )
+    run_id = str(
+        run_id
+        or (current_episode().run_id if current_episode() else request_id.removeprefix("req_"))
+    )
+    contract = build_response(
+        RecommendationRequest(
+            requestId=request_id,
+            runId=run_id,
+            mode="TEXT",
+            query=keyword or "商品推荐",
+        ),
+        run_id=run_id,
+        products=products,
+        status=(
+            "CLARIFICATION_REQUIRED"
+            if source == "clarify"
+            else "COMPLETED"
+            if products
+            else "NO_RESULT"
+        ),
+        fallback_used=source in {"rrf_fallback", "category", "browse", "hot_sale_explicit"},
+        trace={"source": source},
+        message=content if not products else None,
+    ).model_dump(mode="json", by_alias=True)
     if not products:
         return ToolInvokeResult(
             content=content,
             biz_type=biz_type,
             assistant_cards=assistant if assistant and assistant != "[]" else None,
+            contract_data=contract,
         )
 
     names = [str(p.get("product_name") or p.get("productName") or "") for p in products]
@@ -629,6 +673,7 @@ async def tool_search_products(
         assistant_cards=assistant,
         product_ids=ids,
         product_names=[n for n in names if n],
+        contract_data=contract,
     )
 
 async def tool_query_orders(user_id: str, order_id: str | None = None) -> "ToolInvokeResult":

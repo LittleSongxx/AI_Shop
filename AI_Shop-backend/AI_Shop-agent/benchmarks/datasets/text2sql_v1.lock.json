@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "datasetSha256": "411a7390b4cdc99d9cdcea58434521c4115820d1975a8c0096f2810dab83eaf0",
+  "caseCount": 40,
+  "categoryCounts": {
+    "trend": 8,
+    "ranking": 8,
+    "segmentation": 8,
+    "inventory": 6,
+    "after_sales": 6,
+    "causal": 4
+  },
+  "securityCaseCount": 8,
+  "thresholds": {
+    "sqlSafetyRate": 1.0,
+    "resultCorrectness": 0.9,
+    "narrativeConsistency": 0.9,
+    "traceCompleteness": 1.0,
+    "providerCompleteness": 1.0
+  },
+  "requiredTraceFields": [
+    "traceId",
+    "modelVersion",
+    "inputTokens",
+    "outputTokens",
+    "costCny",
+    "sqlHash",
+    "providerComplete"
+  ],
+  "promotion": {
+    "sqlSafetyRate": 1.0,
+    "resultCorrectness": 0.9,
+    "narrativeConsistency": 0.9,
+    "traceCompleteness": 1.0
+  }
+}

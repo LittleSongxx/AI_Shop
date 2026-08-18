@@ -314,6 +314,8 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS agent_recommendation_event
         (
             event_id bigint AUTO_INCREMENT PRIMARY KEY,
+            client_event_id varchar(128) NOT NULL,
+            idempotency_key varchar(160) NOT NULL,
             user_id varchar(32) NOT NULL,
             request_id varchar(128) NOT NULL,
             product_id varchar(64) NOT NULL,
@@ -330,6 +332,10 @@ def upgrade() -> None:
             created_at datetime(3) DEFAULT CURRENT_TIMESTAMP(3) NOT NULL,
             CONSTRAINT uk_agent_rec_event
                 UNIQUE (request_id, product_id, position, event_type),
+            CONSTRAINT uk_agent_rec_idempotency
+                UNIQUE (user_id, idempotency_key),
+            CONSTRAINT uk_agent_rec_client_event
+                UNIQUE (user_id, client_event_id),
             KEY idx_agent_rec_user_time (user_id, occurred_at),
             KEY idx_agent_rec_request_type (request_id, event_type)
         ) COMMENT 'auditable recommendation impression and click facts'
@@ -1249,6 +1255,8 @@ def _reconcile_recommendation_event() -> None:
         )
     }
     definitions = {
+        "client_event_id": "varchar(128) NULL",
+        "idempotency_key": "varchar(160) NULL",
         "retrieval_mode": "varchar(20) NOT NULL DEFAULT 'text'",
         "match_type": "varchar(32) NULL",
         "subject_label": "varchar(128) NULL",
@@ -1261,6 +1269,32 @@ def _reconcile_recommendation_event() -> None:
             op.execute(
                 f"ALTER TABLE agent_recommendation_event ADD COLUMN {name} {ddl}"
             )
+
+    # Legacy rows predate the externally visible event contract.  Generate
+    # stable, non-sensitive identifiers from the existing surrogate key rather
+    # than inferring identity from mutable recommendation fields.
+    op.execute(
+        """
+        UPDATE agent_recommendation_event
+        SET client_event_id=CONCAT('legacy_rec_', event_id)
+        WHERE client_event_id IS NULL OR client_event_id=''
+        """
+    )
+    op.execute(
+        """
+        UPDATE agent_recommendation_event
+        SET idempotency_key=CONCAT('legacy_rec:', event_id)
+        WHERE idempotency_key IS NULL OR idempotency_key=''
+        """
+    )
+    op.execute(
+        "ALTER TABLE agent_recommendation_event "
+        "MODIFY COLUMN client_event_id varchar(128) NOT NULL"
+    )
+    op.execute(
+        "ALTER TABLE agent_recommendation_event "
+        "MODIFY COLUMN idempotency_key varchar(160) NOT NULL"
+    )
 
 
 def _reconcile_support_case() -> None:
@@ -1430,6 +1464,16 @@ def _reconcile_indexes() -> None:
             (
                 "uk_agent_rec_event",
                 ("request_id", "product_id", "position", "event_type"),
+                True,
+            ),
+            (
+                "uk_agent_rec_idempotency",
+                ("user_id", "idempotency_key"),
+                True,
+            ),
+            (
+                "uk_agent_rec_client_event",
+                ("user_id", "client_event_id"),
                 True,
             ),
             ("idx_agent_rec_user_time", ("user_id", "occurred_at"), False),

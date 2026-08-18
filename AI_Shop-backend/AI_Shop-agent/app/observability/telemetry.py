@@ -11,6 +11,7 @@ from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 logger = structlog.get_logger()
 
@@ -37,6 +38,17 @@ def current_span_id() -> str | None:
     if not context.is_valid:
         return None
     return f"{context.span_id:016x}"
+
+
+def current_traceparent() -> str | None:
+    """Return the W3C traceparent for outbound MQ/HTTP contract propagation."""
+    context = trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return None
+    carrier: dict[str, str] = {}
+    TraceContextTextMapPropagator().inject(carrier)
+    value = carrier.get("traceparent")
+    return str(value) if value else None
 
 
 def _telemetry_enabled() -> bool:
@@ -142,6 +154,41 @@ def get_settings_service_name() -> str:
     from app.config.settings import get_settings
 
     return get_settings().otel_service_name
+
+
+def telemetry_status() -> dict[str, Any]:
+    """Expose whether traces are configured and actually collected.
+
+    A trace id can exist in application context even when no exporter is
+    configured. ``evidenceEligible`` therefore follows the initialized SDK
+    provider rather than merely the presence of an OTLP setting.
+    """
+    from app.config.settings import get_settings
+
+    settings = get_settings()
+    endpoint = str(getattr(settings, "otel_otlp_endpoint", "") or "").strip()
+    configured = bool(getattr(settings, "otel_enabled", False) and endpoint)
+    active = _provider is not None
+    if active:
+        state = "ACTIVE"
+        reason = None
+    elif configured:
+        state = "CONFIGURED_NOT_ACTIVE"
+        reason = "TELEMETRY_INITIALIZATION_FAILED_OR_NOT_STARTED"
+    else:
+        state = "DISABLED"
+        reason = "OTEL_NOT_CONFIGURED"
+    return {
+        "state": state,
+        "configured": configured,
+        "active": active,
+        "evidenceEligible": active,
+        "endpointConfigured": bool(endpoint),
+        "serviceName": str(
+            getattr(settings, "otel_service_name", "aishop-agent")
+        ),
+        "reason": reason,
+    }
 
 
 def shutdown_telemetry() -> None:

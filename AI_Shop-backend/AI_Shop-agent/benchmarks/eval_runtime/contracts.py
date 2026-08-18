@@ -29,6 +29,21 @@ class RunState(StrEnum):
     FAILED_RETAINED = "FAILED_RETAINED"
 
 
+class EvidenceLevel(StrEnum):
+    """Evidence levels used in reports and interview material.
+
+    The values deliberately describe what was observed, not how good the
+    result looks.  In particular, deterministic replay can never become a
+    live-provider claim merely because all assertions pass.
+    """
+
+    E0 = "E0"  # contract/documentation only
+    E1 = "E1"  # deterministic synthetic replay
+    E2 = "E2"  # replay of retained live artifacts
+    E3 = "E3"  # fresh local-live provider execution
+    E4 = "E4"  # approved real-user/pilot evidence (not collected this cycle)
+
+
 class FailureClass(StrEnum):
     NONE = "NONE"
     QUALITY_FAIL = "QUALITY_FAIL"
@@ -42,6 +57,46 @@ class FailureClass(StrEnum):
     INCONCLUSIVE = "INCONCLUSIVE"
     CANCELLED = "CANCELLED"
     CONTRACT_ERROR = "CONTRACT_ERROR"
+
+
+@dataclass(frozen=True)
+class EvalRunManifest:
+    """Immutable identity bundle for one evaluation run.
+
+    A manifest is intentionally provider-neutral and contains fingerprints,
+    never credentials or raw user/order payloads.  ``lifecycle`` records the
+    snapshot at the time the manifest is written; the authoritative terminal
+    state remains ``lifecycle.json`` and is copied into the final manifest.
+    """
+
+    suite: str
+    run_id: str
+    git_sha: str
+    dataset_lock: dict[str, Any]
+    provider_bundle: dict[str, Any]
+    fixture_snapshot_id: str | None
+    knowledge_release: str | int | None
+    lifecycle: dict[str, str]
+    evidence_level: EvidenceLevel
+    execution_mode: str
+    created_at: str
+    schema_version: str = "aishop-eval-run/v1"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": self.schema_version,
+            "suite": self.suite,
+            "runId": self.run_id,
+            "gitSha": self.git_sha,
+            "datasetLock": self.dataset_lock,
+            "providerBundle": self.provider_bundle,
+            "fixtureSnapshotId": self.fixture_snapshot_id,
+            "knowledgeRelease": self.knowledge_release,
+            "lifecycle": self.lifecycle,
+            "evidenceLevel": self.evidence_level.value,
+            "executionMode": self.execution_mode,
+            "createdAt": self.created_at,
+        }
 
 
 @dataclass(frozen=True)
@@ -123,11 +178,24 @@ def classify_exception(exc: BaseException) -> FailureClass:
         return FailureClass.CANCELLED
     if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
         return FailureClass.TIMEOUT
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code in {401, 403}:
+        return FailureClass.PROVIDER_ERROR
+    if status_code == 429:
+        return FailureClass.RATE_LIMITED
+    if status_code in {408, 504}:
+        return FailureClass.TIMEOUT
+    if status_code is not None and int(status_code) >= 500:
+        return FailureClass.SERVICE_UNAVAILABLE
     name = type(exc).__name__.lower()
     message = str(exc).lower()
     if "circuit" in name or "breaker" in message or "circuit_open" in message:
         return FailureClass.CIRCUIT_OPEN
-    if any(token in name or token in message for token in ("ratelimit", "rate_limit", "429", "quota")):
+    if any(
+        token in name or token in message
+        for token in ("ratelimit", "rate_limit", "429", "quota", "insufficient_quota")
+    ):
         return FailureClass.RATE_LIMITED
     if any(token in name for token in ("connection", "connect", "http", "network")):
         return FailureClass.SERVICE_UNAVAILABLE
@@ -146,7 +214,20 @@ def classify_exception(exc: BaseException) -> FailureClass:
         )
     ):
         return FailureClass.DEPENDENCY_ERROR
-    if any(token in name or token in message for token in ("provider", "embedding", "rerank", "llm")):
+    if any(
+        token in name or token in message
+        for token in (
+            "provider",
+            "embedding",
+            "rerank",
+            "llm",
+            "invalid_api_key",
+            "invalid api key",
+            "authentication",
+            "unauthorized",
+            "forbidden",
+        )
+    ):
         return FailureClass.PROVIDER_ERROR
     if any(token in name or token in message for token in ("budget", "quotaexceeded")):
         return FailureClass.BUDGET_EXCEEDED

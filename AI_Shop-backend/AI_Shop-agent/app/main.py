@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, WebSocket
 from prometheus_client import make_asgi_app
 
 from app.api.exception_handlers import business_exception_handler
-from app.api.routes import agent, attribution, commerce_outcomes, privacy
+from app.api.routes import agent, attribution, commerce_outcomes, privacy, v1
 from app.api.websocket import (
     admin_websocket_endpoint,
     start_ws_listener,
@@ -138,6 +138,7 @@ configure_telemetry(app)
 app.add_exception_handler(BusinessException, business_exception_handler)
 
 app.include_router(agent.router, prefix="/api")
+app.include_router(v1.router, prefix="/api")
 app.include_router(attribution.router)
 app.include_router(commerce_outcomes.router)
 app.include_router(privacy.router)

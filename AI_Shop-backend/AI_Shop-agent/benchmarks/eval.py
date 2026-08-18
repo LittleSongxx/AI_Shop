@@ -18,6 +18,10 @@ from benchmarks.eval_runtime.adapters import run_stage  # noqa: E402
 from benchmarks.eval_runtime.contracts import FailureClass, RunPhase  # noqa: E402
 from benchmarks.eval_runtime.evidence import EvidenceError, EvidenceStore  # noqa: E402
 from benchmarks.eval_runtime.lifecycle import LifecycleError, RunLifecycle  # noqa: E402
+from benchmarks.eval_runtime.manifest import (  # noqa: E402
+    ensure_run_manifest,
+    write_final_manifest,
+)
 from benchmarks.eval_runtime.preflight import build_suite_preflight  # noqa: E402
 from benchmarks.eval_runtime.registry import SuiteDefinition, list_suites, load_suite  # noqa: E402
 from benchmarks.mature_eval.common import sha256_file  # noqa: E402
@@ -61,11 +65,14 @@ def _lifecycle(suite: SuiteDefinition, run_id: str) -> RunLifecycle:
 
 
 def _suite_lock_sha(suite: SuiteDefinition) -> str | None:
-    raw = suite.contract.get("suiteLock")
-    if not raw:
-        return None
-    path = PROJECT_ROOT / str(raw)
-    return sha256_file(path) if path.is_file() else None
+    for key in ("suiteLock", "datasetLock", "lock"):
+        raw = suite.contract.get(key)
+        if not raw:
+            continue
+        path = PROJECT_ROOT / str(raw)
+        if path.is_file():
+            return sha256_file(path)
+    return None
 
 
 def _validate_contract(suite: SuiteDefinition, options: dict[str, Any]) -> dict[str, Any]:
@@ -99,6 +106,32 @@ def _validate_contract(suite: SuiteDefinition, options: dict[str, Any]) -> dict[
             "contract": contract,
         }
 
+    if suite.adapter == "visual-v1":
+        from benchmarks.visual_eval import load_cases, validate_contract
+
+        cases = load_cases()
+        contract = validate_contract(cases)
+        return {
+            "suite": suite.suite_id,
+            "suiteLockSha256": _suite_lock_sha(suite),
+            "caseCount": len(cases),
+            "contract": contract,
+        }
+
+    if suite.adapter == "text2sql-v1":
+        from benchmarks import text2sql_eval
+
+        dataset = Path(options.get("dataset") or text2sql_eval.DATASET_PATH)
+        lock = Path(options.get("lock") or text2sql_eval.LOCK_PATH)
+        cases = text2sql_eval.load_cases(dataset)
+        contract = text2sql_eval.validate_contract(cases, dataset, lock)
+        return {
+            "suite": suite.suite_id,
+            "suiteLockSha256": _suite_lock_sha(suite),
+            "caseCount": len(cases),
+            "contract": contract,
+        }
+
     raise EvaluationCommandError(f"no validation adapter for suite {suite.suite_id}")
 
 
@@ -107,6 +140,59 @@ def _common_options(args: argparse.Namespace) -> dict[str, Any]:
     for key in ("command", "suite", "stage", "run_id"):
         values.pop(key, None)
     return values
+
+
+def _execution_mode(suite: SuiteDefinition, stage: str) -> str:
+    if suite.contract.get("legacy") or stage == "deterministic":
+        return "deterministic"
+    profile = str(suite.contract.get("profile") or "").strip().lower()
+    if profile == "replay" or stage in {"replay", "replay-final"}:
+        return "replay"
+    return profile or "local-live"
+
+
+def _ensure_manifest(
+    suite: SuiteDefinition,
+    run_id: str,
+    lifecycle: RunLifecycle,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    options = _common_options(args)
+    release = options.get("release_version")
+    return ensure_run_manifest(
+        _store(suite, run_id),
+        suite,
+        run_id,
+        lifecycle.snapshot(),
+        fixture_snapshot_id=options.get("fixture_snapshot_id"),
+        knowledge_release=(release if release not in (None, 0, "0") else None),
+        execution_mode=_execution_mode(
+            suite, str(getattr(args, "stage", "validate"))
+        ),
+    )
+
+
+def _write_terminal_manifest(
+    suite: SuiteDefinition,
+    run_id: str,
+    lifecycle: RunLifecycle,
+    args: argparse.Namespace,
+    stage_status: str,
+) -> dict[str, Any]:
+    options = _common_options(args)
+    release = options.get("release_version")
+    return write_final_manifest(
+        _store(suite, run_id),
+        suite,
+        run_id,
+        lifecycle.snapshot(),
+        stage_status=stage_status,
+        fixture_snapshot_id=options.get("fixture_snapshot_id"),
+        knowledge_release=(release if release not in (None, 0, "0") else None),
+        execution_mode=_execution_mode(
+            suite, str(getattr(args, "stage", "run"))
+        ),
+    )
 
 
 def command_validate(args: argparse.Namespace) -> dict[str, Any]:
@@ -138,6 +224,7 @@ async def command_preflight(args: argparse.Namespace) -> dict[str, Any]:
         require_java=(suite.adapter == "search-v3"),
     )
     store = _store(suite, run_id)
+    manifest = _ensure_manifest(suite, run_id, lifecycle, args)
     store.write_json("validation.json", validation)
     store.write_json("preflight.json", result.to_dict())
     if result.passed:
@@ -156,9 +243,11 @@ async def command_preflight(args: argparse.Namespace) -> dict[str, Any]:
         "runId": run_id,
         "status": result.to_dict()["status"],
         "preflight": result.to_dict(),
+        "runManifest": manifest,
     }
     if not result.passed:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
+        _write_terminal_manifest(suite, run_id, lifecycle, args, "BLOCKED")
         raise EvaluationCommandError("preflight blocked; see JSON output above")
     return payload
 
@@ -189,7 +278,10 @@ def _require_stage_prerequisites(suite: SuiteDefinition, stage: str, lifecycle: 
         if not (_run_root(suite, lifecycle.run_id) / "stage-retrieval-final.json").is_file():
             raise EvaluationCommandError("retrieval-final must complete before generation-final")
     elif stage == "package":
-        if not (_run_root(suite, lifecycle.run_id) / "stage-generation-final.json").is_file():
+        if suite.adapter == "text2sql-v1" or suite.adapter == "visual-v1":
+            if not (_run_root(suite, lifecycle.run_id) / "stage-execute.json").is_file():
+                raise EvaluationCommandError("execute must complete before package")
+        elif not (_run_root(suite, lifecycle.run_id) / "stage-generation-final.json").is_file():
             raise EvaluationCommandError("generation-final must complete before package")
 
 
@@ -206,6 +298,7 @@ async def command_run(args: argparse.Namespace) -> dict[str, Any]:
         if args.stage != "deterministic":
             raise EvaluationCommandError("legacy suite supports deterministic replay only")
     lifecycle = _lifecycle(suite, run_id)
+    run_manifest = _ensure_manifest(suite, run_id, lifecycle, args)
     _require_stage_prerequisites(suite, args.stage, lifecycle)
     if args.stage not in {"validate", "preflight"} and lifecycle.phase in {
         RunPhase.BLOCKED,
@@ -235,16 +328,21 @@ async def command_run(args: argparse.Namespace) -> dict[str, Any]:
             errorType=stage_result.error_type,
             errorMessage=stage_result.error_message,
         )
-        if args.stage in {"final", "retrieval-final", "generation-final"}:
-            lifecycle.transition(RunPhase.FAILED_RETAINED, details={"stage": args.stage})
+        if stage_result.status == "BLOCKED":
+            lifecycle.transition(RunPhase.BLOCKED, details={"stage": args.stage})
         elif stage_result.status == "REVIEW_PENDING":
             lifecycle.transition(RunPhase.REVIEW_PENDING, details={"stage": args.stage})
         else:
-            lifecycle.transition(RunPhase.BLOCKED, details={"stage": args.stage})
+            lifecycle.transition(RunPhase.FAILED_RETAINED, details={"stage": args.stage})
     else:
         target = _stage_phase(suite, args.stage)
         if target is not None:
-            if suite.adapter == "rag-v5":
+            if suite.contract.get("legacy"):
+                lifecycle.complete_legacy(details={"stage": args.stage})
+            elif suite.adapter == "agent-v2" and args.stage == "execute":
+                lifecycle.transition(RunPhase.FINAL_COLLECTED, details={"stage": args.stage})
+                lifecycle.transition(RunPhase.PACKAGED, details={"stage": args.stage})
+            elif suite.adapter == "rag-v5":
                 if args.stage == "retrieval-known":
                     lifecycle.transition(RunPhase.KNOWN_COLLECTED, details={"stage": args.stage})
                     lifecycle.transition(RunPhase.FROZEN, details={"stage": args.stage})
@@ -262,10 +360,11 @@ async def command_run(args: argparse.Namespace) -> dict[str, Any]:
                 lifecycle.transition(RunPhase.KNOWN_COLLECTED, details={"stage": args.stage})
                 lifecycle.transition(RunPhase.FROZEN, details={"stage": args.stage})
             elif target == RunPhase.FINAL_COLLECTED and lifecycle.phase in {
+                RunPhase.PREFLIGHTED,
                 RunPhase.FROZEN,
                 RunPhase.FINAL_COLLECTED,
             }:
-                if lifecycle.phase == RunPhase.FROZEN:
+                if lifecycle.phase in {RunPhase.PREFLIGHTED, RunPhase.FROZEN}:
                     lifecycle.transition(RunPhase.FINAL_COLLECTED, details={"stage": args.stage})
             elif target == RunPhase.PACKAGED and lifecycle.phase == RunPhase.FINAL_COLLECTED:
                 # For RAG, check if still pending human review
@@ -273,6 +372,24 @@ async def command_run(args: argparse.Namespace) -> dict[str, Any]:
                     lifecycle.transition(RunPhase.REVIEW_PENDING, details={"stage": args.stage})
                 else:
                     lifecycle.transition(RunPhase.PACKAGED, details={"stage": args.stage})
+    if (
+        stage_result.status == "COMPLETE"
+        and (
+            suite.contract.get("legacy")
+            or args.stage in {"deterministic", "package"}
+            or (suite.adapter == "agent-v2" and args.stage == "execute")
+        )
+    ):
+        lifecycle.require_complete()
+    terminal_manifest = None
+    if lifecycle.phase in {
+        RunPhase.PACKAGED,
+        RunPhase.BLOCKED,
+        RunPhase.FAILED_RETAINED,
+    }:
+        terminal_manifest = _write_terminal_manifest(
+            suite, run_id, lifecycle, args, stage_result.status
+        )
     return {
         "command": "run",
         "suite": suite.suite_id,
@@ -281,6 +398,8 @@ async def command_run(args: argparse.Namespace) -> dict[str, Any]:
         "status": stage_result.status,
         "result": stage_result.result,
         "lifecycle": lifecycle.snapshot(),
+        "runManifest": run_manifest,
+        "manifest": terminal_manifest,
     }
 
 
@@ -289,8 +408,22 @@ def command_status(args: argparse.Namespace) -> dict[str, Any]:
     run_id = _validate_run_id(suite, args.run_id)
     lifecycle = _lifecycle(suite, run_id)
     root = _run_root(suite, run_id)
-    artifacts = sorted(path.name for path in root.glob("*") if path.is_file())
-    return {"command": "status", "suite": suite.suite_id, "runId": run_id, "lifecycle": lifecycle.snapshot(), "artifacts": artifacts}
+    artifact_roots = {root, _store(suite, run_id).root}
+    artifacts = sorted(
+        {
+            path.name
+            for artifact_root in artifact_roots
+            for path in artifact_root.glob("*")
+            if path.is_file()
+        }
+    )
+    return {
+        "command": "status",
+        "suite": suite.suite_id,
+        "runId": run_id,
+        "lifecycle": lifecycle.snapshot(),
+        "artifacts": artifacts,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -314,6 +447,8 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--dataset", type=Path)
     preflight.add_argument("--lock", type=Path)
     preflight.add_argument("--api-base-url", default="http://127.0.0.1:7050")
+    preflight.add_argument("--release-version", type=int, default=0)
+    preflight.add_argument("--fixture-snapshot-id")
     preflight.set_defaults(handler=command_preflight)
 
     run = subparsers.add_parser("run")
@@ -337,6 +472,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--timeout", type=float, default=180.0)
     run.add_argument("--expected-orchestration-mode", default="adaptive")
     run.add_argument("--subset", action="append")
+    run.add_argument("--predictions", type=Path)
+    run.add_argument("--fallback-outcomes", type=Path)
+    run.add_argument("--limit", type=int)
     run.set_defaults(handler=command_run)
 
     status = subparsers.add_parser("status")

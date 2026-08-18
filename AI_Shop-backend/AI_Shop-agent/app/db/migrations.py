@@ -162,6 +162,8 @@ _REQUIRED_COLUMNS = {
     },
     "agent_recommendation_event": {
         "event_id",
+        "client_event_id",
+        "idempotency_key",
         "user_id",
         "request_id",
         "product_id",
@@ -357,6 +359,8 @@ _REQUIRED_INDEXES = {
     ("agent_pending_action", "uk_agent_pending_active_business"),
     ("agent_pending_action", "idx_agent_pending_run"),
     ("agent_recommendation_event", "uk_agent_rec_event"),
+    ("agent_recommendation_event", "uk_agent_rec_idempotency"),
+    ("agent_recommendation_event", "uk_agent_rec_client_event"),
     ("agent_recommendation_event", "idx_agent_rec_user_time"),
     ("agent_recommendation_event", "idx_agent_rec_request_type"),
     ("support_session", "idx_support_queue"),

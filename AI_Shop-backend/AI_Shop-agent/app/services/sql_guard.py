@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Iterable
 
 import sqlglot
 from sqlglot import exp
@@ -37,6 +38,71 @@ class SqlGuardResult:
     reason: str | None = None
     tables: tuple[str, ...] = field(default_factory=tuple)
     columns: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class AnalyticsAccessPolicy:
+    """Request-scoped access boundary for governed analytics views."""
+
+    permissions: frozenset[str] = frozenset()
+    required_permission: str = "analytics:read"
+    allowed_views: frozenset[str] = ALLOWLIST_VIEWS
+    allowed_columns: dict[str, frozenset[str]] | None = None
+    tenant_id: str | None = None
+
+    @classmethod
+    def from_permissions(
+        cls,
+        permissions: Iterable[str],
+        *,
+        tenant_id: str | None = None,
+    ) -> "AnalyticsAccessPolicy":
+        normalized = frozenset(str(item).strip() for item in permissions if str(item).strip())
+        view_grants = {
+            item.removeprefix("analytics:view:").lower()
+            for item in normalized
+            if item.startswith("analytics:view:")
+        }
+        column_grants: dict[str, frozenset[str]] = {}
+        for item in normalized:
+            prefix = "analytics:column:"
+            if not item.startswith(prefix):
+                continue
+            remainder = item[len(prefix) :]
+            view, separator, column = remainder.partition(":")
+            if not separator or not view or not column:
+                continue
+            column_grants.setdefault(view.lower(), frozenset())
+            column_grants[view.lower()] = frozenset(
+                {*column_grants[view.lower()], column.lower()}
+            )
+        return cls(
+            permissions=normalized,
+            allowed_views=frozenset(view_grants) or ALLOWLIST_VIEWS,
+            allowed_columns=column_grants or None,
+            tenant_id=tenant_id,
+        )
+
+    def allows_view(self, view: str) -> bool:
+        normalized = view.lower()
+        if not self.permission_granted or normalized not in self.allowed_views:
+            return False
+        view_grants = {
+            item.removeprefix("analytics:view:").lower()
+            for item in self.permissions
+            if item.startswith("analytics:view:")
+        }
+        return not view_grants or normalized in view_grants
+
+    def allows_columns(self, view: str, columns: Iterable[str]) -> bool:
+        if self.allowed_columns is None:
+            return True
+        allowed = self.allowed_columns.get(view.lower(), frozenset())
+        return set(columns).issubset(allowed)
+
+    @property
+    def permission_granted(self) -> bool:
+        return self.required_permission in self.permissions
 
 
 def _reject(sql: str, reason: str, *, tables: tuple[str, ...] = ()) -> SqlGuardResult:
@@ -118,6 +184,7 @@ def validate_sql(
     expected_view: str | None = None,
     expected_start_date: date | None = None,
     expected_end_date: date | None = None,
+    access_policy: AnalyticsAccessPolicy | None = None,
 ) -> SqlGuardResult:
     text = str(sql or "").strip()
     if not text:
@@ -131,6 +198,8 @@ def validate_sql(
     if len(statements) != 1:
         return _reject(text, "SQL_MULTI_STATEMENT")
     tree = statements[0]
+    if access_policy is not None and not access_policy.permission_granted:
+        return _reject(text, "SQL_PERMISSION_DENIED")
     if not isinstance(tree, exp.Select):
         return _reject(text, "SQL_NOT_SELECT")
     if _contains_forbidden_star(tree):
@@ -178,8 +247,13 @@ def validate_sql(
             }
         )
     )
-    if len(tables) != 1 or tables[0] not in ALLOWLIST_VIEWS:
+    allowed_views = (
+        access_policy.allowed_views if access_policy is not None else ALLOWLIST_VIEWS
+    )
+    if len(tables) != 1 or tables[0] not in allowed_views:
         return _reject(text, "SQL_VIEW_NOT_ALLOWLISTED", tables=tables)
+    if access_policy is not None and not access_policy.allows_view(tables[0]):
+        return _reject(text, "SQL_VIEW_PERMISSION_DENIED", tables=tables)
     if expected_view and tables[0] != str(expected_view).lower():
         return _reject(text, "SQL_PLAN_VIEW_MISMATCH", tables=tables)
 
@@ -203,6 +277,13 @@ def validate_sql(
     unknown = set(columns) - view_columns
     if unknown:
         return _reject(text, "SQL_COLUMN_NOT_ALLOWLISTED", tables=tables)
+    if access_policy is not None and not access_policy.allows_columns(tables[0], columns):
+        return _reject(text, "SQL_COLUMN_PERMISSION_DENIED", tables=tables)
+    if access_policy is not None and access_policy.tenant_id:
+        # Current governed views intentionally contain no raw tenant column. A
+        # non-empty tenant scope therefore fails closed rather than implying
+        # that a global aggregate is tenant-safe.
+        return _reject(text, "TENANT_SCOPE_REQUIRED", tables=tables)
 
     view_contract = CATALOG[tables[0]]
     if view_contract.get("requires_date_filter"):

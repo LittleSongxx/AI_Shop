@@ -14,8 +14,17 @@ class LifecycleError(ValueError):
 
 
 _ALLOWED: dict[RunPhase, frozenset[RunPhase]] = {
-    RunPhase.VALIDATED: frozenset({RunPhase.PREFLIGHTED, RunPhase.BLOCKED}),
-    RunPhase.PREFLIGHTED: frozenset({RunPhase.KNOWN_COLLECTED, RunPhase.BLOCKED}),
+    RunPhase.VALIDATED: frozenset(
+        {RunPhase.PREFLIGHTED, RunPhase.BLOCKED, RunPhase.FAILED_RETAINED}
+    ),
+    RunPhase.PREFLIGHTED: frozenset(
+        {
+            RunPhase.KNOWN_COLLECTED,
+            RunPhase.FINAL_COLLECTED,
+            RunPhase.BLOCKED,
+            RunPhase.FAILED_RETAINED,
+        }
+    ),
     RunPhase.KNOWN_COLLECTED: frozenset({RunPhase.FROZEN, RunPhase.BLOCKED}),
     RunPhase.FROZEN: frozenset({RunPhase.FINAL_COLLECTED, RunPhase.BLOCKED, RunPhase.FAILED_RETAINED}),
     RunPhase.FINAL_COLLECTED: frozenset({RunPhase.REVIEW_PENDING, RunPhase.REVIEWED, RunPhase.PACKAGED, RunPhase.FAILED_RETAINED}),
@@ -60,6 +69,34 @@ class RunLifecycle:
         self.history.append({"phase": target.value, **(details or {})})
         self._persist()
         return self.snapshot()
+
+    def complete_legacy(self, *, details: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Close a compatibility-only one-stage run without faking preflight phases."""
+
+        if self.phase != RunPhase.VALIDATED:
+            raise LifecycleError(
+                f"legacy completion requires VALIDATED run, found {self.phase.value}"
+            )
+        self.phase = RunPhase.PACKAGED
+        self.state = RunState.COMPLETE
+        self.history.append(
+            {
+                "phase": RunPhase.PACKAGED.value,
+                "compatibility": "legacy-deterministic",
+                **(details or {}),
+            }
+        )
+        self._persist()
+        return self.snapshot()
+
+    def require_complete(self) -> None:
+        """Require the terminal phase/state pair used by CI and formal reports."""
+
+        if self.phase != RunPhase.PACKAGED or self.state != RunState.COMPLETE:
+            raise LifecycleError(
+                "successful terminal stage must finish as PACKAGED/COMPLETE; "
+                f"found {self.phase.value}/{self.state.value}"
+            )
 
     def require(self, *phases: RunPhase) -> None:
         if self.phase not in phases:

@@ -2,6 +2,8 @@
 
 from .contracts import (
     CaseOutcome,
+    EvalRunManifest,
+    EvidenceLevel,
     FailureClass,
     GateResult,
     RunPhase,
@@ -16,6 +18,8 @@ from .registry import SuiteDefinition, list_suites, load_suite
 
 __all__ = [
     "CaseOutcome",
+    "EvalRunManifest",
+    "EvidenceLevel",
     "EvidenceStore",
     "FailureClass",
     "GateResult",

@@ -2,13 +2,26 @@
 
 > 内容状态：当前有效
 >
-> 本轮实施基线：`6eb8e8eb822a20394e6cc05958d72823379614cc` + 工作区边界说明（见 [证据 manifest](docs/evidence-manifest.json)）
+> 本轮实施基线：分支 `refactor/ai-shop-mainline-quality` 从 `e11f1e096dc3d3afef0a56446bb1b9d27d3ef9f6` 创建；未提交改动与证据边界见 [证据 manifest](docs/evidence-manifest.json)
 >
-> 最后核验时间：2026-08-17（Asia/Shanghai）
+> 最后核验时间：2026-08-18（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
-基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，重点是一条“自然语言订单定位 -> RAG 政策 -> MCP/Java 权威事实 -> 用户确认 -> Java 幂等执行 -> 未知结果人工复核”的受控售后 Agent 闭环，而不是让模型直接修改交易状态。
+基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，当前主线收敛为：
+
+1. **Java 电商底座 → 文本/视觉 AI 推荐导购 → Java 权威价格/库存 → 点击/加购/支付归因**；
+2. **AI 客服 → 发布版政策 RAG → Java 订单权威事实 → 用户确认 → 幂等执行 / `INCONCLUSIVE` / `MANUAL_REVIEW`**。
+
+模型只负责受约束的检索、解释和提案；商品、库存、订单、支付和最终写入仍由 Java 领域服务负责。
+
+### 秋招定位
+
+- **主叙述：AI 后端 / Agent 开发**——Agent 边界、RAG/Tool/MCP、可靠执行、真实 badcase、评测和 Trace 闭环。
+- **第二入口：Java 电商后端**——订单/库存/支付事务、Redis、RabbitMQ、一致性、幂等和故障恢复。
+- **视觉搜索**属于推荐主线；**Text2SQL**目前只是带权限、扫描预算、分页、导出审计的治理实验，未达门槛前不包装为第三主线。
+
+完整项目卡、90 秒架构叙述和六个面试故事见 [秋招叙述材料包](docs/AI_SHOP_秋招叙述材料包_20260818.md)。
 
 ---
 
@@ -225,7 +238,7 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 | `EMBEDDING_API_KEY` | 向量检索和知识库索引的 Embedding Key |
 | `RERANK_API_KEY` / `RERANK_BASE_URL` | Qwen3 Rerank Key 与百炼业务空间地址；未配置时回退 RRF |
 | `MEMORY_LLM_API_KEY` | 可选记忆摘要模型 Key，留空复用 `LLM_API_KEY` |
-| `VLM_ENABLED` / `VLM_API_KEY` | 可选视觉模型开关与 Key（Java Search 侧，用于知识文档图片理解）；商城聊天上传链路尚未接通 |
+| `VLM_ENABLED` / `VLM_API_KEY` | 可选视觉模型开关与 Key；视觉找同款走推荐 v1 契约，正式 live 评测禁止 fallback |
 | `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 可选 DirectMail 邮箱验证码凭据 |
 | `ALIPAY_*` | 真实支付和回调验签凭据 |
 | `AMAP_KEY` | 可选高德逆地理编码 Key |
@@ -256,6 +269,8 @@ fresh Recall@3/5 为 0.8056、MRR@10 为 0.75、NDCG@5 为 0.7645，正式门禁
 重评为 49/60，仍低于 0.85 且不能冒充新 holdout。正式 Retrieval/Generation 均保留
 `FAILED_RETAINED`，人工盲评状态为 `HUMAN_REVIEW_PENDING`。
 Agent 另有 37 条、8 个子集的冻结真实全栈任务契约，覆盖订单权威查询、写提案、RAG、跨域、安全、澄清、购物和未知结果；当前 lock 明确为 `resultStatus=NOT_COLLECTED`，80% 只是门禁，不是已取得 TSR。正式运行还要求完整 API/Worker/MCP/Java/DB、私有 fixture bindings、真实 Provider 和可恢复业务快照。
+
+本分支新增的统一 Runner 套件包括 `visual-v1` 和 `text2sql-v1`。视觉套件把图片主体选择、Embedding、候选融合、Rerank、库存核验和无结果准确性纳入同一门禁；没有真实 VLM/Embedding/Rerank 证据时结果必须为 `BLOCKED`。Text2SQL 锁定 40 条趋势、排行、分群、库存、售后、谨慎因果和安全边界任务，当前定位为“治理中的后台分析实验”，同时要求 SQL 安全 100%、结果/叙述一致性达到门槛、Trace 和成本完整后才允许升级。
 
 这些结果不代表真实用户或生产效果；Agent 在线模型 TSR/三模式消融/正式 Trace、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
 线上 SLO 与生产规模仍为“未采集”。详细分组指标、消融、失败 case、Provider 调用和诚实边界见证据总览。历史冻结会话及

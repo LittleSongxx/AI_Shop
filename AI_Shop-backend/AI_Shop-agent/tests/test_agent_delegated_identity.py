@@ -7,6 +7,7 @@
 
 import asyncio
 
+from app.services.episode_service import bind_episode
 from app.services.java_internal_client import (
     clear_delegated_user_id,
     delegated_user_scope,
@@ -46,6 +47,23 @@ def test_delegated_scope_restores_outer_identity():
         assert java_internal_client._headers()["X-Agent-User-Id"] == "outer"
     finally:
         clear_delegated_user_id()
+
+
+def test_headers_carry_episode_and_w3c_identity():
+    with bind_episode(
+        "run-1",
+        message_id=1,
+        user_id="u1",
+        request_id="req-1",
+        episode_id="episode-1",
+        traceparent="00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+    ):
+        headers = java_internal_client._headers()
+
+    assert headers["X-Request-Id"] == "req-1"
+    assert headers["X-Run-Id"] == "run-1"
+    assert headers["X-Episode-Id"] == "episode-1"
+    assert headers["traceparent"].startswith("00-")
 
 
 async def test_delegation_is_isolated_per_task():

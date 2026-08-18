@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-17T15:30:00+08:00",
+  "generatedAt": "2026-08-18T00:00:00+08:00",
   "project": "AI_Shop",
   "targetRoles": [
     "AI application / Agent backend",
@@ -9,10 +9,10 @@
     "RAG / search application engineering"
   ],
   "implementationBaseline": {
-    "gitHead": "6eb8e8eb822a20394e6cc05958d72823379614cc",
-    "workspaceDiffSha256": "672b4d3e73b5b67ed21378a04ccee7962c27f3a3928878f59e6e71af1dc0fd13",
-    "workspaceDiffScope": "历史实施前工作区边界保留值；本轮继续保留用户已有删除文档、求职材料和复盘修改，不把当前未提交实现冒充 commit 内容",
-    "branch": "feat/multi-agent-harness"
+    "gitHead": "e11f1e096dc3d3afef0a56446bb1b9d27d3ef9f6",
+    "workspaceDiffSha256": "dc8cd38ac3362d6a13c85d31a1d187220ce048f8bddbe93699076b06b93a9cb3",
+    "workspaceDiffScope": "本分支从 e11f1e0 创建；哈希覆盖相对 HEAD 的 tracked diff 与未跟踪文件内容摘要（排除本 manifest 避免自引用）；未提交改造只作为工作区内容，不冒充已发布 commit 或正式评测结果",
+    "branch": "refactor/ai-shop-mainline-quality"
   },
   "protocol": {
     "schema": "aishop-eval/v1",
@@ -775,19 +775,6 @@
       ]
     },
     {
-      "path": "优化完成总结.md",
-      "requiredTokens": [
-        "37 个唯一 case",
-        "真实模型 Agent 全栈结果",
-        "不存在伪造的正式 Trace 包"
-      ],
-      "forbiddenTokens": [
-        "12个测试用例",
-        "GraphRunner集成",
-        "所有实现遵循2026年AI Agent生产标准"
-      ]
-    },
-    {
       "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
       "requiredTokens": [
         "Agent v2 真实全栈任务成功率",
@@ -808,9 +795,11 @@
     "POST_FIX_OFFLINE_REPLAY、POST_FIX_OFFLINE_RESCORE 和 POST_FIX_TARGETED_REGRESSION 必须保持 holdoutExposed=true、freshEvidence=false，不得升级为 fresh E3。",
     "RAG v4 人工盲评状态为 HUMAN_REVIEW_PENDING；AI_ASSISTED_INITIAL_REVIEW 不得表述为独立人工标注。",
     "Agent 37 条 live 任务、三模式真实消融和两条正式 Trace 当前均为 NOT_COLLECTED；门禁、单测或旧 deterministic 结果不能替代正式成绩。",
+    "Visual 25 条和 Text2SQL 40 条锁定任务只证明 suite/数据契约与治理边界；没有真实 Provider 证据时不得写成正式质量成绩。",
     "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO；本轮 Search/RAG 各分组仍均小于 100。",
     "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
-    "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。"
+    "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。",
+    "秋招叙述材料包只整理已验证实现与限制，不构成新增 E3/E4 证据。"
   ],
   "claimDocuments": [
     "README.md",
@@ -818,7 +807,8 @@
     "docs/项目问题排查与修复复盘.md",
     "docs/Search与RAG成熟评测报告.md",
     "docs/个人技术贡献边界_项目卡片格式.md",
-    "优化完成总结.md"
+    "docs/AI_SHOP_MAINLINE_BASELINE_20260818.md",
+    "docs/AI_SHOP_秋招叙述材料包_20260818.md"
   ],
   "documentationConsistency": [
     {
@@ -888,14 +878,27 @@
       ]
     },
     {
-      "path": "优化完成总结.md",
+      "path": "docs/AI_SHOP_MAINLINE_BASELINE_20260818.md",
       "requiredTokens": [
-        "resultStatus=NOT_COLLECTED",
-        "旧确定性消融",
-        "正式 fresh `Recall@5=0.8056`"
+        "refactor/ai-shop-mainline-quality",
+        "INCONCLUSIVE",
+        "resultStatus=NOT_COLLECTED"
       ],
       "forbiddenTokens": [
-        "生产就绪度"
+        "REAL_USER 已采集"
+      ]
+    },
+    {
+      "path": "docs/AI_SHOP_秋招叙述材料包_20260818.md",
+      "requiredTokens": [
+        "90 秒 AI 后端 / Agent 开场",
+        "症状 → 错误假设 → 证据 → 根因 → 取舍 → 实测 → 限制",
+        "Search 首次 ProductService",
+        "resultStatus=NOT_COLLECTED",
+        "INCONCLUSIVE"
+      ],
+      "forbiddenTokens": [
+        "REAL_USER 已采集"
       ]
     }
   ],

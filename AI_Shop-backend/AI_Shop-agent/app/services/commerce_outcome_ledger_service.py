@@ -215,6 +215,42 @@ class CommerceOutcomeLedgerService:
         ]
         await self.record_batch(events)
 
+    async def record_impression(
+        self,
+        attribution: dict[str, Any],
+        user_id: str,
+    ) -> None:
+        request_id = str(attribution.get("requestId") or "")
+        product_id = str(attribution.get("productId") or "")
+        position = int(attribution.get("position") or 0)
+        if not request_id or not product_id or position < 1:
+            return
+        context = current_episode()
+        run_id = str(
+            attribution.get("runId") or (context.run_id if context else "")
+        ) or None
+        event = CommerceOutcomeEvent(
+            eventId=_stable_event_id("IMPRESSION", request_id, product_id, position),
+            source="AGENT",
+            idempotencyKey=f"impression:{request_id}:{product_id}:{position}",
+            eventType="IMPRESSION",
+            userId=user_id,
+            requestId=request_id,
+            runId=run_id,
+            productId=product_id,
+            position=position,
+            payload={
+                "position": position,
+                "recommendationSource": attribution.get("source"),
+                "retrievalMode": attribution.get("retrievalMode"),
+                "matchType": attribution.get("matchType"),
+                "subjectLabel": attribution.get("subjectLabel"),
+                "recallSource": attribution.get("recallSource"),
+                "modelVersion": attribution.get("modelVersion"),
+            },
+        )
+        await self.record(event)
+
     async def record_click(self, attribution: dict[str, Any], user_id: str) -> None:
         request_id = str(attribution.get("requestId") or "")
         product_id = str(attribution.get("productId") or "")
@@ -222,6 +258,9 @@ class CommerceOutcomeLedgerService:
         if not request_id or not product_id or position < 1:
             return
         context = current_episode()
+        run_id = str(
+            attribution.get("runId") or (context.run_id if context else "")
+        ) or None
         event = CommerceOutcomeEvent(
             eventId=_stable_event_id("CLICK", request_id, product_id, position),
             source="AGENT",
@@ -229,7 +268,7 @@ class CommerceOutcomeLedgerService:
             eventType="CLICK",
             userId=user_id,
             requestId=request_id,
-            runId=context.run_id if context else None,
+            runId=run_id,
             productId=product_id,
             position=position,
             payload={

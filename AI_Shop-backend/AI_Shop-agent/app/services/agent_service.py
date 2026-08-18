@@ -10,7 +10,7 @@ from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.harness.guardrails.input_guard import InputGuardrail
 from app.harness.metrics.runtime_sensors import RESPONSE_VERIFIER_TOTAL, measure_agent_stage
 from app.memory.session_memory_service import session_memory_service
-from app.observability.telemetry import current_trace_id
+from app.observability.telemetry import current_trace_id, current_traceparent
 from app.rag.retriever import rag_retriever
 from app.services.agent_queue_service import agent_queue_service
 from app.services.badcase_service import badcase_service
@@ -93,6 +93,11 @@ class AgentOrchestrator:
         comparison_product_ids: list[str] | None = None,
         image_asset_id: str | None = None,
         rate_limit_scope: str = "sendMessage",
+        request_id: str | None = None,
+        run_id: str | None = None,
+        episode_id: str | None = None,
+        traceparent: str | None = None,
+        selected_order_reference: dict | None = None,
     ) -> dict:
         settings = get_settings()
         # 一次 inspect 同时完成归一化、注入判定和净化，避免同一段文本归一化两遍。
@@ -196,7 +201,13 @@ class AgentOrchestrator:
 
         active_support = await support_service.get_active(user_id)
         queue_name, priority = agent_queue_service.queue_for_decision(decision)
-        run_id = new_run_id()
+        run_id = str(run_id or new_run_id()).strip()
+        request_id = str(request_id or f"req_{run_id}").strip()
+        episode_id = str(episode_id or run_id).strip()
+        traceparent = str(traceparent or current_traceparent() or "").strip() or None
+        selected_order_reference = self._public_order_reference(
+            selected_order_reference
+        )
         trace_id = current_trace_id()
 
         # 重复意图快速路径（P1）：10 分钟内同一意图连续触发 ≥ intent_repeat_threshold 次时，
@@ -225,6 +236,11 @@ class AgentOrchestrator:
                     run_id=run_id,
                     trace_id=trace_id,
                 )
+                agent_msg["requestId"] = request_id
+                agent_msg["episodeId"] = episode_id
+                agent_msg["traceparent"] = traceparent
+                if selected_order_reference:
+                    agent_msg["selectedOrderReference"] = selected_order_reference
                 _repeat_run_id = agent_msg.get("runId") or run_id
                 await agent_message_service.complete_message(
                     agent_msg["messageId"], _repeat_msg, "intent_repeat", None
@@ -254,6 +270,11 @@ class AgentOrchestrator:
                 else None
             ),
         )
+        agent_msg["requestId"] = request_id
+        agent_msg["episodeId"] = episode_id
+        agent_msg["traceparent"] = traceparent
+        if selected_order_reference:
+            agent_msg["selectedOrderReference"] = selected_order_reference
         episode_keep = episode_service.start_run(
             run_id=run_id,
             message_id=int(agent_msg["messageId"]),
@@ -265,6 +286,7 @@ class AgentOrchestrator:
                 decision.should_handoff
                 or decision.intent in _EPISODE_FULL_INTENTS
                 or verified_image_context is not None
+                or selected_order_reference is not None
             ),
         )
         agent_msg["episodeKeep"] = episode_keep
@@ -1107,6 +1129,32 @@ class AgentOrchestrator:
                 error=type(exc).__name__,
             )
             raise ValueError("图片资产不可用、尚未通过审核或已过期，请重新上传") from exc
+
+    @staticmethod
+    def _public_order_reference(reference: dict | None) -> dict | None:
+        if not isinstance(reference, dict):
+            return None
+        allowlist = (
+            "targetType",
+            "targetId",
+            "orderId",
+            "orderItemId",
+            "productId",
+            "productName",
+            "propertyInfo",
+            "amount",
+            "orderStatus",
+            "orderStatusName",
+            "orderTime",
+        )
+        result = {
+            key: reference.get(key)
+            for key in allowlist
+            if reference.get(key) is not None
+        }
+        if not result.get("targetType") or not result.get("targetId"):
+            return None
+        return result
 
     @staticmethod
     def _route_verified_image(

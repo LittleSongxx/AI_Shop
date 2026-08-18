@@ -7,7 +7,9 @@ import structlog
 from app.config.settings import get_settings
 from app.db.pool import acquire
 from app.infra.http_client import get_client
+from app.observability.telemetry import telemetry_status
 from app.rag.index_contract import vector_index_contract
+from app.services.episode_service import episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.redis_service import redis_service
 from app.visual.index import visual_product_index
@@ -16,6 +18,13 @@ logger = structlog.get_logger()
 
 
 class HealthService:
+
+    @staticmethod
+    def _observability_status() -> dict:
+        return {
+            "otel": telemetry_status(),
+            "episode": episode_service.status(),
+        }
 
     async def _check_mysql(self) -> bool:
         try:
@@ -133,6 +142,7 @@ class HealthService:
             "visualSearch": visual,
             "javaGateway": java_ok,
             "mcp": mcp_ok,
+            "observability": self._observability_status(),
         }
 
     async def check_readiness(self) -> dict:
@@ -169,6 +179,7 @@ class HealthService:
             "ready": readiness["ready"],
             "checks": readiness["checks"],
             "dependencies": dependencies,
+            "observability": self._observability_status(),
         }
 
 

@@ -5,6 +5,7 @@ import asyncio
 import structlog
 
 from app.constants import IMPRESSION_LOG_MAX_PRODUCTS
+from app.domain.recommendation.contracts import RecommendationEvent
 from app.services.commerce_outcome_ledger_service import (
     commerce_outcome_ledger_service,
 )
@@ -15,6 +16,45 @@ logger = structlog.get_logger()
 
 
 class RecommendationAttributionService:
+    async def record_event(
+        self,
+        user_id: str,
+        event: RecommendationEvent,
+    ) -> dict | None:
+        """Persist a client touchpoint without allowing commerce spoofing.
+
+        A click is projected into the outcome ledger because it is an agent
+        touchpoint.  Add-to-cart remains a verified recommendation touchpoint;
+        the Java cart domain is responsible for emitting the authoritative
+        commerce outcome after the cart mutation succeeds.
+        """
+        if event.event_type not in {"IMPRESSION", "CLICK", "ADD_TO_CART"}:
+            return None
+        canonical = await recommendation_event_store.record_event(user_id, event)
+        if canonical is None:
+            return None
+        if event.event_type == "IMPRESSION":
+            try:
+                await commerce_outcome_ledger_service.record_impression(
+                    canonical, user_id
+                )
+            except Exception as exc:
+                logger.warning(
+                    "commerce_impression_event_ledger_failed",
+                    request_id=canonical["requestId"],
+                    error=type(exc).__name__,
+                )
+        elif event.event_type == "CLICK":
+            try:
+                await commerce_outcome_ledger_service.record_click(canonical, user_id)
+            except Exception as exc:
+                logger.warning(
+                    "commerce_click_event_ledger_failed",
+                    request_id=canonical["requestId"],
+                    error=type(exc).__name__,
+                )
+        return canonical
+
     async def record_impression(
         self,
         user_id: str,

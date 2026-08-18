@@ -24,6 +24,7 @@ class ToolInvokeResult:
     source_refs: list[dict] = field(default_factory=list)
     retrieval_trace: dict | None = None
     grounding: dict | None = None
+    contract_data: dict | None = None
     protocol_version: str = MCP_PROTOCOL
     contract_version: str = MCP_TOOL_CONTRACT
 
@@ -31,7 +32,12 @@ class ToolInvokeResult:
         return self.content
 
     def to_biz_dict(self) -> dict | None:
-        if not (self.product_ids or self.product_names or self.order_ids):
+        if not (
+            self.product_ids
+            or self.product_names
+            or self.order_ids
+            or self.contract_data
+        ):
             return None
         payload = {
             "productIds": self.product_ids,
@@ -44,6 +50,8 @@ class ToolInvokeResult:
             payload["retrievalTrace"] = self.retrieval_trace
         if self.grounding:
             payload["grounding"] = self.grounding
+        if self.contract_data:
+            payload["contractData"] = self.contract_data
         return payload
 
     def to_wire(self) -> str:
@@ -63,6 +71,7 @@ class ToolInvokeResult:
             "sourceRefs": self.source_refs,
             "retrievalTrace": self.retrieval_trace,
             "grounding": self.grounding,
+            "contractData": self.contract_data,
         }
         return WIRE_PREFIX + json.dumps(payload, ensure_ascii=False)
 
@@ -95,6 +104,11 @@ def parse_tool_wire(text: str | None) -> ToolInvokeResult:
             else None
         ),
         grounding=(obj.get("grounding") if isinstance(obj.get("grounding"), dict) else None),
+        contract_data=(
+            obj.get("contractData")
+            if isinstance(obj.get("contractData"), dict)
+            else None
+        ),
         protocol_version=str(obj.get("protocolVersion") or ""),
         contract_version=str(obj.get("contractVersion") or ""),
     )

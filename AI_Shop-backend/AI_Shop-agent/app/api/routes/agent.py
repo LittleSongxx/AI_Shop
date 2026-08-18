@@ -22,6 +22,7 @@ from app.models.shopping_profile import (
 from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
+from app.services.analytics_export_service import analytics_export_service
 from app.services.badcase_service import badcase_service
 from app.services.data_analyst_service import data_analyst_service
 from app.services.episode_query_service import episode_query_service
@@ -588,9 +589,141 @@ async def admin_data_analyst_ask(
     admin.require_any("analytics:read")
     body = await _read_admin_body(request)
     result = await data_analyst_service.ask(
-        str(body.get("question") or ""), admin_id=admin.admin_id
+        str(body.get("question") or ""),
+        admin_id=admin.admin_id,
+        permissions=admin.permissions,
+        tenant_id=str(body.get("tenantId") or "").strip() or None,
+        cursor=str(body.get("cursor") or "").strip() or None,
+        page_size=_as_int(body.get("pageSize")),
     )
     return success(result)
+
+
+@router.post("/admin/dataAnalyst/export")
+async def admin_data_analyst_export(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    admin.require_any("analytics:export")
+    body = await _read_admin_body(request)
+    try:
+        result = await analytics_export_service.request(
+            str(body.get("question") or ""),
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(body.get("tenantId") or "").strip() or None,
+        )
+    except PermissionError as exc:
+        return error(403, str(exc))
+    except ValueError as exc:
+        return error(600, str(exc))
+    return success(result)
+
+
+@router.get("/admin/dataAnalyst/export/{job_id}")
+async def admin_data_analyst_export_status(
+    job_id: str,
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    try:
+        result = await analytics_export_service.get(job_id, admin_id=admin.admin_id)
+    except LookupError as exc:
+        return error(404, str(exc))
+    except PermissionError as exc:
+        return error(403, str(exc))
+    return success(result)
+
+
+@router.post("/admin/dataAnalyst/export/status")
+async def admin_data_analyst_export_status_post(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> ResponseVO:
+    body = await _read_admin_body(request)
+    job_id = str(body.get("jobId") or "").strip()
+    if not job_id:
+        return error(600, "jobId 不能为空")
+    try:
+        result = await analytics_export_service.get(job_id, admin_id=admin.admin_id)
+    except LookupError as exc:
+        return error(404, str(exc))
+    except PermissionError as exc:
+        return error(403, str(exc))
+    return success(result)
+
+
+@router.get("/admin/dataAnalyst/export/{job_id}/download")
+async def admin_data_analyst_export_download(
+    job_id: str,
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> Response:
+    try:
+        content = await analytics_export_service.download(job_id, admin_id=admin.admin_id)
+    except LookupError as exc:
+        return Response(
+            content=json.dumps({"code": 404, "info": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=404,
+        )
+    except PermissionError as exc:
+        return Response(
+            content=json.dumps({"code": 403, "info": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=403,
+        )
+    except RuntimeError as exc:
+        return Response(
+            content=json.dumps({"code": 409, "info": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=409,
+        )
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{job_id}.json"'},
+    )
+
+
+@router.post("/admin/dataAnalyst/export/download")
+async def admin_data_analyst_export_download_post(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> Response:
+    body = await _read_admin_body(request)
+    job_id = str(body.get("jobId") or "").strip()
+    if not job_id:
+        return Response(
+            content=json.dumps({"code": 600, "info": "jobId 不能为空"}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=400,
+        )
+    try:
+        content = await analytics_export_service.download(job_id, admin_id=admin.admin_id)
+    except LookupError as exc:
+        return Response(
+            content=json.dumps({"code": 404, "info": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=404,
+        )
+    except PermissionError as exc:
+        return Response(
+            content=json.dumps({"code": 403, "info": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=403,
+        )
+    except RuntimeError as exc:
+        return Response(
+            content=json.dumps({"code": 409, "info": str(exc)}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=409,
+        )
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{job_id}.json"'},
+    )
 
 
 @router.post("/admin/inventoryOps/suggestions")
