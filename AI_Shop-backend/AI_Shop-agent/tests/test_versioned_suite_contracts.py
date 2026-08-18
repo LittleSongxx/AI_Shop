@@ -59,7 +59,9 @@ def test_rag_v5_requires_real_two_reviewer_completion() -> None:
 
 def test_search_v3_contract_binds_runner_locks_and_mandatory_cases() -> None:
     contract = _load("search-v3.json")
-    assert contract["runner"] == "benchmarks/run_search_v3_eval.py"
+    assert contract["runner"] == "benchmarks/eval.py"
+    assert contract["adapter"] == "search-v3"
+    assert contract["stages"] == ["known", "final", "package"]
     assert contract["datasets"] == {
         "knownChineseV2": 240,
         "knownProductServiceV2": 45,
@@ -75,7 +77,7 @@ def test_search_v3_contract_binds_runner_locks_and_mandatory_cases() -> None:
     assert (PROJECT_ROOT / contract["suiteLock"]).is_file()
 
 
-def test_rag_v5_contract_binds_v2_data_and_both_runners() -> None:
+def test_rag_v5_contract_binds_v2_data_and_domain_modules() -> None:
     contract = _load("rag-v5.json")
     assert contract["retrieval"]["known"] == 264
     assert contract["retrieval"]["fresh"] == 48
@@ -87,7 +89,7 @@ def test_rag_v5_contract_binds_v2_data_and_both_runners() -> None:
     ]
     for path in [
         contract["suiteLock"],
-        *contract["runners"].values(),
+        *contract["domainModules"].values(),
         contract["retrieval"]["knownDataset"],
         contract["retrieval"]["freshDataset"],
         contract["generation"]["knownDataset"],

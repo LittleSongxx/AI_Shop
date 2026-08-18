@@ -7,7 +7,17 @@
   "knowledgeCatalog": "AI_Shop-backend/data/demo_knowledge_v2/catalog.v2.json",
   "factMetadata": "AI_Shop-backend/data/demo_knowledge_v2/fact-metadata.v2.json",
   "suiteLock": "benchmarks/datasets/rag_v5_suite.lock.json",
-  "runners": {
+  "runner": "benchmarks/eval.py",
+  "adapter": "rag-v5",
+  "profile": "local-live",
+  "stages": [
+    "retrieval-known",
+    "retrieval-final",
+    "generation-known",
+    "generation-final",
+    "package"
+  ],
+  "domainModules": {
     "retrieval": "benchmarks/run_rag_v5_eval.py",
     "generation": "benchmarks/run_rag_generation_v5.py",
     "humanReview": "benchmarks/human_review/rag_v5_review.py"

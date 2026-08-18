@@ -4,7 +4,10 @@
   "resultRoot": "benchmarks/results/search-v3",
   "runIdPattern": "^search-v3-[0-9a-f]{7,40}-[0-9]{8}(?:-[a-z0-9-]+)?$",
   "evidenceSource": "SYNTHETIC+local-live",
-  "runner": "benchmarks/run_search_v3_eval.py",
+  "runner": "benchmarks/eval.py",
+  "adapter": "search-v3",
+  "profile": "local-live",
+  "stages": ["known", "final", "package"],
   "suiteLock": "benchmarks/datasets/search_v3_suite.lock.json",
   "datasetArtifacts": {
     "knownChineseV2": "benchmarks/datasets/mature_v2/chinese-commerce-search-v2.json",

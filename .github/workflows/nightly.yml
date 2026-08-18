@@ -73,10 +73,9 @@ jobs:
       - name: Run all deterministic evidence suites
         run: |
           run_id="nightly-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          python benchmarks/run_agentic_commerce_runtime.py --run-id "${run_id}-commerce"
-          python benchmarks/run_ai_safety.py --run-id "${run_id}-safety"
-          python benchmarks/run_search_rag_eval.py --run-id "${run_id}-search-rag"
-          python benchmarks/run_ablation.py --run-id "${run_id}-ablation"
+          python benchmarks/eval.py run --suite deterministic-commerce --stage deterministic --run-id "${run_id}-commerce"
+          python benchmarks/eval.py run --suite deterministic-safety --stage deterministic --run-id "${run_id}-safety"
+          python benchmarks/eval.py run --suite deterministic-search-rag --stage deterministic --run-id "${run_id}-search-rag"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

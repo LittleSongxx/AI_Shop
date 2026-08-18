@@ -1,0 +1,494 @@
+{
+  "freshChallenge": [
+    {
+      "caseId": "search-v3-fresh-005",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-007",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-positive-003",
+      "split": "challenge",
+      "queryType": "colloquial_hard_constraints",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-016",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-019",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-020",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-022",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-023",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-026",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-positive-009",
+      "split": "challenge",
+      "queryType": "colloquial_hard_constraints",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-037",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-038",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.5,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-040",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-041",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-056",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-058",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.666667,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-059",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-positive-015",
+      "split": "challenge",
+      "queryType": "colloquial_hard_constraints",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-071",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-074",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-fresh-077",
+      "split": "fresh_holdout",
+      "queryType": "natural_constraint",
+      "recallAt3": 0.75,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-positive-020",
+      "split": "challenge",
+      "queryType": "colloquial_hard_constraints",
+      "recallAt3": 0.5,
+      "noResultCorrect": null,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-002",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-003",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-004",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-005",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-006",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-007",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-008",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-009",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    },
+    {
+      "caseId": "search-v3-challenge-unknown-010",
+      "split": "challenge",
+      "queryType": "out_of_catalog",
+      "recallAt3": null,
+      "noResultCorrect": false,
+      "constraintViolationCount": 0
+    }
+  ],
+  "runtimeHoldout": [
+    {
+      "caseId": "new-real-catalog-category-must-not-be-rejected-by-static-taxonomy",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-002",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-003",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-004",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-005",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-006",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-007",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-008",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-009",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-010",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-011",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-012",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-013",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-014",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-015",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-016",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-017",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-018",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-019",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-020",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-021",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-022",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-023",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-024",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-025",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-026",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-027",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-028",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-029",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    },
+    {
+      "caseId": "search-v3-runtime-030",
+      "status": "ERROR",
+      "route": "none",
+      "recallAt10": 0.0,
+      "expectedNoResults": false,
+      "noResultCorrect": null
+    }
+  ]
+}

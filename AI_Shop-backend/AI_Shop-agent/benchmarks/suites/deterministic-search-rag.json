@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "aishop-evaluation-suite/v1",
+  "suiteId": "deterministic-search-rag",
+  "resultRoot": "benchmarks/results",
+  "runner": "benchmarks/eval.py",
+  "adapter": "legacy-deterministic",
+  "profile": "deterministic",
+  "stages": ["deterministic"],
+  "runIdPattern": "^ci-[a-z0-9-]+$",
+  "hiddenFromFormalList": true,
+  "legacy": true,
+  "command": "benchmarks/run_search_rag_eval.py"
+}

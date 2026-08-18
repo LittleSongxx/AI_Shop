@@ -83,10 +83,9 @@ jobs:
       - name: Deterministic Commerce, Safety, Search/RAG and ablation gates
         run: |
           run_id="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          python benchmarks/run_agentic_commerce_runtime.py --run-id "${run_id}-commerce"
-          python benchmarks/run_ai_safety.py --run-id "${run_id}-safety"
-          python benchmarks/run_search_rag_eval.py --run-id "${run_id}-search-rag"
-          python benchmarks/run_ablation.py --run-id "${run_id}-ablation"
+          python benchmarks/eval.py run --suite deterministic-commerce --stage deterministic --run-id "${run_id}-commerce"
+          python benchmarks/eval.py run --suite deterministic-safety --stage deterministic --run-id "${run_id}-safety"
+          python benchmarks/eval.py run --suite deterministic-search-rag --stage deterministic --run-id "${run_id}-search-rag"
       - name: Upload deterministic evaluation evidence
         if: always()
         uses: actions/upload-artifact@v4

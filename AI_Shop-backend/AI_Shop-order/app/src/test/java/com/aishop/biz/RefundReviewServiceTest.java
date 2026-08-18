@@ -381,4 +381,86 @@ class RefundReviewServiceTest {
         // 缺省与超限都收敛到上限 100。
         verify(refundRequestMapper, org.mockito.Mockito.times(2)).selectManualReview(100);
     }
+
+    @Test
+    void listPendingReviewsClampsZeroToOne() {
+        when(refundRequestMapper.selectManualReview(1)).thenReturn(java.util.List.of());
+        service.listPendingReviews(0);
+        verify(refundRequestMapper).selectManualReview(1);
+    }
+
+    @Test
+    void approveThrowsWhenRequestNotFound() {
+        when(ledgerMapper.selectByReviewId("rv-1")).thenReturn(null);
+        when(refundRequestMapper.selectByIdForUpdate("r-missing")).thenReturn(null);
+
+        BusinessException exc = assertThrows(BusinessException.class,
+                () -> service.approve("r-missing", "rv-1", "admin", null));
+
+        assertEquals("退款请求不存在", exc.getMessage());
+        verify(refundRequestMapper, never()).reviewApprove(anyString(), anyString());
+    }
+
+    @Test
+    void rejectThrowsWhenRequestNotFound() {
+        when(ledgerMapper.selectByReviewId("rv-1")).thenReturn(null);
+        when(refundRequestMapper.selectByIdForUpdate("r-missing")).thenReturn(null);
+
+        BusinessException exc = assertThrows(BusinessException.class,
+                () -> service.reject("r-missing", "rv-1", "admin", null));
+
+        assertEquals("退款请求不存在", exc.getMessage());
+        verify(refundRequestMapper, never()).reviewReject(anyString());
+    }
+
+    @Test
+    void rejectThrowsForNonManualReviewState() {
+        // 退款请求已经完成或处于其他终态，不应再次进入 reject 路径。
+        when(ledgerMapper.selectByReviewId("rv-1")).thenReturn(null);
+        RefundRequest completed = manualReview("r1", "PENDING_PAYMENT");
+        completed.setStatus("COMPLETED");
+        when(refundRequestMapper.selectByIdForUpdate("r1")).thenReturn(completed);
+
+        BusinessException exc = assertThrows(BusinessException.class,
+                () -> service.reject("r1", "rv-1", "admin", null));
+
+        assertEquals("退款请求不在人工复核状态", exc.getMessage());
+        verify(refundRequestMapper, never()).reviewReject(anyString());
+    }
+
+    @Test
+    void rejectCasFailureWithoutConcurrentLedgerThrowsConflict() {
+        // CAS 更新返回 0，但台账中也没有同 review_id 的记录：说明另一个审批已经
+        // 抢先执行（用不同 review_id）——返回冲突让调用方刷新重试。
+        when(ledgerMapper.selectByReviewId("rv-1")).thenReturn(null);
+        when(refundRequestMapper.selectByIdForUpdate("r1"))
+                .thenReturn(manualReview("r1", "PENDING_PAYMENT"));
+        when(refundRequestMapper.reviewReject("r1")).thenReturn(0);
+        when(ledgerMapper.selectByReviewId("rv-1")).thenReturn(null);
+
+        BusinessException exc = assertThrows(BusinessException.class,
+                () -> service.reject("r1", "rv-1", "admin", null));
+
+        assertEquals("审批冲突，请刷新后重试", exc.getMessage());
+        verify(ledgerMapper, never()).insertIgnore(any());
+    }
+
+    @Test
+    void rejectCasFailureWithSameReviewIdReturnsCurrentIdempotent() {
+        // CAS 返回 0，但台账中发现同 review_id + 同 requestId 的 REJECT 记录：
+        // 说明当前请求是并发重试，直接返回当前状态而不抛异常。
+        when(ledgerMapper.selectByReviewId("rv-1"))
+                .thenReturn(null, ledger("rv-1", "r1", "REJECT"));
+        when(refundRequestMapper.selectByIdForUpdate("r1"))
+                .thenReturn(manualReview("r1", "PENDING_PAYMENT"));
+        when(refundRequestMapper.reviewReject("r1")).thenReturn(0);
+        RefundRequest current = new RefundRequest();
+        current.setStatus("REJECTED");
+        when(refundRequestMapper.selectById("r1")).thenReturn(current);
+
+        RefundRequest result = service.reject("r1", "rv-1", "admin", null);
+
+        assertSame(current, result);
+        verify(ledgerMapper, never()).insertIgnore(any());
+    }
 }

@@ -62,7 +62,13 @@ jobs:
           REDIS_PORT: ${{ vars.AI_EVAL_REDIS_PORT }}
       - name: Run unified live Search/RAG evaluation
         if: steps.online.outputs.available == 'true'
-        run: python benchmarks/run_search_rag_eval.py --live --run-id "online-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        run: |
+          python benchmarks/eval.py validate --suite search-v3
+          git_sha="$(git rev-parse --short=7 HEAD)"
+          run_date="$(date -u +%Y%m%d)"
+          python benchmarks/eval.py preflight --suite search-v3 --run-id "search-v3-${git_sha}-${run_date}-ci-${GITHUB_RUN_ATTEMPT}"
+          python benchmarks/eval.py validate --suite rag-v5
+          python benchmarks/eval.py preflight --suite rag-v5 --run-id "rag-v5-${git_sha}-${run_date}-ci-${GITHUB_RUN_ATTEMPT}"
         env:
           APP_ENV: development
           JAVA_WEB_URL: ${{ vars.AI_EVAL_JAVA_WEB_URL }}

@@ -1,8 +1,12 @@
 # AI_Shop 评测入口
 
+> 唯一规范入口：`python benchmarks/eval.py`
+>
+> 历史脚本说明：[`LEGACY.md`](LEGACY.md)
+>
 > 内容状态：当前有效
 >
-> 本轮实施基线：`6eb8e8eb822a20394e6cc05958d72823379614cc`
+> 评测闭环重构基线：统一 `benchmarks/eval.py`；历史证据基线只读保留
 >
 > 最后核验时间：2026-08-17（Asia/Shanghai）
 >
@@ -11,7 +15,34 @@
 当前项目级证据入口为 [`docs/AI应用求职项目证据总览.md`](../../../docs/AI应用求职项目证据总览.md)，机器口径为 [`docs/evidence-manifest.json`](../../../docs/evidence-manifest.json)。本目录包含两代互补评测：
 
 - `aishop_convo_v1` 等历史冻结集保留项目演进和规则回归证据。
-- `aishop-eval/v1` 统一 Runner 输出 case、summary 和 Markdown 报告，覆盖 Commerce runtime、AI 安全、Search/RAG 与进程隔离消融。
+- 历史 `aishop-eval/v1` 结果保留 case、summary 和 Markdown 报告；新的正式评测统一由 `benchmarks/eval.py` 编排。
+
+## 规范闭环
+
+所有正式 suite 共用同一生命周期：
+
+```text
+validate → preflight → known/execute → freeze → final/holdout → review → package → status
+```
+
+示例：
+
+```bash
+python benchmarks/eval.py list
+python benchmarks/eval.py validate --suite search-v3
+python benchmarks/eval.py preflight --suite search-v3 \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py run --suite search-v3 --stage known \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py run --suite search-v3 --stage final \
+  --run-id search-v3-<git-sha>-<yyyymmdd> --finalize-holdout
+python benchmarks/eval.py run --suite search-v3 --stage package \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py status --suite search-v3 \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
+```
+
+`preflight` 不读取 fresh 数据、不创建 fresh claim；只有通过后才允许进入正式执行。最终结果分开报告 `execution`、`quality`、`provider`、`humanReview` 和 `evidence`，环境阻塞不会伪装成召回率为 0。正式 fresh 仍遵循 `ONE_SHOT_FAIL_RETAINED`，历史 evidence 不覆盖。Search/RAG/Agent 的领域评分器继续复用各自 adapter，但不再作为第二套公开生命周期。
 
 ## Agent v2 真实全栈任务成功率
 
@@ -20,7 +51,7 @@
 先做无凭据、无服务调用的哈希和结构校验：
 
 ```bash
-.venv/bin/python benchmarks/run_task_success_v2_eval.py --validate-only
+python benchmarks/eval.py validate --suite agent-v2
 ```
 
 正式运行没有模拟器或进程内 Graph 快捷路径。单轮请求必须经过 Agent API、RabbitMQ、Worker、LangGraph、MCP、Java 和数据库；sequence 还通过现有鉴权接口执行选图主体、点击、加购、下单、内部支付成功、退款、评价和 Agent 确认。判分读取持久 Episode、Mission、Profile、报价快照、推荐事件、Outcome Ledger、pending action、Java 购物车/订单终态。Preflight 会强制检查真实 LLM、生产 embedding、rerank、Java Gateway 和 MCP，缺失状态或 Provider 证据一律 fail-closed。
@@ -38,32 +69,34 @@
 一次 adaptive 运行示例：
 
 ```bash
-.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+python benchmarks/eval.py preflight --suite agent-v2 \
+  --run-id agent-v2-adaptive-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py run --suite agent-v2 --stage execute \
   --bindings benchmarks/task_success_v2_bindings.local.json \
-  --run-id agent-v2-adaptive-6eb8e8e-20260817 \
-  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --run-id agent-v2-adaptive-<git-sha>-<yyyymmdd> \
+  --fixture-snapshot-id fixture-agent-v2-<yyyymmdd> \
   --expected-orchestration-mode adaptive
 ```
 
-三模式 live 消融需要分别把服务端 `ORCHESTRATION_MODE` 设为 `workflow`、`single_agent`、`multi_agent`，每次恢复同一 fixture、重启 API/Worker 后运行：
+三模式 live 消融需要分别把服务端 `ORCHESTRATION_MODE` 设为 `workflow`、`single_agent`、`multi_agent`，每次恢复同一 fixture、重启 API/Worker 后，通过统一入口运行：
 
 ```bash
-.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+python benchmarks/eval.py run --suite agent-v2 --stage execute \
   --bindings benchmarks/task_success_v2_bindings.local.json \
-  --run-id agent-v2-workflow-6eb8e8e-20260817 \
-  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --run-id agent-v2-workflow-<git-sha>-<yyyymmdd> \
+  --fixture-snapshot-id fixture-agent-v2-<yyyymmdd> \
   --expected-orchestration-mode workflow
 
-.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+python benchmarks/eval.py run --suite agent-v2 --stage execute \
   --bindings benchmarks/task_success_v2_bindings.local.json \
-  --run-id agent-v2-single-agent-6eb8e8e-20260817 \
-  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --run-id agent-v2-single-agent-<git-sha>-<yyyymmdd> \
+  --fixture-snapshot-id fixture-agent-v2-<yyyymmdd> \
   --expected-orchestration-mode single_agent
 
-.venv/bin/python benchmarks/run_task_success_v2_eval.py \
+python benchmarks/eval.py run --suite agent-v2 --stage execute \
   --bindings benchmarks/task_success_v2_bindings.local.json \
-  --run-id agent-v2-multi-agent-6eb8e8e-20260817 \
-  --fixture-snapshot-id fixture-agent-v2-20260817 \
+  --run-id agent-v2-multi-agent-<git-sha>-<yyyymmdd> \
+  --fixture-snapshot-id fixture-agent-v2-<yyyymmdd> \
   --expected-orchestration-mode multi_agent
 ```
 
@@ -95,37 +128,38 @@
 Search v3：
 
 ```bash
-.venv/bin/python benchmarks/run_search_v3_eval.py prepare
-.venv/bin/python benchmarks/run_search_v3_eval.py collect-known \
-  --run-id search-v3-6eb8e8e-20260817
-.venv/bin/python benchmarks/run_search_v3_eval.py collect-final \
-  --run-id search-v3-6eb8e8e-20260817 --finalize-holdout
-.venv/bin/python benchmarks/run_search_v3_eval.py package \
-  --run-id search-v3-6eb8e8e-20260817
+python benchmarks/eval.py validate --suite search-v3
+python benchmarks/eval.py preflight --suite search-v3 \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py run --suite search-v3 --stage known \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py run --suite search-v3 --stage final \
+  --run-id search-v3-<git-sha>-<yyyymmdd> --finalize-holdout
+python benchmarks/eval.py run --suite search-v3 --stage package \
+  --run-id search-v3-<git-sha>-<yyyymmdd>
 ```
 
 RAG v5 必须先准备 catalog v2 的隔离索引并完成检索门禁，再运行生成：
 
 ```bash
-.venv/bin/python benchmarks/run_rag_v5_eval.py prepare
-.venv/bin/python benchmarks/run_rag_v5_eval.py prepare-context \
-  --source-index <catalog-v2-published-index>
-.venv/bin/python benchmarks/run_rag_v5_eval.py collect-known \
-  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2>
-.venv/bin/python benchmarks/run_rag_v5_eval.py collect-final \
-  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2> \
+python benchmarks/eval.py validate --suite rag-v5
+python benchmarks/eval.py preflight --suite rag-v5 \
+  --run-id rag-v5-<git-sha>-<yyyymmdd>
+python benchmarks/eval.py run --suite rag-v5 --stage retrieval-known \
+  --run-id rag-v5-<git-sha>-<yyyymmdd> --release-version <release-version-v2>
+python benchmarks/eval.py run --suite rag-v5 --stage retrieval-final \
+  --run-id rag-v5-<git-sha>-<yyyymmdd> --release-version <release-version-v2> \
   --finalize-holdout
-.venv/bin/python benchmarks/run_rag_v5_eval.py package \
-  --run-id rag-v5-6eb8e8e-20260817
-
-.venv/bin/python benchmarks/run_rag_generation_v5.py collect-known \
-  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2>
-.venv/bin/python benchmarks/run_rag_generation_v5.py collect-final \
-  --run-id rag-v5-6eb8e8e-20260817 --release-version <release-version-v2> \
+python benchmarks/eval.py run --suite rag-v5 --stage generation-known \
+  --run-id rag-v5-<git-sha>-<yyyymmdd> --release-version <release-version-v2>
+python benchmarks/eval.py run --suite rag-v5 --stage generation-final \
+  --run-id rag-v5-<git-sha>-<yyyymmdd> --release-version <release-version-v2> \
   --finalize-holdout
-.venv/bin/python benchmarks/run_rag_generation_v5.py package \
-  --run-id rag-v5-6eb8e8e-20260817
+python benchmarks/eval.py run --suite rag-v5 --stage package \
+  --run-id rag-v5-<git-sha>-<yyyymmdd>
 ```
+
+两名真人盲审仍使用 `human_review/rag_v5_review.py` 的 `merge`，但结果挂在同一个 `rag-v5/<run-id>` manifest 下。
 
 生成完成后，`results/rag-v5/<run-id>/generation/human-review/` 中只有 20 条 fresh 的盲评材料。两名真人分别填写 `reviewer-a.csv` 与 `reviewer-b.csv`，再合并：
 
@@ -138,25 +172,9 @@ RAG v5 必须先准备 catalog v2 的隔离索引并完成检索门禁，再运�
 
 fresh 执行锁位于对应 `results/` 根目录。它不是可删除后重试的缓存；失败时保留原 Run，将该集合转为下一版 known，并为下一版另建未见集。
 
-统一 Runner：
+历史 deterministic runner 已移入 [`LEGACY.md`](LEGACY.md)，不再作为正式 suite 入口。CI 兼容执行只能通过隐藏的 `legacy-deterministic` 注册项调用，不创建 fresh 证据。
 
-```bash
-python benchmarks/run_agentic_commerce_runtime.py --run-id local-commerce
-python benchmarks/run_ai_safety.py --run-id local-safety
-python benchmarks/run_search_rag_eval.py --run-id local-search-rag
-python benchmarks/run_ablation.py --run-id local-ablation
-```
-
-成熟 Search/RAG 评测采用显式阶段，holdout 只有在配置冻结后才能执行：
-
-```bash
-python benchmarks/run_search_rag_mature_eval.py prepare
-python benchmarks/run_search_rag_mature_eval.py collect-dev --run-id mature-local
-python benchmarks/run_search_rag_mature_eval.py replay --run-id mature-local
-python benchmarks/run_search_rag_mature_eval.py collect-final --run-id mature-local --finalize-holdout
-python benchmarks/run_search_rag_mature_eval.py package --run-id mature-local
-python benchmarks/run_rag_generation_eval.py --selection-version v2 --run-id mature-generation --top-k 10
-```
+历史 mature Search/RAG v1/v2 replay 命令见 [`LEGACY.md`](LEGACY.md)。它们只用于读取既有证据，不再作为新正式运行入口。
 
 `collect-*` 执行一次冷调用并保存查询向量、BM25/Vector Top-50、Rerank 完整顺序和阶段延迟；`replay` 的所有参数消融 Provider 调用数必须为 0。大数据、向量与完整 case 位于 Git 忽略的 `benchmarks/results/`，`package` 只提交多 K 指标、变体汇总、配对差值、bootstrap CI、badcase、原始 SHA 和诚实边界。本轮正式证据目录为 `benchmarks/evidence/search-rag-mature-v1/mature-21d8159/` 与 `benchmarks/evidence/rag-generation-live-v2/mature-rag-generation-21d8159/`，没有接受或覆盖 baseline。
 

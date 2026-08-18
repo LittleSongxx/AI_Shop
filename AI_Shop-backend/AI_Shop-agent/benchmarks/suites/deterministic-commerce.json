@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "aishop-evaluation-suite/v1",
+  "suiteId": "deterministic-commerce",
+  "resultRoot": "benchmarks/results",
+  "runner": "benchmarks/eval.py",
+  "adapter": "legacy-deterministic",
+  "profile": "deterministic",
+  "stages": ["deterministic"],
+  "runIdPattern": "^ci-[a-z0-9-]+$",
+  "hiddenFromFormalList": true,
+  "legacy": true,
+  "command": "benchmarks/run_agentic_commerce_runtime.py"
+}

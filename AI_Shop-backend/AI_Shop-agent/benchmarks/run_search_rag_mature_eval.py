@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import re
 import sys
@@ -94,6 +95,8 @@ async def _embed_products(
     *,
     dataset: str,
     vector_path: Path,
+    catalog_sha256: str | None = None,
+    embedding_text_version: str = "product-text-v1",
 ) -> tuple[dict[str, list[float]], dict[str, Any]]:
     from app.rag.embedding import embed_texts
     from benchmarks.mature_eval.common import write_gzip_json
@@ -102,7 +105,28 @@ async def _embed_products(
     previous_facts: dict[str, Any] = {}
     if vector_path.is_file():
         payload = read_gzip_json(vector_path)
-        if payload.get("dataset") != dataset or int(payload.get("dimensions") or 0) != 1024:
+        expected_contract = {
+            "catalogSha256": catalog_sha256,
+            "embeddingModel": get_settings().embedding_model,
+            "dimensions": 1024,
+            "embeddingTextVersion": embedding_text_version,
+        }
+        stored_contract = payload.get("vectorContract") or {
+            "dataset": payload.get("dataset"),
+            "dimensions": payload.get("dimensions"),
+        }
+        if (
+            stored_contract.get("catalogSha256") is not None
+            and stored_contract != expected_contract
+        ):
+            raise ValueError("existing product-vector checkpoint contract does not match")
+        if (
+            stored_contract.get("catalogSha256") is None
+            and (
+                payload.get("dataset") != dataset
+                or int(payload.get("dimensions") or 0) != 1024
+            )
+        ):
             raise ValueError("existing product-vector checkpoint does not match this dataset")
         existing = {
             str(key): [float(value) for value in vector]
@@ -137,10 +161,16 @@ async def _embed_products(
         write_gzip_json(
             vector_path,
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "dataset": dataset,
                 "model": get_settings().embedding_model,
                 "dimensions": 1024,
+                "vectorContract": {
+                    "catalogSha256": catalog_sha256,
+                    "embeddingModel": get_settings().embedding_model,
+                    "dimensions": 1024,
+                    "embeddingTextVersion": embedding_text_version,
+                },
                 "embeddingTextMaxChars": 6_000 if dataset == "wands" else None,
                 "providerFacts": facts,
                 "vectors": existing,
@@ -193,6 +223,9 @@ async def _index_dataset(
         es_hosts=settings.es_hosts,
         dimensions=settings.embedding_dimensions,
     )
+    catalog_sha256 = hashlib.sha256(
+        json.dumps(products, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     await manager.ensure()
     ids = [str(row.get("id") or row.get("product_id") or "") for row in products]
     existing_ids = await manager.existing_ids(ids)
@@ -200,6 +233,7 @@ async def _index_dataset(
         products,
         dataset=dataset,
         vector_path=vector_path,
+        catalog_sha256=catalog_sha256,
     )
     documents = [
         index_document(product, dataset=dataset, embedding=vectors[product_id])
