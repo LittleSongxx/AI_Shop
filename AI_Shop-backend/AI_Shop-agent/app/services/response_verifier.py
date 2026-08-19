@@ -114,6 +114,9 @@ class ResponseVerifier:
         called = frozenset(str(tool) for tool in tools_called or [])
         issues: list[VerificationIssue] = []
         source_count = _source_count(source_refs)
+        verified_action_card = (
+            str(biz_type or "") == "action_confirm" and has_pending_action
+        )
 
         if (
             str(rag_evidence_state or "").upper() == "SUPPORTED"
@@ -130,7 +133,14 @@ class ResponseVerifier:
                 )
             )
 
-        if rag_citation_required and source_count > 0 and text != RAG_REFUSAL_TEXT:
+        # ACTION_CONFIRM is a server-built business card whose authority is the
+        # durable pending row and verified tool call, not prose citation syntax.
+        if (
+            rag_citation_required
+            and not verified_action_card
+            and source_count > 0
+            and text != RAG_REFUSAL_TEXT
+        ):
             citations = [int(value) for value in _RAG_CITATION_RE.findall(text)]
             invalid = sorted({value for value in citations if value < 1 or value > source_count})
             uncited = uncited_grounded_sentences(text)

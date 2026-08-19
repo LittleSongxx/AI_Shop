@@ -28,6 +28,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.db.pool import close_pool, init_pool  # noqa: E402
 from app.services.episode_query_service import episode_query_service  # noqa: E402
+from app.services.episode_service import sanitize_episode_payload  # noqa: E402
 from app.services.message_service import agent_message_service  # noqa: E402
 from app.services.pending_action_store import pending_action_store  # noqa: E402
 from app.utils.biz_payload import extract_act_token_id  # noqa: E402
@@ -427,7 +428,9 @@ def evaluate_episode(
 
     for index, contract in enumerate(expected.get("requiredToolArgs") or []):
         tool_name = str(contract.get("tool") or "")
-        subset = contract.get("subset") or {}
+        # Episode traces hash business IDs at the persistence boundary, so the
+        # frozen expectation must cross the same boundary before comparison.
+        subset = sanitize_episode_payload(contract.get("subset") or {})
         candidates = [step for step in tool_steps if step.get("toolName") == tool_name]
         candidate_mismatches: list[list[str]] = []
         for step in candidates:
@@ -1042,6 +1045,11 @@ async def run_live(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
         resolved = [case for case in resolved if case.get("subset") in set(args.subset)]
         if not resolved:
             raise EvaluationContractError("subset selection produced no cases")
+    if args.case_id:
+        selected_ids = set(args.case_id)
+        resolved = [case for case in resolved if str(case.get("id")) in selected_ids]
+        if not resolved:
+            raise EvaluationContractError("case selection produced no cases")
 
     timeout = httpx.Timeout(connect=5, read=max(10.0, args.timeout), write=10, pool=5)
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -1114,6 +1122,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--subset", action="append")
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        help="Run only the selected frozen case ID; repeat to select multiple cases",
+    )
     parser.add_argument(
         "--expected-orchestration-mode",
         choices=("adaptive", "workflow", "single_agent", "multi_agent"),

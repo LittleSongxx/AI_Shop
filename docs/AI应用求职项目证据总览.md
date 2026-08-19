@@ -1,107 +1,88 @@
 # AI_Shop AI 应用求职项目证据总览
 
-> 最后核验：2026-08-17（Asia/Shanghai）
+> 更新：2026-08-20（Asia/Shanghai）
 >
-> 实施基线：Git HEAD `6eb8e8eb822a20394e6cc05958d72823379614cc`；工作区边界与未提交实现说明见 `docs/evidence-manifest.json`
+> 证据实现基线：提交 `c501735644a72ce57b27e48bdd35fbc7a5e870ea` 与由 [evidence-manifest.json](evidence-manifest.json) 固化的实现补丁；结果 SHA、数据锁和文档一致性要求也以该 manifest 为准。
 >
-> 适用岗位：AI 应用 / Agent 后端、Java + AI 业务后端、AI 全栈 / Product Engineer、RAG / 搜索应用工程
->
-> 明确不覆盖：Agent Infra、Kubernetes/服务网格、训练/微调、量化、推理引擎与推理优化算法
+> 适用：AI 应用 / Agent 后端、Java + AI 业务后端，以及要求 RAG、工具调用、可靠执行和评测能力的校招岗位。
 
-这份文档是当前唯一人工证据入口；精确命令、数据锁、结果路径、证据等级和边界以 [evidence-manifest.json](evidence-manifest.json) 为准。普通运行结果位于被 Git 忽略的 `benchmarks/results/`，本轮没有接受任何 baseline。
+这份文档只陈述可复核的项目事实。机器可检验的路径、哈希和结果边界以 manifest 为准；本地 `benchmarks/results/` 被 Git 忽略，不能被表述为已发布基线或生产数据。
 
-## 一、结论
+## 结论
 
-作为秋招 AI 应用岗位项目，AI_Shop 的主线已经完整：它不是单独的聊天 Demo，而是把电商交易底座、订单歧义解析、RAG、MCP 权威查询、Agent/Workflow 边界、受控写操作、未知结果人工复核和 Episode 证据连成闭环。它适合证明三件事：能把模型放进真实业务状态机、能处理 AI 的不确定性与权限风险、能用评测和集成测试而不是截图证明改动。
+AI_Shop 适合作为 AI 应用开发岗位的主项目，但最可信的讲法是“受控业务 Agent + Java 交易底座”，不是“已上线的大规模智能体平台”。系统把自然语言理解、已发布知识库 RAG、MCP/Java 权威查询、写操作提案、用户确认、Java 幂等执行、未知结果核对和 Episode Trace 串成一条业务状态机。
 
-但它仍不是生产经历的替代品。Agent 已冻结 37 条真实全栈任务契约，并实现逐样例 LLM/Embedding/Rerank 证据核验、三模式配对消融和脱敏 Trace 导出；由于完整服务、私有 fixture 与真实 Provider 条件尚未同时满足，lock 仍是 `NOT_COLLECTED`，没有正式 Agent TSR。Search 已扩展到中文 v2 的 600 商品/240 查询、WANDS 42,994 商品全库/202 查询/32,919 条有效人工判断；RAG v4 扩展到 264 条检索和 60 条生成。v4 正式检索与生成均未过质量门禁，暴露后修复不能冒充新的 fresh 结果。当前最重要的未完成项是真实模型 Agent runtime/消融、两条正式 Trace、新未见 RAG 集、两位真实标注者盲评、授权真实用户试用、Java 交易包覆盖率、完整 live E2E 与长期性能/成本数据。
+功能闭环分层成立：取消订单的本地全栈样本已经真实走通；模型驱动的政策问答也有一条真实 Provider/RAG 样本。完整 44 条 Agent v2 契约、三种编排模式的配对消融和真实用户试用仍未采集，当前 lock 的 `resultStatus=NOT_COLLECTED`，因此不能把两个单样本成功率宣传为总体 Agent TSR、P95 或线上业务效果。
 
-## 二、证据等级
+## 证据分层
 
-| 等级 | 含义 | 当前状态 |
+| 等级 | 当前证据 | 可以怎么说 | 不能怎么说 |
+|---|---|---|---|
+| E0 源码与契约 | LangGraph/MCP/Java 边界、44 条冻结 Agent v2 契约、定向单元测试 | 已实现受控写操作、确认和恢复逻辑 | 已有完整 live 成绩 |
+| E1 确定性合成 | Commerce `27/27`、安全 `18/18`、Search/RAG contract `162/162` | 生产决策内核和安全/数据契约已回归 | 在线模型准确率、真实延迟或用户收益 |
+| E2 本地全栈 | 取消订单 `1/1`，`1067 ms` | Agent API 到 Worker、MCP、Java 写接口和确认终态已走通 | LLM 性能，或总体售后成功率 |
+| E3 配置真实 Provider | 政策问答 `1/1`，`deepseek-v4-flash`，RAG Provider Trace 完整 | 真实 LLM/Embedding/Rerank 链路可复核 | `n=1` 的 P95、SLO 或总体质量 |
+| E4 授权真实用户 | 未采集 | 真实用户指标尚无数据 | FCR、CTR/CVR、GMV 提升或生产体验 |
+
+## 当前可复核结果
+
+### 1. 受控取消订单：本地全栈闭环
+
+运行 `agent-v2-adaptive-c501735-20260820-cancel-golden-r6` 的冻结 case 为 `live-cancel-confirmed-012`，结果为 `1/1` 通过，严重安全违规为 `0`。
+
+- 路径：Agent API -> RabbitMQ Worker -> LangGraph -> MCP -> pending action -> 用户确认 -> Java 写接口。
+- 编排：自适应模式选择 `workflow`，原因是参数完整的确定性业务路径。
+- 终态事件：`ACTION_PROPOSED -> ACTION_CONFIRMED_BY_USER -> ACTION_TERMINAL`。
+- 持久状态：`CANCEL_ORDER` 的 pending action 为 `CONFIRMED`，订单状态从 `0` 变为 `4`。
+- 单样本端到端延迟：`1067 ms`；该 Workflow 未调用 LLM，输入/输出 token 均为 `0`。
+- 脱敏 Trace：[`report.md`](evidence/agent-traces/agent-v2-cancel-r6-20260820/report.md)、[`traces.json`](evidence/agent-traces/agent-v2-cancel-r6-20260820/traces.json)、[`SHA256SUMS`](evidence/agent-traces/agent-v2-cancel-r6-20260820/SHA256SUMS)。运行 ID、订单标识和 action token 已做指纹化或删除。
+
+这里的 `0` token 只说明该条确定性 Workflow 没有调用模型；`totalCostCny=0.0` 不能被写成真实模型成本为零，当前成本口径是 `UNPRICED`。
+
+### 2. 政策问答：真实 Provider/RAG 单样本
+
+运行 `agent-v2-adaptive-c501735-20260820-rag-policy-confirmation-r5` 的 case `live-confirmation-policy-020` 为 `1/1` 通过。
+
+- 编排：`single_agent`；模型：`deepseek-v4-flash`；LLM 调用 `1` 次。
+- 用量：`4847` input + `224` output = `5071` tokens。
+- 延迟：`3237 ms`。
+- 检索：Elasticsearch BM25 `1`、Vector `1`、Embedding 成功 `1`、Rerank 成功 `1`、fallback `0`、source refs `2`。
+- 写工具：`0`；严重安全违规：`0`；Provider completeness：`1.0`。
+
+它证明真实 Provider 的单轮政策问答链路存在，不证明完整任务集质量，也不能从一个样本推导 P95 或模型成本。
+
+### 3. 必须保留的失败诊断
+
+四个 `live-refund-policy-018` 结果没有被删除或改写：
+
+| 运行 | 现象 | 结论 |
 |---|---|---|
-| E0 | 源码、迁移、测试、工作流可静态复核 | 受控售后闭环、自适应编排、预算/熔断、live 评测契约、RBAC/HMAC、隐私任务与 CI/SBOM 已具备 |
-| E1 | 生产决策内核 + 确定性替身的合成运行时评测 | Commerce、安全、Search/RAG contract、消融已实跑 |
-| E2 | 本地真实中间件或进程集成 | Java Testcontainers 已实跑 |
-| E3 | 配置真实模型/Embedding/Rerank/实时索引 | Search/RAG 已采集；Agent 在线模型未采集 |
-| E4 | 经授权进入批次的真实用户 | 未采集 |
+| `rag-policy-r1` | OpenAI-compatible 工具消息顺序错误 | 已定位为协议组装问题并修复 |
+| `rag-policy-r2` | Worker 重启窗口超时 | 基础设施干扰，不纳入模型质量结论 |
+| `rag-policy-r3` | Provider 路径成功但 `9965` tokens 超过 `8000` 门禁 | 保留失败，不能靠改报告刷绿 |
+| `rag-policy-r4` | `9992` tokens，且“七天退货政策”不在发布知识库权威语料中 | 真实知识覆盖 Bad Case；应补发布语料/评测，而不是降低证据阈值 |
 
-## 三、当前可声称结果
+确认通过的 `live-confirmation-policy-020` 是另一条可被当前知识库支持的政策问题，不能覆盖上表的退款政策 Bad Case。
 
-| 能力 | 当前实测 | 面试时正确说法 |
-|---|---|---|
-| 受控售后 Agent | 订单歧义解析、RAG 政策、MCP/Java 事实、propose/confirm、Java 幂等、`INCONCLUSIVE -> MANUAL_REVIEW` 均有源码与定向测试 | “模型理解和提案，Java 掌握权威事实与最终写权限”；不说成模型直接退款 |
-| 自适应编排 | `adaptive/workflow/single_agent/multi_agent` 四种配置和安全 fallback 已接入 | 默认选择满足任务的最简单路径；正式 live 三模式消融未采集 |
-| Agent live 任务契约 | 37 条、8 个子集、SHA 锁定；Runner 无模拟/进程内捷径，逐条核验 Provider Trace | `resultStatus=NOT_COLLECTED`；80% 是门禁，不是已取得 TSR |
-| 预算与熔断 | token/人民币成本/步数/deadline 的逐运行预算；CLOSED/OPEN/HALF_OPEN 熔断 | 属于源码与测试证据；不把预算估算冒充真实账单，也不把熔断当业务幂等 |
-| Commerce runtime | 27/27，九个子集；工具和参数正确率 1.0，严重安全违规 0 | “执行生产决策代码的确定性合成套件”，不是在线模型准确率 |
-| AI 安全集 | 18/18 | 覆盖注入、恶意通道、IDOR、委托身份和 PII 脱敏；不声称覆盖所有攻击 |
-| Search/RAG contract | 162/162，公开集与 holdout 分开 | 证明数据锁和查询理解契约；与下方 live 结果分层报告 |
-| 第一轮 Search live（历史保留） | 45 条相关性 case 全部执行；public/holdout Recall@10 均 1.0，MRR 0.8917/0.7889，NDCG@10 0.9078/0.8265 | 解释项目如何从小集发现 Recall@10 饱和；当前求职数字以下方成熟评测为主 |
-| 第一轮 RAG live retrieval（历史保留） | 50 条全部执行；public/holdout Recall@K 0.9167/1.0，MRR 0.9167/0.8846，引用正确性 0.9706/0.95 | 保留 2 条公开 RAG 失败；当前求职数字以下方 v3 为主 |
-| 第一轮 RAG live generation（历史保留） | `deepseek-v4-flash` 10/10 执行，自动 8/10、AI 初审 9/10 | 旧运行不覆盖；当前结论以下方 v3 一次性 final 为主 |
-| 中文成熟 Search v1（历史） | 300 商品、120 查询；冻结链路 public 60 条 Recall@1/3/5=1/1/1；fresh 40 条 Recall@1/3/5=0.50/1/1、NDCG@5 0.9848 | 数据明确为 `SYNTHETIC`；用于解释多 K 和首轮消融，当前以 v2 为主 |
-| Search v2 正式 | 中文 600 商品/240 查询，fresh Recall@3/5=0.8896/0.9969、NDCG@5=0.9753；WANDS 全库 42,994 商品/202 查询/32,919 有效判断，condensed NDCG@10=0.7953、MRR@10=0.9796、bpref=0.3434；真实 ProductService 首次 Recall@10=0.3778 | `FAILED_RETAINED`；中文 challenge no-result=0.80，运行时失配失败不被离线高分掩盖；WANDS 未标注项不当负例 |
-| Search v2 修复后运行时 | 45/45；catalog Recall@3/5/10=0.9778、MRR@10=0.9444、NDCG@10=0.9497；availability-adjusted Recall@3/5/10=1.0；Embedding 86/86、Rerank 30/30 | `POST_FIX_RUNTIME_REGRESSION`，`holdoutExposed=true`、`freshEvidence=false`；证明运行时修复命中已知问题，不替代新 holdout |
-| RAG retrieval v2（历史保留） | 64 条：public 34、known regression 16、fresh 14；Recall@5 均 1.0，fresh no-answer accuracy 0.75 | 用于解释单阈值和窄标签问题，不覆盖旧运行 |
-| RAG generation v2（历史保留） | 24/24 执行；自动与 AI 初审均 16 PASS/8 FAIL | `FAILED_RETAINED`，不覆盖旧运行 |
-| RAG retrieval v3（历史保留） | 12 份文档/75 chunk/6 FAQ；144 条；fresh Recall@1/3/5=0.9583/1/1、MRR@10=0.9792、NDCG@5=0.9846 | 当时门禁 `PASSED`；v4 扩题后暴露泛化和标签问题，不覆盖 v3 |
-| RAG retrieval v4 正式 | 72 public + 144 regression + 48 fresh，共 264/264；fresh Recall@1/3/5=0.6944/0.8056/0.8056、MRR=0.75、NDCG@5=0.7645、no-answer=1.0、injection=0.9167、canonical correctness/coverage=0.7442/0.8056 | `FAILED_RETAINED`；Provider 完整、缓存命中/失败/fallback 为 0不等于质量通过；两条 frozen label 超出知识事实边界 |
-| RAG retrieval v4 暴露后回归 | 0 Provider replay 的 fresh Recall@3/5=0.9444、canonical=1.0/0.9444；7 条 live targeted 中 5/5 修复目标通过、2/2 标签限制安全拒答 | `POST_FIX_OFFLINE_REPLAY` / `POST_FIX_TARGETED_REGRESSION`，`holdoutExposed=true`、`freshEvidence=false`；只能说明已知坏例修复有效 |
-| RAG generation v4 正式 | 60/60、0 runtime error/严重安全违规；39/60，known 29/40，claim completeness=0.8406、claim support=0.8804、canonical coverage=0.9783、token=23,125；AI 初审 46/14 | `FAILED_RETAINED`，人工状态 `HUMAN_REVIEW_PENDING`；AI 初审不冒充人审 |
-| RAG generation v4 暴露后重评 | 0 Provider rescore 为 49/60，known 35/40，claim completeness=0.9674、claim support=0.9565；live targeted `11 → 4 → 1` 定位并修复候选截断 | 总成功率 0.8167 仍低于 0.85；不是 fresh E3，不拼成新 60 条正式成绩 |
-| 消融 | 单 Agent vs 多 Agent 27 个配对 case；多 Agent vs workflow 21 个适用 case；成功率差值均为 0 | 进程隔离和可比性已实现；毫秒级 stub 延迟不用于宣称真实性能提升 |
-| Java 领域 IT | MiddlewareIT 7/7；TransactionPersistenceIT 3/3 | Testcontainers 真实 MySQL/Redis/RabbitMQ/ES，验证幂等、CAS、库存恢复；不是生产压测 |
-| Java 覆盖率 | common 约 12.89%，order 约 13.39% 行覆盖 | 覆盖率仍低，是当前最明确的工程短板，不能包装成高覆盖 |
-| 管理端/用户端 | 管理端 7/7、用户端 33/33；两端 lint/build 通过；Mock Playwright 8/8 | 另有 8 条完整本地服务用例和 2 条视口不适用用例按设计跳过；不声称生产 live E2E |
-| SBOM/供应链 | 四份 CycloneDX SBOM 可生成，Dependency Review/weekly scan 已配置 | SBOM 已生成；完整周期漏洞扫描不声称本地已通过 |
-| 真实模型 | Search/RAG 已采集 E3；Agent 未采集 | 都是 `SYNTHETIC + local-live`，不能表述为真实用户或线上效果 |
-| REAL_USER | 未采集 | 不能虚构任务成功率、FCR、CTR/CVR 或 GMV uplift |
+## 历史 Search/RAG 性能与质量证据
 
-## 四、90 秒项目叙事
+历史 formal `SYNTHETIC + local-live` 结果保留在 `benchmarks/evidence/`，详细数字见 [性能与质量证据_20260820.md](性能与质量证据_20260820.md)。它们有真实 Provider 调用，但不是本轮 Agent v2 的新总体成绩。
 
-> AI_Shop 是一个 Spring Cloud Alibaba + FastAPI/LangGraph 的单商户电商系统。我把它收敛成了一条受控售后闭环：自然语言先定位订单并处理歧义，RAG 查询已发布售后政策，MCP 调 Java 获取订单权威事实，模型只能生成退款提案。用户确认后 Java 重新校验身份、归属、业务状态和幂等键；远端结果明确才成功，未知则进入 `INCONCLUSIVE` 并在核对到边界后转 `MANUAL_REVIEW`。系统按任务选择 Workflow、单 Agent 或受限多 Agent，每次运行记录 Episode、工具参数、Provider 调用、token、成本和终态。我冻结了 37 条真实全栈任务契约，但目前没有把框架可运行写成正式 TSR；RAG v4 正式检索 `Recall@5=0.8056`、生成 `39/60` 也都保留失败。这是本地求职证据，不是生产流量或真实用户效果。
+- Search v2：中文 `600` 商品 / `240` 查询，WANDS `42,994` 商品 / `202` 查询 / `32,919` 有效判断；正式质量门禁为 `FAILED_RETAINED`，其中 ProductService 首次 Recall@10 仅 `0.3778`。
+- RAG retrieval v4：`264` 条，fresh `48` 条；fresh Recall@5 `0.8056`、MRR@10 `0.75`、NDCG@5 `0.7645`，正式门禁为 `FAILED_RETAINED`。
+- RAG generation v4：`60/60` 执行、运行时错误 `0`、严重安全违规 `0`，但 task success rate `0.65`（`39/60`），人工盲评仍为 `HUMAN_REVIEW_PENDING`。
 
-这段开场之后，优先展开一条垂直故事，不要在 90 秒里堆所有技术名词。
+这些失败是项目可信度的一部分：后续的 exposed-holdout replay 或 targeted regression 只能证明已知问题的修复，不能替代新的 fresh 结论。
 
-## 五、按岗位调整重心
+## 面试中可成立的项目叙述
 
-| 岗位 | 首讲内容 | 备选深挖 |
-|---|---|---|
-| AI 应用 / Agent 后端 | Workflow/Agent 分界、受控工具、Trace、评测、安全 | 多 Agent 隔离、Prompt/通道污染、失败恢复、成本边界 |
-| Java + AI 后端 | 订单/支付/退款状态机、幂等、MQ、AI 与领域服务边界 | Testcontainers 并发、管理员 RBAC、内部委托身份 |
-| AI 全栈 | 用户问题、结构化卡片、管理端证据、隐私中心、端到端状态 | 权限可见性、异步任务、错误与空状态、前后端数据契约 |
-| RAG / Search | 混合检索、RRF/rerank、引用/拒答、holdout、注入防护 | public/holdout live 指标、重复证据评分、误拒答 badcase 与模型波动 |
+“我把电商 AI 客服收敛为受控售后闭环：模型负责理解、检索和结构化提案，Java 仍负责订单权威事实、身份/归属/状态校验和幂等写入。用户确认后才执行；如果远端结果未知，状态不会被伪造为成功，而是进入 `INCONCLUSIVE` 并按核对边界转 `MANUAL_REVIEW`。我用 Episode、Provider Trace、pending-action 状态和冻结任务契约来判分。当前已经有一个取消订单的本地全栈闭环和一个真实 Provider/RAG 政策问答样本；完整 44 条任务和真实用户层仍明确标为未采集。”
 
-## 六、最容易被追问的点
+## 仍需补足的优先项
 
-1. **27/27 是否只是写死规则？** 回答生产决策函数与外部依赖替身的边界，打开 Runner 说明每个子集实际调用的服务；承认它是 deterministic synthetic，不冒充模型能力。
-2. **为什么需要多 Agent？** 默认不用。简单权威查询走 Workflow，普通开放/RAG 任务走单 Agent，只有订单事实与政策等跨域复合请求才启用受限多 Agent。旧确定性消融没有成功率增益，真实模型质量/成本优势尚未采集。
-3. **RAG/Search 的 Recall/MRR 怎么得到？** 中文 Search v2 标签来自 600 件结构化商品的确定性约束，120 public、80 fresh、40 challenge 分开；WANDS 在 42,994 商品全库上使用 202 条 query 和 32,919 条有效人工判断，报告 condensed/judged 指标而不把未标注项当负例；RAG v4 是 72 public + 144 regression + 48 一次性 fresh，标签来自 12 份已发布知识、canonical fact catalog 和 required claims。Provider 冷调用后锁定候选，离线 replay 的 Provider 调用数为 0。
-4. **模型为什么不能直接退款/改库存？** 模型只生成结构化提案，用户确认后 Java 重新做身份、归属、状态、金额与幂等校验；库存建议不自动执行。
-5. **Prompt Injection 怎么防？** 输入、RAG、工具输出分通道治理；外部内容按不可信数据处理，工具最小权限、系统信道身份、输出脱敏和合成安全集共同约束，不能回答成“靠 system prompt”。
-6. **管理员内部接口为什么不只用 Token？** 共享 Token 只能证明服务身份，不能证明具体管理员和权限；HMAC 覆盖请求体、角色、权限、时间戳和 nonce，并支持轮换与防重放。
-7. **隐私删除如何处理订单/支付？** AI 消息、摘要、画像、记忆和 Trace 可删除；法律/业务必须保留的数据解除 AI 关联并匿名化，清空聊天与彻底删除 AI 数据是两个动作。
-8. **指标如何定义？** verified success 只来自验证器或用户确认；FCR 为成功且 24 小时无转人工/同问题重开；点击/加购 24 小时，支付与负向结果 7 天；没有 REAL_USER 就显示未采集。
-9. **性能和成本结论是什么？** v4 fresh 检索的 Embedding/Rerank/Expansion P95 为 987.51/522.83/2356.25ms，端到端 P50/P95 为 613.70/2913.93ms；60 条生成端到端 P50/P95 为 1845.26/3449.83ms，TTFT 为 1347.77/2956.63ms，共 23,125 token。Expansion 只有 16 个样本，分位数只描述本地运行；缺可信人民币单价，只能写 `UNPRICED`。
-10. **最大的工程短板？** RAG v4 正式检索和生成均未过门禁，正式生成仅 39/60；暴露后 rescore 为 49/60 仍低于 0.85，且不能当 fresh 结论。还缺新未见集、两位真实 reviewer、Agent 在线模型评测、live E2E 和 REAL_USER；Java 交易包行覆盖约 13%。
-
-## 七、面试最值得准备的六个故事
-
-1. 从自然语言订单引用到歧义澄清和 Java 权威状态。
-2. 从“模型记得调用工具”到 forced tool + propose/confirm + Java 幂等。
-3. 从未知写结果自动重试风险到 `INCONCLUSIVE`、对账和人工复核。
-4. 从默认多 Agent 到 Workflow/单 Agent/多 Agent 自适应路由。
-5. 从普通 RAG 到逐条 Provider Trace、证据门禁、引用和注入检疫。
-6. 从“测试很多”到 37 条 live 契约、真实配对消融和脱敏 Episode 证据。
-
-每个故事都按“症状 → 错误假设 → 证据 → 根因 → 方案取舍 → 实测 → 边界”准备。当前入口为 [项目问题排查与修复复盘.md](项目问题排查与修复复盘.md) 和 [Search与RAG成熟评测报告.md](Search与RAG成熟评测报告.md)；用户已删除的旧决策/面经文档不恢复、不引用。
-
-## 八、复跑与一致性检查
-
-```bash
-python scripts/check_evidence_manifest.py
-python scripts/check_evidence_manifest.py --check-local-results
-```
-
-本轮 2026-08-17 回归为 Agent Python `1114 passed / 7 skipped / 0 failed`；7 条均为显式要求真实 MySQL 8 的迁移用例，另有 1 条 LangGraph 依赖弃用预警。Ruff 全目录检查、29 项 manifest 普通/本地结果检查、六份 claim 文档链接/一致性检查和 `git diff --check` 通过。Java Order 模块本轮 `75/75`，Testcontainers `TransactionPersistenceIT 3/3`，Reactor `BUILD SUCCESS`；售后核心定向单测另以 37/37 单独核验。完整 Agent 服务未启动且缺少私有 fixture bindings、`INTERNAL_TOKEN`，因此没有执行正式 live 任务或接受 baseline。
+1. 在同一隔离 fixture、模型版本和 Provider 指纹下完成完整 44 条 Agent v2，并保留所有失败 case。
+2. 以同一数据/fixture/模型完成 `workflow`、`single_agent`、`multi_agent` 的配对消融，才比较成功率、token 和延迟。
+3. 为“七天退货政策”等缺失事实补发布版知识库、canonical label 和新的未见集；不能用降低证据门槛替代知识治理。
+4. 接入可信人民币定价与账本，区分模型、Embedding、Rerank 和重试成本；当前统一写作 `UNPRICED`。
+5. 完成两名独立 reviewer 的盲评，以及经授权的真实用户试用；未完成前不写线上效果。
+6. 提高 Java 交易/售后核心包的覆盖率，并补长时间、并发和故障恢复数据。

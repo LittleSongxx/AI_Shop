@@ -24,6 +24,16 @@ from app.services.episode_query_service import episode_query_service  # noqa: E4
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT.parents[1] / "docs" / "evidence" / "agent-traces"
 _ACTION_TOKEN = re.compile(r"act_[a-fA-F0-9]{32}")
 _LONG_IDENTIFIER = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{0,12}\d{10,}[A-Za-z0-9_-]*(?![A-Za-z0-9])")
+# Token counters are performance evidence, not credentials.  Keep the broad
+# credential matching for nested provider/request payloads, but explicitly
+# exempt the counters before checking keys that contain ``token``.
+_TOKEN_METRIC_KEYS = {
+    "inputtokens",
+    "outputtokens",
+    "totaltokens",
+    "prompttokens",
+    "completiontokens",
+}
 _SECRET_KEY_PARTS = ("token", "password", "secret", "authorization", "cookie")
 _IDENTITY_KEYS = {
     "userId",
@@ -36,6 +46,20 @@ _IDENTITY_KEYS = {
     "order_item_id",
     "businessKey",
     "targetId",
+}
+_CORRELATION_KEYS = {
+    "runId",
+    "run_id",
+    "traceId",
+    "trace_id",
+    "messageId",
+    "message_id",
+    "callId",
+    "call_id",
+    "handoffId",
+    "handoff_id",
+    "stepId",
+    "step_id",
 }
 
 
@@ -54,12 +78,22 @@ def _redact_text(value: str) -> str:
     return _LONG_IDENTIFIER.sub("[BUSINESS_ID]", text)
 
 
+def _is_secret_key(lower_key: str) -> bool:
+    """Return whether a field name denotes a credential rather than a metric."""
+
+    if lower_key in _TOKEN_METRIC_KEYS:
+        return False
+    return any(part in lower_key for part in _SECRET_KEY_PARTS)
+
+
 def redact_value(value: Any, *, key: str | None = None) -> Any:
     normalized_key = str(key or "")
     lower_key = normalized_key.lower()
-    if any(part in lower_key for part in _SECRET_KEY_PARTS):
+    if _is_secret_key(lower_key):
         return "[REDACTED]" if value is not None else None
-    if normalized_key in _IDENTITY_KEYS and value not in (None, ""):
+    if (
+        normalized_key in _IDENTITY_KEYS or normalized_key in _CORRELATION_KEYS
+    ) and value not in (None, ""):
         return _fingerprint(value)
     if isinstance(value, dict):
         return {
@@ -116,8 +150,8 @@ def validate_trace_pair(
     errors: list[str] = []
     success_eval = success.get("episodeEvaluation") or {}
     success_facts = success_eval.get("facts") or {}
-    if success_facts.get("actionType") != "REFUND":
-        errors.append("success trace must be a refund action")
+    if success_facts.get("actionType") not in {"REFUND", "CANCEL_ORDER"}:
+        errors.append("success trace must be a REFUND or CANCEL_ORDER action")
     if success_facts.get("actionProposed") is not True:
         errors.append("success trace has no durable proposal fact")
     if success_facts.get("userConfirmed") is not True:
@@ -237,6 +271,54 @@ def build_bundle(
     }
 
 
+def validate_confirmed_trace(
+    confirmed: Mapping[str, Any],
+    confirmed_pending: list[Mapping[str, Any]],
+) -> None:
+    """Validate one known-outcome trace without requiring a synthetic pair."""
+
+    evaluation = confirmed.get("episodeEvaluation") or {}
+    facts = evaluation.get("facts") or {}
+    errors: list[str] = []
+    if facts.get("actionType") not in {"REFUND", "CANCEL_ORDER"}:
+        errors.append("confirmed trace action type must be REFUND or CANCEL_ORDER")
+    if facts.get("actionProposed") is not True:
+        errors.append("confirmed trace has no durable proposal fact")
+    if facts.get("userConfirmed") is not True:
+        errors.append("confirmed trace has no user-confirmation fact")
+    if facts.get("remoteOutcomeKnown") is not True:
+        errors.append("confirmed trace remote outcome is not authoritative")
+    if facts.get("actionOutcome") != "CONFIRMED":
+        errors.append("confirmed trace action outcome is not CONFIRMED")
+    if not any(row.get("status") == "CONFIRMED" for row in confirmed_pending):
+        errors.append("confirmed trace has no CONFIRMED MySQL pending-action row")
+    if errors:
+        raise TraceExportError("confirmed trace contract invalid:\n- " + "\n- ".join(errors))
+
+
+def build_confirmed_bundle(
+    confirmed: Mapping[str, Any],
+    confirmed_pending: list[Mapping[str, Any]],
+    *,
+    label: str,
+) -> dict[str, Any]:
+    validate_confirmed_trace(confirmed, confirmed_pending)
+    return {
+        "schemaVersion": "aishop-interview-traces/v1",
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "executionMode": "LIVE_FULL_STACK",
+        "simulated": False,
+        "redaction": {
+            "pii": True,
+            "businessIdentifiers": "sha256 fingerprint or placeholder",
+            "correlationIdentifiers": "sha256 fingerprint",
+            "actionTokens": "removed",
+            "secrets": "removed",
+        },
+        "traces": [public_trace(label, confirmed, confirmed_pending)],
+    }
+
+
 def _event_chain(trace: Mapping[str, Any]) -> str:
     events = [
         str(step.get("eventType"))
@@ -316,17 +398,28 @@ def write_bundle(bundle: Mapping[str, Any], output_dir: Path) -> dict[str, str]:
 async def export(args: argparse.Namespace) -> tuple[dict[str, Any], Path, dict[str, str]]:
     await init_pool()
     try:
-        success = await episode_query_service.detail(args.success_refund_run_id)
-        unknown = await episode_query_service.detail(args.unknown_outcome_run_id)
-        if success is None:
-            raise TraceExportError("confirmed refund run does not exist")
-        if unknown is None:
-            raise TraceExportError("unknown-outcome run does not exist")
-        success_pending = await pending_actions_for_run(args.success_refund_run_id)
-        unknown_pending = await pending_actions_for_run(args.unknown_outcome_run_id)
+        if args.confirmed_run_id:
+            confirmed = await episode_query_service.detail(args.confirmed_run_id)
+            if confirmed is None:
+                raise TraceExportError("confirmed run does not exist")
+            confirmed_pending = await pending_actions_for_run(args.confirmed_run_id)
+            bundle = build_confirmed_bundle(
+                confirmed,
+                confirmed_pending,
+                label=args.confirmed_label,
+            )
+        else:
+            success = await episode_query_service.detail(args.success_refund_run_id)
+            unknown = await episode_query_service.detail(args.unknown_outcome_run_id)
+            if success is None:
+                raise TraceExportError("confirmed refund run does not exist")
+            if unknown is None:
+                raise TraceExportError("unknown-outcome run does not exist")
+            success_pending = await pending_actions_for_run(args.success_refund_run_id)
+            unknown_pending = await pending_actions_for_run(args.unknown_outcome_run_id)
+            bundle = build_bundle(success, success_pending, unknown, unknown_pending)
     finally:
         await close_pool()
-    bundle = build_bundle(success, success_pending, unknown, unknown_pending)
     bundle_id = args.bundle_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     output_dir = args.output_root / bundle_id
     hashes = write_bundle(bundle, output_dir)
@@ -335,11 +428,20 @@ async def export(args: argparse.Namespace) -> tuple[dict[str, Any], Path, dict[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--success-refund-run-id", required=True)
-    parser.add_argument("--unknown-outcome-run-id", required=True)
+    parser.add_argument("--success-refund-run-id")
+    parser.add_argument("--unknown-outcome-run-id")
+    parser.add_argument("--confirmed-run-id")
+    parser.add_argument("--confirmed-label", default="confirmed_action")
     parser.add_argument("--bundle-id")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     args = parser.parse_args()
+    pair_mode = bool(args.success_refund_run_id or args.unknown_outcome_run_id)
+    if pair_mode != bool(args.success_refund_run_id and args.unknown_outcome_run_id):
+        parser.error("双 trace 模式必须同时提供 --success-refund-run-id 和 --unknown-outcome-run-id")
+    if not args.confirmed_run_id and not pair_mode:
+        parser.error("请提供 --confirmed-run-id，或使用旧的双 trace 参数")
+    if args.confirmed_run_id and pair_mode:
+        parser.error("--confirmed-run-id 不能与旧双 trace 参数同时使用")
     try:
         bundle, output_dir, hashes = asyncio.run(export(args))
     except TraceExportError as exc:

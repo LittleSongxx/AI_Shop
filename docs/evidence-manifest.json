@@ -1,31 +1,24 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-18T00:00:00+08:00",
+  "generatedAt": "2026-08-20T00:00:00+08:00",
   "project": "AI_Shop",
-  "targetRoles": [
-    "AI application / Agent backend",
-    "Java + AI business backend",
-    "AI full-stack / Product Engineer",
-    "RAG / search application engineering"
-  ],
   "implementationBaseline": {
-    "gitHead": "e11f1e096dc3d3afef0a56446bb1b9d27d3ef9f6",
-    "workspaceDiffSha256": "dc8cd38ac3362d6a13c85d31a1d187220ce048f8bddbe93699076b06b93a9cb3",
-    "workspaceDiffScope": "本分支从 e11f1e0 创建；哈希覆盖相对 HEAD 的 tracked diff 与未跟踪文件内容摘要（排除本 manifest 避免自引用）；未提交改造只作为工作区内容，不冒充已发布 commit 或正式评测结果",
+    "gitHead": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
+    "workspaceDiffSha256": "e0afc3a3c718db3ad12929521adeddcee1412288a1ec305d60467014f51932aa",
+    "workspaceDiffScope": "Hash captures the tracked binary diff and sorted untracked implementation/document-file summaries from the evidence capture workspace; the manifest itself is excluded to avoid self-reference.",
     "branch": "refactor/ai-shop-mainline-quality"
   },
   "protocol": {
     "schema": "aishop-eval/v1",
     "resultsPattern": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/<suite>/<run_id>/",
-    "baselinePattern": "AI_Shop-backend/AI_Shop-agent/benchmarks/baselines/<suite>.lock.json",
     "baselinePolicy": "Only an explicit --accept-baseline may create or replace a baseline; CI never accepts baselines."
   },
   "evidenceLevels": {
-    "E0_SOURCE": "源码、迁移、测试或工作流存在并可静态校验",
-    "E1_DETERMINISTIC": "执行生产决策内核，模型和外部系统使用确定性替身；属于 SYNTHETIC",
-    "E2_LOCAL_INTEGRATION": "本地真实进程或 Testcontainers 中间件集成验证",
-    "E3_CONFIGURED_LIVE": "配置真实模型、Embedding、Rerank 或实时索引后执行",
-    "E4_REAL_USER": "取得授权并进入试用批次的真实用户样本"
+    "E0_SOURCE": "Source, migration, test, data lock, or runner contract that can be statically checked.",
+    "E1_DETERMINISTIC": "Production decision code with deterministic adapters; always SYNTHETIC.",
+    "E2_LOCAL_INTEGRATION": "Local real processes and dependencies or a full local business path.",
+    "E3_CONFIGURED_LIVE": "A configured real model, embedding, rerank, or live index path executed locally.",
+    "E4_REAL_USER": "Authorized real-user sample; not collected in this project."
   },
   "evidence": [
     {
@@ -34,13 +27,21 @@
       "suite": "agentic-commerce-v2-runtime",
       "level": "E1_DETERMINISTIC",
       "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_agentic_commerce_runtime.py --run-id final-20260812-commerce",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_agentic_commerce_runtime.py --run-id commerce-c501735-20260819",
       "caseCount": 27,
-      "claim": "27 个 Commerce case 覆盖九个子集，全部通过运行时断言，工具/参数正确率为 1.0，严重安全违规为 0。",
-      "boundary": "生产决策代码被实际调用，但模型、数据库和 Java 内部依赖在该套件中使用确定性适配器；不是在线模型准确率或业务转化效果。",
+      "claim": "27 deterministic Commerce cases passed; tool and parameter correctness are 1.0 and critical safety violations are 0.",
+      "boundary": "The production decision paths execute with deterministic adapters. This is not online-model accuracy, a load test, or business conversion evidence.",
       "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/agentic-commerce-v2-runtime/final-20260812-commerce/summary.json",
-      "resultSha256": "a7061bf5f46b202a30ddc8499045c0c29485085fe33623f8b84f539e33be7f06",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/agentic-commerce-v2-runtime/commerce-c501735-20260819/summary.json",
+      "resultSha256": "754268a8caeed43e142960e44301c129da729a975335b3f0f7f2581c02c03f5a",
+      "resultAssertions": {
+        "metadata.schemaVersion": "aishop-eval/v1",
+        "metadata.gitCommit": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
+        "summary.caseCount": 27,
+        "summary.executedCount": 27,
+        "summary.taskSuccessRate": 1.0,
+        "summary.criticalSafetyViolationCount": 0
+      },
       "datasetLocks": [
         {
           "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.lock.json",
@@ -54,283 +55,216 @@
       "suite": "ai-safety-v1",
       "level": "E1_DETERMINISTIC",
       "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_ai_safety.py --run-id final-20260812-safety",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_ai_safety.py --run-id safety-c501735-20260819",
       "caseCount": 18,
-      "claim": "18 个直接/间接注入、通道污染、IDOR、PII 脱敏和委托身份 case 全部执行通过，严重安全违规为 0。",
-      "boundary": "这是合成攻击集对安全边界的确定性验证，不代表覆盖所有开放世界攻击。",
+      "claim": "18 deterministic injection, channel-guard, IDOR, identity-binding, and PII-redaction cases passed with 0 critical safety violations.",
+      "boundary": "This is a synthetic security regression set, not proof against every open-world attack.",
       "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/ai-safety-v1/final-20260812-safety/summary.json",
-      "resultSha256": "e37b48ac71fb6f20eddea4362598cf69d19398731ca1ab4f8dff6d63d71c3a38",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/ai-safety-v1/safety-c501735-20260819/summary.json",
+      "resultSha256": "562329f1bc6d32186414168f235166b5fdeea5fb9627490477bf845532b3c5bc",
+      "resultAssertions": {
+        "metadata.schemaVersion": "aishop-eval/v1",
+        "metadata.gitCommit": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
+        "summary.caseCount": 18,
+        "summary.executedCount": 18,
+        "summary.taskSuccessRate": 1.0,
+        "summary.criticalSafetyViolationCount": 0
+      },
       "datasetLocks": [
         "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/ai_safety_v1.lock.json"
       ]
     },
     {
-      "id": "search-rag-deterministic",
+      "id": "search-rag-deterministic-contract",
       "kind": "evaluation",
       "suite": "search-rag-v1",
       "level": "E1_DETERMINISTIC",
       "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_rag_eval.py --run-id final-20260812-search-rag",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_rag_eval.py --run-id search-rag-c501735-20260819",
       "caseCount": 162,
-      "claim": "162 个公开集与 holdout 的数据/查询理解契约全部执行通过，holdout 标签和数据 SHA 被锁定。",
-      "boundary": "本地未启用 --live，因而只声称数据与 query-understanding contract；Recall@K、MRR、NDCG、引用质量、真实延迟和成本均为未采集。",
+      "claim": "162 deterministic Search/RAG data and query-understanding contract cases passed with locked datasets.",
+      "boundary": "The result did not run --live. It does not claim Recall@K, MRR, NDCG, citation quality, real-provider latency, or model cost.",
       "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-rag-v1/final-20260812-search-rag/summary.json",
-      "resultSha256": "c743f1a4014626e7ab8ab154aed8e6385c1d2b248fc7559fc5ec1761b6e23caf",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-rag-v1/search-rag-c501735-20260819/summary.json",
+      "resultSha256": "99452b8679746dc5942b13763245bdf9cb1cd2d301b452960025b3f867629534",
+      "resultAssertions": {
+        "metadata.schemaVersion": "aishop-eval/v1",
+        "metadata.gitCommit": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
+        "summary.caseCount": 162,
+        "summary.executedCount": 162,
+        "summary.taskSuccessRate": 1.0,
+        "summary.evaluationLayers.live.executed": false
+      },
       "datasetLocks": [
         "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.lock.json",
         "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
       ]
     },
     {
-      "id": "agent-ablation",
-      "kind": "ablation",
-      "level": "E1_DETERMINISTIC",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_ablation.py --run-id final-20260812-ablation",
-      "claim": "legacy single-agent、multi-agent 和 workflow 在独立进程执行；主实验 27 个配对 case、次实验 21 个适用 case，成功率差值均为 0，安全门禁通过。",
-      "boundary": "结果来自确定性适配器且尚未接受性能基线，毫秒级延迟只用于检查 Runner/进程隔离，不用于声称真实模型性能优势。",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/agentic-commerce-v2-ablation/final-20260812-ablation/summary.json",
-      "resultSha256": "dff1224827bc83e3e1907fde7a298c4bb7fef8db22943a68dd0f56cc6d4176e8",
+      "id": "agent-v2-live-contract",
+      "kind": "evaluation-contract",
+      "suite": "agent-v2",
+      "level": "E0_SOURCE",
+      "state": "VERIFIED",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/eval.py validate --suite agent-v2",
+      "caseCount": 44,
+      "claim": "The current frozen Agent v2 contract contains 37 single-turn cases and 7 sequence cases, and requires LIVE_FULL_STACK execution for formal collection.",
+      "boundary": "The lock is NOT_COLLECTED. The contract and isolated one-case runs do not establish a full 44-case task-success rate or formal orchestration ablation.",
+      "resultLocation": "tracked",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
+      "resultAssertions": {
+        "suite": "agent-v2",
+        "caseCounts.total": 44,
+        "resultStatus": "NOT_COLLECTED"
+      },
       "datasetLocks": [
         {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.jsonl"
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
         }
       ]
     },
     {
-      "id": "java-domain-integration",
-      "kind": "integration-test",
+      "id": "agent-v2-cancel-local-full-stack",
+      "kind": "live-task-subset",
+      "suite": "agent-v2",
       "level": "E2_LOCAL_INTEGRATION",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend && mvn --batch-mode --no-transfer-progress -Pintegration -pl AI_Shop-common,AI_Shop-order/app -am verify",
-      "claim": "Testcontainers 实测 MiddlewareIT 7/7、TransactionPersistenceIT 3/3；覆盖 MySQL、Redis、RabbitMQ、Elasticsearch，以及订单幂等、支付 CAS 和退款库存恢复。",
-      "boundary": "本地容器并发测试，不是生产压测；当前 JaCoCo 行覆盖率 common 约 12.89%、order 约 13.39%，只作为薄弱项披露。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/pom.xml",
-      "datasetLocks": []
-    },
-    {
-      "id": "rbac-hmac-privacy",
-      "kind": "security-and-privacy",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && pytest -q tests/test_admin_assertion.py tests/test_privacy_api.py tests/test_privacy_job_service.py tests/test_ai_safety_runner.py",
-      "claim": "五角色 RBAC、管理员主体版本、HMAC 时间窗/nonce/轮换、跨用户拒绝、隐私导出删除幂等与恢复均有实现和定向测试。",
-      "boundary": "项目明确是单商户 single-tenant 商城；没有把这些能力包装成多租户平台或监管认证。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/tests/test_admin_assertion.py",
-      "datasetLocks": []
-    },
-    {
-      "id": "frontend-evidence-privacy",
-      "kind": "frontend-test",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-front/AI_Shop-admin && npm test && npm run lint && npm run build; cd ../AI_Shop-web && npm test && npm run lint && npm run build && npm run test:e2e",
-      "claim": "管理端证据中心和用户隐私中心已接入；管理端 7/7、用户端 33/33 单测通过，两端 lint/build 通过，Mock Playwright 8/8 通过。",
-      "boundary": "另有 8 条要求显式启动本地完整服务的 live Playwright 用例和 2 条视口不适用用例按设计跳过；没有据此声称生产环境 live E2E 已通过。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-front/AI_Shop-admin/src/views/data/AIEvidenceCenter.vue",
-      "datasetLocks": []
-    },
-    {
-      "id": "supply-chain",
-      "kind": "supply-chain",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "python scripts/check_dependency_exceptions.py && bash scripts/generate_sbom.sh",
-      "claim": "Maven、Python、两个 npm 工程均可生成 CycloneDX SBOM；PR Dependency Review 和每周 Maven/Python/npm 漏洞扫描工作流已配置。",
-      "boundary": "SBOM 已本地生成；完整 OWASP、pip-audit、npm audit 周期扫描尚未在本地声明通过。",
-      "resultLocation": "tracked",
-      "resultPath": "scripts/generate_sbom.sh",
-      "datasetLocks": []
-    },
-    {
-      "id": "search-rag-live-retrieval",
-      "kind": "evaluation",
-      "suite": "search-rag-v1",
-      "level": "E3_CONFIGURED_LIVE",
       "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && JAVA_WEB_URL=http://127.0.0.1:8108 python benchmarks/run_search_rag_eval.py --live --run-id live-search-rag-8471902",
-      "caseCount": 257,
-      "runCommit": "8471902c47ff6536becfc7f89c131c619d76f372",
-      "claim": "162 个确定性 contract 与 95 个 local-live 检索 case 全部执行；Search public/holdout Recall@10 均为 1.0，MRR 分别为 0.8917/0.7889，NDCG@10 为 0.9078/0.8265；RAG public/holdout Recall@K 为 0.9167/1.0，聚合质量门禁通过，严重安全违规为 0。",
-      "boundary": "证据来源仍为 SYNTHETIC，执行方式为 local-live；95 个 live case 中 93 个逐 case 通过，公开 RAG 的 faq-member-001 与 doc-address-001 未通过。Search 链路是 BM25 + Embedding + RRF，不声称使用 Rerank；RAG 使用 qwen3-rerank。Embedding/Rerank 没有可核验账单，不声称 costCny=0 代表免费；95 个延迟样本的 P99 只作样本描述。",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_task_success_v2_eval.py --case-id live-cancel-confirmed-012 --run-id agent-v2-adaptive-c501735-20260820-cancel-golden-r6",
+      "caseCount": 1,
+      "claim": "One isolated SYNTHETIC + local-live cancel-order case passed through Agent API, RabbitMQ Worker, LangGraph, MCP, pending-action confirmation, and the Java write path; latency was 1067 ms and severe safety violations were 0.",
+      "boundary": "This is one deterministic Workflow sample with 0 LLM tokens. It is not a model benchmark, overall Agent TSR, P95, or production SLO.",
       "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-rag-v1/live-search-rag-8471902/summary.json",
-      "resultSha256": "571d2649efa13893d23c140848e24014b696071aa341c0c4187ca1ed076fd408",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-cancel-golden-r6/summary.json",
+      "resultSha256": "83200742578f45d7a1a58ead624b85e359f79c4f02da4736664dd1d35bbdf9c8",
+      "resultAssertions": {
+        "metadata.executionMode": "LIVE_FULL_STACK",
+        "metadata.evidenceSource": "SYNTHETIC+local-live",
+        "metadata.simulated": false,
+        "summary.caseCount": 1,
+        "summary.passedCount": 1,
+        "summary.totalTokens": 0,
+        "cases.0.caseId": "live-cancel-confirmed-012",
+        "cases.0.taskSuccess": true,
+        "cases.0.orchestration.mode": "workflow",
+        "cases.0.metrics.latencyMs": 1067
+      },
       "datasetLocks": [
         {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/search_relevance_v1.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/search_relevance_v1.jsonl"
-        },
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.lock.json",
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
+        }
+      ],
+      "relatedArtifacts": [
         {
-          "path": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.jsonl"
+          "path": "docs/evidence/agent-traces/agent-v2-cancel-r6-20260820/manifest.json",
+          "sha256": "252d61479fdf9fc28da7a8972ce984f11d5ca9cb22abf857719d283c36cdb91a",
+          "assertions": {
+            "executionMode": "LIVE_FULL_STACK",
+            "simulated": false
+          }
         },
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
+        {
+          "path": "docs/evidence/agent-traces/agent-v2-cancel-r6-20260820/traces.json",
+          "sha256": "d3883ed12aef54cb0ffd6c4d8970cf44e091ddb126ff68f3f330c897b9bf20d3"
+        },
+        {
+          "path": "docs/evidence/agent-traces/agent-v2-cancel-r6-20260820/report.md",
+          "sha256": "f57c8b2d2a356a2fd76b8c2af0671e39f6d83e1f726da51e3b8066456d953a99"
+        }
       ]
     },
     {
-      "id": "rag-generation-live",
-      "kind": "evaluation",
-      "suite": "rag-generation-live-v1",
+      "id": "agent-v2-rag-provider-local-full-stack",
+      "kind": "live-task-subset",
+      "suite": "agent-v2",
       "level": "E3_CONFIGURED_LIVE",
       "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && JAVA_WEB_URL=http://127.0.0.1:8108 python benchmarks/run_rag_generation_eval.py --run-id live-rag-generation-76e596b --top-k 10",
-      "caseCount": 10,
-      "runCommit": "76e596bdd4621bced24d5838efa649388ac2e66b",
-      "claim": "deepseek-v4-flash 对 10 个锁定 holdout case 全部完成生成，自动断言 8/10 通过；关键词覆盖率 0.9375、引用正确性 0.875、引用覆盖率 0.75、拒答准确率 1.0、注入鲁棒性 1.0，严重安全违规为 0；AI 辅助初审 9/10 通过。",
-      "boundary": "自动质量门禁未通过：rag-holdout-002 的引用没有覆盖标签指定 FAQ，rag-holdout-011 把流程规则问题误当成当前无答案；AI 初审只将前者判为语义有据，后者仍 FAIL。结果是 SYNTHETIC + local-live，不是独立人工标注、真实用户或生产效果。共采集 3384 input/240 output token，但可信人民币单价和检索账单未配置，成本状态为 UNPRICED。10 个样本的 P95/P99 不作为 SLO。",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_task_success_v2_eval.py --case-id live-confirmation-policy-020 --run-id agent-v2-adaptive-c501735-20260820-rag-policy-confirmation-r5",
+      "caseCount": 1,
+      "claim": "One isolated SYNTHETIC + local-live policy case passed with deepseek-v4-flash, one LLM call, 5071 tokens, 3237 ms latency, complete Elasticsearch/Embedding/Rerank runtime trace, and 0 write tools.",
+      "boundary": "This is n=1. It does not establish full Agent quality, P95, SLO, or trusted monetary cost; totalCostCny=0.0 means no trustworthy CNY pricing is configured and must be reported as UNPRICED.",
       "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v1/live-rag-generation-76e596b/summary.json",
-      "resultSha256": "a681b92d95aac8b899f846ee5950818fca64de4e316ffff964726342778017eb",
-      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v1/live-rag-generation-76e596b/ai-review.json",
-      "reviewSha256": "d32ea891d74b2905e463e19443a1c5361d3abe4c1c756d9fa16d450202904661",
-      "reviewCaseCount": 10,
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-confirmation-r5/summary.json",
+      "resultSha256": "7790d0a8a561b07ba9d15ee18acdc41a6dc43b43a9a679428fbfa567edb0dcae",
+      "resultAssertions": {
+        "metadata.executionMode": "LIVE_FULL_STACK",
+        "metadata.evidenceSource": "SYNTHETIC+local-live",
+        "metadata.simulated": false,
+        "summary.caseCount": 1,
+        "summary.passedCount": 1,
+        "summary.totalTokens": 5071,
+        "cases.0.caseId": "live-confirmation-policy-020",
+        "cases.0.taskSuccess": true,
+        "cases.0.orchestration.mode": "single_agent",
+        "cases.0.provider.llmCallCount": 1,
+        "cases.0.metrics.inputTokens": 4847,
+        "cases.0.metrics.outputTokens": 224,
+        "cases.0.metrics.latencyMs": 3237
+      },
       "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v1.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
+        }
       ]
     },
     {
-      "id": "search-rag-mature",
-      "kind": "mature-evaluation",
-      "suite": "search-rag-mature-v1",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_rag_mature_eval.py prepare && python benchmarks/run_search_rag_mature_eval.py collect-dev --run-id mature-21d8159 && python benchmarks/run_search_rag_mature_eval.py replay --run-id mature-21d8159 && python benchmarks/run_search_rag_mature_eval.py collect-final --run-id mature-21d8159 --finalize-holdout && python benchmarks/run_search_rag_mature_eval.py package --run-id mature-21d8159",
-      "caseCount": 242,
-      "runCommit": "21d8159b253dc0aa761d1338570afa6491a8e96a",
-      "claim": "完成 300 件中文合成商品/120 条查询、WANDS 4,960 商品/58 查询/5,733 人工判断和 64 条 RAG 检索的成熟评测；中文 final 冻结链路 Recall@1/3/5/10/20 为 0.50/1/1/1/1，MRR@10 1.0、NDCG@5 0.9878、负例准确率 1.0；WANDS judged-pool 的 Rerank 相对同预算 RRF 将 NDCG@5 提升 0.0471，bootstrap 95% CI [0.0184, 0.0766]。",
-      "boundary": "中文商品与查询为 SYNTHETIC，WANDS 只在每条查询完整人工判断池内排序，不能声称 42,994 商品全库 Recall。中文 final 同时含 40 条 fresh holdout 和 20 条 challenge；WANDS Recall@5 的 Rerank 差值 CI 跨 0，RAG Rerank 也没有统计支持的排名增益，因此只把有正 CI 的结构化过滤、中文/WANDS NDCG@5 改善表述为有效。全部 P95/P99 为本地样本，不是 SLO；未修改 baseline。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-rag-mature-v1/mature-21d8159/summary.json",
-      "resultSha256": "7528cf9dcde820bc537ac45488ba6c45907de5159c2e09e371e3d8f468008bb9",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-rag-mature-v1/mature-21d8159/run-manifest.json",
-      "runManifestSha256": "159ee403f8cb4cd7517bd6b7a112305671d02bcff19d8879714478adc10134a8",
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/chinese-commerce-search-v1.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/chinese-commerce-search-v1.json",
-          "optionalLocalDataset": true,
-          "hashMode": "canonical-json"
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/wands/selection.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v1/wands/selection.json",
-          "optionalLocalDataset": true,
-          "hashMode": "canonical-json",
-          "expectedField": "selectionSha256"
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/scripts/rag_golden.jsonl"
-        },
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_fresh_holdout_v2.lock.json"
-      ]
-    },
-    {
-      "id": "rag-generation-live-v2",
-      "kind": "evaluation",
-      "suite": "rag-generation-live-v2",
+      "id": "agent-v2-rag-policy-failures-retained",
+      "kind": "live-task-diagnostics",
+      "suite": "agent-v2",
       "level": "E3_CONFIGURED_LIVE",
       "state": "LOCAL_RESULT",
       "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && JAVA_WEB_URL=http://127.0.0.1:8108 python benchmarks/run_rag_generation_eval.py --selection-version v2 --run-id mature-rag-generation-21d8159 --top-k 10",
-      "caseCount": 24,
-      "runCommit": "21d8159b253dc0aa761d1338570afa6491a8e96a",
-      "claim": "deepseek-v4-flash 对锁定的 10 条 known regression + 14 条 fresh holdout 全部完成一次生成；16/24 自动通过、AI 辅助初审 16 PASS/8 FAIL，真实 usage 为 7,763 input + 542 output token，Provider 运行错误为 0。",
-      "boundary": "E3 已完整采集但质量门禁未通过：关键词覆盖 0.75、引用正确性 0.7222、严格标签引用精度 0.4444、引用覆盖率 0.5556、注入鲁棒性 0.75，存在 1 条严重安全失败；8 个失败 case 均保留。结果是 SYNTHETIC + local-live，AI_ASSISTED_INITIAL_REVIEW 不是独立人工标注；成本为 UNPRICED，24 个样本 P95/P99 不作 SLO。",
+      "command": "Retain and inspect rag-policy-r1 through rag-policy-r4; do not overwrite failed run IDs.",
+      "caseCount": 1,
+      "claim": "Four retained local-live diagnostics document an OpenAI-compatible tool-message ordering defect, a Worker restart interruption, two token-budget failures, and a real missing-knowledge bad case for the seven-day return-policy question.",
+      "boundary": "The failures remain evidence of system and knowledge limits. A later different passing policy question does not erase or aggregate over them.",
       "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v2/mature-rag-generation-21d8159/summary.json",
-      "resultSha256": "f0b80698397317e20bd310bf7eb1b0119ca2f7ac2fde165fbcf12403d830bc3d",
-      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v2/mature-rag-generation-21d8159/ai-review.json",
-      "reviewSha256": "06e1e9557c44283036039b42c05c0dbf07ed80ef59964565067e29ad25d15b51",
-      "reviewCaseCount": 24,
-      "trackedEvidencePath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v2/mature-rag-generation-21d8159/summary.json",
-      "trackedEvidenceSha256": "66fe67358be1c2df3f44bbc1cb0ca3a25e599a22a11307658063e87c51f3c7ce",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v2/mature-rag-generation-21d8159/run-manifest.json",
-      "runManifestSha256": "c17696762ca62f549e0f491c6cd304f27fe3d6a7bffddac5535e1e2c235f3a2b",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r4/summary.json",
+      "resultSha256": "5a936c6c25b456bc2f79b44000d738fb9c2afb12ed6ef7bd99668c0ba898a780",
+      "resultAssertions": {
+        "summary.caseCount": 1,
+        "summary.passedCount": 0,
+        "summary.totalTokens": 9992,
+        "cases.0.caseId": "live-refund-policy-018",
+        "cases.0.taskSuccess": false
+      },
+      "relatedArtifacts": [
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r1/summary.json",
+          "sha256": "23cf4e7fef8fcad2f5aa5fcf577805f9df679bf0d982c240e4b5c55cc01c1cc8"
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r2/summary.json",
+          "sha256": "68764a046e8dbb824153cd4740daef47207a79e954cbbe00b71ace894dfdc7c8"
+        },
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r3/summary.json",
+          "sha256": "60b31f39f1ebe2b32277daee4026eea887939b4914aa35bf04043385d23ff07c"
+        }
+      ],
       "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v2.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_fresh_holdout_v2.lock.json"
+        {
+          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
+          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
+        }
       ]
     },
     {
-      "id": "rag-retrieval-live-v3",
-      "kind": "mature-evaluation",
-      "suite": "rag-retrieval-live-v3",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "qualityGateState": "PASSED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v3_eval.py collect-dev --run-id rag-v3-ca8cf02-20260813 && python benchmarks/run_rag_v3_eval.py replay --run-id rag-v3-ca8cf02-20260813 && python benchmarks/run_rag_v3_eval.py collect-final --run-id rag-v3-ca8cf02-20260813 --finalize-holdout && python benchmarks/run_rag_v3_eval.py package --run-id rag-v3-ca8cf02-20260813",
-      "caseCount": 144,
-      "runCommit": "ca8cf02e9f05bc3869045807fa4101bb414ab07b",
-      "claim": "在 12 份文档、75 个 knowledge chunk、6 FAQ 上完成 48 public + 64 known regression + 32 一次性 fresh 的真实 Embedding/Rerank 检索评测；fresh Recall@1/3/5 为 0.9583/1.0/1.0、MRR@10 为 0.9792、NDCG@5 为 0.9846，no-answer accuracy 与 injection robustness 均为 1.0，质量门禁通过。",
-      "boundary": "全部 144 条为 SYNTHETIC + local-live；fresh 只有 32 条，P99 不是 SLO。Dev 上多数消融置信区间跨 0，不能声称所有 Rerank/Query Expansion 变体均有统计显著收益。检索结果不代表真实用户或生产效果，未修改 baseline。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/summary.json",
-      "resultSha256": "b2027fbac2d43eac4bbfd16af5921d83723717443bdfd56ac014954fcee58af9",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v3/rag-v3-ca8cf02-20260813/run-manifest.json",
-      "runManifestSha256": "b5bf7b61ef9d60e43d7295d7e8eb153379c4e6645beb94189fbcb0f3553013be",
-      "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v3_public.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v3_known_regression.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v3_fresh_holdout.lock.json"
-      ]
-    },
-    {
-      "id": "rag-generation-live-v3",
-      "kind": "evaluation",
-      "suite": "rag-generation-live-v3",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_eval.py --selection-version v3 --retrieval-run-id rag-v3-ca8cf02-20260813 --run-id rag-generation-v3-ca8cf02-20260813 && python benchmarks/run_rag_generation_eval.py --selection-version v3 --package-existing-v3 --run-id rag-generation-v3-ca8cf02-20260813",
-      "caseCount": 40,
-      "runCommit": "ca8cf02e9f05bc3869045807fa4101bb414ab07b",
-      "claim": "deepseek-v4-flash 对 24 条 known regression + 16 条 fresh 全部完成一次最终生成，Provider/runtime error 为 0；自动任务与 AI 辅助初审均为 28 PASS/12 FAIL，真实 usage 为 11,559 input + 1,446 output token。",
-      "boundary": "E3 完整采集但质量门禁 FAILED_RETAINED：任务成功率 0.70、concept coverage 0.8111、canonical citation correctness/coverage 0.8667/0.9333；冻结旧口径 injection robustness 为 0.75、严重安全违规记 2。后续已修复安全计分耦合与规范性否定句检疫误报，但没有重写本次结果，必须用新 run ID 才能验证。结果为 SYNTHETIC + local-live，AI 初审不是人工标注，成本 UNPRICED，P99 不作 SLO。",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v3/rag-generation-v3-ca8cf02-20260813/summary.json",
-      "resultSha256": "5ca07b8baf36fda4967304db6b4bc1a105967eecf066187ac9187c7cae692214",
-      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/rag-generation-live-v3/rag-generation-v3-ca8cf02-20260813/ai-review.json",
-      "reviewSha256": "9315193608e45adb7ceb0d9e0e9b46146a8522095e6248eb0f10c028d262491c",
-      "reviewCaseCount": 40,
-      "trackedEvidencePath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v3/rag-generation-v3-ca8cf02-20260813/summary.json",
-      "trackedEvidenceSha256": "1b565234f600bd9288545606421ebe6603b971f7bdb4a52160a8d2e63bd1dccd",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v3/rag-generation-v3-ca8cf02-20260813/run-manifest.json",
-      "runManifestSha256": "704209b8af9e2f632cde387ec586767285ab2b95d87c738a320f27c1555d002d",
-      "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v3.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v3_known_regression.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v3_fresh_holdout.lock.json"
-      ]
-    },
-    {
-      "id": "search-mature-v2-formal",
+      "id": "search-v2-formal-retained",
       "kind": "evaluation",
       "suite": "search-mature-v2",
       "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
+      "state": "VERIFIED",
       "qualityGateState": "FAILED_RETAINED",
       "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_v2_eval.py package --run-id search-v2-64aa86e-final-20260814",
       "caseCount": 487,
-      "claim": "中文 v2 600 商品/240 查询、WANDS 42,994 商品全库/202 查询，以及 47 商品目录的 45 条 ProductService 路径均完成真实 Embedding/Rerank 评测；中文 fresh Recall@3/5 为 0.8896/0.9969，WANDS condensed NDCG@10 为 0.7953。",
-      "boundary": "正式质量门禁 FAILED_RETAINED：challenge no-result accuracy 为 0.80，首次 ProductService Recall@10 仅 0.3778。WANDS qrels 不完整，未标注商品不当负例，只报告 known-relevant、Judged@K、bpref 和 condensed 指标。",
+      "claim": "Configured local-live Search v2 covers Chinese 600 products/240 queries, WANDS 42,994 products/202 queries/32,919 judgments, and 45 ProductService cases; the formal quality gate failed and is retained.",
+      "boundary": "Synthetic data and local-live Provider calls are not real-user traffic. WANDS qrels are incomplete, and the ProductService Recall@10 failure must remain visible.",
       "resultLocation": "tracked",
       "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/summary.json",
       "resultSha256": "64445a87f51fa63f140a35dae4d0f056b04a552edae4586fe7c48e6b8632e7ba",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/run-manifest.json",
-      "runManifestSha256": "6e62f595bd63f76b89e0c92a90971505e277de9516c3ffe12d6c7a92ac4513b9",
       "resultAssertions": {
         "runId": "search-v2-64aa86e-final-20260814",
         "suite": "search-mature-v2",
@@ -341,73 +275,40 @@
         "datasets.wandsFullCatalog.queries": 202,
         "providerCompleteness.productService.passed": true
       },
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/run-manifest.json",
+      "runManifestSha256": "6e62f595bd63f76b89e0c92a90971505e277de9516c3ffe12d6c7a92ac4513b9",
       "datasetLocks": [
         {
           "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.lock.json",
           "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.json",
           "hashMode": "canonical-json"
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/wands/selection.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-mature-v2/raw/wands/selection.json",
-          "expectedField": "selectionSha256",
-          "hashMode": "canonical-json",
-          "optionalLocalDataset": true
         }
       ]
     },
     {
-      "id": "search-mature-v2-postfix-runtime",
-      "kind": "evaluation-regression",
-      "suite": "search-mature-v2",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_v2_eval.py package-runtime-regression --run-id search-v2-64aa86e-postfix-regression-v5-20260814 --original-final-run-id search-v2-64aa86e-final-20260814",
-      "caseCount": 45,
-      "claim": "修复后的真实 ProductService 路径完成 45/45；catalog Recall@3/5/10 为 0.9778，MRR@10 为 0.9444，availability-adjusted Recall@3/5/10 为 1.0；Embedding 86/86、Rerank 30/30，失败与 fallback 为 0。",
-      "boundary": "这是 POST_FIX_RUNTIME_REGRESSION；所有 case 已暴露，holdoutExposed=true、freshEvidence=false。它证明运行时 taxonomy、澄清、品牌/schema 和缺货修复命中已知问题，不覆盖正式失败或证明新鲜泛化。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-postfix-regression-v5-20260814/summary.json",
-      "resultSha256": "324a99789114d99e3addea4c6f1dd514fc834b3a8a74c1bca4aac4ab7dc8b62d",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-postfix-regression-v5-20260814/run-manifest.json",
-      "runManifestSha256": "3a024ec8cf995860b5562f4c1cf29b79fa77f4025bfbef902c20e98f72f7f876",
-      "resultAssertions": {
-        "runId": "search-v2-64aa86e-postfix-regression-v5-20260814",
-        "evidenceKind": "POST_FIX_RUNTIME_REGRESSION",
-        "originalFinalRunId": "search-v2-64aa86e-final-20260814",
-        "holdoutExposed": true,
-        "freshEvidence": false,
-        "caseCount": 45,
-        "qualityGateState": "PASSED_POST_FIX_REGRESSION",
-        "qualityGates.goldNeverUsedByRuntime": true
-      },
-      "datasetLocks": []
-    },
-    {
-      "id": "rag-retrieval-live-v4-formal",
+      "id": "rag-retrieval-v4-formal-retained",
       "kind": "evaluation",
       "suite": "rag-retrieval-live-v4",
       "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
+      "state": "VERIFIED",
       "qualityGateState": "FAILED_RETAINED",
       "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py package --run-id rag-v4-64aa86e-routefix-20260814",
       "caseCount": 264,
-      "claim": "72 public、144 known regression、48 一次性 fresh 共 264 条完成真实 Embedding/Rerank/按需 Expansion；fresh Recall@3/5 为 0.8056，MRR 为 0.75，NDCG@5 为 0.7645，no-answer 为 1.0。",
-      "boundary": "正式门禁 FAILED_RETAINED；fresh injection 为 0.9167，canonical correctness/coverage 为 0.7442/0.8056。Provider 完整不等于质量通过；两个 frozen label 还要求了已发布知识没有写出的细节。",
+      "claim": "Configured local-live RAG retrieval v4 executed 264 cases with complete Provider evidence; the one-shot fresh quality gate failed and remains retained.",
+      "boundary": "All labels are SYNTHETIC, local latency is not an SLO, and automatic citation grounding is not human faithfulness review.",
       "resultLocation": "tracked",
       "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/summary.json",
       "resultSha256": "be1b3b0fb1bf2bb337eb38d100c57841f5643e865925e3e65c2d77a85effb29f",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/run-manifest.json",
-      "runManifestSha256": "2b0c1e1105a80bc5479dee4cff4bae3364422531eff92f51026d425a6bdb3720",
       "resultAssertions": {
         "runId": "rag-v4-64aa86e-routefix-20260814",
-        "caseCounts.total": 264,
+        "suite": "rag-retrieval-live-v4",
         "qualityGate.status": "FAILED_RETAINED",
-        "qualityGate.providerCompleteness.dev.passed": true,
-        "qualityGate.providerCompleteness.fresh.passed": true,
-        "selectedFreshMetrics.noAnswerAccuracy": 1.0,
-        "humanReviewStatus": "NOT_APPLICABLE"
+        "qualityGate.passed": false,
+        "caseCounts.total": 264,
+        "caseCounts.freshHoldout": 48
       },
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/run-manifest.json",
+      "runManifestSha256": "2b0c1e1105a80bc5479dee4cff4bae3364422531eff92f51026d425a6bdb3720",
       "datasetLocks": [
         "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_public.lock.json",
         "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_known_regression.lock.json",
@@ -415,499 +316,196 @@
       ]
     },
     {
-      "id": "rag-generation-live-v4-formal",
+      "id": "rag-generation-v4-formal-retained",
       "kind": "evaluation",
       "suite": "rag-generation-live-v4",
       "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
+      "state": "VERIFIED",
       "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py --package --run-id rag-generation-v4-64aa86e-postfix-20260814",
+      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py package --run-id rag-generation-v4-64aa86e-postfix-20260814",
       "caseCount": 60,
-      "claim": "60/60 完成，runtime error 和严重安全违规均为 0；任务成功 39/60，known regression 29/40，claim completeness 0.8406，claim-citation support 0.8804，canonical coverage 0.9783，真实 token 为 23,125。",
-      "boundary": "正式质量门禁 FAILED_RETAINED。AI 辅助初审为 46 PASS/14 FAIL，不是独立人工标注；两位 reviewer 尚未提交，HUMAN_REVIEW_PENDING。成本 UNPRICED，本地分位数不是 SLO。",
+      "claim": "Configured local-live RAG generation v4 executed 60 cases with 0 runtime errors and 0 critical safety violations, but only 39/60 task success; the formal failed result and HUMAN_REVIEW_PENDING state are retained.",
+      "boundary": "AI-assisted scoring is not independent human review; Provider CNY cost is UNPRICED and local percentiles are not production SLOs.",
       "resultLocation": "tracked",
       "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/summary.json",
       "resultSha256": "b751ac463f97e43681d402b96d4795404e9a669a8b41186673223609ba77bfe0",
-      "reviewPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/ai-review.json",
-      "reviewSha256": "205f31a3153b81c67dbe57e9100811f9c4f8b90449d075d6f4a7d5406c6d1824",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/run-manifest.json",
-      "runManifestSha256": "18786d733bc82b9d044584db9ab9cc0cddfb2368240ce241a62fe9906f49543e",
       "resultAssertions": {
         "runId": "rag-generation-v4-64aa86e-postfix-20260814",
+        "suite": "rag-generation-live-v4",
         "summary.caseCount": 60,
         "summary.executedCount": 60,
-        "summary.qualityGate.status": "FAILED_RETAINED",
-        "summary.providerCompleteness.passed": true,
+        "summary.runtimeErrorCount": 0,
+        "summary.taskSuccessRate": 0.65,
         "humanReviewStatus": "HUMAN_REVIEW_PENDING"
       },
-      "reviewAssertions": {
-        "runId": "rag-generation-v4-64aa86e-postfix-20260814",
-        "reviewerType": "AI_ASSISTED_INITIAL_REVIEW",
-        "status": "COMPLETED",
-        "cases.$length": 60
-      },
+      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/run-manifest.json",
+      "runManifestSha256": "18786d733bc82b9d044584db9ab9cc0cddfb2368240ce241a62fe9906f49543e",
       "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v4.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_generation_known.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_generation_fresh.lock.json"
-      ]
-    },
-    {
-      "id": "rag-retrieval-v4-postfix-offline",
-      "kind": "offline-regression",
-      "suite": "rag-retrieval-live-v4",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py postfix-replay --source-run-id rag-v4-64aa86e-routefix-20260814 --run-id rag-v4-64aa86e-postfix-offline-v3-20260814",
-      "caseCount": 264,
-      "claim": "对正式 Provider 候选做 0 Provider 的修复后重放；fresh Recall@3/5、MRR、NDCG 均为 0.9444，canonical correctness/coverage 为 1.0/0.9444，known regression guard 通过。",
-      "boundary": "POST_FIX_OFFLINE_REPLAY，holdoutExposed=true、freshEvidence=false；两个超出知识事实范围的 frozen label 保持安全拒答，因此质量门禁仍 FAILED_RETAINED。该结果不是新的 E3 调用或 fresh holdout。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v3-20260814/summary.json",
-      "resultSha256": "d8e65dc7a5e98d80799a8523d9ac9656c26a42fba4e93b79b6311126e50c21de",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-offline-v3-20260814/run-manifest.json",
-      "runManifestSha256": "5230a0c10919df6c7abedbff5b730abfa119786342b7c4705cf07331c59b193c",
-      "resultAssertions": {
-        "runId": "rag-v4-64aa86e-postfix-offline-v3-20260814",
-        "sourceRunId": "rag-v4-64aa86e-routefix-20260814",
-        "status": "POST_FIX_OFFLINE_REPLAY",
-        "holdoutExposed": true,
-        "freshEvidence": false,
-        "providerFacts.embeddingRequests": 0,
-        "providerFacts.rerankRequests": 0,
-        "knownRegressionGuard.passed": true
-      },
-      "datasetLocks": []
-    },
-    {
-      "id": "rag-retrieval-v4-postfix-targeted",
-      "kind": "targeted-regression",
-      "suite": "rag-retrieval-live-v4",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py targeted-regression --source-run-id rag-v4-64aa86e-routefix-20260814 --run-id rag-v4-64aa86e-postfix-targeted-20260814 --knowledge-index aishop_eval_rag_context_v4",
-      "caseCount": 7,
-      "claim": "7/7 暴露坏例完成真实 Provider 回归；5/5 修复目标通过，2/2 已知标签限制继续返回证据不足；Embedding 16/16、Rerank 7/7、Expansion 5/5，失败/fallback 为 0。",
-      "boundary": "POST_FIX_TARGETED_REGRESSION，holdoutExposed=true、freshEvidence=false。只证明修复路径在已知坏例上有效，不能作为新 48 条 fresh 的替代成绩。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-targeted-20260814/summary.json",
-      "resultSha256": "2f4d3fc8bb6485c397af2510a5286959fa5e449b9a95e5d0073d24c902865f71",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-postfix-targeted-20260814/run-manifest.json",
-      "runManifestSha256": "aa0208b81b0d007cc8f1bb88ddb8f30c72580de81bc80b8509f8ab3a4a178d97",
-      "resultAssertions": {
-        "runId": "rag-v4-64aa86e-postfix-targeted-20260814",
-        "status": "POST_FIX_TARGETED_REGRESSION",
-        "holdoutExposed": true,
-        "freshEvidence": false,
-        "caseCount": 7,
-        "validation.status": "PASSED_TARGETED_WITH_KNOWN_LABEL_LIMITS",
-        "validation.checks.fiveFixTargetsPassed": true,
-        "validation.checks.twoUnsupportedLabelsRemainInsufficient": true
-      },
-      "datasetLocks": []
-    },
-    {
-      "id": "rag-generation-v4-postfix-rescore",
-      "kind": "offline-regression",
-      "suite": "rag-generation-live-v4",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py --rescore-source-run-id rag-generation-v4-64aa86e-postfix-20260814 --run-id rag-generation-v4-64aa86e-postfix-rescore-v3-20260814",
-      "caseCount": 60,
-      "claim": "不改答案、证据和 Provider 输出的 0 Provider 重评为 49/60，known regression 35/40，required-claim completeness 0.9674，claim-citation support 0.9565，canonical coverage 0.9783。",
-      "boundary": "POST_FIX_OFFLINE_RESCORE，holdoutExposed=true、freshEvidence=false；总成功率 0.8167 仍低于 0.85，正式 39/60 不变。HUMAN_REVIEW_PENDING。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-rescore-v3-20260814/summary.json",
-      "resultSha256": "f978888461d9b95aa64d0364308ec93cd9e2095996dad0b088dee0d8ba3dddbe",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-rescore-v3-20260814/run-manifest.json",
-      "runManifestSha256": "187b76a14722ce2a0b59e535fa60d8181cfbed3057989cd5b1b8a4eaf31575bb",
-      "resultAssertions": {
-        "runId": "rag-generation-v4-64aa86e-postfix-rescore-v3-20260814",
-        "status": "POST_FIX_OFFLINE_RESCORE",
-        "summary.rescore.providerRequests": 0,
-        "summary.rescore.holdoutExposed": true,
-        "summary.rescore.freshEvidence": false,
-        "summary.qualityGate.status": "FAILED_RETAINED",
-        "humanReviewStatus": "HUMAN_REVIEW_PENDING"
-      },
-      "datasetLocks": []
-    },
-    {
-      "id": "rag-generation-v4-postfix-targeted-chain",
-      "kind": "targeted-regression",
-      "suite": "rag-generation-live-v4",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py --targeted-source-run-id rag-generation-v4-64aa86e-postfix-targeted-v4-20260814 --run-id rag-generation-v4-64aa86e-postfix-targeted-v5-20260814",
-      "caseCount": 1,
-      "claim": "保留 11 条、4 条、1 条、1 条、1 条的定向诊断链；最终 v5 使物流 SLA 坏例正确否定两小时承诺并引用模拟物流边界，Provider 完整。",
-      "boundary": "整条链均为 POST_FIX_TARGETED_REGRESSION，holdoutExposed=true、freshEvidence=false；不得把各轮结果拼成新的 60 条分数。人审仍为 HUMAN_REVIEW_PENDING。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v5-20260814/summary.json",
-      "resultSha256": "0404f1cb869415d6526a1317f29192a8a1da68cad9ae814580e089c5b3ba180b",
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v5-20260814/run-manifest.json",
-      "runManifestSha256": "66214e1b17d0b81301c64161a8964c2dfa6368d1a1dc004c16b333572aefcc59",
-      "resultAssertions": {
-        "runId": "rag-generation-v4-64aa86e-postfix-targeted-v5-20260814",
-        "status": "POST_FIX_TARGETED_REGRESSION",
-        "metadata.holdoutExposed": true,
-        "metadata.freshEvidence": false,
-        "summary.caseCount": 1,
-        "summary.taskSuccessCount": 1,
-        "summary.providerCompleteness.passed": true,
-        "humanReviewStatus": "HUMAN_REVIEW_PENDING"
-      },
-      "relatedArtifacts": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-20260814/summary.json",
-          "sha256": "23f1181ebe13164b51998d15e10696edfa5f74639e3659c21db8fa6f35dd35ed",
-          "assertions": {
-            "runId": "rag-generation-v4-64aa86e-postfix-targeted-20260814",
-            "summary.caseCount": 11
-          }
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v2-20260814/summary.json",
-          "sha256": "eb741159aee69e01b8c4076de765006e280f52de9599f520ed6f9c336979869a",
-          "assertions": {
-            "runId": "rag-generation-v4-64aa86e-postfix-targeted-v2-20260814",
-            "summary.caseCount": 4
-          }
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v3-20260814/summary.json",
-          "sha256": "5fcdcc9b66e4feb0f8b5194b88f0503bbd790c71e2dfcd3afd2484de4287c396",
-          "assertions": {
-            "runId": "rag-generation-v4-64aa86e-postfix-targeted-v3-20260814",
-            "summary.caseCount": 1,
-            "summary.taskSuccessCount": 0
-          }
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-targeted-v4-20260814/summary.json",
-          "sha256": "b90f64063b7d15fdb1c1ef2d05258acb09c0a21186bfe6d674814ede2960e07a",
-          "assertions": {
-            "runId": "rag-generation-v4-64aa86e-postfix-targeted-v4-20260814",
-            "summary.caseCount": 1,
-            "summary.taskSuccessCount": 0
-          }
-        }
-      ],
-      "datasetLocks": []
-    },
-    {
-      "id": "agent-adaptive-orchestration",
-      "kind": "source-and-test-contract",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_orchestration_policy.py tests/test_order_reference_flow.py tests/test_forced_tools.py -q",
-      "claim": "自适应策略按任务证据选择 workflow、single_agent 或 multi_agent，并支持四种固定配置；只读退款解释不能产生退款提案，Workflow 缺参会留下显式 fallback。",
-      "boundary": "这是源码和确定性测试证据；尚未证明真实模型下多 Agent 的质量、延迟或成本收益。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/app/graph/orchestration_policy.py",
-      "datasetLocks": []
-    },
-    {
-      "id": "agent-runtime-guardrails",
-      "kind": "source-and-test-contract",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_budget_guard.py tests/test_circuit_breaker.py -q",
-      "claim": "逐运行预算守卫覆盖 token、人民币成本、节点步数和 monotonic deadline；熔断器覆盖 CLOSED/OPEN/HALF_OPEN、并发 probe 和恢复。",
-      "boundary": "预算与熔断保护资源和依赖，不替代写操作幂等；人民币成本只有命中可信价格表时才可报告。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/app/graph/budget_guard.py",
-      "datasetLocks": []
-    },
-    {
-      "id": "agent-live-task-contract",
-      "kind": "evaluation-contract",
-      "suite": "task-success-live-v1",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python benchmarks/run_task_success_eval.py --validate-only",
-      "caseCount": 37,
-      "claim": "37 条、8 个子集的任务集已冻结；Runner 只允许 LIVE_FULL_STACK 路径，并从持久 Episode、消息和 pending-action 状态判分。",
-      "boundary": "这是数据与 Runner 契约，不是正式成绩；lock 的 resultStatus 为 NOT_COLLECTED，不能声称已有 TSR、延迟或成本。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/run_task_success_eval.py",
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.jsonl"
-        }
-      ]
-    },
-    {
-      "id": "agent-live-ablation-contract",
-      "kind": "evaluation-contract",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_live_orchestration_ablation.py -q",
-      "claim": "三模式比较器只接受同数据 SHA、case、fixture、模型集合和 Provider 指纹的完整 LIVE_FULL_STACK 报告，并计算配对差值与 bootstrap 95% CI。",
-      "boundary": "比较能力已测试，但三份真实模型报告尚未采集；不得用旧确定性消融替代。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/compare_live_orchestration_ablation.py",
-      "datasetLocks": []
-    },
-    {
-      "id": "agent-trace-export-contract",
-      "kind": "evidence-export-contract",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python -m pytest tests/test_export_interview_traces.py -q",
-      "claim": "导出器只接受真实已确认退款与真实未知结果两类 Episode/MySQL 组合，并生成脱敏报告、manifest 和 SHA256SUMS。",
-      "boundary": "导出能力有测试；由于缺少两条合格 live run，正式 Trace bundle 尚未采集。",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/scripts/export_interview_traces.py",
-      "datasetLocks": []
-    },
-    {
-      "id": "agent-live-model",
-      "kind": "online-evaluation",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "NOT_COLLECTED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && .venv/bin/python benchmarks/run_task_success_eval.py --bindings benchmarks/task_success_bindings.local.json --fixture-snapshot-id <snapshot> --expected-orchestration-mode adaptive",
-      "claim": "未采集。",
-      "boundary": "真实模型 Agent TSR、在线消融、正式 Trace 及其 token/成本仍未采集；不能用单元测试、deterministic Runner 或 Search/RAG 结果替代。",
-      "resultLocation": "not-collected",
-      "resultPath": null,
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.jsonl"
-        }
+        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v4.lock.json"
       ]
     },
     {
       "id": "real-user-pilot",
-      "kind": "pilot-evaluation",
+      "kind": "real-user-contract",
+      "suite": "authorized-pilot",
       "level": "E4_REAL_USER",
       "state": "NOT_COLLECTED",
-      "command": "Create an authorized REAL_USER pilot batch and export its anonymized report",
-      "claim": "未采集。",
-      "boundary": "没有真实用户任务成功率、FCR、CTR/CVR、GMV uplift、线上 SLO 或生产规模结论。",
-      "resultLocation": "not-collected",
-      "resultPath": null,
-      "datasetLocks": []
+      "command": "Collect only after consent, source tagging, privacy review, and a documented pilot batch exist.",
+      "claim": "No authorized real-user sample, FCR, CTR/CVR, GMV uplift, production SLO, or capacity result has been collected.",
+      "boundary": "Local synthetic and local-live results must never be relabeled as real users or production outcomes.",
+      "resultLocation": "not-collected"
     }
   ],
   "requiredEvidenceIds": [
-    "java-domain-integration",
-    "agent-adaptive-orchestration",
-    "agent-runtime-guardrails",
-    "agent-live-task-contract",
-    "agent-live-ablation-contract",
-    "agent-trace-export-contract",
-    "agent-live-model",
+    "commerce-runtime",
+    "ai-safety",
+    "search-rag-deterministic-contract",
+    "agent-v2-live-contract",
+    "agent-v2-cancel-local-full-stack",
+    "agent-v2-rag-provider-local-full-stack",
+    "agent-v2-rag-policy-failures-retained",
+    "search-v2-formal-retained",
+    "rag-retrieval-v4-formal-retained",
+    "rag-generation-v4-formal-retained",
     "real-user-pilot"
+  ],
+  "honestBoundaries": [
+    "The frozen 44-case Agent v2 lock remains resultStatus=NOT_COLLECTED. Isolated one-case local-live results do not establish total Agent TSR, P95, or a formal ablation.",
+    "SYNTHETIC, local-live, and REAL_USER evidence must remain separate. No authorized real-user data has been collected.",
+    "The cancel-order sample is a deterministic Workflow with 0 LLM tokens; it is not a model performance result.",
+    "The policy-QA Provider result is n=1. Its totalCostCny=0.0 is UNPRICED, not proof that model cost is zero.",
+    "The r1-r4 refund-policy failures are retained; missing published knowledge must be fixed with governed content and a new holdout, not a lower evidence threshold.",
+    "Search v2, RAG retrieval v4, and RAG generation v4 formal local-live failures stay FAILED_RETAINED. Exposed-holdout replay cannot replace fresh evidence.",
+    "HUMAN_REVIEW_PENDING means no independent human calibration has been completed.",
+    "This project is an AI application engineering portfolio project, not proof of production scale, revenue impact, model training, inference-engine optimization, Kubernetes, or Agent infrastructure operations."
+  ],
+  "claimDocuments": [
+    "README.md",
+    "docs/AI应用求职项目证据总览.md",
+    "docs/性能与质量证据_20260820.md",
+    "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
+    "AI应用开发_Java后端_真实面试题与备考报告_20260819.md"
+  ],
+  "documentationConsistency": [
+    {
+      "path": "README.md",
+      "requiredTokens": [
+        "Agent v2 冻结 44 条",
+        "SYNTHETIC + local-live",
+        "UNPRICED",
+        "NOT_COLLECTED"
+      ],
+      "forbiddenTokens": [
+        "AI_SHOP_秋招叙述材料包_20260818.md",
+        "docs/项目问题排查与修复复盘.md",
+        "docs/Search与RAG成熟评测报告.md"
+      ]
+    },
+    {
+      "path": "docs/AI应用求职项目证据总览.md",
+      "requiredTokens": [
+        "live-cancel-confirmed-012",
+        "live-confirmation-policy-020",
+        "5071",
+        "HUMAN_REVIEW_PENDING",
+        "NOT_COLLECTED",
+        "UNPRICED"
+      ],
+      "forbiddenTokens": [
+        "正式 Agent 模型结果已采集"
+      ]
+    },
+    {
+      "path": "docs/性能与质量证据_20260820.md",
+      "requiredTokens": [
+        "1067 ms",
+        "3237 ms",
+        "5071",
+        "FAILED_RETAINED",
+        "HUMAN_REVIEW_PENDING",
+        "UNPRICED"
+      ],
+      "forbiddenTokens": [
+        "生产 SLO 已达标"
+      ]
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
+      "requiredTokens": [
+        "44 条",
+        "resultStatus` 为 `NOT_COLLECTED",
+        "local-live 子集",
+        "UNPRICED"
+      ],
+      "forbiddenTokens": [
+        "agent-v2-workflow-6eb8e8e-20260817"
+      ]
+    },
+    {
+      "path": "AI应用开发_Java后端_真实面试题与备考报告_20260819.md",
+      "requiredTokens": [
+        "AI_Shop 当前证据边界",
+        "44 条",
+        "NOT_COLLECTED",
+        "SYNTHETIC + local-live"
+      ],
+      "forbiddenTokens": [
+        "AI应用开发_Java后端_手撕与工程题集合_20260819.md",
+        "AI应用开发_电商后端_场景设计题集合_20260819.md"
+      ]
+    }
   ],
   "implementationArtifacts": [
     {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v1.lock.json",
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
       "requiredTokens": [
-        "\"caseCount\": 37",
+        "\"total\": 44",
         "\"resultStatus\": \"NOT_COLLECTED\""
       ],
       "forbiddenTokens": []
     },
     {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/run_task_success_eval.py",
+      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/run_task_success_v2_eval.py",
       "requiredTokens": [
-        "EXECUTION_MODE = \"LIVE_FULL_STACK\"",
-        "def _rag_provider_facts",
-        "POST /api/agent/sendMessage"
+        "LIVE_FULL_STACK",
+        "--case-id"
       ],
       "forbiddenTokens": [
         "def simulate_case"
       ]
     },
     {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/compare_live_orchestration_ablation.py",
-      "requiredTokens": [
-        "EXPECTED_MODES = (\"workflow\", \"single_agent\", \"multi_agent\")",
-        "LIVE_FULL_STACK_PAIRED",
-        "taskSuccessDelta95Ci"
-      ],
-      "forbiddenTokens": []
-    },
-    {
       "path": "AI_Shop-backend/AI_Shop-agent/scripts/export_interview_traces.py",
       "requiredTokens": [
-        "def validate_trace_pair",
-        "unknown_outcome_manual_review",
+        "def validate_confirmed_trace",
+        "_TOKEN_METRIC_KEYS",
         "SHA256SUMS"
       ],
       "forbiddenTokens": []
     },
     {
-      "path": "AI_Shop-backend/AI_Shop-agent/app/graph/orchestration_policy.py",
+      "path": "AI_Shop-backend/AI_Shop-agent/app/mcp_server/server.py",
       "requiredTokens": [
-        "ConfiguredMode = Literal[\"adaptive\", \"workflow\", \"single_agent\", \"multi_agent\"]",
-        "def _workflow_eligible",
-        "cross_domain_request"
+        "episode_service"
       ],
       "forbiddenTokens": []
-    },
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/app/graph/budget_guard.py",
-      "requiredTokens": [
-        "class BudgetGuard",
-        "time.monotonic",
-        "ContextVar[BudgetGuard"
-      ],
-      "forbiddenTokens": []
-    },
-    {
-      "path": "docs/个人技术贡献边界_项目卡片格式.md",
-      "requiredTokens": [
-        "Java 交易底座 + Python 受控售后 Agent",
-        "LangGraph Checkpoint 持久化在 Redis",
-        "resultStatus=NOT_COLLECTED"
-      ],
-      "forbiddenTokens": [
-        "AI_Shop-agent/app/services/rag/",
-        "app/agents/orchestrator.py",
-        "Vue 3 + Vite + Vant 4",
-        "官方PostgreSQL checkpointer"
-      ]
-    },
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
-      "requiredTokens": [
-        "Agent v2 真实全栈任务成功率",
-        "task_success_v2_bindings.local.json",
-        "每个模式运行前恢复同一份业务 fixture",
-        "compare_live_orchestration_ablation.py",
-        "resultStatus` 为 `NOT_COLLECTED"
-      ],
-      "forbiddenTokens": [
-        "12个测试用例"
-      ]
-    }
-  ],
-  "honestBoundaries": [
-    "普通 benchmarks/results 目录被 Git 忽略；只有显式接受的 baseline lock 才能入库，本轮没有运行 --accept-baseline。",
-    "SYNTHETIC、LOCAL_PILOT、REAL_USER 必须分开报告；REAL_USER 没有样本时固定为未采集。",
-    "Search/RAG 的 E3 configured-live 证据已经采集；Search v2、RAG retrieval v4 和 generation v4 的正式门禁均未全过，不得用暴露后回归覆盖正式失败。",
-    "POST_FIX_OFFLINE_REPLAY、POST_FIX_OFFLINE_RESCORE 和 POST_FIX_TARGETED_REGRESSION 必须保持 holdoutExposed=true、freshEvidence=false，不得升级为 fresh E3。",
-    "RAG v4 人工盲评状态为 HUMAN_REVIEW_PENDING；AI_ASSISTED_INITIAL_REVIEW 不得表述为独立人工标注。",
-    "Agent 37 条 live 任务、三模式真实消融和两条正式 Trace 当前均为 NOT_COLLECTED；门禁、单测或旧 deterministic 结果不能替代正式成绩。",
-    "Visual 25 条和 Text2SQL 40 条锁定任务只证明 suite/数据契约与治理边界；没有真实 Provider 证据时不得写成正式质量成绩。",
-    "小于 100 个样本的 P99 只作样本描述，不作为总体尾延迟或 SLO；本轮 Search/RAG 各分组仍均小于 100。",
-    "项目不包含模型训练、微调、量化、推理引擎优化、Kubernetes、服务网格或 Agent Infra 平台。",
-    "本项目适合作为秋招 AI 应用工程项目，但不能冒充生产业务经历、线上业务收益或大规模系统容量证明。",
-    "秋招叙述材料包只整理已验证实现与限制，不构成新增 E3/E4 证据。"
-  ],
-  "claimDocuments": [
-    "README.md",
-    "docs/AI应用求职项目证据总览.md",
-    "docs/项目问题排查与修复复盘.md",
-    "docs/Search与RAG成熟评测报告.md",
-    "docs/个人技术贡献边界_项目卡片格式.md",
-    "docs/AI_SHOP_MAINLINE_BASELINE_20260818.md",
-    "docs/AI_SHOP_秋招叙述材料包_20260818.md"
-  ],
-  "documentationConsistency": [
-    {
-      "path": "README.md",
-      "requiredTokens": [
-        "Search v2 覆盖中文 600 商品/240 查询",
-        "正式 Retrieval/Generation 均保留",
-        "HUMAN_REVIEW_PENDING",
-        "自适应编排",
-        "resultStatus=NOT_COLLECTED",
-        "INCONCLUSIVE"
-      ],
-      "forbiddenTokens": [
-        "RAG v3 将知识库扩为 12 份/75 chunk"
-      ]
-    },
-    {
-      "path": "docs/AI应用求职项目证据总览.md",
-      "requiredTokens": [
-        "Search v2 正式",
-        "RAG retrieval v4 正式",
-        "RAG generation v4 正式",
-        "39/60",
-        "HUMAN_REVIEW_PENDING",
-        "Agent live 任务契约",
-        "resultStatus=NOT_COLLECTED",
-        "INCONCLUSIVE"
-      ],
-      "forbiddenTokens": [
-        "RAG retrieval v3（当前）",
-        "RAG generation v3（当前）"
-      ]
-    },
-    {
-      "path": "docs/Search与RAG成熟评测报告.md",
-      "requiredTokens": [
-        "search-v2-64aa86e-final-20260814",
-        "rag-v4-64aa86e-routefix-20260814",
-        "rag-generation-v4-64aa86e-postfix-20260814",
-        "POST_FIX_OFFLINE_RESCORE",
-        "rag-v4-fresh-extra-021",
-        "HUMAN_REVIEW_PENDING"
-      ],
-      "forbiddenTokens": []
-    },
-    {
-      "path": "docs/项目问题排查与修复复盘.md",
-      "requiredTokens": [
-        "rag-v4-64aa86e-routefix-20260814",
-        "rag-generation-v4-64aa86e-postfix-20260814",
-        "gold 泄漏",
-        "PASSED_TARGETED_WITH_KNOWN_LABEL_LIMITS",
-        "HUMAN_REVIEW_PENDING"
-      ],
-      "forbiddenTokens": []
-    },
-    {
-      "path": "docs/个人技术贡献边界_项目卡片格式.md",
-      "requiredTokens": [
-        "受控售后闭环",
-        "INCONCLUSIVE -> 对账 -> MANUAL_REVIEW",
-        "正式 Agent 模型结果",
-        "RAG v4 正式 fresh `Recall@5=0.8056`"
-      ],
-      "forbiddenTokens": [
-        "推荐归因持久化和不可变Outcome Ledger"
-      ]
-    },
-    {
-      "path": "docs/AI_SHOP_MAINLINE_BASELINE_20260818.md",
-      "requiredTokens": [
-        "refactor/ai-shop-mainline-quality",
-        "INCONCLUSIVE",
-        "resultStatus=NOT_COLLECTED"
-      ],
-      "forbiddenTokens": [
-        "REAL_USER 已采集"
-      ]
-    },
-    {
-      "path": "docs/AI_SHOP_秋招叙述材料包_20260818.md",
-      "requiredTokens": [
-        "90 秒 AI 后端 / Agent 开场",
-        "症状 → 错误假设 → 证据 → 根因 → 取舍 → 实测 → 限制",
-        "Search 首次 ProductService",
-        "resultStatus=NOT_COLLECTED",
-        "INCONCLUSIVE"
-      ],
-      "forbiddenTokens": [
-        "REAL_USER 已采集"
-      ]
     }
   ],
   "forbiddenCurrentClaims": [
     {
-      "pattern": "pytest（838 通过|整改基线：`f639599",
+      "pattern": "完整 44 条 Agent v2[^\\n]*(?:已通过|100%)",
       "paths": [
         "README.md",
-        "docs/AI应用求职项目证据总览.md"
+        "docs/AI应用求职项目证据总览.md",
+        "docs/性能与质量证据_20260820.md"
+      ]
+    },
+    {
+      "pattern": "REAL_USER 已采集|线上 SLO 已达标|生产业务收益",
+      "paths": [
+        "README.md",
+        "docs/AI应用求职项目证据总览.md",
+        "docs/性能与质量证据_20260820.md"
       ]
     }
   ]

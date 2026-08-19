@@ -637,7 +637,6 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         await redis_service.clear_bound_message_id(user_id)
         return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
 
-    llm = rt.bind_agent_llm()
     consult = state.get("card")
     user_text = state.get("user_text") or ""
     from_product = state.get("from_product", False)
@@ -676,7 +675,19 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         and state.get("rag_evidence_state") == "SUPPORTED"
         and state.get("rag_evidence_items")
     )
+    # A simple policy question with prevalidated evidence has no reason to
+    # enter a second tool-calling round. Keeping tools enabled here can cause
+    # redundant retrieval, extra context, and an avoidable token-budget miss.
+    bounded_grounded_turn = grounded_answer_turn and not state.get("rag_agentic_allowed")
+    if bounded_grounded_turn:
+        tool_required_first_turn = False
     non_stream_turn = non_stream_turn or grounded_answer_turn
+    llm_options = {
+        "tools_enabled": not bounded_grounded_turn,
+        "max_tokens": 384 if bounded_grounded_turn else None,
+        "disable_thinking": bounded_grounded_turn,
+    }
+    llm = rt.bind_agent_llm(**llm_options)
     try:
         if non_stream_turn:
             response = await invoke_llm_with_metrics(
@@ -708,7 +719,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         )
         if can_retry:
             try:
-                fallback_llm = rt.bind_agent_llm(fallback=True)
+                fallback_llm = rt.bind_agent_llm(fallback=True, **llm_options)
                 if non_stream_turn:
                     response = await invoke_llm_with_metrics(
                         fallback_llm,
@@ -1116,6 +1127,12 @@ async def tools_node(state: AgentGraphState) -> dict:
         state.get("rag_safe_business_query") or state.get("user_text") or ""
     )
     quarantined_result = False
+    # OpenAI-compatible providers require every ToolMessage to immediately
+    # follow the assistant message that declared its tool_calls. RAG's
+    # system-role grounding rule is therefore queued and inserted before that
+    # assistant message after all pending calls have their ToolMessages.
+    tool_call_message_index = max(0, len(messages) - 1)
+    pending_grounding_rules: list[SystemMessage] = []
 
     for tc in state.get("pending_tool_calls") or []:
         if await rt.is_cancelled(user_id, message_id):
@@ -1293,8 +1310,12 @@ async def tools_node(state: AgentGraphState) -> dict:
                 evidence_items=list(grounding.get("evidenceItems") or []),
             )
             # A ToolMessage is untrusted by definition; the shared behavioral
-            # contract must still be a true system-role message.
-            messages.insert(-1, grounding_prompt.production_system_messages()[0])
+            # contract must still be a true system-role message. It cannot be
+            # inserted between an AI tool-call message and its ToolMessages,
+            # because OpenAI-compatible providers reject that message order.
+            pending_grounding_rules.append(
+                grounding_prompt.production_system_messages()[0]
+            )
             for item in grounding.get("evidenceItems") or []:
                 if not isinstance(item, dict):
                     continue
@@ -1348,6 +1369,9 @@ async def tools_node(state: AgentGraphState) -> dict:
             product_id = (tc.get("args") or {}).get("productId") or (tc.get("args") or {}).get("product_id")
             if product_id:
                 await product_snapshot_service.ensure_consult_snapshot(user_id, str(product_id))
+
+    if pending_grounding_rules:
+        messages[tool_call_message_index:tool_call_message_index] = pending_grounding_rules
 
     rag_update = {
         "rag_mode": rag_mode,

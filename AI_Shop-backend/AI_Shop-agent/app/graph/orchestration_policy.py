@@ -85,12 +85,15 @@ def select_orchestration(
 
 
 def _workflow_eligible(state: Mapping[str, Any]) -> bool:
-    if state.get("rag_evidence_required"):
-        return False
     if _looks_composite(str(state.get("user_text") or "")):
         return False
+    # The order resolver has already verified ownership, state eligibility,
+    # and exact tool arguments. A conditional RAG prefetch must not promote a
+    # single deterministic write proposal into a multi-agent policy workflow.
     if state.get("resolved_order_tool"):
         return True
+    if state.get("rag_evidence_required"):
+        return False
     return (
         str(state.get("request_mode") or "") == RequestMode.READ_QUERY.value
         and str(state.get("intent") or "") in _WORKFLOW_READ_INTENTS

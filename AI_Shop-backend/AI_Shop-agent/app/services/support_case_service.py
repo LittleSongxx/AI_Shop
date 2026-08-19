@@ -84,6 +84,16 @@ class SupportCaseService:
             "DELIVERY": "LOGISTICS",
             "REFUND": "REFUND_DISPUTE",
             "PAYMENT": "PAYMENT_DISPUTE",
+            **{label.upper(): code for code, label in CASE_CATEGORY_LABELS.items()},
+            "破损": "DAMAGED",
+            "商品损坏": "DAMAGED",
+            "发错商品": "WRONG_ITEM",
+            "缺件": "MISSING_ITEM",
+            "物流": "LOGISTICS",
+            "退款": "REFUND_DISPUTE",
+            "支付": "PAYMENT_DISPUTE",
+            "修改地址": "ADDRESS_CHANGE",
+            "发票": "INVOICE",
         }
         value = aliases.get(value, value)
         return value if value in CASE_CATEGORIES else "OTHER"

@@ -270,6 +270,22 @@ def _has_non_negated_action_cue(text: str, cues: tuple[str, ...]) -> bool:
     return False
 
 
+def _is_direct_order_action(text: str, intent: IntentKind, asks_information: bool) -> bool:
+    """Recognize terse order commands without turning questions into writes."""
+
+    cues = {
+        IntentKind.REFUND: ("退款", "退掉"),
+        IntentKind.CANCEL_ORDER: ("取消订单", "取消这单", "取消该订单"),
+    }.get(intent)
+    if not cues or not extract_order_id(text):
+        return False
+    if asks_information or any(marker in text for marker in _ACTION_NEGATION_MARKERS):
+        return False
+    if "?" in text or "？" in text or re.search(r"(?:吗|么|嘛)\s*$", text):
+        return False
+    return any(cue in text for cue in cues)
+
+
 def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     """Deterministically separate information, reads, and proposed writes."""
 
@@ -283,7 +299,10 @@ def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     explicitly_delegates = any(
         marker in text for marker in ("帮我", "给我", "直接", "立即", "提交", "申请")
     )
-    if strong_action and (not asks_information or explicitly_delegates):
+    direct_order_action = _is_direct_order_action(text, intent, asks_information)
+    if (strong_action or direct_order_action) and (
+        not asks_information or explicitly_delegates
+    ):
         return RequestMode.ACTION_PROPOSAL
 
     # A selected order can turn the next message into an argument-only write

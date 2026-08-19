@@ -40,6 +40,8 @@ def _acquire_for(cursor: _Cursor):
 def test_category_mapping_keeps_after_sales_domains_deterministic():
     assert SupportCaseService.category_for_intent("ADDRESS_CHANGE") == "ADDRESS_CHANGE"
     assert SupportCaseService.category_for_intent("INVOICE") == "INVOICE"
+    assert SupportCaseService.normalize_category("商品破损") == "DAMAGED"
+    assert SupportCaseService.normalize_category("商品错发") == "WRONG_ITEM"
     assert (
         SupportCaseService.category_for_intent("DAMAGED_OR_WRONG_ITEM", "包裹少了一件")
         == "MISSING_ITEM"

@@ -4,6 +4,7 @@ import json
 import pytest
 
 from benchmarks import run_task_success_eval as live_eval
+from app.services.episode_service import sanitize_episode_payload
 
 
 def _case() -> dict:
@@ -59,10 +60,9 @@ def _episode() -> dict:
                 "status": "OK",
                 "toolName": "PROPOSE_REFUND",
                 "input": {
-                    "args": {
-                        "userId": "hashed-at-report-boundary",
-                        "orderItemId": "item-1",
-                    }
+                    "args": sanitize_episode_payload(
+                        {"userId": "user-1", "orderItemId": "item-1"}
+                    )
                 },
             },
             {

@@ -16,6 +16,7 @@ from app.db.migrations import run_migrations
 from app.db.pool import close_pool, init_pool
 from app.observability.logging import configure_structured_logging
 from app.services import mcp_tools_service as tools
+from app.services.episode_service import episode_service
 from app.services.java_internal_client import delegated_user_scope
 from app.services.redis_service import redis_service
 from app.services.shopping_mission_service import initialize_category_need_schemas
@@ -38,9 +39,11 @@ async def _mcp_lifespan(_server: FastMCP) -> AsyncIterator[dict]:
     if settings.agent_auto_migrate:
         await asyncio.to_thread(run_migrations)
     await initialize_category_need_schemas()
+    await episode_service.start()
     try:
         yield {}
     finally:
+        await episode_service.close()
         await close_pool()
         await redis_service.close()
 

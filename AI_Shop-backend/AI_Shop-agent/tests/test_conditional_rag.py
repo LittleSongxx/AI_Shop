@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from app.graph.nodes import tools_node
 from app.harness.observation import CONTAMINATED_CONTENT_PLACEHOLDER
@@ -141,3 +142,63 @@ async def test_tools_node_quarantines_poisoned_result_and_drops_sources(monkeypa
     assert result["tool_biz"] is None
     assert result["biz_data"] is None
     assert poison not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_rag_rules_do_not_interrupt_openai_tool_message_sequence(monkeypatch):
+    invoke = AsyncMock(
+        side_effect=[
+            ToolInvokeResult(
+                content="退款规则证据一",
+                source_refs=[{"chunkId": "c1", "knowledgeVersion": 3}],
+                retrieval_trace={"hit": True, "knowledgeVersion": 3},
+                grounding={
+                    "evidenceState": "SUPPORTED",
+                    "queryPlan": {"safeBusinessQuery": "退款规则"},
+                    "evidenceItems": [{"citation": 1, "text": "证据一", "ref": {"id": "c1"}}],
+                },
+            ),
+            ToolInvokeResult(
+                content="退款规则证据二",
+                source_refs=[{"chunkId": "c2", "knowledgeVersion": 3}],
+                retrieval_trace={"hit": True, "knowledgeVersion": 3},
+                grounding={
+                    "evidenceState": "SUPPORTED",
+                    "queryPlan": {"safeBusinessQuery": "退款规则"},
+                    "evidenceItems": [{"citation": 2, "text": "证据二", "ref": {"id": "c2"}}],
+                },
+            ),
+        ]
+    )
+    monkeypatch.setattr(mcp_tool_router, "invoke", invoke)
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    state = _state(
+        pending=[
+            {"id": "call-1", "name": "SEARCH_KNOWLEDGE", "args": {"query": "退款规则"}},
+            {"id": "call-2", "name": "SEARCH_KNOWLEDGE", "args": {"query": "退款运费"}},
+        ]
+    )
+    state["llm_messages"] = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {"id": "call-1", "name": "SEARCH_KNOWLEDGE", "args": {"query": "退款规则"}},
+                {"id": "call-2", "name": "SEARCH_KNOWLEDGE", "args": {"query": "退款运费"}},
+            ],
+        )
+    ]
+
+    result = await tools_node(state)
+
+    messages = result["llm_messages"]
+    response_index = next(
+        index for index, message in enumerate(messages) if isinstance(message, AIMessage)
+    )
+    assert all(isinstance(message, SystemMessage) for message in messages[:response_index])
+    assert [message.tool_call_id for message in messages[response_index + 1 :]] == [
+        "call-1",
+        "call-2",
+    ]
+    assert all(
+        isinstance(message, ToolMessage) for message in messages[response_index + 1 :]
+    )

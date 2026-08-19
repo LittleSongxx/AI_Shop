@@ -104,6 +104,16 @@ async def test_write_tool_leaves_audit_log(sent_to_mcp):
     assert audit[0]["user_id"] == "u1"
 
 
+async def test_support_case_category_is_normalized_before_mcp(sent_to_mcp):
+    await mcp_tool_router.invoke(
+        "PROPOSE_CREATE_SUPPORT_CASE",
+        {"category": "商品破损", "description": "外壳破裂"},
+        "u1",
+    )
+
+    assert sent_to_mcp[0][1]["category"] == "DAMAGED"
+
+
 async def test_read_tool_leaves_no_audit_log(sent_to_mcp):
     """只读调用量大且没有追溯价值，记了只会淹掉写操作的线索。"""
     with structlog.testing.capture_logs() as logs:

@@ -39,8 +39,28 @@ from app.services.agent_service import AgentOrchestrator
             IntentKind.REFUND,
             RequestMode.INFORMATIONAL,
         ),
+        (
+            "把订单 SM202608050002 退款",
+            IntentKind.REFUND,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "订单 SM202608050002 能退款吗？",
+            IntentKind.REFUND,
+            RequestMode.INFORMATIONAL,
+        ),
         ("选择耳机订单继续退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
         ("取消订单怎么操作", IntentKind.CHAT, RequestMode.INFORMATIONAL),
+        (
+            "取消订单 SM202608050001",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "先别取消订单 SM202608050001",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.INFORMATIONAL,
+        ),
         ("五星，音质很好", IntentKind.PRODUCT_REVIEW, RequestMode.ACTION_PROPOSAL),
         ("五星评价怎么写", IntentKind.PRODUCT_REVIEW, RequestMode.INFORMATIONAL),
         ("补充一下，降噪和续航都不错", IntentKind.RECOMMENT, RequestMode.ACTION_PROPOSAL),

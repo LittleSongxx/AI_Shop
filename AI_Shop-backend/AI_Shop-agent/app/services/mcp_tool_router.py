@@ -15,6 +15,7 @@ from app.rag.prompt_builder import format_grounding_evidence
 from app.services.badcase_service import badcase_service
 from app.services.episode_service import current_episode, episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
+from app.services.support_case_service import SupportCaseService
 from app.services.tool_invoke_result import ToolInvokeResult
 
 logger = structlog.get_logger()
@@ -603,7 +604,7 @@ class McpToolRouter:
         if tool_name == "PROPOSE_CREATE_SUPPORT_CASE":
             out = {
                 "userId": uid,
-                "category": g("category"),
+                "category": SupportCaseService.normalize_category(g("category")),
                 "description": g("description"),
             }
             optional = {

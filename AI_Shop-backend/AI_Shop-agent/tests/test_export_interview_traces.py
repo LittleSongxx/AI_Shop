@@ -66,6 +66,17 @@ def _episode(*, known: bool) -> dict:
     }
 
 
+def _cancel_episode() -> dict:
+    episode = _episode(known=True)
+    episode["intent"] = "CANCEL_ORDER"
+    episode["episodeEvaluation"]["verdict"] = "CANCEL_CONFIRMED"
+    episode["episodeEvaluation"]["facts"]["actionType"] = "CANCEL_ORDER"
+    episode["steps"][0]["toolName"] = "PROPOSE_CANCEL_ORDER"
+    episode["steps"][0]["input"]["args"]["runId"] = "run-internal-123"
+    episode["steps"][1]["output"]["traceId"] = "trace-internal-123"
+    return episode
+
+
 def test_trace_pair_requires_confirmed_refund_and_unknown_mysql_state():
     success = _episode(known=True)
     unknown = _episode(known=False)
@@ -103,6 +114,50 @@ def test_public_trace_redacts_tokens_pii_and_business_ids():
     assert "act_1234567890abcdef1234567890abcdef" not in serialized
     assert "[ACTION_TOKEN]" in serialized
     assert "sha256:" in serialized
+
+
+def test_public_trace_keeps_token_metrics_but_redacts_action_credentials():
+    public = exporter.redact_value(
+        {
+            "inputTokens": 100,
+            "outputTokens": 50,
+            "totalTokens": 150,
+            "actionToken": "act_secret",
+            "authorization": "Bearer secret",
+        }
+    )
+
+    assert public["inputTokens"] == 100
+    assert public["outputTokens"] == 50
+    assert public["totalTokens"] == 150
+    assert public["actionToken"] == "[REDACTED]"
+    assert public["authorization"] == "[REDACTED]"
+
+
+def test_confirmed_cancel_trace_is_supported_and_correlation_ids_are_hashed():
+    episode = _cancel_episode()
+    exporter.validate_confirmed_trace(
+        episode,
+        [{"actionType": "CANCEL_ORDER", "status": "CONFIRMED"}],
+    )
+    public = exporter.public_trace(
+        "confirmed_cancel",
+        episode,
+        [{"actionType": "CANCEL_ORDER", "status": "CONFIRMED"}],
+    )
+    serialized = str(public)
+    assert "run-internal-123" not in serialized
+    assert "trace-internal-123" not in serialized
+    assert "sha256:" in serialized
+
+
+def test_confirmed_bundle_accepts_single_cancel_trace():
+    bundle = exporter.build_confirmed_bundle(
+        _cancel_episode(),
+        [{"actionType": "CANCEL_ORDER", "status": "CONFIRMED"}],
+        label="confirmed_cancel",
+    )
+    assert bundle["traces"][0]["label"] == "confirmed_cancel"
 
 
 def test_bundle_writer_emits_verifiable_sha256_files(tmp_path):

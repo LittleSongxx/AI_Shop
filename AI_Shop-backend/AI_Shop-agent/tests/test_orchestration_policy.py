@@ -29,6 +29,7 @@ def test_adaptive_router_uses_workflow_for_verified_write_proposal():
             "intent": "REFUND",
             "request_mode": "ACTION_PROPOSAL",
             "user_text": "把刚买的耳机退款",
+            "rag_evidence_required": True,
             "resolved_order_tool": {
                 "name": "PROPOSE_REFUND",
                 "args": {"orderItemId": "item-1"},

@@ -1,0 +1,1322 @@
+{
+  "schemaVersion": "aishop-interview-traces/v1",
+  "generatedAt": "2026-08-19T17:39:53.447178+00:00",
+  "executionMode": "LIVE_FULL_STACK",
+  "simulated": false,
+  "redaction": {
+    "pii": true,
+    "businessIdentifiers": "sha256 fingerprint or placeholder",
+    "correlationIdentifiers": "sha256 fingerprint",
+    "actionTokens": "removed",
+    "secrets": "removed"
+  },
+  "traces": [
+    {
+      "label": "confirmed_cancel",
+      "run": {
+        "runId": "sha256:eabff439f364",
+        "traceId": "sha256:b348ae9d2221",
+        "status": "SUCCEEDED",
+        "outcome": "ok",
+        "scenario": "ORDER_AFTERSALES",
+        "intent": "CANCEL_ORDER",
+        "modelName": null,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "costCny": 0.0,
+        "latencyMs": 1067,
+        "ttftMs": null,
+        "startedAt": "2026-08-19T16:54:17.675",
+        "completedAt": "2026-08-19T16:54:18.815",
+        "experiment": {
+          "rag": {
+            "hit": true,
+            "mode": "cache",
+            "phase": "prefetch",
+            "bucket": "A",
+            "ragMode": "conditional",
+            "runtime": {
+              "route": "GENERAL",
+              "cacheHits": 1,
+              "fallbacks": [],
+              "observations": {
+                "plannedQuery": {
+                  "route": "GENERAL",
+                  "domains": [],
+                  "factHints": [],
+                  "subquestions": [
+                    "帮我取消订单 [BUSINESS_ID]"
+                  ],
+                  "expansionReasons": [],
+                  "llmExpansionCalls": 0,
+                  "actualVariantCount": 1,
+                  "deterministicVariantCount": 1
+                },
+                "evidenceSelection": {
+                  "totalChars": 62,
+                  "selectedCount": 1,
+                  "coveredDomains": [
+                    "GENERAL"
+                  ],
+                  "coveredFactIds": [
+                    "order.cancel.<ID:8dcba3775585>"
+                  ],
+                  "subquestionCount": 1,
+                  "effectiveMaxItems": 1,
+                  "configuredMaxItems": 4,
+                  "duplicateBodyCount": 0,
+                  "duplicateFactCount": 0
+                }
+              },
+              "providerCalls": {},
+              "stageLatencyMs": {
+                "catalog": 49.6572,
+                "exactFaq": 7.9662,
+                "decomposition": 0.333,
+                "evidenceSelection": 0.5514
+              },
+              "stageCallCounts": {
+                "catalog": 1,
+                "exactFaq": 1,
+                "decomposition": 1,
+                "evidenceSelection": 1
+              },
+              "providerFailures": {},
+              "policyFingerprint": "<ID:7d62c8b69e4f>",
+              "providerCacheHits": {},
+              "providerSuccesses": {}
+            },
+            "topScore": 0.7689845004139102,
+            "latencyMs": 60.67,
+            "queryHash": "<ID:f7f101ef8fde>",
+            "retrievals": [
+              {
+                "hit": true,
+                "mode": "cache",
+                "phase": "prefetch",
+                "bucket": "A",
+                "runtime": {
+                  "route": "GENERAL",
+                  "cacheHits": 1,
+                  "fallbacks": [],
+                  "observations": {
+                    "plannedQuery": {
+                      "route": "GENERAL",
+                      "domains": [],
+                      "factHints": [],
+                      "subquestions": [
+                        "帮我取消订单 [BUSINESS_ID]"
+                      ],
+                      "expansionReasons": [],
+                      "llmExpansionCalls": 0,
+                      "actualVariantCount": 1,
+                      "deterministicVariantCount": 1
+                    },
+                    "evidenceSelection": {
+                      "totalChars": 62,
+                      "selectedCount": 1,
+                      "coveredDomains": [
+                        "GENERAL"
+                      ],
+                      "coveredFactIds": [
+                        "order.cancel.<ID:8dcba3775585>"
+                      ],
+                      "subquestionCount": 1,
+                      "effectiveMaxItems": 1,
+                      "configuredMaxItems": 4,
+                      "duplicateBodyCount": 0,
+                      "duplicateFactCount": 0
+                    }
+                  },
+                  "providerCalls": {},
+                  "stageLatencyMs": {
+                    "catalog": 49.6572,
+                    "exactFaq": 7.9662,
+                    "decomposition": 0.333,
+                    "evidenceSelection": 0.5514
+                  },
+                  "stageCallCounts": {
+                    "catalog": 1,
+                    "exactFaq": 1,
+                    "decomposition": 1,
+                    "evidenceSelection": 1
+                  },
+                  "providerFailures": {},
+                  "policyFingerprint": "<ID:7d62c8b69e4f>",
+                  "providerCacheHits": {},
+                  "providerSuccesses": {}
+                },
+                "topScore": 0.7689845004139102,
+                "latencyMs": 60.67,
+                "queryHash": "<ID:f7f101ef8fde>",
+                "retrievalNo": 1,
+                "sourceCount": 1,
+                "contamination": [],
+                "candidateCount": 1,
+                "quarantineCount": 0,
+                "knowledgeVersion": 18
+              }
+            ],
+            "retrievalNo": 1,
+            "sourceCount": 1,
+            "contamination": [],
+            "candidateCount": 1,
+            "quarantineCount": 0,
+            "knowledgeVersion": 18
+          },
+          "bucket": "A",
+          "ragMode": "conditional",
+          "orchestration": {
+            "mode": "workflow",
+            "reason": "deterministic_business_path",
+            "configuredMode": "adaptive",
+            "multiAgentAvailable": true
+          }
+        }
+      },
+      "conversation": {
+        "userMessage": "帮我取消订单 [BUSINESS_ID]",
+        "assistantMessage": "{\"type\": \"ACTION_CONFIRM\", \"token\": \"[ACTION_TOKEN]\", \"actionType\": \"CANCEL_ORDER\", \"label\": \"取消订单\", \"summary\": \"取消订单：订单 [BUSINESS_ID]，实付金额 24.0 元\", \"confirmText\": \"确认取消订单\", \"riskTip\": \"取消后订单将关闭，不能恢复\", \"intro\": \"已生成取消订单确认卡片。请用一句话说明关键信息（勿重复工具原文、勿写），并在回复末尾附带 如仍未解决，可以回复“转人工”，由人工客服继续协助。\", \"details\": [{\"label\": \"订单号\", \"value\": \"[BUSINESS_ID]\"}, {\"label\": \"实付金额\", \"value\": \"24.0 元\"}], \"status\": 0, \"orderId\": \"[BUSINESS_ID]\", \"orderAmount\": 24.0, \"items\": [{\"cover\": \"2026-06/QI7QDtLaR1mVCTtmcIbfywOhqBN0Ew.jpg\", \"orderItemId\": \"[BUSINESS_ID]\", \"productName\": \"旺旺 雪饼 厚烧海苔 原味 385g\", \"propertyInfo\": \"厚烧海苔分享装 385g*1袋\"}]}",
+        "bizType": "action_confirm",
+        "sourceRefs": {
+          "trace": {
+            "hit": true,
+            "mode": "cache",
+            "phase": "prefetch",
+            "bucket": "A",
+            "ragMode": "conditional",
+            "runtime": {
+              "route": "GENERAL",
+              "cacheHits": 1,
+              "fallbacks": [],
+              "observations": {
+                "plannedQuery": {
+                  "route": "GENERAL",
+                  "domains": [],
+                  "factHints": [],
+                  "subquestions": [
+                    "帮我取消订单 [BUSINESS_ID]"
+                  ],
+                  "expansionReasons": [],
+                  "llmExpansionCalls": 0,
+                  "actualVariantCount": 1,
+                  "deterministicVariantCount": 1
+                },
+                "evidenceSelection": {
+                  "totalChars": 62,
+                  "selectedCount": 1,
+                  "coveredDomains": [
+                    "GENERAL"
+                  ],
+                  "coveredFactIds": [
+                    "order.cancel.by_fulfillment_state"
+                  ],
+                  "subquestionCount": 1,
+                  "effectiveMaxItems": 1,
+                  "configuredMaxItems": 4,
+                  "duplicateBodyCount": 0,
+                  "duplicateFactCount": 0
+                }
+              },
+              "providerCalls": {},
+              "stageLatencyMs": {
+                "catalog": 49.6572,
+                "exactFaq": 7.9662,
+                "decomposition": 0.333,
+                "evidenceSelection": 0.5514
+              },
+              "stageCallCounts": {
+                "catalog": 1,
+                "exactFaq": 1,
+                "decomposition": 1,
+                "evidenceSelection": 1
+              },
+              "providerFailures": {},
+              "policyFingerprint": "53467d7e8654da1a44ef17d10a7394c4fb4b53a48de295418589a773a9c7421c",
+              "providerCacheHits": {},
+              "providerSuccesses": {}
+            },
+            "topScore": 0.7689845004139102,
+            "latencyMs": 60.67,
+            "queryHash": "2082e9f49b6ef6cba2afc5594a172d503ec7255076e798458b667e3fcb9fd2b5",
+            "retrievals": [
+              {
+                "hit": true,
+                "mode": "cache",
+                "phase": "prefetch",
+                "bucket": "A",
+                "runtime": {
+                  "route": "GENERAL",
+                  "cacheHits": 1,
+                  "fallbacks": [],
+                  "observations": {
+                    "plannedQuery": {
+                      "route": "GENERAL",
+                      "domains": [],
+                      "factHints": [],
+                      "subquestions": [
+                        "帮我取消订单 [BUSINESS_ID]"
+                      ],
+                      "expansionReasons": [],
+                      "llmExpansionCalls": 0,
+                      "actualVariantCount": 1,
+                      "deterministicVariantCount": 1
+                    },
+                    "evidenceSelection": {
+                      "totalChars": 62,
+                      "selectedCount": 1,
+                      "coveredDomains": [
+                        "GENERAL"
+                      ],
+                      "coveredFactIds": [
+                        "order.cancel.by_fulfillment_state"
+                      ],
+                      "subquestionCount": 1,
+                      "effectiveMaxItems": 1,
+                      "configuredMaxItems": 4,
+                      "duplicateBodyCount": 0,
+                      "duplicateFactCount": 0
+                    }
+                  },
+                  "providerCalls": {},
+                  "stageLatencyMs": {
+                    "catalog": 49.6572,
+                    "exactFaq": 7.9662,
+                    "decomposition": 0.333,
+                    "evidenceSelection": 0.5514
+                  },
+                  "stageCallCounts": {
+                    "catalog": 1,
+                    "exactFaq": 1,
+                    "decomposition": 1,
+                    "evidenceSelection": 1
+                  },
+                  "providerFailures": {},
+                  "policyFingerprint": "53467d7e8654da1a44ef17d10a7394c4fb4b53a48de295418589a773a9c7421c",
+                  "providerCacheHits": {},
+                  "providerSuccesses": {}
+                },
+                "topScore": 0.7689845004139102,
+                "latencyMs": 60.67,
+                "queryHash": "2082e9f49b6ef6cba2afc5594a172d503ec7255076e798458b667e3fcb9fd2b5",
+                "retrievalNo": 1,
+                "sourceCount": 1,
+                "contamination": [],
+                "candidateCount": 1,
+                "quarantineCount": 0,
+                "knowledgeVersion": 18
+              }
+            ],
+            "retrievalNo": 1,
+            "sourceCount": 1,
+            "contamination": [],
+            "candidateCount": 1,
+            "quarantineCount": 0,
+            "knowledgeVersion": 18
+          },
+          "sources": [
+            {
+              "id": "knowledge_2_1_2",
+              "type": "knowledge_chunk",
+              "score": 0.768985,
+              "domain": "GENERAL",
+              "source": "02-orders-delivery-and-returns.md",
+              "factIds": [
+                "order.cancel.by_fulfillment_state"
+              ],
+              "heading": "取消订单",
+              "snippet": "取消订单\n待付款订单可以直接取消。订单进入发货流程后，是否可以取消取决于当前履约状态；已经发货的订单通常需要按售后流程处理。",
+              "dataType": "knowledge",
+              "retrieval": "rerank",
+              "documentId": "2",
+              "knowledgeVersion": 14
+            }
+          ]
+        }
+      },
+      "episodeEvaluation": {
+        "schemaVersion": 1,
+        "verdict": "CANCEL_CONFIRMED",
+        "orderAftersales": true,
+        "runTerminal": true,
+        "verifierPassed": true,
+        "factComplete": true,
+        "reviewEligible": true,
+        "datasetReviewStatus": "UNREVIEWED",
+        "trainingEligible": false,
+        "facts": {
+          "actionType": "CANCEL_ORDER",
+          "actionProposed": true,
+          "userConfirmed": true,
+          "remoteOutcomeKnown": true,
+          "actionOutcome": "CONFIRMED",
+          "caseCreated": false,
+          "caseStatus": null,
+          "humanResolved": false,
+          "supportResolutionComplete": false
+        }
+      },
+      "pendingActions": [
+        {
+          "actionType": "CANCEL_ORDER",
+          "status": "CONFIRMED",
+          "reconcileAttempts": 0,
+          "reconcileDeadline": null,
+          "lastReconcileAt": null,
+          "reviewReason": null,
+          "createdAt": "2026-08-20T00:54:18.000",
+          "updatedAt": "2026-08-20T00:54:19.000"
+        }
+      ],
+      "steps": [
+        {
+          "stepId": "sha256:994aa605e86d",
+          "eventType": "INTENT_DECISION",
+          "nodeName": "api",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": {
+            "message": {
+              "chars": 21,
+              "sha256": "2082e9f49b6ef6cba2afc5594a172d503ec7255076e798458b667e3fcb9fd2b5"
+            }
+          },
+          "output": {
+            "data": "",
+            "intent": "CANCEL_ORDER",
+            "source": "rule",
+            "urgency": "HIGH",
+            "entities": {
+              "orderId": "sha256:019c9a481b76"
+            },
+            "sentiment": "NEUTRAL",
+            "confidence": 0.9,
+            "risk_level": "LOW",
+            "next_action": "<ID:6d895ba0ea8e>",
+            "request_mode": "ACTION_PROPOSAL",
+            "handoff_reason": "REPEATED_INTENT"
+          },
+          "occurredAt": "2026-08-19T16:54:17.675",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:72dbc1d0c990",
+          "eventType": "MQ_RECEIVE",
+          "nodeName": "worker",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": {
+            "queue": "agent.shopping.low",
+            "messageId": "sha256:cd70bea023f7",
+            "redelivered": false
+          },
+          "output": null,
+          "occurredAt": "2026-08-19T16:54:17.716",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:05798b5867fa",
+          "eventType": "MQ_PUBLISH",
+          "nodeName": "api",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "queue": "agent.shopping.low",
+            "status": "QUEUED"
+          },
+          "occurredAt": "2026-08-19T16:54:17.717",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:23d2c2e28f2d",
+          "eventType": "GRAPH_START",
+          "nodeName": "graph",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": {
+            "queue": "agent.shopping.low",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7"
+          },
+          "output": null,
+          "occurredAt": "2026-08-19T16:54:17.747",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:b88ced2dde66",
+          "eventType": "GUARD",
+          "nodeName": "entry",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "guard": "cancellation",
+            "decision": "PASS",
+            "hasImage": false
+          },
+          "occurredAt": "2026-08-19T16:54:17.755",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:4dc4e583a1ec",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "entry",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 2,
+          "input": {
+            "round": 0,
+            "route": "agent_loop",
+            "intent": null,
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": null,
+            "toolsCalled": [],
+            "hasRagEvidence": false,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": null,
+            "intent": null,
+            "outcome": null,
+            "finished": null,
+            "cancelled": false,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:17.755",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:afd0df92f8c4",
+          "eventType": "MEMORY_READ",
+          "nodeName": "build_context",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "stateKeys": [
+              "consultProduct",
+              "estimatedTokens",
+              "lastToolResults",
+              "pendingAction",
+              "shoppingMission",
+              "<ID:8903b6fd99ec>",
+              "turnCount"
+            ],
+            "turnCount": 84,
+            "hasSummary": true
+          },
+          "occurredAt": "2026-08-19T16:54:17.758",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:b0981fa41b7a",
+          "eventType": "INTENT_DECISION",
+          "nodeName": "build_context",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "intent": "CANCEL_ORDER",
+            "source": "rule",
+            "confidence": 0.9,
+            "nextAction": "<ID:6d895ba0ea8e>",
+            "requestMode": "ACTION_PROPOSAL"
+          },
+          "occurredAt": "2026-08-19T16:54:17.758",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:6c6ece85b5d6",
+          "eventType": "RAG_RETRIEVAL",
+          "nodeName": "build_context",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 827,
+          "input": {
+            "queryHash": "帮我取消订单[BUSINESS_ID]",
+            "categoryFilter": null
+          },
+          "output": {
+            "trace": {
+              "hit": true,
+              "mode": "cache",
+              "phase": "prefetch",
+              "bucket": "A",
+              "ragMode": "conditional",
+              "runtime": {
+                "route": "GENERAL",
+                "cacheHits": 1,
+                "fallbacks": [],
+                "observations": {
+                  "plannedQuery": {
+                    "route": "GENERAL",
+                    "domains": [],
+                    "factHints": [],
+                    "subquestions": [
+                      "帮我取消订单 [BUSINESS_ID]"
+                    ],
+                    "expansionReasons": [],
+                    "llmExpansionCalls": 0,
+                    "actualVariantCount": 1,
+                    "deterministicVariantCount": 1
+                  },
+                  "evidenceSelection": {
+                    "totalChars": 62,
+                    "selectedCount": 1,
+                    "coveredDomains": [
+                      "GENERAL"
+                    ],
+                    "coveredFactIds": [
+                      "order.cancel.<ID:8dcba3775585>"
+                    ],
+                    "subquestionCount": 1,
+                    "effectiveMaxItems": 1,
+                    "configuredMaxItems": 4,
+                    "duplicateBodyCount": 0,
+                    "duplicateFactCount": 0
+                  }
+                },
+                "providerCalls": {},
+                "stageLatencyMs": {
+                  "catalog": 49.6572,
+                  "exactFaq": 7.9662,
+                  "decomposition": 0.333,
+                  "evidenceSelection": 0.5514
+                },
+                "stageCallCounts": {
+                  "catalog": 1,
+                  "exactFaq": 1,
+                  "decomposition": 1,
+                  "evidenceSelection": 1
+                },
+                "providerFailures": {},
+                "policyFingerprint": "<ID:7d62c8b69e4f>",
+                "providerCacheHits": {},
+                "providerSuccesses": {}
+              },
+              "topScore": 0.7689845004139102,
+              "latencyMs": 60.67,
+              "queryHash": "<ID:f7f101ef8fde>",
+              "retrievals": [
+                {
+                  "hit": true,
+                  "mode": "cache",
+                  "phase": "prefetch",
+                  "bucket": "A",
+                  "runtime": {
+                    "route": "GENERAL",
+                    "cacheHits": 1,
+                    "fallbacks": [],
+                    "observations": {
+                      "plannedQuery": {
+                        "route": "GENERAL",
+                        "domains": [],
+                        "factHints": [],
+                        "subquestions": [
+                          "帮我取消订单 [BUSINESS_ID]"
+                        ],
+                        "expansionReasons": [],
+                        "llmExpansionCalls": 0,
+                        "actualVariantCount": 1,
+                        "deterministicVariantCount": 1
+                      },
+                      "evidenceSelection": {
+                        "totalChars": 62,
+                        "selectedCount": 1,
+                        "coveredDomains": [
+                          "GENERAL"
+                        ],
+                        "coveredFactIds": [
+                          "order.cancel.<ID:8dcba3775585>"
+                        ],
+                        "subquestionCount": 1,
+                        "effectiveMaxItems": 1,
+                        "configuredMaxItems": 4,
+                        "duplicateBodyCount": 0,
+                        "duplicateFactCount": 0
+                      }
+                    },
+                    "providerCalls": {},
+                    "stageLatencyMs": {
+                      "catalog": 49.6572,
+                      "exactFaq": 7.9662,
+                      "decomposition": 0.333,
+                      "evidenceSelection": 0.5514
+                    },
+                    "stageCallCounts": {
+                      "catalog": 1,
+                      "exactFaq": 1,
+                      "decomposition": 1,
+                      "evidenceSelection": 1
+                    },
+                    "providerFailures": {},
+                    "policyFingerprint": "<ID:7d62c8b69e4f>",
+                    "providerCacheHits": {},
+                    "providerSuccesses": {}
+                  },
+                  "topScore": 0.7689845004139102,
+                  "latencyMs": 60.67,
+                  "queryHash": "<ID:f7f101ef8fde>",
+                  "retrievalNo": 1,
+                  "sourceCount": 1,
+                  "contamination": [],
+                  "candidateCount": 1,
+                  "quarantineCount": 0,
+                  "knowledgeVersion": 18
+                }
+              ],
+              "retrievalNo": 1,
+              "sourceCount": 1,
+              "contamination": [],
+              "candidateCount": 1,
+              "quarantineCount": 0,
+              "knowledgeVersion": 18
+            },
+            "sourceRefs": [
+              {
+                "id": "knowledge_2_1_2",
+                "type": "knowledge_chunk",
+                "score": 0.768985,
+                "domain": "GENERAL",
+                "source": "<ID:337653864bd4>.md",
+                "factIds": [
+                  "order.cancel.<ID:8dcba3775585>"
+                ],
+                "heading": "取消订单",
+                "snippet": "取消订单\n待付款订单可以直接取消。订单进入发货流程后，是否可以取消取决于当前履约状态；已经发货的订单通常需要按售后流程处理。",
+                "dataType": "knowledge",
+                "retrieval": "rerank",
+                "documentId": "2",
+                "knowledgeVersion": 14
+              }
+            ],
+            "hasEvidence": true
+          },
+          "occurredAt": "2026-08-19T16:54:18.586",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:687224ed4bc8",
+          "eventType": "CONTEXT_BUILT",
+          "nodeName": "build_context",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": {
+            "intent": "CANCEL_ORDER",
+            "intentSource": "rule"
+          },
+          "output": {
+            "selectedFragments": [
+              {
+                "chars": 1060,
+                "source": "file",
+                "fragment": "global",
+                "promptKey": "global"
+              },
+              {
+                "chars": 344,
+                "source": "file",
+                "fragment": "intent",
+                "promptKey": "cancel_order"
+              },
+              {
+                "chars": 566,
+                "source": "file",
+                "fragment": "<ID:3fafa99aeaf7>",
+                "promptKey": "<ID:3fafa99aeaf7>"
+              }
+            ],
+            "systemPromptChars": 1970
+          },
+          "occurredAt": "2026-08-19T16:54:18.626",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:25e4150d8ad5",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "build_context",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 870,
+          "input": {
+            "round": 0,
+            "route": "agent_loop",
+            "intent": null,
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": null,
+            "toolsCalled": [],
+            "hasRagEvidence": false,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": "agent_loop",
+            "intent": "CANCEL_ORDER",
+            "outcome": null,
+            "finished": null,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.627",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:4e58abd48761",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "order_reference",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 21,
+          "input": {
+            "round": 0,
+            "route": "agent_loop",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": "ACTION_PROPOSAL",
+            "toolsCalled": [],
+            "hasRagEvidence": true,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": "<ID:1d3b4ec6955f>",
+            "intent": null,
+            "outcome": null,
+            "finished": null,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.651",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:70c766cb85e3",
+          "eventType": "ORCHESTRATION_DECISION",
+          "nodeName": "orchestration_router",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "mode": "workflow",
+            "reason": "deterministic_business_path",
+            "configuredMode": "adaptive",
+            "multiAgentAvailable": true
+          },
+          "occurredAt": "2026-08-19T16:54:18.655",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:c63bd0d975c6",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "orchestration_router",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 0,
+          "input": {
+            "round": 0,
+            "route": "<ID:1d3b4ec6955f>",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": "ACTION_PROPOSAL",
+            "toolsCalled": [],
+            "hasRagEvidence": true,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": "<ID:ed9b1dfdfd2b>",
+            "intent": null,
+            "outcome": null,
+            "finished": null,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.655",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:00150bc11aee",
+          "eventType": "ACTION_PROPOSED",
+          "nodeName": "pending_action",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "status": "PENDING",
+            "created": true,
+            "actionType": "CANCEL_ORDER"
+          },
+          "occurredAt": "2026-08-19T16:54:18.769",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:a0869c71d5d3",
+          "eventType": "TOOL_CALL",
+          "nodeName": "tools",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": "PROPOSE_CANCEL_ORDER",
+          "callId": "sha256:b39b7ccd71f9",
+          "errorCode": null,
+          "latencyMs": 117,
+          "input": {
+            "args": {
+              "runId": "sha256:d2f7fe53a11e",
+              "userId": "sha256:111218e4b08e",
+              "orderId": "sha256:019c9a481b76"
+            }
+          },
+          "output": {
+            "bizType": null,
+            "success": true,
+            "hasCards": false,
+            "errorCode": null,
+            "productIds": [],
+            "sourceCount": 0,
+            "retrievalTrace": null
+          },
+          "occurredAt": "2026-08-19T16:54:18.775",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:23aadc4582d4",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "deterministic_workflow",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 118,
+          "input": {
+            "round": 0,
+            "route": "<ID:ed9b1dfdfd2b>",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": "ACTION_PROPOSAL",
+            "toolsCalled": [],
+            "hasRagEvidence": true,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": "finalize",
+            "intent": null,
+            "outcome": null,
+            "finished": null,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.776",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:3a3a99897cab",
+          "eventType": "GUARD",
+          "nodeName": "finalize",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "guard": "<ID:b722f0a6885b>",
+            "decision": "PASS"
+          },
+          "occurredAt": "2026-08-19T16:54:18.780",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:87557ad1d2f9",
+          "eventType": "RESPONSE_VERIFIER",
+          "nodeName": "finalize",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": {
+            "bizType": "action_confirm",
+            "hasSources": true,
+            "toolsCalled": [
+              "<ID:632c3d840533>"
+            ],
+            "hasPendingAction": true
+          },
+          "output": {
+            "verifierAction": "PASS",
+            "verifierIssues": [],
+            "verifierPassed": true,
+            "safeFallbackApplied": false
+          },
+          "occurredAt": "2026-08-19T16:54:18.782",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:396019fec61a",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "finalize",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 7,
+          "input": {
+            "round": 0,
+            "route": "finalize",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": "ACTION_PROPOSAL",
+            "toolsCalled": [
+              "<ID:632c3d840533>"
+            ],
+            "hasRagEvidence": true,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": "post_turn",
+            "intent": null,
+            "outcome": "ok",
+            "finished": true,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.787",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:8acd25a355a2",
+          "eventType": "MEMORY_WRITE",
+          "nodeName": "post_turn",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "hasCard": false,
+            "toolsCalled": [
+              "<ID:632c3d840533>"
+            ]
+          },
+          "occurredAt": "2026-08-19T16:54:18.803",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:862952ddccaf",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "post_turn",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 13,
+          "input": {
+            "round": 0,
+            "route": "post_turn",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": "ACTION_PROPOSAL",
+            "toolsCalled": [
+              "<ID:632c3d840533>"
+            ],
+            "hasRagEvidence": true,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": null,
+            "intent": null,
+            "outcome": null,
+            "finished": true,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.803",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:dbaf899fbd96",
+          "eventType": "NODE_TRANSITION",
+          "nodeName": "cleanup",
+          "roundNo": 0,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 0,
+          "input": {
+            "round": 0,
+            "route": "post_turn",
+            "intent": "CANCEL_ORDER",
+            "messageId": "sha256:cd70bea023f7",
+            "requestMode": "ACTION_PROPOSAL",
+            "toolsCalled": [
+              "<ID:632c3d840533>"
+            ],
+            "hasRagEvidence": true,
+            "hasPendingOrderReference": false
+          },
+          "output": {
+            "route": null,
+            "intent": null,
+            "outcome": null,
+            "finished": true,
+            "cancelled": null,
+            "toolCalls": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.807",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:9c55b07c4633",
+          "eventType": "GRAPH_END",
+          "nodeName": "graph",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": 1067,
+          "input": null,
+          "output": {
+            "tools": [
+              "<ID:632c3d840533>"
+            ],
+            "intent": "CANCEL_ORDER",
+            "outcome": "ok",
+            "costSummary": {
+              "path": "heavy",
+              "models": [],
+              "costCny": 0.0,
+              "llmCalls": 0,
+              "inputTokens": 0,
+              "outputTokens": 0
+            }
+          },
+          "occurredAt": "2026-08-19T16:54:18.814",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:cf3b763a6272",
+          "eventType": "BUDGET_SUMMARY",
+          "nodeName": "graph",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "usage": {
+              "stepsUsed": 8,
+              "tokensUsed": "[REDACTED]",
+              "costUsedCny": 0.0,
+              "elapsedSeconds": 1.0674
+            },
+            "limits": {
+              "maxSteps": 24,
+              "maxTokens": "[REDACTED]",
+              "maxCostCny": 1.0,
+              "warnThreshold": 0.8,
+              "deadlineSeconds": 120.0
+            },
+            "remaining": {
+              "steps": 16,
+              "tokens": "[REDACTED]",
+              "costCny": 1.0,
+              "seconds": 118.932617061997
+            },
+            "warnedDimensions": []
+          },
+          "occurredAt": "2026-08-19T16:54:18.814",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:fc6f7f134454",
+          "eventType": "ACTION_CONFIRMED_BY_USER",
+          "nodeName": "pending_action",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "actionType": "CANCEL_ORDER",
+            "userConfirmed": true,
+            "actionProposed": true
+          },
+          "occurredAt": "2026-08-19T16:54:19.256",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        },
+        {
+          "stepId": "sha256:5cfbad52611c",
+          "eventType": "ACTION_TERMINAL",
+          "nodeName": "pending_action",
+          "roundNo": null,
+          "status": "OK",
+          "modelName": null,
+          "toolName": null,
+          "callId": null,
+          "errorCode": null,
+          "latencyMs": null,
+          "input": null,
+          "output": {
+            "outcome": "CONFIRMED",
+            "actionType": "CANCEL_ORDER",
+            "userConfirmed": true,
+            "actionProposed": true,
+            "orderStatusAfter": 4,
+            "orderStatusBefore": 0,
+            "remoteOutcomeKnown": true
+          },
+          "occurredAt": "2026-08-19T16:54:19.328",
+          "agentId": null,
+          "artifactType": null,
+          "handoffId": null
+        }
+      ],
+      "handoffs": [],
+      "children": []
+    }
+  ]
+}

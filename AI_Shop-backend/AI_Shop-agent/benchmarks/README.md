@@ -8,7 +8,7 @@
 >
 > 评测闭环重构基线：统一 `benchmarks/eval.py`；历史证据基线只读保留
 >
-> 最后核验时间：2026-08-17（Asia/Shanghai）
+> 最后核验时间：2026-08-20（Asia/Shanghai）
 >
 > 适用环境：确定性回归、本地集成和可选 live 评测；不是生产效果或真实用户报告
 
@@ -44,7 +44,7 @@ python benchmarks/eval.py status --suite search-v3 \
 
 `preflight` 不读取 fresh 数据、不创建 fresh claim；只有通过后才允许进入正式执行。最终结果分开报告 `execution`、`quality`、`provider`、`humanReview` 和 `evidence`，环境阻塞不会伪装成召回率为 0。正式 fresh 仍遵循 `ONE_SHOT_FAIL_RETAINED`，历史 evidence 不覆盖。Search/RAG/Agent 的领域评分器继续复用各自 adapter，但不再作为第二套公开生命周期。
 
-## Agent v2 真实全栈任务成功率
+## Agent v2 真实全栈任务契约与子集证据
 
 `task_success_v2.jsonl` 是当前冻结契约：前 37 条与 `task_success_v1.jsonl` 逐对象相同，另有 7 条多步 sequence，共 44 条。sequence 覆盖 Mission 覆盖长期 Profile、候选比较与报价刷新、单/多主体视觉搜索、点击防伪、加购/两次成交/复购，以及退款、低分评价、售后联系和幂等。v1 数据、lock 与历史结果保持只读。
 
@@ -104,22 +104,29 @@ python benchmarks/eval.py run --suite agent-v2 --stage execute \
 
 ```bash
 .venv/bin/python benchmarks/compare_live_orchestration_ablation.py \
-  --workflow benchmarks/results/task-success-live-v2/agent-v2-workflow-6eb8e8e-20260817/summary.json \
-  --single-agent benchmarks/results/task-success-live-v2/agent-v2-single-agent-6eb8e8e-20260817/summary.json \
-  --multi-agent benchmarks/results/task-success-live-v2/agent-v2-multi-agent-6eb8e8e-20260817/summary.json \
-  --run-id agent-v2-ablation-20260817
+  --workflow benchmarks/results/task-success-live-v2/agent-v2-workflow-<git-sha>-<yyyymmdd>/summary.json \
+  --single-agent benchmarks/results/task-success-live-v2/agent-v2-single-agent-<git-sha>-<yyyymmdd>/summary.json \
+  --multi-agent benchmarks/results/task-success-live-v2/agent-v2-multi-agent-<git-sha>-<yyyymmdd>/summary.json \
+  --run-id agent-v2-ablation-<yyyymmdd>
 ```
 
-正式面试 Trace 只能从已存在的真实 Episode 导出。一条必须是用户已确认且远端结果已知的 `CONFIRMED` 退款，另一条必须是用户已确认但远端结果未知、MySQL 处于 `INCONCLUSIVE` 或 `MANUAL_REVIEW` 的运行：
+当前已记录两个 local-live 子集，均来自隔离 fixture，不能与完整 44 条结果混写：
+
+- `live-cancel-confirmed-012`：`1/1` 经过 Agent API、RabbitMQ Worker、LangGraph、MCP、pending action、用户确认和 Java 写接口；`workflow`、`1067 ms`、0 LLM token。
+- `live-confirmation-policy-020`：`1/1` 使用 `deepseek-v4-flash`，`4847 + 224 = 5071` tokens、`3237 ms`，RAG Provider Trace 完整。
+
+两项成本均为 `UNPRICED`。取消订单的 0 token 是确定性 Workflow 的调用事实，不是模型成本为零；政策问答为 n=1，不能报告为 P95、SLO 或整体 Agent TSR。
+
+已验证的取消订单 Trace 从持久 Episode 和 MySQL pending-action 行导出，运行 ID 与业务标识均已脱敏：
 
 ```bash
 .venv/bin/python scripts/export_interview_traces.py \
-  --success-refund-run-id <confirmed-run-id> \
-  --unknown-outcome-run-id <unknown-run-id> \
-  --bundle-id interview-20260817
+  --confirmed-run-id 4a5bafde79424b308ca306ad91b7ff7c \
+  --confirmed-label confirmed_cancel \
+  --bundle-id agent-v2-cancel-r6-<yyyymmdd>
 ```
 
-当前 lock 的 `resultStatus` 为 `NOT_COLLECTED`。在上述完整条件实际满足前，不得把门禁阈值、单元测试或历史确定性结果写成 Agent live TSR、真实消融或正式 Trace。
+旧的双 Trace 参数仍支持“已确认退款 + 未知远端结果”的诊断导出，但不能假定该证据已经采集。当前 lock 的 `resultStatus` 为 `NOT_COLLECTED`。在上述完整条件实际满足前，不得把门禁阈值、单元测试、local-live 子集或历史确定性结果写成完整 Agent live TSR、真实消融或正式 Trace。
 
 ## Search v3 与 RAG v5 正式门禁
 
@@ -165,9 +172,9 @@ python benchmarks/eval.py run --suite rag-v5 --stage package \
 
 ```bash
 .venv/bin/python benchmarks/human_review/rag_v5_review.py merge \
-  --package-dir benchmarks/results/rag-v5/rag-v5-6eb8e8e-20260817/generation/human-review \
+  --package-dir benchmarks/results/rag-v5/rag-v5-<git-sha>-<yyyymmdd>/generation/human-review \
   --reviewer-a <reviewer-a.csv> --reviewer-b <reviewer-b.csv> \
-  --output benchmarks/results/rag-v5/rag-v5-6eb8e8e-20260817/generation/human-review/merged-review.json
+  --output benchmarks/results/rag-v5/rag-v5-<git-sha>-<yyyymmdd>/generation/human-review/merged-review.json
 ```
 
 fresh 执行锁位于对应 `results/` 根目录。它不是可删除后重试的缓存；失败时保留原 Run，将该集合转为下一版 known，并为下一版另建未见集。
@@ -221,7 +228,7 @@ fresh 执行锁位于对应 `results/` 根目录。它不是可删除后重试�
 | `aishop_convo_v1.lock.json` | 数据集 SHA-256 + 首次跑分基线 + 已知失败 ID 清单 |
 | `validate_convo_eval.py` | 题面结构体检：字段、分布、split、PII |
 | `run_convo_eval.py` | 跑分 + 对基线做门禁 |
-| `results/` | 跑分产物（summary / raw / failures） |
+| `results/` | 新跑分产物（summary / raw / failures）；过期的 `convo_eval_v1_*` 导出已清理，不是当前证据 |
 | `冻结会话评测限制与变更记录.md` | 这个评测集**没有**覆盖什么，以及留着的失败是什么 |
 
 ## 用法

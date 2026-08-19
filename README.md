@@ -2,9 +2,9 @@
 
 > 内容状态：当前有效
 >
-> 本轮实施基线：分支 `refactor/ai-shop-mainline-quality` 从 `e11f1e096dc3d3afef0a56446bb1b9d27d3ef9f6` 创建；未提交改动与证据边界见 [证据 manifest](docs/evidence-manifest.json)
+> 本轮证据实现基线：提交 `c501735644a72ce57b27e48bdd35fbc7a5e870ea` 与由 [证据 manifest](docs/evidence-manifest.json) 固化的实现补丁；结果 SHA 和证据边界也以该 manifest 为准
 >
-> 最后核验时间：2026-08-18（Asia/Shanghai）
+> 最后核验时间：2026-08-20（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
@@ -21,7 +21,7 @@
 - **第二入口：Java 电商后端**——订单/库存/支付事务、Redis、RabbitMQ、一致性、幂等和故障恢复。
 - **视觉搜索**属于推荐主线；**Text2SQL**目前只是带权限、扫描预算、分页、导出审计的治理实验，未达门槛前不包装为第三主线。
 
-完整项目卡、90 秒架构叙述和六个面试故事见 [秋招叙述材料包](docs/AI_SHOP_秋招叙述材料包_20260818.md)。
+面试可陈述的功能闭环、真实样本和未采集边界见 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)。
 
 ---
 
@@ -109,7 +109,7 @@ AI_Shop/
 ### AI 购物导购与客服
 
 - **自然语言订单定位**：根据订单号、相对时间、金额和商品描述筛选权威订单；零候选、多候选、无可操作项和依赖失败分别处理，歧义上下文可跨轮持久化
-- **自适应编排**：简单权威查询或参数完整提案走 Workflow，开放/单域 RAG 走单 Agent，订单事实与政策等跨域复合请求才走 bounded multi-agent；支持四种固定模式做真实配对消融
+- **自适应编排**：简单权威查询或参数完整提案走 Workflow，开放/单域 RAG 走单 Agent，订单事实与政策等跨域复合请求才走 bounded multi-agent；四种配置可用于配对消融，但正式 live 配对结果仍未采集
 - **受控写操作**：模型只能生成 `PROPOSE_*` 提案；用户确认后 Java 重新校验身份、归属、状态与幂等键，未知远端结果进入 `INCONCLUSIVE`，核对到边界后转 `MANUAL_REVIEW`
 - **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用和有界 repair
 - **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
@@ -120,7 +120,7 @@ AI_Shop/
 - **Prompt 单一事实源**：fragment 注册表统一管理全部提示词片段（redis 覆盖可观测），每轮对话记录 selectedFragments 到决策 trace
 - **逐运行预算**：ContextVar 隔离 token、人民币成本、节点步数与 monotonic deadline，80% 预警，超限进入明确受控终态；异步任务与对话互不污染
 - **委托身份信道**：`X-Agent-User-Id` 系统信道头为权威（模型不可见），body userId 仅作参考；缺失 401、不一致 403、归属不符 403，fail-closed
-- **统一评测与消融**：除 Commerce、安全和 Search/RAG 外，新增 37 条真实全栈 Agent 任务契约；Runner 无模拟捷径，逐条核验 Episode、业务终态和 LLM/Embedding/Rerank 证据，三模式报告必须同数据/fixture/模型后才能比较
+- **统一评测与消融**：除 Commerce、安全和 Search/RAG 外，冻结 44 条真实全栈 Agent v2 任务契约（37 条单轮、7 条 sequence）；Runner 无模拟捷径，逐条核验 Episode、业务终态和 LLM/Embedding/Rerank 证据，三模式报告必须同数据/fixture/模型后才能比较
 - **熔断降级**：外部 Provider 使用 CLOSED/OPEN/HALF_OPEN 熔断与受控 fallback；未知写结果不会被通用重试自动重放
 - **速率限制**：用户级别双窗口限流，防止滥用
 
@@ -250,37 +250,24 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ## 数据与指标口径
 
-唯一人工证据入口是 [docs/AI应用求职项目证据总览.md](docs/AI应用求职项目证据总览.md)，机器可校验入口是
-[docs/evidence-manifest.json](docs/evidence-manifest.json)。证据严格分为源码/测试、确定性合成运行时、
-本地集成、配置真实模型和授权真实用户五级；运行 `python scripts/check_evidence_manifest.py` 可检查结构、
-数据锁、结果 SHA 和“未采集”边界。
+人工阅读入口为 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)，性能与质量数字见
+[性能与质量证据](docs/性能与质量证据_20260820.md)，机器可校验入口为
+[evidence-manifest.json](docs/evidence-manifest.json)。证据按源码/契约、确定性合成、本地全栈、配置真实
+Provider 和授权真实用户分层；运行 `python scripts/check_evidence_manifest.py` 可检查结构、数据锁、结果 SHA 和
+“未采集”边界。
 
-当前 27 条 Commerce runtime、18 条 AI 安全和 162 条 Search/RAG 数据契约属于
-`SYNTHETIC + deterministic`。在 `SYNTHETIC + local-live` 层，Search v2 覆盖中文 600 商品/240 查询、
-WANDS 42,994 商品全库/202 查询/32,919 条有效人工判断，以及 47 商品目录上的 45 条真实
-`ProductService` 路径。中文 fresh Recall@3/5 为 0.8896/0.9969、NDCG@5 为 0.9753；WANDS 只报告
-known-relevant、Judged@K、bpref 和 condensed 指标，不把未标注商品当成无关。首次 ProductService
-Recall@10 只有 0.3778，正式结果按 `FAILED_RETAINED` 保留；暴露后运行时回归为 45/45、Recall@3/5/10
-均 0.9778、MRR@10 0.9444，但明确标记 `freshEvidence=false`。
+当前确定性回归为 Commerce `27/27`、AI 安全 `18/18`、Search/RAG contract `162/162`。Agent v2 冻结 44 条
+任务契约，lock 明确为 `resultStatus=NOT_COLLECTED`；因此不能把门禁阈值、单元测试或单 case 成功写成完整 Agent
+TSR。正式全量运行仍需要同一隔离 fixture、API/Worker/MCP/Java/DB、真实 Provider 和可恢复的业务快照。
 
-RAG v4 在 12 份文档、75 chunk、6 FAQ 上实跑 72 public + 144 regression + 48 fresh，共 264 条检索；
-fresh Recall@3/5 为 0.8056、MRR@10 为 0.75、NDCG@5 为 0.7645，正式门禁未过。60 条
-`deepseek-v4-flash` 生成完整执行，0 runtime error、0 严重安全违规，但只通过 39 条；暴露后零 Provider
-重评为 49/60，仍低于 0.85 且不能冒充新 holdout。正式 Retrieval/Generation 均保留
-`FAILED_RETAINED`，人工盲评状态为 `HUMAN_REVIEW_PENDING`。
-Agent 另有 37 条、8 个子集的冻结真实全栈任务契约，覆盖订单权威查询、写提案、RAG、跨域、安全、澄清、购物和未知结果；当前 lock 明确为 `resultStatus=NOT_COLLECTED`，80% 只是门禁，不是已取得 TSR。正式运行还要求完整 API/Worker/MCP/Java/DB、私有 fixture bindings、真实 Provider 和可恢复业务快照。
+已有两个 `SYNTHETIC + local-live` 子集：取消订单 `1/1` 通过，经过 Agent API、RabbitMQ Worker、LangGraph、
+MCP、用户确认和 Java 写接口，单样本延迟 `1067 ms`，该确定性 Workflow 的 LLM token 为 `0`；政策问答 `1/1`
+通过，`deepseek-v4-flash` 单次调用为 `4847 + 224 = 5071` tokens、`3237 ms`，BM25/Vector/Embedding/Rerank
+runtime trace 完整。两者都不是总体 TSR、P95 或线上 SLO，且成本为 `UNPRICED`，不能把结果中的 `0.0` 写成模型成本为零。
 
-本分支新增的统一 Runner 套件包括 `visual-v1` 和 `text2sql-v1`。视觉套件把图片主体选择、Embedding、候选融合、Rerank、库存核验和无结果准确性纳入同一门禁；没有真实 VLM/Embedding/Rerank 证据时结果必须为 `BLOCKED`。Text2SQL 锁定 40 条趋势、排行、分群、库存、售后、谨慎因果和安全边界任务，当前定位为“治理中的后台分析实验”，同时要求 SQL 安全 100%、结果/叙述一致性达到门槛、Trace 和成本完整后才允许升级。
-
-这些结果不代表真实用户或生产效果；Agent 在线模型 TSR/三模式消融/正式 Trace、可信人民币成本、`REAL_USER`、CTR/CVR、GMV uplift、
-线上 SLO 与生产规模仍为“未采集”。详细分组指标、消融、失败 case、Provider 调用和诚实边界见证据总览。历史冻结会话及
-旧小样本结果只用于解释项目演进，见 [冻结会话评测限制与变更记录.md](AI_Shop-backend/AI_Shop-agent/benchmarks/冻结会话评测限制与变更记录.md)，
-不再作为 README 的当前成绩。
-
-本地全链路部署、RAG、搜索、分类、购物车和管理端滚动问题的真实排障过程见
-[docs/项目问题排查与修复复盘.md](docs/项目问题排查与修复复盘.md)。文档保留了错误假设、
-证据链、修复取舍与回归数据，可作为面试项目复盘材料；Search/RAG 数据、消融、SHA 和坏例见
-[docs/Search与RAG成熟评测报告.md](docs/Search与RAG成熟评测报告.md)。用户已删除的旧审计/决策文档不再作为当前证据入口。
+Search v2、RAG retrieval v4 和 RAG generation v4 的 historical configured-local-live 正式结果仍保留
+`FAILED_RETAINED`：它们暴露了 ProductService 召回、fresh RAG 质量和生成成功率的真实缺口。`HUMAN_REVIEW_PENDING`
+表示独立人工盲评尚未完成。`REAL_USER`、正式三模式消融、全量 Agent v2、长期容量与线上业务指标均为未采集。
 
 ---
 

@@ -211,6 +211,20 @@ def test_rag_citation_must_exist_and_stay_in_range():
     assert valid.passed is True
 
 
+def test_verified_action_card_does_not_require_prose_rag_citations():
+    result = response_verifier.verify(
+        assistant='{"type":"ACTION_CONFIRM","actionType":"CANCEL_ORDER"}',
+        biz_type="action_confirm",
+        tools_called=["PROPOSE_CANCEL_ORDER"],
+        source_refs=[{"id": "knowledge_1"}],
+        has_pending_action=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert result.passed is True
+
+
 def test_rag_citation_is_checked_per_factual_sentence():
     result = response_verifier.verify(
         assistant="每个订单只能使用一张优惠券。[1] 支付失败后优惠券会释放。",

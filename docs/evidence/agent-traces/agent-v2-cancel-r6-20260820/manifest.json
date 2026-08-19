@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-19T17:39:53.447178+00:00",
+  "executionMode": "LIVE_FULL_STACK",
+  "simulated": false,
+  "sha256": {
+    "traces.json": "d3883ed12aef54cb0ffd6c4d8970cf44e091ddb126ff68f3f330c897b9bf20d3",
+    "report.md": "f57c8b2d2a356a2fd76b8c2af0671e39f6d83e1f726da51e3b8066456d953a99"
+  }
+}

@@ -1183,6 +1183,11 @@ async def run_live(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
         cases = [case for case in cases if case.get("subset") in selected_subsets]
         if not cases:
             raise EvaluationContractError("subset selection produced no cases")
+    if args.case_id:
+        selected_ids = set(args.case_id)
+        cases = [case for case in cases if str(case.get("id")) in selected_ids]
+        if not cases:
+            raise EvaluationContractError("case selection produced no cases")
     _require_fixture_flags(cases, bindings)
     resolved = [resolve_placeholders(case, bindings) for case in cases]
     if not str(args.fixture_snapshot_id or "").strip():
@@ -1291,6 +1296,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fixture-snapshot-id")
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--subset", action="append")
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        help="Run only the selected frozen case ID; repeat to select multiple cases",
+    )
     parser.add_argument(
         "--expected-orchestration-mode",
         choices=("adaptive", "workflow", "single_agent", "multi_agent"),
