@@ -29,6 +29,7 @@ from app.rag.retriever import (
     rag_retriever,
 )
 from app.services.agent_queue_service import agent_queue_service
+from app.services.analytics_export_service import analytics_export_service
 from app.services.episode_service import episode_service
 from app.services.health_service import health_service
 from app.services.judge_service import judge_service
@@ -89,6 +90,7 @@ async def lifespan(app: FastAPI):
     # the view-only reader before Agent startup; this check intentionally fails
     # closed when that order is violated.
     await init_analytics_pool()
+    await analytics_export_service.resume_incomplete()
 
     await episode_service.start()
     await judge_service.start()
@@ -115,6 +117,7 @@ async def lifespan(app: FastAPI):
     _warmup_task = None
     await stop_ws_listener()
     await agent_queue_service.close()
+    await analytics_export_service.close()
     await close_checkpointer()
     await mcp_streamable_client.close()
     await close_http_clients()

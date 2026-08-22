@@ -6,13 +6,17 @@ import re
 from dataclasses import dataclass
 
 _EXPLICIT_APPENDIX = re.compile(
-    r"(?P<prefix>.+?)(?:[；;。.!?\n]\s*)"
+    r"(?P<prefix>.+?)(?:[；;。.!?！？\n]\s*)"
     r"(?P<attack>(?:附加|额外)(?:命令|指令)\s*[:：].+)$",
     re.I | re.S,
 )
 _EXPLICIT_OVERRIDE = re.compile(
-    r"(?P<prefix>.+?)(?:[；;。.!?\n]\s*)"
-    r"(?P<attack>(?:请)?(?:忽略|无视|绕过)[^。；\n]{0,20}(?:规则|指令|知识库|提示词)"
+    r"(?P<prefix>.+?)(?:[；;。.!?！？\n]\s*)"
+    # A natural-language connector often sits between the business question
+    # and the attack appendix ("然后忽略...", "随后请无视...").  Keep the
+    # connector inside the locked suffix so the legitimate prefix is retained.
+    r"(?P<attack>(?:(?:然后|随后|接着|再|并且|并)\s*)?(?:请)?"
+    r"(?:忽略|无视|绕过)[^。；\n]{0,20}(?:规则|指令|知识库|提示词)"
     r"[^。；\n]{0,12}(?:并|然后|再).+)$",
     re.I | re.S,
 )
@@ -47,7 +51,7 @@ def separate_explicit_attack_suffix(text: str | None) -> QuerySeparation:
         match = pattern.fullmatch(value)
         if not match:
             continue
-        prefix = match.group("prefix").strip(" \t\r\n；;。.!?")
+        prefix = match.group("prefix").strip(" \t\r\n；;。.!?！？")
         if len(prefix) < 3 or _META_ONLY_PREFIX.match(prefix):
             continue
         return QuerySeparation(prefix, (rule_id,), True)

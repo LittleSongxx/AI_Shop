@@ -9,6 +9,7 @@ from app.config.settings import get_settings
 from app.infra.http_client import get_client
 from app.observability.telemetry import current_traceparent
 from app.services.episode_service import current_episode
+from evaluation.core.fault_injection import fault_point
 
 logger = structlog.get_logger()
 
@@ -88,7 +89,25 @@ class JavaInternalClient:
 
     async def post_json(self, path: str, body: dict | None = None) -> Any:
         url = f"{self._base()}/{path.lstrip('/')}"
+        injected_mode: str | None = None
         try:
+            path_key = path.casefold()
+            if "snapshot" in path_key or "offersnapshot" in path_key:
+                injected_mode = fault_point("java-offer-snapshot")
+                if injected_mode == "empty":
+                    return {}
+            elif "/internal/product" in path_key:
+                injected_mode = fault_point("java-product")
+                if injected_mode == "empty":
+                    return {}
+            elif "/internal/stock" in path_key:
+                injected_mode = fault_point("java-inventory")
+                if injected_mode == "empty":
+                    return {}
+            elif "/internal/coupon" in path_key:
+                injected_mode = fault_point("java-offer-snapshot")
+                if injected_mode == "empty":
+                    return []
             client = await get_client("java_internal", timeout=self._timeout)
             resp = await client.post(
                 url, json=body or {}, headers=self._headers(), timeout=self._timeout
@@ -107,7 +126,20 @@ class JavaInternalClient:
             raise ValueError(payload.get("info") or f"internal call failed: {url}")
         if status is None and code not in (200, "200", None):
             raise ValueError(payload.get("info") or f"internal call failed: {url}")
-        return payload.get("data")
+        data = payload.get("data")
+        if injected_mode == "partial":
+            # Preserve the response shape while making the degraded boundary
+            # explicit to the caller. Never synthesize records for a partial
+            # Java response.
+            if isinstance(data, list):
+                data = data[: max(1, len(data) // 2)] if data else []
+            elif isinstance(data, dict):
+                for key in ("products", "items", "rows", "offers"):
+                    value = data.get(key)
+                    if isinstance(value, list):
+                        data = {**data, key: value[: max(1, len(value) // 2)] if value else []}
+                        break
+        return data
 
     async def post_bytes(
         self, path: str, body: dict | None = None, *, timeout: float | None = None
@@ -240,6 +272,9 @@ class JavaInternalClient:
         return normalize_keys(data) if isinstance(data, dict) else {}
 
     async def snapshot_batch(self, product_ids: list[str]) -> dict | None:
+        # Keep product-fact failures distinguishable from the later offer
+        # snapshot boundary in evaluation traces.
+        fault_point("java-product")
         data = await self.post_json(
             "/internal/product/snapshotBatch",
             {"productIds": product_ids},
@@ -247,12 +282,20 @@ class JavaInternalClient:
         return normalize_keys(data) if data else None
 
     async def offer_snapshot_batch(
-        self, user_id: str, product_ids: list[str]
+        self,
+        user_id: str,
+        product_ids: list[str],
+        *,
+        allowed_sku_keys_by_product: dict[str, list[str]] | None = None,
     ) -> dict | None:
         """Return Java-owned, SKU-level sellability facts for Agent ranking."""
+        fault_point("java-inventory")
+        body: dict[str, Any] = {"userId": user_id, "productIds": product_ids}
+        if allowed_sku_keys_by_product:
+            body["allowedSkuKeysByProduct"] = allowed_sku_keys_by_product
         data = await self.post_json(
             "/internal/product/agent/offerSnapshots",
-            {"userId": user_id, "productIds": product_ids},
+            body,
         )
         return normalize_keys(data) if isinstance(data, dict) else None
 

@@ -121,6 +121,28 @@ def test_build_action_confirm_unavailable_payload():
     assert "无权" in card["summary"]
 
 
+def test_action_confirm_payload_exposes_explicit_action_token():
+    import json
+
+    from app.utils.biz_payload import build_action_confirm_payload
+
+    token = "act_" + "e" * 32
+    raw, biz_data = build_action_confirm_payload(
+        {
+            "token": token,
+            "actionType": "CANCEL_ORDER",
+            "paramsJson": json.dumps({"orderId": "EVAL1", "orderAmount": 1}),
+            "summary": "取消订单",
+            "status": 0,
+        },
+        "已生成提案",
+    )
+    card = json.loads(raw)
+    data = json.loads(biz_data)
+    assert card["actionToken"] == token
+    assert data["actionToken"] == token
+
+
 def test_extract_review_helpers():
     from app.domain.intent.write_args import extract_review_content, extract_review_star
 

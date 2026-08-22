@@ -23,6 +23,7 @@ public final class InternalApiHeaders {
 
     public static final String REMOTE_COMPENSATE_EXCHANGE = "REMOTE_COMPENSATE";
     public static final String REMOTE_STOCK_CHANGE_BATCH = "stock.changeBatch";
+    public static final String REMOTE_STOCK_ORDER_RESTORE = "stock.orderRestore";
     public static final String REMOTE_COUPON_UNLOCK = "coupon.unlock";
 
     private InternalApiHeaders() {

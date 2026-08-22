@@ -1,0 +1,40 @@
+{
+  "createdAt": "2026-08-21T15:34:57.749Z",
+  "files": {
+    "bad-cases.jsonl": {
+      "bytes": 207911,
+      "sha256": "ede99d2b70d5a47cceec9df976db9f62e8e4e7cef0697f717e4f9745eacee66e"
+    },
+    "cases.jsonl": {
+      "bytes": 281381,
+      "sha256": "54a44457c58c5a15184585a081094c84784388886329cfd795ff2a43ab4fe799"
+    },
+    "environment.json": {
+      "bytes": 4273,
+      "sha256": "f8650eff3e324f0bdfb6eb5a30be6f94fd9fba0d8d3cbf7408742fffdae05cff"
+    },
+    "gates.json": {
+      "bytes": 333,
+      "sha256": "d7c68f8d444a4cefee6d94521bdd15cab38c91e28cce9a5c574ebd03463c7c56"
+    },
+    "report.md": {
+      "bytes": 4452,
+      "sha256": "46c37ba7ebb06201824b5fa6d0d8f856c1c10299d8522c72ea5fb0aa56637b81"
+    },
+    "source-fingerprint.json": {
+      "bytes": 1671,
+      "sha256": "182d9d903282f47a199183e66b740de9dfc2698dda83adc4426731c125f5b5d5"
+    },
+    "summary.json": {
+      "bytes": 33903,
+      "sha256": "3fdb00a9ec9d8398e9d41b3822647ac9cf80756ac48f6e201ebe1c4a4d5a45f7"
+    }
+  },
+  "kind": "resilience",
+  "normalQualityDenominatorExcluded": true,
+  "packageId": "fault-matrix-v4-r9",
+  "schemaVersion": "aishop-auxiliary-evidence/v1",
+  "shadowOnly": false,
+  "sourceRunId": "visible-fault-matrix-cross-process-v4-r9-20260821",
+  "sourceRunSha256SumsSha256": "bffc71424dfe312e762b56cd7266d7c9f840539a7da8090f680841adb9ba17cc"
+}

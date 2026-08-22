@@ -187,6 +187,36 @@ async def test_property_clue_narrows_same_category_without_fuzzy_scoring():
 
 
 @pytest.mark.asyncio
+async def test_proposal_filler_words_do_not_hide_a_recent_payable_order():
+    # A fixture/order without item rows is valid for the cancel contract.  The
+    # resolver must not treat words such as "一笔" or "确认提案" as product
+    # identity and discard the otherwise uniquely matching order.
+    order = {
+        "order_id": "EVAL202608210001",
+        "order_status": 0,
+        "order_time": "2026-08-21 16:00:00",
+        "amount": 1,
+        "comment_status": 0,
+        "subject": "AI evaluation cancelable order",
+        "items": [],
+    }
+    with patch(
+        "app.services.order_reference_resolver.java_internal_client.list_orders",
+        AsyncMock(return_value=[order]),
+    ):
+        result = await order_reference_resolver.resolve(
+            user_id="u1",
+            intent=IntentKind.CANCEL_ORDER.value,
+            user_text="我想取消最近一笔待付款订单，请先给出确认提案",
+            enforce_action_eligibility=True,
+        )
+
+    assert result.outcome == OrderReferenceOutcome.RESOLVED
+    assert result.target is not None
+    assert result.target["orderId"] == "EVAL202608210001"
+
+
+@pytest.mark.asyncio
 async def test_explicit_recent_relation_uniquely_selects_the_newest_match():
     orders = [
         _order(

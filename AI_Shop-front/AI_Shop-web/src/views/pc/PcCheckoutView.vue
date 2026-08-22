@@ -156,7 +156,7 @@
             <h2 class="panel-title">支付方式</h2>
             <el-radio-group v-model="payMethod" class="pc-pay-methods">
               <label class="pc-pay-option" :class="{ active: payMethod === PAY_METHOD_ALIPAY_PC }">
-                <el-radio :label="PAY_METHOD_ALIPAY_PC">支付宝</el-radio>
+                <el-radio :value="PAY_METHOD_ALIPAY_PC">支付宝</el-radio>
                 <span class="pay-desc">提交后在新窗口打开支付宝扫码支付</span>
               </label>
             </el-radio-group>

@@ -476,3 +476,20 @@ async def test_recommend_survives_both_recall_paths_raising(monkeypatch):
     products = await service.load_recommend_products("u1", limit=8)
 
     assert [p["product_id"] for p in products] == ["hot"]
+
+
+@pytest.mark.asyncio
+async def test_recommend_fetches_purchase_history_once_per_request(monkeypatch):
+    service = SearchRecommendService()
+    purchase_history = AsyncMock(return_value=["p1"])
+    monkeypatch.setattr(java_internal_client, "purchase_history_product_ids", purchase_history)
+    monkeypatch.setattr(
+        service, "_resolve_category_from_browse", AsyncMock(return_value="phone")
+    )
+    monkeypatch.setattr(service, "_load_by_category", AsyncMock(return_value=[_product("cat")]))
+    monkeypatch.setattr(service, "_co_purchase_recall", AsyncMock(return_value=[]))
+
+    products = await service.load_recommend_products("u1", limit=4)
+
+    assert [row["product_id"] for row in products] == ["cat"]
+    purchase_history.assert_awaited_once_with("u1", limit=3)

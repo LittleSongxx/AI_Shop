@@ -1,4 +1,8 @@
-from app.rag.prompt_builder import grounding_repair_reason
+from app.rag.prompt_builder import (
+    build_grounding_prompt,
+    deterministic_grounding_policy_fallback,
+    grounding_repair_reason,
+)
 from app.services.response_verifier import response_verifier
 
 
@@ -250,6 +254,159 @@ def test_grounding_repair_catches_uncited_short_boundary_answer():
 
     assert reason is not None
     assert "事实句缺少就近引用" in reason
+
+
+def test_grounding_policy_fallback_is_scoped_and_cited():
+    evidence = [
+        {
+            "citation": 3,
+            "factIds": ["rag.retrieval_and_abstention"],
+            "text": "若知识库没有足够证据，助手应明确说明并建议联系人工客服。",
+            "ref": {"source": "知识库", "heading": "知识检索"},
+        }
+    ]
+
+    result = deterministic_grounding_policy_fallback(
+        "RAG检索不足时的grounding含义是什么？",
+        evidence_state="SUPPORTED",
+        evidence_items=evidence,
+    )
+
+    assert result is not None
+    assert result["event"] == "RAG_GENERATION_DETERMINISTIC_FALLBACK"
+    assert result["citation"] == 3
+    assert result["answer"].count("[3]") == 2
+    assert deterministic_grounding_policy_fallback(
+        "平台退款规则是什么？",
+        evidence_state="SUPPORTED",
+        evidence_items=evidence,
+    ) is None
+    assert deterministic_grounding_policy_fallback(
+        "RAG检索不足时的grounding含义是什么？",
+        evidence_state="INSUFFICIENT",
+        evidence_items=evidence,
+    ) is None
+
+
+def test_grounding_policy_fallback_accepts_fact_ids_on_reference():
+    result = deterministic_grounding_policy_fallback(
+        "证据不足时 grounding 应如何处理？",
+        evidence_state="SUPPORTED",
+        evidence_items=[
+            {
+                "citation": 1,
+                "text": "证据不足时明确说明并联系人工客服。",
+                "ref": {"factIds": ["rag.retrieval_and_abstention"]},
+            }
+        ],
+    )
+
+    assert result is not None
+    assert result["factId"] == "rag.retrieval_and_abstention"
+
+
+def test_grounding_prompt_requires_complete_compound_question_coverage():
+    prompt = build_grounding_prompt(
+        "能否自动发布，是否需要确认？",
+        evidence_state="SUPPORTED",
+        evidence_items=[],
+    )
+
+    assert "每个明确子问题或并列条件" in prompt.system
+    assert "确认、身份或归属约束" in prompt.system
+
+
+def test_grounding_prompt_exposes_atomic_fact_checklist():
+    prompt = build_grounding_prompt(
+        "结算时会重新检查价格和库存吗？",
+        evidence_state="SUPPORTED",
+        evidence_items=[
+            {
+                "citation": 1,
+                "factIds": ["checkout.price_and_stock_revalidation"],
+                "text": "结算时系统重新校验最新价格和库存。",
+                "ref": {"source": "05-cart-and-checkout.md", "heading": "结算重新校验"},
+            }
+        ],
+    )
+
+    assert "证据原子事实" in prompt.evidence
+    assert "重新校验最新价格和库存" in prompt.evidence
+
+
+def test_grounding_repair_detects_missing_paired_operational_facts():
+    reason = grounding_repair_reason(
+        "提交订单时会重新读取商品快照并校验当前价格。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="加入购物车的价格和库存到结算时还会重新检查吗？",
+        evidence_items=[
+            {
+                "citation": 1,
+                "factIds": ["checkout.price_and_stock_revalidation"],
+                "text": "结算时系统仍会重新校验最新价格和库存。",
+            }
+        ],
+    )
+
+    assert reason is not None
+    assert "库存" in reason
+
+
+def test_grounding_repair_detects_coupon_limit_and_checkout_revalidation_pair():
+    reason = grounding_repair_reason(
+        "一个订单最多选择一张优惠券，不支持多张券叠加。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="一个订单能叠加多张优惠券吗？",
+        evidence_items=[
+            {
+                "citation": 1,
+                "factIds": ["coupon.single_per_order_and_revalidate"],
+                "text": "当前一个订单最多选择一张用户优惠券，不支持多张券叠加。提交订单时会重新校验有效期、门槛和归属。",
+            }
+        ],
+    )
+
+    assert reason is not None
+    assert "重新校验" in reason
+
+
+def test_grounding_repair_detects_memory_storage_and_external_service_pair():
+    reason = grounding_repair_reason(
+        "对话记忆保存在 MySQL 和 Redis。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="对话记忆保存在哪里，依赖外部Mem0吗？",
+        evidence_items=[
+            {
+                "citation": 1,
+                "factIds": ["ai.memory.local_storage"],
+                "text": "记忆数据由项目自身的 MySQL 和 Redis 组件管理，当前不依赖 Mem0 等外部记忆服务。",
+            }
+        ],
+    )
+
+    assert reason is not None
+    assert "Mem0" in reason
+
+
+def test_grounding_repair_accepts_complete_memory_storage_and_external_service_pair():
+    reason = grounding_repair_reason(
+        "对话记忆保存在 MySQL 和 Redis，当前不依赖外部 Mem0。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="对话记忆保存在哪里，依赖外部Mem0吗？",
+        evidence_items=[
+            {
+                "citation": 1,
+                "factIds": ["ai.memory.local_storage"],
+                "text": "记忆数据由项目自身的 MySQL 和 Redis 组件管理，当前不依赖 Mem0 等外部记忆服务。",
+            }
+        ],
+    )
+
+    assert reason is None
 
 
 def test_recommendation_hard_constraints_are_deterministic():

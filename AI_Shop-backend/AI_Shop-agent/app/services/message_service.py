@@ -451,6 +451,21 @@ class AgentMessageService:
             row = await cur.fetchone()
         return _row_to_dict(row) if row else None
 
+    async def get_by_run_id(self, user_id: str, run_id: str) -> dict | None:
+        """Resolve the authoritative message created for a deterministic API run."""
+        async with acquire() as cur:
+            await cur.execute(
+                f"""
+                SELECT {_MESSAGE_SELECT_COLUMNS}
+                FROM agent_message
+                WHERE user_id=%s AND run_id=%s
+                LIMIT 1
+                """,
+                (str(user_id), str(run_id)),
+            )
+            row = await cur.fetchone()
+        return _row_to_dict(row) if row else None
+
     async def admin_load_messages(
         self,
         page_no: int = 1,

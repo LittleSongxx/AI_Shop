@@ -109,7 +109,7 @@
         <h3 class="block-title">支付方式</h3>
         <el-radio-group v-model="payMethod" class="pay-methods">
           <div class="pay-option" :class="{ active: payMethod === PAY_METHOD_ALIPAY_WAP }">
-            <el-radio :label="PAY_METHOD_ALIPAY_WAP">支付宝</el-radio>
+            <el-radio :value="PAY_METHOD_ALIPAY_WAP">支付宝</el-radio>
             <p class="pay-desc">提交后将跳转支付宝完成手机支付</p>
           </div>
         </el-radio-group>

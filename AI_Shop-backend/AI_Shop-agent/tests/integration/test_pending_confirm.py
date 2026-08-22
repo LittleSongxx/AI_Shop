@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.exceptions import RemoteActionRejected
+from app.services.java_internal_client import java_internal_client
 from app.services.pending_action_service import PendingActionService
 from app.services.pending_action_store import pending_action_store
 
@@ -224,6 +225,17 @@ async def test_reconciler_confirms_only_when_java_reports_success(service):
         "statusName": "CONFIRMED",
         "resultMessage": "订单已确认收货",
     }
+    delegated_headers = []
+
+    async def remote_status(*_args, **_kwargs):
+        delegated_headers.append(
+            java_internal_client._headers().get("X-Agent-User-Id")
+        )
+        return {
+            "status": "SUCCESS",
+            "result_message": "订单已确认收货",
+        }
+
     with (
         patch.object(
             pending_action_store,
@@ -237,12 +249,7 @@ async def test_reconciler_confirms_only_when_java_reports_success(service):
         ) as complete,
         patch(
             "app.services.pending_action_service.java_internal_client.get_agent_action_status",
-            AsyncMock(
-                return_value={
-                    "status": "SUCCESS",
-                    "result_message": "订单已确认收货",
-                }
-            ),
+            AsyncMock(side_effect=remote_status),
         ),
         patch("app.services.pending_action_service.redis_service") as redis,
     ):
@@ -253,6 +260,8 @@ async def test_reconciler_confirms_only_when_java_reports_success(service):
         reconciled = await service.reconcile_stale_executing(600)
 
     assert reconciled == 1
+    assert delegated_headers == ["u1"]
+    assert "X-Agent-User-Id" not in java_internal_client._headers()
     complete.assert_awaited_once_with(
         "act_reconcile", "CONFIRMED", result_message="订单已确认收货"
     )
@@ -328,12 +337,20 @@ async def test_structured_remote_rejection_reconciles_domain_success(service):
     async def executor(_):
         raise RemoteActionRejected("成长值服务暂时不可用")
 
+    delegated_headers = []
+
+    async def remote_status(*_args, **_kwargs):
+        delegated_headers.append(
+            java_internal_client._headers().get("X-Agent-User-Id")
+        )
+        return {"status": "SUCCESS", "result_message": "订单已确认收货"}
+
     with (
         patch.object(pending_action_store, "claim", AsyncMock(return_value=(True, pending))),
         patch.object(pending_action_store, "complete", AsyncMock(return_value=final)) as complete,
         patch(
             "app.services.pending_action_service.java_internal_client.get_agent_action_status",
-            AsyncMock(return_value={"status": "SUCCESS", "result_message": "订单已确认收货"}),
+            AsyncMock(side_effect=remote_status),
         ),
         patch("app.services.pending_action_service.redis_service") as redis,
     ):
@@ -344,6 +361,8 @@ async def test_structured_remote_rejection_reconciles_domain_success(service):
         action_type, ok, msg = await service.confirm("u1", pending["token"], executor)
 
     assert (action_type, ok, msg) == ("CONFIRM_RECEIPT", True, "订单已确认收货")
+    assert delegated_headers == ["u1"]
+    assert "X-Agent-User-Id" not in java_internal_client._headers()
     complete.assert_awaited_once_with(
         pending["token"],
         "CONFIRMED",

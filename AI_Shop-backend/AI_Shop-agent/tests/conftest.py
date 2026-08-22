@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from app.config.settings import Settings, get_settings
 from app.services.redis_service import redis_service
 
@@ -68,3 +70,26 @@ async def _allow_test_nonce(_nonce_hash: str, _ttl_seconds: int) -> bool:
 # Unit route tests do not start the production Redis lifespan. Individual replay tests
 # replace this function with a stateful fake.
 redis_service.claim_admin_assertion_nonce = _allow_test_nonce
+
+
+@pytest.fixture(autouse=True)
+def _restore_process_state_between_tests():
+    """Keep process-wide settings/runtime helpers from leaking across tests.
+
+    The evaluator deliberately derives service URLs by writing ``os.environ``
+    because it runs as a standalone process.  Unit tests call that same entry
+    point directly, so a plain ``monkeypatch`` cannot see those writes.  A
+    snapshot at the test boundary makes the test suite deterministic while
+    leaving the production process-level behavior unchanged.
+    """
+    environment_before = os.environ.copy()
+    get_settings.cache_clear()
+    try:
+        yield
+    finally:
+        for key in list(os.environ):
+            if key not in environment_before:
+                os.environ.pop(key, None)
+        for key, value in environment_before.items():
+            os.environ[key] = value
+        get_settings.cache_clear()

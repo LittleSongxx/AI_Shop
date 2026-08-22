@@ -64,3 +64,28 @@ def test_mcp_server_does_not_wrap_business_failure_text_as_success():
 
     assert parsed.success is False
     assert parsed.error_code == "BUSINESS_REJECTED"
+
+
+def test_confirmation_result_round_trip_preserves_server_action_card():
+    import json
+
+    token = "act_" + "f" * 32
+    source = ToolInvokeResult(
+        content=f"已生成确认卡片【{token}】",
+        biz_type="action_confirm",
+        biz_data=json.dumps({"actionToken": token}),
+        assistant_cards=json.dumps(
+            {"type": "ACTION_CONFIRM", "actionToken": token},
+            ensure_ascii=False,
+        ),
+        contract_data={"type": "ACTION_CONFIRM", "actionTokenPresent": True},
+    )
+
+    restored = parse_tool_wire(source.to_wire())
+
+    card = json.loads(restored.assistant_cards)
+    assert restored.biz_type == "action_confirm"
+    assert card["type"] == "ACTION_CONFIRM"
+    assert card["actionToken"] == token
+    assert json.loads(restored.biz_data)["actionToken"] == token
+    assert restored.contract_data["actionTokenPresent"] is True

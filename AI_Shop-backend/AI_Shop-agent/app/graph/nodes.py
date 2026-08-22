@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 import structlog
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from app.config.settings import get_settings
 from app.domain.intent.classifier import resolve_intent
@@ -35,7 +35,11 @@ from app.memory.session_memory_service import session_memory_service
 from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_bucket
-from app.rag.prompt_builder import build_grounding_prompt, grounding_repair_reason
+from app.rag.prompt_builder import (
+    build_grounding_prompt,
+    deterministic_grounding_policy_fallback,
+    grounding_repair_reason,
+)
 from app.rag.query_rewriter import rewrite_for_rag
 from app.rag.retriever import rag_retriever
 from app.services import agent_runtime as rt
@@ -823,6 +827,8 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
 
     repair_attempted = bool(state.get("rag_repair_attempted"))
     repair_reason = None
+    repair_failed = False
+    deterministic_fallback: dict | None = None
     if grounded_answer_turn and not repair_attempted:
         initial_text = strip_emojis(
             rt.chunk_text(getattr(response, "content", "") or "")
@@ -832,6 +838,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             initial_text,
             evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
             evidence_count=len(evidence_items),
+            evidence_items=evidence_items,
         )
         if repair_reason:
             repair_attempted = True
@@ -861,11 +868,13 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                         state.get("rag_evidence_state") or "INSUFFICIENT"
                     ),
                     evidence_count=len(evidence_items),
+                    evidence_items=evidence_items,
                 )
                 if repaired_text and not remaining:
                     response = repaired
                     turn_chunks = [repaired_text]
                 else:
+                    repair_failed = True
                     repair_reason = (
                         f"{repair_reason}；修复后仍失败：{remaining or '空答案'}"
                     )
@@ -881,6 +890,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                     output_data={"repairedAnswer": repaired_text},
                 )
             except Exception as exc:
+                repair_failed = True
                 repair_reason = f"{repair_reason}；修复调用失败：{type(exc).__name__}"
                 episode_service.record_step(
                     "RAG_GENERATION_REPAIR",
@@ -893,6 +903,41 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                     },
                     error_code=type(exc).__name__,
                     error_message=str(exc),
+                )
+
+        if repair_failed:
+            deterministic_fallback = deterministic_grounding_policy_fallback(
+                str(state.get("rag_safe_business_query") or user_text),
+                evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
+                evidence_items=evidence_items,
+            )
+            if deterministic_fallback:
+                fallback_text = str(deterministic_fallback["answer"])
+                response = AIMessage(content=fallback_text)
+                turn_chunks = [fallback_text]
+                repair_reason = (
+                    f"{repair_reason or '模型修复未通过'}；deterministicFallback="
+                    f"{deterministic_fallback['event']}"
+                )
+                episode_service.record_step(
+                    deterministic_fallback["event"],
+                    node_name="agent_loop",
+                    status="OK",
+                    input_data={
+                        "query": str(
+                            state.get("rag_safe_business_query") or user_text
+                        ),
+                        "evidenceState": str(
+                            state.get("rag_evidence_state") or "INSUFFICIENT"
+                        ),
+                        "evidenceCount": len(evidence_items),
+                        "factId": deterministic_fallback["factId"],
+                    },
+                    output_data={
+                        "answer": fallback_text,
+                        "citation": deterministic_fallback["citation"],
+                        "usageAdded": False,
+                    },
                 )
 
     messages.append(response)

@@ -1,6 +1,7 @@
 package com.aishop.controller.internal;
 
 import com.aishop.api.dto.LessStockPageDTO;
+import com.aishop.api.dto.OrderStockRestoreDTO;
 import com.aishop.api.dto.ProductIdDTO;
 import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.dto.SkuStockBatchChangeDTO;
@@ -56,6 +57,12 @@ public class StockInternalController extends ABaseController {
     public ResponseVO<StockChangeResultVO> restoreRefundStock(
             @Valid @RequestBody RefundStockRestoreDTO dto) {
         return getSuccessResponseVO(new StockChangeResultVO(skuStockService.restoreRefundStock(dto)));
+    }
+
+    @PostMapping("/order/restore")
+    public ResponseVO<StockChangeResultVO> restoreOrderStock(
+            @Valid @RequestBody OrderStockRestoreDTO dto) {
+        return getSuccessResponseVO(new StockChangeResultVO(skuStockService.restoreOrderStock(dto)));
     }
 
     @PostMapping("/refund/applied")

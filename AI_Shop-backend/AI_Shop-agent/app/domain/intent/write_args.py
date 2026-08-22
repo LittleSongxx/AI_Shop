@@ -40,6 +40,7 @@ _NEUTRAL_STAR_HINTS = ("一般", "还行", "凑合", "普通")
 # 模型自己编一段话出来就是幻觉。
 TOOL_REQUIRED_INTENTS = frozenset(
     {
+        IntentKind.PRODUCT_SEARCH.value,
         IntentKind.QUERY_ORDER.value,
         IntentKind.QUERY_LOGISTICS.value,
         IntentKind.QUERY_COMMENT.value,
@@ -151,6 +152,13 @@ async def required_tool_for_intent(
     """返回该意图必须执行的 (工具名, 参数)；参数不全或无需工具时返回 None。"""
     def order_id() -> str | None:
         return (intent_data or "").strip() or extract_order_id(user_text)
+
+    if intent == IntentKind.PRODUCT_SEARCH.value:
+        # Search is a read-only, authoritative tool path. The query parser in
+        # the search service owns constraint extraction; passing the original
+        # text preserves brands, model numbers, budgets, and exclusions.
+        keyword = (user_text or "").strip()
+        return ("SEARCH_PRODUCTS", {"keyword": keyword}) if keyword else None
 
     if intent == IntentKind.QUERY_ORDER.value:
         oid = order_id()

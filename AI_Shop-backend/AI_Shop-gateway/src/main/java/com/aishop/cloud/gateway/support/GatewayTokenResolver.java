@@ -20,10 +20,6 @@ public final class GatewayTokenResolver {
         if (StringUtils.hasText(header)) {
             return header.trim();
         }
-        String query = request.getQueryParams().getFirst(TOKEN_WEB);
-        if (StringUtils.hasText(query)) {
-            return query.trim();
-        }
         return cookieValue(request, TOKEN_WEB);
     }
 

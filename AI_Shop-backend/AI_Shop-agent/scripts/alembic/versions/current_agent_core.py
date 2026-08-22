@@ -47,6 +47,27 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        CREATE TABLE IF NOT EXISTS agent_request_idempotency
+        (
+            user_id             varchar(64) NOT NULL,
+            idempotency_key     varchar(160) NOT NULL,
+            request_fingerprint char(64) NOT NULL,
+            run_id              varchar(64) NOT NULL,
+            message_id          bigint NULL,
+            status              varchar(16) NOT NULL DEFAULT 'RESERVED',
+            response_json       mediumtext NULL,
+            created_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            updated_at          datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (user_id, idempotency_key),
+            UNIQUE KEY uk_agent_request_idempotency_run (run_id),
+            KEY idx_agent_request_idempotency_message (message_id)
+        ) COMMENT 'durable public Agent request idempotency ledger'
+          CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci
+        """
+    )
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS agent_run
         (
             run_id                 varchar(64) NOT NULL PRIMARY KEY,
@@ -1400,6 +1421,18 @@ def _reconcile_indexes() -> None:
                 False,
             ),
         ),
+        "agent_request_idempotency": (
+            (
+                "uk_agent_request_idempotency_run",
+                ("run_id",),
+                True,
+            ),
+            (
+                "idx_agent_request_idempotency_message",
+                ("message_id",),
+                False,
+            ),
+        ),
         "agent_run": (
             ("uk_agent_run_message", ("message_id",), True),
             ("idx_agent_run_trace", ("otel_trace_id",), False),
@@ -1577,5 +1610,6 @@ def downgrade() -> None:
         "agent_order_selection",
         "agent_session_memory",
         "agent_message",
+        "agent_request_idempotency",
     ):
         op.drop_table(table_name)

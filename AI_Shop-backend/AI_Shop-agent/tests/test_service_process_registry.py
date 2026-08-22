@@ -42,6 +42,22 @@ def test_pid_record_rejects_reused_pid_without_killing_process(tmp_path: Path):
         ["bash", "-c", "exec -a 'python app.main:app' sleep 30"]
     )
     try:
+        # Popen returns before the child has necessarily completed exec(2).
+        # Wait for the command marker used by the registry so this test does
+        # not race the short startup window it is meant to exercise.
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                command = Path(f"/proc/{process.pid}/cmdline").read_bytes().replace(
+                    b"\0", b" "
+                ).decode("utf-8", errors="replace")
+            except OSError:
+                command = ""
+            if "app.main:app" in command:
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError("test process did not reach the expected command marker")
         pidfile = tmp_path / "agent.pid"
         pidfile.write_text(f"{process.pid}\n", encoding="ascii")
 

@@ -30,6 +30,9 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
     private static final String REDIS_KEY_TOKEN_WEB = "mall:token:web:";
     private static final String REDIS_KEY_TOKEN_ADMIN = "mall:token:admin:";
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String USER_VERIFIED_HEADER = "X-User-Token-Verified";
+    private static final String ADMIN_VERIFIED_HEADER = "X-Admin-Token-Verified";
     private static final int CODE_LOGIN_TIMEOUT = 901;
 
     private final GatewayAuthProperties authProperties;
@@ -47,63 +50,75 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        ServerWebExchange sanitizedExchange = removeClientSuppliedIdentityHeaders(exchange);
         if (!authProperties.isEnabled()) {
-            return chain.filter(exchange);
+            return chain.filter(sanitizedExchange);
         }
-        ServerHttpRequest request = exchange.getRequest();
+        ServerHttpRequest request = sanitizedExchange.getRequest();
         if (HttpMethod.OPTIONS.equals(request.getMethod())) {
-            return chain.filter(exchange);
+            return chain.filter(sanitizedExchange);
         }
         String path = request.getURI().getPath();
         if (isInfraPath(path) || isInternalPath(path)) {
-            return chain.filter(exchange);
+            return chain.filter(sanitizedExchange);
         }
 
         if (path.startsWith("/admin-api/")) {
             if (matchAny(path, authProperties.getAdminExcludePaths())) {
-                return chain.filter(exchange);
+                return chain.filter(sanitizedExchange);
             }
             String adminToken = GatewayTokenResolver.resolveAdminToken(exchange);
             if (!StringUtils.hasText(adminToken)) {
-                return unauthorized(exchange, "登录超时");
+                return unauthorized(sanitizedExchange, "登录超时");
             }
             return reactiveStringRedisTemplate.hasKey(REDIS_KEY_TOKEN_ADMIN + adminToken)
                     .flatMap(exists -> {
                         if (Boolean.TRUE.equals(exists)) {
                             ServerHttpRequest mutated = request.mutate()
-                                    .header("X-Admin-Token-Verified", "1")
+                                    .headers(headers -> headers.set(ADMIN_VERIFIED_HEADER, "1"))
                                     .build();
-                            return chain.filter(exchange.mutate().request(mutated).build());
+                            return chain.filter(sanitizedExchange.mutate().request(mutated).build());
                         }
-                        return unauthorized(exchange, "登录超时");
+                        return unauthorized(sanitizedExchange, "登录超时");
                     });
         }
 
         if (path.startsWith("/api/") || path.startsWith("/ws/")) {
             if (path.startsWith("/api/") && matchAny(path, authProperties.getWebExcludePaths())) {
-                return chain.filter(exchange);
+                return chain.filter(sanitizedExchange);
             }
             String token = GatewayTokenResolver.resolveWebToken(exchange);
             if (!StringUtils.hasText(token)) {
-                return unauthorized(exchange, "登录超时");
+                return unauthorized(sanitizedExchange, "登录超时");
             }
             return reactiveStringRedisTemplate.opsForValue().get(REDIS_KEY_TOKEN_WEB + token)
                     .flatMap(sessionJson -> {
                         if (!StringUtils.hasText(sessionJson)) {
-                            return unauthorized(exchange, "登录超时");
+                            return unauthorized(sanitizedExchange, "登录超时");
                         }
                         String userId = extractUserId(sessionJson);
                         ServerHttpRequest.Builder builder = request.mutate()
-                                .header("X-User-Token-Verified", "1");
+                                .headers(headers -> headers.set(USER_VERIFIED_HEADER, "1"));
                         if (StringUtils.hasText(userId)) {
-                            builder.header("X-User-Id", userId);
+                            builder.headers(headers -> headers.set(USER_ID_HEADER, userId));
                         }
-                        return chain.filter(exchange.mutate().request(builder.build()).build());
+                        return chain.filter(sanitizedExchange.mutate().request(builder.build()).build());
                     })
-                    .switchIfEmpty(unauthorized(exchange, "登录超时"));
+                    .switchIfEmpty(unauthorized(sanitizedExchange, "登录超时"));
         }
 
-        return chain.filter(exchange);
+        return chain.filter(sanitizedExchange);
+    }
+
+    private ServerWebExchange removeClientSuppliedIdentityHeaders(ServerWebExchange exchange) {
+        ServerHttpRequest sanitized = exchange.getRequest().mutate()
+                .headers(headers -> {
+                    headers.remove(USER_ID_HEADER);
+                    headers.remove(USER_VERIFIED_HEADER);
+                    headers.remove(ADMIN_VERIFIED_HEADER);
+                })
+                .build();
+        return exchange.mutate().request(sanitized).build();
     }
 
     private boolean isInfraPath(String path) {

@@ -12,6 +12,11 @@ ConfiguredMode = Literal["adaptive", "workflow", "single_agent", "multi_agent"]
 
 _WORKFLOW_READ_INTENTS = frozenset(
     {
+        # A plain product search is an authoritative read: the query parser
+        # and Java-backed search tool can execute it without asking an LLM to
+        # decide whether to call SEARCH_PRODUCTS. Composite and product
+        # consultation requests are filtered separately below.
+        IntentKind.PRODUCT_SEARCH.value,
         IntentKind.QUERY_ORDER.value,
         IntentKind.QUERY_LOGISTICS.value,
         IntentKind.QUERY_FULFILLMENT.value,
@@ -94,6 +99,9 @@ def _workflow_eligible(state: Mapping[str, Any]) -> bool:
         return True
     if state.get("rag_evidence_required"):
         return False
+    # Product search has a deterministic tool contract. Keep product detail
+    # consultation and visual search on the Agent path because they may need
+    # explanation or image-specific reasoning.
     return (
         str(state.get("request_mode") or "") == RequestMode.READ_QUERY.value
         and str(state.get("intent") or "") in _WORKFLOW_READ_INTENTS

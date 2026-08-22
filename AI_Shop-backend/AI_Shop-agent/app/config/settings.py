@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # （deploy/prometheus/prometheus.yml 已加 aishop-agent-worker job）。
     worker_metrics_port: int = 7051
     app_env: str = "development"
+    # Cross-process fault capabilities are strictly local evaluation machinery.
+    # Production rejects them even when this switch is accidentally enabled.
+    ai_eval_enable_fault_injection: bool = False
     # Autoreload respawns the server on file changes and is a local-dev tool
     # only; leaving it on elsewhere costs a watcher process and restarts.
     app_reload: bool = False
@@ -122,6 +125,19 @@ class Settings(BaseSettings):
     memory_llm_api_key: str = ""
     memory_llm_base_url: str = ""
     memory_llm_model: str = ""
+
+    # Intent classification can use provider-native structured output when the
+    # endpoint supports it. ``auto`` keeps that behavior for compatible
+    # providers; ``disabled`` is required for models such as DeepSeek
+    # v4-flash, which rejects the JSON-schema response format before the text
+    # JSON fallback can run.
+    intent_structured_output_mode: Literal["auto", "enabled", "disabled"] = Field(
+        default="auto",
+        validation_alias=AliasChoices(
+            "INTENT_STRUCTURED_OUTPUT_MODE",
+            "intent_structured_output_mode",
+        ),
+    )
 
     # 留空 = 回落 llm_timeout，见 _blank_to_none。
     memory_llm_timeout: OptionalInt = None
@@ -324,15 +340,14 @@ class Settings(BaseSettings):
     # 取值依据与验证方法：DashScope text-embedding-v4 在中文短查询上，相关文档的
     # cosine 多在 0.4~0.8，无关文档在 0.1~0.3。0.30 取在两个分布之间偏保守的位置——
     # 宁可放进来交给 rerank 筛，也不要在召回阶段就把边缘相关的丢掉（召回阶段的漏召
-    # 无法在后续任何阶段补回）。这两个数需要用 benchmarks/search_relevance_v1.jsonl
-    # 在真实 ES 上标定，当前取值是保守默认而不是实测最优。
+    # 无法在后续任何阶段补回）。这两个数必须用 evaluation/ 的可见 development
+    # 与 regression 集在真实 ES 上标定；final 集不得用于选参。当前值是保守默认。
     rag_vector_min_cosine: float = 0.30
     # 商品召回比知识库召回更容忍噪声：搜出来的商品会再过一遍 rerank 和 MMR，
     # 而且用户能直接看出哪个不相关；知识库召回的噪声会被写进 prompt 当证据。
     rag_product_vector_min_cosine: float = 0.20
-    # RAG v3 local-live retrieval selected 0.70 with a 0.10 top-score margin on
-    # public + known regression before the fresh holdout was opened. RAG v4
-    # keeps those values in one shared runtime/evaluation policy fingerprint.
+    # 证据阈值与 top-score margin 是线上和评测共用的一个策略指纹。它们只能根据
+    # 可见 development/regression bad case 调整，正式 final 冻结后不得修改。
     rag_evidence_min_relevance: float = 0.70
     # Deterministic canonical fact hints may recover a directly mapped passage
     # below the global semantic threshold. The hint must come from runtime query
@@ -369,6 +384,11 @@ class Settings(BaseSettings):
     knn_num_candidates_factor: int = 3
     knn_num_candidates_min: int = 100
     rag_cache_ttl_seconds: int = 30 * 60
+    # LLM expansion is an optional recall enhancement. Deterministic business
+    # aliases are sufficient for many queries, so the remote call is skipped
+    # when they already provide a second variant.
+    rag_query_expansion_enabled: bool = True
+    rag_query_expansion_timeout_seconds: float = 3.0
     # B2：语义缓存命中按此比例抽样进盲评队列（1% 命中会被记录，
     # 离线抽样看误报率——行业建议"命中率突降按事故处理，误报率按周评审"）。
     rag_cache_sample_rate: float = 0.01
@@ -418,6 +438,11 @@ class Settings(BaseSettings):
     shopping_mission_max_clarifications: int = 2
     shopping_offer_ttl_seconds: int = 300
     shopping_decision_max_results: int = 6
+    # Hybrid product recall is allowed to return a partial result when one
+    # provider is slow or unavailable.  These limits bound the whole recall
+    # fan-out and each individual BM25/vector request respectively.
+    product_search_deadline_seconds: float = 8.0
+    product_search_provider_timeout_seconds: float = 4.0
     commerce_outcome_retention_days: int = 180
     commerce_outcome_attribution_days: int = 30
     multi_agent_specialist_max_rounds: int = 2
@@ -435,6 +460,15 @@ class Settings(BaseSettings):
 
     intent_use_llm: bool = True
     intent_rule_fallback: bool = True
+    # Intent classification is a bounded auxiliary call. It must not inherit
+    # the full conversational LLM retry budget and consume the Worker deadline.
+    intent_llm_timeout_seconds: int = Field(
+        default=15,
+        validation_alias=AliasChoices(
+            "INTENT_LLM_TIMEOUT_SECONDS",
+            "intent_llm_timeout_seconds",
+        ),
+    )
     intent_handoff_confidence: float = 0.55
     order_query_lookback_days: int = 90
     force_mcp_on_llm_skip: bool = True
@@ -487,6 +521,8 @@ class Settings(BaseSettings):
             raise ValueError("AGENT_BUDGET_MAX_STEPS must be between 4 and 100")
         if not 5 <= self.agent_budget_deadline_seconds <= 600:
             raise ValueError("AGENT_BUDGET_DEADLINE_SECONDS must be between 5 and 600")
+        if not 1 <= self.intent_llm_timeout_seconds <= 60:
+            raise ValueError("INTENT_LLM_TIMEOUT_SECONDS must be between 1 and 60")
         if not 0 < self.agent_budget_warn_threshold < 1:
             raise ValueError("AGENT_BUDGET_WARN_THRESHOLD must be between 0 and 1")
         if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
@@ -537,6 +573,14 @@ class Settings(BaseSettings):
             raise ValueError("SHOPPING_OFFER_TTL_SECONDS must be between 60 and 900")
         if not 1 <= self.shopping_decision_max_results <= 6:
             raise ValueError("SHOPPING_DECISION_MAX_RESULTS must be between 1 and 6")
+        if not 1 <= self.product_search_provider_timeout_seconds <= 60:
+            raise ValueError(
+                "PRODUCT_SEARCH_PROVIDER_TIMEOUT_SECONDS must be between 1 and 60"
+            )
+        if not self.product_search_provider_timeout_seconds <= self.product_search_deadline_seconds <= 120:
+            raise ValueError(
+                "PRODUCT_SEARCH_DEADLINE_SECONDS must cover the provider timeout and be <= 120"
+            )
         if not 30 <= self.commerce_outcome_retention_days <= 730:
             raise ValueError("COMMERCE_OUTCOME_RETENTION_DAYS must be between 30 and 730")
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
@@ -558,6 +602,10 @@ class Settings(BaseSettings):
             raise ValueError(
                 "RAG_EVIDENCE_CANONICAL_HINT_FLOOR must be between 0 and "
                 "RAG_EVIDENCE_MIN_RELEVANCE"
+            )
+        if not 0.5 <= self.rag_query_expansion_timeout_seconds <= 10:
+            raise ValueError(
+                "RAG_QUERY_EXPANSION_TIMEOUT_SECONDS must be between 0.5 and 10"
             )
         for model, pricing in self.llm_pricing_cny_per_million_json.items():
             if not str(model).strip() or not isinstance(pricing, dict):
@@ -687,6 +735,8 @@ class Settings(BaseSettings):
             return
 
         errors: list[str] = []
+        if self.ai_eval_enable_fault_injection:
+            errors.append("AI_EVAL_ENABLE_FAULT_INJECTION must be false in production")
         if not self.internal_token.strip() or self.internal_token == "your-token":
             errors.append("AISHOP_INTERNAL_TOKEN must be configured")
         if (

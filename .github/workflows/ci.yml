@@ -80,19 +80,8 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_USER: root
           MYSQL_PASSWORD: root
-      - name: Deterministic Commerce, Safety, Search/RAG and ablation gates
-        run: |
-          run_id="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          python benchmarks/eval.py run --suite deterministic-commerce --stage deterministic --run-id "${run_id}-commerce"
-          python benchmarks/eval.py run --suite deterministic-safety --stage deterministic --run-id "${run_id}-safety"
-          python benchmarks/eval.py run --suite deterministic-search-rag --stage deterministic --run-id "${run_id}-search-rag"
-      - name: Upload deterministic evaluation evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: deterministic-ai-evidence-${{ github.run_id }}
-          path: AI_Shop-backend/AI_Shop-agent/benchmarks/results
-          if-no-files-found: error
+      - name: Validate AI evaluation suite and locked visible datasets
+        run: python -m evaluation.cli validate
 
   repository-contracts:
     name: Repository configuration contracts
@@ -198,5 +187,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python scripts/check_evidence_manifest.py
-      - run: python -m unittest discover -s scripts -p 'test_check_evidence_manifest.py'
+      - run: python -m pip install "pytest>=9,<10"
+      - run: python scripts/check_evidence_manifest.py --require-current
+      - run: PYTHONPATH=scripts python -m pytest -q scripts/test_check_evidence_manifest.py

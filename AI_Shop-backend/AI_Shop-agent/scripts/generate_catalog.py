@@ -2,10 +2,9 @@
 
 Why this exists: ``AI_Shop-backend/data/generate_products.sql`` titles every row
 ``商品-<categoryId>-<serial>``. That string contains no product word, so BM25 on
-``productName`` matches nothing a user would type, dense retrieval embeds noise,
-and the graded-relevance layer of ``benchmarks/run_search_relevance.py`` has
-nothing it could honestly label. The catalogue is not "fake but usable" — it is
-unsearchable. This script replaces it with titles a shopper would actually type.
+``productName`` matches nothing a user would type and dense retrieval embeds
+noise. The catalogue is not useful for realistic shopping search evaluation.
+This script replaces it with titles a shopper would actually type.
 
 Generation is aimed at four contracts that already exist in this repo, so the
 output is consumed by the live code rather than sitting beside it:

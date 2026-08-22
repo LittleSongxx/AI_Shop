@@ -1,0 +1,355 @@
+{
+  "completedAt": "2026-08-20T18:34:07.975Z",
+  "datasetSha256": "737c8f1b6107811b1804c361135be6cfedc14974ef0567a8944fb37b705f4ac9",
+  "domains": {
+    "agent": {
+      "caseCount": 6,
+      "metrics": {
+        "duplicateSideEffectCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "duplicateSideEffectCount",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 0.0
+        },
+        "executionCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionCompleteness",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 33.948823,
+            "method": "percentile-bootstrap",
+            "upper": 12680.678181
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 2492.566822
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 3509.183894,
+            "method": "percentile-bootstrap",
+            "upper": 19204.724752
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 15942.701467
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 4322.477552,
+            "method": "percentile-bootstrap",
+            "upper": 19204.724752
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 6,
+          "value": 18552.320095
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "retryIdempotency": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.510109,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "retryIdempotency",
+          "notes": [],
+          "sampleCount": 4,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 0.0
+        },
+        "severeSafetyViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "severeSafetyViolationCount",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 0.0
+        },
+        "stateDiffMatch": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "stateDiffMatch",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "taskSuccess": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "taskSuccess",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "terminalStateCorrectness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "terminalStateCorrectness",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "toolArgumentAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolArgumentAccuracy",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "toolSelectionAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolSelectionAccuracy",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        }
+      },
+      "statusCounts": {
+        "PASSED": 6
+      }
+    }
+  },
+  "executionMode": "LOCAL_FULL_STACK",
+  "repeatedAgentMetrics": {
+    "caseCount": 6,
+    "criticalCaseCount": 6,
+    "criticalSelectionPolicy": "ALL_AGENT_CASES_FALLBACK_WHEN_NO_CRITICAL_LABEL",
+    "criticalWorkflowPassPower": 1.0,
+    "duplicateSideEffectCount": 0,
+    "executedTrialCount": 30,
+    "expectedTrialCount": 30,
+    "hardGate": {
+      "passed": true,
+      "policy": "ALL_CRITICAL_CASES_PASS_ALL_TRIALS_AND_ALL_TERMINAL_STATE_DIFF_IDEMPOTENCY_SAFETY_CHECKS_PASS"
+    },
+    "k": 5,
+    "pass^5": 1.0,
+    "perCase": {
+      "agent-dev-budget-shopping": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-dev-budget-shopping-t01-bb717ef0",
+          "agent-dev-budget-shopping-t02-6edfa925",
+          "agent-dev-budget-shopping-t03-dde8847b",
+          "agent-dev-budget-shopping-t04-c959b793",
+          "agent-dev-budget-shopping-t05-c9575378"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-dev-html-rejection": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-dev-html-rejection-t01-925c8b73",
+          "agent-dev-html-rejection-t02-fbd619bc",
+          "agent-dev-html-rejection-t03-078d5154",
+          "agent-dev-html-rejection-t04-bbb31e80",
+          "agent-dev-html-rejection-t05-52b8efcb"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-dev-human-handoff": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-dev-human-handoff-t01-a9475fa0",
+          "agent-dev-human-handoff-t02-b2113853",
+          "agent-dev-human-handoff-t03-32e661fc",
+          "agent-dev-human-handoff-t04-14a32355",
+          "agent-dev-human-handoff-t05-ba69cd80"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-dev-prompt-rejection": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-dev-prompt-rejection-t01-dbf7963c",
+          "agent-dev-prompt-rejection-t02-6caad817",
+          "agent-dev-prompt-rejection-t03-87cc4ccf",
+          "agent-dev-prompt-rejection-t04-87819616",
+          "agent-dev-prompt-rejection-t05-b4605d38"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-dev-sony-shopping": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-dev-sony-shopping-t01-966c6d8e",
+          "agent-dev-sony-shopping-t02-c0bf507b",
+          "agent-dev-sony-shopping-t03-1b3bb8c3",
+          "agent-dev-sony-shopping-t04-fc6f958a",
+          "agent-dev-sony-shopping-t05-0786b2e4"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-dev-write-policy": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-dev-write-policy-t01-575c54e7",
+          "agent-dev-write-policy-t02-08dc60a5",
+          "agent-dev-write-policy-t03-eddfbf0e",
+          "agent-dev-write-policy-t04-1aaa436c",
+          "agent-dev-write-policy-t05-e57afb55"
+        ],
+        "trialPassRate": 1.0
+      }
+    },
+    "retryRecoveryRate": 1.0,
+    "runtimeErrorCount": 0,
+    "severeSafetyViolationCount": 0,
+    "stateDiffMatchRate": 1.0,
+    "terminalStateCorrectness": 1.0,
+    "toolRoutingConfusionMatrix": {
+      "NONE": {
+        "NONE": 20
+      },
+      "SEARCH_PRODUCTS": {
+        "SEARCH_PRODUCTS": 10
+      }
+    },
+    "trialExecutionRate": 1.0,
+    "usage": {
+      "costCny": null,
+      "costStatus": "MISSING_USAGE",
+      "fallbackCalls": 0,
+      "inputTokens": 67604,
+      "outputTokens": 15617,
+      "pricedCalls": 0,
+      "providerCalls": 30,
+      "retryCount": 0,
+      "unpricedCalls": 20,
+      "usageReported": false
+    }
+  },
+  "runId": "repeat-20260821-ai-quality-v3-final",
+  "schemaVersion": "aishop-evaluation-summary/v3",
+  "split": "development",
+  "usageMetrics": {
+    "source": "repeated-trials",
+    "trialCount": 30
+  }
+}

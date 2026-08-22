@@ -14,6 +14,7 @@ from app.rag.local_embedding import local_hash_embedding
 from app.rag.runtime_trace import active_rag_runtime_trace
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.redis_service import redis_service
+from evaluation.core.fault_injection import fault_point
 
 logger = structlog.get_logger()
 
@@ -106,6 +107,9 @@ async def embed_text(text: str) -> list[float] | None:
             runtime_trace.fallback("embedding_breaker_open")
         return None
     try:
+        injected_mode = fault_point("embedding")
+        if injected_mode == "empty":
+            return None
         runtime_trace = active_rag_runtime_trace()
         if runtime_trace is not None:
             runtime_trace.called("embedding")
@@ -207,6 +211,9 @@ async def embed_texts(texts: list[str], *, batch_size: int = 10) -> list[list[fl
                 runtime_trace.fallback("embedding_breaker_open")
             continue
         try:
+            injected_mode = fault_point("embedding")
+            if injected_mode == "empty":
+                continue
             runtime_trace = active_rag_runtime_trace()
             if runtime_trace is not None:
                 runtime_trace.called("embedding")

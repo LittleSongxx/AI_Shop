@@ -1,3 +1,6 @@
+import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
 from langchain_core.messages import AIMessage
 
@@ -6,6 +9,7 @@ from app.domain.intent.classifier import (
     FUND_AT_RISK,
     PAYMENT_ISSUE_HINTS,
     _parse_intent_json,
+    classify_high_confidence_intent,
     classify_intent_by_llm,
     classify_intent_by_rules,
     classify_request_mode,
@@ -67,6 +71,26 @@ from app.services.agent_service import AgentOrchestrator
         ("我有哪些优惠券", IntentKind.QUERY_COUPON, RequestMode.READ_QUERY),
         ("收到的商品坏了，帮我处理", IntentKind.DAMAGED_OR_WRONG_ITEM, RequestMode.ACTION_PROPOSAL),
         ("坏了以后怎么处理", IntentKind.DAMAGED_OR_WRONG_ITEM, RequestMode.INFORMATIONAL),
+        (
+            "请先为我生成取消订单的操作确认卡",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "取消订单前只生成提案，不要实际执行",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "请展示取消待付款订单的方案，等待我确认",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "远程结果未知时不要伪造成功，只保留订单 SM202608050001 的取消提案",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.ACTION_PROPOSAL,
+        ),
     ],
 )
 def test_request_mode_is_independent_from_business_intent(text, intent, expected):
@@ -86,8 +110,44 @@ def test_rule_fallback_refund():
     intent = classify_intent_by_rules("我要退款")
     assert intent == IntentKind.REFUND
 
+
+def test_explicit_cancel_proposal_is_high_confidence_before_llm():
+    text = "远程结果未知时不要伪造成功，只保留订单 SM202608050001 的取消提案"
+    assert classify_high_confidence_intent(text) == (
+        IntentKind.CANCEL_ORDER,
+        "SM202608050001",
+    )
+
+
+def test_cancel_policy_question_is_not_promoted_to_write_proposal():
+    text = "订单 SM202608050001 的取消规则是什么？"
+    assert classify_high_confidence_intent(text) == (None, "")
+    assert classify_request_mode(text, IntentKind.CANCEL_ORDER) == RequestMode.INFORMATIONAL
+
 def test_rule_chat_returns_none_without_keywords():
     assert classify_intent_by_rules("你好呀") is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "办公室采购旺旺雪饼和汽水",
+        "采购一批可乐和芬达",
+    ],
+)
+def test_bulk_snack_procurement_routes_to_product_search(text):
+    assert classify_intent_by_rules(text) == IntentKind.PRODUCT_SEARCH
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "新房除甲醛空气净化器怎么选",
+        "净水器和空气净化器哪个好",
+    ],
+)
+def test_category_selection_routes_to_product_search_without_buy_verb(text):
+    assert classify_intent_by_rules(text) == IntentKind.PRODUCT_SEARCH
 
 
 def test_bag_budget_revision_continues_product_search():
@@ -229,6 +289,37 @@ async def test_llm_intent_falls_back_to_text_json_when_schema_unsupported(monkey
 
 
 @pytest.mark.asyncio
+async def test_llm_intent_can_skip_known_unsupported_schema_mode(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_STRUCTURED_OUTPUT_MODE", "disabled")
+    get_settings.cache_clear()
+
+    class FakeLlm:
+        def with_structured_output(self, *_args, **_kwargs):
+            raise AssertionError("structured output must be skipped when disabled")
+
+        async def ainvoke(self, _messages):
+            return AIMessage(
+                content='{"intentType":"QUERY_COUPON","confidence":0.82,"data":""}'
+            )
+
+    async def prompt():
+        return "用户 %s 的问题是 %s"
+
+    monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
+    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+
+    try:
+        decision = await classify_intent_by_llm("u1", "查优惠券")
+    finally:
+        get_settings.cache_clear()
+
+    assert decision is not None
+    assert decision.intent == IntentKind.QUERY_COUPON
+    assert decision.source == "llm_fallback"
+
+
+@pytest.mark.asyncio
 async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     get_settings.cache_clear()
@@ -262,6 +353,65 @@ async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monke
     assert decision is not None
     assert decision.intent == IntentKind.CHAT
     assert decision.next_action == NextAction.ASK_CLARIFICATION
+    assert decision.source == "llm_invalid"
+
+
+@pytest.mark.asyncio
+async def test_resolve_intent_uses_rules_when_auxiliary_llm_is_invalid(monkeypatch):
+    """Provider failure must not turn a recognizable shopping request into CHAT."""
+
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.classify_intent_by_llm",
+        AsyncMock(
+            return_value=IntentDecision(
+                intent=IntentKind.CHAT,
+                confidence=0.0,
+                next_action=NextAction.ASK_CLARIFICATION,
+                source="llm_invalid",
+            )
+        ),
+    )
+
+    decision = await resolve_intent(
+        "u1",
+        "推荐预算2000元内的无线降噪耳机",
+        allow_llm=True,
+    )
+
+    assert decision.intent == IntentKind.PRODUCT_SEARCH
+    assert decision.next_action == NextAction.TOOL
+    assert decision.source == "rule"
+
+
+@pytest.mark.asyncio
+async def test_intent_llm_call_is_bounded_by_dedicated_timeout(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("INTENT_LLM_TIMEOUT_SECONDS", "1")
+    monkeypatch.setenv("INTENT_STRUCTURED_OUTPUT_MODE", "disabled")
+    get_settings.cache_clear()
+
+    class SlowLlm:
+        async def ainvoke(self, _messages):
+            await asyncio.sleep(10)
+
+    async def prompt():
+        return "用户 %s 的问题是 %s"
+
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt
+    )
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.create_memory_llm", lambda: SlowLlm()
+    )
+    try:
+        started = asyncio.get_running_loop().time()
+        decision = await classify_intent_by_llm("u1", "查优惠券")
+        elapsed = asyncio.get_running_loop().time() - started
+    finally:
+        get_settings.cache_clear()
+
+    assert elapsed < 3
+    assert decision is not None
     assert decision.source == "llm_invalid"
 
 
@@ -378,6 +528,34 @@ async def test_payment_blocked_without_fund_loss_is_not_fund_dispute():
     assert decision.intent == IntentKind.PAYMENT_ISSUE
     assert decision.risk_level != RiskLevel.HIGH
     assert decision.handoff_reason != "FUND_DISPUTE"
+
+
+@pytest.mark.asyncio
+async def test_hypothetical_demo_payment_policy_is_answered_without_handoff():
+    decision = await resolve_intent(
+        "u1",
+        "演示支付会不会发生真实扣款？",
+        allow_llm=False,
+    )
+
+    assert decision.intent == IntentKind.CHAT
+    assert decision.risk_level == RiskLevel.LOW
+    assert decision.next_action == NextAction.ANSWER
+    assert decision.handoff_reason is None
+
+
+@pytest.mark.asyncio
+async def test_observed_demo_payment_charge_remains_a_fund_dispute():
+    decision = await resolve_intent(
+        "u1",
+        "演示支付已经扣款了，请处理",
+        allow_llm=False,
+    )
+
+    assert decision.intent == IntentKind.PAYMENT_ISSUE
+    assert decision.risk_level == RiskLevel.HIGH
+    assert decision.next_action == NextAction.HANDOFF
+    assert decision.handoff_reason == "FUND_DISPUTE"
 
 
 @pytest.mark.asyncio

@@ -103,6 +103,102 @@ async def test_analytics_export_is_async_audited_and_owner_bound(monkeypatch, tm
     assert payload["lineage"] == ["analytics_sales_daily"]
     with pytest.raises(PermissionError):
         await service.get(job["jobId"], admin_id="admin-b")
+    await service.close()
+
+
+@pytest.mark.asyncio
+async def test_analytics_export_resumes_incomplete_job_after_restart(monkeypatch, tmp_path):
+    from app.services import analytics_export_service as export_module
+
+    settings = SimpleNamespace(
+        privacy_export_dir=str(tmp_path),
+        analytics_cursor_ttl_seconds=900,
+        analytics_export_max_rows=10_000,
+    )
+    monkeypatch.setattr(export_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        export_module.redis_service,
+        "get_json",
+        AsyncMock(side_effect=RuntimeError("redis unavailable")),
+    )
+    monkeypatch.setattr(
+        export_module.redis_service,
+        "set_json",
+        AsyncMock(side_effect=RuntimeError("redis unavailable")),
+    )
+    monkeypatch.setattr(
+        export_module.data_analyst_service,
+        "ask",
+        AsyncMock(
+            return_value={
+                "runId": "run-recovered",
+                "status": "EMPTY_RESULT",
+                "sql": _sql(),
+                "columns": [],
+                "rows": [],
+                "lineage": ["analytics_sales_daily"],
+                "explain": [],
+                "warnings": [],
+                "answer": "无数据",
+            }
+        ),
+    )
+    job_id = "analytics-export-recovery-test"
+    export_module._LOCAL_JOBS[job_id] = {
+        "jobId": job_id,
+        "status": "RUNNING",
+        "adminId": "admin-a",
+        "adminIdHash": hashlib.sha256(b"admin-a").hexdigest(),
+        "permissions": ["analytics:export", "analytics:read"],
+        "tenantId": None,
+        "question": "最近七天销售额",
+        "questionHash": hashlib.sha256("最近七天销售额".encode()).hexdigest(),
+        "createdAt": "2026-08-20T00:00:00+00:00",
+        "updatedAt": "2026-08-20T00:00:00+00:00",
+        "downloadable": False,
+    }
+    service = export_module.AnalyticsExportService()
+
+    try:
+        assert await service.resume_incomplete() == 1
+        for _ in range(20):
+            current = await service.get(job_id, admin_id="admin-a")
+            if current["status"] in {"COMPLETED", "FAILED"}:
+                break
+            await asyncio.sleep(0)
+        assert current["status"] == "COMPLETED"
+        assert current["recoveryCount"] == 1
+        assert await service.download(job_id, admin_id="admin-a")
+    finally:
+        await service.close()
+        export_module._LOCAL_JOBS.pop(job_id, None)
+
+
+@pytest.mark.asyncio
+async def test_legacy_incomplete_export_is_failed_instead_of_left_running(monkeypatch):
+    from app.services import analytics_export_service as export_module
+
+    monkeypatch.setattr(
+        export_module.redis_service,
+        "set_json",
+        AsyncMock(side_effect=RuntimeError("redis unavailable")),
+    )
+    job_id = "analytics-export-legacy-test"
+    export_module._LOCAL_JOBS[job_id] = {
+        "jobId": job_id,
+        "status": "RUNNING",
+        "adminIdHash": hashlib.sha256(b"admin-a").hexdigest(),
+        "question": "最近七天销售额",
+    }
+    service = export_module.AnalyticsExportService()
+
+    try:
+        assert await service.resume_incomplete() == 0
+        current = await service.get(job_id, admin_id="admin-a")
+        assert current["status"] == "FAILED"
+        assert current["errorCode"] == "RECOVERY_CONTEXT_MISSING"
+    finally:
+        export_module._LOCAL_JOBS.pop(job_id, None)
 
 
 @pytest.mark.asyncio

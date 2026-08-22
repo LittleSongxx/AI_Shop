@@ -17,6 +17,7 @@ from app.services.final_offer_snapshot_service import (
     OfferSnapshotUnavailable,
     final_offer_snapshot_service,
 )
+from app.services.product_constraint_evidence import evaluate_excluded_terms
 from app.services.product_decision_feature_service import product_decision_feature_service
 from app.services.shopping_mission_service import mission_summary, schema_for
 from app.services.shopping_profile_service import shopping_profile_service
@@ -55,12 +56,93 @@ def _text(product: dict[str, Any]) -> str:
     values = [
         product.get("product_name"),
         product.get("productName"),
+        product.get("product_desc"),
+        product.get("productDesc"),
+        product.get("description"),
         product.get("brand"),
+        product.get("category"),
+        product.get("categoryName"),
+        product.get("category_name"),
+        product.get("product_class"),
     ]
     for feature in product.get("decisionFeatures") or []:
         if isinstance(feature, dict):
             values.extend((feature.get("key"), feature.get("value")))
     return " ".join(str(value or "") for value in values).lower()
+
+
+def _category_text(product: dict[str, Any]) -> str:
+    return " ".join(
+        str(product.get(key) or "")
+        for key in ("category", "categoryName", "category_name", "product_class")
+    ).casefold().strip()
+
+
+def _category_matches(product: dict[str, Any], category: str | None) -> bool:
+    """Conservatively enforce a mission category when the snapshot exposes one.
+
+    Some Java snapshots only carry a numeric category id.  In that case there is
+    no safe text comparison and the candidate is retained for the authoritative
+    offer check.  Known broad category aliases avoid rejecting valid leaf
+    categories such as ``笔记本电脑`` for a ``电脑`` mission.
+    """
+
+    target = str(category or "").strip().casefold()
+    if not target:
+        return True
+    fields = _category_text(product)
+    if not fields:
+        fields = " ".join(
+            str(product.get(key) or "")
+            for key in ("product_name", "productName", "product_desc", "productDesc")
+        ).casefold().strip()
+    if not fields:
+        return True
+    aliases = {target}
+    if target in {"电脑", "计算机"}:
+        aliases.update({"笔记本", "台式机", "台式电脑", "电脑"})
+    elif target in {"家电", "电器"}:
+        aliases.update({"家电", "电器", "厨房电器", "生活电器"})
+    elif target in {"包", "箱包"}:
+        aliases.update({"包", "箱包", "背包", "双肩包", "旅行包"})
+    elif target in {"乐器", "音乐器材"}:
+        # Java's compact product snapshot may expose only a numeric category
+        # id.  Keep broad taxonomy missions compatible with leaf names carried
+        # in the authoritative product title.
+        aliases.update(
+            {
+                "乐器",
+                "吉他",
+                "电吉他",
+                "民谣",
+                "钢琴",
+                "电子琴",
+                "尤克里里",
+                "小提琴",
+                "架子鼓",
+            }
+        )
+    return any(alias in fields for alias in aliases)
+
+
+def _slate_diversity_score(product: dict[str, Any], selected: list[dict[str, Any]]) -> float:
+    """Return a deterministic [0, 1] novelty score against the selected slate."""
+
+    if not selected:
+        return 1.0
+    category = _category_text(product)
+    brand = str(product.get("brand") or "").casefold().strip()
+    max_similarity = 0.0
+    for previous in selected:
+        previous_category = _category_text(previous)
+        previous_brand = str(previous.get("brand") or "").casefold().strip()
+        similarity = 0.0
+        if category and previous_category and category == previous_category:
+            similarity = 1.0
+        elif brand and previous_brand and brand == previous_brand:
+            similarity = 0.5
+        max_similarity = max(max_similarity, similarity)
+    return 1.0 - max_similarity
 
 
 def _feature_values(product: dict[str, Any]) -> list[str]:
@@ -234,6 +316,12 @@ class ShoppingDecisionService:
         max_budget = _number(hard.get("budgetMax"))
         required_brands = {str(value).lower() for value in hard.get("requiredBrands") or []}
         excluded_brands = {str(value).lower() for value in exclusions.get("brands") or []}
+        excluded_terms = {
+            str(value).strip().casefold()
+            for value in exclusions.get("terms") or []
+            if str(value).strip()
+        }
+        required_category = str(mission.get("category") or "").strip()
         brand_profile = {
             "brands": list(hard.get("requiredBrands") or soft.get("brands") or []),
             "excludedBrands": list(exclusions.get("brands") or []),
@@ -266,6 +354,12 @@ class ShoppingDecisionService:
                 reason = "BRAND_REQUIRED"
             elif brand and brand in excluded_brands:
                 reason = "BRAND_EXCLUDED"
+            elif excluded_terms and evaluate_excluded_terms(
+                product, tuple(excluded_terms), selected_only=True
+            )["violates"]:
+                reason = "TERM_EXCLUDED"
+            elif required_category and not _category_matches(product, required_category):
+                reason = "CATEGORY_REQUIRED"
             if reason:
                 rejected.append({"productId": product_id, "reason": reason})
                 continue
@@ -333,28 +427,62 @@ class ShoppingDecisionService:
                         0.15 if not normalized_kind.startswith("negative") else -0.15
                     ) * weight
             explicit_score = min(1.0, max(0.0, explicit_score + inferred_adjustment))
-            diversity_score = 1.0 / recall_rank
-            score = (
+            base_score = (
                 weights["useCase"] * use_case_score
                 + weights["feature"] * feature_score
                 + weights["offer"] * offer_score
                 + weights["explicit"] * explicit_score
-                + weights["diversity"] * diversity_score
             )
             product["ranking"] = {
-                "utilityScore": round(score, 4),
+                "baseUtilityScore": round(base_score, 4),
                 "useCaseScore": round(use_case_score, 4),
                 "featureScore": round(feature_score, 4),
                 "offerScore": round(offer_score, 4),
                 "explicitPreferenceScore": round(explicit_score, 4),
-                "diversityScore": round(diversity_score, 4),
+                "recallPriorScore": round(1.0 / recall_rank, 4),
                 "policyVersion": POLICY_VERSION,
             }
+            product["_base_utility_score"] = base_score
+            product["_recall_rank"] = recall_rank
             ranked.append(product)
-        return sorted(
-            ranked,
-            key=lambda product: (-float(product["ranking"]["utilityScore"]), str(product.get("product_id") or "")),
-        )
+
+        # Greedy slate-level MMR: relevance remains the dominant signal, while
+        # the small diversity weight has a real and inspectable effect on later
+        # positions.  This avoids presenting a reciprocal-rank prior under the
+        # misleading name ``diversityScore``.
+        selected: list[dict[str, Any]] = []
+        remaining = list(ranked)
+        while remaining:
+            best: dict[str, Any] | None = None
+            best_score = float("-inf")
+            for product in remaining:
+                diversity_score = _slate_diversity_score(product, selected)
+                score = float(product["_base_utility_score"]) + weights["diversity"] * diversity_score
+                product_id = str(product.get("product_id") or product.get("productId") or "")
+                if best is None or (score, -int(product.get("_recall_rank") or 0), product_id) > (
+                    best_score,
+                    -int(best.get("_recall_rank") or 0),
+                    str(best.get("product_id") or best.get("productId") or ""),
+                ):
+                    best = product
+                    best_score = score
+                    product["_selected_diversity_score"] = diversity_score
+            if best is None:
+                break
+            best["ranking"]["utilityScore"] = round(best_score, 4)
+            best["ranking"]["diversityScore"] = round(
+                float(best.get("_selected_diversity_score") or 0.0), 4
+            )
+            selected.append(best)
+            remaining.remove(best)
+        for product in selected:
+            for private_key in (
+                "_base_utility_score",
+                "_recall_rank",
+                "_selected_diversity_score",
+            ):
+                product.pop(private_key, None)
+        return selected
 
     def _apply_operational_governance(
         self,

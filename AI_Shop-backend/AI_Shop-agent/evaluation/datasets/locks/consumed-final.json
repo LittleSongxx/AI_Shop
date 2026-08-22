@@ -1,0 +1,101 @@
+{
+  "claims": [
+    {
+      "caseCount": 50,
+      "claimedAt": "2026-08-20T10:53:31.854Z",
+      "completedAt": "2026-08-20T10:55:29.171Z",
+      "datasetSha256": "a6aa8a436c1457f78d76fb44e19d1227c6972fae2068e291318f3f8147145d75",
+      "evidenceSha256": "f9d754532faf7252b1ea42f6efcd8849beb926165b378062b50dd172b36b6f63",
+      "executionStartedAt": "2026-08-20T10:53:49.790Z",
+      "outcome": "PASSED",
+      "releaseId": "release-20260820-ai-quality-v2",
+      "runId": "final-20260820-ai-quality-v2",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-21T04:05:33.077Z",
+      "completedAt": "2026-08-21T05:21:46.417Z",
+      "datasetSha256": "296ed448fac4c4ad9c2373a853448b87cb046535e65387ba08ab5a007fdc02c1",
+      "evidenceSha256": "a84e81c802868f50bb43f5f05f5a636e5975bc49611e2c57515e888c4770acd4",
+      "executionStartedAt": "2026-08-21T04:05:52.967Z",
+      "outcome": "FAILED",
+      "releaseId": "release-20260820-ai-quality-v3",
+      "runId": "final-20260820-ai-quality-v3",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-21T14:47:17.176Z",
+      "completedAt": "2026-08-21T15:27:26.988Z",
+      "datasetSha256": "b4331e6a7c243fef3d28b3c7e9f7ed3b9a7724cd3bc6c72137dd52ce8f243a6a",
+      "evidenceSha256": "513fb63d35be01a776d46fc30be3f303b3642e0b0a72d37a37fdd16192d89dea",
+      "executionStartedAt": "2026-08-21T14:47:33.618Z",
+      "outcome": "FAILED",
+      "releaseId": "release-20260821-ai-quality-v4",
+      "runId": "final-20260821-ai-quality-v4",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-21T17:15:49.135Z",
+      "completedAt": "2026-08-21T17:38:23.122Z",
+      "datasetSha256": "c9c88ee551c89605e2bda26b2b55bc1ce7d2d9ffb9b097b4330e24e2509942d0",
+      "evidenceSha256": "222068cc81a67d18d47a5afeb335ba2c42a4a15a126315c02c0b53c072485d5e",
+      "executionStartedAt": "2026-08-21T17:16:03.174Z",
+      "outcome": "FAILED",
+      "releaseId": "release-20260822-ai-quality-v5",
+      "runId": "final-20260822-ai-quality-v5",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-21T19:42:46.690Z",
+      "completedAt": "2026-08-21T20:05:41.492Z",
+      "datasetSha256": "a17508fd3c6a87f317defed56dbd1f4e4dafab24e2f8de451725df4384504c17",
+      "evidenceSha256": "1a755205637e1f16428c4acc55de04e83dfc28ed0b0090629bb8b86772455bc1",
+      "executionStartedAt": "2026-08-21T19:43:46.788Z",
+      "outcome": "FAILED",
+      "releaseId": "release-20260822-ai-quality-v6",
+      "runId": "final-20260822-ai-quality-v6",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-22T03:10:51.884Z",
+      "completedAt": "2026-08-22T03:36:26.953Z",
+      "datasetSha256": "672755f3a626ca554ee09b4bf9e7e275664b30070ed873c902968e1bcd870b93",
+      "evidenceSha256": "c3cce3413117ca8a208f112e18d6c84f08495980537a32b202696c57d31d77a1",
+      "executionStartedAt": "2026-08-22T03:12:52.070Z",
+      "outcome": "FAILED",
+      "releaseId": "release-20260822-ai-quality-v7",
+      "runId": "final-20260822-ai-quality-v7",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-22T03:42:35.749Z",
+      "completedAt": "2026-08-22T04:03:21.165Z",
+      "datasetSha256": "e2cfddea0fd0b0e906571fd34c1c731459d0a42c6cba715b55869fbd64ccd74b",
+      "evidenceSha256": "93beabac78642ccf2e642efa7ce1de9f7fc832aa53ef2ead5407b0781b236d44",
+      "executionStartedAt": "2026-08-22T03:43:11.539Z",
+      "outcome": "FAILED",
+      "releaseId": "release-20260822-ai-quality-v8",
+      "runId": "final-20260822-ai-quality-v8",
+      "status": "EXECUTED"
+    },
+    {
+      "caseCount": 125,
+      "claimedAt": "2026-08-22T04:40:53.772Z",
+      "completedAt": "2026-08-22T04:58:47.104Z",
+      "datasetSha256": "d02e89e644fc115e55c5553baeb98681178822d3cc2e7395003b7cfc3bb5cd07",
+      "evidenceSha256": "94edeb894f3e2d36f597cb9cc9796d6e0e6f6b81da08f030b8723435e441c11a",
+      "executionStartedAt": "2026-08-22T04:41:11.614Z",
+      "outcome": "PASSED",
+      "releaseId": "release-20260822-ai-quality-v9",
+      "runId": "final-20260822-ai-quality-v9",
+      "status": "EXECUTED"
+    }
+  ],
+  "schemaVersion": "aishop-evaluation-final-registry/v3"
+}

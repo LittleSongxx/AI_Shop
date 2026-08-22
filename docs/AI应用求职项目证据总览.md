@@ -1,88 +1,108 @@
 # AI_Shop AI 应用求职项目证据总览
 
-> 更新：2026-08-20（Asia/Shanghai）
+> 当前发布：`release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`
 >
-> 证据实现基线：提交 `c501735644a72ce57b27e48bdd35fbc7a5e870ea` 与由 [evidence-manifest.json](evidence-manifest.json) 固化的实现补丁；结果 SHA、数据锁和文档一致性要求也以该 manifest 为准。
->
-> 适用：AI 应用 / Agent 后端、Java + AI 业务后端，以及要求 RAG、工具调用、可靠执行和评测能力的校招岗位。
+> 最后核验：2026-08-22（Asia/Shanghai）；Python 运行环境为 Conda `shop`
 
-这份文档只陈述可复核的项目事实。机器可检验的路径、哈希和结果边界以 manifest 为准；本地 `benchmarks/results/` 被 Git 忽略，不能被表述为已发布基线或生产数据。
+本页只陈述源码、运行记录和不可变证据包能够复核的事实。机器入口是
+[evidence-manifest.json](evidence-manifest.json)；它校验 suite、数据锁、运行文件集、SHA-256、生命周期和归档只读状态。
 
-## 结论
+本轮优化、排错过程、阶段指标和新版面试报告复核见 [AI质量闭环工作记录](AI质量闭环工作记录_20260822.md)；方法成熟度和外部资料对照见
+[AI主线方法成熟度与后续优化路线](AI主线方法成熟度与后续优化路线_20260820.md)。
 
-AI_Shop 适合作为 AI 应用开发岗位的主项目，但最可信的讲法是“受控业务 Agent + Java 交易底座”，不是“已上线的大规模智能体平台”。系统把自然语言理解、已发布知识库 RAG、MCP/Java 权威查询、写操作提案、用户确认、Java 幂等执行、未知结果核对和 Episode Trace 串成一条业务状态机。
+## 项目闭环
 
-功能闭环分层成立：取消订单的本地全栈样本已经真实走通；模型驱动的政策问答也有一条真实 Provider/RAG 样本。完整 44 条 Agent v2 契约、三种编排模式的配对消融和真实用户试用仍未采集，当前 lock 的 `resultStatus=NOT_COLLECTED`，因此不能把两个单样本成功率宣传为总体 Agent TSR、P95 或线上业务效果。
+AI_Shop 的 AI 主线是“商品 Search + 可信 RAG + 受控业务 Agent”。Python 负责自然语言理解、检索、解释和编排，Java
+微服务负责商品、SKU、库存、报价、订单、支付和售后等权威事实及写入边界。
 
-## 证据分层
-
-| 等级 | 当前证据 | 可以怎么说 | 不能怎么说 |
-|---|---|---|---|
-| E0 源码与契约 | LangGraph/MCP/Java 边界、44 条冻结 Agent v2 契约、定向单元测试 | 已实现受控写操作、确认和恢复逻辑 | 已有完整 live 成绩 |
-| E1 确定性合成 | Commerce `27/27`、安全 `18/18`、Search/RAG contract `162/162` | 生产决策内核和安全/数据契约已回归 | 在线模型准确率、真实延迟或用户收益 |
-| E2 本地全栈 | 取消订单 `1/1`，`1067 ms` | Agent API 到 Worker、MCP、Java 写接口和确认终态已走通 | LLM 性能，或总体售后成功率 |
-| E3 配置真实 Provider | 政策问答 `1/1`，`deepseek-v4-flash`，RAG Provider Trace 完整 | 真实 LLM/Embedding/Rerank 链路可复核 | `n=1` 的 P95、SLO 或总体质量 |
-| E4 授权真实用户 | 未采集 | 真实用户指标尚无数据 | FCR、CTR/CVR、GMV 提升或生产体验 |
-
-## 当前可复核结果
-
-### 1. 受控取消订单：本地全栈闭环
-
-运行 `agent-v2-adaptive-c501735-20260820-cancel-golden-r6` 的冻结 case 为 `live-cancel-confirmed-012`，结果为 `1/1` 通过，严重安全违规为 `0`。
-
-- 路径：Agent API -> RabbitMQ Worker -> LangGraph -> MCP -> pending action -> 用户确认 -> Java 写接口。
-- 编排：自适应模式选择 `workflow`，原因是参数完整的确定性业务路径。
-- 终态事件：`ACTION_PROPOSED -> ACTION_CONFIRMED_BY_USER -> ACTION_TERMINAL`。
-- 持久状态：`CANCEL_ORDER` 的 pending action 为 `CONFIRMED`，订单状态从 `0` 变为 `4`。
-- 单样本端到端延迟：`1067 ms`；该 Workflow 未调用 LLM，输入/输出 token 均为 `0`。
-- 脱敏 Trace：[`report.md`](evidence/agent-traces/agent-v2-cancel-r6-20260820/report.md)、[`traces.json`](evidence/agent-traces/agent-v2-cancel-r6-20260820/traces.json)、[`SHA256SUMS`](evidence/agent-traces/agent-v2-cancel-r6-20260820/SHA256SUMS)。运行 ID、订单标识和 action token 已做指纹化或删除。
-
-这里的 `0` token 只说明该条确定性 Workflow 没有调用模型；`totalCostCny=0.0` 不能被写成真实模型成本为零，当前成本口径是 `UNPRICED`。
-
-### 2. 政策问答：真实 Provider/RAG 单样本
-
-运行 `agent-v2-adaptive-c501735-20260820-rag-policy-confirmation-r5` 的 case `live-confirmation-policy-020` 为 `1/1` 通过。
-
-- 编排：`single_agent`；模型：`deepseek-v4-flash`；LLM 调用 `1` 次。
-- 用量：`4847` input + `224` output = `5071` tokens。
-- 延迟：`3237 ms`。
-- 检索：Elasticsearch BM25 `1`、Vector `1`、Embedding 成功 `1`、Rerank 成功 `1`、fallback `0`、source refs `2`。
-- 写工具：`0`；严重安全违规：`0`；Provider completeness：`1.0`。
-
-它证明真实 Provider 的单轮政策问答链路存在，不证明完整任务集质量，也不能从一个样本推导 P95 或模型成本。
-
-### 3. 必须保留的失败诊断
-
-四个 `live-refund-policy-018` 结果没有被删除或改写：
-
-| 运行 | 现象 | 结论 |
+| 域 | 用户路径 | 可复核终点 |
 |---|---|---|
-| `rag-policy-r1` | OpenAI-compatible 工具消息顺序错误 | 已定位为协议组装问题并修复 |
-| `rag-policy-r2` | Worker 重启窗口超时 | 基础设施干扰，不纳入模型质量结论 |
-| `rag-policy-r3` | Provider 路径成功但 `9965` tokens 超过 `8000` 门禁 | 保留失败，不能靠改报告刷绿 |
-| `rag-policy-r4` | `9992` tokens，且“七天退货政策”不在发布知识库权威语料中 | 真实知识覆盖 Bad Case；应补发布语料/评测，而不是降低证据阈值 |
+| Search | 自然语言需求 -> BM25/向量召回 -> RRF/rerank -> Java 商品/库存/报价快照 -> 硬约束 -> 商品列表 | 商品 ID 排名、qrel、预算/品牌/排除约束、provider trace |
+| RAG | 问题 -> 混合检索/重排 -> 版本与注入隔离 -> 最小证据 -> 带引用回答或拒答 | canonical fact/source、claim、引用、拒答和注入判定 |
+| Agent | HTTP/队列/LangGraph -> RAG 或工具 -> 用户确认 -> Java 权威接口 -> 终态校验 | Episode/step、工具参数、before/after 状态、幂等和终态 |
 
-确认通过的 `live-confirmation-policy-020` 是另一条可被当前知识库支持的政策问题，不能覆盖上表的退款政策 Bad Case。
+因此可以清晰描述闭环：先发现商品或政策事实，再形成只读回答或业务提案；写操作必须经过确认、Java 身份/状态校验和
+幂等执行，最终以权威数据库状态而不是模型文案判断成功。远程结果未知只能进入 `INCONCLUSIVE` 或 `MANUAL_REVIEW`。
 
-## 历史 Search/RAG 性能与质量证据
+## 评测协议与数据分层
 
-历史 formal `SYNTHETIC + local-live` 结果保留在 `benchmarks/evidence/`，详细数字见 [性能与质量证据_20260820.md](性能与质量证据_20260820.md)。它们有真实 Provider 调用，但不是本轮 Agent v2 的新总体成绩。
+评测入口只有 `AI_Shop-backend/AI_Shop-agent/evaluation/`。所有命令都复用真实 Provider preflight、运行环境、脱敏、哈希和
+fail-closed 规则；执行 Python 时使用：
 
-- Search v2：中文 `600` 商品 / `240` 查询，WANDS `42,994` 商品 / `202` 查询 / `32,919` 有效判断；正式质量门禁为 `FAILED_RETAINED`，其中 ProductService 首次 Recall@10 仅 `0.3778`。
-- RAG retrieval v4：`264` 条，fresh `48` 条；fresh Recall@5 `0.8056`、MRR@10 `0.75`、NDCG@5 `0.7645`，正式门禁为 `FAILED_RETAINED`。
-- RAG generation v4：`60/60` 执行、运行时错误 `0`、严重安全违规 `0`，但 task success rate `0.65`（`39/60`），人工盲评仍为 `HUMAN_REVIEW_PENDING`。
+```bash
+conda activate shop
+python -m evaluation.cli validate
+python -m evaluation.cli verify
+```
 
-这些失败是项目可信度的一部分：后续的 exposed-holdout replay 或 targeted regression 只能证明已知问题的修复，不能替代新的 fresh 结论。
+数据分为 development（可见调优）、regression（可见防回归）、final holdout（一次性未见数据）和独立 benchmark/fault
+证据。development 与 regression 的 case ID 以及 `{domain,input}` 指纹互斥；final holdout 不加入 Git。
 
-## 面试中可成立的项目叙述
+| Split | Search | RAG | Agent | 总数 | canonical SHA-256 |
+|---|---:|---:|---:|---:|---|
+| development | 18 | 18 | 7 | 43 | `01cbf2996f9d0ba7b47503dc748b6dcc18374d7cdcb7404c5df22006b67ffa50` |
+| regression | 20 | 26 | 5 | 51 | `a102ed7a7e6225ad52da9a60c05c25f8c9f22a2ed5f036395b00c906e802eeb2` |
+| final holdout | 50 | 50 | 25 | 125 | `d02e89e644fc115e55c5553baeb98681178822d3cc2e7395003b7cfc3bb5cd07` |
 
-“我把电商 AI 客服收敛为受控售后闭环：模型负责理解、检索和结构化提案，Java 仍负责订单权威事实、身份/归属/状态校验和幂等写入。用户确认后才执行；如果远端结果未知，状态不会被伪造为成功，而是进入 `INCONCLUSIVE` 并按核对边界转 `MANUAL_REVIEW`。我用 Episode、Provider Trace、pending-action 状态和冻结任务契约来判分。当前已经有一个取消订单的本地全栈闭环和一个真实 Provider/RAG 政策问答样本；完整 44 条任务和真实用户层仍明确标为未采集。”
+Final 分层固定为 Search `10/10/8/8/6/4/4`（精确型号数字品牌、中文同义口语、预算结构化、否定排除、无结果冲突、
+fallback/partial provider、类目品牌比较）；RAG `25/8/8/5/4`（answerable、no-answer、injection、temporal/contradiction、
+terminology/citation）；Agent `8/7/4/6`（shopping、RAG/政策、handoff/safety、confirmation/idempotency/write）。
 
-## 仍需补足的优先项
+## 当前 final 结果
 
-1. 在同一隔离 fixture、模型版本和 Provider 指纹下完成完整 44 条 Agent v2，并保留所有失败 case。
-2. 以同一数据/fixture/模型完成 `workflow`、`single_agent`、`multi_agent` 的配对消融，才比较成功率、token 和延迟。
-3. 为“七天退货政策”等缺失事实补发布版知识库、canonical label 和新的未见集；不能用降低证据门槛替代知识治理。
-4. 接入可信人民币定价与账本，区分模型、Embedding、Rerank 和重试成本；当前统一写作 `UNPRICED`。
-5. 完成两名独立 reviewer 的盲评，以及经授权的真实用户试用；未完成前不写线上效果。
-6. 提高 Java 交易/售后核心包的覆盖率，并补长时间、并发和故障恢复数据。
+| 域 | 结果 | 关键点估计 | 硬门禁 |
+|---|---:|---|---|
+| Search | 50/50 | Recall@3 `0.928030`、Recall@5/10 `0.962121`、MRR@10 `0.937500`、NDCG@10 `0.920521` | case/slice `1.0`、约束违规 `0`、provider completeness `1.0` |
+| RAG | 50/50 | retrieval、generation、required claim、citation、grounded faithfulness、no-answer、injection 均通过 | invalid citation、严重安全违规、runtime error 均 `0` |
+| Agent | 25/25；200/200 trials | `pass^8=1.0`、critical workflow pass power `1.0`、terminal/state diff `1.0` | 重复副作用、runtime error、严重安全违规均 `0` |
+
+Search 每个正常 slice 独立报告 Recall/MRR/NDCG、no-result、hard constraint、provider completeness、casePassRate、P50/P95/P99、
+fallback/partial/deadline 和拒绝原因；不计算加权总分掩盖单 slice 失败。变形检查覆盖预算单调性、排除品牌、无结果不放宽、
+精确型号不被宽泛变体覆盖、partial provider 不引入不存在商品。
+
+## RAG semantic shadow judge
+
+lexical claim、事实 ID、引用支持和 grounded faithfulness 是硬门禁下界，永不被语义 judge 覆盖。v9 额外保存 judge 版本、prompt
+hash、model/provider fingerprint、timeout/重试、claim ID、answer span、evidence fact/source ID、label、confidence 和
+abstain reason。Final `50/50` 有可追溯 semantic shadow 记录、disagreement `0`；它不等于人工真值、人工准确率或人工一致性，
+在独立人工校准完成前永远不阻断发布。judge 调用失败必须记录 `UNAVAILABLE`，不能写成 0 分或 1 分。
+
+## Agent 重复与状态证据
+
+development/regression 的 visible repeat 使用 `k=5`；final 使用 `k=8`。每个 trial 有独立 `trialId`、evaluation user、request ID、
+幂等键和隔离状态，并保存 API envelope、Episode/step、工具及字段参数、Java authoritative before/after hash、结构化 state diff、
+重复副作用、token、延迟、重试和错误分类。只读 case 要求空 diff，提案未确认不得写入，确认写操作只允许预声明变化。
+
+v9 final 的 25 个 case 共 200 trials，`pass^8=1.0`；6 个关键写/确认流程全部通过，重复扣库存、建单或退款为 `0`。这只是
+冻结数据上的可靠性证据，不是开放世界成功率或生产容量证明。
+
+## 故障恢复与 benchmark
+
+`fault-v9-20260822` 覆盖 BM25/vector/embedding/rerank、Java 商品/库存/报价、LLM malformed、Redis checkpoint、worker deadline、
+MCP 失败和重复请求。每个 scenario 预声明 fallback、unsafe answer、hard-constraint bypass 和 terminal state；判定同时检查
+failure trace、降级标识、deadline、硬约束、RAG 拒答/降级、Agent 幂等以及故障恢复后的下一请求。
+
+`db-benchmark-v9-20260822` 使用隔离真实 MySQL 8.4.11，候选规模为 `1/10/50/100`，比较 batch 与 N+1 offer snapshot/decision feature，
+并记录 round trips、连接使用、P50/P95、错误率和 rollback probe。100 候选时 batch 为 1 次 round trip，N+1 为 100 次；所有错误率为 0，
+回滚探针通过。这个 benchmark 是本地描述性证据，不是线上 SLO、容量或并发结论。
+
+## Usage、费用和置信区间
+
+统一 usage 结构区分 `PRICED`、`UNPRICED`、`MISSING_USAGE`。Provider 未返回 usage 时保留缺失状态；没有可信单价时
+`costCny=null`，绝不写成零。v9 final 的 RAG usage 有 token 记录但单价未知，Search/部分 Agent deterministic path 有缺 usage，
+因此没有启用费用预算硬门禁。二项指标使用 Wilson 区间，连续/ranking 指标使用 percentile bootstrap；P99 在样本少于 100 时标为
+描述性统计。所有延迟边界是本地完整链路观测，不是生产 SLO。
+
+## 证据生命周期
+
+- current：`evaluation-evidence/current/`，只指向已发布的 v9 final；SHA256SUMS digest 为
+  `94edeb894f3e2d36f597cb9cc9796d6e0e6f6b81da08f030b8723435e441c11a`。
+- archive：v2 是历史通过 final；v3-v8 是 immutable failed final archives，均保留原始文件和原始 SHA256SUMS，文件不可写。
+- visible：`.runs/` 只保留 v9 development、v9 regression、v9 final 三个主线目录；旧运行的可追溯性来自 archive/lifecycle/manifest。
+- holdout：final holdout 位于 ignored `.holdouts/`，不加入 Git，不能用同一 hash 重跑或改写分母。
+
+## 求职表达边界
+
+可以描述：混合检索、硬约束商品搜索、可信 RAG、MCP/工具编排、确认后写入、Java 权威状态、幂等、故障恢复和可复核评测。
+不能描述：已经获得 CTR/CVR/GMV、工业级个性化推荐、生产容量/SLO、支付合规或人工语义准确率。47 商品目录和 125 条 final
+样本足以证明闭环工程和质量门禁，不足以证明真实用户收益、长期稳定性或大规模线上效果。

@@ -35,7 +35,7 @@ jobs:
           if-no-files-found: warn
 
   agent-extended:
-    name: Agent migrations and deterministic runtime evidence
+    name: Agent migrations and evaluation contracts
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -70,18 +70,8 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_USER: root
           MYSQL_PASSWORD: root
-      - name: Run all deterministic evidence suites
-        run: |
-          run_id="nightly-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          python benchmarks/eval.py run --suite deterministic-commerce --stage deterministic --run-id "${run_id}-commerce"
-          python benchmarks/eval.py run --suite deterministic-safety --stage deterministic --run-id "${run_id}-safety"
-          python benchmarks/eval.py run --suite deterministic-search-rag --stage deterministic --run-id "${run_id}-search-rag"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: nightly-ai-evidence-${{ github.run_id }}
-          path: AI_Shop-backend/AI_Shop-agent/benchmarks/results
-          if-no-files-found: error
+      - name: Validate evaluation suite and dataset locks
+        run: python -m evaluation.cli validate
 
   browser-mock:
     name: Desktop and mobile Playwright regression

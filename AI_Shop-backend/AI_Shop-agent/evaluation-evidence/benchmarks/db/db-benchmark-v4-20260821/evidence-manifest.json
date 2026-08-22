@@ -1,0 +1,22 @@
+{
+  "benchmarkId": "db-benchmark-v4-20260821",
+  "benchmarkSchemaVersion": "aishop-db-benchmark/v2",
+  "createdAt": "2026-08-21T15:35:10.544Z",
+  "dedicatedBenchmarkDatabase": false,
+  "files": {
+    "benchmark.json": {
+      "bytes": 22091,
+      "sha256": "d98cc426c3a89cc9e6fc3cadf92e20c3498c0eb2bcb0f769b708fca07e9d87b6"
+    },
+    "report.md": {
+      "bytes": 2823,
+      "sha256": "84dc938b017d8221b1bd65a0ce2f729136aed5f2fa5465243439704feb9e955e"
+    }
+  },
+  "notProductionSlo": true,
+  "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+  "rollbackProbePassed": true,
+  "schemaVersion": "aishop-db-benchmark-evidence/v2",
+  "scope": "REAL_LOCAL_DATABASE_READ_BENCHMARK_WITH_ROLLBACK_PROBE",
+  "sourceSha256": "19c423443f9b89996f6a85fb0e3869aa8050e5953f08ae2c2f8d10eb746643ea"
+}

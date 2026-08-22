@@ -27,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -67,6 +69,7 @@ public class MqCompensationLogServiceImpl implements MqCompensationLogService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveFromFailure(MqCompensationRecord record) {
         if (record == null || StringTools.isEmpty(record.getIdempotencyKey())) {
             return;
@@ -193,6 +196,17 @@ public class MqCompensationLogServiceImpl implements MqCompensationLogService {
                     throw new BusinessException("库存补偿能力不可用（缺少 stock-api）");
                 }
                 stockPort.changeStockBatch(items);
+            } else if (InternalApiHeaders.REMOTE_STOCK_ORDER_RESTORE.equals(routingKey)) {
+                JsonNode payload = JsonUtils.parseTree(existing.getPayloadJson());
+                StockBatchCompensatePort stockPort = stockBatchCompensatePort.getIfAvailable();
+                if (stockPort == null) {
+                    throw new BusinessException("库存补偿能力不可用（缺少 stock-api）");
+                }
+                JsonNode itemsNode = payload == null ? null : payload.get("items");
+                List<ProductItem> items = itemsNode == null
+                        ? List.of()
+                        : JsonUtils.parseArray(itemsNode.toString(), ProductItem.class);
+                stockPort.restoreOrderStock(textOrNull(payload, "payOrderId"), items);
             } else if (InternalApiHeaders.REMOTE_COUPON_UNLOCK.equals(routingKey)) {
                 JsonNode payload = JsonUtils.parseTree(existing.getPayloadJson());
                 UserCouponStatusCompensatePort couponPort = userCouponStatusCompensatePort.getIfAvailable();

@@ -7,7 +7,6 @@ the serving path never turns a draft into a user-facing guarantee.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from typing import Any
 
@@ -109,41 +108,10 @@ def structured_feature_pairs(product: dict[str, Any]) -> list[tuple[str, str, di
 
 
 class ProductDecisionFeatureService:
-    async def ensure_structured_features(self, product: dict[str, Any]) -> list[dict[str, Any]]:
-        product_id = str(product.get("product_id") or product.get("productId") or "").strip()
-        if not product_id:
-            return []
-        pairs = structured_feature_pairs(product)
-        if not pairs:
-            return []
-        try:
-            async with acquire() as cur:
-                for key, value, evidence in pairs:
-                    await cur.execute(
-                        """
-                        INSERT INTO agent_product_decision_feature
-                            (product_id, feature_key, feature_value, source_type,
-                             evidence_json, confidence, review_status, version,
-                             valid_from, created_at, updated_at)
-                        VALUES (%s,%s,%s,'STRUCTURED_ATTRIBUTE',%s,1.0000,'VERIFIED','v1',
-                                NOW(3),NOW(3),NOW(3)) AS incoming
-                        ON DUPLICATE KEY UPDATE
-                            evidence_json=incoming.evidence_json, confidence=incoming.confidence,
-                            review_status='VERIFIED', valid_until=NULL, updated_at=NOW(3)
-                        """,
-                        (
-                            product_id,
-                            key,
-                            value[:255],
-                            json.dumps(evidence, ensure_ascii=False),
-                        ),
-                    )
-        except Exception as exc:
-            logger.warning(
-                "product_decision_feature_persist_failed",
-                product_id=product_id,
-                error=type(exc).__name__,
-            )
+    @staticmethod
+    def _direct_features(
+        pairs: list[tuple[str, str, dict[str, Any]]],
+    ) -> list[dict[str, Any]]:
         return [
             {
                 "key": key,
@@ -154,6 +122,105 @@ class ProductDecisionFeatureService:
             }
             for key, value, evidence in pairs
         ]
+
+    async def _persist_structured_features_batch(
+        self,
+        rows: list[tuple[str, str, str, dict[str, Any]]],
+    ) -> None:
+        if not rows:
+            return
+        try:
+            async with acquire() as cur:
+                sql = """
+                    INSERT INTO agent_product_decision_feature
+                        (product_id, feature_key, feature_value, source_type,
+                         evidence_json, confidence, review_status, version,
+                         valid_from, created_at, updated_at)
+                    VALUES (%s,%s,%s,'STRUCTURED_ATTRIBUTE',%s,1.0000,'VERIFIED','v1',
+                            NOW(3),NOW(3),NOW(3)) AS incoming
+                    ON DUPLICATE KEY UPDATE
+                        evidence_json=incoming.evidence_json, confidence=incoming.confidence,
+                        review_status='VERIFIED', valid_until=NULL, updated_at=NOW(3)
+                """
+                params = [
+                    (product_id, key, value[:255], json.dumps(evidence, ensure_ascii=False))
+                    for product_id, key, value, evidence in rows
+                ]
+                executemany = getattr(cur, "executemany", None)
+                if callable(executemany):
+                    await executemany(sql, params)
+                else:
+                    for row in params:
+                        await cur.execute(sql, row)
+        except Exception as exc:
+            logger.warning(
+                "product_decision_feature_batch_persist_failed",
+                product_count=len({row[0] for row in rows}),
+                feature_count=len(rows),
+                error=type(exc).__name__,
+            )
+
+    async def verified_features_batch(
+        self,
+        product_ids: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Read verified features for a candidate set in one database query."""
+
+        ids = list(dict.fromkeys(str(value).strip() for value in product_ids if str(value).strip()))
+        if not ids:
+            return {}
+        try:
+            async with acquire() as cur:
+                placeholders = ",".join(["%s"] * len(ids))
+                await cur.execute(
+                    f"""
+                    SELECT product_id, feature_key, feature_value, source_type,
+                           evidence_json, confidence
+                    FROM agent_product_decision_feature
+                    WHERE product_id IN ({placeholders}) AND review_status='VERIFIED'
+                      AND (valid_until IS NULL OR valid_until>NOW(3))
+                    ORDER BY product_id, feature_key, feature_id
+                    LIMIT %s
+                    """,
+                    (*ids, max(40, len(ids) * 40)),
+                )
+                rows = await cur.fetchall()
+        except Exception as exc:
+            logger.warning("product_decision_feature_batch_read_failed", error=type(exc).__name__)
+            return {}
+
+        result: dict[str, list[dict[str, Any]]] = {}
+        for row in rows or []:
+            evidence = row.get("evidence_json")
+            if isinstance(evidence, str):
+                try:
+                    evidence = json.loads(evidence)
+                except json.JSONDecodeError:
+                    evidence = None
+            product_id = str(row.get("product_id") or "")
+            result.setdefault(product_id, []).append(
+                {
+                    "key": str(row.get("feature_key") or ""),
+                    "value": str(row.get("feature_value") or ""),
+                    "source": str(row.get("source_type") or ""),
+                    "confidence": float(row.get("confidence") or 0),
+                    "reviewStatus": "VERIFIED",
+                    "evidence": evidence if isinstance(evidence, dict) else None,
+                }
+            )
+        return result
+
+    async def ensure_structured_features(self, product: dict[str, Any]) -> list[dict[str, Any]]:
+        product_id = str(product.get("product_id") or product.get("productId") or "").strip()
+        if not product_id:
+            return []
+        pairs = structured_feature_pairs(product)
+        if not pairs:
+            return []
+        await self._persist_structured_features_batch(
+            [(product_id, key, value, evidence) for key, value, evidence in pairs]
+        )
+        return self._direct_features(pairs)
 
     async def verified_features(self, product_id: str) -> list[dict[str, Any]]:
         if not product_id:
@@ -196,15 +263,34 @@ class ProductDecisionFeatureService:
         return output
 
     async def annotate_candidates(self, products: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        async def annotate(raw: dict[str, Any]) -> dict[str, Any]:
-            product = dict(raw)
-            direct = await self.ensure_structured_features(product)
-            product_id = str(product.get("product_id") or product.get("productId") or "")
-            persisted = await self.verified_features(product_id)
-            product["decisionFeatures"] = persisted or direct
-            return product
+        if not products:
+            return []
+        prepared = [dict(raw) for raw in products]
+        direct_by_id: dict[str, list[dict[str, Any]]] = {}
+        persist_rows: list[tuple[str, str, str, dict[str, Any]]] = []
+        product_ids: list[str] = []
+        for product in prepared:
+            product_id = str(product.get("product_id") or product.get("productId") or "").strip()
+            if not product_id:
+                continue
+            product_ids.append(product_id)
+            pairs = structured_feature_pairs(product)
+            direct_by_id[product_id] = self._direct_features(pairs)
+            persist_rows.extend(
+                (product_id, key, value, evidence) for key, value, evidence in pairs
+            )
 
-        return list(await asyncio.gather(*(annotate(product) for product in products))) if products else []
+        # One upsert and one read serve the whole candidate set.  If the audit
+        # table is temporarily unavailable, direct Java snapshot attributes are
+        # still safe to use for this request.
+        await self._persist_structured_features_batch(persist_rows)
+        persisted_by_id = await self.verified_features_batch(product_ids)
+        for product in prepared:
+            product_id = str(product.get("product_id") or product.get("productId") or "").strip()
+            product["decisionFeatures"] = persisted_by_id.get(product_id) or direct_by_id.get(
+                product_id, []
+            )
+        return prepared
 
     @staticmethod
     def evidence_for(features: list[dict[str, Any]], *, limit: int = 3) -> list[dict[str, Any]]:

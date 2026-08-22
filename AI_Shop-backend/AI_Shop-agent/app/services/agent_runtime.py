@@ -115,6 +115,47 @@ async def resolve_action_confirm(
     )
     return None
 
+
+async def resolve_server_action_card(
+    assistant_cards: str | None,
+    user_id: str,
+) -> tuple[str, str, str, dict] | None:
+    """Resolve a server-produced ACTION_CONFIRM card without model token echo.
+
+    The card itself is only a reference.  We accept it after validating the
+    shape of its action token and reloading the authoritative pending row for
+    the authenticated user, then rebuild the payload from that row.  A model
+    fabricated card or a cross-user token therefore remains fail-closed.
+    """
+    if not is_action_confirm_json(assistant_cards):
+        return None
+    try:
+        card = json.loads(str(assistant_cards).strip())
+    except (TypeError, json.JSONDecodeError):
+        return None
+    token = str(
+        card.get("actionToken") or card.get("token") or ""
+    ).strip()
+    if not re.fullmatch(r"act_[a-f0-9]{32}", token, flags=re.IGNORECASE):
+        return None
+    pending = await pending_action_service.get_by_token(token)
+    if not pending:
+        return None
+    if str(pending.get("userId") or "") != str(user_id or ""):
+        logger.warning("action_confirm_card_wrong_user", user_id=user_id)
+        return None
+    pending_action_type = str(pending.get("actionType") or "").upper()
+    card_action_type = str(card.get("actionType") or "").upper()
+    if card_action_type and card_action_type != pending_action_type:
+        logger.warning(
+            "action_confirm_card_action_type_mismatch",
+            user_id=user_id,
+            token_shape=token[:8],
+        )
+        return None
+    assistant, biz_data = build_action_confirm_payload(pending)
+    return assistant, biz_data, "action_confirm", pending
+
 async def stream_llm_turn(
     llm,
     messages: list,
@@ -314,6 +355,10 @@ async def finalize_agent_response(
     called = list(tools_called or [])
 
     resolved = await resolve_action_confirm(full_text, messages, user_id)
+    if resolved is None:
+        # Structured tool results may reach this function without the model
+        # echoing the credential.  Re-validate the server card before using it.
+        resolved = await resolve_server_action_card(assistant_cards, user_id)
     pending_for_verifier: dict | None = None
     if resolved:
         assistant, biz_data, biz_type, pending_for_verifier = resolved

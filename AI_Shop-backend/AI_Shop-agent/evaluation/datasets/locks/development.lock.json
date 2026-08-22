@@ -1,0 +1,26 @@
+{
+  "canonicalDatasetSha256": "01cbf2996f9d0ba7b47503dc748b6dcc18374d7cdcb7404c5df22006b67ffa50",
+  "caseCount": 43,
+  "createdAt": "2026-08-21T17:08:45.181Z",
+  "domainCounts": {
+    "agent": 7,
+    "rag": 18,
+    "search": 18
+  },
+  "files": {
+    "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/development/agent.jsonl": {
+      "bytes": 6361,
+      "sha256": "4e7461fc6d664cab0b640dfac2552f2b0c058912ea27df14657800887b41482d"
+    },
+    "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/development/rag.jsonl": {
+      "bytes": 13125,
+      "sha256": "b6b4577e0ca58675a77e2d362c650490e5bdaca27318134836bed437031eba5b"
+    },
+    "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/development/search.jsonl": {
+      "bytes": 10142,
+      "sha256": "1b8612ba509e9ac700362867c28ae9003b2d77f060c65fc69de3d950bcdf0a5a"
+    }
+  },
+  "schemaVersion": "aishop-evaluation-dataset-lock/v3",
+  "split": "development"
+}

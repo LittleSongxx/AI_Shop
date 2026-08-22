@@ -62,6 +62,12 @@ _BRAND_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("戴尔", ("戴尔", "dell")),
     ("惠普", ("惠普", "hp")),
     ("索尼", ("索尼", "sony")),
+    ("香奈儿", ("香奈儿", "chanel")),
+    ("旺旺", ("旺旺", "want want", "wantwant")),
+    ("COLMO", ("colmo", "科慕")),
+    ("雅马哈", ("雅马哈", "yamaha")),
+    ("华硕", ("华硕", "asus")),
+    ("AOC", ("aoc",)),
     ("耐克", ("耐克", "nike")),
     ("阿迪达斯", ("阿迪达斯", "adidas")),
 )
@@ -126,8 +132,18 @@ _EXPLICIT_SPEC_PATTERNS = (
     re.compile(r"(?i)(\d+(?:\.\d+)?\s*(?:GB|TB|G)\s*(?:内存|运存|存储|硬盘))"),
     re.compile(r"(?i)((?:内存|运存|存储|硬盘)\s*\d+(?:\.\d+)?\s*(?:GB|TB|G))"),
 )
+_EXACT_MODEL_HINT_RE = re.compile(
+    r"(?i)(?<![a-z0-9])(?:[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+|"
+    r"[a-z]+[a-z0-9]*\d+[a-z0-9-]*|\d+[a-z][a-z0-9-]*)(?![a-z0-9])"
+)
 
 _NEGATIVE_BRAND_WORDS = ("不要", "不想要", "排除", "不考虑", "不选", "别买", "避开")
+# Product names often mention a compatibility target (for example
+# ``车充……适用苹果17``). That is not evidence that the product brand is Apple.
+_COMPATIBILITY_BRAND_PREFIX = re.compile(
+    r"(?:适用|适配|兼容|支持|可充|适用于|适配于|兼容于)\s*$",
+    re.IGNORECASE,
+)
 _GENERIC_RECOMMEND_WORDS = ("推荐", "买什么", "选什么", "挑什么", "有什么好物", "找点")
 
 # Low-consideration categories: the bare category is already a good enough query,
@@ -357,6 +373,18 @@ def _parse_budget(text: str) -> tuple[float | None, float | None]:
 
 def _brand_in_text(text: str, aliases: tuple[str, ...]) -> bool:
     return any(re.search(re.escape(alias), text, flags=re.IGNORECASE) for alias in aliases)
+
+
+def _brand_in_product_name(text: str, aliases: tuple[str, ...]) -> bool:
+    """Match a brand in the name, excluding compatibility clauses."""
+
+    for alias in aliases:
+        for match in re.finditer(re.escape(alias), text, flags=re.IGNORECASE):
+            prefix = text[max(0, match.start() - 8) : match.start()]
+            if _COMPATIBILITY_BRAND_PREFIX.search(prefix):
+                continue
+            return True
+    return False
 
 
 def _brand_is_excluded(text: str, aliases: tuple[str, ...]) -> bool:
@@ -1157,6 +1185,8 @@ class ShoppingProfileService:
         value = (text or keyword or "").strip()
         if not value or len(value) > CLARIFY_MAX_TEXT_LENGTH:
             return False
+        if _EXACT_MODEL_HINT_RE.search(value):
+            return False
         extracted = extract_profile(value)
         if _has_narrowing_signal(extracted):
             return False
@@ -1383,7 +1413,11 @@ class ShoppingProfileService:
                 ):
                     return canonical
             return existing
-        product_text = self._product_text(product).lower()
+        # Descriptions are intentionally excluded: ``适用苹果``/``兼容 Apple``
+        # describes a target device, not the seller's brand.
+        product_name = str(
+            product.get("product_name") or product.get("productName") or ""
+        )
         preferred = list((profile or {}).get("brands") or [])
         excluded = list((profile or {}).get("excludedBrands") or [])
         for brand in [*preferred, *excluded]:
@@ -1395,7 +1429,7 @@ class ShoppingProfileService:
                 ),
                 (brand,),
             )
-            if _brand_in_text(product_text, aliases):
+            if _brand_in_product_name(product_name, aliases):
                 return str(brand)
         return None
 

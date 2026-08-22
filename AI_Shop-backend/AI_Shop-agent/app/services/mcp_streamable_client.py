@@ -23,6 +23,7 @@ import httpx
 import structlog
 
 from app.config.settings import get_settings
+from app.services.evaluation_fault_service import active_mcp_fault_meta
 from app.services.tool_invoke_result import (
     MCP_PROTOCOL,
     MCP_TOOL_CONTRACT,
@@ -212,8 +213,14 @@ class McpStreamableClient:
         self, name: str, arguments: dict[str, Any] | None = None
     ) -> ToolInvokeResult:
         args = arguments or {}
+        evaluation_meta = active_mcp_fault_meta()
         raw = await self._with_session(
-            lambda session: session.call_tool(name, args), what=name
+            (
+                (lambda session: session.call_tool(name, args, meta=evaluation_meta))
+                if evaluation_meta
+                else (lambda session: session.call_tool(name, args))
+            ),
+            what=name,
         )
         parts: list[str] = []
         content = getattr(raw, "content", None) or []

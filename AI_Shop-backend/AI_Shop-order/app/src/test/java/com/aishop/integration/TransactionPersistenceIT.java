@@ -6,6 +6,8 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -13,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +42,7 @@ class TransactionPersistenceIT {
             statement.execute("DROP TABLE IF EXISTS stock_change_record");
             statement.execute("DROP TABLE IF EXISTS sku_stock");
             statement.execute("DROP TABLE IF EXISTS pay_trade_record");
+            statement.execute("DROP TABLE IF EXISTS order_info");
             statement.execute("DROP TABLE IF EXISTS order_request_idempotency");
             statement.execute("""
                     CREATE TABLE order_request_idempotency (
@@ -53,6 +57,15 @@ class TransactionPersistenceIT {
                       update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                       CONSTRAINT uk_order_request_idempotency
                         UNIQUE (user_id, command_type, idempotency_key)
+                    ) ENGINE=InnoDB
+                    """);
+            statement.execute("""
+                    CREATE TABLE order_info (
+                      order_id VARCHAR(32) NOT NULL PRIMARY KEY,
+                      pay_order_id VARCHAR(32) NOT NULL,
+                      user_id VARCHAR(15) NOT NULL,
+                      order_status TINYINT NOT NULL,
+                      KEY idx_order_pay_order (pay_order_id, order_status)
                     ) ENGINE=InnoDB
                     """);
             statement.execute("""
@@ -241,6 +254,108 @@ class TransactionPersistenceIT {
         assertEquals(1, claimed);
         assertEquals(2, scalarInt("SELECT stock FROM sku_stock WHERE product_id='p1' AND property_value_id_hash='sku1'"));
         assertEquals(1, scalarInt("SELECT COUNT(*) FROM stock_change_record WHERE business_key='refund:r1'"));
+    }
+
+    @Test
+    void concurrentChildCancellationClosesAggregateAndRestoresStockExactlyOnce() throws Exception {
+        executeUpdate("""
+                INSERT INTO order_info(order_id, pay_order_id, user_id, order_status) VALUES
+                  ('order-1', 'pay-aggregate-1', 'u1', 0),
+                  ('order-2', 'pay-aggregate-1', 'u1', 0)
+                """);
+        executeUpdate("INSERT INTO sku_stock VALUES ('p1', 'sku1', 0)");
+        String businessKey = orderCloseBusinessKey("pay-aggregate-1", "p1", "sku1");
+
+        int workers = 12;
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
+        CountDownLatch ready = new CountDownLatch(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Integer>> results = new ArrayList<>();
+        for (int index = 0; index < workers; index++) {
+            results.add(pool.submit(() -> {
+                ready.countDown();
+                start.await();
+                int transitioned;
+                try (Connection connection = connection()) {
+                    connection.setAutoCommit(false);
+                    try (PreparedStatement update = connection.prepareStatement("""
+                            UPDATE order_info SET order_status=4
+                             WHERE pay_order_id='pay-aggregate-1' AND order_status=0
+                            """)) {
+                        transitioned = update.executeUpdate();
+                        connection.commit();
+                    } catch (Exception exc) {
+                        connection.rollback();
+                        throw exc;
+                    }
+                }
+                if (transitioned > 0) {
+                    assertEquals(2, transitioned);
+                    assertEquals(1, restoreOrderStockOnce(businessKey, 5));
+                }
+                return transitioned;
+            }));
+        }
+        assertTrue(ready.await(10, TimeUnit.SECONDS));
+        start.countDown();
+        int transitioned = 0;
+        for (Future<Integer> result : results) {
+            transitioned += result.get(10, TimeUnit.SECONDS);
+        }
+        pool.shutdownNow();
+
+        assertEquals(2, transitioned);
+        assertEquals(2, scalarInt("""
+                SELECT COUNT(*) FROM order_info
+                 WHERE pay_order_id='pay-aggregate-1' AND order_status=4
+                """));
+        assertEquals(0, executeUpdate("""
+                UPDATE order_info SET order_status=4
+                 WHERE pay_order_id='pay-aggregate-1' AND order_status=0
+                """));
+        assertEquals(0, restoreOrderStockOnce(businessKey, 5));
+        assertEquals(5, scalarInt("""
+                SELECT stock FROM sku_stock
+                 WHERE product_id='p1' AND property_value_id_hash='sku1'
+                """));
+        assertEquals(1, scalarInt("SELECT COUNT(*) FROM stock_change_record WHERE business_key='" + businessKey + "'"));
+    }
+
+    private static int restoreOrderStockOnce(String businessKey, int amount) throws SQLException {
+        try (Connection connection = connection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement ledger = connection.prepareStatement("""
+                    INSERT IGNORE INTO stock_change_record
+                      (business_key, change_type, product_id, property_value_id_hash, change_amount)
+                    VALUES (?, 'ORDER_CLOSE_RESTORE', 'p1', 'sku1', ?)
+                    """)) {
+                ledger.setString(1, businessKey);
+                ledger.setInt(2, amount);
+                int claimed = ledger.executeUpdate();
+                if (claimed == 1) {
+                    try (PreparedStatement stock = connection.prepareStatement("""
+                            UPDATE sku_stock SET stock=stock+?
+                             WHERE product_id='p1' AND property_value_id_hash='sku1'
+                            """)) {
+                        stock.setInt(1, amount);
+                        assertEquals(1, stock.executeUpdate());
+                    }
+                }
+                connection.commit();
+                return claimed;
+            } catch (SQLException exc) {
+                connection.rollback();
+                throw exc;
+            }
+        }
+    }
+
+    private static String orderCloseBusinessKey(
+            String payOrderId, String productId, String propertyValueIdHash) throws Exception {
+        String canonical = payOrderId + "\0" + productId + "\0" + propertyValueIdHash;
+        byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(canonical.getBytes(StandardCharsets.UTF_8));
+        return "order-close:" + HexFormat.of().formatHex(digest);
     }
 
     private static Connection connection() throws SQLException {

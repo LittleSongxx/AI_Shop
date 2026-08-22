@@ -31,7 +31,19 @@ _RUN_COST: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
 
 def reset_run_cost() -> None:
     """清空本 task 的累计（每条消息开头、异步调度任务开头各调一次）。"""
-    _RUN_COST.set(None)
+    # LangGraph can execute nodes in child asyncio tasks. Context variables are
+    # copied into those tasks, but a value first created inside the child is not
+    # propagated back to the parent. Seed one mutable accumulator here so child
+    # calls and the parent GRAPH_END snapshot observe the same request-local data.
+    _RUN_COST.set(
+        {
+            "calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cost_cny": 0.0,
+            "models": set(),
+        }
+    )
 
 
 def _run_cost_state() -> dict:

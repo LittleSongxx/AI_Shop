@@ -12,6 +12,7 @@ import structlog
 
 from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.services import mcp_tool_router as router_module
+from app.services.episode_service import bind_episode
 from app.services.mcp_tool_router import mcp_tool_router
 from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -91,6 +92,31 @@ async def test_absent_user_id_is_not_flagged(sent_to_mcp):
         await mcp_tool_router.invoke("QUERY_ORDERS", {"orderId": "O1"}, "u1")
 
     assert [e for e in logs if e["event"] == "tool_arg_user_id_mismatch"] == []
+
+
+async def test_episode_request_id_is_forwarded_for_forced_mcp_calls(sent_to_mcp):
+    """Forced workflow tools must preserve the API request binding across MCP."""
+    with bind_episode(
+        "run-eval-1",
+        message_id=101,
+        user_id="u1",
+        request_id="eval-req-1",
+    ):
+        await mcp_tool_router.invoke(
+            "SEARCH_PRODUCTS", {"keyword": "耳机"}, "u1", call_id="forced_mcp"
+        )
+
+    assert sent_to_mcp == [
+        (
+            "SEARCH_PRODUCTS",
+            {
+                "userId": "u1",
+                "keyword": "耳机",
+                "requestId": "eval-req-1",
+                "runId": "run-eval-1",
+            },
+        )
+    ]
 
 
 async def test_write_tool_leaves_audit_log(sent_to_mcp):

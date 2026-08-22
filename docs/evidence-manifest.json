@@ -1,512 +1,259 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-08-20T00:00:00+08:00",
-  "project": "AI_Shop",
-  "implementationBaseline": {
-    "gitHead": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
-    "workspaceDiffSha256": "e0afc3a3c718db3ad12929521adeddcee1412288a1ec305d60467014f51932aa",
-    "workspaceDiffScope": "Hash captures the tracked binary diff and sorted untracked implementation/document-file summaries from the evidence capture workspace; the manifest itself is excluded to avoid self-reference.",
-    "branch": "refactor/ai-shop-mainline-quality"
+  "schemaVersion": "aishop-project-evidence/v2",
+  "status": "PUBLISHED_FINAL",
+  "evaluation": {
+    "suite": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/suite.json",
+      "sha256": "d69d1cef4c8e5cc16f5cc8099d7425f3e5658a4d1e3e2d7dfd6221de55a1239c"
+    },
+    "datasetLocks": [
+      {
+        "split": "development",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/locks/development.lock.json",
+        "sha256": "cbf09fb07eabfbd85b669f90da1bfc43adb8cff9e78ceee9cc81eea3d5ad2be0"
+      },
+      {
+        "split": "regression",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/locks/regression.lock.json",
+        "sha256": "5451b5de4c64e2174981722a4c5c71c9e674530d88d5c4992b87ed2709cfa5d1"
+      }
+    ],
+    "currentEvidence": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",
+      "runId": "final-20260822-ai-quality-v9",
+      "releaseId": "release-20260822-ai-quality-v9",
+      "split": "final",
+      "datasetSha256": "d02e89e644fc115e55c5553baeb98681178822d3cc2e7395003b7cfc3bb5cd07",
+      "sourceSha256": "e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69",
+      "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+      "sha256SumsSha256": "94edeb894f3e2d36f597cb9cc9796d6e0e6f6b81da08f030b8723435e441c11a",
+      "qualityGatePassed": true
+    },
+    "archives": [
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v2",
+        "releaseId": "release-20260820-ai-quality-v2",
+        "runId": "final-20260820-ai-quality-v2",
+        "split": "final",
+        "datasetSha256": "a6aa8a436c1457f78d76fb44e19d1227c6972fae2068e291318f3f8147145d75",
+        "sourceSha256": "ed308e9a8694729df310c4e7d70f9560a5717ceedf1f95778794028c463d667d",
+        "providerConfigurationSha256": "08bbf823a5057f271c49cd7d168df16fd417ee943bd499a7e734f165d1a8502f",
+        "sha256SumsSha256": "f9d754532faf7252b1ea42f6efcd8849beb926165b378062b50dd172b36b6f63",
+        "qualityGatePassed": true,
+        "outcome": "PASSED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v3",
+        "releaseId": "release-20260820-ai-quality-v3",
+        "runId": "final-20260820-ai-quality-v3",
+        "split": "final",
+        "datasetSha256": "296ed448fac4c4ad9c2373a853448b87cb046535e65387ba08ab5a007fdc02c1",
+        "sourceSha256": "cfdc62a717dd4cf25d64ed2d82f7b91fc55bf45489effe9100c57cf45f1a5f85",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "a84e81c802868f50bb43f5f05f5a636e5975bc49611e2c57515e888c4770acd4",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260821-ai-quality-v4",
+        "releaseId": "release-20260821-ai-quality-v4",
+        "runId": "final-20260821-ai-quality-v4",
+        "split": "final",
+        "datasetSha256": "b4331e6a7c243fef3d28b3c7e9f7ed3b9a7724cd3bc6c72137dd52ce8f243a6a",
+        "sourceSha256": "19c423443f9b89996f6a85fb0e3869aa8050e5953f08ae2c2f8d10eb746643ea",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "513fb63d35be01a776d46fc30be3f303b3642e0b0a72d37a37fdd16192d89dea",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v5",
+        "releaseId": "release-20260822-ai-quality-v5",
+        "runId": "final-20260822-ai-quality-v5",
+        "split": "final",
+        "datasetSha256": "c9c88ee551c89605e2bda26b2b55bc1ce7d2d9ffb9b097b4330e24e2509942d0",
+        "sourceSha256": "e3153d2a9d37b1ee3ada1a10b53079082822469a417c4669a9604aca2ce39468",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "222068cc81a67d18d47a5afeb335ba2c42a4a15a126315c02c0b53c072485d5e",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v6",
+        "releaseId": "release-20260822-ai-quality-v6",
+        "runId": "final-20260822-ai-quality-v6",
+        "split": "final",
+        "datasetSha256": "a17508fd3c6a87f317defed56dbd1f4e4dafab24e2f8de451725df4384504c17",
+        "sourceSha256": "6d58f85350eb31322324fe0056428f67cebaf1fd740502d4ef9a818f3bbbe4ce",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "1a755205637e1f16428c4acc55de04e83dfc28ed0b0090629bb8b86772455bc1",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v7",
+        "releaseId": "release-20260822-ai-quality-v7",
+        "runId": "final-20260822-ai-quality-v7",
+        "split": "final",
+        "datasetSha256": "672755f3a626ca554ee09b4bf9e7e275664b30070ed873c902968e1bcd870b93",
+        "sourceSha256": "ecc70129979b76099af6eefe4d80f9a2f10839043035c507bf1681c6541d66fe",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "c3cce3413117ca8a208f112e18d6c84f08495980537a32b202696c57d31d77a1",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v8",
+        "releaseId": "release-20260822-ai-quality-v8",
+        "runId": "final-20260822-ai-quality-v8",
+        "split": "final",
+        "datasetSha256": "e2cfddea0fd0b0e906571fd34c1c731459d0a42c6cba715b55869fbd64ccd74b",
+        "sourceSha256": "05fa8bd4044bc87805f8aca98a2e9f84ad2310aafd1ca20b3055ffeee333de9a",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "93beabac78642ccf2e642efa7ce1de9f7fc832aa53ef2ead5407b0781b236d44",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      }
+    ],
+    "failedFinalAttempts": [
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v3",
+        "releaseId": "release-20260820-ai-quality-v3",
+        "runId": "final-20260820-ai-quality-v3",
+        "split": "final",
+        "datasetSha256": "296ed448fac4c4ad9c2373a853448b87cb046535e65387ba08ab5a007fdc02c1",
+        "sourceSha256": "cfdc62a717dd4cf25d64ed2d82f7b91fc55bf45489effe9100c57cf45f1a5f85",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "a84e81c802868f50bb43f5f05f5a636e5975bc49611e2c57515e888c4770acd4",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260821-ai-quality-v4",
+        "releaseId": "release-20260821-ai-quality-v4",
+        "runId": "final-20260821-ai-quality-v4",
+        "split": "final",
+        "datasetSha256": "b4331e6a7c243fef3d28b3c7e9f7ed3b9a7724cd3bc6c72137dd52ce8f243a6a",
+        "sourceSha256": "19c423443f9b89996f6a85fb0e3869aa8050e5953f08ae2c2f8d10eb746643ea",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "513fb63d35be01a776d46fc30be3f303b3642e0b0a72d37a37fdd16192d89dea",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v5",
+        "releaseId": "release-20260822-ai-quality-v5",
+        "runId": "final-20260822-ai-quality-v5",
+        "split": "final",
+        "datasetSha256": "c9c88ee551c89605e2bda26b2b55bc1ce7d2d9ffb9b097b4330e24e2509942d0",
+        "sourceSha256": "e3153d2a9d37b1ee3ada1a10b53079082822469a417c4669a9604aca2ce39468",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "222068cc81a67d18d47a5afeb335ba2c42a4a15a126315c02c0b53c072485d5e",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v6",
+        "releaseId": "release-20260822-ai-quality-v6",
+        "runId": "final-20260822-ai-quality-v6",
+        "split": "final",
+        "datasetSha256": "a17508fd3c6a87f317defed56dbd1f4e4dafab24e2f8de451725df4384504c17",
+        "sourceSha256": "6d58f85350eb31322324fe0056428f67cebaf1fd740502d4ef9a818f3bbbe4ce",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "1a755205637e1f16428c4acc55de04e83dfc28ed0b0090629bb8b86772455bc1",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v7",
+        "releaseId": "release-20260822-ai-quality-v7",
+        "runId": "final-20260822-ai-quality-v7",
+        "split": "final",
+        "datasetSha256": "672755f3a626ca554ee09b4bf9e7e275664b30070ed873c902968e1bcd870b93",
+        "sourceSha256": "ecc70129979b76099af6eefe4d80f9a2f10839043035c507bf1681c6541d66fe",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "c3cce3413117ca8a208f112e18d6c84f08495980537a32b202696c57d31d77a1",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      },
+      {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v8",
+        "releaseId": "release-20260822-ai-quality-v8",
+        "runId": "final-20260822-ai-quality-v8",
+        "split": "final",
+        "datasetSha256": "e2cfddea0fd0b0e906571fd34c1c731459d0a42c6cba715b55869fbd64ccd74b",
+        "sourceSha256": "05fa8bd4044bc87805f8aca98a2e9f84ad2310aafd1ca20b3055ffeee333de9a",
+        "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+        "sha256SumsSha256": "93beabac78642ccf2e642efa7ce1de9f7fc832aa53ef2ead5407b0781b236d44",
+        "qualityGatePassed": false,
+        "outcome": "FAILED"
+      }
+    ],
+    "benchmarks": [
+      {
+        "benchmarkId": "db-benchmark-v9-20260822",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/db/db-benchmark-v9-20260822",
+        "sha256SumsSha256": "59ff62b29458b10de1889b8234066cfd3ebe54bdabdbc7c839535c8a3ef23623",
+        "scope": "REAL_DEDICATED_DATABASE_READ_BENCHMARK_WITH_ROLLBACK_PROBE",
+        "notProductionSlo": true
+      }
+    ],
+    "auxiliaryEvidence": [
+      {
+        "kind": "repeated-agent",
+        "packageId": "agent-pass5-development-v9-20260822",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-development-v9-20260822",
+        "sourceRunId": "development-agent-pass5-v9-20260822",
+        "sourceRunSha256SumsSha256": "fcb3a5be8e4aa2d84905a59f7b7ae94ce4699efdd8e0f57c9a2fa36e0ff83a3c",
+        "sha256SumsSha256": "3b84b059f6506a84ede475f6869bd46b85aa1c73a417bc84f49a021191d28e63"
+      },
+      {
+        "kind": "repeated-agent",
+        "packageId": "agent-pass5-regression-v9-20260822",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-regression-v9-20260822",
+        "sourceRunId": "regression-agent-pass5-v9-20260822",
+        "sourceRunSha256SumsSha256": "acabcb0633be637360b12c91c13d4bf8c36bd2bba1892c2488a0b7d65836fc66",
+        "sha256SumsSha256": "648f5332cf13ef971a3b2b032d7759564a5c943b215af720a528e6a0fa1a5b06"
+      },
+      {
+        "kind": "resilience",
+        "packageId": "fault-v9-20260822",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/resilience/fault-v9-20260822",
+        "sourceRunId": "resilience-v9-20260822",
+        "sourceRunSha256SumsSha256": "0c664acbb8daaf41973619b713a9183a1979e81634f57b27edb1693048836d3f",
+        "sha256SumsSha256": "9aebf69bd9552d520829e9474f5910917de4182c9ac148b73837a289c48f1868"
+      }
+    ]
   },
-  "protocol": {
-    "schema": "aishop-eval/v1",
-    "resultsPattern": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/<suite>/<run_id>/",
-    "baselinePolicy": "Only an explicit --accept-baseline may create or replace a baseline; CI never accepts baselines."
-  },
-  "evidenceLevels": {
-    "E0_SOURCE": "Source, migration, test, data lock, or runner contract that can be statically checked.",
-    "E1_DETERMINISTIC": "Production decision code with deterministic adapters; always SYNTHETIC.",
-    "E2_LOCAL_INTEGRATION": "Local real processes and dependencies or a full local business path.",
-    "E3_CONFIGURED_LIVE": "A configured real model, embedding, rerank, or live index path executed locally.",
-    "E4_REAL_USER": "Authorized real-user sample; not collected in this project."
-  },
-  "evidence": [
-    {
-      "id": "commerce-runtime",
-      "kind": "evaluation",
-      "suite": "agentic-commerce-v2-runtime",
-      "level": "E1_DETERMINISTIC",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_agentic_commerce_runtime.py --run-id commerce-c501735-20260819",
-      "caseCount": 27,
-      "claim": "27 deterministic Commerce cases passed; tool and parameter correctness are 1.0 and critical safety violations are 0.",
-      "boundary": "The production decision paths execute with deterministic adapters. This is not online-model accuracy, a load test, or business conversion evidence.",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/agentic-commerce-v2-runtime/commerce-c501735-20260819/summary.json",
-      "resultSha256": "754268a8caeed43e142960e44301c129da729a975335b3f0f7f2581c02c03f5a",
-      "resultAssertions": {
-        "metadata.schemaVersion": "aishop-eval/v1",
-        "metadata.gitCommit": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
-        "summary.caseCount": 27,
-        "summary.executedCount": 27,
-        "summary.taskSuccessRate": 1.0,
-        "summary.criticalSafetyViolationCount": 0
-      },
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/agentic_commerce_v2.jsonl"
-        }
-      ]
+  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Development and regression are separate visible evidence. v2 is a historical passed archive; v3-v8 are immutable failed final archives and are not current. Semantic judging is shadow-only until independent human calibration; local latency is descriptive and not a production SLO; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, production capacity, payment compliance, or industrial personalization.",
+  "visibleRuns": {
+    "development": {
+      "runId": "development-20260822-ai-quality-v9",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/.runs/development-20260822-ai-quality-v9",
+      "split": "development",
+      "sha256SumsSha256": "1e8ca6a8e1cfc87ec6b17552b9b57eb923040299700817a6b1a4f28a6f75b882",
+      "qualityGatePassed": true,
+      "datasetSha256": "01cbf2996f9d0ba7b47503dc748b6dcc18374d7cdcb7404c5df22006b67ffa50",
+      "sourceSha256": "e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69"
     },
-    {
-      "id": "ai-safety",
-      "kind": "evaluation",
-      "suite": "ai-safety-v1",
-      "level": "E1_DETERMINISTIC",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_ai_safety.py --run-id safety-c501735-20260819",
-      "caseCount": 18,
-      "claim": "18 deterministic injection, channel-guard, IDOR, identity-binding, and PII-redaction cases passed with 0 critical safety violations.",
-      "boundary": "This is a synthetic security regression set, not proof against every open-world attack.",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/ai-safety-v1/safety-c501735-20260819/summary.json",
-      "resultSha256": "562329f1bc6d32186414168f235166b5fdeea5fb9627490477bf845532b3c5bc",
-      "resultAssertions": {
-        "metadata.schemaVersion": "aishop-eval/v1",
-        "metadata.gitCommit": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
-        "summary.caseCount": 18,
-        "summary.executedCount": 18,
-        "summary.taskSuccessRate": 1.0,
-        "summary.criticalSafetyViolationCount": 0
-      },
-      "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/ai_safety_v1.lock.json"
-      ]
-    },
-    {
-      "id": "search-rag-deterministic-contract",
-      "kind": "evaluation",
-      "suite": "search-rag-v1",
-      "level": "E1_DETERMINISTIC",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_rag_eval.py --run-id search-rag-c501735-20260819",
-      "caseCount": 162,
-      "claim": "162 deterministic Search/RAG data and query-understanding contract cases passed with locked datasets.",
-      "boundary": "The result did not run --live. It does not claim Recall@K, MRR, NDCG, citation quality, real-provider latency, or model cost.",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/search-rag-v1/search-rag-c501735-20260819/summary.json",
-      "resultSha256": "99452b8679746dc5942b13763245bdf9cb1cd2d301b452960025b3f867629534",
-      "resultAssertions": {
-        "metadata.schemaVersion": "aishop-eval/v1",
-        "metadata.gitCommit": "c501735644a72ce57b27e48bdd35fbc7a5e870ea",
-        "summary.caseCount": 162,
-        "summary.executedCount": 162,
-        "summary.taskSuccessRate": 1.0,
-        "summary.evaluationLayers.live.executed": false
-      },
-      "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/search_holdout_v1.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_holdout_v1.lock.json"
-      ]
-    },
-    {
-      "id": "agent-v2-live-contract",
-      "kind": "evaluation-contract",
-      "suite": "agent-v2",
-      "level": "E0_SOURCE",
-      "state": "VERIFIED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/eval.py validate --suite agent-v2",
-      "caseCount": 44,
-      "claim": "The current frozen Agent v2 contract contains 37 single-turn cases and 7 sequence cases, and requires LIVE_FULL_STACK execution for formal collection.",
-      "boundary": "The lock is NOT_COLLECTED. The contract and isolated one-case runs do not establish a full 44-case task-success rate or formal orchestration ablation.",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
-      "resultAssertions": {
-        "suite": "agent-v2",
-        "caseCounts.total": 44,
-        "resultStatus": "NOT_COLLECTED"
-      },
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
-        }
-      ]
-    },
-    {
-      "id": "agent-v2-cancel-local-full-stack",
-      "kind": "live-task-subset",
-      "suite": "agent-v2",
-      "level": "E2_LOCAL_INTEGRATION",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_task_success_v2_eval.py --case-id live-cancel-confirmed-012 --run-id agent-v2-adaptive-c501735-20260820-cancel-golden-r6",
-      "caseCount": 1,
-      "claim": "One isolated SYNTHETIC + local-live cancel-order case passed through Agent API, RabbitMQ Worker, LangGraph, MCP, pending-action confirmation, and the Java write path; latency was 1067 ms and severe safety violations were 0.",
-      "boundary": "This is one deterministic Workflow sample with 0 LLM tokens. It is not a model benchmark, overall Agent TSR, P95, or production SLO.",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-cancel-golden-r6/summary.json",
-      "resultSha256": "83200742578f45d7a1a58ead624b85e359f79c4f02da4736664dd1d35bbdf9c8",
-      "resultAssertions": {
-        "metadata.executionMode": "LIVE_FULL_STACK",
-        "metadata.evidenceSource": "SYNTHETIC+local-live",
-        "metadata.simulated": false,
-        "summary.caseCount": 1,
-        "summary.passedCount": 1,
-        "summary.totalTokens": 0,
-        "cases.0.caseId": "live-cancel-confirmed-012",
-        "cases.0.taskSuccess": true,
-        "cases.0.orchestration.mode": "workflow",
-        "cases.0.metrics.latencyMs": 1067
-      },
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
-        }
-      ],
-      "relatedArtifacts": [
-        {
-          "path": "docs/evidence/agent-traces/agent-v2-cancel-r6-20260820/manifest.json",
-          "sha256": "252d61479fdf9fc28da7a8972ce984f11d5ca9cb22abf857719d283c36cdb91a",
-          "assertions": {
-            "executionMode": "LIVE_FULL_STACK",
-            "simulated": false
-          }
-        },
-        {
-          "path": "docs/evidence/agent-traces/agent-v2-cancel-r6-20260820/traces.json",
-          "sha256": "d3883ed12aef54cb0ffd6c4d8970cf44e091ddb126ff68f3f330c897b9bf20d3"
-        },
-        {
-          "path": "docs/evidence/agent-traces/agent-v2-cancel-r6-20260820/report.md",
-          "sha256": "f57c8b2d2a356a2fd76b8c2af0671e39f6d83e1f726da51e3b8066456d953a99"
-        }
-      ]
-    },
-    {
-      "id": "agent-v2-rag-provider-local-full-stack",
-      "kind": "live-task-subset",
-      "suite": "agent-v2",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_task_success_v2_eval.py --case-id live-confirmation-policy-020 --run-id agent-v2-adaptive-c501735-20260820-rag-policy-confirmation-r5",
-      "caseCount": 1,
-      "claim": "One isolated SYNTHETIC + local-live policy case passed with deepseek-v4-flash, one LLM call, 5071 tokens, 3237 ms latency, complete Elasticsearch/Embedding/Rerank runtime trace, and 0 write tools.",
-      "boundary": "This is n=1. It does not establish full Agent quality, P95, SLO, or trusted monetary cost; totalCostCny=0.0 means no trustworthy CNY pricing is configured and must be reported as UNPRICED.",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-confirmation-r5/summary.json",
-      "resultSha256": "7790d0a8a561b07ba9d15ee18acdc41a6dc43b43a9a679428fbfa567edb0dcae",
-      "resultAssertions": {
-        "metadata.executionMode": "LIVE_FULL_STACK",
-        "metadata.evidenceSource": "SYNTHETIC+local-live",
-        "metadata.simulated": false,
-        "summary.caseCount": 1,
-        "summary.passedCount": 1,
-        "summary.totalTokens": 5071,
-        "cases.0.caseId": "live-confirmation-policy-020",
-        "cases.0.taskSuccess": true,
-        "cases.0.orchestration.mode": "single_agent",
-        "cases.0.provider.llmCallCount": 1,
-        "cases.0.metrics.inputTokens": 4847,
-        "cases.0.metrics.outputTokens": 224,
-        "cases.0.metrics.latencyMs": 3237
-      },
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
-        }
-      ]
-    },
-    {
-      "id": "agent-v2-rag-policy-failures-retained",
-      "kind": "live-task-diagnostics",
-      "suite": "agent-v2",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "LOCAL_RESULT",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "Retain and inspect rag-policy-r1 through rag-policy-r4; do not overwrite failed run IDs.",
-      "caseCount": 1,
-      "claim": "Four retained local-live diagnostics document an OpenAI-compatible tool-message ordering defect, a Worker restart interruption, two token-budget failures, and a real missing-knowledge bad case for the seven-day return-policy question.",
-      "boundary": "The failures remain evidence of system and knowledge limits. A later different passing policy question does not erase or aggregate over them.",
-      "resultLocation": "local-ignored",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r4/summary.json",
-      "resultSha256": "5a936c6c25b456bc2f79b44000d738fb9c2afb12ed6ef7bd99668c0ba898a780",
-      "resultAssertions": {
-        "summary.caseCount": 1,
-        "summary.passedCount": 0,
-        "summary.totalTokens": 9992,
-        "cases.0.caseId": "live-refund-policy-018",
-        "cases.0.taskSuccess": false
-      },
-      "relatedArtifacts": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r1/summary.json",
-          "sha256": "23cf4e7fef8fcad2f5aa5fcf577805f9df679bf0d982c240e4b5c55cc01c1cc8"
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r2/summary.json",
-          "sha256": "68764a046e8dbb824153cd4740daef47207a79e954cbbe00b71ace894dfdc7c8"
-        },
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/results/task-success-live-v2/agent-v2-adaptive-c501735-20260820-rag-policy-r3/summary.json",
-          "sha256": "60b31f39f1ebe2b32277daee4026eea887939b4914aa35bf04043385d23ff07c"
-        }
-      ],
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.jsonl"
-        }
-      ]
-    },
-    {
-      "id": "search-v2-formal-retained",
-      "kind": "evaluation",
-      "suite": "search-mature-v2",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "VERIFIED",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_search_v2_eval.py package --run-id search-v2-64aa86e-final-20260814",
-      "caseCount": 487,
-      "claim": "Configured local-live Search v2 covers Chinese 600 products/240 queries, WANDS 42,994 products/202 queries/32,919 judgments, and 45 ProductService cases; the formal quality gate failed and is retained.",
-      "boundary": "Synthetic data and local-live Provider calls are not real-user traffic. WANDS qrels are incomplete, and the ProductService Recall@10 failure must remain visible.",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/summary.json",
-      "resultSha256": "64445a87f51fa63f140a35dae4d0f056b04a552edae4586fe7c48e6b8632e7ba",
-      "resultAssertions": {
-        "runId": "search-v2-64aa86e-final-20260814",
-        "suite": "search-mature-v2",
-        "qualityGates.passed": false,
-        "datasets.chineseV2.counts.products": 600,
-        "datasets.chineseV2.counts.queries": 240,
-        "datasets.wandsFullCatalog.products": 42994,
-        "datasets.wandsFullCatalog.queries": 202,
-        "providerCompleteness.productService.passed": true
-      },
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/search-mature-v2/search-v2-64aa86e-final-20260814/run-manifest.json",
-      "runManifestSha256": "6e62f595bd63f76b89e0c92a90971505e277de9516c3ffe12d6c7a92ac4513b9",
-      "datasetLocks": [
-        {
-          "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.lock.json",
-          "datasetPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/mature_v2/chinese-commerce-search-v2.json",
-          "hashMode": "canonical-json"
-        }
-      ]
-    },
-    {
-      "id": "rag-retrieval-v4-formal-retained",
-      "kind": "evaluation",
-      "suite": "rag-retrieval-live-v4",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "VERIFIED",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_v4_eval.py package --run-id rag-v4-64aa86e-routefix-20260814",
-      "caseCount": 264,
-      "claim": "Configured local-live RAG retrieval v4 executed 264 cases with complete Provider evidence; the one-shot fresh quality gate failed and remains retained.",
-      "boundary": "All labels are SYNTHETIC, local latency is not an SLO, and automatic citation grounding is not human faithfulness review.",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/summary.json",
-      "resultSha256": "be1b3b0fb1bf2bb337eb38d100c57841f5643e865925e3e65c2d77a85effb29f",
-      "resultAssertions": {
-        "runId": "rag-v4-64aa86e-routefix-20260814",
-        "suite": "rag-retrieval-live-v4",
-        "qualityGate.status": "FAILED_RETAINED",
-        "qualityGate.passed": false,
-        "caseCounts.total": 264,
-        "caseCounts.freshHoldout": 48
-      },
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-retrieval-live-v4/rag-v4-64aa86e-routefix-20260814/run-manifest.json",
-      "runManifestSha256": "2b0c1e1105a80bc5479dee4cff4bae3364422531eff92f51026d425a6bdb3720",
-      "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_public.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_known_regression.lock.json",
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_v4_fresh_holdout.lock.json"
-      ]
-    },
-    {
-      "id": "rag-generation-v4-formal-retained",
-      "kind": "evaluation",
-      "suite": "rag-generation-live-v4",
-      "level": "E3_CONFIGURED_LIVE",
-      "state": "VERIFIED",
-      "qualityGateState": "FAILED_RETAINED",
-      "command": "cd AI_Shop-backend/AI_Shop-agent && python benchmarks/run_rag_generation_v4.py package --run-id rag-generation-v4-64aa86e-postfix-20260814",
-      "caseCount": 60,
-      "claim": "Configured local-live RAG generation v4 executed 60 cases with 0 runtime errors and 0 critical safety violations, but only 39/60 task success; the formal failed result and HUMAN_REVIEW_PENDING state are retained.",
-      "boundary": "AI-assisted scoring is not independent human review; Provider CNY cost is UNPRICED and local percentiles are not production SLOs.",
-      "resultLocation": "tracked",
-      "resultPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/summary.json",
-      "resultSha256": "b751ac463f97e43681d402b96d4795404e9a669a8b41186673223609ba77bfe0",
-      "resultAssertions": {
-        "runId": "rag-generation-v4-64aa86e-postfix-20260814",
-        "suite": "rag-generation-live-v4",
-        "summary.caseCount": 60,
-        "summary.executedCount": 60,
-        "summary.runtimeErrorCount": 0,
-        "summary.taskSuccessRate": 0.65,
-        "humanReviewStatus": "HUMAN_REVIEW_PENDING"
-      },
-      "runManifestPath": "AI_Shop-backend/AI_Shop-agent/benchmarks/evidence/rag-generation-live-v4/rag-generation-v4-64aa86e-postfix-20260814/run-manifest.json",
-      "runManifestSha256": "18786d733bc82b9d044584db9ab9cc0cddfb2368240ce241a62fe9906f49543e",
-      "datasetLocks": [
-        "AI_Shop-backend/AI_Shop-agent/benchmarks/datasets/rag_generation_live_v4.lock.json"
-      ]
-    },
-    {
-      "id": "real-user-pilot",
-      "kind": "real-user-contract",
-      "suite": "authorized-pilot",
-      "level": "E4_REAL_USER",
-      "state": "NOT_COLLECTED",
-      "command": "Collect only after consent, source tagging, privacy review, and a documented pilot batch exist.",
-      "claim": "No authorized real-user sample, FCR, CTR/CVR, GMV uplift, production SLO, or capacity result has been collected.",
-      "boundary": "Local synthetic and local-live results must never be relabeled as real users or production outcomes.",
-      "resultLocation": "not-collected"
+    "regression": {
+      "runId": "regression-20260822-ai-quality-v9",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/.runs/regression-20260822-ai-quality-v9",
+      "split": "regression",
+      "sha256SumsSha256": "fe88d5f93d3e8a03c3c47f48502960a320e0ea4c460c67a1c2f85700e3301a85",
+      "qualityGatePassed": true,
+      "datasetSha256": "a102ed7a7e6225ad52da9a60c05c25f8c9f22a2ed5f036395b00c906e802eeb2",
+      "sourceSha256": "e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69"
     }
-  ],
-  "requiredEvidenceIds": [
-    "commerce-runtime",
-    "ai-safety",
-    "search-rag-deterministic-contract",
-    "agent-v2-live-contract",
-    "agent-v2-cancel-local-full-stack",
-    "agent-v2-rag-provider-local-full-stack",
-    "agent-v2-rag-policy-failures-retained",
-    "search-v2-formal-retained",
-    "rag-retrieval-v4-formal-retained",
-    "rag-generation-v4-formal-retained",
-    "real-user-pilot"
-  ],
-  "honestBoundaries": [
-    "The frozen 44-case Agent v2 lock remains resultStatus=NOT_COLLECTED. Isolated one-case local-live results do not establish total Agent TSR, P95, or a formal ablation.",
-    "SYNTHETIC, local-live, and REAL_USER evidence must remain separate. No authorized real-user data has been collected.",
-    "The cancel-order sample is a deterministic Workflow with 0 LLM tokens; it is not a model performance result.",
-    "The policy-QA Provider result is n=1. Its totalCostCny=0.0 is UNPRICED, not proof that model cost is zero.",
-    "The r1-r4 refund-policy failures are retained; missing published knowledge must be fixed with governed content and a new holdout, not a lower evidence threshold.",
-    "Search v2, RAG retrieval v4, and RAG generation v4 formal local-live failures stay FAILED_RETAINED. Exposed-holdout replay cannot replace fresh evidence.",
-    "HUMAN_REVIEW_PENDING means no independent human calibration has been completed.",
-    "This project is an AI application engineering portfolio project, not proof of production scale, revenue impact, model training, inference-engine optimization, Kubernetes, or Agent infrastructure operations."
-  ],
+  },
   "claimDocuments": [
     "README.md",
     "docs/AI应用求职项目证据总览.md",
     "docs/性能与质量证据_20260820.md",
-    "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
-    "AI应用开发_Java后端_真实面试题与备考报告_20260819.md"
-  ],
-  "documentationConsistency": [
-    {
-      "path": "README.md",
-      "requiredTokens": [
-        "Agent v2 冻结 44 条",
-        "SYNTHETIC + local-live",
-        "UNPRICED",
-        "NOT_COLLECTED"
-      ],
-      "forbiddenTokens": [
-        "AI_SHOP_秋招叙述材料包_20260818.md",
-        "docs/项目问题排查与修复复盘.md",
-        "docs/Search与RAG成熟评测报告.md"
-      ]
-    },
-    {
-      "path": "docs/AI应用求职项目证据总览.md",
-      "requiredTokens": [
-        "live-cancel-confirmed-012",
-        "live-confirmation-policy-020",
-        "5071",
-        "HUMAN_REVIEW_PENDING",
-        "NOT_COLLECTED",
-        "UNPRICED"
-      ],
-      "forbiddenTokens": [
-        "正式 Agent 模型结果已采集"
-      ]
-    },
-    {
-      "path": "docs/性能与质量证据_20260820.md",
-      "requiredTokens": [
-        "1067 ms",
-        "3237 ms",
-        "5071",
-        "FAILED_RETAINED",
-        "HUMAN_REVIEW_PENDING",
-        "UNPRICED"
-      ],
-      "forbiddenTokens": [
-        "生产 SLO 已达标"
-      ]
-    },
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/README.md",
-      "requiredTokens": [
-        "44 条",
-        "resultStatus` 为 `NOT_COLLECTED",
-        "local-live 子集",
-        "UNPRICED"
-      ],
-      "forbiddenTokens": [
-        "agent-v2-workflow-6eb8e8e-20260817"
-      ]
-    },
-    {
-      "path": "AI应用开发_Java后端_真实面试题与备考报告_20260819.md",
-      "requiredTokens": [
-        "AI_Shop 当前证据边界",
-        "44 条",
-        "NOT_COLLECTED",
-        "SYNTHETIC + local-live"
-      ],
-      "forbiddenTokens": [
-        "AI应用开发_Java后端_手撕与工程题集合_20260819.md",
-        "AI应用开发_电商后端_场景设计题集合_20260819.md"
-      ]
-    }
-  ],
-  "implementationArtifacts": [
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/task_success_v2.lock.json",
-      "requiredTokens": [
-        "\"total\": 44",
-        "\"resultStatus\": \"NOT_COLLECTED\""
-      ],
-      "forbiddenTokens": []
-    },
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/benchmarks/run_task_success_v2_eval.py",
-      "requiredTokens": [
-        "LIVE_FULL_STACK",
-        "--case-id"
-      ],
-      "forbiddenTokens": [
-        "def simulate_case"
-      ]
-    },
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/scripts/export_interview_traces.py",
-      "requiredTokens": [
-        "def validate_confirmed_trace",
-        "_TOKEN_METRIC_KEYS",
-        "SHA256SUMS"
-      ],
-      "forbiddenTokens": []
-    },
-    {
-      "path": "AI_Shop-backend/AI_Shop-agent/app/mcp_server/server.py",
-      "requiredTokens": [
-        "episode_service"
-      ],
-      "forbiddenTokens": []
-    }
-  ],
-  "forbiddenCurrentClaims": [
-    {
-      "pattern": "完整 44 条 Agent v2[^\\n]*(?:已通过|100%)",
-      "paths": [
-        "README.md",
-        "docs/AI应用求职项目证据总览.md",
-        "docs/性能与质量证据_20260820.md"
-      ]
-    },
-    {
-      "pattern": "REAL_USER 已采集|线上 SLO 已达标|生产业务收益",
-      "paths": [
-        "README.md",
-        "docs/AI应用求职项目证据总览.md",
-        "docs/性能与质量证据_20260820.md"
-      ]
-    }
+    "docs/AI主线方法成熟度与后续优化路线_20260820.md",
+    "docs/AI质量闭环工作记录_20260822.md",
+    "AI应用开发_Java后端_真实面试题与备考报告_20260821.md",
+    "AI应用开发_Java后端_手撕与工程题集合_20260821.md",
+    "AI应用开发_电商后端_场景设计题集合_20260821.md"
   ]
 }

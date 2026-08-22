@@ -20,6 +20,8 @@ from app.services.episode_service import (
 )
 from app.services.java_internal_client import java_internal_client
 from app.services.pending_action_service import pending_action_service
+from app.services.tool_invoke_result import ToolInvokeResult
+from app.utils.biz_payload import build_action_confirm_payload
 
 logger = structlog.get_logger()
 
@@ -673,7 +675,7 @@ class SupportCaseService:
         category: str,
         description: str,
         **kwargs,
-    ) -> str:
+    ) -> str | ToolInvokeResult:
         params = await self.build_proposal(user_id, category, description, **kwargs)
         forced = bool(params.get("forcedHandoff"))
         if forced:
@@ -690,7 +692,10 @@ class SupportCaseService:
                 forced_handoff=True,
                 idempotency_key=params.get("caseDedupeKey"),
             )
-            return f"已为您创建售后工单 {case['caseNo']}，该问题将立即转人工处理。"
+            return ToolInvokeResult(
+                content=f"已为您创建售后工单 {case['caseNo']}，该问题将立即转人工处理。",
+                biz_type="support_case",
+            )
         pending = await pending_action_service.create_pending(
             "CREATE_SUPPORT_CASE",
             user_id,
@@ -698,8 +703,23 @@ class SupportCaseService:
             f"创建售后工单：{params['category']}，{params['description'][:80]}",
             run_id=params.get("runId"),
         )
-        return (
-            f"已生成创建售后工单确认卡片。请确认后提交，回复末尾附带【{pending['token']}】"
+        assistant, biz_data = build_action_confirm_payload(
+            pending,
+            intro="已生成创建售后工单确认卡片，请确认后提交。",
+        )
+        return ToolInvokeResult(
+            content=(
+                "已生成创建售后工单确认卡片。请确认后提交，"
+                f"回复末尾附带【{pending.get('token') or ''}】"
+            ),
+            biz_type="action_confirm",
+            biz_data=biz_data,
+            assistant_cards=assistant,
+            contract_data={
+                "type": "ACTION_CONFIRM",
+                "actionType": "CREATE_SUPPORT_CASE",
+                "actionTokenPresent": bool(pending.get("token")),
+            },
         )
 
     async def public_query(self, user_id: str, case_id: str | None = None) -> str:

@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/internal/product/agent")
@@ -186,6 +188,9 @@ public class ProductAgentInternalController extends ABaseController {
         if (!(rawIds instanceof List<?> ids) || ids.isEmpty()) {
             return getSuccessResponseVO(Map.of("products", List.of()));
         }
+        Map<String, Set<String>> allowedSkuKeysByProduct = parseAllowedSkuKeys(
+                body.get("allowedSkuKeysByProduct"));
+
         List<Map<String, Object>> result = new ArrayList<>();
         int processed = 0;
         for (Object rawId : ids) {
@@ -210,10 +215,15 @@ public class ProductAgentInternalController extends ABaseController {
             row.put("cover", product.getCover());
             int totalStock = 0;
             Map<String, Object> selected = null;
+            Set<String> allowedSkuKeys = allowedSkuKeysByProduct.get(productId);
             if (skus != null) {
                 for (ProductSku sku : skus) {
                     if (sku == null || StringTools.isEmpty(sku.getPropertyValueIdHash())
                             || sku.getPrice() == null) {
+                        continue;
+                    }
+                    if (allowedSkuKeys != null
+                            && !allowedSkuKeys.contains(sku.getPropertyValueIdHash())) {
                         continue;
                     }
                     int stock = Math.max(0, stockFeignSupport.getAvailable(
@@ -238,6 +248,26 @@ public class ProductAgentInternalController extends ABaseController {
             result.add(row);
         }
         return getSuccessResponseVO(Map.of("products", result));
+    }
+
+    static Map<String, Set<String>> parseAllowedSkuKeys(Object rawAllowed) {
+        Map<String, Set<String>> allowedSkuKeysByProduct = new HashMap<>();
+        if (rawAllowed instanceof Map<?, ?> allowedMap) {
+            for (Map.Entry<?, ?> entry : allowedMap.entrySet()) {
+                if (entry.getKey() == null || !(entry.getValue() instanceof List<?> values)) {
+                    continue;
+                }
+                Set<String> keys = values.stream()
+                        .filter(value -> value != null
+                                && !StringTools.isEmpty(String.valueOf(value).trim()))
+                        .map(value -> String.valueOf(value).trim())
+                        .collect(Collectors.toSet());
+                if (!keys.isEmpty()) {
+                    allowedSkuKeysByProduct.put(String.valueOf(entry.getKey()).trim(), keys);
+                }
+            }
+        }
+        return allowedSkuKeysByProduct;
     }
 
     @PostMapping("/imageContent")

@@ -238,6 +238,7 @@ def test_narrowing_signal_suppresses_clarification():
     assert not service.should_clarify("台式电脑主机", "台式电脑主机", empty, None)
     assert not service.should_clarify("新生儿衣服礼盒", "新生儿衣服礼盒", empty, None)
     assert not service.should_clarify("100W车载充电器", "100W车载充电器", empty, None)
+    assert not service.should_clarify("WH-1000XM999 原装耳机", "耳机", empty, None)
 
     # A remembered budget also suppresses it, so we never ask the same thing twice.
     remembered = extract_profile("预算3000以内")

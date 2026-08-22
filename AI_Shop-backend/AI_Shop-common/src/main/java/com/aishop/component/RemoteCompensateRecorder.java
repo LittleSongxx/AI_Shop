@@ -33,6 +33,21 @@ public class RemoteCompensateRecorder {
         persist(record);
     }
 
+    public void recordOrderStockRestore(String payOrderId, List<ProductItem> items, Throwable error) {
+        if (StringTools.isEmpty(payOrderId) || items == null || items.isEmpty()) {
+            return;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("payOrderId", payOrderId);
+        payload.put("items", items);
+        MqCompensationRecord record = baseRecord(
+                "remote:stock:orderRestore:" + payOrderId,
+                InternalApiHeaders.REMOTE_STOCK_ORDER_RESTORE,
+                payload,
+                error);
+        persist(record);
+    }
+
     public void recordCouponUnlock(String bizKey, String userCouponId, String userId,
                                    Integer fromStatus, Integer toStatus, Throwable error) {
         if (StringTools.isEmpty(bizKey) || StringTools.isEmpty(userCouponId)) {

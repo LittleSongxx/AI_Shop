@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+from collections.abc import Awaitable
 
 import structlog
 
@@ -25,11 +27,19 @@ class SearchRecommendService:
         """
         size = max(1, min(limit, 20))
 
-        # Parallel: resolve preferred category AND purchase history (needed by
-        # both the weighted-vote category resolver and the co-purchase path).
+        # Start the shared purchase-history request once.  The category
+        # resolver awaits the same task while it fetches browse history, so the
+        # two network operations remain parallel without issuing a duplicate
+        # purchase-history call.
+        purchase_task = asyncio.create_task(
+            java_internal_client.purchase_history_product_ids(user_id, limit=3)
+        )
+        category_task = asyncio.create_task(
+            self._resolve_category_from_browse(user_id, purchase_ids=purchase_task)
+        )
         category_result, purchase_result = await asyncio.gather(
-            self._resolve_category_from_browse(user_id),
-            java_internal_client.purchase_history_product_ids(user_id, limit=3),
+            category_task,
+            purchase_task,
             return_exceptions=True,
         )
         category_id: str | None = (
@@ -62,7 +72,12 @@ class SearchRecommendService:
     # Recall sources                                                       #
     # ------------------------------------------------------------------ #
 
-    async def _resolve_category_from_browse(self, user_id: str) -> str | None:
+    async def _resolve_category_from_browse(
+        self,
+        user_id: str,
+        *,
+        purchase_ids: list[str] | Awaitable[list[str]] | None = None,
+    ) -> str | None:
         """Infer a recommendation category from browse and purchase history.
 
         Strategy:
@@ -80,10 +95,22 @@ class SearchRecommendService:
         if not user_id:
             return None
 
-        # Fetch browse and purchase IDs concurrently.
+        # Fetch browse and the shared purchase IDs concurrently.  Direct callers
+        # that do not provide the shared task retain the old self-contained
+        # behavior.
+        purchase_source: Awaitable[list[str]]
+        if purchase_ids is None:
+            purchase_source = java_internal_client.purchase_history_product_ids(user_id, limit=3)
+        elif inspect.isawaitable(purchase_ids):
+            purchase_source = purchase_ids
+        else:
+            async def resolved_purchase_ids() -> list[str]:
+                return list(purchase_ids or [])
+
+            purchase_source = resolved_purchase_ids()
         browse_result, purchase_result = await asyncio.gather(
             java_internal_client.browse_history_ids(user_id, limit=5),
-            java_internal_client.purchase_history_product_ids(user_id, limit=3),
+            purchase_source,
             return_exceptions=True,
         )
         browse_ids: list[str] = (

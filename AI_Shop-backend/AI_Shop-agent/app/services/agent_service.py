@@ -98,6 +98,8 @@ class AgentOrchestrator:
         episode_id: str | None = None,
         traceparent: str | None = None,
         selected_order_reference: dict | None = None,
+        evaluation_trial_id: str | None = None,
+        evaluation_fault: dict | None = None,
     ) -> dict:
         settings = get_settings()
         # 一次 inspect 同时完成归一化、注入判定和净化，避免同一段文本归一化两遍。
@@ -581,8 +583,14 @@ class AgentOrchestrator:
             )
             return agent_msg
 
+        task_payload = dict(agent_msg)
+        if evaluation_fault is not None:
+            task_payload["evaluationTrialId"] = str(
+                evaluation_trial_id or ""
+            ).strip()
+            task_payload["evaluationFault"] = dict(evaluation_fault)
         created = await agent_task_service.create(
-            agent_msg["messageId"], user_id, queue_name, priority, agent_msg
+            agent_msg["messageId"], user_id, queue_name, priority, task_payload
         )
         if not created:
             agent_msg["deliveryState"] = "DUPLICATE"
@@ -595,7 +603,7 @@ class AgentOrchestrator:
             if not await agent_task_service.mark_dispatching(agent_msg["messageId"]):
                 agent_msg["deliveryState"] = "DUPLICATE"
                 return agent_msg
-            await agent_queue_service.publish(queue_name, agent_msg)
+            await agent_queue_service.publish(queue_name, task_payload)
             await agent_task_service.mark_queued(agent_msg["messageId"])
             agent_msg["deliveryState"] = "QUEUED"
             episode_service.record_step(

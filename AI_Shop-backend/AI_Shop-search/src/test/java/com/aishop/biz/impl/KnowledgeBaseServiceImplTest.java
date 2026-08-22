@@ -204,6 +204,37 @@ class KnowledgeBaseServiceImplTest {
     }
 
     @Test
+    void explicitReleaseRejectsCatalogShaThatDoesNotMatchSelectedDocuments() {
+        when(jdbcTemplate.queryForObject(
+                argThat(sql -> sql.contains("knowledge_release") && sql.contains("FOR UPDATE")),
+                eq(Long.class)))
+                .thenReturn(9L);
+        when(jdbcTemplate.queryForList(
+                argThat(sql -> sql != null && sql.contains("d.document_id IN")),
+                eq(11L)))
+                .thenReturn(List.of(Map.of(
+                        "document_id", 11L,
+                        "source_name", "shipping.md",
+                        "content_hash", "b".repeat(64),
+                        "version", 1,
+                        "domain", "LOGISTICS",
+                        "index_schema_version", 1,
+                        "chunk_count", 7L)));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.activateRelease(
+                        "tampered-release", "a".repeat(64), List.of(11L), null, "admin"));
+
+        assertTrue(error.getMessage().contains("所选知识文档集合不一致"));
+        verify(jdbcTemplate, never()).batchUpdate(
+                argThat(sql -> sql != null && sql.contains("knowledge_release_document")),
+                anyList());
+        verify(jdbcTemplate, never()).update(
+                argThat(sql -> sql != null && sql.contains("INSERT INTO knowledge_release_snapshot")),
+                any(), any(), any(), any(), any());
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void currentSchemaPublishedDocumentSkipsReindex() {
         Map<String, Object> current = document(42L, "PUBLISHED");

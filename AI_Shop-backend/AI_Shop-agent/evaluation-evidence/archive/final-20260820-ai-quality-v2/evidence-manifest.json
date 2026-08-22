@@ -1,0 +1,1242 @@
+{
+  "createdAt": "2026-08-20T10:55:29.302Z",
+  "files": {
+    "bad-cases.jsonl": {
+      "bytes": 167707,
+      "sha256": "6d105301ca3ea599c1ff1f9a63594f03c088af7b2646418cc17b8b75ae88439d"
+    },
+    "cases.jsonl": {
+      "bytes": 1640602,
+      "sha256": "577a89f8d670826bf0ed5ac4bae438563957f1d5e1c5333acc5d809787df4ef3"
+    },
+    "environment.json": {
+      "bytes": 4231,
+      "sha256": "77d107fe3d9c4362956b9bb60c6b41f1350a6648f22b1d2a86b1681313bd718c"
+    },
+    "gates.json": {
+      "bytes": 8504,
+      "sha256": "c5ce834d76d90b669cbd86501be28eaa12590015ff125dce8b6915550d72dd7f"
+    },
+    "lifecycle.json": {
+      "bytes": 2455,
+      "sha256": "2234a1502a727a36bc87e568c7671604b840273ca75736f8a06fb48b6e911092"
+    },
+    "report.md": {
+      "bytes": 4055,
+      "sha256": "f4c71e887a1071530428be8ec6fb58e64d37a399ae92fdf607e2005c8a5a160d"
+    },
+    "source-fingerprint.json": {
+      "bytes": 1624,
+      "sha256": "c55713beeda68c63333a289e2c3612881606a2a92e71fe64470e75bed3df30fb"
+    },
+    "summary.json": {
+      "bytes": 16638,
+      "sha256": "eec649c265544e75774a5908bfda57d6be55bf4be8a5709e416df3209e0ea422"
+    }
+  },
+  "limitations": [
+    "Latency is labeled LOCAL_FULL_STACK and is not a production SLO.",
+    "P99 is descriptive when fewer than 100 eligible samples are present.",
+    "Release gates are task-specific predeclared targets, not universal industry standards.",
+    "Unjudged search documents are not silently converted into explicit negative judgments."
+  ],
+  "methodologySources": [
+    {
+      "name": "TREC QA evaluation discipline",
+      "url": "https://trec.nist.gov/data/qa/2005_qadata/qa.05.guidelines.html"
+    },
+    {
+      "name": "RAGAS",
+      "url": "https://arxiv.org/abs/2309.15217"
+    },
+    {
+      "name": "RAGChecker",
+      "url": "https://arxiv.org/abs/2408.08067"
+    },
+    {
+      "name": "tau-bench",
+      "url": "https://arxiv.org/abs/2406.12045"
+    },
+    {
+      "name": "NIST Wilson interval",
+      "url": "https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm"
+    }
+  ],
+  "run": {
+    "datasetSha256": "a6aa8a436c1457f78d76fb44e19d1227c6972fae2068e291318f3f8147145d75",
+    "environment": {
+      "capturedAt": "2026-08-20T10:53:48.328Z",
+      "executionMode": "LOCAL_FULL_STACK",
+      "latencyBoundary": "Client-observed local full-stack latency; descriptive evidence, not a production SLO.",
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+      "preflight": {
+        "checkedAt": "2026-08-20T10:53:49.752Z",
+        "checks": [
+          {
+            "name": "java-gateway",
+            "ok": true,
+            "statusCode": 200,
+            "url": "http://127.0.0.1:8081/actuator/health"
+          },
+          {
+            "name": "elasticsearch",
+            "ok": true,
+            "statusCode": 200,
+            "url": "http://127.0.0.1:9200/_cluster/health"
+          },
+          {
+            "name": "agent-readiness",
+            "ok": true,
+            "statusCode": 200,
+            "url": "http://127.0.0.1:7082/health/ready"
+          },
+          {
+            "name": "redis",
+            "ok": true
+          },
+          {
+            "name": "mysql",
+            "ok": true
+          },
+          {
+            "facts": {
+              "canonicalSha256": "d248958b5441d775d1a54e42abc9e2968cb12acba695e66538d70e66d7ca2435",
+              "index": "aishop-index",
+              "matchesFixture": true,
+              "productCount": 47
+            },
+            "name": "product-catalog",
+            "ok": true
+          },
+          {
+            "facts": {
+              "breakerRejections": 0,
+              "bypassCache": true,
+              "cacheHits": 0,
+              "providerFailures": 0,
+              "providerRequests": 1,
+              "providerSuccesses": 1,
+              "requests": 1,
+              "responseRecords": [
+                {
+                  "dimensions": 1024,
+                  "inputSha256": "bd8b872f4e43c2693b1ade8caa84965c17b437523dbb1c11d2624c4f61eefc2e",
+                  "vectorSha256": "4ce23a7ae75d0914fdd90ac0e2361aa5b3162667980869b6f4db6c218a1f7199"
+                }
+              ]
+            },
+            "name": "embedding-provider",
+            "ok": true
+          },
+          {
+            "facts": {
+              "eligibleRequests": 1,
+              "fallbackCount": 0,
+              "fallbackReasons": {},
+              "providerFailures": 0,
+              "providerRequests": 1,
+              "providerSuccesses": 1,
+              "responseRecords": [
+                {
+                  "candidateIds": [
+                    "preflight-1",
+                    "preflight-2"
+                  ],
+                  "instructionHash": "8bc1b29ab6d31ba3903e158297f6af4b1136d29bd967278bc08cfef201a157d3",
+                  "queryHash": "1bc009fa87e0dae1a5471eefcde551c4fa0bbb8c1daebf7dfee6652a63d2c348",
+                  "results": [
+                    {
+                      "id": "preflight-1",
+                      "score": 0.79237791
+                    },
+                    {
+                      "id": "preflight-2",
+                      "score": 0.37935121
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "rerank-provider",
+            "ok": true
+          },
+          {
+            "model": "deepseek-v4-flash",
+            "name": "llm-provider",
+            "ok": true
+          }
+        ],
+        "configuration": {
+          "embedding": {
+            "configured": true,
+            "dimensions": 1024,
+            "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "model": "text-embedding-v4",
+            "provider": "openai"
+          },
+          "llm": {
+            "configured": true,
+            "endpoint": "https://api.deepseek.com",
+            "intentStructuredOutputMode": "disabled",
+            "maxRetries": 3,
+            "model": "deepseek-v4-flash",
+            "timeoutSeconds": 60
+          },
+          "rerank": {
+            "configured": true,
+            "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+            "format": "compatible",
+            "model": "qwen3-rerank",
+            "topN": 6
+          },
+          "runtime": {
+            "elasticsearchEndpoints": [
+              "http://127.0.0.1:9200"
+            ],
+            "elasticsearchIndex": "aishop_vectorstore",
+            "javaEndpoint": "http://127.0.0.1:8081",
+            "redisDatabase": 0,
+            "redisHost": "127.0.0.1",
+            "redisPort": 6380,
+            "vectorField": "embedding"
+          }
+        },
+        "passed": true,
+        "requiredProviders": [
+          "agent-runtime",
+          "embedding",
+          "llm",
+          "rerank"
+        ],
+        "schemaVersion": "aishop-evaluation-preflight/v2"
+      },
+      "python": "3.12.13"
+    },
+    "frameworkSchemaVersion": "aishop-evaluation/v2",
+    "gates": {
+      "decisions": [
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "minimumCaseCount",
+          "observed": 21,
+          "operator": ">=",
+          "passed": true,
+          "reason": "21 cases meet the predeclared minimum 20",
+          "threshold": 20
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "executionRate",
+          "observed": 1.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=1.000000 == 1.0",
+          "threshold": 1.0
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "recallAt10",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.85",
+          "threshold": 0.85
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "ndcgAt10",
+          "observed": 0.972792,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=0.972792 >= 0.75",
+          "threshold": 0.75
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "noResultAccuracy",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.95",
+          "threshold": 0.95
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "constraintViolationCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "providerCompleteness",
+          "observed": 1.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=1.000000 == 1.0",
+          "threshold": 1.0
+        },
+        {
+          "domain": "search",
+          "evaluated_field": "value",
+          "metric": "runtimeErrorCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "minimumCaseCount",
+          "observed": 21,
+          "operator": ">=",
+          "passed": true,
+          "reason": "21 cases meet the predeclared minimum 20",
+          "threshold": 20
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "executionRate",
+          "observed": 1.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=1.000000 == 1.0",
+          "threshold": 1.0
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "retrievalRecallAt5",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.85",
+          "threshold": 0.85
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "retrievalMrrAt10",
+          "observed": 0.973684,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=0.973684 >= 0.75",
+          "threshold": 0.75
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "retrievalNdcgAt5",
+          "observed": 0.980575,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=0.980575 >= 0.75",
+          "threshold": 0.75
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "generationCorrectness",
+          "observed": 0.904762,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=0.904762 >= 0.85",
+          "threshold": 0.85
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "requiredClaimCompleteness",
+          "observed": 0.928571,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=0.928571 >= 0.85",
+          "threshold": 0.85
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "citationSupport",
+          "observed": 0.952381,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=0.952381 >= 0.9",
+          "threshold": 0.9
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "groundedFaithfulness",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.9",
+          "threshold": 0.9
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "noAnswerAccuracy",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.95",
+          "threshold": 0.95
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "injectionResistance",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.95",
+          "threshold": 0.95
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "invalidCitationCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "severeSafetyViolationCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "providerCompleteness",
+          "observed": 1.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=1.000000 == 1.0",
+          "threshold": 1.0
+        },
+        {
+          "domain": "rag",
+          "evaluated_field": "value",
+          "metric": "runtimeErrorCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "minimumCaseCount",
+          "observed": 8,
+          "operator": ">=",
+          "passed": true,
+          "reason": "8 cases meet the predeclared minimum 8",
+          "threshold": 8
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "executionRate",
+          "observed": 1.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=1.000000 == 1.0",
+          "threshold": 1.0
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "taskSuccess",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.85",
+          "threshold": 0.85
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "executionCompleteness",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.9",
+          "threshold": 0.9
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "toolSelectionAccuracy",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.9",
+          "threshold": 0.9
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "toolArgumentAccuracy",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.9",
+          "threshold": 0.9
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "terminalStateCorrectness",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.95",
+          "threshold": 0.95
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "retryIdempotency",
+          "observed": 1.0,
+          "operator": ">=",
+          "passed": true,
+          "reason": "value=1.000000 >= 0.95",
+          "threshold": 0.95
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "providerCompleteness",
+          "observed": 1.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=1.000000 == 1.0",
+          "threshold": 1.0
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "severeSafetyViolationCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        },
+        {
+          "domain": "agent",
+          "evaluated_field": "value",
+          "metric": "runtimeErrorCount",
+          "observed": 0.0,
+          "operator": "==",
+          "passed": true,
+          "reason": "value=0.000000 == 0",
+          "threshold": 0.0
+        }
+      ],
+      "domainOutcomes": {
+        "agent": true,
+        "rag": true,
+        "search": true
+      },
+      "passed": true,
+      "policy": "ALL_DOMAINS_AND_ALL_HARD_GATES_MUST_PASS"
+    },
+    "runId": "final-20260820-ai-quality-v2",
+    "schemaVersion": "aishop-evaluation-run/v2",
+    "sourceFingerprint": {
+      "capturedAt": "2026-08-20T10:53:48.302Z",
+      "git": {
+        "commit": "35f800e67e9e8fbb762a909c9211fb285dc82189",
+        "worktreeDirty": true
+      },
+      "knowledge": {
+        "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+        "fileCount": 14,
+        "sha256": "d16067f3ea9ff09981aef96793c9aec7f4c993a2184ec3a60069c3f7f2feeae7"
+      },
+      "providerConfiguration": {
+        "embedding": {
+          "configured": true,
+          "dimensions": 1024,
+          "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+          "model": "text-embedding-v4",
+          "provider": "openai"
+        },
+        "llm": {
+          "configured": true,
+          "endpoint": "https://api.deepseek.com",
+          "intentStructuredOutputMode": "disabled",
+          "maxRetries": 3,
+          "model": "deepseek-v4-flash",
+          "timeoutSeconds": 60
+        },
+        "rerank": {
+          "configured": true,
+          "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+          "format": "compatible",
+          "model": "qwen3-rerank",
+          "topN": 6
+        },
+        "runtime": {
+          "elasticsearchEndpoints": [
+            "http://127.0.0.1:9200"
+          ],
+          "elasticsearchIndex": "aishop_vectorstore",
+          "javaEndpoint": "http://127.0.0.1:8081",
+          "redisDatabase": 0,
+          "redisHost": "127.0.0.1",
+          "redisPort": 6380,
+          "vectorField": "embedding"
+        }
+      },
+      "providerConfigurationSha256": "08bbf823a5057f271c49cd7d168df16fd417ee943bd499a7e734f165d1a8502f",
+      "source": {
+        "fileCount": 208,
+        "sha256": "ed308e9a8694729df310c4e7d70f9560a5717ceedf1f95778794028c463d667d"
+      }
+    },
+    "split": "final",
+    "summary": {
+      "completedAt": "2026-08-20T10:55:29.171Z",
+      "datasetSha256": "a6aa8a436c1457f78d76fb44e19d1227c6972fae2068e291318f3f8147145d75",
+      "domains": {
+        "agent": {
+          "caseCount": 8,
+          "metrics": {
+            "executionCompleteness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "executionCompleteness",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            },
+            "executionRate": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "executionRate",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            },
+            "latencyMsP50": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 224.713579,
+                "method": "percentile-bootstrap",
+                "upper": 11769.561359
+              },
+              "kind": "latency",
+              "name": "latencyMsP50",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 3278.184799
+            },
+            "latencyMsP95": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 4446.864951,
+                "method": "percentile-bootstrap",
+                "upper": 13792.376038
+              },
+              "kind": "latency",
+              "name": "latencyMsP95",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 13084.3909
+            },
+            "latencyMsP99": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 5123.703975,
+                "method": "percentile-bootstrap",
+                "upper": 13792.376038
+              },
+              "kind": "latency",
+              "name": "latencyMsP99",
+              "notes": [
+                "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+              ],
+              "sampleCount": 8,
+              "value": 13650.77901
+            },
+            "providerCompleteness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "providerCompleteness",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            },
+            "retryIdempotency": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.609666,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "retryIdempotency",
+              "notes": [],
+              "sampleCount": 6,
+              "value": 1.0
+            },
+            "runtimeErrorCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "runtimeErrorCount",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 0.0
+            },
+            "severeSafetyViolationCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "severeSafetyViolationCount",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 0.0
+            },
+            "taskSuccess": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "taskSuccess",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            },
+            "terminalStateCorrectness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "terminalStateCorrectness",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            },
+            "toolArgumentAccuracy": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "toolArgumentAccuracy",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            },
+            "toolSelectionAccuracy": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.675592,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "toolSelectionAccuracy",
+              "notes": [],
+              "sampleCount": 8,
+              "value": 1.0
+            }
+          },
+          "statusCounts": {
+            "PASSED": 8
+          }
+        },
+        "rag": {
+          "caseCount": 21,
+          "metrics": {
+            "citationSupport": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.857143,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "continuous",
+              "name": "citationSupport",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.952381
+            },
+            "executionRate": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.845361,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "executionRate",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "generationCorrectness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.710859,
+                "method": "wilson",
+                "upper": 0.973481
+              },
+              "kind": "binary",
+              "name": "generationCorrectness",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.904762
+            },
+            "groundedFaithfulness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "continuous",
+              "name": "groundedFaithfulness",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "injectionResistance": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.34238,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "injectionResistance",
+              "notes": [],
+              "sampleCount": 2,
+              "value": 1.0
+            },
+            "invalidCitationCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "invalidCitationCount",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.0
+            },
+            "latencyMsP50": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1480.361352,
+                "method": "percentile-bootstrap",
+                "upper": 2956.46427
+              },
+              "kind": "latency",
+              "name": "latencyMsP50",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 2515.201171
+            },
+            "latencyMsP95": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 3518.858388,
+                "method": "percentile-bootstrap",
+                "upper": 5540.426454
+              },
+              "kind": "latency",
+              "name": "latencyMsP95",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 4419.628742
+            },
+            "latencyMsP99": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 3651.939522,
+                "method": "percentile-bootstrap",
+                "upper": 5540.426454
+              },
+              "kind": "latency",
+              "name": "latencyMsP99",
+              "notes": [
+                "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+              ],
+              "sampleCount": 21,
+              "value": 5316.266912
+            },
+            "noAnswerAccuracy": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.845361,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "noAnswerAccuracy",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "providerCompleteness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.845361,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "providerCompleteness",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "requiredClaimCompleteness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.809524,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "continuous",
+              "name": "requiredClaimCompleteness",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.928571
+            },
+            "retrievalMrrAt10": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.921053,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "retrievalMrrAt10",
+              "notes": [],
+              "sampleCount": 19,
+              "value": 0.973684
+            },
+            "retrievalNdcgAt5": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.941726,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "retrievalNdcgAt5",
+              "notes": [],
+              "sampleCount": 19,
+              "value": 0.980575
+            },
+            "retrievalRecallAt3": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "retrievalRecallAt3",
+              "notes": [],
+              "sampleCount": 19,
+              "value": 1.0
+            },
+            "retrievalRecallAt5": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "retrievalRecallAt5",
+              "notes": [],
+              "sampleCount": 19,
+              "value": 1.0
+            },
+            "runtimeErrorCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "runtimeErrorCount",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.0
+            },
+            "severeSafetyViolationCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "severeSafetyViolationCount",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.0
+            },
+            "sourceCoverage": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "continuous",
+              "name": "sourceCoverage",
+              "notes": [],
+              "sampleCount": 19,
+              "value": 1.0
+            },
+            "sourcePrecision": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.921053,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "continuous",
+              "name": "sourcePrecision",
+              "notes": [],
+              "sampleCount": 19,
+              "value": 0.973684
+            }
+          },
+          "statusCounts": {
+            "FAILED": 2,
+            "PASSED": 19
+          }
+        },
+        "search": {
+          "caseCount": 21,
+          "metrics": {
+            "constraintViolationCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "constraintViolationCount",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.0
+            },
+            "executionRate": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.845361,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "executionRate",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "latencyMsP50": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 288.886943,
+                "method": "percentile-bootstrap",
+                "upper": 470.048456
+              },
+              "kind": "latency",
+              "name": "latencyMsP50",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 381.220749
+            },
+            "latencyMsP95": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 487.473782,
+                "method": "percentile-bootstrap",
+                "upper": 617.628437
+              },
+              "kind": "latency",
+              "name": "latencyMsP95",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 591.056916
+            },
+            "latencyMsP99": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 515.359389,
+                "method": "percentile-bootstrap",
+                "upper": 617.628437
+              },
+              "kind": "latency",
+              "name": "latencyMsP99",
+              "notes": [
+                "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+              ],
+              "sampleCount": 21,
+              "value": 612.314133
+            },
+            "mrrAt10": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.9,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "mrrAt10",
+              "notes": [],
+              "sampleCount": 20,
+              "value": 0.966667
+            },
+            "ndcgAt10": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.920583,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "ndcgAt10",
+              "notes": [],
+              "sampleCount": 20,
+              "value": 0.972792
+            },
+            "ndcgAt5": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.918375,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "ndcgAt5",
+              "notes": [],
+              "sampleCount": 20,
+              "value": 0.972792
+            },
+            "noResultAccuracy": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.845361,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "noResultAccuracy",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "providerCompleteness": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 0.845361,
+                "method": "wilson",
+                "upper": 1.0
+              },
+              "kind": "binary",
+              "name": "providerCompleteness",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 1.0
+            },
+            "recallAt10": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "recallAt10",
+              "notes": [],
+              "sampleCount": 20,
+              "value": 1.0
+            },
+            "recallAt3": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "recallAt3",
+              "notes": [],
+              "sampleCount": 20,
+              "value": 1.0
+            },
+            "recallAt5": {
+              "interval": {
+                "confidenceLevel": 0.95,
+                "lower": 1.0,
+                "method": "percentile-bootstrap",
+                "upper": 1.0
+              },
+              "kind": "ranking",
+              "name": "recallAt5",
+              "notes": [],
+              "sampleCount": 20,
+              "value": 1.0
+            },
+            "runtimeErrorCount": {
+              "interval": null,
+              "kind": "count",
+              "name": "runtimeErrorCount",
+              "notes": [],
+              "sampleCount": 21,
+              "value": 0.0
+            }
+          },
+          "statusCounts": {
+            "PASSED": 21
+          }
+        }
+      },
+      "executionMode": "LOCAL_FULL_STACK",
+      "runId": "final-20260820-ai-quality-v2",
+      "schemaVersion": "aishop-evaluation-summary/v2",
+      "split": "final"
+    }
+  },
+  "schemaVersion": "aishop-evaluation-evidence/v2"
+}

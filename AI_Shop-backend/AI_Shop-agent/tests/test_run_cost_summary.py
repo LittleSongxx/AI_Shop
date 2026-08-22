@@ -140,6 +140,24 @@ def test_task_isolation_between_parallel_requests():
     assert results == {"alice": 2, "bob": 3}
 
 
+def test_child_graph_task_updates_parent_request_accumulator():
+    """Graph child tasks inherit the seeded mutable request accumulator."""
+
+    async def request_flow():
+        reset_run_cost()
+
+        async def graph_node():
+            record_llm_usage(_priced_response(input_tokens=40, output_tokens=7))
+
+        await asyncio.create_task(graph_node())
+        return snapshot_cost_summary()
+
+    summary = asyncio.run(request_flow())
+    assert summary["llmCalls"] == 1
+    assert summary["inputTokens"] == 40
+    assert summary["outputTokens"] == 7
+
+
 def test_scheduled_task_reset_isolates_from_triggering_request():
     """压缩/condense 异步任务开头 reset 后，其调用不计入触发它的请求。"""
     async def request_flow():

@@ -93,6 +93,9 @@ class _DuplicateCursor:
     async def fetchone(self):
         return self.row
 
+    async def fetchall(self):
+        return [self.row] if self.row else []
+
 
 def _acquire_for(cursor):
     @asynccontextmanager
@@ -100,6 +103,60 @@ def _acquire_for(cursor):
         yield cursor
 
     return _acquire
+
+
+@pytest.mark.asyncio
+async def test_owned_run_lookup_is_exact_active_and_unique():
+    now = datetime.now()
+    row = {
+        "action_token": "act_" + "a" * 32,
+        "user_id": "u1",
+        "action_type": "CANCEL_ORDER",
+        "run_id": "run-1",
+        "params_json": '{"orderId":"o1"}',
+        "status": "PENDING",
+        "expires_at": now + timedelta(minutes=10),
+        "created_at": now,
+    }
+    cursor = _DuplicateCursor(row)
+
+    with patch("app.services.pending_action_store.acquire", _acquire_for(cursor)):
+        pending = await PendingActionStore().get_unique_pending_for_run(
+            user_id="u1",
+            run_id="run-1",
+            action_type="cancel_order",
+        )
+
+    assert pending is not None
+    assert pending["token"] == row["action_token"]
+    statement = cursor.statements[-1]
+    assert "user_id=%s AND run_id=%s AND action_type=%s" in statement
+    assert "status=%s AND expires_at > NOW()" in statement
+
+
+@pytest.mark.asyncio
+async def test_owned_run_lookup_rejects_multiple_active_proposals():
+    now = datetime.now()
+    row = {
+        "action_token": "act_" + "a" * 32,
+        "user_id": "u1",
+        "action_type": "CANCEL_ORDER",
+        "run_id": "run-1",
+        "params_json": "{}",
+        "status": "PENDING",
+        "expires_at": now + timedelta(minutes=10),
+        "created_at": now,
+    }
+    cursor = _DuplicateCursor(row)
+    cursor.fetchall = AsyncMock(return_value=[row, {**row, "action_token": "act_" + "b" * 32}])
+
+    with patch("app.services.pending_action_store.acquire", _acquire_for(cursor)):
+        with pytest.raises(RuntimeError, match="multiple active"):
+            await PendingActionStore().get_unique_pending_for_run(
+                user_id="u1",
+                run_id="run-1",
+                action_type="CANCEL_ORDER",
+            )
 
 
 @pytest.mark.asyncio

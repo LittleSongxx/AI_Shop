@@ -33,6 +33,12 @@ AGENT_QUEUE_FAST = "agent.faq.fast"
 AGENT_QUEUE_LOW = "agent.shopping.low"
 AGENT_QUEUE_DEAD = "agent.tasks.dead"
 
+COMMERCE_OUTCOME_EXCHANGE = "commerce.outcome.exchange"
+COMMERCE_OUTCOME_QUEUE = "commerce.outcome.queue"
+COMMERCE_OUTCOME_DEAD_QUEUE = "commerce.outcome.dead.queue"
+COMMERCE_OUTCOME_KEY = "commerce.outcome"
+COMMERCE_OUTCOME_DEAD_KEY = "commerce.outcome.dead"
+
 SUPPORT_STATUS_QUEUED = "QUEUED"
 SUPPORT_STATUS_ASSIGNED = "ASSIGNED"
 SUPPORT_STATUS_ACTIVE = "ACTIVE"

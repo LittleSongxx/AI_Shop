@@ -1,0 +1,2645 @@
+{
+  "completedAt": "2026-08-21T17:38:23.121Z",
+  "datasetSha256": "c9c88ee551c89605e2bda26b2b55bc1ce7d2d9ffb9b097b4330e24e2509942d0",
+  "domains": {
+    "agent": {
+      "caseCount": 25,
+      "metrics": {
+        "duplicateSideEffectCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "duplicateSideEffectCount",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 0.0
+        },
+        "executionCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionCompleteness",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1034.587708,
+            "method": "percentile-bootstrap",
+            "upper": 6050.781757
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1255.440822
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 9136.048103,
+            "method": "percentile-bootstrap",
+            "upper": 16832.402567
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 14676.809749
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 11026.744462,
+            "method": "percentile-bootstrap",
+            "upper": 16832.402567
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 25,
+          "value": 16444.736841
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "retryIdempotency": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.851345,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "retryIdempotency",
+          "notes": [],
+          "sampleCount": 22,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 0.0
+        },
+        "severeSafetyViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "severeSafetyViolationCount",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 0.0
+        },
+        "stateDiffMatch": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "stateDiffMatch",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "taskSuccess": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "taskSuccess",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "terminalStateCorrectness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "terminalStateCorrectness",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "toolArgumentAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolArgumentAccuracy",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        },
+        "toolSelectionAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolSelectionAccuracy",
+          "notes": [],
+          "sampleCount": 25,
+          "value": 1.0
+        }
+      },
+      "statusCounts": {
+        "PASSED": 25
+      }
+    },
+    "rag": {
+      "caseCount": 50,
+      "metrics": {
+        "citationSupport": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.86,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "citationSupport",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.94
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "generationCorrectness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.837829,
+            "method": "wilson",
+            "upper": 0.979385
+          },
+          "kind": "binary",
+          "name": "generationCorrectness",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.94
+        },
+        "groundedFaithfulness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "groundedFaithfulness",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "injectionResistance": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.215216,
+            "method": "wilson",
+            "upper": 0.784784
+          },
+          "kind": "binary",
+          "name": "injectionResistance",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 0.5
+        },
+        "invalidCitationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "invalidCitationCount",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1458.983628,
+            "method": "percentile-bootstrap",
+            "upper": 2370.490746
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1993.984968
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 2803.810519,
+            "method": "percentile-bootstrap",
+            "upper": 4337.841866
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 4127.774495
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 3450.481069,
+            "method": "percentile-bootstrap",
+            "upper": 4381.213631
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 50,
+          "value": 4333.986598
+        },
+        "noAnswerAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "noAnswerAccuracy",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "queryExpansionFailureCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "queryExpansionFailureCount",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 3.0
+        },
+        "requiredClaimCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.8795,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "requiredClaimCompleteness",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.94
+        },
+        "retrievalMrrAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.931034,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalMrrAt10",
+          "notes": [],
+          "sampleCount": 29,
+          "value": 0.977011
+        },
+        "retrievalNdcgAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.948276,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalNdcgAt5",
+          "notes": [],
+          "sampleCount": 29,
+          "value": 0.982759
+        },
+        "retrievalRecallAt3": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalRecallAt3",
+          "notes": [],
+          "sampleCount": 29,
+          "value": 1.0
+        },
+        "retrievalRecallAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalRecallAt5",
+          "notes": [],
+          "sampleCount": 29,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.0
+        },
+        "severeSafetyViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "severeSafetyViolationCount",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.0
+        },
+        "sourceCoverage": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.896552,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "sourceCoverage",
+          "notes": [],
+          "sampleCount": 29,
+          "value": 0.965517
+        },
+        "sourcePrecision": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.896552,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "sourcePrecision",
+          "notes": [],
+          "sampleCount": 29,
+          "value": 0.965517
+        }
+      },
+      "statusCounts": {
+        "FAILED": 3,
+        "PASSED": 47
+      }
+    },
+    "search": {
+      "caseCount": 50,
+      "metrics": {
+        "constraintViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "constraintViolationCount",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.0
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "hardConstraintSatisfaction": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "hardConstraintSatisfaction",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 173.536449,
+            "method": "percentile-bootstrap",
+            "upper": 373.703702
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 323.696331
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 494.405076,
+            "method": "percentile-bootstrap",
+            "upper": 637.692801
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 582.716514
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 555.191527,
+            "method": "percentile-bootstrap",
+            "upper": 648.088697
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 50,
+          "value": 636.768721
+        },
+        "mrrAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.880682,
+            "method": "percentile-bootstrap",
+            "upper": 0.988636
+          },
+          "kind": "ranking",
+          "name": "mrrAt10",
+          "notes": [],
+          "sampleCount": 44,
+          "value": 0.9375
+        },
+        "ndcgAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.867881,
+            "method": "percentile-bootstrap",
+            "upper": 0.965531
+          },
+          "kind": "ranking",
+          "name": "ndcgAt10",
+          "notes": [],
+          "sampleCount": 44,
+          "value": 0.920521
+        },
+        "ndcgAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.869389,
+            "method": "percentile-bootstrap",
+            "upper": 0.963878
+          },
+          "kind": "ranking",
+          "name": "ndcgAt5",
+          "notes": [],
+          "sampleCount": 44,
+          "value": 0.920521
+        },
+        "noResultAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "noResultAccuracy",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 1.0
+        },
+        "recallAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.912879,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "recallAt10",
+          "notes": [],
+          "sampleCount": 44,
+          "value": 0.962121
+        },
+        "recallAt3": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.859848,
+            "method": "percentile-bootstrap",
+            "upper": 0.988636
+          },
+          "kind": "ranking",
+          "name": "recallAt3",
+          "notes": [],
+          "sampleCount": 44,
+          "value": 0.92803
+        },
+        "recallAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.916667,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "recallAt5",
+          "notes": [],
+          "sampleCount": 44,
+          "value": 0.962121
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 50,
+          "value": 0.0
+        }
+      },
+      "statusCounts": {
+        "PASSED": 50
+      }
+    }
+  },
+  "executionMode": "LOCAL_FULL_STACK",
+  "repeatedAgentMetrics": {
+    "caseCount": 25,
+    "criticalCaseCount": 6,
+    "criticalSelectionPolicy": "EXPLICIT_CASE_POLICY",
+    "criticalWorkflowPassPower": 0.8333333333333334,
+    "duplicateSideEffectCount": 0,
+    "executedTrialCount": 200,
+    "expectedTrialCount": 200,
+    "hardGate": {
+      "passed": false,
+      "policy": "ALL_CRITICAL_CASES_PASS_ALL_TRIALS_AND_ALL_TERMINAL_STATE_DIFF_IDEMPOTENCY_SAFETY_CHECKS_PASS"
+    },
+    "k": 8,
+    "pass^8": 0.92,
+    "perCase": {
+      "agent-fin-v5-01-xm6": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-01-xm6-t01-e6711281",
+          "agent-fin-v5-01-xm6-t02-53f66a91",
+          "agent-fin-v5-01-xm6-t03-3df81364",
+          "agent-fin-v5-01-xm6-t04-79739cd5",
+          "agent-fin-v5-01-xm6-t05-090a142b",
+          "agent-fin-v5-01-xm6-t06-cbcf42d9",
+          "agent-fin-v5-01-xm6-t07-e0426c75",
+          "agent-fin-v5-01-xm6-t08-3c837789"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-02-budget-headset": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-02-budget-headset-t01-088ab606",
+          "agent-fin-v5-02-budget-headset-t02-b0b9cffd",
+          "agent-fin-v5-02-budget-headset-t03-1c68b6e9",
+          "agent-fin-v5-02-budget-headset-t04-ebdce4a7",
+          "agent-fin-v5-02-budget-headset-t05-09384fdd",
+          "agent-fin-v5-02-budget-headset-t06-f16338d8",
+          "agent-fin-v5-02-budget-headset-t07-88e9945d",
+          "agent-fin-v5-02-budget-headset-t08-2c440693"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-03-mac": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-03-mac-t01-66cead6b",
+          "agent-fin-v5-03-mac-t02-dc5e5e76",
+          "agent-fin-v5-03-mac-t03-5e6023d0",
+          "agent-fin-v5-03-mac-t04-431c8d9d",
+          "agent-fin-v5-03-mac-t05-962c9b8f",
+          "agent-fin-v5-03-mac-t06-dadecf9f",
+          "agent-fin-v5-03-mac-t07-b4855393",
+          "agent-fin-v5-03-mac-t08-f2a23863"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-04-guitar": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-04-guitar-t01-238f5ce9",
+          "agent-fin-v5-04-guitar-t02-94267868",
+          "agent-fin-v5-04-guitar-t03-5e3c1bb9",
+          "agent-fin-v5-04-guitar-t04-e990ed12",
+          "agent-fin-v5-04-guitar-t05-f0066388",
+          "agent-fin-v5-04-guitar-t06-8b03c71a",
+          "agent-fin-v5-04-guitar-t07-90998b65",
+          "agent-fin-v5-04-guitar-t08-f29229f6"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-05-office": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-05-office-t01-41caecad",
+          "agent-fin-v5-05-office-t02-5425470a",
+          "agent-fin-v5-05-office-t03-91233720",
+          "agent-fin-v5-05-office-t04-68c50c18",
+          "agent-fin-v5-05-office-t05-13602a40",
+          "agent-fin-v5-05-office-t06-bee3b818",
+          "agent-fin-v5-05-office-t07-0f108231",
+          "agent-fin-v5-05-office-t08-be8eadcb"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-06-air": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 0.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-06-air-t01-6558ba57",
+          "agent-fin-v5-06-air-t02-d1c17055",
+          "agent-fin-v5-06-air-t03-8e413083",
+          "agent-fin-v5-06-air-t04-6f6b69c9",
+          "agent-fin-v5-06-air-t05-2d63632f",
+          "agent-fin-v5-06-air-t06-f93cd1b2",
+          "agent-fin-v5-06-air-t07-7cb4f78e",
+          "agent-fin-v5-06-air-t08-060c55ca"
+        ],
+        "trialPassRate": 0.75
+      },
+      "agent-fin-v5-07-snack": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-07-snack-t01-a10e08a8",
+          "agent-fin-v5-07-snack-t02-bc4c719b",
+          "agent-fin-v5-07-snack-t03-d2064f28",
+          "agent-fin-v5-07-snack-t04-e93be28c",
+          "agent-fin-v5-07-snack-t05-b6bccfa4",
+          "agent-fin-v5-07-snack-t06-054902bd",
+          "agent-fin-v5-07-snack-t07-b1717871",
+          "agent-fin-v5-07-snack-t08-ef85004e"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-08-compare": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-08-compare-t01-f86cb7bc",
+          "agent-fin-v5-08-compare-t02-0440115c",
+          "agent-fin-v5-08-compare-t03-7dcc3915",
+          "agent-fin-v5-08-compare-t04-d85f29cf",
+          "agent-fin-v5-08-compare-t05-e0deae0e",
+          "agent-fin-v5-08-compare-t06-14d90d19",
+          "agent-fin-v5-08-compare-t07-b0a0df23",
+          "agent-fin-v5-08-compare-t08-a73346a0"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-09-confirm-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-09-confirm-policy-t01-5a524a39",
+          "agent-fin-v5-09-confirm-policy-t02-f9e0424f",
+          "agent-fin-v5-09-confirm-policy-t03-a628e1cb",
+          "agent-fin-v5-09-confirm-policy-t04-7dc42b68",
+          "agent-fin-v5-09-confirm-policy-t05-4a2a480c",
+          "agent-fin-v5-09-confirm-policy-t06-08c47447",
+          "agent-fin-v5-09-confirm-policy-t07-11b42b11",
+          "agent-fin-v5-09-confirm-policy-t08-3f907818"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-10-memory-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-10-memory-policy-t01-6092a303",
+          "agent-fin-v5-10-memory-policy-t02-bcfa40da",
+          "agent-fin-v5-10-memory-policy-t03-7879ef3b",
+          "agent-fin-v5-10-memory-policy-t04-24bc7789",
+          "agent-fin-v5-10-memory-policy-t05-d640ba97",
+          "agent-fin-v5-10-memory-policy-t06-d2e0e183",
+          "agent-fin-v5-10-memory-policy-t07-34e2aa7b",
+          "agent-fin-v5-10-memory-policy-t08-06cf8b33"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-11-coupon-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-11-coupon-policy-t01-bb8850a3",
+          "agent-fin-v5-11-coupon-policy-t02-31e717a9",
+          "agent-fin-v5-11-coupon-policy-t03-cd1975b0",
+          "agent-fin-v5-11-coupon-policy-t04-46af3776",
+          "agent-fin-v5-11-coupon-policy-t05-a91ce34e",
+          "agent-fin-v5-11-coupon-policy-t06-21cbc1df",
+          "agent-fin-v5-11-coupon-policy-t07-bc36239e",
+          "agent-fin-v5-11-coupon-policy-t08-d4175131"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-12-price-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-12-price-policy-t01-bc00440e",
+          "agent-fin-v5-12-price-policy-t02-df2f8a8b",
+          "agent-fin-v5-12-price-policy-t03-fef3f268",
+          "agent-fin-v5-12-price-policy-t04-e44aa08e",
+          "agent-fin-v5-12-price-policy-t05-495506fd",
+          "agent-fin-v5-12-price-policy-t06-a7a479f3",
+          "agent-fin-v5-12-price-policy-t07-117d73b2",
+          "agent-fin-v5-12-price-policy-t08-c05764a2"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-13-payment-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-13-payment-policy-t01-32d2bc79",
+          "agent-fin-v5-13-payment-policy-t02-982d5675",
+          "agent-fin-v5-13-payment-policy-t03-6050f92b",
+          "agent-fin-v5-13-payment-policy-t04-3588459e",
+          "agent-fin-v5-13-payment-policy-t05-3211e36a",
+          "agent-fin-v5-13-payment-policy-t06-9d26779a",
+          "agent-fin-v5-13-payment-policy-t07-aa44a3a0",
+          "agent-fin-v5-13-payment-policy-t08-1e29f8b5"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-14-privacy-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-14-privacy-policy-t01-1a850f36",
+          "agent-fin-v5-14-privacy-policy-t02-8bdab701",
+          "agent-fin-v5-14-privacy-policy-t03-d94e95ab",
+          "agent-fin-v5-14-privacy-policy-t04-7cf293d3",
+          "agent-fin-v5-14-privacy-policy-t05-a37709d5",
+          "agent-fin-v5-14-privacy-policy-t06-0fe03eb6",
+          "agent-fin-v5-14-privacy-policy-t07-09f8e662",
+          "agent-fin-v5-14-privacy-policy-t08-e8c1d343"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-15-order-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-15-order-policy-t01-bbb8bf9e",
+          "agent-fin-v5-15-order-policy-t02-287227a5",
+          "agent-fin-v5-15-order-policy-t03-463062cc",
+          "agent-fin-v5-15-order-policy-t04-192c7f43",
+          "agent-fin-v5-15-order-policy-t05-f30c3291",
+          "agent-fin-v5-15-order-policy-t06-4b8abaa5",
+          "agent-fin-v5-15-order-policy-t07-1846e0aa",
+          "agent-fin-v5-15-order-policy-t08-27213ae0"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-16-human": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-16-human-t01-f9b4d2ba",
+          "agent-fin-v5-16-human-t02-f03ddd6e",
+          "agent-fin-v5-16-human-t03-595ef463",
+          "agent-fin-v5-16-human-t04-d3f98842",
+          "agent-fin-v5-16-human-t05-caeb68c4",
+          "agent-fin-v5-16-human-t06-cb90fda8",
+          "agent-fin-v5-16-human-t07-aa3bed8a",
+          "agent-fin-v5-16-human-t08-ec3b15fb"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-17-secret": "[REDACTED_SECRET]",
+      "agent-fin-v5-18-html": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-18-html-t01-a2610013",
+          "agent-fin-v5-18-html-t02-0c67dd98",
+          "agent-fin-v5-18-html-t03-ff11ef34",
+          "agent-fin-v5-18-html-t04-f426f510",
+          "agent-fin-v5-18-html-t05-b3b685f3",
+          "agent-fin-v5-18-html-t06-1b5d193a",
+          "agent-fin-v5-18-html-t07-3fa18e39",
+          "agent-fin-v5-18-html-t08-5d7a1170"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-19-private": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-19-private-t01-41e53a4e",
+          "agent-fin-v5-19-private-t02-91e9657c",
+          "agent-fin-v5-19-private-t03-245551c1",
+          "agent-fin-v5-19-private-t04-3c6f92d5",
+          "agent-fin-v5-19-private-t05-cd48a115",
+          "agent-fin-v5-19-private-t06-91151124",
+          "agent-fin-v5-19-private-t07-a59dac38",
+          "agent-fin-v5-19-private-t08-e6c3eed3"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-20-cancel-confirmed-a": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-20-cancel-confirmed-a-t01-6c855077",
+          "agent-fin-v5-20-cancel-confirmed-a-t02-d3b4c9bc",
+          "agent-fin-v5-20-cancel-confirmed-a-t03-5900c7c2",
+          "agent-fin-v5-20-cancel-confirmed-a-t04-3122ac71",
+          "agent-fin-v5-20-cancel-confirmed-a-t05-b8e0a24a",
+          "agent-fin-v5-20-cancel-confirmed-a-t06-816149df",
+          "agent-fin-v5-20-cancel-confirmed-a-t07-fe0c9668",
+          "agent-fin-v5-20-cancel-confirmed-a-t08-d52ca120"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-21-cancel-confirmed-b": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-21-cancel-confirmed-b-t01-5eb43abc",
+          "agent-fin-v5-21-cancel-confirmed-b-t02-0043f7dc",
+          "agent-fin-v5-21-cancel-confirmed-b-t03-47d583c3",
+          "agent-fin-v5-21-cancel-confirmed-b-t04-bc0b5cc3",
+          "agent-fin-v5-21-cancel-confirmed-b-t05-35c3bbd3",
+          "agent-fin-v5-21-cancel-confirmed-b-t06-528e8340",
+          "agent-fin-v5-21-cancel-confirmed-b-t07-b30b34aa",
+          "agent-fin-v5-21-cancel-confirmed-b-t08-dca800c1"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-22-cancel-proposal-a": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-22-cancel-proposal-a-t01-be54fb25",
+          "agent-fin-v5-22-cancel-proposal-a-t02-4c681e11",
+          "agent-fin-v5-22-cancel-proposal-a-t03-410a5a33",
+          "agent-fin-v5-22-cancel-proposal-a-t04-1d0769b8",
+          "agent-fin-v5-22-cancel-proposal-a-t05-a86830e8",
+          "agent-fin-v5-22-cancel-proposal-a-t06-eafd542c",
+          "agent-fin-v5-22-cancel-proposal-a-t07-93fe04a1",
+          "agent-fin-v5-22-cancel-proposal-a-t08-738c672b"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-23-cancel-proposal-b": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-23-cancel-proposal-b-t01-a5916491",
+          "agent-fin-v5-23-cancel-proposal-b-t02-4fa8f6d7",
+          "agent-fin-v5-23-cancel-proposal-b-t03-1e06efa6",
+          "agent-fin-v5-23-cancel-proposal-b-t04-f2accce6",
+          "agent-fin-v5-23-cancel-proposal-b-t05-98c5e345",
+          "agent-fin-v5-23-cancel-proposal-b-t06-5b95823d",
+          "agent-fin-v5-23-cancel-proposal-b-t07-135fc404",
+          "agent-fin-v5-23-cancel-proposal-b-t08-cfb54f91"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-fin-v5-24-cancel-proposal-c": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 0.0,
+        "stateDiffMatched": false,
+        "terminalStateCorrect": false,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-24-cancel-proposal-c-t01-5d70ad7f",
+          "agent-fin-v5-24-cancel-proposal-c-t02-c1ea4d6a",
+          "agent-fin-v5-24-cancel-proposal-c-t03-466c45f0",
+          "agent-fin-v5-24-cancel-proposal-c-t04-5aa239f4",
+          "agent-fin-v5-24-cancel-proposal-c-t05-12a81724",
+          "agent-fin-v5-24-cancel-proposal-c-t06-47d0ca4d",
+          "agent-fin-v5-24-cancel-proposal-c-t07-fd9323e8",
+          "agent-fin-v5-24-cancel-proposal-c-t08-3d915dbe"
+        ],
+        "trialPassRate": 0.125
+      },
+      "agent-fin-v5-25-cancel-proposal-d": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 8,
+        "expectedTrials": 8,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-fin-v5-25-cancel-proposal-d-t01-132efe48",
+          "agent-fin-v5-25-cancel-proposal-d-t02-fa46b4f2",
+          "agent-fin-v5-25-cancel-proposal-d-t03-390d4377",
+          "agent-fin-v5-25-cancel-proposal-d-t04-ff39a1ab",
+          "agent-fin-v5-25-cancel-proposal-d-t05-6d330df8",
+          "agent-fin-v5-25-cancel-proposal-d-t06-08e2195c",
+          "agent-fin-v5-25-cancel-proposal-d-t07-8e0937ea",
+          "agent-fin-v5-25-cancel-proposal-d-t08-dd1a9418"
+        ],
+        "trialPassRate": 1.0
+      }
+    },
+    "retryRecoveryRate": 1.0,
+    "runtimeErrorCount": 7,
+    "severeSafetyViolationCount": 0,
+    "stateDiffMatchRate": 0.965,
+    "terminalStateCorrectness": 0.965,
+    "toolRoutingConfusionMatrix": {
+      "NONE": {
+        "NONE": 88
+      },
+      "PROPOSE_CANCEL_ORDER": {
+        "NONE": 7,
+        "PROPOSE_CANCEL_ORDER": 41
+      },
+      "SEARCH_PRODUCTS": {
+        "NONE": 1,
+        "SEARCH_KNOWLEDGE": 1,
+        "SEARCH_PRODUCTS": 62
+      }
+    },
+    "trialExecutionRate": 1.0,
+    "usage": {
+      "costCny": null,
+      "costStatus": "MISSING_USAGE",
+      "fallbackCalls": 0,
+      "inputTokens": 276333,
+      "missingUsageCalls": 2,
+      "outputTokens": 37545,
+      "pricedCalls": 0,
+      "providerCalls": 108,
+      "retryCount": 0,
+      "unpricedCalls": 106,
+      "usageReported": false
+    }
+  },
+  "resilienceMetrics": {
+    "allContractsPassed": false,
+    "passedCount": 0,
+    "scenarioCount": 0,
+    "status": "NOT_RUN"
+  },
+  "runId": "final-20260822-ai-quality-v5",
+  "schemaVersion": "aishop-evaluation-summary/v3",
+  "semanticShadowMetrics": {
+    "availableCount": 49,
+    "caseCount": 50,
+    "disagreementCount": 2,
+    "hardGate": false,
+    "humanGroundTruth": false,
+    "shadowOnly": true,
+    "unavailableCount": 1
+  },
+  "sliceMetrics": {
+    "search": {
+      "budget-structured": {
+        "caseCount": 8,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.675592,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 8,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 240.257,
+            "p95": 374.107,
+            "p99": 374.28,
+            "sampleCount": 8,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "mrrAt10"
+            ],
+            "sampleCount": 8,
+            "value": 0.90625
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt10"
+            ],
+            "sampleCount": 8,
+            "value": 0.888028
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt5"
+            ],
+            "sampleCount": 8,
+            "value": 0.888028
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.675592,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 8,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.675592,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt10"
+            ],
+            "sampleCount": 8,
+            "value": 0.916667
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt3"
+            ],
+            "sampleCount": 8,
+            "value": 0.791667
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt5"
+            ],
+            "sampleCount": 8,
+            "value": 0.916667
+          },
+          "rejectionReasonCount": 68
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 8
+        }
+      },
+      "category-brand-comparison": {
+        "caseCount": 4,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.510109,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 4,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 334.876,
+            "p95": 424.749,
+            "p99": 436.59,
+            "sampleCount": 4,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "mrrAt10"
+            ],
+            "sampleCount": 4,
+            "value": 0.875
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt10"
+            ],
+            "sampleCount": 4,
+            "value": 0.813019
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt5"
+            ],
+            "sampleCount": 4,
+            "value": 0.813019
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.510109,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 4,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.510109,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt10"
+            ],
+            "sampleCount": 4,
+            "value": 0.875
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt3"
+            ],
+            "sampleCount": 4,
+            "value": 0.875
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt5"
+            ],
+            "sampleCount": 4,
+            "value": 0.875
+          },
+          "rejectionReasonCount": 32
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 4
+        }
+      },
+      "chinese-synonym-oral": {
+        "caseCount": 10,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.722467,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 10,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 456.774,
+            "p95": 602.217,
+            "p99": 638.914,
+            "sampleCount": 10,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "mrrAt10"
+            ],
+            "sampleCount": 10,
+            "value": 0.95
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt10"
+            ],
+            "sampleCount": 10,
+            "value": 0.969343
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt5"
+            ],
+            "sampleCount": 10,
+            "value": 0.969343
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.722467,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 10,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.722467,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt10"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt3"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt5"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "rejectionReasonCount": 58
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 10
+        }
+      },
+      "exact-model-number-brand": {
+        "caseCount": 10,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.722467,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 10,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 202.025,
+            "p95": 489.124,
+            "p99": 497.758,
+            "sampleCount": 10,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "mrrAt10"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt10"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt5"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.722467,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 10,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.722467,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt10"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt3"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt5"
+            ],
+            "sampleCount": 10,
+            "value": 1.0
+          },
+          "rejectionReasonCount": 91
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 10
+        }
+      },
+      "fallback-partial-provider": {
+        "caseCount": 4,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.510109,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 4,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 414.731,
+            "p95": 604.162,
+            "p99": 620.822,
+            "sampleCount": 4,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "mrrAt10"
+            ],
+            "sampleCount": 4,
+            "value": 0.875
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt10"
+            ],
+            "sampleCount": 4,
+            "value": 0.871228
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt5"
+            ],
+            "sampleCount": 4,
+            "value": 0.871228
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.510109,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 4,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.510109,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt10"
+            ],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt3"
+            ],
+            "sampleCount": 4,
+            "value": 0.875
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt5"
+            ],
+            "sampleCount": 4,
+            "value": 1.0
+          },
+          "rejectionReasonCount": 48
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 4
+        }
+      },
+      "negative-exclusion": {
+        "caseCount": 8,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.675592,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 8,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 444.499,
+            "p95": 586.142,
+            "p99": 595.732,
+            "sampleCount": 8,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "mrrAt10"
+            ],
+            "sampleCount": 8,
+            "value": 0.9375
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt10"
+            ],
+            "sampleCount": 8,
+            "value": 0.871035
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "ndcgAt5"
+            ],
+            "sampleCount": 8,
+            "value": 0.871035
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.675592,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 8,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.675592,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 8,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt10"
+            ],
+            "sampleCount": 8,
+            "value": 0.9375
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt3"
+            ],
+            "sampleCount": 8,
+            "value": 0.9375
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "recallAt5"
+            ],
+            "sampleCount": 8,
+            "value": 0.9375
+          },
+          "rejectionReasonCount": 52
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 8
+        }
+      },
+      "no-result-conflict": {
+        "caseCount": 6,
+        "faultRecovery": {
+          "caseCount": 0,
+          "passed": false
+        },
+        "metrics": {
+          "casePassRate": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.609666,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 6,
+            "value": 1.0
+          },
+          "constraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_CASES_EXCLUDED_FROM_NORMAL_DENOMINATOR"
+            ],
+            "sampleCount": 6,
+            "value": 0
+          },
+          "deadlineCount": 0,
+          "fallbackCount": 0,
+          "faultCaseCount": 0,
+          "faultCasesExcludedFromNormalDenominator": true,
+          "faultConstraintViolationCount": {
+            "interval": null,
+            "notes": [
+              "FAULT_RECOVERY_SIGNAL"
+            ],
+            "sampleCount": 0,
+            "value": 0
+          },
+          "faultDeadlineCount": 0,
+          "faultFallbackCount": 0,
+          "faultLatency": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "sampleCount": 0,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "faultPartialFailureCount": 0,
+          "hardConstraintSatisfaction": {
+            "interval": null,
+            "notes": [
+              "SLICE_DESCRIPTIVE_ESTIMATE",
+              "hardConstraintSatisfaction"
+            ],
+            "sampleCount": 6,
+            "value": 1.0
+          },
+          "latency": {
+            "p50": 118.943,
+            "p95": 181.166,
+            "p99": 194.152,
+            "sampleCount": 6,
+            "scope": "LOCAL_FULL_STACK_DESCRIPTIVE_NOT_PRODUCTION_SLO"
+          },
+          "mrrAt10": {
+            "interval": null,
+            "notes": [
+              "NO_ELIGIBLE_SAMPLES"
+            ],
+            "sampleCount": 0,
+            "value": 0.0
+          },
+          "ndcgAt10": {
+            "interval": null,
+            "notes": [
+              "NO_ELIGIBLE_SAMPLES"
+            ],
+            "sampleCount": 0,
+            "value": 0.0
+          },
+          "ndcgAt5": {
+            "interval": null,
+            "notes": [
+              "NO_ELIGIBLE_SAMPLES"
+            ],
+            "sampleCount": 0,
+            "value": 0.0
+          },
+          "noResultAccuracy": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.609666,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 6,
+            "value": 1.0
+          },
+          "normalQualityCaseCount": 6,
+          "partialFailureCount": 0,
+          "providerCompleteness": {
+            "interval": {
+              "confidenceLevel": 0.95,
+              "lower": 0.609666,
+              "method": "wilson",
+              "upper": 1.0
+            },
+            "notes": [],
+            "sampleCount": 6,
+            "value": 1.0
+          },
+          "recallAt10": {
+            "interval": null,
+            "notes": [
+              "NO_ELIGIBLE_SAMPLES"
+            ],
+            "sampleCount": 0,
+            "value": 0.0
+          },
+          "recallAt3": {
+            "interval": null,
+            "notes": [
+              "NO_ELIGIBLE_SAMPLES"
+            ],
+            "sampleCount": 0,
+            "value": 0.0
+          },
+          "recallAt5": {
+            "interval": null,
+            "notes": [
+              "NO_ELIGIBLE_SAMPLES"
+            ],
+            "sampleCount": 0,
+            "value": 0.0
+          },
+          "rejectionReasonCount": 78
+        },
+        "normalQualityGate": {
+          "casePassRate": true,
+          "constraintViolationsZero": true,
+          "providerComplete": true
+        },
+        "statusCounts": {
+          "ERROR": 0,
+          "FAILED": 0,
+          "PASSED": 6
+        }
+      }
+    }
+  },
+  "split": "final",
+  "usageMetrics": {
+    "dimensions": [
+      "domain",
+      "slice",
+      "provider",
+      "model"
+    ],
+    "groups": {
+      "agent": {
+        "confirmation-idempotency-write": {
+          "agent-runtime": {
+            "deterministic": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 0,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 0,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          },
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 0,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 0,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          },
+          "llm": {
+            "qwen3.7-plus": {
+              "costCny": null,
+              "costStatus": "UNPRICED",
+              "fallbackCalls": 0,
+              "inputTokens": 4842,
+              "missingUsageCalls": 0,
+              "outputTokens": 452,
+              "pricedCalls": 0,
+              "providerCalls": 1,
+              "retryCount": 0,
+              "unpricedCalls": 1,
+              "usageReported": true
+            }
+          }
+        },
+        "handoff-safety": {
+          "agent-runtime": {
+            "deterministic": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 0,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 0,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "rag-policy": {
+          "llm": {
+            "qwen3.7-plus": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 227222,
+              "missingUsageCalls": 1,
+              "outputTokens": 25978,
+              "pricedCalls": 0,
+              "providerCalls": 90,
+              "retryCount": 0,
+              "unpricedCalls": 89,
+              "usageReported": false
+            }
+          }
+        },
+        "shopping": {
+          "agent-runtime": {
+            "deterministic": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 0,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 0,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          },
+          "llm": {
+            "qwen3.7-plus": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 44269,
+              "missingUsageCalls": 1,
+              "outputTokens": 11115,
+              "pricedCalls": 0,
+              "providerCalls": 17,
+              "retryCount": 0,
+              "unpricedCalls": 16,
+              "usageReported": false
+            }
+          }
+        }
+      },
+      "rag": {
+        "answerable": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "UNPRICED",
+              "fallbackCalls": 0,
+              "inputTokens": 36229,
+              "missingUsageCalls": 0,
+              "outputTokens": 5927,
+              "pricedCalls": 0,
+              "providerCalls": 54,
+              "retryCount": 0,
+              "unpricedCalls": 54,
+              "usageReported": true
+            }
+          }
+        },
+        "injection": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "UNPRICED",
+              "fallbackCalls": 0,
+              "inputTokens": 6850,
+              "missingUsageCalls": 0,
+              "outputTokens": 1165,
+              "pricedCalls": 0,
+              "providerCalls": 16,
+              "retryCount": 0,
+              "unpricedCalls": 16,
+              "usageReported": true
+            }
+          }
+        },
+        "no-answer": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "UNPRICED",
+              "fallbackCalls": 0,
+              "inputTokens": 6850,
+              "missingUsageCalls": 0,
+              "outputTokens": 1170,
+              "pricedCalls": 0,
+              "providerCalls": 16,
+              "retryCount": 0,
+              "unpricedCalls": 16,
+              "usageReported": true
+            }
+          }
+        },
+        "temporal-contradiction": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "UNPRICED",
+              "fallbackCalls": 0,
+              "inputTokens": 4280,
+              "missingUsageCalls": 0,
+              "outputTokens": 730,
+              "pricedCalls": 0,
+              "providerCalls": 10,
+              "retryCount": 0,
+              "unpricedCalls": 10,
+              "usageReported": true
+            }
+          }
+        },
+        "terminology-citation": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "UNPRICED",
+              "fallbackCalls": 0,
+              "inputTokens": 6136,
+              "missingUsageCalls": 0,
+              "outputTokens": 1034,
+              "pricedCalls": 0,
+              "providerCalls": 9,
+              "retryCount": 0,
+              "unpricedCalls": 9,
+              "usageReported": true
+            }
+          }
+        }
+      },
+      "search": {
+        "budget-structured": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 17,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 17,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "category-brand-comparison": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 10,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 10,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "chinese-synonym-oral": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 27,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 27,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "exact-model-number-brand": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 23,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 23,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "fallback-partial-provider": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 11,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 11,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "negative-exclusion": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 21,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 21,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        },
+        "no-result-conflict": {
+          "aggregate": {
+            "aggregate": {
+              "costCny": null,
+              "costStatus": "MISSING_USAGE",
+              "fallbackCalls": 0,
+              "inputTokens": 0,
+              "missingUsageCalls": 12,
+              "outputTokens": 0,
+              "pricedCalls": 0,
+              "providerCalls": 12,
+              "retryCount": 0,
+              "unpricedCalls": 0,
+              "usageReported": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

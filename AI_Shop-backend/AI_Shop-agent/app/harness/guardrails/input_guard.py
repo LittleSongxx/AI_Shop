@@ -38,8 +38,65 @@ _HTML_DOC_PREFIX = re.compile(r"^\s*(<\s*!DOCTYPE\s+html|<\s*html\b)", re.I)
 # 触发 HTML 友好提示的密度阈值（标签数/总字符数）
 _HTML_TAG_DENSITY_THRESHOLD = 0.08
 
+# Credential material must never be echoed by a public shopping assistant.
+# Match an explicit exfiltration action together with a credential term in
+# either order.  Definition/configuration questions ("Authorization 是什么")
+# intentionally do not contain one of the strong output actions below.
+_CREDENTIAL_EXFILTRATION = re.compile(
+    r"(?:(?:(?:完整|全部|原文|真实|当前|所有)\s*)?"
+    r"(?:打印|输出|显示|展示|导出|泄露|返回|贴出|复制|dump|print|show|reveal|output|export|leak|disclose)"
+    r"[^。；\n]{0,40}(?:authorization|api\s*key|api密钥|密钥|private[_\s-]?key|"
+    r"access\s*token|refresh\s*token)"
+    r"|(?:authorization|api\s*key|api密钥|密钥|private[_\s-]?key|access\s*token|"
+    r"refresh\s*token)[^。；\n]{0,40}"
+    r"(?:(?:完整|全部|原文|真实|当前|所有)\s*)?"
+    r"(?:打印|输出|显示|展示|导出|泄露|返回|贴出|复制|dump|print|show|reveal|output|export|leak|disclose))",
+    re.I | re.X,
+)
+
+# A small set of high-confidence compound attacks that are otherwise easy to
+# miss when their individual words are intentionally kept as weak signals.
+# These patterns require both an exfiltration/override action and a sensitive
+# target; ordinary HTML pasted for product support, policy documentation about
+# prompt injection, and standalone words such as ``DAN`` remain untouched.
+_HTML_EXFILTRATION = re.compile(
+    r"<\s*(?:script|iframe|object|html)\b[^>]*>.*?"
+    r"</\s*(?:script|iframe|object|html)\s*>"
+    r"(?:请|帮|要求)?\s*(?:泄露|输出|打印|回显|显示|导出|dump|print|reveal|exfiltrat)"
+    r"[^。；\n]{0,40}(?:secret|token|密钥|隐藏上下文|系统提示)",
+    re.I | re.S,
+)
+_OVERRIDE_HIDDEN_CONTEXT_ZH = re.compile(
+    r"(?:覆盖|替换|无视)[^。；\n]{0,12}"
+    r"(?:开发者|系统|安全)[^。；\n]{0,8}(?:指令|规则|提示)"
+    r"[^。；\n]{0,12}(?:回显|输出|打印|泄露|展示)[^。；\n]{0,16}"
+    r"(?:隐藏上下文|内部上下文|系统提示|prompt)",
+    re.I,
+)
+_JAILBREAK_BYPASS_ZH = re.compile(
+    r"(?:启用|进入|开启|使用)?\s*(?:dan|DAN)\s*模式"
+    r"[^。；\n]{0,24}(?:绕过|无视|突破)[^。；\n]{0,16}"
+    r"(?:引用约束|安全规则|防护|限制|校验)",
+    re.I,
+)
+_PROMPT_EXFILTRATION_REVERSE_ZH = re.compile(
+    r"(?:检索到|获取到|读取到|找到|看到)[^。；\n]{0,12}"
+    r"(?:系统提示词|系统提示|开发者指令|隐藏上下文|内部提示)"
+    r"[^。；\n]{0,12}(?:原样|完整|全部)?\s*"
+    r"(?:输出|打印|回显|复述|展示|泄露)",
+    re.I,
+)
+
 # 命中即拒。购物咨询场景里这些写法没有正常语义，误伤风险可以忽略。
 _BLOCKING_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "credential_exfiltration",
+        _CREDENTIAL_EXFILTRATION,
+    ),
+    ("html_exfiltration", _HTML_EXFILTRATION),
+    ("override_hidden_context_zh", _OVERRIDE_HIDDEN_CONTEXT_ZH),
+    ("jailbreak_bypass_zh", _JAILBREAK_BYPASS_ZH),
+    ("prompt_exfiltration_reverse_zh", _PROMPT_EXFILTRATION_REVERSE_ZH),
     # 只保留"指令类"宾语。原来把 message/context 也算进来会误伤正常的重置说法
     # （"ignore my previous message, show me white ones"），那是改需求不是攻击。
     (

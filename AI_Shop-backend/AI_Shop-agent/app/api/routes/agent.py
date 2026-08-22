@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 
+import structlog
 from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request, Response
 
 from app.api.deps import TokenUserInfo, get_request_token, require_login
@@ -27,6 +28,10 @@ from app.services.badcase_service import badcase_service
 from app.services.data_analyst_service import data_analyst_service
 from app.services.episode_query_service import episode_query_service
 from app.services.episode_review_service import episode_review_service
+from app.services.evaluation_fault_service import (
+    FaultCapabilityRejected,
+    consume_api_fault_capability,
+)
 from app.services.inventory_ops_service import inventory_ops_service
 from app.services.message_service import agent_message_service
 from app.services.order_selection_store import (
@@ -42,6 +47,11 @@ from app.services.recommendation_attribution_service import (
 )
 from app.services.redis_service import redis_service
 from app.services.regression_replay_service import regression_replay_service
+from app.services.request_idempotency_service import (
+    AgentRequestIdempotencyConflict,
+    IdempotencyReservation,
+    agent_request_idempotency_service,
+)
 from app.services.shopping_profile_service import (
     ProfileRevisionConflict,
     shopping_profile_service,
@@ -55,6 +65,7 @@ from app.services.visual_selection_store import (
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 tracer = get_tracer()
+logger = structlog.get_logger()
 
 # 限流统一走 rate_limit_service（Redis 固定窗口，跨进程共享配额）。
 # 这里曾经叠了一层 slowapi @limiter.limit：它默认存在进程内存里，多 uvicorn worker
@@ -125,6 +136,119 @@ def _as_datetime(value: object) -> datetime | None:
     except ValueError as exc:
         raise ValueError("时间参数必须是 ISO-8601 格式") from exc
 
+
+def _canonical_response(response: ResponseVO) -> ResponseVO:
+    payload = json.dumps(
+        response.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+    return ResponseVO.model_validate_json(payload)
+
+
+def _inconclusive_response(
+    reservation: IdempotencyReservation,
+    message_id: int | None = None,
+) -> ResponseVO:
+    return _canonical_response(
+        error(503, "请求结果未知，请人工核验").model_copy(
+            update={
+                "data": {
+                    "terminalState": "INCONCLUSIVE",
+                    "deliveryState": "MANUAL_REVIEW",
+                    "manualReview": True,
+                    "runId": reservation.run_id,
+                    "messageId": message_id,
+                }
+            }
+        )
+    )
+
+
+async def _record_idempotent_failure(
+    reservation: IdempotencyReservation, response: ResponseVO
+) -> bool:
+    """Persist a replayable failure, reporting false when its ledger is unknown."""
+    try:
+        await agent_request_idempotency_service.fail(
+            reservation, response.model_dump(mode="json")
+        )
+    except Exception as exc:  # pragma: no cover - exercised with a live DB fault
+        logger.error(
+            "agent_idempotency_failure_ledger_unknown",
+            user_id=reservation.user_id,
+            run_id=reservation.run_id,
+            error=type(exc).__name__,
+        )
+        return False
+    return True
+
+
+async def _record_idempotent_inconclusive(
+    reservation: IdempotencyReservation,
+    response: ResponseVO,
+    message_id: int | None,
+) -> bool:
+    try:
+        await agent_request_idempotency_service.inconclusive(
+            reservation,
+            response.model_dump(mode="json"),
+            message_id=message_id,
+        )
+    except Exception as exc:  # pragma: no cover - exercised with a live DB fault
+        logger.error(
+            "agent_idempotency_inconclusive_ledger_unknown",
+            user_id=reservation.user_id,
+            run_id=reservation.run_id,
+            message_id=message_id,
+            error=type(exc).__name__,
+        )
+        return False
+    return True
+
+
+async def _idempotent_failure_or_unknown(
+    reservation: IdempotencyReservation,
+    failure: ResponseVO,
+    *,
+    known_message_id: int | None = None,
+) -> ResponseVO:
+    """Fail only when the deterministic run is authoritatively absent."""
+    lookup_unknown = False
+    message_id = known_message_id
+    if message_id is None:
+        try:
+            message = await agent_message_service.get_by_run_id(
+                reservation.user_id, reservation.run_id
+            )
+        except Exception as exc:
+            lookup_unknown = True
+            logger.error(
+                "agent_idempotency_business_state_unknown",
+                user_id=reservation.user_id,
+                run_id=reservation.run_id,
+                error=type(exc).__name__,
+            )
+        else:
+            if message is not None:
+                message_id = int(message["messageId"])
+
+    if message_id is not None or lookup_unknown:
+        response = _inconclusive_response(reservation, message_id)
+        await _record_idempotent_inconclusive(
+            reservation, response, message_id
+        )
+        return response
+
+    canonical_failure = _canonical_response(failure)
+    if await _record_idempotent_failure(reservation, canonical_failure):
+        return canonical_failure
+
+    response = _inconclusive_response(reservation)
+    await _record_idempotent_inconclusive(reservation, response, None)
+    return response
+
 @router.post("/loadHistoryMessage")
 async def load_history_message(
     pageNo: int = Form(1),
@@ -151,26 +275,130 @@ async def send_message(
     consultProductId: str | None = Form(None),
     comparisonProductIds: str | None = Form(None),
     imageAssetId: str | None = Form(None),
+    x_request_id: str | None = Header(None, alias="X-Request-ID"),
+    x_idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    x_evaluation_trial_id: str | None = Header(
+        None, alias="X-Evaluation-Trial-ID"
+    ),
+    x_evaluation_fault_capability: str | None = Header(
+        None, alias="X-Evaluation-Fault-Capability"
+    ),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
+    reservation = None
+    orchestration_data = None
     try:
+        comparison_product_ids = _form_string_list(comparisonProductIds)
+        normalized_idempotency_key = str(x_idempotency_key or "").strip()
+        if normalized_idempotency_key:
+            fingerprint = agent_request_idempotency_service.fingerprint(
+                message=message,
+                from_product=_form_bool(fromProduct),
+                consult_product_id=consultProductId,
+                comparison_product_ids=comparison_product_ids,
+                image_asset_id=imageAssetId,
+            )
+            reservation = await agent_request_idempotency_service.reserve(
+                user_id=user.user_id,
+                key=normalized_idempotency_key,
+                fingerprint=fingerprint,
+            )
+            if not reservation.owner:
+                replay = await agent_request_idempotency_service.wait(reservation)
+                if replay.response is not None:
+                    return ResponseVO.model_validate(replay.response)
+                # The first request has reserved the key but has not published
+                # its response yet. Return the same deterministic run identity;
+                # callers can poll history/episodes without creating a second
+                # message or task.
+                return success(
+                    {
+                        "runId": replay.run_id,
+                        "messageId": replay.message_id,
+                        "deliveryState": "IDEMPOTENCY_IN_PROGRESS",
+                    }
+                )
+        evaluation_fault = None
+        if x_evaluation_fault_capability:
+            try:
+                evaluation_fault = await consume_api_fault_capability(
+                    x_evaluation_fault_capability,
+                    user_id=user.user_id,
+                    request_id=str(x_request_id or ""),
+                    trial_id=str(x_evaluation_trial_id or ""),
+                )
+            except FaultCapabilityRejected as exc:
+                raise HTTPException(
+                    status_code=403,
+                    detail="invalid evaluation fault capability",
+                ) from exc
         with tracer.start_as_current_span("agent.send_message") as span:
             span.set_attribute("agent.user_id", user.user_id)
             span.set_attribute("agent.from_product", _form_bool(fromProduct))
-            data = await agent_orchestrator.send_message(
+            orchestration_data = await agent_orchestrator.send_message(
                 user.user_id,
                 message,
                 _form_bool(fromProduct),
                 consultProductId,
-                _form_string_list(comparisonProductIds),
+                comparison_product_ids,
                 imageAssetId,
+                request_id=x_request_id,
+                run_id=reservation.run_id if reservation is not None else None,
+                evaluation_trial_id=x_evaluation_trial_id,
+                evaluation_fault=evaluation_fault,
             )
-        return success(data)
+        response = _canonical_response(success(orchestration_data))
+        if reservation is not None:
+            await agent_request_idempotency_service.complete(
+                reservation,
+                response.model_dump(mode="json"),
+                message_id=(
+                    orchestration_data.get("messageId")
+                    if isinstance(orchestration_data, dict)
+                    else None
+                ),
+            )
+        return response
     except PendingActionExpired as e:
+        if reservation is not None:
+            return await _idempotent_failure_or_unknown(
+                reservation, error(410, str(e))
+            )
         raise HTTPException(status_code=410, detail=str(e)) from e
+    except AgentRequestIdempotencyConflict as e:
+        return error(409, str(e))
+    except HTTPException as e:
+        if reservation is None:
+            raise
+        return await _idempotent_failure_or_unknown(
+            reservation, error(e.status_code, str(e.detail))
+        )
     except ValueError as e:
-
-        return error(600, str(e))
+        response = error(600, str(e))
+        if reservation is not None:
+            return await _idempotent_failure_or_unknown(reservation, response)
+        return response
+    except Exception as exc:
+        if reservation is not None:
+            # A keyed request must return the same envelope that a later replay
+            # reads. If the failure ledger itself is unavailable, the business
+            # result is explicitly unknown; never report a false success/failure.
+            failed = error(500, "AI 服务暂时不可用，请稍后重试")
+            known_message_id = (
+                orchestration_data.get("messageId")
+                if isinstance(orchestration_data, dict)
+                else None
+            )
+            return await _idempotent_failure_or_unknown(
+                reservation,
+                failed,
+                known_message_id=known_message_id,
+            )
+        logger.exception(
+            "agent_send_message_unhandled",
+            error=type(exc).__name__,
+        )
+        raise
 
 
 @router.get("/supportCases")

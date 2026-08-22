@@ -69,9 +69,9 @@
         </el-form-item>
         <el-form-item label="优惠券类型" prop="couponType">
           <el-radio-group v-model="form.couponType" @change="onCouponTypeChange">
-            <el-radio :label="1">满减券</el-radio>
-            <el-radio :label="2">折扣券</el-radio>
-            <el-radio :label="3">无门槛券</el-radio>
+            <el-radio :value="1">满减券</el-radio>
+            <el-radio :value="2">折扣券</el-radio>
+            <el-radio :value="3">无门槛券</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="form.couponType !== 3" label="使用门槛金额" prop="thresholdAmount">

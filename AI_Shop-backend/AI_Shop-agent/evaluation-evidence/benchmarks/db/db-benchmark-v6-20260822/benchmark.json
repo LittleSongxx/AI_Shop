@@ -1,0 +1,745 @@
+{
+  "benchmarkId": "db-benchmark-v6-20260822",
+  "createdAt": "2026-08-21T18:55:46.038Z",
+  "databaseFacts": {
+    "databaseName": "aishop_agent",
+    "dedicatedBenchmarkDatabase": false,
+    "endpoint": "localhost:3306",
+    "serverVersion": "8.4.11",
+    "transactionIsolation": "REPEATABLE-READ"
+  },
+  "limitations": [
+    "Local connection pool and dataset; no production capacity claim.",
+    "This is not a dedicated benchmark database; read queries share the local development database.",
+    "Round trips count cursor.execute calls and connection usage counts pool acquisitions in this runner.",
+    "Candidate IDs are unique; sizes above the catalog count include explicitly labeled non-fixture misses."
+  ],
+  "notProductionSlo": true,
+  "rollbackProbe": {
+    "afterRollbackCount": 0,
+    "beforeCount": 0,
+    "committedWrites": 0,
+    "insideTransactionCount": 1,
+    "markerRedacted": true,
+    "passed": true,
+    "probeTable": "agent_product_decision_feature"
+  },
+  "rows": {
+    "1": {
+      "batchDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          0.613,
+          0.651,
+          0.643
+        ],
+        "p50Ms": 0.643,
+        "p95Ms": 0.65,
+        "resultSha256PerSuccessfulIteration": [
+          "d632027d44a0c5bba5af2bd96dab69b493f5a5111a37906c2e380670ebbd325d",
+          "d632027d44a0c5bba5af2bd96dab69b493f5a5111a37906c2e380670ebbd325d",
+          "d632027d44a0c5bba5af2bd96dab69b493f5a5111a37906c2e380670ebbd325d"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          5,
+          5,
+          5
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "batchOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          7.487,
+          0.871,
+          0.817
+        ],
+        "p50Ms": 0.871,
+        "p95Ms": 6.826,
+        "resultSha256PerSuccessfulIteration": [
+          "de4a2c192eb55743ec6b1571c8c969629500a6d787a404b6637c0b93d537288e",
+          "de4a2c192eb55743ec6b1571c8c969629500a6d787a404b6637c0b93d537288e",
+          "de4a2c192eb55743ec6b1571c8c969629500a6d787a404b6637c0b93d537288e"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "candidateCount": 1,
+      "catalogFixtureCandidateCount": 1,
+      "nPlusOneDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          0.694,
+          0.639,
+          0.661
+        ],
+        "p50Ms": 0.661,
+        "p95Ms": 0.691,
+        "resultSha256PerSuccessfulIteration": [
+          "d632027d44a0c5bba5af2bd96dab69b493f5a5111a37906c2e380670ebbd325d",
+          "d632027d44a0c5bba5af2bd96dab69b493f5a5111a37906c2e380670ebbd325d",
+          "d632027d44a0c5bba5af2bd96dab69b493f5a5111a37906c2e380670ebbd325d"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          5,
+          5,
+          5
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "nPlusOneOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          0.892,
+          0.85,
+          0.692
+        ],
+        "p50Ms": 0.85,
+        "p95Ms": 0.888,
+        "resultSha256PerSuccessfulIteration": [
+          "de4a2c192eb55743ec6b1571c8c969629500a6d787a404b6637c0b93d537288e",
+          "de4a2c192eb55743ec6b1571c8c969629500a6d787a404b6637c0b93d537288e",
+          "de4a2c192eb55743ec6b1571c8c969629500a6d787a404b6637c0b93d537288e"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "nonFixtureCandidateCount": 0,
+      "resultEquivalence": {
+        "decisionFeature": true,
+        "method": "ORDER_INDEPENDENT_CANONICAL_ROW_SHA256",
+        "offerSnapshot": true
+      },
+      "selectionPolicy": "UNIQUE_CATALOG_IDS_THEN_EXPLICIT_NON_FIXTURE_IDS",
+      "uniqueCandidateCount": 1
+    },
+    "10": {
+      "batchDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          0.789,
+          0.699,
+          0.732
+        ],
+        "p50Ms": 0.732,
+        "p95Ms": 0.783,
+        "resultSha256PerSuccessfulIteration": [
+          "7baf772987ddb89aa2c7504067fb1e814cd20aaf219a4a430bddc223abd51553",
+          "7baf772987ddb89aa2c7504067fb1e814cd20aaf219a4a430bddc223abd51553",
+          "7baf772987ddb89aa2c7504067fb1e814cd20aaf219a4a430bddc223abd51553"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          20,
+          20,
+          20
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "batchOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          41.021,
+          5.609,
+          5.225
+        ],
+        "p50Ms": 5.609,
+        "p95Ms": 37.48,
+        "resultSha256PerSuccessfulIteration": [
+          "6912d03b6df7b670cf8662b4a33888c797c34bfcdcd4e10a50694cc3737fcc3f",
+          "6912d03b6df7b670cf8662b4a33888c797c34bfcdcd4e10a50694cc3737fcc3f",
+          "6912d03b6df7b670cf8662b4a33888c797c34bfcdcd4e10a50694cc3737fcc3f"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          9,
+          9,
+          9
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "candidateCount": 10,
+      "catalogFixtureCandidateCount": 10,
+      "nPlusOneDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          5.562,
+          5.693,
+          5.366
+        ],
+        "p50Ms": 5.562,
+        "p95Ms": 5.679,
+        "resultSha256PerSuccessfulIteration": [
+          "7baf772987ddb89aa2c7504067fb1e814cd20aaf219a4a430bddc223abd51553",
+          "7baf772987ddb89aa2c7504067fb1e814cd20aaf219a4a430bddc223abd51553",
+          "7baf772987ddb89aa2c7504067fb1e814cd20aaf219a4a430bddc223abd51553"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          20,
+          20,
+          20
+        ],
+        "roundTrips": 10,
+        "roundTripsPerSuccessfulIteration": [
+          10,
+          10,
+          10
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 30
+      },
+      "nPlusOneOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          7.822,
+          9.429,
+          8.832
+        ],
+        "p50Ms": 8.832,
+        "p95Ms": 9.369,
+        "resultSha256PerSuccessfulIteration": [
+          "6912d03b6df7b670cf8662b4a33888c797c34bfcdcd4e10a50694cc3737fcc3f",
+          "6912d03b6df7b670cf8662b4a33888c797c34bfcdcd4e10a50694cc3737fcc3f",
+          "6912d03b6df7b670cf8662b4a33888c797c34bfcdcd4e10a50694cc3737fcc3f"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          9,
+          9,
+          9
+        ],
+        "roundTrips": 10,
+        "roundTripsPerSuccessfulIteration": [
+          10,
+          10,
+          10
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 30
+      },
+      "nonFixtureCandidateCount": 0,
+      "resultEquivalence": {
+        "decisionFeature": true,
+        "method": "ORDER_INDEPENDENT_CANONICAL_ROW_SHA256",
+        "offerSnapshot": true
+      },
+      "selectionPolicy": "UNIQUE_CATALOG_IDS_THEN_EXPLICIT_NON_FIXTURE_IDS",
+      "uniqueCandidateCount": 10
+    },
+    "100": {
+      "batchDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          2.305,
+          1.924,
+          1.969
+        ],
+        "p50Ms": 1.969,
+        "p95Ms": 2.271,
+        "resultSha256PerSuccessfulIteration": [
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          145,
+          145,
+          145
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "batchOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          15.958,
+          16.003,
+          17.312
+        ],
+        "p50Ms": 16.003,
+        "p95Ms": 17.181,
+        "resultSha256PerSuccessfulIteration": [
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          46,
+          46,
+          46
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "candidateCount": 100,
+      "catalogFixtureCandidateCount": 47,
+      "nPlusOneDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          61.149,
+          55.979,
+          54.289
+        ],
+        "p50Ms": 55.979,
+        "p95Ms": 60.632,
+        "resultSha256PerSuccessfulIteration": [
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          145,
+          145,
+          145
+        ],
+        "roundTrips": 100,
+        "roundTripsPerSuccessfulIteration": [
+          100,
+          100,
+          100
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 300
+      },
+      "nPlusOneOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          72.016,
+          72.556,
+          70.627
+        ],
+        "p50Ms": 72.016,
+        "p95Ms": 72.502,
+        "resultSha256PerSuccessfulIteration": [
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          46,
+          46,
+          46
+        ],
+        "roundTrips": 100,
+        "roundTripsPerSuccessfulIteration": [
+          100,
+          100,
+          100
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 300
+      },
+      "nonFixtureCandidateCount": 53,
+      "resultEquivalence": {
+        "decisionFeature": true,
+        "method": "ORDER_INDEPENDENT_CANONICAL_ROW_SHA256",
+        "offerSnapshot": true
+      },
+      "selectionPolicy": "UNIQUE_CATALOG_IDS_THEN_EXPLICIT_NON_FIXTURE_IDS",
+      "uniqueCandidateCount": 100
+    },
+    "50": {
+      "batchDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          1.926,
+          1.673,
+          1.638
+        ],
+        "p50Ms": 1.673,
+        "p95Ms": 1.901,
+        "resultSha256PerSuccessfulIteration": [
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          145,
+          145,
+          145
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "batchOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          28.735,
+          16.673,
+          14.421
+        ],
+        "p50Ms": 16.673,
+        "p95Ms": 27.529,
+        "resultSha256PerSuccessfulIteration": [
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          46,
+          46,
+          46
+        ],
+        "roundTrips": 1,
+        "roundTripsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 3
+      },
+      "candidateCount": 50,
+      "catalogFixtureCandidateCount": 47,
+      "nPlusOneDecisionFeature": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          29.574,
+          29.361,
+          31.645
+        ],
+        "p50Ms": 29.574,
+        "p95Ms": 31.438,
+        "resultSha256PerSuccessfulIteration": [
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f",
+          "40e5561ebafe0db12f2ca96884c6595c9821274d6bd18bd98036837e989ee43f"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          145,
+          145,
+          145
+        ],
+        "roundTrips": 50,
+        "roundTripsPerSuccessfulIteration": [
+          50,
+          50,
+          50
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 150
+      },
+      "nPlusOneOfferSnapshot": {
+        "connectionAcquisitions": 1,
+        "connectionAcquisitionsPerSuccessfulIteration": [
+          1,
+          1,
+          1
+        ],
+        "counterSource": "COUNTED_CURSOR_EXECUTE_AND_POOL_ACQUIRE_CALLS",
+        "errorRate": 0.0,
+        "iterations": 3,
+        "latenciesMs": [
+          40.337,
+          39.383,
+          38.893
+        ],
+        "p50Ms": 39.383,
+        "p95Ms": 40.241,
+        "resultSha256PerSuccessfulIteration": [
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1",
+          "0613c0641187ae3d8c63753f4930b2acc192e1216491b171e66917887a10d3a1"
+        ],
+        "returnedRowsPerSuccessfulIteration": [
+          46,
+          46,
+          46
+        ],
+        "roundTrips": 50,
+        "roundTripsPerSuccessfulIteration": [
+          50,
+          50,
+          50
+        ],
+        "stableResult": true,
+        "successfulIterations": 3,
+        "totalConnectionAcquisitions": 3,
+        "totalRoundTrips": 150
+      },
+      "nonFixtureCandidateCount": 3,
+      "resultEquivalence": {
+        "decisionFeature": true,
+        "method": "ORDER_INDEPENDENT_CANONICAL_ROW_SHA256",
+        "offerSnapshot": true
+      },
+      "selectionPolicy": "UNIQUE_CATALOG_IDS_THEN_EXPLICIT_NON_FIXTURE_IDS",
+      "uniqueCandidateCount": 50
+    }
+  },
+  "schemaVersion": "aishop-db-benchmark/v2",
+  "scope": "REAL_LOCAL_DATABASE_READ_BENCHMARK_WITH_ROLLBACK_PROBE",
+  "sizes": [
+    1,
+    10,
+    50,
+    100
+  ],
+  "sourceFingerprint": {
+    "capturedAt": "2026-08-21T18:55:46.046Z",
+    "git": {
+      "commit": "35f800e67e9e8fbb762a909c9211fb285dc82189",
+      "worktreeDirty": true
+    },
+    "knowledge": {
+      "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+      "fileCount": 14,
+      "sha256": "d16067f3ea9ff09981aef96793c9aec7f4c993a2184ec3a60069c3f7f2feeae7"
+    },
+    "providerConfiguration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 3,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 60
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+    "source": {
+      "fileCount": 227,
+      "sha256": "0d68481bbe1b70106b4c1c30c7c99dea6beb2989a4406730589293b9c9c989cb"
+    }
+  }
+}

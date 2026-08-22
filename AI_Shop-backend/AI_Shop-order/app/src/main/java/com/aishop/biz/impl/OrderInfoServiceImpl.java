@@ -587,22 +587,26 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		if (orderInfo == null) {
 			throw new BusinessException("订单不存在");
 		}
-		if (OrderStatusEnum.PAID.getStatus().equals(orderInfo.getOrderStatus())) {
-			throw new BusinessException("当前订单已支付无法取消");
-		}
 		if (userId != null && !orderInfo.getUserId().equals(userId)) {
 			throw new BusinessException("订单不存在");
 		}
-		if (!OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(orderInfo.getOrderStatus())) {
-			throw new BusinessException("当前订单状态不能取消");
-		}
 		if (isCouponRushOrder(orderInfo)) {
+			if (!OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(orderInfo.getOrderStatus())) {
+				throw new BusinessException("当前订单状态不能取消");
+			}
 			cancelCouponRushOrder(orderId, userId);
 			return;
 		}
 		if (userId == null && !StringTools.isEmpty(orderInfo.getPayOrderId())) {
 			closeUnpaidPayOrderForTimeout(orderInfo.getPayOrderId());
 			return;
+		}
+		if (!StringTools.isEmpty(orderInfo.getPayOrderId())) {
+			cancelUnpaidPayOrderForUser(userId, orderInfo.getPayOrderId());
+			return;
+		}
+		if (!OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(orderInfo.getOrderStatus())) {
+			throw new BusinessException("当前订单状态不能取消");
 		}
 		OrderInfo updateBean = new OrderInfo();
 		if (userId != null) {
@@ -620,17 +624,50 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			}
 			return;
 		}
-		markPayOrderClosedIfNeeded(orderInfo.getPayOrderId());
-		payFeignSupport.markClosed(orderInfo.getPayOrderId());
-		restoreStockForPayOrderId(orderInfo.getPayOrderId());
-		if (StringTools.isEmpty(orderInfo.getChannelOrderId())) {
-			releaseCouponIfNeeded(orderInfo.getPayOrderId());
-			recordCancellationOutcomes(List.of(orderInfo), "USER_CANCEL", "CANCELLED");
+		restoreStockForOrders(orderId, List.of(orderInfo));
+		recordCancellationOutcomes(List.of(orderInfo), "USER_CANCEL", "CANCELLED");
+	}
+
+	private void cancelUnpaidPayOrderForUser(String userId, String payOrderId) {
+		List<OrderInfo> orderList = loadOrdersByPayOrderId(payOrderId);
+		if (orderList.isEmpty()
+				|| orderList.stream().anyMatch(order -> !Objects.equals(userId, order.getUserId()))) {
+			throw new BusinessException("订单不存在");
+		}
+		if (orderList.stream().anyMatch(order -> isPaidOrBeyond(order.getOrderStatus()))) {
+			throw new BusinessException("当前支付单已支付无法取消");
+		}
+		if (orderList.stream().anyMatch(order ->
+				!OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(order.getOrderStatus())
+						&& !isClosedOrCancelled(order.getOrderStatus()))) {
+			throw new BusinessException("当前支付单状态不能取消");
+		}
+		List<OrderInfo> waitingOrders = orderList.stream()
+				.filter(order -> OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(order.getOrderStatus()))
+				.toList();
+		if (waitingOrders.isEmpty()) {
 			return;
 		}
-		cancelOrder4Channel(orderInfo);
-		releaseCouponIfNeeded(orderInfo.getPayOrderId());
-		recordCancellationOutcomes(List.of(orderInfo), "USER_CANCEL", "CANCELLED");
+		if (waitingOrders.size() != orderList.size()) {
+			throw new BusinessException("支付单内子订单状态不一致，请联系客服处理");
+		}
+
+		OrderInfo updateBean = new OrderInfo();
+		updateBean.setOrderStatus(OrderStatusEnum.CANCELLED.getStatus());
+		OrderInfoQuery statusQuery = new OrderInfoQuery();
+		statusQuery.setPayOrderId(payOrderId);
+		statusQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+		Integer rows = orderInfoMapper.updateByParam(updateBean, statusQuery);
+		if (rows == null || rows != waitingOrders.size()) {
+			throw new BusinessException("支付单取消失败，子订单状态已变化");
+		}
+
+		markPayOrderClosedIfNeeded(payOrderId);
+		payFeignSupport.markClosed(payOrderId);
+		cancelOrder4Channel(waitingOrders.get(0));
+		releaseCouponIfNeeded(payOrderId);
+		restoreStockForOrders(payOrderId, waitingOrders);
+		recordCancellationOutcomes(waitingOrders, "USER_CANCEL", "CANCELLED");
 	}
 
 	private boolean isPaidOrBeyond(Integer status) {
@@ -640,6 +677,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		return OrderStatusEnum.PAID.getStatus().equals(status)
 				|| OrderStatusEnum.SHIPPED.getStatus().equals(status)
 				|| OrderStatusEnum.COMPLETED.getStatus().equals(status)
+				|| OrderStatusEnum.REFUNDED.getStatus().equals(status)
 				|| OrderStatusEnum.PARTIALLY_REFUNDED.getStatus().equals(status)
 				|| OrderStatusEnum.WAIT_COMMENT.getStatus().equals(status);
 	}
@@ -657,10 +695,6 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				return;
 			}
 		}
-		if (!payOrderRedisComponent.tryMarkPayOrderCloseOnce(payOrderId)) {
-			log.info("支付超时关单幂等跳过 payOrderId={}", payOrderId);
-			return;
-		}
 		OrderInfo updateBean = new OrderInfo();
 		updateBean.setOrderStatus(OrderStatusEnum.CLOSED.getStatus());
 		OrderInfoQuery statusQuery = new OrderInfoQuery();
@@ -671,26 +705,25 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			log.info("支付超时关单无待付款子单 payOrderId={}", payOrderId);
 			return;
 		}
+		if (rows != orderList.size()) {
+			throw new BusinessException("支付超时关单失败，子订单状态已变化");
+		}
+		markPayOrderClosedIfNeeded(payOrderId);
 		payFeignSupport.markClosed(payOrderId);
-		restoreStockForPayOrderId(payOrderId);
 		OrderInfo channelRef = orderList.stream()
 				.filter(o -> !StringTools.isEmpty(o.getChannelOrderId()))
 				.findFirst()
 				.orElse(orderList.get(0));
-		if (!StringTools.isEmpty(channelRef.getChannelOrderId())) {
-			cancelOrder4Channel(channelRef);
-		}
+		cancelOrder4Channel(channelRef);
 		releaseCouponIfNeeded(payOrderId);
+		restoreStockForOrders(payOrderId, orderList);
 		recordCancellationOutcomes(orderList, "PAYMENT_TIMEOUT", "CLOSED");
 	}
 
-	private void restoreStockForPayOrderId(String payOrderId) {
-		if (StringTools.isEmpty(payOrderId)) {
+	private void restoreStockForOrders(String restoreReferenceId, List<OrderInfo> orderList) {
+		if (StringTools.isEmpty(restoreReferenceId) || orderList == null || orderList.isEmpty()) {
 			return;
 		}
-		OrderInfoQuery orderInfoQuery = new OrderInfoQuery();
-		orderInfoQuery.setPayOrderId(payOrderId);
-		List<OrderInfo> orderList = orderInfoMapper.selectList(orderInfoQuery);
 		List<ProductItem> newList = new ArrayList<>();
 		for (OrderInfo orderInfo1 : orderList) {
 			OrderItemQuery orderItemQuery = new OrderItemQuery();
@@ -708,11 +741,10 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			throw new BusinessException("商品列表为空");
 		}
 		try {
-			stockFeignSupport.changeStockBatch(newList);
+			stockFeignSupport.restoreOrderStock(restoreReferenceId, newList);
 		} catch (Exception e) {
-			log.error("关单库存回补失败, payOrderId={}", payOrderId, e);
-			remoteCompensateRecorder.recordStockChangeBatch(payOrderId, newList, e);
-			throw new BusinessException("库存回补失败，已登记补偿任务，请稍后重试或联系客服");
+			log.error("关单库存回补失败, referenceId={}", restoreReferenceId, e);
+			remoteCompensateRecorder.recordOrderStockRestore(restoreReferenceId, newList, e);
 		}
 	}
 
@@ -742,7 +774,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			log.info("paySuccess 幂等跳过 payOrderId={}", payOrderId);
 			return;
 		}
-		if (payOrderRedisComponent.isPayOrderCloseMarked(payOrderId)) {
+		if (orderInfoList.stream().anyMatch(o -> isClosedOrCancelled(o.getOrderStatus()))) {
 			handlePaySuccessConflict(payOrderId, payOrderNotifyDTO);
 			return;
 		}
@@ -894,7 +926,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			log.info("couponRush paySuccess 幂等跳过 payOrderId={}", payOrderId);
 			return;
 		}
-		if (payOrderRedisComponent.isPayOrderCloseMarked(payOrderId)) {
+		if (orderInfoList.stream().anyMatch(o -> isClosedOrCancelled(o.getOrderStatus()))) {
 			handlePaySuccessConflict(payOrderId, payOrderNotifyDTO);
 			return;
 		}
@@ -955,8 +987,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			log.info("paySuccess 幂等跳过 payOrderId={}", payOrderId);
 			return;
 		}
-		if (latest.stream().anyMatch(o -> isClosedOrCancelled(o.getOrderStatus()))
-				|| payOrderRedisComponent.isPayOrderCloseMarked(payOrderId)) {
+		if (latest.stream().anyMatch(o -> isClosedOrCancelled(o.getOrderStatus()))) {
 			refundLatePaymentAfterClose(payOrderId, payOrderNotifyDTO, latest);
 			return;
 		}

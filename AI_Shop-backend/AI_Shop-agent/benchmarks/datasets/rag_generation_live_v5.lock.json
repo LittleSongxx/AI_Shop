@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 5,
-  "dataset": "rag_generation_live_v5.json",
-  "datasetSha256": "a862198e0b606c5fd87262fc9d3aa7f7786516fd52e48e7d4df069b36639cf62",
-  "caseCount": 80,
-  "known": 60,
-  "fresh": 20,
-  "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e"
-}

@@ -1,21 +1,14 @@
 package com.aishop.integration;
 
-import com.aishop.constants.InternalApiHeaders;
+import com.aishop.constants.RabbitMQConfig;
+import com.aishop.constants.TransactionalMqSender;
 import com.aishop.entity.dto.RecommendationAttributionCarrier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.aishop.entity.enums.MessageReliabilityLevelEnum;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.client.RestClient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Date;
@@ -23,44 +16,24 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executor;
 
 /**
- * Best-effort projection of committed commerce facts into the Agent outcome ledger.
- *
- * The HTTP projection is deliberately outside the business transaction. It has a
- * dedicated short timeout and no retry, so an Agent outage cannot fail checkout.
- * The immutable business identifiers make a future outbox/MQ transport a transport
- * change rather than a data-contract change.
+ * Reliable projection of committed commerce facts into the Agent outcome ledger.
+ * The local business transaction owns the Outbox row; Agent availability is not on
+ * the checkout path, and immutable event identifiers make redelivery harmless.
  */
 @Component
 public class CommerceOutcomeClient {
 
-    private static final Logger log = LoggerFactory.getLogger(CommerceOutcomeClient.class);
     private static final int MAX_BATCH_SIZE = 100;
 
-    private final RestClient client;
-    private final String internalToken;
-    private final Executor executor;
+    private final TransactionalMqSender transactionalMqSender;
     private final boolean enabled;
 
     public CommerceOutcomeClient(
-            RestClient.Builder builder,
-            @Qualifier("mqAsyncExecutor") Executor executor,
-            @Value("${aishop.agent.base-url:http://127.0.0.1:7050}") String agentBaseUrl,
-            @Value("${aishop.internal.token:your-token}") String internalToken,
-            @Value("${aishop.agent.outcome-connect-timeout-ms:200}") int connectTimeoutMs,
-            @Value("${aishop.agent.outcome-read-timeout-ms:500}") int readTimeoutMs,
+            TransactionalMqSender transactionalMqSender,
             @Value("${aishop.agent.outcome-enabled:true}") boolean enabled) {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofMillis(Math.max(connectTimeoutMs, 50)));
-        requestFactory.setReadTimeout(Duration.ofMillis(Math.max(readTimeoutMs, 50)));
-        this.client = builder.clone()
-                .baseUrl(agentBaseUrl.replaceAll("/+$", ""))
-                .requestFactory(requestFactory)
-                .build();
-        this.internalToken = internalToken;
-        this.executor = executor;
+        this.transactionalMqSender = transactionalMqSender;
         this.enabled = enabled;
     }
 
@@ -75,47 +48,27 @@ public class CommerceOutcomeClient {
             return;
         }
         List<OutcomeEvent> snapshot = List.copyOf(events);
-        Runnable dispatch = () -> dispatch(snapshot);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            dispatch.run();
-                        }
-                    });
-            return;
-        }
-        dispatch.run();
-    }
-
-    private void dispatch(List<OutcomeEvent> events) {
-        try {
-            executor.execute(() -> sendInBatches(events));
-        } catch (java.util.concurrent.RejectedExecutionException ex) {
-            log.warn("Commerce outcome executor saturated; dropping {} projection(s)", events.size());
-        }
+        sendInBatches(snapshot);
     }
 
     private void sendInBatches(List<OutcomeEvent> events) {
         for (int start = 0; start < events.size(); start += MAX_BATCH_SIZE) {
             int end = Math.min(events.size(), start + MAX_BATCH_SIZE);
-            send(events.subList(start, end));
+            List<OutcomeEvent> batch = List.copyOf(events.subList(start, end));
+            transactionalMqSender.sendAfterCommit(
+                    RabbitMQConfig.COMMERCE_OUTCOME_EXCHANGE,
+                    RabbitMQConfig.COMMERCE_OUTCOME_KEY,
+                    new OutcomeBatch(batch),
+                    outcomeBatchIdempotencyKey(batch),
+                    MessageReliabilityLevelEnum.STANDARD);
         }
     }
 
-    private void send(List<OutcomeEvent> events) {
-        try {
-            client.post()
-                    .uri("/internal/commerce-outcomes/ingestBatch")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header(InternalApiHeaders.INTERNAL_TOKEN, internalToken)
-                    .body(Map.of("events", events))
-                    .retrieve()
-                    .toBodilessEntity();
-        } catch (Exception ex) {
-            log.warn("Commerce outcome projection unavailable; dropping {} event(s)", events.size());
-        }
+    private String outcomeBatchIdempotencyKey(List<OutcomeEvent> events) {
+        Object[] facts = events.stream()
+                .map(OutcomeEvent::idempotencyKey)
+                .toArray();
+        return stableIdentifier("commerce-outbox", "v1", facts);
     }
 
     public static OutcomeEvent fromVerifiedCarrier(
@@ -198,6 +151,12 @@ public class CommerceOutcomeClient {
                     ? Map.of()
                     : new LinkedHashMap<>(payload);
             payload = Collections.unmodifiableMap(copy);
+        }
+    }
+
+    public record OutcomeBatch(List<OutcomeEvent> events) {
+        public OutcomeBatch {
+            events = List.copyOf(events);
         }
     }
 }

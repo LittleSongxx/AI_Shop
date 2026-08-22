@@ -1,6 +1,7 @@
 package com.aishop.api;
 
 import com.aishop.api.dto.LessStockPageDTO;
+import com.aishop.api.dto.OrderStockRestoreDTO;
 import com.aishop.api.dto.SkuStockBatchChangeDTO;
 import com.aishop.api.dto.SkuStockChangeDTO;
 import com.aishop.api.dto.SkuStockDTO;
@@ -37,6 +38,9 @@ public interface StockFeignClient {
 
     @PostMapping("/refund/restore")
     ResponseVO<StockChangeResultVO> restoreRefundStock(@RequestBody RefundStockRestoreDTO dto);
+
+    @PostMapping("/order/restore")
+    ResponseVO<StockChangeResultVO> restoreOrderStock(@RequestBody OrderStockRestoreDTO dto);
 
     @PostMapping("/refund/applied")
     ResponseVO<Boolean> isRefundStockApplied(@RequestBody RefundStockRestoreDTO dto);

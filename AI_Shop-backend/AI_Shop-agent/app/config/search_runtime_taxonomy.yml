@@ -10,6 +10,7 @@ topics:
   - canonical: 蓝牙音箱
     aliases: [桌面音箱, 蓝牙音响, 桌面音响, 音箱, 音响]
     runtimeCategory: 音箱
+    surfaceTerms: [蓝牙音箱, 蓝牙音响, 桌面音箱, 桌面音响, 音箱, 音响]
   - canonical: 车载充电器
     aliases: [车充, 车载快充, 汽车充电器]
     runtimeCategory: 车载充电器
@@ -28,6 +29,12 @@ topics:
   - canonical: 空气净化器
     aliases: [净化器]
     runtimeCategory: 空气净化器
+    surfaceTerms: [空气净化器, 净化器]
+  - canonical: 净水器
+    aliases: [厨下净水器, RO净水器, 反渗透净水器]
+    runtimeCategory: 净水器
+    surfaceTerms: [净水器, 反渗透, RO]
+    blockedTerms: [空气净化器]
   - canonical: 咖啡机
     aliases: [意式咖啡机, 胶囊咖啡机]
     runtimeCategory: 咖啡机
@@ -47,8 +54,18 @@ topics:
     aliases: [积木]
     runtimeCategory: 积木玩具
   - canonical: 吉他
-    aliases: [民谣吉他, 电吉他]
+    aliases: [民谣吉他, 民谣琴, 原声吉他, 电吉他]
     runtimeCategory: 吉他
+    surfaceTerms: [吉他, 民谣吉他, 民谣琴, 原声吉他]
+  - canonical: 雪饼
+    aliases: [米饼]
+    runtimeCategory: 零食
+    surfaceTerms: [雪饼, 米饼]
+  - canonical: 无人机
+    aliases: [航拍无人机]
+    runtimeCategory: 无人机
+    surfaceTerms: [无人机, 航拍无人机]
+    blockedTerms: [充电器, 车充, 电池, 桨叶, 配件]
   - canonical: 办公椅
     aliases: [人体工学椅]
     runtimeCategory: 办公椅
@@ -61,3 +78,20 @@ topics:
   - canonical: 平板电脑
     aliases: [平板电脑, ipad, 学习平板]
     runtimeCategory: 平板电脑
+
+# Qualifiers in this list are hard product-attribute requests. They may only
+# pass when the Java-owned product snapshot contains one of the declared
+# evidence terms; semantic similarity is not accepted as attribute evidence.
+verifiedQualifiers:
+  - id: vegan
+    triggers: [纯素食, 纯素, 素食]
+    evidenceTerms: [纯素食, 纯素, 素食, 植物基]
+
+# Marketplace titles often describe several variants even when the currently
+# indexed SKU is more specific. A title-level exclusion may only be overridden
+# by an explicit, mutually exclusive SKU property declared here. Absence of the
+# excluded word alone is not evidence.
+variantExclusionEvidence:
+  - id: acoustic-guitar-not-electric-box
+    excludedTerms: [电箱]
+    requiredAlternativeTerms: [原声款, 原声吉他, 纯原声]

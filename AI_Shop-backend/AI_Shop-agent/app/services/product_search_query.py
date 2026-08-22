@@ -40,6 +40,30 @@ def _runtime_topics() -> list[dict[str, Any]]:
     return [item for item in topics if isinstance(item, dict)]
 
 
+@lru_cache(maxsize=1)
+def _verified_qualifiers() -> list[dict[str, Any]]:
+    payload = yaml.safe_load(_RUNTIME_TAXONOMY_PATH.read_text(encoding="utf-8"))
+    qualifiers = payload.get("verifiedQualifiers") if isinstance(payload, dict) else None
+    if qualifiers is None:
+        return []
+    if not isinstance(qualifiers, list):
+        raise ValueError(f"invalid runtime product qualifiers: {_RUNTIME_TAXONOMY_PATH}")
+    return [item for item in qualifiers if isinstance(item, dict)]
+
+
+@lru_cache(maxsize=1)
+def _variant_exclusion_evidence() -> list[dict[str, Any]]:
+    payload = yaml.safe_load(_RUNTIME_TAXONOMY_PATH.read_text(encoding="utf-8"))
+    contracts = payload.get("variantExclusionEvidence") if isinstance(payload, dict) else None
+    if contracts is None:
+        return []
+    if not isinstance(contracts, list):
+        raise ValueError(
+            f"invalid runtime variant exclusion evidence: {_RUNTIME_TAXONOMY_PATH}"
+        )
+    return [item for item in contracts if isinstance(item, dict)]
+
+
 def _topic_aliases(topic: dict[str, Any]) -> list[str]:
     values = [topic.get("canonical"), *(topic.get("aliases") or [])]
     return [str(value).strip() for value in values if str(value or "").strip()]
@@ -51,6 +75,183 @@ def _topic_exact_aliases(topic: dict[str, Any]) -> list[str]:
         for value in topic.get("exactAliases") or []
         if str(value or "").strip()
     ]
+
+
+_NEGATED_SURFACE_MARKERS = (
+    "不要",
+    "不含",
+    "排除",
+    "剔除",
+    "不选",
+    "别要",
+    "无需",
+    "不要买",
+)
+
+
+def _alias_is_negated(value: str, alias: str, start: int) -> bool:
+    """Return whether an alias occurrence belongs to a nearby exclusion span.
+
+    Product queries often combine a broad positive shelf with a narrow negative
+    example (``平价零食不要旺旺雪饼``).  Treating the latter alias as a positive
+    category contract would make the runtime discard every valid alternative.
+    The check is deliberately local to the current clause so a later positive
+    target (``不要 XM6，保留十周年版``) remains usable.
+    """
+
+    clause_start = max(
+        value.rfind(marker, 0, start)
+        for marker in ("，", ",", "。", "；", ";", "并", "但", "却")
+    )
+    prefix = value[clause_start + 1 : start]
+    return any(marker in prefix for marker in _NEGATED_SURFACE_MARKERS)
+
+
+def _alias_in_positive_context(value: str, alias: str) -> bool:
+    alias_value = alias.casefold()
+    offset = 0
+    while True:
+        start = value.find(alias_value, offset)
+        if start < 0:
+            return False
+        if not _alias_is_negated(value, alias_value, start):
+            return True
+        offset = start + len(alias_value)
+
+
+def runtime_surface_contracts(query: str | None) -> list[dict[str, list[str] | str]]:
+    """Return snapshot-verifiable product-type contracts explicitly named in a query."""
+
+    value = str(query or "").strip().casefold()
+    if not value:
+        return []
+    contracts: list[dict[str, list[str] | str]] = []
+    for topic in _runtime_topics():
+        aliases = _topic_aliases(topic)
+        exact_aliases = _topic_exact_aliases(topic)
+        if not any(_alias_in_positive_context(value, alias.casefold()) for alias in aliases) and not any(
+            value == alias.casefold() for alias in exact_aliases
+        ):
+            continue
+        surface_terms = topic.get("surfaceTerms") or aliases
+        contracts.append(
+            {
+                "category": str(
+                    topic.get("runtimeCategory") or topic.get("canonical") or ""
+                ).strip(),
+                "surfaceTerms": [
+                    str(term).strip()
+                    for term in surface_terms
+                    if str(term or "").strip()
+                ],
+                "blockedTerms": [
+                    str(term).strip()
+                    for term in topic.get("blockedTerms") or []
+                    if str(term or "").strip()
+                ],
+            }
+        )
+    return contracts
+
+
+def verified_qualifier_contracts(query: str | None) -> list[dict[str, list[str] | str]]:
+    value = str(query or "").strip().casefold()
+    contracts: list[dict[str, list[str] | str]] = []
+    for qualifier in _verified_qualifiers():
+        triggers = [str(item).strip() for item in qualifier.get("triggers") or []]
+        if not any(trigger and trigger.casefold() in value for trigger in triggers):
+            continue
+        contracts.append(
+            {
+                "id": str(qualifier.get("id") or "verified-qualifier"),
+                "evidenceTerms": [
+                    str(item).strip()
+                    for item in qualifier.get("evidenceTerms") or []
+                    if str(item or "").strip()
+                ],
+            }
+        )
+    return contracts
+
+
+def variant_exclusion_contracts(term: str | None) -> list[dict[str, list[str] | str]]:
+    """Return explicit SKU evidence that can disambiguate a noisy listing title."""
+
+    value = str(term or "").strip().casefold()
+    if not value:
+        return []
+    contracts: list[dict[str, list[str] | str]] = []
+    for contract in _variant_exclusion_evidence():
+        excluded_terms = [
+            str(item).strip()
+            for item in contract.get("excludedTerms") or []
+            if str(item or "").strip()
+        ]
+        if value not in {item.casefold() for item in excluded_terms}:
+            continue
+        contracts.append(
+            {
+                "id": str(contract.get("id") or "variant-exclusion"),
+                "excludedTerms": excluded_terms,
+                "requiredAlternativeTerms": [
+                    str(item).strip()
+                    for item in contract.get("requiredAlternativeTerms") or []
+                    if str(item or "").strip()
+                ],
+            }
+        )
+    return contracts
+
+
+_MODEL_TOKEN_RE = re.compile(
+    r"(?i)(?<![a-z0-9])(?:"
+    r"[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+|"
+    r"[a-z]+[a-z0-9]*\d+[a-z0-9-]*|"
+    r"\d+[a-z][a-z0-9-]*"
+    r")(?![a-z0-9])"
+)
+_SPEC_TOKEN_RE = re.compile(
+    r"(?i)^(?:[345]g|\d+(?:\.\d+)?(?:gb|tb|g|w|mah|ml|cm|mm))$"
+)
+
+
+def exact_model_tokens(query: str | None) -> tuple[str, ...]:
+    """Extract model-like identifiers while excluding common units and network labels."""
+
+    tokens: list[str] = []
+    for match in _MODEL_TOKEN_RE.finditer(str(query or "")):
+        raw = match.group(0).strip("-_")
+        if not raw or _SPEC_TOKEN_RE.fullmatch(raw):
+            continue
+        normalized = re.sub(r"[^a-z0-9]", "", raw.casefold())
+        if len(normalized) >= 2 and normalized not in tokens:
+            tokens.append(normalized)
+    return tuple(tokens)
+
+
+def is_comparison_query(query: str | None) -> bool:
+    """Whether model identifiers describe alternative targets, not one SKU."""
+
+    value = str(query or "")
+    return bool(
+        re.search(
+            r"(?:与|和|对比|比较|怎么选|如何选|哪个好|排除|保留|不要|不选)",
+            value,
+        )
+    )
+
+
+def comparison_target_terms(query: str | None) -> tuple[str, ...]:
+    """Extract non-model words naming an explicitly retained comparison target."""
+
+    value = str(query or "").casefold()
+    spans = re.findall(r"(?:保留|对比|比较)\s*([^，。；;！？!?]+)", value)
+    terms: list[str] = []
+    for span in spans:
+        for token in re.findall(r"[\u4e00-\u9fff]{2,}|[a-z0-9][a-z0-9_-]{1,}", span):
+            if token not in terms:
+                terms.append(token)
+    return tuple(terms)
 
 
 def infer_product_category(text: str | None) -> str | None:
@@ -77,7 +278,7 @@ def infer_product_category(text: str | None) -> str | None:
         if not category:
             continue
         for alias in _topic_aliases(topic):
-            if alias.lower() in value:
+            if _alias_in_positive_context(value, alias.casefold()):
                 matches.append((len(alias), -position, category))
         for alias in _topic_exact_aliases(topic):
             if cleaned_value == alias.casefold():

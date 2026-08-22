@@ -11,14 +11,21 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 from app.rag.rrf import rrf_score_at_rank
+from app.services.product_constraint_evidence import evaluate_excluded_terms
 from app.services.product_search_query import (
+    comparison_target_terms,
+    exact_model_tokens,
     filter_products_by_query_relevance,
     infer_product_category,
+    is_comparison_query,
     is_managed_search_keyword,
     normalize_product_search_query,
     primary_product_request,
+    runtime_surface_contracts,
+    verified_qualifier_contracts,
 )
 from app.services.shopping_profile_service import shopping_profile_service
+from evaluation.core.fault_injection import fault_point
 
 
 @dataclass(frozen=True)
@@ -67,10 +74,19 @@ class ProductSearchTrace:
     stage_latency_ms: dict[str, float] = field(default_factory=dict)
     recall_counts: dict[str, int] = field(default_factory=dict)
     rejection_counts: dict[str, int] = field(default_factory=dict)
+    rejection_reasons: list[dict[str, str]] = field(default_factory=list)
     candidate_count: int = 0
     result_count: int = 0
     fallback: bool = False
     provider_calls: dict[str, int] = field(default_factory=dict)
+    provider_failures: dict[str, int] = field(default_factory=dict)
+    provider_timeouts: dict[str, int] = field(default_factory=dict)
+    deadline_cancellations: dict[str, int] = field(default_factory=dict)
+    stage_failures: dict[str, int] = field(default_factory=dict)
+    stage_timeouts: dict[str, int] = field(default_factory=dict)
+    cancelled_count: int = 0
+    partial_failure: bool = False
+    deadline_exceeded: bool = False
     result_source: str = "none"
 
     def public(self) -> dict[str, Any]:
@@ -79,10 +95,19 @@ class ProductSearchTrace:
             "stageLatencyMs": dict(self.stage_latency_ms),
             "recallCounts": dict(self.recall_counts),
             "rejectionCounts": dict(self.rejection_counts),
+            "rejectionReasons": list(self.rejection_reasons),
             "candidateCount": self.candidate_count,
             "resultCount": self.result_count,
             "fallback": self.fallback,
             "providerCalls": dict(self.provider_calls),
+            "providerFailures": dict(self.provider_failures),
+            "providerTimeouts": dict(self.provider_timeouts),
+            "deadlineCancellations": dict(self.deadline_cancellations),
+            "stageFailures": dict(self.stage_failures),
+            "stageTimeouts": dict(self.stage_timeouts),
+            "cancelledCount": self.cancelled_count,
+            "partialFailure": self.partial_failure,
+            "deadlineExceeded": self.deadline_exceeded,
             "resultSource": self.result_source,
         }
 
@@ -245,6 +270,23 @@ def _product_text(product: Mapping[str, Any]) -> str:
     return " ".join(str(value or "") for value in values).casefold()
 
 
+def _product_surface_text(product: Mapping[str, Any]) -> str:
+    values = (
+        product.get("product_name"),
+        product.get("productName"),
+        product.get("brand"),
+        product.get("category"),
+        product.get("categoryName"),
+        product.get("category_name"),
+        product.get("product_class"),
+    )
+    return " ".join(str(value or "") for value in values).casefold()
+
+
+def _product_id(product: Mapping[str, Any]) -> str:
+    return str(product.get("product_id") or product.get("productId") or product.get("id") or "")
+
+
 def _product_price(product: Mapping[str, Any]) -> float | None:
     for key in ("estimated_payable", "price", "min_price", "minPrice"):
         value = _number(product.get(key))
@@ -276,7 +318,6 @@ def filter_products_by_runtime_constraints(
         ).strip().casefold()
         if brand:
             product["brand"] = brand
-        product_text = _product_text(product)
         price = _product_price(product)
         reason: str | None = None
         if constraints.budget_max is not None and price is not None and price > constraints.budget_max:
@@ -287,8 +328,13 @@ def filter_products_by_runtime_constraints(
             reason = "BRAND_REQUIRED"
         elif brand and brand in excluded:
             reason = "BRAND_EXCLUDED"
-        elif excluded_terms and any(term in product_text for term in excluded_terms):
-            reason = "TERM_EXCLUDED"
+        elif excluded_terms:
+            exclusion = evaluate_excluded_terms(product, tuple(excluded_terms))
+            if exclusion["violates"]:
+                reason = "TERM_EXCLUDED"
+            elif exclusion["eligibleSkuKeys"]:
+                product["constraint_allowed_sku_keys"] = exclusion["eligibleSkuKeys"]
+                product["constraint_evidence_contracts"] = exclusion["evidenceContracts"]
         elif constraints.category:
             category_fields = " ".join(
                 str(product.get(key) or "")
@@ -310,13 +356,106 @@ def filter_products_for_query_plan(
     """Apply the same verified candidate guard in runtime and evaluation.
 
     Managed and dynamic catalog categories use snapshot-backed hard
-    constraints.  A conservative surface guard is limited to explicit
-    comparison suffixes; applying it to every unknown taxonomy category would
-    incorrectly hide valid products newly added to the live catalog.
+    constraints. Explicit product-type contracts are strict: a compact Java
+    snapshot without a matching surface cannot justify a cross-category
+    substitute. Broad shelves without a concrete type contract retain their
+    conservative unknown-category behavior, while comparison suffixes remain
+    separately guarded.
     """
 
     candidates = [dict(product) for product in products]
     surface_rejected: list[dict[str, str]] = []
+    model_tokens = exact_model_tokens(plan.raw_query)
+    if model_tokens:
+        model_match = any if is_comparison_query(plan.raw_query) else all
+        retained_terms = comparison_target_terms(plan.raw_query)
+
+        def matches_model_or_retained_target(product: Mapping[str, Any]) -> bool:
+            name = "".join(
+                character
+                for character in str(
+                    product.get("product_name") or product.get("productName") or ""
+                ).casefold()
+                if character.isalnum()
+            )
+            model_hit = model_match(
+                token in name
+                for token in model_tokens
+            )
+            return model_hit or bool(
+                is_comparison_query(plan.raw_query)
+                and any(
+                    term in name
+                    or (len(term) >= 3 and term[:-1] in name)
+                    for term in retained_terms
+                )
+            )
+
+        matched = [
+            product
+            for product in candidates
+            if matches_model_or_retained_target(product)
+        ]
+        matched_ids = {id(product) for product in matched}
+        surface_rejected.extend(
+            {
+                "productId": _product_id(product),
+                "reason": "EXACT_MODEL_MISMATCH",
+            }
+            for product in candidates
+            if id(product) not in matched_ids
+        )
+        candidates = matched
+
+    type_contracts = runtime_surface_contracts(plan.raw_query)
+    if type_contracts and candidates:
+        matched = []
+        for product in candidates:
+            text = _product_surface_text(product)
+            contract_matches = [
+                bool(contract.get("surfaceTerms"))
+                and any(
+                    str(term).casefold() in text
+                    for term in contract.get("surfaceTerms") or []
+                )
+                and not any(
+                    str(term).casefold() in text
+                    for term in contract.get("blockedTerms") or []
+                )
+                for contract in type_contracts
+            ]
+            if any(contract_matches):
+                matched.append(product)
+            else:
+                surface_rejected.append(
+                    {
+                        "productId": _product_id(product),
+                        "reason": "MANAGED_CATEGORY_SURFACE_MISMATCH",
+                    }
+                )
+        candidates = matched
+
+    qualifier_contracts = verified_qualifier_contracts(plan.raw_query)
+    if qualifier_contracts and candidates:
+        matched = []
+        for product in candidates:
+            text = _product_text(product)
+            if all(
+                any(
+                    str(term).casefold() in text
+                    for term in contract.get("evidenceTerms") or []
+                )
+                for contract in qualifier_contracts
+            ):
+                matched.append(product)
+            else:
+                surface_rejected.append(
+                    {
+                        "productId": _product_id(product),
+                        "reason": "UNVERIFIED_REQUIRED_ATTRIBUTE",
+                    }
+                )
+        candidates = matched
     if "comparison_target_excluded_from_requested_category" in plan.normalization_rules:
         matched = filter_products_by_query_relevance(
             candidates, primary_product_request(plan.raw_query)
@@ -338,8 +477,31 @@ def filter_products_for_query_plan(
                 )
         candidates = matched
     managed_category = infer_product_category(plan.raw_query)
-    if managed_category and candidates:
+    if managed_category and candidates and not type_contracts:
+        # A Java offer snapshot may intentionally omit human-readable category
+        # fields.  In that case absence of the category word in a title is not
+        # evidence that the offer is unrelated; keep the authoritative
+        # candidates and let explicit constraints/exclusions decide.
+        category_fields_available = any(
+            any(
+                any(char.isalpha() or "\u4e00" <= char <= "\u9fff" for char in value)
+                for value in (
+                    str(product.get(key) or "").strip()
+                    for key in ("category", "categoryName", "category_name", "product_class")
+                )
+                if value
+            )
+            for product in candidates
+        )
         matched = filter_products_by_query_relevance(candidates, managed_category)
+        if not category_fields_available and plan.constraints.excluded_terms:
+            # A negative-constraint query may intentionally use a broad shelf
+            # (for example, "零食不要旺旺").  Product titles are not a
+            # category authority in this snapshot shape, so retain the pool
+            # for the explicit exclusion filter instead of manufacturing a
+            # false partial result (a title can mention the shelf alias for the
+            # excluded item while valid alternatives do not).
+            matched = list(candidates)
         matched_ids = {id(product) for product in matched}
         for product in candidates:
             if id(product) not in matched_ids:
@@ -372,6 +534,8 @@ class ProductSearchPipeline:
         vector_search: VectorSearch,
         load_products: ProductLoader,
         rerank: ProductReranker,
+        deadline_seconds: float | None = None,
+        provider_timeout_seconds: float | None = None,
     ) -> ProductSearchResult:
         started = time.perf_counter()
         trace = ProductSearchTrace(query_plan=plan.public())
@@ -380,36 +544,194 @@ class ProductSearchPipeline:
             trace.stage_latency_ms["total"] = 0.0
             return ProductSearchResult([], [], trace)
 
-        async def measured(kind: str, variant: str, call) -> tuple[str, str, list[str], float]:
-            stage_started = time.perf_counter()
-            values = await call(variant, candidate_size)
-            return kind, variant, list(values), (time.perf_counter() - stage_started) * 1000
+        search_deadline = float(8.0 if deadline_seconds is None else deadline_seconds)
+        provider_timeout = float(
+            4.0 if provider_timeout_seconds is None else provider_timeout_seconds
+        )
+        if search_deadline <= 0 or provider_timeout <= 0:
+            raise ValueError("search deadlines must be positive")
 
-        tasks = [
-            asyncio.create_task(measured(kind, variant, search))
-            for variant in variants
-            for kind, search in (("bm25", keyword_search), ("vector", vector_search))
-        ]
-        recall_rows = await asyncio.gather(*tasks)
+        # The deadline is an end-to-end budget for this pipeline, not merely a
+        # recall timeout.  Providers receive a shorter individual timeout, while
+        # snapshot loading and reranking consume whatever budget remains.
+        deadline_at = started + search_deadline
+
+        def remaining_budget() -> float:
+            return deadline_at - time.perf_counter()
+
+        async def measured(
+            kind: str,
+            variant: str,
+            call,
+        ) -> tuple[str, str, list[str], float, str, str | None]:
+            stage_started = time.perf_counter()
+            try:
+                injected_mode = fault_point(kind)
+                if injected_mode == "empty":
+                    return (
+                        kind,
+                        variant,
+                        [],
+                        (time.perf_counter() - stage_started) * 1000,
+                        "EMPTY",
+                        "InjectedEmptyResult",
+                    )
+                async with asyncio.timeout(provider_timeout):
+                    values = await call(variant, candidate_size)
+                values = list(values)
+                if injected_mode == "partial":
+                    values = values[: max(1, len(values) // 2)] if values else []
+                return (
+                    kind,
+                    variant,
+                    values,
+                    (time.perf_counter() - stage_started) * 1000,
+                    "OK",
+                    None,
+                )
+            except TimeoutError:
+                return (
+                    kind,
+                    variant,
+                    [],
+                    (time.perf_counter() - stage_started) * 1000,
+                    "TIMEOUT",
+                    "TimeoutError",
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                return (
+                    kind,
+                    variant,
+                    [],
+                    (time.perf_counter() - stage_started) * 1000,
+                    "ERROR",
+                    type(exc).__name__,
+                )
+
+        tasks: list[asyncio.Task] = []
+        task_metadata: dict[asyncio.Task, tuple[str, str]] = {}
+        for variant in variants:
+            for kind, search in (("bm25", keyword_search), ("vector", vector_search)):
+                task = asyncio.create_task(measured(kind, variant, search))
+                tasks.append(task)
+                task_metadata[task] = (kind, variant)
         trace.provider_calls["bm25"] = len(variants)
         trace.provider_calls["embeddingVector"] = len(variants)
+        recall_started = time.perf_counter()
+        done, pending = await asyncio.wait(tasks, timeout=max(0.0, remaining_budget()))
+        if pending:
+            trace.partial_failure = True
+            trace.deadline_exceeded = True
+            trace.cancelled_count += len(pending)
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+        recall_rows: list[tuple[str, str, list[str], float, str, str | None]] = []
+        for task in done:
+            try:
+                recall_rows.append(task.result())
+            except asyncio.CancelledError:
+                trace.cancelled_count += 1
+                kind, _variant = task_metadata.get(task, ("unknown", ""))
+                trace.deadline_cancellations[kind] = (
+                    trace.deadline_cancellations.get(kind, 0) + 1
+                )
+            except Exception:
+                trace.partial_failure = True
+                kind, variant = task_metadata.get(task, ("unknown", ""))
+                trace.provider_failures[kind] = trace.provider_failures.get(kind, 0) + 1
+                key = f"{kind}:{variant}" if variant else f"unknown:task-{id(task)}"
+                trace.recall_counts[key] = 0
+                trace.stage_latency_ms[key] = 0.0
+        trace.stage_latency_ms["recall"] = round(
+            (time.perf_counter() - recall_started) * 1000, 4
+        )
+        if pending:
+            # ``asyncio.wait`` retains task identity but not its payload after
+            # cancellation, so use the explicit metadata map for diagnostics.
+            for task in pending:
+                kind, variant = task_metadata.get(task, ("unknown", ""))
+                trace.deadline_cancellations[kind] = (
+                    trace.deadline_cancellations.get(kind, 0) + 1
+                )
+                trace.recall_counts[f"{kind}:{variant}"] = 0
+                trace.stage_latency_ms[f"{kind}:{variant}"] = round(
+                    (time.perf_counter() - recall_started) * 1000, 4
+                )
         rankings: list[list[str]] = []
-        for kind, variant, values, latency in recall_rows:
+        for kind, variant, values, latency, status, error_name in recall_rows:
             key = f"{kind}:{variant}"
-            rankings.append(values)
+            if status in {"OK", "EMPTY"}:
+                rankings.append(values)
+                if status == "EMPTY":
+                    trace.partial_failure = True
+                    trace.provider_failures[kind] = trace.provider_failures.get(kind, 0) + 1
+            else:
+                trace.partial_failure = True
+                if status == "TIMEOUT":
+                    trace.provider_timeouts[kind] = trace.provider_timeouts.get(kind, 0) + 1
+                else:
+                    trace.provider_failures[kind] = trace.provider_failures.get(kind, 0) + 1
             trace.recall_counts[key] = len(values)
             trace.stage_latency_ms[key] = round(latency, 4)
+            if error_name:
+                trace.recall_counts[f"{key}:error"] = 1
+
+        if not rankings:
+            trace.result_source = "recall_unavailable" if trace.partial_failure else "no_recall"
+            trace.stage_latency_ms["total"] = round((time.perf_counter() - started) * 1000, 4)
+            capture = _PRODUCT_SEARCH_EVALUATION_CAPTURE.get()
+            if capture is not None:
+                capture.traces.append(trace)
+            return ProductSearchResult([], [], trace)
 
         rrf_started = time.perf_counter()
         ranked_ids = merge_ranked_lists(rankings, candidate_size)
         trace.stage_latency_ms["rrf"] = round((time.perf_counter() - rrf_started) * 1000, 4)
         trace.candidate_count = len(ranked_ids)
 
-        load_started = time.perf_counter()
-        products = await load_products(ranked_ids)
-        trace.stage_latency_ms["snapshotLoad"] = round(
-            (time.perf_counter() - load_started) * 1000, 4
+        async def bounded_stage(
+            stage: str,
+            call: Callable[[], Awaitable[Any]],
+        ) -> tuple[Any, str, float]:
+            stage_started = time.perf_counter()
+            remaining = remaining_budget()
+            if remaining <= 0:
+                trace.partial_failure = True
+                trace.deadline_exceeded = True
+                trace.stage_timeouts[stage] = trace.stage_timeouts.get(stage, 0) + 1
+                return None, "DEADLINE", (time.perf_counter() - stage_started) * 1000
+            try:
+                async with asyncio.timeout(remaining):
+                    value = await call()
+                return value, "OK", (time.perf_counter() - stage_started) * 1000
+            except TimeoutError:
+                trace.partial_failure = True
+                trace.deadline_exceeded = True
+                trace.stage_timeouts[stage] = trace.stage_timeouts.get(stage, 0) + 1
+                return None, "TIMEOUT", (time.perf_counter() - stage_started) * 1000
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                trace.partial_failure = True
+                trace.stage_failures[stage] = trace.stage_failures.get(stage, 0) + 1
+                return None, "ERROR", (time.perf_counter() - stage_started) * 1000
+
+        products, load_status, load_latency = await bounded_stage(
+            "snapshotLoad", lambda: load_products(ranked_ids)
         )
+        trace.stage_latency_ms["snapshotLoad"] = round(load_latency, 4)
+        if load_status != "OK":
+            trace.result_source = "snapshot_unavailable"
+            trace.result_count = 0
+            trace.stage_latency_ms["total"] = round((time.perf_counter() - started) * 1000, 4)
+            capture = _PRODUCT_SEARCH_EVALUATION_CAPTURE.get()
+            if capture is not None:
+                capture.traces.append(trace)
+            return ProductSearchResult([], ranked_ids, trace)
+        products = list(products or [])
 
         filter_started = time.perf_counter()
         eligible, rejected = filter_products_for_query_plan(products, plan)
@@ -419,22 +741,33 @@ class ProductSearchPipeline:
         for row in rejected:
             reason = row["reason"]
             trace.rejection_counts[reason] = trace.rejection_counts.get(reason, 0) + 1
+        trace.rejection_reasons.extend(rejected)
 
         if eligible:
-            rerank_started = time.perf_counter()
-            eligible = await rerank(plan.raw_query, eligible, result_size)
-            trace.stage_latency_ms["rerank"] = round(
-                (time.perf_counter() - rerank_started) * 1000, 4
-            )
-            trace.fallback = any(
-                str(product.get("_search_rerank_source") or "rerank") != "rerank"
-                for product in eligible
-            )
             trace.provider_calls["rerank"] = 1
-            trace.result_source = "rrf_fallback" if trace.fallback else "rerank"
+            reranked, rerank_status, rerank_latency = await bounded_stage(
+                "rerank", lambda: rerank(plan.raw_query, eligible, result_size)
+            )
+            trace.stage_latency_ms["rerank"] = round(rerank_latency, 4)
+            if rerank_status == "OK":
+                eligible = list(reranked or [])
+                trace.fallback = any(
+                    str(product.get("_search_rerank_source") or "rerank") != "rerank"
+                    for product in eligible
+                )
+                trace.result_source = "rrf_fallback" if trace.fallback else "rerank"
+            else:
+                # Preserve an eligible, authoritative snapshot when the optional
+                # reranker misses its budget.  The trace makes the degradation
+                # explicit and provider-completeness gates can fail the case.
+                trace.fallback = True
+                trace.result_source = "rrf_fallback"
+                eligible = eligible[: max(1, result_size)]
         else:
             trace.stage_latency_ms["rerank"] = 0.0
             trace.provider_calls["rerank"] = 0
+            if ranked_ids:
+                trace.result_source = "constraint_miss"
         trace.result_count = len(eligible)
         trace.stage_latency_ms["total"] = round((time.perf_counter() - started) * 1000, 4)
         capture = _PRODUCT_SEARCH_EVALUATION_CAPTURE.get()

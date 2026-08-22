@@ -17,10 +17,16 @@ from app.db.pool import close_pool, init_pool
 from app.observability.logging import configure_structured_logging
 from app.services import mcp_tools_service as tools
 from app.services.episode_service import episode_service
+from app.services.evaluation_fault_service import (
+    consume_mcp_fault_capability,
+    mcp_fault_capability_from_meta,
+    record_fault_events,
+)
 from app.services.java_internal_client import delegated_user_scope
 from app.services.redis_service import redis_service
 from app.services.shopping_mission_service import initialize_category_need_schemas
 from app.services.tool_invoke_result import ToolInvokeResult
+from evaluation.core.fault_injection import FailureInjectionScope, fault_point
 
 _MCP_HOST = os.getenv("FASTMCP_HOST", "127.0.0.1")
 _MCP_PORT = int(os.getenv("FASTMCP_PORT", "7060"))
@@ -29,6 +35,34 @@ configure_structured_logging()
 # mcp 1.28.1 defines Settings before FastMCP and leaves its lifespan forward
 # reference unresolved under pydantic-settings 2.15.
 FastMCPSettings.model_rebuild()
+
+
+class EvaluationAwareFastMCP(FastMCP):
+    """Intercept an opaque evaluation capability without changing tool schemas."""
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]):
+        context = self.get_context()
+        capability = mcp_fault_capability_from_meta(
+            context.request_context.meta
+        )
+        if not capability:
+            return await super().call_tool(name, arguments)
+
+        authorized = await consume_mcp_fault_capability(
+            capability,
+            arguments=arguments,
+        )
+        scope = FailureInjectionScope(authorized.scenario)
+        try:
+            with scope:
+                fault_point("mcp-tool")
+                return await super().call_tool(name, arguments)
+        finally:
+            await record_fault_events(
+                authorized,
+                scope.events,
+                process="mcp-server",
+            )
 
 
 @asynccontextmanager
@@ -48,7 +82,7 @@ async def _mcp_lifespan(_server: FastMCP) -> AsyncIterator[dict]:
         await redis_service.close()
 
 
-mcp = FastMCP(
+mcp = EvaluationAwareFastMCP(
     "aishop-tools",
     instructions=(
         "AI_Shop mall agent tools. Read tools return text; write tools create confirm cards. "

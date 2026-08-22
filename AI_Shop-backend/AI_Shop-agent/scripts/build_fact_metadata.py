@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -18,12 +19,24 @@ from app.rag.fact_metadata import (  # noqa: E402
     DEFAULT_FACT_METADATA_PATH,
     FACT_METADATA_SCHEMA,
 )
-from benchmarks.mature_eval.common import atomic_write_json  # noqa: E402
 
 _HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 _SENTENCE_RE = re.compile(r"[。；;\n]")
 _NEGATIVE_RE = re.compile(r"(?:不支持|不能|不得|不会|不可|不允许|仅|无法|无权)")
 _CAPABILITY_PREFIXES = ("ai.", "payment.", "privacy.", "review.ai_")
+
+
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    """Replace generated metadata atomically without an evaluation dependency."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+        temporary = Path(handle.name)
+    temporary.replace(path)
 
 
 def _sections(path: Path) -> dict[str, str]:
@@ -65,15 +78,14 @@ def build(output: Path = DEFAULT_FACT_METADATA_PATH) -> dict:
             polarity = "NEGATIVE" if direct_negative else "MIXED" if has_negative else "AFFIRMATIVE"
             prefix = fact_id.split(".", 1)[0].upper()
             row = {
-                    "factId": fact_id,
-                    "factType": "CAPABILITY" if fact_id.startswith(_CAPABILITY_PREFIXES) else prefix,
-                    "polarity": polarity,
-                    "capabilityBoundary": fact_id.startswith(_CAPABILITY_PREFIXES)
-                    and has_negative,
-                    "domain": str(document.get("domain") or "GENERAL").upper(),
-                    "aliases": [heading, f"{document.get('title')} {heading}"],
-                    "atomicClaims": claims,
-                }
+                "factId": fact_id,
+                "factType": "CAPABILITY" if fact_id.startswith(_CAPABILITY_PREFIXES) else prefix,
+                "polarity": polarity,
+                "capabilityBoundary": fact_id.startswith(_CAPABILITY_PREFIXES) and has_negative,
+                "domain": str(document.get("domain") or "GENERAL").upper(),
+                "aliases": [heading, f"{document.get('title')} {heading}"],
+                "atomicClaims": claims,
+            }
             existing = by_fact.get(fact_id)
             if existing is None:
                 by_fact[fact_id] = row
@@ -91,14 +103,12 @@ def build(output: Path = DEFAULT_FACT_METADATA_PATH) -> dict:
     payload = {
         "schemaVersion": FACT_METADATA_SCHEMA,
         "metadataVersion": 1,
-        "canonicalCatalogSha256": hashlib.sha256(
-            DEFAULT_CATALOG_PATH.read_bytes()
-        ).hexdigest(),
+        "canonicalCatalogSha256": hashlib.sha256(DEFAULT_CATALOG_PATH.read_bytes()).hexdigest(),
         "factCount": len(rows),
         "generation": "deterministic headings and published section sentences; no LLM",
         "facts": sorted(rows, key=lambda row: row["factId"]),
     }
-    atomic_write_json(output, payload)
+    _atomic_write_json(output, payload)
     return payload
 
 

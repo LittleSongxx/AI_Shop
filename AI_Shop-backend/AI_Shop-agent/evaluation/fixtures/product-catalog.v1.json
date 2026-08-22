@@ -1,0 +1,385 @@
+{
+  "canonicalSha256": "d248958b5441d775d1a54e42abc9e2968cb12acba695e66538d70e66d7ca2435",
+  "capturedAt": "2026-08-20T08:41:49.531Z",
+  "index": "aishop-index",
+  "productCount": 47,
+  "products": [
+    {
+      "categoryId": "20001",
+      "maxPrice": 6849.0,
+      "minPrice": 6379.0,
+      "productDesc": "",
+      "productId": "053997047858558",
+      "productName": "三星（SAMSUNG） Z Fold6大折叠屏5G全网通 高端 AI商务双卡旗舰智能手机"
+    },
+    {
+      "categoryId": "20004",
+      "maxPrice": 7291.0,
+      "minPrice": 7291.0,
+      "productDesc": "",
+      "productId": "055216728343001",
+      "productName": "COLMO北极星净水器C3套装 家用厨下十年RO反渗透母婴直饮机 触控龙头 1200G大通量净水器管线机套装 2件套丨C3净水器+A1管线机"
+    },
+    {
+      "categoryId": "20022",
+      "maxPrice": 12.0,
+      "minPrice": 12.0,
+      "productDesc": "",
+      "productId": "065293686460191",
+      "productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食膨化休闲食品饼干糕点"
+    },
+    {
+      "categoryId": "20032",
+      "maxPrice": 488.0,
+      "minPrice": 488.0,
+      "productDesc": "",
+      "productId": "088573992437392",
+      "productName": "君高 器材维修工具箱铝合金工具箱维修保养工具箱 军械员工具箱(京仓发货) 铝合金 25新型"
+    },
+    {
+      "categoryId": "20015",
+      "maxPrice": 1430.0,
+      "minPrice": 1430.0,
+      "productDesc": "",
+      "productId": "100766326868880",
+      "productName": "CHANEL【官方正品】香奈儿邂逅系列套组 香水礼盒套装 女士 生日礼物 邂逅柔情淡香水50ml+双效持色唇釉174号"
+    },
+    {
+      "categoryId": "20044",
+      "maxPrice": 4880.0,
+      "minPrice": 4880.0,
+      "productDesc": "",
+      "productId": "116420922896782",
+      "productName": "小猫爱学绘喵教育手绘商业插画板绘教程好课在线教学全套课程 日韩系统班"
+    },
+    {
+      "categoryId": "20003",
+      "maxPrice": 3998.0,
+      "minPrice": 2054.0,
+      "productDesc": "",
+      "productId": "158081823347974",
+      "productName": "哈曼卡顿AURA STUDIO 5琉璃5代琉璃4升级版蓝牙音箱 环绕立体声 下沉式低音炮 居家桌面音响 氛围感音响"
+    },
+    {
+      "categoryId": "20003",
+      "maxPrice": 3999.0,
+      "minPrice": 3999.0,
+      "productDesc": "",
+      "productId": "231335860060520",
+      "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生"
+    },
+    {
+      "categoryId": "20010",
+      "maxPrice": 938.0,
+      "minPrice": 938.0,
+      "productDesc": "",
+      "productId": "270126564877983",
+      "productName": "Walker Shop品牌新款旅行包男新款训练包干湿分离大容量手提单肩斜跨健身包 黑色大号【鞋仓+干湿分离】"
+    },
+    {
+      "categoryId": "20029",
+      "maxPrice": 13999.0,
+      "minPrice": 13999.0,
+      "productDesc": "",
+      "productId": "293985085089344",
+      "productName": "ANKER安克立体纹理百万色全彩打印喷绘印刷eufyMake UV浮雕打印自清洁3D打印安克UV打印机E1"
+    },
+    {
+      "categoryId": "20012",
+      "maxPrice": 9.9,
+      "minPrice": 9.9,
+      "productDesc": "",
+      "productId": "298286497857602",
+      "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g"
+    },
+    {
+      "categoryId": "20002",
+      "maxPrice": 7399.0,
+      "minPrice": 4399.0,
+      "productDesc": "",
+      "productId": "301841010226518",
+      "productName": "华硕破晓6X 台式机台式电脑主机"
+    },
+    {
+      "categoryId": "20023",
+      "maxPrice": 49.9,
+      "minPrice": 49.9,
+      "productDesc": "",
+      "productId": "303019597302892",
+      "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐"
+    },
+    {
+      "categoryId": "20024",
+      "maxPrice": 19.4,
+      "minPrice": 19.4,
+      "productDesc": "",
+      "productId": "327158568449097",
+      "productName": "海天厨房调料组合套装油盐酱醋组合装家庭宿舍调料大全调味料做饭礼盒 【性价比Plus】常用调料12件套"
+    },
+    {
+      "categoryId": "20003",
+      "maxPrice": 4169.0,
+      "minPrice": 1417.0,
+      "productDesc": "",
+      "productId": "350000232815799",
+      "productName": "索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机"
+    },
+    {
+      "categoryId": "20046",
+      "maxPrice": 158.0,
+      "minPrice": 158.0,
+      "productDesc": "",
+      "productId": "365554660873099",
+      "productName": "WPS Office【学生专享】超级会员2年卡744天论文排版外文翻译PPT模 直充到账"
+    },
+    {
+      "categoryId": "20016",
+      "maxPrice": 899.0,
+      "minPrice": 499.0,
+      "productDesc": "",
+      "productId": "378919755916188",
+      "productName": "席梦思床垫家用卧室硬椰棕1.5米20cm厚乳胶软垫独立弹簧"
+    },
+    {
+      "categoryId": "20007",
+      "maxPrice": 39.9,
+      "minPrice": 39.9,
+      "productDesc": "",
+      "productId": "422543322296606",
+      "productName": "女大童加绒加厚毛衣女秋冬15岁18初高中学生水貂绒翻领针织打底衫"
+    },
+    {
+      "categoryId": "20031",
+      "maxPrice": 109.0,
+      "minPrice": 109.0,
+      "productDesc": "",
+      "productId": "435499775288057",
+      "productName": "点氛车载香薰固体香膏男士专用持久留香汽车香水车内香氛古刹檀香"
+    },
+    {
+      "categoryId": "20021",
+      "maxPrice": 89.9,
+      "minPrice": 39.9,
+      "productDesc": "",
+      "productId": "438316828084252",
+      "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃"
+    },
+    {
+      "categoryId": "20014",
+      "maxPrice": 179.0,
+      "minPrice": 179.0,
+      "productDesc": "",
+      "productId": "467794132963439",
+      "productName": "babycare新生儿见面礼盒衣服婴儿礼物周岁初生宝宝用品大全 淡焦黄 66cm"
+    },
+    {
+      "categoryId": "20027",
+      "maxPrice": 79.9,
+      "minPrice": 79.9,
+      "productDesc": "",
+      "productId": "484914171487881",
+      "productName": "匹克（PEAK）筋膜枪按摩器肩颈腰背按摩仪肌颈膜枪专业级迷你便携式健身肌肉放松父母亲节春节情人七夕礼物男女"
+    },
+    {
+      "categoryId": "20025",
+      "maxPrice": 289.8,
+      "minPrice": 289.8,
+      "productDesc": "",
+      "productId": "485810554704298",
+      "productName": "同仁堂品牌 北京同仁堂正宗西洋参片礼盒250g花旗参送父母长辈补品礼品"
+    },
+    {
+      "categoryId": "20047",
+      "maxPrice": 960.0,
+      "minPrice": 96.0,
+      "productDesc": "",
+      "productId": "519183041848998",
+      "productName": "任天堂港服NS充值卡香港Switch点卡100 200 300 400 500港区eshop预付卡"
+    },
+    {
+      "categoryId": "20004",
+      "maxPrice": 7087.0,
+      "minPrice": 7087.0,
+      "productDesc": "",
+      "productId": "547755968243478",
+      "productName": "352空气净化器除甲醛除花粉除菌猫毛宠物TVOC异味 除过敏认证新房家用塔式双风机Z90"
+    },
+    {
+      "categoryId": "20028",
+      "maxPrice": 1749.0,
+      "minPrice": 1749.0,
+      "productDesc": "",
+      "productId": "549376645121601",
+      "productName": "雅马哈（YAMAHA）吉他FG800初学者单板民谣FS800男女学生指弹原声弹唱电箱入门吉它 FG800 沙暴渐变-41英寸原声款"
+    },
+    {
+      "categoryId": "20004",
+      "maxPrice": 12890.0,
+      "minPrice": 12890.0,
+      "productDesc": "",
+      "productId": "563738828031657",
+      "productName": "西门子（SIEMENS）71升德国原装进口蒸烤一体机蒸烤炸搪瓷内胆4D热风立体环绕烤精控探针空气炸多重自清洁HS756G3B1W 黑色"
+    },
+    {
+      "categoryId": "20020",
+      "maxPrice": 319.6,
+      "minPrice": 319.6,
+      "productDesc": "",
+      "productId": "578084699484498",
+      "productName": "拖把置物架架不锈钢扫把架拖布架沥水架学校工厂落地式清洁工具收纳架 卡夹款5卡6钩"
+    },
+    {
+      "categoryId": "20026",
+      "maxPrice": 34.4,
+      "minPrice": 34.4,
+      "productDesc": "",
+      "productId": "583435458113015",
+      "productName": "红楼梦 我国古典小说的巅峰之作（1书+1MP3）"
+    },
+    {
+      "categoryId": "20007",
+      "maxPrice": 10999.0,
+      "minPrice": 10999.0,
+      "productDesc": "",
+      "productId": "587742827032945",
+      "productName": "春日野餐 古典玩偶 Lolita 洛丽塔 裙子"
+    },
+    {
+      "categoryId": "88409",
+      "maxPrice": 33.9,
+      "minPrice": 33.9,
+      "productDesc": "",
+      "productId": "622491960431656",
+      "productName": "名创优品（MINISO）小猪B-BO弹力超柔趴姿公仔毛绒玩偶儿童玩具抱枕靠枕生日礼物女"
+    },
+    {
+      "categoryId": "20030",
+      "maxPrice": 1298.0,
+      "minPrice": 1298.0,
+      "productDesc": "",
+      "productId": "627057993813554",
+      "productName": "飞艇航天级TPE汽车脚垫适用于蔚来ES8/ET5/ET5T/ES6/EC6耐刮防护配件 蔚来ES8六座（26款）TPE脚垫+银河抗污毯"
+    },
+    {
+      "categoryId": "20002",
+      "maxPrice": 5099.0,
+      "minPrice": 4399.0,
+      "productDesc": "",
+      "productId": "650980987345712",
+      "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260"
+    },
+    {
+      "categoryId": "20012",
+      "maxPrice": 59.9,
+      "minPrice": 59.9,
+      "productDesc": "",
+      "productId": "664740861226404",
+      "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+    },
+    {
+      "categoryId": "20033",
+      "maxPrice": 99.0,
+      "minPrice": 99.0,
+      "productDesc": "",
+      "productId": "683735539720416",
+      "productName": "CUKTECH酷态科10号超级车充自带伸缩线车载充电器可充大疆无人机多口100W/单口90W超级快充适用苹果17小米"
+    },
+    {
+      "categoryId": "20018",
+      "maxPrice": 379.0,
+      "minPrice": 379.0,
+      "productDesc": "",
+      "productId": "694835806434643",
+      "productName": "以辰景德镇68头餐具整套碗具碗碟套装家用碗筷碗盘洗碗机可用送礼物"
+    },
+    {
+      "categoryId": "20019",
+      "maxPrice": 109.0,
+      "minPrice": 109.0,
+      "productDesc": "",
+      "productId": "748346463863251",
+      "productName": "杞乐招财猫乔迁礼物入户玄关摆件客厅钥匙收纳置物架搬家新居礼品装饰 铃铛猫+置物架+相框+小摆件"
+    },
+    {
+      "categoryId": "20011",
+      "maxPrice": 35.9,
+      "minPrice": 19.9,
+      "productDesc": "",
+      "productId": "763086281772264",
+      "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女"
+    },
+    {
+      "categoryId": "20013",
+      "maxPrice": 259.0,
+      "minPrice": 259.0,
+      "productDesc": "",
+      "productId": "811128851953351",
+      "productName": "欧莱雅第四代小蜜罐胶原面霜滋润紧致抗皱抗老补水保湿护肤品送妈妈礼物 第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml 女士优选"
+    },
+    {
+      "categoryId": "20012",
+      "maxPrice": 19.9,
+      "minPrice": 19.9,
+      "productDesc": "",
+      "productId": "843304724668395",
+      "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红"
+    },
+    {
+      "categoryId": "20045",
+      "maxPrice": 890.0,
+      "minPrice": 890.0,
+      "productDesc": "",
+      "productId": "857498255651316",
+      "productName": "SW SolidWorks软件安装包正版激活码服务 2025高级许可证企业商用序列 2024激活订阅正版授权 激活服务 2025版本【一年有效】"
+    },
+    {
+      "categoryId": "20008",
+      "maxPrice": 189.9,
+      "minPrice": 189.9,
+      "productDesc": "",
+      "productId": "864824304719236",
+      "productName": "假两件格纹翻领棉服外套男冬季新款宽松加绒加厚大码男生夹克"
+    },
+    {
+      "categoryId": "20002",
+      "maxPrice": 25399.0,
+      "minPrice": 12699.0,
+      "productDesc": "",
+      "productId": "869004898763662",
+      "productName": "Apple/苹果AI笔记本/MacBookPro14英寸M5(10+10核)16G 1T银色笔记本电脑MDE54CH/A"
+    },
+    {
+      "categoryId": "20001",
+      "maxPrice": 16999.0,
+      "minPrice": 8999.0,
+      "productDesc": "",
+      "productId": "895150981058759",
+      "productName": "Apple/苹果 iPhone 17 Pro Max 移动联通电信5G 双卡双待手机"
+    },
+    {
+      "categoryId": "88409",
+      "maxPrice": 25.9,
+      "minPrice": 19.9,
+      "productDesc": "",
+      "productId": "917186661226040",
+      "productName": "卡皮巴拉软握按动中性笔高颜值胖胖笔熊猫笔减负速干欧包笔 0.5黑色水笔大容量刷题笔st笔头考试专用开学文具"
+    },
+    {
+      "categoryId": "20009",
+      "maxPrice": 1800.0,
+      "minPrice": 1800.0,
+      "productDesc": "",
+      "productId": "993921843864063",
+      "productName": "KAILAS凯乐石M8软壳衣男女户外登山耐磨弹力透气轻量防风连帽外套春秋 "
+    },
+    {
+      "categoryId": "20002",
+      "maxPrice": 42299.0,
+      "minPrice": 9199.0,
+      "productDesc": "",
+      "productId": "995230446006541",
+      "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制"
+    }
+  ],
+  "schemaVersion": "aishop-evaluation-product-catalog/v1"
+}

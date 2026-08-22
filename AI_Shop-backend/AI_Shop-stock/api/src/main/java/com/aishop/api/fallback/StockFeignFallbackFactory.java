@@ -2,6 +2,7 @@ package com.aishop.api.fallback;
 
 import com.aishop.api.StockFeignClient;
 import com.aishop.api.dto.LessStockPageDTO;
+import com.aishop.api.dto.OrderStockRestoreDTO;
 import com.aishop.api.dto.ProductIdDTO;
 import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.dto.SkuStockBatchChangeDTO;
@@ -50,6 +51,11 @@ public class StockFeignFallbackFactory implements FallbackFactory<StockFeignClie
 
             @Override
             public ResponseVO<StockChangeResultVO> restoreRefundStock(RefundStockRestoreDTO dto) {
+                return FeignFallbackResponses.unavailable("库存服务");
+            }
+
+            @Override
+            public ResponseVO<StockChangeResultVO> restoreOrderStock(OrderStockRestoreDTO dto) {
                 return FeignFallbackResponses.unavailable("库存服务");
             }
 

@@ -9,9 +9,8 @@ build/
 .pytest_cache/
 .ruff_cache/
 
-# 评测产物（可复现基线，不入库）
-benchmarks/results/
-benchmarks/task_success_bindings.local.json
-benchmarks/task_success_v2_bindings.local.json
-benchmarks/datasets/mature_v1/chinese-commerce-search-v1.json
-benchmarks/datasets/mature_v1/wands/selection.json
+# Mutable runs, lifecycle state, and unseen final inputs are never published.
+evaluation/.runs/
+evaluation/.state/
+evaluation/.holdouts/
+evaluation/datasets/final-inputs/*.jsonl

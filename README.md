@@ -2,9 +2,9 @@
 
 > 内容状态：当前有效
 >
-> 本轮证据实现基线：提交 `c501735644a72ce57b27e48bdd35fbc7a5e870ea` 与由 [证据 manifest](docs/evidence-manifest.json) 固化的实现补丁；结果 SHA 和证据边界也以该 manifest 为准
+> 当前证据状态：`PUBLISHED_FINAL`；唯一当前结果、数据集哈希和可陈述边界以 [证据 manifest](docs/evidence-manifest.json) 为准
 >
-> 最后核验时间：2026-08-20（Asia/Shanghai）
+> 最后核验时间：2026-08-22（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
@@ -52,7 +52,7 @@
 | 工具调用 | MCP（Model Context Protocol）双向通信 |
 | 会话记忆 | Redis 短期 + MySQL 长期持久化 |
 | 可观测 | OpenTelemetry（OTLP）+ Prometheus 指标 |
-| 评测与测试 | pytest + `aishop-eval/v1` 统一 Runner；精确结果、命令和证据边界见 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md) |
+| 评测与测试 | pytest + `aishop-evaluation/v3`；Conda `shop` 环境、development/regression 数据锁、一次性 final、逐域/切片门禁和哈希证据包 |
 
 ### 前端
 
@@ -120,7 +120,7 @@ AI_Shop/
 - **Prompt 单一事实源**：fragment 注册表统一管理全部提示词片段（redis 覆盖可观测），每轮对话记录 selectedFragments 到决策 trace
 - **逐运行预算**：ContextVar 隔离 token、人民币成本、节点步数与 monotonic deadline，80% 预警，超限进入明确受控终态；异步任务与对话互不污染
 - **委托身份信道**：`X-Agent-User-Id` 系统信道头为权威（模型不可见），body userId 仅作参考；缺失 401、不一致 403、归属不符 403，fail-closed
-- **统一评测与消融**：除 Commerce、安全和 Search/RAG 外，冻结 44 条真实全栈 Agent v2 任务契约（37 条单轮、7 条 sequence）；Runner 无模拟捷径，逐条核验 Episode、业务终态和 LLM/Embedding/Rerank 证据，三模式报告必须同数据/fixture/模型后才能比较
+- **统一可信评测**：Search、RAG、Agent 共用一个 fail-closed suite；适配器分别调用生产 ProductService、RAG retriever/generation contract 和 Agent HTTP + 持久化 Episode，冻结后 final 只能 claim/执行一次，任何域失败都会阻断发布门禁
 - **熔断降级**：外部 Provider 使用 CLOSED/OPEN/HALF_OPEN 熔断与受控 fallback；未知写结果不会被通用重试自动重放
 - **速率限制**：用户级别双窗口限流，防止滥用
 
@@ -130,7 +130,7 @@ AI_Shop/
 - **内部管理员断言**：Java → Python 使用 HMAC-SHA256，覆盖 method、path、body hash、管理员、角色、权限、时间戳和 nonce，支持 current/previous 密钥轮换与重放拒绝
 - **试用与指标**：批次、参与者、`SYNTHETIC`/`LOCAL_PILOT`/`REAL_USER` 来源、verified success、FCR、TTFT、token、成本和匿名 JSON/CSV/Markdown 报告
 - **隐私中心**：用户可异步导出或彻底删除 AI 数据，支持密码二次确认、`Idempotency-Key`、分步骤恢复和短期下载；订单/支付保留数据解除 AI 关联并匿名化
-- **分层 CI 与供应链**：PR 跑确定性 AI Runner、Java unit/IT、双前端、Mock Playwright 和 SBOM；nightly 扩展回归，weekly 漏洞扫描，真实模型工作流缺 secrets 时明确“未采集”
+- **分层 CI 与供应链**：PR 校验评测契约/数据锁并运行 Java unit/IT、Python、双前端、Playwright 和 SBOM；配置真实 Provider 的工作流缺任何依赖都会失败，不以 skip 伪装成功
 
 ---
 
@@ -250,24 +250,38 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ## 数据与指标口径
 
-人工阅读入口为 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)，性能与质量数字见
-[性能与质量证据](docs/性能与质量证据_20260820.md)，机器可校验入口为
-[evidence-manifest.json](docs/evidence-manifest.json)。证据按源码/契约、确定性合成、本地全栈、配置真实
-Provider 和授权真实用户分层；运行 `python scripts/check_evidence_manifest.py` 可检查结构、数据锁、结果 SHA 和
-“未采集”边界。
+人工阅读入口为 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)，固定指标、统计方法和门禁见
+[性能与质量证据](docs/性能与质量证据_20260820.md)，机器入口为
+[evidence-manifest.json](docs/evidence-manifest.json)。运行 `python scripts/check_evidence_manifest.py` 会交叉校验 suite、
+development/regression 数据锁、文件 SHA、case 数、域分布、集合互斥、失败 final 和文档边界。
 
-当前确定性回归为 Commerce `27/27`、AI 安全 `18/18`、Search/RAG contract `162/162`。Agent v2 冻结 44 条
-任务契约，lock 明确为 `resultStatus=NOT_COLLECTED`；因此不能把门禁阈值、单元测试或单 case 成功写成完整 Agent
-TSR。正式全量运行仍需要同一隔离 fixture、API/Worker/MCP/Java/DB、真实 Provider 和可恢复的业务快照。
+本轮核心排错、阶段指标、外部调研和后续优先级记录在
+[AI质量闭环工作记录](docs/AI质量闭环工作记录_20260822.md)；新版面试题入口为
+[AI应用开发_Java后端_真实面试题与备考报告_20260821.md](AI应用开发_Java后端_真实面试题与备考报告_20260821.md)。
 
-已有两个 `SYNTHETIC + local-live` 子集：取消订单 `1/1` 通过，经过 Agent API、RabbitMQ Worker、LangGraph、
-MCP、用户确认和 Java 写接口，单样本延迟 `1067 ms`，该确定性 Workflow 的 LLM token 为 `0`；政策问答 `1/1`
-通过，`deepseek-v4-flash` 单次调用为 `4847 + 224 = 5071` tokens、`3237 ms`，BM25/Vector/Embedding/Rerank
-runtime trace 完整。两者都不是总体 TSR、P95 或线上 SLO，且成本为 `UNPRICED`，不能把结果中的 `0.0` 写成模型成本为零。
+当前评测协议为 `aishop-evaluation/v3`，Python 命令必须使用 Conda `shop` 环境：
+`/home/song/miniconda3/envs/shop/bin/python`。development 锁定 `43` 条（Search/RAG/Agent = `18/18/7`），
+regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
+`development-20260822-ai-quality-v9` 和 `regression-20260822-ai-quality-v9`，源码指纹均为
+`e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69`。
 
-Search v2、RAG retrieval v4 和 RAG generation v4 的 historical configured-local-live 正式结果仍保留
-`FAILED_RETAINED`：它们暴露了 ProductService 召回、fresh RAG 质量和生成成功率的真实缺口。`HUMAN_REVIEW_PENDING`
-表示独立人工盲评尚未完成。`REAL_USER`、正式三模式消融、全量 Agent v2、长期容量与线上业务指标均为未采集。
+当前唯一发布结果是 `release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`：Search、RAG、Agent
+分别 `50/50`、`50/50`、`25/25`，三域硬门禁通过；Agent `200/200` 重复 trial 的 `pass^8=1.0`，终态和
+authoritative Java 状态 diff 均 `1.0`，重复副作用为 `0`。Search Recall@10=`0.962121`、MRR@10=`0.9375`、
+NDCG@10=`0.920521`，硬约束违规为 `0`、Provider completeness=`1.0`；RAG retrieval、generation、claim、
+citation、faithfulness 和安全门禁均通过。Final 的 semantic judge `50/50` 可追溯，但始终是 shadow 信号，
+不是人工真值、人工准确率或人工一致性。
+
+质量报告不隐藏诊断信号：final 有 `3` 次 query-expansion provider failure，均走安全 deterministic fallback；
+regression 有 `1` 次同类诊断和 `1` 次 semantic judge unavailable。它们不会被改写为零，也不会进入不适用的正常质量分母。
+12 个故障注入场景满足 recovery contract；真实隔离 MySQL benchmark 在候选规模 `1/10/50/100` 下验证 batch
+offer/decision feature 为一次 round trip，而 N+1 随候选数线性增长。Token 只采用 Provider usage；缺 usage 标为
+`MISSING_USAGE`，没有可信单价时 `costCny=null`，不写成零成本。所有延迟都是本地完整链路的描述性数据，不是生产 SLO。
+
+历史 `final-20260820-ai-quality-v2` 保留为只读 archive，`v3` 至 `v8` 是只读失败 final archive；它们不代表当前结果，
+也不会被删除后重新计算。项目没有 CTR/CVR/GMV、工业级个性化推荐、生产容量或支付合规证据。逐 case、切片、故障、
+usage、状态 diff、生命周期和 SHA-256 入口见 [项目证据总览](docs/AI应用求职项目证据总览.md)、
+[性能与质量证据](docs/性能与质量证据_20260820.md) 和 [机器清单](docs/evidence-manifest.json)。
 
 ---
 

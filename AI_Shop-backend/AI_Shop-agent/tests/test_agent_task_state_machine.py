@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,7 +14,7 @@ from app.domain.intent.types import IntentDecision, IntentKind, NextAction
 from app.services.agent_service import AgentOrchestrator
 from app.services.message_service import AgentMessageService
 from app.services.task_service import AgentTaskService
-from app.worker import AgentWorker, LeaseLostError
+from app.worker import AgentWorker, LeaseLostError, TaskDeadlineError
 
 
 class _Cursor:
@@ -218,6 +219,87 @@ async def test_lease_guard_cancels_operation_when_worker_is_cancelled():
     with pytest.raises(asyncio.CancelledError):
         await guarded
     assert operation_cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_lease_guard_cancels_and_joins_operation_at_task_deadline():
+    operation_cancelled = asyncio.Event()
+
+    async def operation() -> str:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            operation_cancelled.set()
+
+    with pytest.raises(TaskDeadlineError, match="during execution"):
+        await AgentWorker._run_with_lease_guard(
+            operation(),
+            asyncio.Event(),
+            timeout_seconds=0.001,
+        )
+    assert operation_cancelled.is_set()
+
+
+def test_worker_deadline_remaining_is_bounded_and_malformed_fails_closed():
+    future = datetime.now() + timedelta(seconds=5)
+    remaining = AgentWorker._remaining_deadline_seconds({"deadlineAt": future.isoformat()})
+
+    assert remaining is not None
+    assert 0 < remaining <= 5
+    assert AgentWorker._remaining_deadline_seconds({"deadlineAt": "invalid"}) == 0
+    assert AgentWorker._deadline_expired({"deadlineAt": "invalid"}) is True
+
+
+@pytest.mark.asyncio
+async def test_worker_deadline_writes_terminal_without_retrying():
+    worker = AgentWorker()
+    payload = {
+        "messageId": 12,
+        "userId": "u1",
+        "queueName": "q",
+        "deadlineAt": (datetime.now() + timedelta(seconds=30)).isoformat(),
+    }
+    message = MagicMock()
+    message.body = json.dumps(payload).encode()
+    message.redelivered = False
+    message.ack = AsyncMock()
+    message.nack = AsyncMock()
+    message.reject = AsyncMock()
+
+    async def deadline_guard(operation, *_args, **_kwargs):
+        operation.close()
+        raise TaskDeadlineError("deadline")
+
+    with (
+        patch("app.worker.agent_task_service.claim", AsyncMock(return_value=True)),
+        patch(
+            "app.worker.redis_service.acquire_agent_user_lock",
+            AsyncMock(return_value=True),
+        ),
+        patch(
+            "app.worker.agent_message_service.is_execution_cancelled",
+            AsyncMock(return_value=False),
+        ),
+        patch("app.worker.redis_service.release_agent_user_lock", AsyncMock()),
+        patch("app.worker.observe_agent_stage"),
+        patch.object(
+            worker,
+            "_run_with_lease_guard",
+            AsyncMock(side_effect=deadline_guard),
+        ),
+        patch.object(worker, "_finish_terminal", AsyncMock()) as finish,
+        patch("app.worker.agent_task_service.mark_failed", AsyncMock()) as failed,
+    ):
+        await worker._process_message_inner("q", message)
+
+    finish.assert_awaited_once()
+    assert finish.await_args.args[:3] == (
+        message,
+        payload,
+        "TASK_DEADLINE: 任务超过处理截止时间",
+    )
+    assert str(finish.await_args.args[3]).startswith("worker-")
+    failed.assert_not_awaited()
 
 
 @pytest.mark.asyncio

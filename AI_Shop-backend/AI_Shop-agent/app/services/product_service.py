@@ -319,6 +319,8 @@ class ProductService:
                 vector_search=rag_retriever.search_product_vector_ids,
                 load_products=self._load_products_by_ids,
                 rerank=rag_retriever.rerank_products,
+                deadline_seconds=get_settings().product_search_deadline_seconds,
+                provider_timeout_seconds=get_settings().product_search_provider_timeout_seconds,
             )
             search_result.trace.stage_latency_ms["queryParse"] = query_parse_ms
             product_ids = search_result.ranked_ids

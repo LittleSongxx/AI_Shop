@@ -30,7 +30,16 @@ from app.observability.logging import configure_structured_logging
 from app.observability.telemetry import shutdown_telemetry
 from app.services.agent_queue_service import agent_queue_service
 from app.services.agent_service import agent_orchestrator
+from app.services.commerce_outcome_queue_consumer import (
+    commerce_outcome_queue_consumer,
+)
 from app.services.episode_service import bind_episode, episode_service
+from app.services.evaluation_fault_service import (
+    FaultCapabilityRejected,
+    McpFaultCapabilityScope,
+    prepare_worker_fault,
+    record_fault_events,
+)
 from app.services.java_internal_client import set_delegated_user_id
 from app.services.judge_service import judge_service
 from app.services.mcp_streamable_client import mcp_streamable_client
@@ -42,6 +51,11 @@ from app.services.stream_service import stream_service
 from app.services.task_service import agent_task_service
 from app.utils.product_consult import parse_consult_card
 from app.visual.consumer import visual_index_consumer
+from evaluation.core.fault_injection import (
+    FailureInjectionScope,
+    InjectedFailure,
+    fault_point,
+)
 
 configure_structured_logging()
 logger = structlog.get_logger()
@@ -66,6 +80,10 @@ _EPISODE_FULL_INTENTS = frozenset(
 
 class LeaseLostError(RuntimeError):
     """The claimed task or per-user lock is no longer owned by this execution."""
+
+
+class TaskDeadlineError(TimeoutError):
+    """The durable queue-to-terminal task deadline elapsed during execution."""
 
 
 class AgentWorker:
@@ -119,6 +137,11 @@ class AgentWorker:
             await self._start_consumer(
                 AGENT_QUEUE_LOW, settings.agent_worker_low_concurrency
             )
+            outcome_channel, outcome_queue, outcome_consumer_tag = (
+                await commerce_outcome_queue_consumer.start()
+            )
+            self._channels.append(outcome_channel)
+            self._consumers.append((outcome_queue, outcome_consumer_tag))
             visual_index_active = (
                 settings.visual_search_enabled
                 and settings.visual_index_consumer_enabled
@@ -425,7 +448,55 @@ class AgentWorker:
                         "messageId": message_id,
                     },
                 )
+                await self._process_message_with_evaluation_fault(
+                    queue_name,
+                    message,
+                    episode_payload,
+                )
+
+    async def _process_message_with_evaluation_fault(
+        self,
+        queue_name: str,
+        message: aio_pika.abc.AbstractIncomingMessage,
+        payload: dict,
+    ) -> None:
+        """Restore only a signed, request-bound local evaluation fault scope."""
+
+        try:
+            activation = await prepare_worker_fault(payload)
+        except FaultCapabilityRejected as exc:
+            # Never execute a supplied fault when its authorization is invalid.
+            # The ordinary request may still complete, while the missing injected
+            # event makes the resilience evidence fail closed.
+            episode_service.record_step(
+                "EVALUATION_FAULT_REJECTED",
+                run_id=str(payload.get("runId") or "") or None,
+                node_name="worker",
+                status="BLOCKED",
+                error_code=type(exc).__name__,
+            )
+            await self._process_message_inner(queue_name, message)
+            return
+
+        authorized = activation.authorized
+        if authorized is None:
+            await self._process_message_inner(queue_name, message)
+            return
+        if activation.mcp_capability:
+            with McpFaultCapabilityScope(activation.mcp_capability):
                 await self._process_message_inner(queue_name, message)
+            return
+
+        scope = FailureInjectionScope(authorized.scenario)
+        try:
+            with scope:
+                await self._process_message_inner(queue_name, message)
+        finally:
+            await record_fault_events(
+                authorized,
+                scope.events,
+                process="agent-worker",
+            )
 
     async def _process_message_inner(
         self,
@@ -530,15 +601,40 @@ class AgentWorker:
                 episode_service.finish_run("cancelled")
                 await message.ack()
                 return
-            if self._deadline_expired(payload):
+            try:
+                fault_point("worker-deadline")
+            except InjectedFailure:
                 await self._finish_terminal(
-                    message, payload, "任务超过处理截止时间", lease_owner
+                    message,
+                    payload,
+                    "TASK_DEADLINE: 评测注入的任务截止时间已到",
+                    lease_owner,
+                )
+                return
+            remaining_deadline = self._remaining_deadline_seconds(payload)
+            if remaining_deadline is not None and remaining_deadline <= 0:
+                await self._finish_terminal(
+                    message,
+                    payload,
+                    "TASK_DEADLINE: 任务超过处理截止时间",
+                    lease_owner,
                 )
                 return
 
-            outcome = await self._run_with_lease_guard(
-                self._execute_payload(payload), lease_lost
-            )
+            try:
+                outcome = await self._run_with_lease_guard(
+                    self._execute_payload(payload),
+                    lease_lost,
+                    timeout_seconds=remaining_deadline,
+                )
+            except TaskDeadlineError:
+                await self._finish_terminal(
+                    message,
+                    payload,
+                    "TASK_DEADLINE: 任务超过处理截止时间",
+                    lease_owner,
+                )
+                return
             if outcome != "ok":
                 # 图内部已经把错误文案推给了用户（P0-1）。这一轮不能记成功，
                 # 也不自动重试——重试会向用户重复推送错误消息。
@@ -675,17 +771,32 @@ class AgentWorker:
 
     @staticmethod
     async def _run_with_lease_guard(
-        operation: Awaitable[str], lease_lost: asyncio.Event
+        operation: Awaitable[str],
+        lease_lost: asyncio.Event,
+        *,
+        timeout_seconds: float | None = None,
     ) -> str:
+        if timeout_seconds is not None and timeout_seconds <= 0:
+            if hasattr(operation, "close"):
+                operation.close()  # type: ignore[attr-defined]
+            raise TaskDeadlineError("task deadline elapsed before execution")
         work = asyncio.create_task(operation)
         lost_waiter = asyncio.create_task(lease_lost.wait())
         try:
-            await asyncio.wait({work, lost_waiter}, return_when=asyncio.FIRST_COMPLETED)
+            done, _pending = await asyncio.wait(
+                {work, lost_waiter},
+                timeout=timeout_seconds,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
             if lease_lost.is_set():
                 if not work.done():
                     work.cancel()
                 await asyncio.gather(work, return_exceptions=True)
                 raise LeaseLostError("task lease or user lock lost during execution")
+            if work not in done:
+                work.cancel()
+                await asyncio.gather(work, return_exceptions=True)
+                raise TaskDeadlineError("task deadline elapsed during execution")
             return await work
         finally:
             lost_waiter.cancel()
@@ -844,15 +955,25 @@ class AgentWorker:
 
     @staticmethod
     def _deadline_expired(payload: dict) -> bool:
+        remaining = AgentWorker._remaining_deadline_seconds(payload)
+        return remaining is not None and remaining <= 0
+
+    @staticmethod
+    def _remaining_deadline_seconds(payload: dict) -> float | None:
         deadline = payload.get("deadlineAt")
         if not deadline:
-            return False
+            return None
         if isinstance(deadline, datetime):
-            return deadline <= datetime.now()
-        try:
-            return datetime.fromisoformat(str(deadline)) <= datetime.now()
-        except ValueError:
-            return False
+            parsed = deadline
+        else:
+            try:
+                parsed = datetime.fromisoformat(str(deadline))
+            except (TypeError, ValueError):
+                # The API owns this field. A malformed internal deadline must
+                # fail closed instead of granting an unbounded execution.
+                return 0.0
+        now = datetime.now(tz=parsed.tzinfo) if parsed.tzinfo else datetime.now()
+        return (parsed - now).total_seconds()
 
 
 async def run_worker() -> None:

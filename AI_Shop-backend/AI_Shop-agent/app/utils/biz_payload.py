@@ -682,6 +682,10 @@ def build_action_confirm_payload(pending: dict, intro: str | None = None) -> tup
     card: dict[str, Any] = {
         "type": "ACTION_CONFIRM",
         "token": pending.get("token"),
+        # Explicitly name the server-issued credential so API/evaluation
+        # consumers never need to guess whether a generic token is an auth
+        # token or an action token.  Keep ``token`` for existing clients.
+        "actionToken": pending.get("token"),
         "actionType": action_type,
         "label": label,
         "summary": pending.get("summary"),
@@ -701,7 +705,12 @@ def build_action_confirm_payload(pending: dict, intro: str | None = None) -> tup
     if items:
         card["items"] = items[:MAX_ORDER_ITEMS]
     assistant = trim_assistant(_json_dumps(card))
-    biz_data = _json_dumps({"token": pending.get("token")})
+    biz_data = _json_dumps(
+        {
+            "token": pending.get("token"),
+            "actionToken": pending.get("token"),
+        }
+    )
     return assistant, biz_data
 
 def _sanitize_intro(intro: str | None) -> str:
@@ -813,6 +822,7 @@ def build_action_confirm_unavailable_payload(
     card: dict[str, Any] = {
         "type": "ACTION_CONFIRM",
         "token": token,
+        "actionToken": token,
         "actionType": "UNKNOWN",
         "label": "操作确认",
         "summary": summary,
@@ -823,5 +833,5 @@ def build_action_confirm_unavailable_payload(
         "details": [{"label": "提示", "value": summary}],
     }
     assistant = trim_assistant(_json_dumps(card))
-    biz_data = _json_dumps({"token": token})
+    biz_data = _json_dumps({"token": token, "actionToken": token})
     return assistant, biz_data

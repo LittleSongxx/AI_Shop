@@ -196,6 +196,13 @@ async def test_forced_tool_failure_never_reuses_llm_business_claim(monkeypatch):
 @pytest.mark.parametrize(
     ("intent", "intent_data", "user_text", "expected_tool", "expected_args"),
     [
+        (
+            IntentKind.PRODUCT_SEARCH.value,
+            None,
+            "新房除甲醛空气净化器怎么选",
+            "SEARCH_PRODUCTS",
+            {"keyword": "新房除甲醛空气净化器怎么选"},
+        ),
         (IntentKind.QUERY_ORDER.value, None, "我的订单", "QUERY_ORDERS", {}),
         (
             IntentKind.QUERY_LOGISTICS.value,

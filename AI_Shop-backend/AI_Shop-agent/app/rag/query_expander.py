@@ -29,6 +29,7 @@ class QueryExpansionEvaluationStats:
     provider_requests: int = 0
     provider_successes: int = 0
     provider_failures: int = 0
+    deterministic_short_circuits: int = 0
 
     def snapshot(self) -> dict[str, int]:
         return {
@@ -36,6 +37,7 @@ class QueryExpansionEvaluationStats:
             "providerRequests": self.provider_requests,
             "providerSuccesses": self.provider_successes,
             "providerFailures": self.provider_failures,
+            "deterministicShortCircuits": self.deterministic_short_circuits,
         }
 
 
@@ -95,7 +97,16 @@ async def expand_query(query: str) -> list[str]:
 
     result = deterministic_query_variants(query)
     settings = get_settings()
-    if not settings.llm_api_key.strip():
+    if not settings.rag_query_expansion_enabled or not settings.llm_api_key.strip():
+        return result
+    # A deterministic domain alias already gives the retriever a second
+    # channel query. Avoid paying a remote LLM round trip when the marginal
+    # recall gain is small; the original and deterministic variant remain in
+    # the trace and can be audited independently.
+    if len(result) >= 2:
+        evaluation = _EVALUATION_STATS.get()
+        if evaluation is not None:
+            evaluation.deterministic_short_circuits += 1
         return result
     evaluation = _EVALUATION_STATS.get()
     if evaluation is not None:
@@ -112,7 +123,8 @@ async def expand_query(query: str) -> list[str]:
         runtime_trace = active_rag_runtime_trace()
         if runtime_trace is not None:
             runtime_trace.called("llmQueryExpansion")
-        client = await get_client("llm_query_expander", timeout=6)
+        timeout_seconds = settings.rag_query_expansion_timeout_seconds
+        client = await get_client("llm_query_expander", timeout=timeout_seconds)
         resp = await client.post(
             f"{settings.llm_base_url.rstrip('/')}/chat/completions",
             headers={"Authorization": f"Bearer {settings.llm_api_key}"},
@@ -125,7 +137,7 @@ async def expand_query(query: str) -> list[str]:
                 "max_tokens": 80,
                 "temperature": 0,
             },
-            timeout=6,
+            timeout=timeout_seconds,
         )
         resp.raise_for_status()
         text = (

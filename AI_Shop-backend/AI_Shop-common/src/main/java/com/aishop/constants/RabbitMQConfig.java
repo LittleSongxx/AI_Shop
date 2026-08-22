@@ -52,6 +52,7 @@ public class RabbitMQConfig {
     public static final String NOTIFY_EXCHANGE = "notify.exchange";
     public static final String REFUND_EXCHANGE = "refund.exchange";
     public static final String USER_GROWTH_EXCHANGE = "user.growth.exchange";
+    public static final String COMMERCE_OUTCOME_EXCHANGE = "commerce.outcome.exchange";
     public static final String MQ_RETRY_EXCHANGE = "mq.retry.exchange";
     public static final String MQ_FAILURE_EXCHANGE = "mq.failure.exchange";
     public static final String MQ_FAILURE_QUEUE = "mq.failure.queue";
@@ -71,6 +72,8 @@ public class RabbitMQConfig {
     public static final String REFUND_RESULT_DEAD_QUEUE = "refund.result.dead.queue";
     public static final String USER_GROWTH_QUEUE = "user.growth.queue";
     public static final String USER_GROWTH_DEAD_QUEUE = "user.growth.dead.queue";
+    public static final String COMMERCE_OUTCOME_QUEUE = "commerce.outcome.queue";
+    public static final String COMMERCE_OUTCOME_DEAD_QUEUE = "commerce.outcome.dead.queue";
 
     // 死信队列（超时未支付释放库存）
     public static final String RUSHING_DELAY_QUEUE = "rushing.delay.queue";
@@ -107,6 +110,8 @@ public class RabbitMQConfig {
     public static final String REFUND_RESULT_DEAD_KEY = "refund.result.dead";
     public static final String USER_GROWTH_KEY = "user.growth";
     public static final String USER_GROWTH_DEAD_KEY = "user.growth.dead";
+    public static final String COMMERCE_OUTCOME_KEY = "commerce.outcome";
+    public static final String COMMERCE_OUTCOME_DEAD_KEY = "commerce.outcome.dead";
 
     // 通知队列
     public static final String NOTIFY_QUEUE = "notify.queue";
@@ -291,6 +296,41 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(payConfirmDeadQueue())
                 .to(payExchange())
                 .with(PAY_CONFIRM_DEAD_KEY);
+    }
+
+    @Bean
+    public DirectExchange commerceOutcomeExchange() {
+        return new DirectExchange(COMMERCE_OUTCOME_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue commerceOutcomeQueue() {
+        QueueBuilder builder = durableQueue(COMMERCE_OUTCOME_QUEUE)
+                .withArgument("x-dead-letter-exchange", COMMERCE_OUTCOME_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", COMMERCE_OUTCOME_DEAD_KEY);
+        if ("quorum".equalsIgnoreCase(queueType)) {
+            builder.withArgument("x-delivery-limit", 10);
+        }
+        return builder.build();
+    }
+
+    @Bean
+    public Queue commerceOutcomeDeadQueue() {
+        return durableQueue(COMMERCE_OUTCOME_DEAD_QUEUE).build();
+    }
+
+    @Bean
+    public Binding commerceOutcomeBinding() {
+        return BindingBuilder.bind(commerceOutcomeQueue())
+                .to(commerceOutcomeExchange())
+                .with(COMMERCE_OUTCOME_KEY);
+    }
+
+    @Bean
+    public Binding commerceOutcomeDeadBinding() {
+        return BindingBuilder.bind(commerceOutcomeDeadQueue())
+                .to(commerceOutcomeExchange())
+                .with(COMMERCE_OUTCOME_DEAD_KEY);
     }
 
     @Bean

@@ -20,6 +20,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -40,6 +41,7 @@ public class ProductCartController extends ABaseController{
     // 加入购物车
     @PostMapping("/add2Cart")
     @GlobalInterceptor(checkLogin = true)
+    @Transactional(rollbackFor = Exception.class)
     public ResponseVO add2Cart(ProductCart productCart){
         TokenUserInfoDTO tokenUserInfo = getTokenUserInfo();
         if (tokenUserInfo == null || StringTools.isEmpty(tokenUserInfo.getUserId())) {

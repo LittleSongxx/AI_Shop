@@ -47,8 +47,21 @@ class FinalOfferSnapshotService:
         if not product_ids:
             return []
         settings = get_settings()
+        allowed_sku_keys_by_product = {
+            str(_get(product, "product_id", "productId")): [
+                str(value)
+                for value in product.get("constraint_allowed_sku_keys") or []
+                if str(value or "").strip()
+            ]
+            for product in products
+            if product.get("constraint_allowed_sku_keys")
+        }
         try:
-            raw = await java_internal_client.offer_snapshot_batch(user_id, product_ids)
+            raw = await java_internal_client.offer_snapshot_batch(
+                user_id,
+                product_ids,
+                allowed_sku_keys_by_product=allowed_sku_keys_by_product,
+            )
         except Exception as exc:
             logger.warning("offer_snapshot_java_unavailable", error=type(exc).__name__)
             raise OfferSnapshotUnavailable from exc
@@ -89,6 +102,7 @@ class FinalOfferSnapshotService:
             str(_get(product, "product_id", "productId")): product for product in products
         }
         result: list[dict[str, Any]] = []
+        persist_rows: list[tuple[str, str, str, str, dict[str, Any], datetime]] = []
         expires_at = _now() + timedelta(seconds=settings.shopping_offer_ttl_seconds)
         for row in rows:
             product_id = str(_get(row, "product_id", "productId") or "")
@@ -103,6 +117,18 @@ class FinalOfferSnapshotService:
             sku_key = str(
                 _get(selected, "property_value_id_hash", "propertyValueIdHash", "skuKey") or ""
             )
+            allowed_sku_keys = {
+                str(value)
+                for value in source.get("constraint_allowed_sku_keys") or []
+                if str(value or "").strip()
+            }
+            if allowed_sku_keys and sku_key not in allowed_sku_keys:
+                logger.warning(
+                    "offer_snapshot_selected_disallowed_sku",
+                    product_id=product_id,
+                    sku_key=sku_key,
+                )
+                continue
             base_price = _as_float(_get(selected, "price", "basePrice"))
             if not sku_key or base_price is None or base_price < 0:
                 continue
@@ -141,7 +167,9 @@ class FinalOfferSnapshotService:
                 "deliveryPromise": _get(row, "delivery_promise", "deliveryPromise"),
                 "factSources": ["JAVA_PRODUCT", "JAVA_STOCK", "JAVA_COUPON"],
             }
-            await self._persist(snapshot_id, user_id, product_id, sku_key, offer, expires_at)
+            persist_rows.append(
+                (snapshot_id, user_id, product_id, sku_key, offer, expires_at)
+            )
             card = dict(source)
             card.update(
                 {
@@ -165,6 +193,7 @@ class FinalOfferSnapshotService:
                 }
             )
             result.append(card)
+        await self._persist_many(persist_rows)
         return result
 
     async def _persist(
@@ -176,14 +205,24 @@ class FinalOfferSnapshotService:
         offer: dict[str, Any],
         expires_at: datetime,
     ) -> None:
+        """Compatibility wrapper for callers that persist one snapshot."""
+
+        await self._persist_many([(snapshot_id, user_id, product_id, sku_key, offer, expires_at)])
+
+    async def _persist_many(
+        self,
+        rows: list[tuple[str, str, str, str, dict[str, Any], datetime]],
+    ) -> None:
+        if not rows:
+            return
         try:
             async with acquire() as cur:
-                await cur.execute(
-                    """
+                sql = """
                     INSERT INTO agent_final_offer_snapshot
                         (snapshot_id,user_id,product_id,sku_key,offer_json,expires_at,created_at)
                     VALUES (%s,%s,%s,%s,%s,%s,NOW(3))
-                    """,
+                """
+                params = [
                     (
                         snapshot_id,
                         user_id,
@@ -191,10 +230,24 @@ class FinalOfferSnapshotService:
                         sku_key,
                         json.dumps(offer, ensure_ascii=False, default=str),
                         expires_at.replace(tzinfo=None),
-                    ),
-                )
+                    )
+                    for snapshot_id, user_id, product_id, sku_key, offer, expires_at in rows
+                ]
+                executemany = getattr(cur, "executemany", None)
+                if callable(executemany):
+                    await executemany(sql, params)
+                else:
+                    # A small compatibility fallback keeps local test cursors
+                    # and older drivers functional; production aiomysql uses
+                    # the single batched round trip above.
+                    for row in params:
+                        await cur.execute(sql, row)
         except Exception as exc:
-            logger.warning("offer_snapshot_persist_failed", snapshot_id=snapshot_id, error=type(exc).__name__)
+            logger.warning(
+                "offer_snapshot_persist_failed",
+                snapshot_count=len(rows),
+                error=type(exc).__name__,
+            )
 
     async def get(self, user_id: str, snapshot_id: str) -> dict[str, Any] | None:
         if not user_id or not snapshot_id:

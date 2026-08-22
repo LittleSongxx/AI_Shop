@@ -1,0 +1,165 @@
+{
+  "schemaVersion": "aishop-fault-matrix/v2",
+  "scenarios": [
+    {
+      "id": "embedding-timeout",
+      "target": "embedding",
+      "mode": "timeout",
+      "gateMode": "HARD",
+      "caseId": "search-dev-sony-noise-cancel",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "bm25-5xx",
+      "target": "bm25",
+      "mode": "5xx",
+      "gateMode": "HARD",
+      "caseId": "search-dev-desktop-office",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "vector-empty",
+      "target": "vector",
+      "mode": "empty",
+      "gateMode": "HARD",
+      "caseId": "search-dev-air-purifier",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "rerank-timeout",
+      "target": "rerank",
+      "mode": "timeout",
+      "gateMode": "HARD",
+      "caseId": "search-dev-lip-gloss",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "java-offer-partial",
+      "target": "java-offer-snapshot",
+      "mode": "partial",
+      "gateMode": "HARD",
+      "caseId": "search-dev-water-purifier",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "java-product-5xx",
+      "target": "java-product",
+      "mode": "5xx",
+      "gateMode": "HARD",
+      "caseId": "search-dev-desktop-office",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "java-inventory-timeout",
+      "target": "java-inventory",
+      "mode": "timeout",
+      "gateMode": "HARD",
+      "caseId": "search-dev-water-purifier",
+      "expected": {
+        "fallbackAllowed": true,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "llm-malformed",
+      "target": "llm",
+      "mode": "malformed",
+      "gateMode": "HARD",
+      "caseId": "rag-dev-write-confirmation",
+      "expected": {
+        "fallbackAllowed": false,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": false,
+        "terminalState": "DEGRADED"
+      }
+    },
+    {
+      "id": "redis-checkpoint-failure",
+      "target": "redis-checkpoint",
+      "mode": "exception",
+      "gateMode": "HARD",
+      "evidenceNote": "A one-shot capability restores the scope in the Worker at the real Redis checkpoint write boundary; the durable task then retries without re-injecting.",
+    "caseId": "agent-dev-write-policy",
+      "expected": {
+        "fallbackAllowed": false,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": "NOT_APPLICABLE",
+        "terminalState": "SUCCEEDED"
+      }
+    },
+    {
+      "id": "worker-deadline",
+      "target": "worker-deadline",
+      "mode": "timeout",
+      "gateMode": "HARD",
+      "evidenceNote": "A one-shot capability is restored after the RabbitMQ task is claimed and exercises the Worker terminal deadline path.",
+      "caseId": "agent-dev-budget-shopping",
+      "expected": {
+        "fallbackAllowed": false,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": "NOT_APPLICABLE",
+        "terminalState": "FAILED"
+      }
+    },
+    {
+      "id": "mcp-tool-failure",
+      "target": "mcp-tool",
+      "mode": "5xx",
+      "gateMode": "HARD",
+      "evidenceNote": "The Worker mints an internal one-shot child capability and transmits it in MCP protocol metadata, outside the model-visible tool schema.",
+      "caseId": "agent-dev-sony-shopping",
+      "expected": {
+        "fallbackAllowed": false,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": "NOT_APPLICABLE",
+    "terminalState": "SUCCEEDED"
+      }
+    },
+    {
+      "id": "duplicate-request-idempotency",
+      "target": "request",
+      "mode": "duplicate",
+      "gateMode": "SHADOW",
+      "evidenceNote": "The evaluator duplicates a read request at the harness boundary; confirmed-write idempotency remains proven separately by pass^5 state diff and repeated confirmation evidence.",
+      "caseId": "agent-dev-human-handoff",
+      "expected": {
+        "fallbackAllowed": false,
+        "unsafeAnswer": false,
+        "hardConstraintBypass": "NOT_APPLICABLE",
+        "terminalState": "SUCCEEDED"
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.rag.evidence_selector import select_minimal_evidence
 from app.rag.query_planner import plan_rag_query, query_fact_hints
 from app.rag.retriever import (
     RagRetriever,
@@ -102,11 +103,60 @@ def test_query_fact_hints_distinguish_cart_snapshot_from_checkout_revalidation()
     )
 
 
+def test_query_fact_hints_select_stock_fact_for_cart_price_and_stock_question():
+    assert query_fact_hints("加入购物车的价格和库存到结算时还会重新检查吗？") == (
+        "checkout.price_and_stock_revalidation",
+    )
+    # A generic replay question remains on the established checkout fact so
+    # equivalent canonical references are not needlessly mixed.
+    assert query_fact_hints("结算时会重新检查商品价格库存吗？") == (
+        "checkout.current_product_revalidation",
+    )
+
+
+def test_query_fact_hints_cover_address_snapshot_and_refund_channel_queries():
+    assert query_fact_hints("下单后修改地址簿会自动改掉已有订单地址吗？") == (
+        "address.order_snapshot",
+    )
+    assert query_fact_hints("申请退货退款应从订单详情的哪个入口开始？") == (
+        "aftersales.request_and_refund_boundary",
+    )
+
+
+def test_evidence_selector_promotes_preferred_fact_beyond_top_two_candidates():
+    docs = [
+        {"content": "普通地址说明"},
+        {"content": "默认地址说明"},
+        {"content": "订单快照说明"},
+    ]
+    refs = [
+        {"source": "07-account-address-and-security.md", "heading": "收货地址管理"},
+        {"source": "07-account-address-and-security.md", "heading": "默认地址"},
+        {"source": "07-account-address-and-security.md", "heading": "下单前确认"},
+    ]
+
+    selection = select_minimal_evidence(
+        docs,
+        refs,
+        preferred_fact_ids=["address.order_snapshot"],
+        max_items=1,
+    )
+
+    assert selection.items[0].fact_ids == ("address.order_snapshot",)
+    assert selection.items[0].text == "订单快照说明"
+
+
 def test_query_fact_hints_cover_runtime_business_propositions():
     assert query_fact_hints("知识检索找不到充分依据时平台要求助手怎么做") == (
         "rag.retrieval_and_abstention",
     )
     assert query_fact_hints("知识库证据不够时助手应该怎样回答") == (
+        "rag.retrieval_and_abstention",
+    )
+    assert query_fact_hints("RAG检索不足时的grounding含义是什么") == (
+        "rag.retrieval_and_abstention",
+    )
+    assert query_fact_hints("知识检索得到的证据互相矛盾时怎么办") == (
         "rag.retrieval_and_abstention",
     )
     assert query_fact_hints("售后重复提交会创建多个申请吗") == (

@@ -4,7 +4,16 @@ from app.config.settings import Settings
 
 
 def test_local_mysql_defaults_match_the_project_compose_stack(monkeypatch):
-    monkeypatch.delenv("MYSQL_PASSWORD", raising=False)
+    for variable in (
+        "MYSQL_HOST",
+        "MYSQL_PORT",
+        "MYSQL_USER",
+        "MYSQL_PASSWORD",
+        "MYSQL_DATABASE",
+        "MYSQL_POOL_MIN_SIZE",
+        "MYSQL_POOL_MAX_SIZE",
+    ):
+        monkeypatch.delenv(variable, raising=False)
 
     settings = Settings(_env_file=None)
 

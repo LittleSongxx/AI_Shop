@@ -3,6 +3,7 @@ from app.services import agent_runtime
 from app.services.agent_runtime import bind_agent_llm
 from app.services.llm_factory import (
     _is_deepseek_endpoint,
+    _is_qwen_compatible_endpoint,
     _resolve_memory_llm_config,
     chat_llm_config,
     create_chat_llm,
@@ -89,6 +90,28 @@ def test_thinking_toggle_is_only_sent_to_deepseek_compatible_endpoints():
     assert _is_deepseek_endpoint("https://api.deepseek.com") is True
     assert _is_deepseek_endpoint("https://deepseek.com/v1") is True
     assert _is_deepseek_endpoint("https://api.openai.com/v1") is False
+
+
+def test_bounded_qwen_work_uses_provider_specific_thinking_toggle(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv(
+        "LLM_BASE_URL",
+        "https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    )
+    monkeypatch.setenv("LLM_MODEL", "qwen3.7-flash")
+    get_settings.cache_clear()
+    try:
+        regular = chat_llm_config()
+        bounded = chat_llm_config(disable_thinking=True, streaming=False)
+
+        assert _is_qwen_compatible_endpoint(bounded.base_url) is True
+        assert regular.disable_thinking is False
+        assert bounded.disable_thinking is True
+        assert create_memory_llm(disable_thinking=True).extra_body == {
+            "enable_thinking": False
+        }
+    finally:
+        get_settings.cache_clear()
 
 
 def test_chat_llm_can_switch_to_distinct_fallback_model(monkeypatch):

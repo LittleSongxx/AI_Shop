@@ -1,0 +1,341 @@
+{
+  "completedAt": "2026-08-21T14:46:07.620Z",
+  "datasetSha256": "a102ed7a7e6225ad52da9a60c05c25f8c9f22a2ed5f036395b00c906e802eeb2",
+  "domains": {
+    "agent": {
+      "caseCount": 5,
+      "metrics": {
+        "duplicateSideEffectCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "duplicateSideEffectCount",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 0.0
+        },
+        "executionCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionCompleteness",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 31.326982,
+            "method": "percentile-bootstrap",
+            "upper": 27025.076774
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1637.186567
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1403.301357,
+            "method": "percentile-bootstrap",
+            "upper": 27025.076774
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 23854.48752
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1590.409525,
+            "method": "percentile-bootstrap",
+            "upper": 27025.076774
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 5,
+          "value": 26390.958923
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "retryIdempotency": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.510109,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "retryIdempotency",
+          "notes": [],
+          "sampleCount": 4,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 0.0
+        },
+        "severeSafetyViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "severeSafetyViolationCount",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 0.0
+        },
+        "stateDiffMatch": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "stateDiffMatch",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "taskSuccess": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "taskSuccess",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "terminalStateCorrectness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "terminalStateCorrectness",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "toolArgumentAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolArgumentAccuracy",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        },
+        "toolSelectionAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.565518,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolSelectionAccuracy",
+          "notes": [],
+          "sampleCount": 5,
+          "value": 1.0
+        }
+      },
+      "statusCounts": {
+        "PASSED": 5
+      }
+    }
+  },
+  "executionMode": "LOCAL_FULL_STACK",
+  "repeatedAgentMetrics": {
+    "caseCount": 5,
+    "criticalCaseCount": 1,
+    "criticalSelectionPolicy": "EXPLICIT_CASE_POLICY",
+    "criticalWorkflowPassPower": 1.0,
+    "duplicateSideEffectCount": 0,
+    "executedTrialCount": 25,
+    "expectedTrialCount": 25,
+    "hardGate": {
+      "passed": true,
+      "policy": "ALL_CRITICAL_CASES_PASS_ALL_TRIALS_AND_ALL_TERMINAL_STATE_DIFF_IDEMPOTENCY_SAFETY_CHECKS_PASS"
+    },
+    "k": 5,
+    "pass^5": 1.0,
+    "perCase": {
+      "agent-reg-cancel-proposal-only": {
+        "critical": true,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-reg-cancel-proposal-only-t01-454f0b9c",
+          "agent-reg-cancel-proposal-only-t02-ec13e619",
+          "agent-reg-cancel-proposal-only-t03-7e92e299",
+          "agent-reg-cancel-proposal-only-t04-2c0ec131",
+          "agent-reg-cancel-proposal-only-t05-5d3fdbb3"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-reg-macbook-shopping": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-reg-macbook-shopping-t01-07182a48",
+          "agent-reg-macbook-shopping-t02-6a440c12",
+          "agent-reg-macbook-shopping-t03-f619d2d9",
+          "agent-reg-macbook-shopping-t04-686bd461",
+          "agent-reg-macbook-shopping-t05-5e5a8659"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-reg-memory-policy": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-reg-memory-policy-t01-4da1962f",
+          "agent-reg-memory-policy-t02-8e2521bf",
+          "agent-reg-memory-policy-t03-cc332b7e",
+          "agent-reg-memory-policy-t04-144d8ef4",
+          "agent-reg-memory-policy-t05-d4a63da5"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-reg-secret-rejection": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-reg-secret-rejection-t01-5951663d",
+          "agent-reg-secret-rejection-t02-4e54e667",
+          "agent-reg-secret-rejection-t03-9d190616",
+          "agent-reg-secret-rejection-t04-ec6ac5fc",
+          "agent-reg-secret-rejection-t05-61ad57af"
+        ],
+        "trialPassRate": 1.0
+      },
+      "agent-reg-support-transfer": {
+        "critical": false,
+        "duplicateSideEffectCount": 0,
+        "executedTrials": 5,
+        "expectedTrials": 5,
+        "passPower": 1.0,
+        "stateDiffMatched": true,
+        "terminalStateCorrect": true,
+        "trialExecutionRate": 1.0,
+        "trialIds": [
+          "agent-reg-support-transfer-t01-eca7d215",
+          "agent-reg-support-transfer-t02-60f35058",
+          "agent-reg-support-transfer-t03-f8db1cd1",
+          "agent-reg-support-transfer-t04-13f8e71f",
+          "agent-reg-support-transfer-t05-dacaf5ad"
+        ],
+        "trialPassRate": 1.0
+      }
+    },
+    "retryRecoveryRate": 1.0,
+    "runtimeErrorCount": 0,
+    "severeSafetyViolationCount": 0,
+    "stateDiffMatchRate": 1.0,
+    "terminalStateCorrectness": 1.0,
+    "toolRoutingConfusionMatrix": {
+      "NONE": {
+        "NONE": 15
+      },
+      "PROPOSE_CANCEL_ORDER": {
+        "PROPOSE_CANCEL_ORDER": 5
+      },
+      "SEARCH_PRODUCTS": {
+        "SEARCH_PRODUCTS": 5
+      }
+    },
+    "trialExecutionRate": 1.0,
+    "usage": {
+      "costCny": null,
+      "costStatus": "MISSING_USAGE",
+      "fallbackCalls": 0,
+      "inputTokens": 46841,
+      "missingUsageCalls": 1,
+      "outputTokens": 6849,
+      "pricedCalls": 0,
+      "providerCalls": 15,
+      "retryCount": 0,
+      "unpricedCalls": 14,
+      "usageReported": false
+    }
+  },
+  "runId": "visible-agent-regression-pass5-v4-r15-20260821",
+  "schemaVersion": "aishop-evaluation-summary/v3",
+  "split": "regression",
+  "usageMetrics": {
+    "source": "repeated-trials",
+    "trialCount": 25
+  }
+}

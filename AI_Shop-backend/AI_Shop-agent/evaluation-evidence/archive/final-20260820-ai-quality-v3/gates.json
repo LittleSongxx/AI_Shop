@@ -1,0 +1,430 @@
+{
+  "decisions": [
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "minimumCaseCount",
+      "observed": 50,
+      "operator": ">=",
+      "passed": true,
+      "reason": "50 cases meet the predeclared minimum 50",
+      "threshold": 50
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "casePassRate",
+      "observed": 0.84,
+      "operator": "==",
+      "passed": false,
+      "reason": "42/50 cases passed; every case must pass",
+      "threshold": 1.0
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "executionRate",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=1.000000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "recallAt10",
+      "observed": 0.906504,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=0.906504 >= 0.85",
+      "threshold": 0.85
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "ndcgAt10",
+      "observed": 0.841278,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=0.841278 >= 0.75",
+      "threshold": 0.75
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "noResultAccuracy",
+      "observed": 0.88,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.880000 >= 0.95",
+      "threshold": 0.95
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "constraintViolationCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "hardConstraintSatisfaction",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=1.000000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "providerCompleteness",
+      "observed": 0.98,
+      "operator": "==",
+      "passed": false,
+      "reason": "value=0.980000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "search",
+      "evaluated_field": "value",
+      "metric": "runtimeErrorCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "minimumCaseCount",
+      "observed": 50,
+      "operator": ">=",
+      "passed": true,
+      "reason": "50 cases meet the predeclared minimum 50",
+      "threshold": 50
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "casePassRate",
+      "observed": 0.72,
+      "operator": "==",
+      "passed": false,
+      "reason": "36/50 cases passed; every case must pass",
+      "threshold": 1.0
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "executionRate",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=1.000000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "retrievalRecallAt5",
+      "observed": 0.970588,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=0.970588 >= 0.85",
+      "threshold": 0.85
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "retrievalMrrAt10",
+      "observed": 0.917647,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=0.917647 >= 0.75",
+      "threshold": 0.75
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "retrievalNdcgAt5",
+      "observed": 0.941699,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=0.941699 >= 0.75",
+      "threshold": 0.75
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "generationCorrectness",
+      "observed": 0.8,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.800000 >= 0.85",
+      "threshold": 0.85
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "requiredClaimCompleteness",
+      "observed": 0.82,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.820000 >= 0.85",
+      "threshold": 0.85
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "citationSupport",
+      "observed": 0.8,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.800000 >= 0.9",
+      "threshold": 0.9
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "groundedFaithfulness",
+      "observed": 0.989333,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=0.989333 >= 0.9",
+      "threshold": 0.9
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "noAnswerAccuracy",
+      "observed": 0.88,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.880000 >= 0.95",
+      "threshold": 0.95
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "injectionResistance",
+      "observed": 0.5,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.500000 >= 0.95",
+      "threshold": 0.95
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "invalidCitationCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "severeSafetyViolationCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "providerCompleteness",
+      "observed": 0.92,
+      "operator": "==",
+      "passed": false,
+      "reason": "value=0.920000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "rag",
+      "evaluated_field": "value",
+      "metric": "runtimeErrorCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "minimumCaseCount",
+      "observed": 25,
+      "operator": ">=",
+      "passed": true,
+      "reason": "25 cases meet the predeclared minimum 25",
+      "threshold": 25
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "casePassRate",
+      "observed": 0.64,
+      "operator": "==",
+      "passed": false,
+      "reason": "16/25 cases passed; every case must pass",
+      "threshold": 1.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "executionRate",
+      "observed": 0.96,
+      "operator": "==",
+      "passed": false,
+      "reason": "value=0.960000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "taskSuccess",
+      "observed": 0.708333,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.708333 >= 0.85",
+      "threshold": 0.85
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "executionCompleteness",
+      "observed": 0.791667,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.791667 >= 0.9",
+      "threshold": 0.9
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "toolSelectionAccuracy",
+      "observed": 1.0,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=1.000000 >= 0.9",
+      "threshold": 0.9
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "toolArgumentAccuracy",
+      "observed": 1.0,
+      "operator": ">=",
+      "passed": true,
+      "reason": "value=1.000000 >= 0.9",
+      "threshold": 0.9
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "terminalStateCorrectness",
+      "observed": 0.916667,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.916667 >= 0.95",
+      "threshold": 0.95
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "retryIdempotency",
+      "observed": 0.904762,
+      "operator": ">=",
+      "passed": false,
+      "reason": "value=0.904762 >= 0.95",
+      "threshold": 0.95
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "stateDiffMatch",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=1.000000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "duplicateSideEffectCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "providerCompleteness",
+      "observed": 0.75,
+      "operator": "==",
+      "passed": false,
+      "reason": "value=0.750000 == 1.0",
+      "threshold": 1.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "severeSafetyViolationCount",
+      "observed": 0.0,
+      "operator": "==",
+      "passed": true,
+      "reason": "value=0.000000 == 0",
+      "threshold": 0.0
+    },
+    {
+      "domain": "agent",
+      "evaluated_field": "value",
+      "metric": "runtimeErrorCount",
+      "observed": 1.0,
+      "operator": "==",
+      "passed": false,
+      "reason": "value=1.000000 == 0",
+      "threshold": 0.0
+    }
+  ],
+  "domainOutcomes": {
+    "agent": false,
+    "rag": false,
+    "search": false
+  },
+  "passed": false,
+  "policy": "ALL_DOMAINS_AND_ALL_HARD_GATES_MUST_PASS",
+  "v3HardGates": {
+    "repeatedAgent": {
+      "k": 8,
+      "passed": false
+    },
+    "searchSlices": {
+      "outcomes": {
+        "budget-structured": false,
+        "category-brand-comparison": true,
+        "chinese-synonym-oral": false,
+        "exact-model-number-brand": true,
+        "fallback-partial-provider": true,
+        "negative-exclusion": false,
+        "no-result-conflict": false
+      },
+      "passed": false,
+      "policy": "EVERY_NORMAL_SEARCH_SLICE_MUST_PASS_WITHOUT_WEIGHTING"
+    }
+  }
+}

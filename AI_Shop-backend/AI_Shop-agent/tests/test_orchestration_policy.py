@@ -23,6 +23,45 @@ def test_adaptive_router_uses_workflow_for_authoritative_read():
     assert decision.reason == "deterministic_business_path"
 
 
+def test_adaptive_router_uses_workflow_for_plain_product_search():
+    decision = select_orchestration(
+        {
+            "intent": "PRODUCT_SEARCH",
+            "request_mode": "READ_QUERY",
+            "user_text": "帮我找索尼头戴式降噪耳机",
+        }
+    )
+
+    assert decision.mode == "workflow"
+    assert decision.route == "deterministic_workflow"
+
+
+@pytest.mark.asyncio
+async def test_workflow_searches_plain_product_search_without_llm(monkeypatch):
+    invoke = AsyncMock(return_value=ToolInvokeResult(content="商品结果"))
+    monkeypatch.setattr("app.graph.forced_tools.mcp_tool_router.invoke", invoke)
+
+    update = await deterministic_workflow_node(
+        {
+            "user_id": "u1",
+            "message_id": 45,
+            "intent": "PRODUCT_SEARCH",
+            "intent_data": None,
+            "user_text": "帮我找索尼头戴式降噪耳机",
+            "llm_messages": [],
+        }
+    )
+
+    invoke.assert_awaited_once_with(
+        "SEARCH_PRODUCTS",
+        {"keyword": "帮我找索尼头戴式降噪耳机"},
+        "u1",
+        call_id="forced_mcp",
+    )
+    assert update["tools_called"] == ["SEARCH_PRODUCTS"]
+    assert update["route"] == "finalize"
+
+
 def test_adaptive_router_uses_workflow_for_verified_write_proposal():
     decision = select_orchestration(
         {

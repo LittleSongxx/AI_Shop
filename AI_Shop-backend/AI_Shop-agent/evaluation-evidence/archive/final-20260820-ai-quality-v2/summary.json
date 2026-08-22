@@ -1,0 +1,617 @@
+{
+  "completedAt": "2026-08-20T10:55:29.171Z",
+  "datasetSha256": "a6aa8a436c1457f78d76fb44e19d1227c6972fae2068e291318f3f8147145d75",
+  "domains": {
+    "agent": {
+      "caseCount": 8,
+      "metrics": {
+        "executionCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionCompleteness",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 224.713579,
+            "method": "percentile-bootstrap",
+            "upper": 11769.561359
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 3278.184799
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 4446.864951,
+            "method": "percentile-bootstrap",
+            "upper": 13792.376038
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 13084.3909
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 5123.703975,
+            "method": "percentile-bootstrap",
+            "upper": 13792.376038
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 8,
+          "value": 13650.77901
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        },
+        "retryIdempotency": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.609666,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "retryIdempotency",
+          "notes": [],
+          "sampleCount": 6,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 0.0
+        },
+        "severeSafetyViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "severeSafetyViolationCount",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 0.0
+        },
+        "taskSuccess": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "taskSuccess",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        },
+        "terminalStateCorrectness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "terminalStateCorrectness",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        },
+        "toolArgumentAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolArgumentAccuracy",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        },
+        "toolSelectionAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.675592,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "toolSelectionAccuracy",
+          "notes": [],
+          "sampleCount": 8,
+          "value": 1.0
+        }
+      },
+      "statusCounts": {
+        "PASSED": 8
+      }
+    },
+    "rag": {
+      "caseCount": 21,
+      "metrics": {
+        "citationSupport": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.857143,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "citationSupport",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.952381
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.845361,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "generationCorrectness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.710859,
+            "method": "wilson",
+            "upper": 0.973481
+          },
+          "kind": "binary",
+          "name": "generationCorrectness",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.904762
+        },
+        "groundedFaithfulness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "groundedFaithfulness",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "injectionResistance": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.34238,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "injectionResistance",
+          "notes": [],
+          "sampleCount": 2,
+          "value": 1.0
+        },
+        "invalidCitationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "invalidCitationCount",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1480.361352,
+            "method": "percentile-bootstrap",
+            "upper": 2956.46427
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 2515.201171
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 3518.858388,
+            "method": "percentile-bootstrap",
+            "upper": 5540.426454
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 4419.628742
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 3651.939522,
+            "method": "percentile-bootstrap",
+            "upper": 5540.426454
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 21,
+          "value": 5316.266912
+        },
+        "noAnswerAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.845361,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "noAnswerAccuracy",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.845361,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "requiredClaimCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.809524,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "requiredClaimCompleteness",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.928571
+        },
+        "retrievalMrrAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.921053,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalMrrAt10",
+          "notes": [],
+          "sampleCount": 19,
+          "value": 0.973684
+        },
+        "retrievalNdcgAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.941726,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalNdcgAt5",
+          "notes": [],
+          "sampleCount": 19,
+          "value": 0.980575
+        },
+        "retrievalRecallAt3": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalRecallAt3",
+          "notes": [],
+          "sampleCount": 19,
+          "value": 1.0
+        },
+        "retrievalRecallAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "retrievalRecallAt5",
+          "notes": [],
+          "sampleCount": 19,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.0
+        },
+        "severeSafetyViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "severeSafetyViolationCount",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.0
+        },
+        "sourceCoverage": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "sourceCoverage",
+          "notes": [],
+          "sampleCount": 19,
+          "value": 1.0
+        },
+        "sourcePrecision": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.921053,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "continuous",
+          "name": "sourcePrecision",
+          "notes": [],
+          "sampleCount": 19,
+          "value": 0.973684
+        }
+      },
+      "statusCounts": {
+        "FAILED": 2,
+        "PASSED": 19
+      }
+    },
+    "search": {
+      "caseCount": 21,
+      "metrics": {
+        "constraintViolationCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "constraintViolationCount",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.0
+        },
+        "executionRate": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.845361,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "executionRate",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "latencyMsP50": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 288.886943,
+            "method": "percentile-bootstrap",
+            "upper": 470.048456
+          },
+          "kind": "latency",
+          "name": "latencyMsP50",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 381.220749
+        },
+        "latencyMsP95": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 487.473782,
+            "method": "percentile-bootstrap",
+            "upper": 617.628437
+          },
+          "kind": "latency",
+          "name": "latencyMsP95",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 591.056916
+        },
+        "latencyMsP99": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 515.359389,
+            "method": "percentile-bootstrap",
+            "upper": 617.628437
+          },
+          "kind": "latency",
+          "name": "latencyMsP99",
+          "notes": [
+            "DESCRIPTIVE_ONLY_SAMPLE_COUNT_BELOW_100"
+          ],
+          "sampleCount": 21,
+          "value": 612.314133
+        },
+        "mrrAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.9,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "mrrAt10",
+          "notes": [],
+          "sampleCount": 20,
+          "value": 0.966667
+        },
+        "ndcgAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.920583,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "ndcgAt10",
+          "notes": [],
+          "sampleCount": 20,
+          "value": 0.972792
+        },
+        "ndcgAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.918375,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "ndcgAt5",
+          "notes": [],
+          "sampleCount": 20,
+          "value": 0.972792
+        },
+        "noResultAccuracy": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.845361,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "noResultAccuracy",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "providerCompleteness": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.845361,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "kind": "binary",
+          "name": "providerCompleteness",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 1.0
+        },
+        "recallAt10": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "recallAt10",
+          "notes": [],
+          "sampleCount": 20,
+          "value": 1.0
+        },
+        "recallAt3": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "recallAt3",
+          "notes": [],
+          "sampleCount": 20,
+          "value": 1.0
+        },
+        "recallAt5": {
+          "interval": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "kind": "ranking",
+          "name": "recallAt5",
+          "notes": [],
+          "sampleCount": 20,
+          "value": 1.0
+        },
+        "runtimeErrorCount": {
+          "interval": null,
+          "kind": "count",
+          "name": "runtimeErrorCount",
+          "notes": [],
+          "sampleCount": 21,
+          "value": 0.0
+        }
+      },
+      "statusCounts": {
+        "PASSED": 21
+      }
+    }
+  },
+  "executionMode": "LOCAL_FULL_STACK",
+  "runId": "final-20260820-ai-quality-v2",
+  "schemaVersion": "aishop-evaluation-summary/v2",
+  "split": "final"
+}

@@ -1,10 +1,11 @@
 package com.aishop.biz;
 
+import com.aishop.api.dto.OrderStockRestoreDTO;
+import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.dto.SkuStockBatchChangeDTO;
 import com.aishop.api.dto.SkuStockChangeDTO;
 import com.aishop.api.dto.SkuStockDTO;
 import com.aishop.api.dto.SkuStockQueryDTO;
-import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.vo.ProductTotalStockVO;
 import com.aishop.domain.SkuStock;
 import com.aishop.exception.BusinessException;
@@ -16,9 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -177,6 +182,56 @@ public class SkuStockService {
         return affected;
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public int restoreOrderStock(OrderStockRestoreDTO dto) {
+        if (dto == null || dto.getPayOrderId() == null || dto.getPayOrderId().isBlank()) {
+            throw new BusinessException("支付订单号不能为空");
+        }
+        if (CollectionUtils.isEmpty(dto.getItems())) {
+            throw new BusinessException("关单库存恢复列表为空");
+        }
+
+        Map<String, Integer> merged = new TreeMap<>();
+        for (SkuStockChangeDTO item : dto.getItems()) {
+            if (item == null || item.getProductId() == null || item.getProductId().isBlank()
+                    || item.getPropertyValueIdHash() == null
+                    || item.getPropertyValueIdHash().isBlank()) {
+                throw new BusinessException("商品sku不存在");
+            }
+            if (item.getChangeAmount() == null || item.getChangeAmount() <= 0) {
+                throw new BusinessException("关单库存恢复数量必须大于0");
+            }
+            String key = item.getProductId() + "\0" + item.getPropertyValueIdHash();
+            try {
+                merged.merge(key, item.getChangeAmount(), Math::addExact);
+            } catch (ArithmeticException exception) {
+                throw new BusinessException("关单库存恢复数量超出范围");
+            }
+        }
+
+        int total = 0;
+        for (Map.Entry<String, Integer> entry : merged.entrySet()) {
+            String[] parts = entry.getKey().split("\0", 2);
+            String businessKey = orderRestoreBusinessKey(
+                    dto.getPayOrderId(), parts[0], parts[1]);
+            int inserted = stockChangeRecordMapper.insertIgnore(
+                    businessKey,
+                    "ORDER_CLOSE_RESTORE",
+                    parts[0],
+                    parts[1],
+                    entry.getValue());
+            if (inserted == 0) {
+                continue;
+            }
+            int affected = skuStockMapper.changeStock(parts[0], parts[1], entry.getValue());
+            if (affected <= 0) {
+                throw new BusinessException("关单库存恢复失败");
+            }
+            total += affected;
+        }
+        return total;
+    }
+
     public boolean isRefundStockApplied(String businessKey) {
         return businessKey != null && stockChangeRecordMapper.exists(businessKey) > 0;
     }
@@ -216,5 +271,17 @@ public class SkuStockService {
                     merged.merge(key, item.getChangeAmount(), Integer::sum);
                 });
         return merged;
+    }
+
+    private String orderRestoreBusinessKey(
+            String payOrderId, String productId, String propertyValueIdHash) {
+        String canonical = payOrderId + "\0" + productId + "\0" + propertyValueIdHash;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.getBytes(StandardCharsets.UTF_8));
+            return "order-close:" + HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is unavailable", impossible);
+        }
     }
 }

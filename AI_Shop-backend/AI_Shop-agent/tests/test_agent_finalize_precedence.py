@@ -77,6 +77,53 @@ async def test_order_selection_is_persisted_as_the_terminal_payload():
 
 
 @pytest.mark.asyncio
+async def test_server_action_card_is_authoritative_without_model_token_echo():
+    token = "act_" + "a" * 32
+    card = json.dumps(
+        {
+            "type": "ACTION_CONFIRM",
+            "actionToken": token,
+            "actionType": "CANCEL_ORDER",
+            "summary": "untrusted client text",
+        },
+        ensure_ascii=False,
+    )
+    pending = {
+        "token": token,
+        "userId": "u1",
+        "actionType": "CANCEL_ORDER",
+        "paramsJson": json.dumps({"orderId": "O-1"}),
+        "summary": "取消订单 O-1",
+        "status": 0,
+    }
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+        patch(
+            "app.services.agent_runtime.pending_action_service.get_by_token",
+            AsyncMock(return_value=pending),
+        ),
+    ):
+        await finalize_agent_response(
+            {"userId": "u1", "messageId": 34, "userMessage": "取消订单"},
+            ["请核对信息"],
+            [],
+            assistant_cards=card,
+            tools_called=["PROPOSE_CANCEL_ORDER"],
+            user_text="取消订单",
+        )
+
+    persisted = json.loads(complete.await_args.args[1])
+    assert persisted["type"] == "ACTION_CONFIRM"
+    assert persisted["actionToken"] == token
+    assert persisted["summary"] == pending["summary"]
+    assert complete.await_args.args[2] == "action_confirm"
+
+
+@pytest.mark.asyncio
 async def test_product_comparison_card_is_the_terminal_payload():
     comparison = json.dumps(
         {
@@ -148,3 +195,34 @@ async def test_support_case_cards_are_terminal_and_preserve_structured_payload(
 
     assert complete.await_args.args[1] == cards
     assert complete.await_args.args[2] == biz_type
+
+
+@pytest.mark.asyncio
+async def test_failed_rag_repair_draft_is_replaced_by_verifier_fallback():
+    unsafe_draft = "平台支持七天无理由退货。"
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+        patch("app.services.agent_runtime.badcase_service.add_candidate", AsyncMock()),
+        patch("app.services.agent_runtime.judge_service.enqueue"),
+    ):
+        await finalize_agent_response(
+            {"userId": "u1", "messageId": 33, "userMessage": "退货政策是什么"},
+            [unsafe_draft],
+            [],
+            tools_called=[],
+            user_text="退货政策是什么",
+            source_refs={
+                "trace": {"evidenceState": "SUPPORTED"},
+                "sources": [{"id": "returns-policy", "citation": 1}],
+            },
+            rag_evidence_required=True,
+            rag_evidence_state="SUPPORTED",
+        )
+
+    persisted = complete.await_args.args[1]
+    assert persisted != unsafe_draft
+    assert persisted == "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。"

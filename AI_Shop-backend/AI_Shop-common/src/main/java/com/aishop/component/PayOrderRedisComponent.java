@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -96,6 +98,7 @@ public class PayOrderRedisComponent {
 		long deadline = System.currentTimeMillis() + Constants.PAY_ORDER_LIFECYCLE_LOCK_WAIT_MS;
 		String token = null;
 		boolean acquired = false;
+		boolean releaseDeferred = false;
 		try {
 			while (System.currentTimeMillis() < deadline) {
 				token = newPayOrderLifecycleLockToken();
@@ -119,9 +122,14 @@ public class PayOrderRedisComponent {
 			throw new BusinessException("支付订单处理失败", e);
 		} finally {
 			if (acquired && token != null) {
-				releasePayOrderLifecycleLock(lockKey, token);
+				releaseDeferred = deferReleaseUntilTransactionCompletion(lockKey, token);
+				if (!releaseDeferred) {
+					releasePayOrderLifecycleLock(lockKey, token);
+				}
 			}
-			PayOrderLifecycleLockHolder.clear();
+			if (!releaseDeferred) {
+				PayOrderLifecycleLockHolder.clear();
+			}
 		}
 	}
 
@@ -134,11 +142,35 @@ public class PayOrderRedisComponent {
 	}
 
 	private void releasePayOrderLifecycleLock(String lockKey, String token) {
-		Long deleted = stringRedisTemplate.execute(
-				PAY_ORDER_LIFECYCLE_UNLOCK_SCRIPT, List.of(lockKey), token);
-		if (deleted == null || deleted == 0L) {
-			log.warn("支付生命周期锁释放跳过（非持有者或已过期） lockKey={}", lockKey);
+		try {
+			Long deleted = stringRedisTemplate.execute(
+					PAY_ORDER_LIFECYCLE_UNLOCK_SCRIPT, List.of(lockKey), token);
+			if (deleted == null || deleted == 0L) {
+				log.warn("支付生命周期锁释放跳过（非持有者或已过期） lockKey={}", lockKey);
+			}
+		} catch (RuntimeException e) {
+			// The lease still has a TTL. Unlock failure must not turn a committed
+			// order transaction into an apparent request failure.
+			log.error("支付生命周期锁释放失败，等待租约过期 lockKey={}", lockKey, e);
 		}
+	}
+
+	private boolean deferReleaseUntilTransactionCompletion(String lockKey, String token) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()
+				|| !TransactionSynchronizationManager.isActualTransactionActive()) {
+			return false;
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCompletion(int status) {
+				try {
+					releasePayOrderLifecycleLock(lockKey, token);
+				} finally {
+					PayOrderLifecycleLockHolder.clear();
+				}
+			}
+		});
+		return true;
 	}
 
 	public boolean tryMarkLatePaymentRefundOnce(String payOrderId) {

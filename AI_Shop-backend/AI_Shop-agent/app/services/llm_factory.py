@@ -30,7 +30,12 @@ class ChatLLMConfig(NamedTuple):
     disable_thinking: bool
 
 
-def chat_llm_config(*, fallback: bool = False, disable_thinking: bool = False) -> ChatLLMConfig:
+def chat_llm_config(
+    *,
+    fallback: bool = False,
+    disable_thinking: bool = False,
+    streaming: bool = True,
+) -> ChatLLMConfig:
 
     s = get_settings()
     _require_api_key(s.llm_api_key, "LLM_API_KEY")
@@ -41,8 +46,9 @@ def chat_llm_config(*, fallback: bool = False, disable_thinking: bool = False) -
         model=model,
         timeout=s.llm_timeout,
         max_retries=s.llm_max_retries,
-        streaming=True,
-        disable_thinking=disable_thinking and _is_deepseek_endpoint(s.llm_base_url),
+        streaming=streaming,
+        disable_thinking=disable_thinking
+        and (_is_deepseek_endpoint(s.llm_base_url) or _is_qwen_compatible_endpoint(s.llm_base_url)),
     )
 
 
@@ -56,7 +62,7 @@ def chat_llm_for_config(config: ChatLLMConfig) -> ChatOpenAI:
         timeout=config.timeout,
         max_retries=config.max_retries,
         streaming=config.streaming,
-        extra_body={"thinking": {"type": "disabled"}} if config.disable_thinking else None,
+        extra_body=_thinking_extra_body(config.base_url) if config.disable_thinking else None,
     )
 
 
@@ -85,7 +91,8 @@ def create_memory_llm(*, disable_thinking: bool = False) -> ChatOpenAI:
             timeout=timeout,
             max_retries=s.llm_max_retries,
             streaming=False,
-            disable_thinking=disable_thinking and _is_deepseek_endpoint(base_url),
+            disable_thinking=disable_thinking
+            and (_is_deepseek_endpoint(base_url) or _is_qwen_compatible_endpoint(base_url)),
         )
     )
 
@@ -103,6 +110,21 @@ def _resolve_memory_llm_config(s: Settings) -> tuple[str, str, str, int]:
 def _is_deepseek_endpoint(base_url: str) -> bool:
     host = (urlparse(base_url).hostname or "").lower()
     return host == "deepseek.com" or host.endswith(".deepseek.com")
+
+
+def _is_qwen_compatible_endpoint(base_url: str) -> bool:
+    """Return whether the OpenAI-compatible endpoint accepts enable_thinking."""
+
+    host = (urlparse(base_url).hostname or "").lower()
+    return host == "aliyuncs.com" or host.endswith(".aliyuncs.com")
+
+
+def _thinking_extra_body(base_url: str) -> dict | None:
+    if _is_deepseek_endpoint(base_url):
+        return {"thinking": {"type": "disabled"}}
+    if _is_qwen_compatible_endpoint(base_url):
+        return {"enable_thinking": False}
+    return None
 
 
 def create_llm() -> ChatOpenAI:

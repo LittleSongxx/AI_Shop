@@ -54,6 +54,26 @@ class AgentTaskService:
         AGENT_TASK_BACKLOG.set(count)
         return count
 
+    async def get(self, message_id: int) -> dict | None:
+        """Return the durable task projection used by evaluators and diagnostics.
+
+        Episode status is an execution trace and can briefly expose the first
+        failed attempt while the queue's retry backoff is still active. The task
+        ledger is the authoritative source for whether recovery is still pending
+        or has reached a terminal state.
+        """
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT message_id, status, retry_count, error_message,
+                       completed_at, updated_at
+                FROM agent_task WHERE message_id=%s
+                """,
+                (int(message_id),),
+            )
+            row = await cur.fetchone()
+        return dict(row) if row else None
+
     async def mark_dispatching(self, message_id: int) -> bool:
         """原子预占一次 MQ 发布，防止多个恢复 Worker 重复投递同一任务。"""
         settings = get_settings()

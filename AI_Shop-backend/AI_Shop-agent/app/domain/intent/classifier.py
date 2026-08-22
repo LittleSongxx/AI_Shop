@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 
@@ -29,6 +30,13 @@ from app.utils.order_ids import extract_order_id, extract_order_item_id
 from app.utils.product_consult import is_product_consult_turn, normalize_consult_card
 
 logger = structlog.get_logger()
+
+
+async def _invoke_intent_llm(llm, messages: list, *, model: str):
+    """Keep auxiliary intent classification inside its own bounded budget."""
+    timeout = get_settings().intent_llm_timeout_seconds
+    async with asyncio.timeout(timeout):
+        return await invoke_llm_with_metrics(llm, messages, model=model)
 
 # A5：转人工原因 label 的合法取值集合（策略分支写死的常量 + 业务侧兜底）。
 # LLM 自由文本 reason 一律归一化为 OTHER，防止 Prometheus 基数膨胀。
@@ -109,7 +117,53 @@ PAYMENT_BLOCKED = (
     "支付异常",
 )
 PAYMENT_ISSUE_HINTS = FUND_AT_RISK + PAYMENT_BLOCKED
+_FUND_INFORMATION_QUESTION_HINTS = (
+    "会不会",
+    "是否",
+    "会否",
+    "什么时候扣款",
+    "何时扣款",
+    "支付方式",
+    "支付渠道",
+    "演示支付",
+    "模拟支付",
+    "测试支付",
+)
+_FUND_INCIDENT_HINTS = (
+    "已经扣",
+    "实际扣",
+    "被扣",
+    "扣了钱",
+    "钱扣了",
+    "重复支付",
+    "钱没退",
+    "退款没到账",
+    "支付成功没订单",
+    "盗刷了",
+    "被盗刷",
+)
 _UNRESOLVED_HINTS = ("还是没解决", "没有解决", "又不行", "还是不行", "说了没用", "重复问")
+
+
+def _is_informational_fund_question(text: str) -> bool:
+    """Distinguish payment-policy questions from an already-observed loss."""
+
+    if not any(term in text for term in FUND_AT_RISK):
+        return False
+    if any(term in text for term in _FUND_INCIDENT_HINTS):
+        return False
+    if any(term in text for term in _FUND_INFORMATION_QUESTION_HINTS):
+        return True
+    return bool(
+        any(term in text for term in ("扣款", "资金"))
+        and text.rstrip().endswith(("吗", "么", "？", "?"))
+    )
+
+
+def _funds_at_risk(text: str) -> bool:
+    return any(term in text for term in FUND_AT_RISK) and not _is_informational_fund_question(
+        text
+    )
 
 _TOOL_INTENTS = frozenset(
     {
@@ -254,6 +308,80 @@ _ACTION_NEGATION_MARKERS = (
     "别再",
 )
 
+# A proposal is a write-intent boundary, even though it must not mutate state.
+# Keep these cues separate from the direct-write cues: users commonly say
+# "只生成提案" or "等待我确认", which contains a negation/information marker
+# but still requires order resolution and a server-issued confirmation card.
+_PROPOSAL_INTENTS = frozenset(
+    {
+        IntentKind.REFUND,
+        IntentKind.CANCEL_ORDER,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.PRODUCT_REVIEW,
+        IntentKind.RECOMMENT,
+        IntentKind.ADDRESS_CHANGE,
+        IntentKind.INVOICE,
+        IntentKind.DAMAGED_OR_WRONG_ITEM,
+        IntentKind.AFTERSALES_UNKNOWN,
+    }
+)
+_PROPOSAL_MARKERS = (
+    "确认卡",
+    "确认提案",
+    "操作确认",
+    "生成提案",
+    "生成方案",
+    "展示方案",
+    "给出确认提案",
+    "等待我确认",
+    "等我确认",
+    "只生成",
+    "仅生成",
+    "只做预览",
+    "仅做预览",
+    "当前只做预览",
+    "不要实际执行",
+    "不要写入",
+    "不写入",
+    "保留提案",
+    "只保留",
+    "仅保留",
+)
+
+
+def _has_explicit_cancel_proposal(text: str) -> bool:
+    """Recognize a cancellation proposal without delegating the boundary to the LLM.
+
+    This deliberately requires an order id and proposal/preview wording.  A bare
+    ``取消订单`` request still follows the normal order-reference flow, while a
+    request such as ``只保留订单 <id> 的取消提案`` must never be downgraded to an
+    informational turn merely because it mentions an unknown remote outcome.
+    """
+
+    value = str(text or "")
+    if not extract_order_id(value) or "取消" not in value or "订单" not in value:
+        return False
+    return any(
+        marker in value
+        for marker in (
+            "取消提案",
+            "取消方案",
+            "取消操作确认",
+            "取消操作需要确认",
+            "只保留",
+            "仅保留",
+            "只生成",
+            "仅生成",
+            "只做预览",
+            "仅做预览",
+            "不要实际执行",
+            "不要写入",
+            "不写入",
+            "等待我确认",
+            "等我确认",
+        )
+    )
+
 
 def _has_non_negated_action_cue(text: str, cues: tuple[str, ...]) -> bool:
     """Recognize explicit writes while failing closed on negated requests."""
@@ -296,13 +424,18 @@ def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     action_cues = _ACTION_CUES.get(intent, ())
     strong_action = _has_non_negated_action_cue(text, action_cues)
     asks_information = any(marker in text for marker in _INFORMATIONAL_MARKERS)
+    proposal_requested = intent in _PROPOSAL_INTENTS and any(
+        marker in text for marker in _PROPOSAL_MARKERS
+    )
     explicitly_delegates = any(
         marker in text for marker in ("帮我", "给我", "直接", "立即", "提交", "申请")
     )
     direct_order_action = _is_direct_order_action(text, intent, asks_information)
-    if (strong_action or direct_order_action) and (
+    if intent == IntentKind.CANCEL_ORDER and _has_explicit_cancel_proposal(text):
+        return RequestMode.ACTION_PROPOSAL
+    if proposal_requested or ((strong_action or direct_order_action) and (
         not asks_information or explicitly_delegates
-    ):
+    )):
         return RequestMode.ACTION_PROPOSAL
 
     # A selected order can turn the next message into an argument-only write
@@ -404,6 +537,8 @@ def classify_intent_by_rules(
         generic_policy = any(k in text for k in ("一般", "通常", "大概", "规则", "正常"))
         if personal_refund or not generic_policy and not re.search(r"^(退款|退货).*(多久|几天|何时|什么时候)", text):
             return IntentKind.REFUND_STATUS
+        return IntentKind.CHAT
+    if _is_informational_fund_question(text):
         return IntentKind.CHAT
     if any(k in text for k in PAYMENT_ISSUE_HINTS):
         return IntentKind.PAYMENT_ISSUE
@@ -629,6 +764,11 @@ def classify_high_confidence_intent(
     order_id = extract_order_id(text) or ""
 
     ruled = classify_intent_by_rules(text, session_intent=session_intent)
+    # An explicit order id plus cancellation-proposal wording is a closed,
+    # safety-sensitive contract.  Resolve it before the auxiliary LLM so model
+    # variance cannot turn a write proposal into QUERY_ORDER/CHAT.
+    if ruled == IntentKind.CANCEL_ORDER and _has_explicit_cancel_proposal(text):
+        return IntentKind.CANCEL_ORDER, order_id
     if ruled in {
         IntentKind.HUMAN_REQUEST,
         IntentKind.COMPLAINT,
@@ -745,6 +885,26 @@ def _build_intent_context(
     return "\n".join(lines)
 
 
+def _use_structured_intent_output() -> bool:
+    """Return whether the configured intent provider supports JSON schema.
+
+    The explicit setting is the source of truth. ``auto`` retains the
+    provider-native path for normal OpenAI-compatible clients while avoiding a
+    known incompatibility in DeepSeek v4-flash, whose endpoint rejects the
+    JSON-schema response format with a 400. The text-JSON path below remains
+    bounded and schema-validated.
+    """
+
+    settings = get_settings()
+    mode = settings.intent_structured_output_mode
+    if mode == "enabled":
+        return True
+    if mode == "disabled":
+        return False
+    model = (settings.memory_llm_model or settings.llm_model).strip().lower()
+    return model not in {"deepseek-v4-flash", "deepseek-v4-flash-latest"}
+
+
 async def classify_intent_by_llm(
     user_id: str,
     user_text: str,
@@ -812,30 +972,37 @@ async def classify_intent_by_llm(
         )
 
     structured_error: Exception | None = None
-    try:
-        structured_llm = llm.with_structured_output(IntentDecision, include_raw=True)
-        response = await invoke_llm_with_metrics(
-            structured_llm,
-            messages,
-            model=get_settings().memory_llm_model or get_settings().llm_model,
-        )
-        parsed = response.get("parsed") if isinstance(response, dict) else response
-        parsing_error = response.get("parsing_error") if isinstance(response, dict) else None
-        if parsing_error is not None:
-            raise ValueError(f"structured intent parsing failed: {parsing_error}")
-        decision = IntentDecision.model_validate(parsed)
-        INTENT_SCHEMA_TOTAL.labels(result="schema_success").inc()
-        return _normalize_llm_decision(decision, user_text, source="llm_structured")
-    except Exception as exc:
-        structured_error = exc
+    if _use_structured_intent_output():
+        try:
+            structured_llm = llm.with_structured_output(IntentDecision, include_raw=True)
+            response = await _invoke_intent_llm(
+                structured_llm,
+                messages,
+                model=get_settings().memory_llm_model or get_settings().llm_model,
+            )
+            parsed = response.get("parsed") if isinstance(response, dict) else response
+            parsing_error = response.get("parsing_error") if isinstance(response, dict) else None
+            if parsing_error is not None:
+                raise ValueError(f"structured intent parsing failed: {parsing_error}")
+            decision = IntentDecision.model_validate(parsed)
+            INTENT_SCHEMA_TOTAL.labels(result="schema_success").inc()
+            return _normalize_llm_decision(decision, user_text, source="llm_structured")
+        except Exception as exc:
+            structured_error = exc
+            logger.info(
+                "intent_structured_output_fallback",
+                error_type=type(exc).__name__,
+                error=str(exc)[:300],
+            )
+    else:
         logger.info(
-            "intent_structured_output_fallback",
-            error_type=type(exc).__name__,
-            error=str(exc)[:300],
+            "intent_structured_output_skipped",
+            reason="provider_capability_or_configuration",
+            model=get_settings().memory_llm_model or get_settings().llm_model,
         )
 
     try:
-        response = await invoke_llm_with_metrics(
+        response = await _invoke_intent_llm(
             llm,
             [
                 SystemMessage(
@@ -1000,7 +1167,13 @@ async def resolve_intent(
             consult_card=consult_card,
             message_card=message_card,
         )
-        if llm_decision is not None:
+        # An auxiliary provider failure is not a business decision. Continue to
+        # deterministic rules so a safe, high-confidence request (for example
+        # product search) is not silently downgraded to generic CHAT.
+        if llm_decision is not None and llm_decision.source not in {
+            "llm_invalid",
+            "llm_unavailable",
+        }:
             return _record_and_apply(
                 llm_decision,
                 user_text,
@@ -1065,7 +1238,7 @@ def _build_decision(
     after_sales_workflow: bool = False,
 ) -> IntentDecision:
     sentiment = analyze_sentiment(user_text)
-    risk = RiskLevel.HIGH if any(k in user_text for k in FUND_AT_RISK) else RiskLevel.LOW
+    risk = RiskLevel.HIGH if _funds_at_risk(user_text) else RiskLevel.LOW
     if risk == RiskLevel.LOW and intent in {
         IntentKind.PAYMENT_ISSUE,
         IntentKind.COMPLAINT,

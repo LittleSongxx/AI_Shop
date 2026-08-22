@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 import structlog
 
@@ -18,9 +17,8 @@ from app.exceptions import PendingActionConflict
 from app.services.java_internal_client import java_internal_client
 from app.services.order_service import order_service
 from app.services.pending_action_service import pending_action_service
-
-if TYPE_CHECKING:
-    from app.services.tool_invoke_result import ToolInvokeResult
+from app.services.tool_invoke_result import ToolInvokeResult
+from app.utils.biz_payload import build_action_confirm_payload
 
 logger = structlog.get_logger()
 
@@ -30,11 +28,34 @@ def _status_name(status: int | None) -> str:
         return "未知"
     return ORDER_STATUS_NAMES.get(status, str(status))
 
-def _propose_reply(label: str, pending: dict) -> str:
+def _propose_reply(label: str, pending: dict) -> ToolInvokeResult:
+    """Return a server-authored confirmation card and a small model observation.
 
-    return (
-        f"已生成{label}确认卡片。请用一句话说明关键信息（勿重复工具原文、勿写【成功/失败】），"
-        f"并在回复末尾附带【{pending['token']}】"
+    The action credential is intentionally present in the structured card and
+    ``bizData``.  Keeping it in the tool observation is a compatibility bridge
+    for older graph paths, but it is no longer the only transport contract.
+    """
+    token = str(pending.get("token") or "").strip()
+    assistant, biz_data = build_action_confirm_payload(
+        pending,
+        intro=(
+            f"已生成{label}确认卡片。请用一句话说明关键信息（勿重复工具原文、"
+            "勿写【成功/失败】）。"
+        ),
+    )
+    return ToolInvokeResult(
+        content=(
+            f"已生成{label}确认卡片。请确认后提交，"
+            f"并在回复末尾附带【{token}】"
+        ),
+        biz_type="action_confirm",
+        biz_data=biz_data,
+        assistant_cards=assistant,
+        contract_data={
+            "type": "ACTION_CONFIRM",
+            "actionType": pending.get("actionType"),
+            "actionTokenPresent": bool(token),
+        },
     )
 
 def _truncate(text: str, max_len: int = 40) -> str:
@@ -236,7 +257,7 @@ async def _order_items_params(order_id: str, order: dict | None = None) -> list[
 
 async def propose_cancel_order(
     user_id: str, order_id: str, run_id: str | None = None
-) -> str:
+) -> str | ToolInvokeResult:
     if not order_id:
         return "【取消订单失败】请输入要取消的订单号"
     try:
@@ -276,7 +297,7 @@ async def propose_cancel_order(
 
 async def propose_confirm_receipt(
     user_id: str, order_id: str, run_id: str | None = None
-) -> str:
+) -> str | ToolInvokeResult:
 
     if not order_id:
         return "【确认收货失败】请输入要确认收货的订单号"
@@ -317,7 +338,7 @@ async def propose_confirm_receipt(
 
 async def propose_refund(
     user_id: str, order_item_id: str, run_id: str | None = None
-) -> str:
+) -> str | ToolInvokeResult:
 
     if not order_item_id:
         return "【退款失败】请输入要退款的订单项ID"
@@ -410,7 +431,7 @@ async def propose_product_review(
     content: str,
     star: int,
     run_id: str | None = None,
-) -> str:
+) -> str | ToolInvokeResult:
 
     if not order_id:
         return "【评价失败】请输入要评价的订单号"
@@ -454,7 +475,7 @@ async def propose_product_review(
 
 async def propose_recomment(
     user_id: str, order_id: str, content: str, run_id: str | None = None
-) -> str:
+) -> str | ToolInvokeResult:
 
     if not order_id:
         return "【追评失败】请输入要追评的订单号"
@@ -507,7 +528,7 @@ async def propose_create_support_case(
     source_message_id: int | None = None,
     forced_handoff: bool = False,
     priority: str = "NORMAL",
-) -> str:
+) -> str | ToolInvokeResult:
     from app.services.support_case_service import support_case_service
 
     try:

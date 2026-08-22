@@ -8,8 +8,8 @@
       </el-form-item>
       <el-form-item label="是否包含图片" prop="coverType">
         <el-radio-group v-model="formData.coverType">
-          <el-radio :label="1">包含</el-radio>
-          <el-radio :label="0">不包含</el-radio>
+          <el-radio :value="1">包含</el-radio>
+          <el-radio :value="0">不包含</el-radio>
         </el-radio-group>
       </el-form-item>
     </el-form>

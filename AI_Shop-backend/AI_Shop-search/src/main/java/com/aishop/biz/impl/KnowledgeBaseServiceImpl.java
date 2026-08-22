@@ -819,10 +819,14 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 throw new BusinessException("catalogSha256与源快照不一致");
             }
         } else {
-            resolvedCatalogSha = normalizeCatalogSha(catalogSha256);
+            String requestedCatalogSha = normalizeCatalogSha(catalogSha256);
             documents = loadSelectableDocuments(selectedIds);
             if (documents.size() != selectedIds.size()) {
                 throw new BusinessException("发布集合包含不存在或尚未索引的知识文档");
+            }
+            resolvedCatalogSha = catalogMembershipSha(documents);
+            if (!resolvedCatalogSha.equals(requestedCatalogSha)) {
+                throw new BusinessException("catalogSha256与所选知识文档集合不一致");
             }
         }
         long nextVersion = currentVersion + 1;

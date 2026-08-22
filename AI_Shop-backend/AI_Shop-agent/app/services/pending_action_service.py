@@ -10,7 +10,7 @@ import structlog
 from app.config.settings import get_settings
 from app.exceptions import PendingActionConflict, PendingActionExpired, RemoteActionRejected
 from app.services.episode_service import current_episode, episode_service
-from app.services.java_internal_client import java_internal_client
+from app.services.java_internal_client import delegated_user_scope, java_internal_client
 from app.services.pending_action_store import pending_action_store
 from app.services.redis_service import redis_service
 from app.utils.biz_payload import ACTION_LABELS
@@ -291,16 +291,23 @@ class PendingActionService:
             params = {}
         if not isinstance(params, dict) or not token:
             return None
+        delegated_user_id = str(pending.get("userId") or "").strip()
+        if not delegated_user_id:
+            return None
         try:
             settings = get_settings()
-            remote = await java_internal_client.get_agent_action_status(
-                str(pending.get("userId") or ""),
-                str(pending.get("actionType") or ""),
-                token,
-                params,
-                max_attempts=settings.pending_action_reconcile_max_attempts,
-                reconcile_window_seconds=settings.pending_action_reconcile_deadline_seconds,
-            )
+            # The user ID is read from the persisted pending action, never from
+            # model-controlled params. Bind it to the authenticated internal
+            # request header so Java can enforce body/header consistency.
+            with delegated_user_scope(delegated_user_id):
+                remote = await java_internal_client.get_agent_action_status(
+                    delegated_user_id,
+                    str(pending.get("actionType") or ""),
+                    token,
+                    params,
+                    max_attempts=settings.pending_action_reconcile_max_attempts,
+                    reconcile_window_seconds=settings.pending_action_reconcile_deadline_seconds,
+                )
         except Exception as exc:
             logger.warning(
                 "pending_action_rejection_status_failed",
@@ -491,16 +498,20 @@ class PendingActionService:
                 if not isinstance(params, dict):
                     params = {}
                 try:
-                    remote = await java_internal_client.get_agent_action_status(
-                        str(pending.get("userId") or ""),
-                        str(pending.get("actionType") or ""),
-                        str(token),
-                        params,
-                        max_attempts=settings.pending_action_reconcile_max_attempts,
-                        reconcile_window_seconds=(
-                            settings.pending_action_reconcile_deadline_seconds
-                        ),
-                    )
+                    delegated_user_id = str(pending.get("userId") or "").strip()
+                    if not delegated_user_id:
+                        raise ValueError("pending action has no persisted user identity")
+                    with delegated_user_scope(delegated_user_id):
+                        remote = await java_internal_client.get_agent_action_status(
+                            delegated_user_id,
+                            str(pending.get("actionType") or ""),
+                            str(token),
+                            params,
+                            max_attempts=settings.pending_action_reconcile_max_attempts,
+                            reconcile_window_seconds=(
+                                settings.pending_action_reconcile_deadline_seconds
+                            ),
+                        )
                     remote_status = str(remote.get("status") or "UNKNOWN").upper()
                     result_message = str(remote.get("result_message") or "").strip()
                 except Exception as exc:

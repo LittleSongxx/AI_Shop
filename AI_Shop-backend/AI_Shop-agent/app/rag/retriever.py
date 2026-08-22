@@ -41,6 +41,7 @@ from app.rag.runtime_trace import (
 from app.resilience.circuit_breaker import circuit_registry
 from app.services.java_internal_client import java_internal_client
 from app.services.redis_service import redis_service
+from evaluation.core.fault_injection import fault_point
 
 logger = structlog.get_logger()
 tracer = get_tracer()
@@ -754,6 +755,9 @@ class RagRetriever:
         if not breaker.allow_request() or not query.strip():
             return []
         try:
+            injected_mode = fault_point("bm25")
+            if injected_mode == "empty":
+                return []
             body = {
                 "size": min(max(limit, 1), 50),
                 "query": {
@@ -1181,6 +1185,9 @@ class RagRetriever:
             return []
         data_types = [data_type] if isinstance(data_type, str) else list(data_type)
         try:
+            injected_mode = fault_point("vector")
+            if injected_mode == "empty":
+                return []
             vector_started = time.perf_counter()
             if runtime_trace is not None:
                 runtime_trace.called("elasticsearchVector")
@@ -1265,6 +1272,9 @@ class RagRetriever:
                 runtime_trace.fallback("rerank_breaker_open")
             return fallback
         try:
+            injected_mode = fault_point("rerank")
+            if injected_mode == "empty":
+                return fallback
             rerank_started = time.perf_counter()
             if runtime_trace is not None:
                 runtime_trace.called("rerank")

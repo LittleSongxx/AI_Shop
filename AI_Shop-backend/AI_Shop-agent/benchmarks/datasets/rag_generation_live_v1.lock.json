@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "dataset": "rag_generation_live_v1.json",
-  "datasetSha256": "7428b91b32d2211e349668deac574f5539f7a54cdf8dfd1e901a9d2ba9958ee8",
-  "sourceDataset": "rag_holdout_v1.jsonl",
-  "sourceDatasetSha256": "6e009d56a1d9025c28da092f4b51dc19665e9e6166513fe71032c99a8bb35194",
-  "caseCount": 10,
-  "split": "holdout"
-}

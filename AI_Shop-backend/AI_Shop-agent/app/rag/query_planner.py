@@ -70,11 +70,16 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
     price_question = any(
         term in text for term in ("价格", "成交价", "价格不同", "快照")
     )
+    stock_question = any(term in text for term in ("库存", "余量", "有货"))
     checkout_price_question = price_question and any(
         term in text for term in ("提交订单", "下单时", "结算时", "结算")
     )
     if checkout_price_question:
-        add("checkout.current_product_revalidation")
+        add(
+            "checkout.price_and_stock_revalidation"
+            if stock_question and any(term in text for term in ("购物车", "加入"))
+            else "checkout.current_product_revalidation"
+        )
     elif any(term in text for term in ("加购", "购物车")) and price_question:
         add("cart.price_snapshot_not_guarantee")
     ai_is_actor = bool(
@@ -104,13 +109,33 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
         term in text for term in ("绕过", "校验", "下单")
     ):
         add("address.ownership_check")
+    if (
+        any(term in text for term in ("地址簿", "地址本", "账户地址"))
+        and any(term in text for term in ("已有订单", "已生成订单", "订单地址", "订单快照"))
+        and any(term in text for term in ("修改", "改掉", "追改", "自动"))
+    ) or (
+        "订单快照" in text
+        and any(term in text for term in ("地址", "履约快照"))
+    ):
+        add("address.order_snapshot")
     if "优惠券" in text and all(
         term in text for term in ("下单", "支付", "关闭")
     ):
         add("coupon.lock_consume_release")
-    if any(term in text for term in ("知识库", "知识检索")) and any(
+    if any(
+        term in text for term in ("知识库", "知识检索", "检索不足", "rag", "grounding")
+    ) and any(
         term in text
-        for term in ("证据不足", "证据不够", "找不到充分依据", "没有充分依据")
+        for term in (
+            "证据不足",
+            "证据不够",
+            "找不到充分依据",
+            "没有充分依据",
+            "检索不足",
+            "grounding",
+            "证据矛盾",
+            "互相矛盾",
+        )
     ):
         add("rag.retrieval_and_abstention")
     if any(term in text for term in ("知识助手", "助手")) and any(
@@ -131,8 +156,9 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
         add("privacy.retained_business_anonymization")
     if "演示" in text and any(term in text for term in ("资金", "扣款", "扣除")):
         add("payment.demo_no_real_funds")
-    if any(term in text for term in ("退货申请", "售后申请")) and any(
-        term in text for term in ("到账", "退款成功", "等于退款")
+    if (
+        any(term in text for term in ("退货申请", "售后申请", "退货退款", "退款"))
+        and any(term in text for term in ("订单详情", "入口", "发起", "申请", "到账", "支付渠道"))
     ):
         add("aftersales.request_and_refund_boundary")
     if "幂等键" in text and any(

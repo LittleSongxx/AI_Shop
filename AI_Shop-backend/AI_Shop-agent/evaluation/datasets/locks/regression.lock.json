@@ -1,0 +1,26 @@
+{
+  "canonicalDatasetSha256": "a102ed7a7e6225ad52da9a60c05c25f8c9f22a2ed5f036395b00c906e802eeb2",
+  "caseCount": 51,
+  "createdAt": "2026-08-21T09:29:26.117Z",
+  "domainCounts": {
+    "agent": 5,
+    "rag": 26,
+    "search": 20
+  },
+  "files": {
+    "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/regression/agent.jsonl": {
+      "bytes": 3763,
+      "sha256": "92286cf5a6ce19272233589ddb2e66266bc1e2c6a062f3d3349eb829437cc77d"
+    },
+    "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/regression/rag.jsonl": {
+      "bytes": 17443,
+      "sha256": "095d4a6ba35587a3478a5de9c59dc265193cd96beed0cec879f6c5dc0bbe16fc"
+    },
+    "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/regression/search.jsonl": {
+      "bytes": 11500,
+      "sha256": "fd32f1f16f8da74c3a87367de3a85211b9cde540bea0ae72c192d36492c52482"
+    }
+  },
+  "schemaVersion": "aishop-evaluation-dataset-lock/v3",
+  "split": "regression"
+}

@@ -218,23 +218,26 @@ class McpToolRouter:
         raw.pop("user_id", None)
         raw["userId"] = user_id
 
+        # The episode is the authoritative cross-process request context.  This
+        # is especially important for deterministic/forced tools: they do not
+        # pass through the model-tool argument path where graph state normally
+        # adds requestId.  Falling back to ``req_<runId>`` here breaks evaluation
+        # fault capabilities (and can split production idempotency traces) because
+        # the API-bound request id is the value that must cross MCP.
+        context = current_episode()
+        if context and context.run_id:
+            raw.setdefault("runId", context.run_id)
+            raw.setdefault("requestId", context.request_id or f"req_{context.run_id}")
+
         # 写操作留一条审计线索：出问题时要能回答"谁在什么时候发起了哪个提案"。
         # 只读调用量大且没有追溯价值，不记。
         if policy.is_write:
-            context = current_episode()
-            if context and context.run_id:
-                raw.setdefault("runId", context.run_id)
             logger.info(
                 "write_tool_invoked",
                 tool=tool_name,
                 risk=policy.risk.value,
                 user_id=user_id,
             )
-        else:
-            context = current_episode()
-            if context and context.run_id:
-                raw.setdefault("runId", context.run_id)
-                raw.setdefault("requestId", f"req_{context.run_id}")
 
         # P3-1: in-process tools are handled locally, never forwarded to the
         # MCP Streamable HTTP server.

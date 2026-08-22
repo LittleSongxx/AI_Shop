@@ -2,12 +2,12 @@ package com.aishop.api.support;
 
 import com.aishop.api.StockFeignClient;
 import com.aishop.api.dto.LessStockPageDTO;
+import com.aishop.api.dto.OrderStockRestoreDTO;
 import com.aishop.api.dto.ProductIdDTO;
 import com.aishop.api.dto.RefundStockRestoreDTO;
 import com.aishop.api.dto.SkuStockBatchChangeDTO;
 import com.aishop.api.dto.SkuStockChangeDTO;
 import com.aishop.api.dto.SkuStockDTO;
-import com.aishop.api.dto.SkuStockQueryDTO;
 import com.aishop.api.dto.SkuStockSetDTO;
 import com.aishop.api.dto.SkuStockQueryDTO;
 import com.aishop.api.vo.ProductTotalStockVO;
@@ -86,6 +86,16 @@ public class StockFeignSupport implements StockBatchCompensatePort {
     public int restoreRefundStock(RefundStockRestoreDTO dto) {
         StockChangeResultVO result = feignResponseSupport.call(
                 () -> stockFeignClient.restoreRefundStock(dto), "退款库存恢复失败");
+        return result == null || result.getAffectedRows() == null ? 0 : result.getAffectedRows();
+    }
+
+    @Override
+    public int restoreOrderStock(String payOrderId, List<ProductItem> items) {
+        OrderStockRestoreDTO dto = new OrderStockRestoreDTO();
+        dto.setPayOrderId(payOrderId);
+        dto.setItems(toBatch(items, true).getItems());
+        StockChangeResultVO result = feignResponseSupport.call(
+                () -> stockFeignClient.restoreOrderStock(dto), "关单库存恢复失败");
         return result == null || result.getAffectedRows() == null ? 0 : result.getAffectedRows();
     }
 

@@ -110,6 +110,41 @@ class PendingActionStore:
             row = await cur.fetchone()
         return self._to_public(row) if row else None
 
+    async def get_unique_pending_for_run(
+        self,
+        *,
+        user_id: str,
+        run_id: str,
+        action_type: str,
+    ) -> dict | None:
+        """Return one active proposal owned by an exact completed Agent run."""
+
+        owner = str(user_id or "").strip()
+        run = str(run_id or "").strip()
+        action = str(action_type or "").strip().upper()
+        if not owner or not run or not action:
+            raise ValueError("pending action run lookup requires owner, run and action type")
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT action_token, user_id, action_type, message_id, run_id, params_json,
+                       business_key, args_fingerprint, active_business_key,
+                       summary, confirm_text, risk_tip, status, result_message,
+                       error_message, reconcile_attempts, reconcile_deadline,
+                       last_reconcile_at, review_reason, expires_at, created_at
+                FROM agent_pending_action
+                WHERE user_id=%s AND run_id=%s AND action_type=%s
+                  AND status=%s AND expires_at > NOW()
+                ORDER BY created_at, action_token
+                LIMIT 2
+                """,
+                (owner, run, action, self.PENDING),
+            )
+            rows = list(await cur.fetchall())
+        if len(rows) > 1:
+            raise RuntimeError("multiple active pending actions matched one owned Agent run")
+        return self._to_public(rows[0]) if rows else None
+
     async def get_active_by_business_key(self, business_key: str) -> dict | None:
         async with acquire() as cur:
             await cur.execute(

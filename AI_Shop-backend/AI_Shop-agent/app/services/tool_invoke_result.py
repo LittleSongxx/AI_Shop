@@ -28,6 +28,14 @@ class ToolInvokeResult:
     protocol_version: str = MCP_PROTOCOL
     contract_version: str = MCP_TOOL_CONTRACT
 
+    def __str__(self) -> str:
+        """Keep legacy direct-tool callers readable while preserving structure."""
+        return self.content or ""
+
+    def __contains__(self, item: object) -> bool:
+        """Allow old ``'text' in result`` assertions without losing the contract."""
+        return str(item) in (self.content or "")
+
     def to_tool_message(self) -> str:
         return self.content
 

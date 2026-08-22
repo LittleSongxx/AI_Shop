@@ -19,6 +19,7 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from app.config.settings import get_settings
 from app.harness.metrics.runtime_sensors import CHECKPOINT_PERSIST_FAILURES
+from evaluation.core.fault_injection import fault_point
 
 logger = structlog.get_logger()
 
@@ -129,6 +130,7 @@ class RedisCheckpointSaver(BaseCheckpointSaver[str]):
             },
             separators=(",", ":"),
         )
+        fault_point("redis-checkpoint")
         await self._redis.setex(self._redis_key(thread_id), self._ttl, envelope)
 
     def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:

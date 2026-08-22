@@ -7,7 +7,10 @@ from app.domain.category_terms import has_bare_bag_category
 HUMAN_HINTS = ("转人工", "人工客服", "找客服", "真人客服", "人工处理", "人工介入", "找你们主管")
 
 _PHONE_HINTS = ("手机", "iphone", "苹果", "三星", "华为", "小米", "oppo", "vivo", "荣耀")
-_SNACK_HINTS = ("零食", "小吃", "坚果", "糖果", "饼干")
+_SNACK_HINTS = (
+    "零食", "小吃", "坚果", "糖果", "饼干", "雪饼", "旺旺", "汽水",
+    "可乐", "雪碧", "芬达", "薯片", "巧克力",
+)
 _COMPUTER_HINTS = ("电脑", "台式", "台式机", "笔记本", "平板", "主机", "显示器")
 _TOY_HINTS = ("玩具", "玩偶", "模型", "积木", "乐高")
 _MUSIC_HINTS = ("吉他", "乐器", "钢琴", "尤克里里", "电子琴")
@@ -16,14 +19,17 @@ _OTHER_PRODUCT_HINTS = ("家电", "服饰", "衣服", "鞋子", "美妆", "护�
 # 这里只是把最高频的几种补进去，不追求穷尽——LLM 兜底仍然存在。
 _DIGITAL_LIFESTYLE_HINTS = (
     "耳机", "音箱", "键盘", "鼠标", "手表", "充电宝",
-    "空气炸锅", "电饭煲", "扫地机器人", "空调", "冰箱", "洗衣机", "风扇",
+    "空气炸锅", "电饭煲", "扫地机器人", "空气净化器", "净水器", "净化器",
+    "空调", "冰箱", "洗衣机", "风扇",
 )
 _ALL_PRODUCT_HINTS = (
     _PHONE_HINTS + _SNACK_HINTS + _COMPUTER_HINTS + _TOY_HINTS + _MUSIC_HINTS
     + _OTHER_PRODUCT_HINTS + _DIGITAL_LIFESTYLE_HINTS
 )
 _SWITCH_HINTS = ("转", "切换", "换品类", "换个", "不要这款", "不要这个", "看看别的", "别的品类", "跨品类")
-_SEARCH_VERBS = ("搜索", "找", "推荐", "买", "想要", "需要", "看看", "有没有")
+_SEARCH_VERBS = (
+    "搜索", "找", "推荐", "买", "购买", "采购", "想要", "需要", "看看", "有没有",
+)
 _CONSULT_FOLLOWUP_HINTS = (
     "这款",
     "这个",
@@ -204,6 +210,15 @@ def looks_like_new_product_search(user_text: str) -> bool:
         _mentions_any(t, _ALL_PRODUCT_HINTS)
         or has_bare_bag_category(t)
         or re.search(r"预算\s*(?:(?:提高|提升|调整|改成|改为|改|提到|放宽)\s*(?:到|至|为|成)?\s*)?\d+", t)
+    ):
+        return True
+
+    # Category-selection questions are product search even without an explicit
+    # "buy/recommend" verb. This keeps high-frequency requests such as
+    # "新房除甲醛空气净化器怎么选" on the authoritative search path instead
+    # of allowing an LLM intent fallback to classify them as generic chat.
+    if any(k in t for k in ("怎么选", "如何选", "怎么挑", "如何挑", "哪个好")) and _mentions_any(
+        t, _ALL_PRODUCT_HINTS
     ):
         return True
 
