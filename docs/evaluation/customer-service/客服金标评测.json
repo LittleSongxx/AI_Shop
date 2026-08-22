@@ -2518,6 +2518,7 @@
     "status": "PROVISIONAL_NOT_HUMAN_GOLD"
   },
   "humanReviewPlan": {
+    "adjudicationComplete": false,
     "adjudicationRequired": true,
     "blindedFirstPass": true,
     "fields": [
@@ -2542,7 +2543,7 @@
   "limitations": [
     "Labels are not independently human reviewed; this is a provisional routing baseline, not human accuracy.",
     "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
-    "The four metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion."
+    "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion."
   ],
   "metrics": {
     "criticalHandoffMissRate": {

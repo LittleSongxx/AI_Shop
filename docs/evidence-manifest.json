@@ -22,7 +22,7 @@
       "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
       "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
       "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
-      "reportSha256": "f31cceadd3e30832cafa13e7ec664c4b41d1bef3c6e0e5a25e95658343a74d5d",
+      "reportSha256": "a81ab063995b73c0a51b117fc6b651038ad3f1d6c4167a5146d70801228498cc",
       "caseCount": 60,
       "status": "PROVISIONAL_NOT_HUMAN_GOLD",
       "releaseGateEligible": false,

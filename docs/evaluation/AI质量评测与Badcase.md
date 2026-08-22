@@ -59,7 +59,7 @@
 
 标签尚未独立人工复核，所有指标标记 `PROVISIONAL_NOT_HUMAN_GOLD`、`releaseGateEligible=false`；点估计 1.0 只说明这 60 条规则诊断样本全部命中，不能外推为人工准确率或生产稳定性。复核后必须重新冻结并运行，不能覆盖本 provisional 结果。
 
-最近一次修复了首轮低风险“支付方式有哪些”误建议转人工的策略边界；客服专项回归 `102 passed`，全量 Python `1244 passed, 7 skipped`（跳过项均要求真实 MySQL 8）。
+最近一次修复了首轮低风险“支付方式有哪些”误建议转人工的策略边界；客服相关规则/路由回归 `155 passed`，全量 Python `1257 passed, 7 skipped`（跳过项均要求真实 MySQL 8）。
 
 ## RAG 与 Agent 边界
 
@@ -87,6 +87,8 @@ cd AI_Shop-backend/AI_Shop-agent
 python -m evaluation.cli validate
 python -m evaluation.cli slices --split development
 python -m evaluation.cli customer-service-gold --mode rule
+# 客服人工金标：两位标注者独立填写后再 seal/merge，不能跳过人工步骤
+python -m evaluation.cli customer-service-review export --annotator reviewer-a --output /tmp/reviewer-a.open.jsonl
 ```
 
 current 只指向 v9 final；v2 是历史通过 archive，v3-v8 是 immutable failed archive；旧运行不参与当前分母。机器索引、哈希和生命周期见

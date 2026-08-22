@@ -74,6 +74,12 @@ from evaluation.customer_service_gold import (
     DEFAULT_REPORT as DEFAULT_CUSTOMER_SERVICE_REPORT,
     run_customer_service_gold,
 )
+from evaluation.customer_service_review import (
+    export_review_sheet,
+    merge_human_reviews,
+    seal_review_sheet,
+    validate_review_sheet,
+)
 from evaluation.db_benchmark import benchmark_db_sizes, write_db_benchmark_evidence
 from evaluation.repeat_runner import run_repeated_agent_cases
 from evaluation.repeat_runner import trial_context
@@ -175,6 +181,39 @@ def build_parser() -> argparse.ArgumentParser:
     customer_service.add_argument(
         "--json-output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_JSON_REPORT
     )
+    customer_review = commands.add_parser(
+        "customer-service-review",
+        help="export, validate, or merge two blinded customer-service review sheets",
+    )
+    review_commands = customer_review.add_subparsers(dest="review_command", required=True)
+    review_export = review_commands.add_parser("export", help="export one blinded reviewer sheet")
+    review_export.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
+    review_export.add_argument("--annotator", required=True, help="stable reviewer identifier")
+    review_export.add_argument("--output", type=Path, required=True)
+    review_export.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="optional deterministic order seed; omitted uses a stable reviewer-specific seed",
+    )
+    review_validate = review_commands.add_parser("validate", help="validate a reviewer sheet")
+    review_validate.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
+    review_validate.add_argument("--review", type=Path, required=True)
+    review_validate.add_argument("--complete", action="store_true")
+    review_seal = review_commands.add_parser(
+        "seal", help="seal a completed open sheet into a new hashed artifact"
+    )
+    review_seal.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
+    review_seal.add_argument("--review", type=Path, required=True)
+    review_seal.add_argument("--output", type=Path, required=True)
+    review_merge = review_commands.add_parser("merge", help="merge two sheets into human-verified data")
+    review_merge.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
+    review_merge.add_argument("--review-a", type=Path, required=True)
+    review_merge.add_argument("--review-b", type=Path, required=True)
+    review_merge.add_argument("--adjudication", type=Path)
+    review_merge.add_argument("--adjudicator", default="consensus")
+    review_merge.add_argument("--output-dataset", type=Path, required=True)
+    review_merge.add_argument("--evidence", type=Path, required=True)
     seal = commands.add_parser(
         "seal-auxiliary",
         help="copy a verified fault/repeat run into an immutable diagnostic package",
@@ -819,6 +858,41 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "customer-service-review":
+        if args.review_command == "export":
+            manifest = export_review_sheet(
+                args.dataset,
+                args.output,
+                reviewer_id=args.annotator,
+                seed=args.seed,
+            )
+            _print(manifest)
+            return 0
+        if args.review_command == "validate":
+            manifest = validate_review_sheet(
+                args.dataset,
+                args.review,
+                require_complete=args.complete,
+            )
+            _print({"valid": True, "manifest": manifest})
+            return 0
+        if args.review_command == "seal":
+            manifest = seal_review_sheet(args.dataset, args.review, args.output)
+            _print(manifest)
+            return 0
+        if args.review_command == "merge":
+            evidence = merge_human_reviews(
+                args.dataset,
+                args.review_a,
+                args.review_b,
+                output_dataset_path=args.output_dataset,
+                evidence_path=args.evidence,
+                adjudication_path=args.adjudication,
+                default_adjudicator=args.adjudicator,
+            )
+            _print(evidence)
+            return 0
+        raise AssertionError(f"unhandled customer-service review command: {args.review_command}")
     if args.command == "slices":
         return await _slices(args)
     if args.command == "repeat":

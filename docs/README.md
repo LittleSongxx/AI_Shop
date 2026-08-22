@@ -25,3 +25,5 @@ python -m evaluation.cli customer-service-gold --mode rule
 ```
 
 客服金标完成独立人工复核后，先冻结标签版本，再重新运行并保留本 provisional 结果；不得把规则基线、模型自评或 `pass^k` 当成人工真值。
+
+人工复核工具已内置为 fail-closed 流程：`customer-service-review export` 生成无 expected/预测的双人盲标 sheet，`seal` 生成带哈希的不可变 sheet，`merge` 只接受两份 sealed sheet，并要求所有冲突有仲裁记录。当前仍等待人工标注，不在仓库伪造 `HUMAN_VERIFIED` 数据。

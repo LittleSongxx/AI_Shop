@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
+from evaluation.core.io import atomic_write_jsonl
 from evaluation.customer_service_gold import (
+    HUMAN_STATUS,
     CustomerServiceGoldError,
     evaluate_predictions,
     load_gold_dataset,
@@ -40,6 +42,40 @@ def test_report_exposes_pending_blinded_human_review_plan():
     assert plan["blindedFirstPass"] is True
     assert plan["adjudicationRequired"] is True
     assert report["releaseGateEligible"] is False
+
+
+def test_human_verified_status_requires_and_exposes_review_evidence():
+    row = load_gold_dataset(DATASET)[0]
+    row["annotation"] = {
+        "status": HUMAN_STATUS,
+        "reviewers": ["reviewer-a", "reviewer-b"],
+        "adjudicator": "lead-reviewer",
+        "reviewEvidence": {"sourceDatasetSha256": "a" * 64},
+    }
+    report = evaluate_predictions(
+        [row],
+        _perfect_predictions([row]),
+        provenance={"mode": "fixture", "datasetSha256": "b" * 64},
+    )
+    assert report["status"] == HUMAN_STATUS
+    assert report["humanReviewPlan"]["status"] == "COMPLETE"
+    assert report["humanReviewPlan"]["adjudicationComplete"] is True
+    assert HUMAN_STATUS in report["metrics"]["intentMacroF1"]["notes"]
+    assert "not customer satisfaction" in report["limitations"][0]
+
+
+def test_human_verified_dataset_rejects_missing_reviewer_hashes(tmp_path):
+    row = load_gold_dataset(DATASET)[0]
+    row["annotation"] = {
+        "status": HUMAN_STATUS,
+        "reviewers": ["reviewer-a", "reviewer-b"],
+        "adjudicator": "lead-reviewer",
+        "reviewEvidence": {"sourceDatasetSha256": "a" * 64},
+    }
+    target = tmp_path / "human.jsonl"
+    atomic_write_jsonl(target, [row])
+    with pytest.raises(CustomerServiceGoldError, match="reviewASha256"):
+        load_gold_dataset(target)
 
 
 def test_metrics_keep_handoff_suggested_out_of_handoff_recall():

@@ -38,7 +38,8 @@
 - 将日期版项目/质量说明合并到本文件和 [质量评测与 Badcase](../evaluation/AI质量评测与Badcase.md)，JSON scorecard 与客服 JSON 统一放入 `docs/evaluation/`。
 - 新增独立客服 `gold-v1`（先 32 条，后扩展为 60 条），运行生产 `resolve_intent(..., allow_llm=False)` 规则预路由基线，输出四项核心指标和逐指标 badcase；扩展样本覆盖咨询/搜索边界、资金风险、隐私、否定、少件和货币槽位。
 - 修复并回归验证支付扣款否定、重复/未授权支付、退款未到账、隐私数据与账号安全、否定转人工、破损短句和商品名 span 边界；当前 provisional 点估计为 Intent Macro-F1 `1.000`、高风险 Recall `1.000`、slot span F1 `1.000`、slot EM `1.000`、handoff Recall `1.000`，共 60 条、当前 0 badcase，95% CI 仍较宽。
-- 额外修复首轮“支付方式有哪些”误建议转人工：`ASK_CLARIFICATION` 现在按低风险信息问法直接回答；第二次低置信度提示、连续第三次升级的既有契约保持不变。客服专项回归 `102 passed`，全量 Python `1244 passed, 7 skipped`（7 项均为真实 MySQL 8 migration 条件跳过）。
+- 额外修复首轮“支付方式有哪些”误建议转人工：`ASK_CLARIFICATION` 现在按低风险信息问法直接回答；第二次低置信度提示、连续第三次升级的既有契约保持不变。客服相关规则/路由回归 `155 passed`，全量 Python `1257 passed, 7 skipped`（7 项均为真实 MySQL 8 migration 条件跳过）。
+- 将客服人工金标流程落成可执行 CLI：双人盲标导出、开放 sheet 封存、源数据/内容 SHA-256、taxonomy/切片一致性、递归脱敏校验、冲突仲裁和独立 HUMAN_VERIFIED 数据输出；新增专项测试 `18 passed`。当前只完成工具和自动化验证，未伪造人工标签，draft 结果仍不进 release gate。
 - 暂不修复 Search hard negative、不重刷 Search 质量数据；先保留真实漏召回作为后续 paired replay 素材。
 
 ## 方法成熟度判断

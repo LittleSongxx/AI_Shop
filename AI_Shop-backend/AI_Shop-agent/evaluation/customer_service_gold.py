@@ -3,9 +3,10 @@
 The evaluator is deliberately separate from the Agent pass^k evidence.  It
 measures the production intent pre-router and keeps four high-value support
 signals visible: intent Macro-F1, high-risk routing recall, slot span F1/EM,
-and handoff recall.  The checked-in v1 labels are a draft annotation set.  The
-report therefore uses ``PROVISIONAL_NOT_HUMAN_GOLD`` throughout and cannot be
-used as a release gate until a second human annotator reviews every row.
+and handoff recall.  The checked-in v1 labels are a draft annotation set, so
+the current report uses ``PROVISIONAL_NOT_HUMAN_GOLD``.  A separately frozen
+dataset with review evidence can be reported as ``HUMAN_VERIFIED`` but still
+does not become a release gate automatically.
 """
 
 from __future__ import annotations
@@ -86,6 +87,11 @@ def _public(value: Any) -> Any:
     return value.value if hasattr(value, "value") else value
 
 
+def _is_sha256(value: Any) -> bool:
+    text = str(value or "")
+    return len(text) == 64 and all(char in "0123456789abcdef" for char in text.casefold())
+
+
 def load_gold_dataset(path: Path) -> list[dict[str, Any]]:
     """Load and validate the independent customer-service dataset."""
 
@@ -112,6 +118,15 @@ def load_gold_dataset(path: Path) -> list[dict[str, Any]]:
             raise CustomerServiceGoldError(f"{label}: expected.riskLevel is invalid")
         if not isinstance(expected.get("shouldHandoff"), bool):
             raise CustomerServiceGoldError(f"{label}: expected.shouldHandoff must be boolean")
+        handoff_severity = expected.get("handoffSeverity")
+        if expected["shouldHandoff"] and handoff_severity not in {"NORMAL", "CRITICAL"}:
+            raise CustomerServiceGoldError(
+                f"{label}: expected.handoffSeverity is required for handoff cases"
+            )
+        if not expected["shouldHandoff"] and handoff_severity is not None:
+            raise CustomerServiceGoldError(
+                f"{label}: expected.handoffSeverity must be empty without handoff"
+            )
         slots = expected.get("slots")
         if not isinstance(slots, dict) or any(
             not str(key).strip() or value in (None, "") for key, value in slots.items()
@@ -124,6 +139,35 @@ def load_gold_dataset(path: Path) -> list[dict[str, Any]]:
             raise CustomerServiceGoldError(
                 f"{label}: annotation.status must be DRAFT_NEEDS_HUMAN_REVIEW or {HUMAN_STATUS}"
             )
+        if annotation.get("status") == HUMAN_STATUS:
+            reviewers = annotation.get("reviewers")
+            if (
+                not isinstance(reviewers, list)
+                or len(reviewers) != 2
+                or any(not isinstance(item, str) or not item.strip() for item in reviewers)
+                or len({item.strip() for item in reviewers}) != 2
+            ):
+                raise CustomerServiceGoldError(
+                    f"{label}: HUMAN_VERIFIED requires two distinct reviewers"
+                )
+            if not isinstance(annotation.get("adjudicator"), str) or not annotation[
+                "adjudicator"
+            ].strip():
+                raise CustomerServiceGoldError(
+                    f"{label}: HUMAN_VERIFIED requires an adjudicator"
+                )
+            review_evidence = annotation.get("reviewEvidence")
+            if not isinstance(review_evidence, dict) or not _is_sha256(
+                review_evidence.get("sourceDatasetSha256")
+            ):
+                raise CustomerServiceGoldError(
+                    f"{label}: HUMAN_VERIFIED requires a SHA-256 reviewEvidence.sourceDatasetSha256"
+                )
+            for hash_field in ("reviewASha256", "reviewBSha256"):
+                if not _is_sha256(review_evidence.get(hash_field)):
+                    raise CustomerServiceGoldError(
+                        f"{label}: HUMAN_VERIFIED requires SHA-256 {hash_field}"
+                    )
         slice_tags = row.get("sliceTags", [])
         if not isinstance(slice_tags, list) or any(
             not isinstance(tag, str) or not tag.strip() for tag in slice_tags
@@ -232,6 +276,7 @@ def _metric(
     badcase_ids: Sequence[str],
     definition: str,
     notes: Sequence[str] = (),
+    evidence_status: str = PROVISIONAL_STATUS,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -245,7 +290,7 @@ def _metric(
         "definition": definition,
         "role": "PRIMARY_QUALITY",
         "releaseGateEligible": False,
-        "notes": [*notes, PROVISIONAL_STATUS],
+        "notes": [*notes, evidence_status],
     }
 
 
@@ -295,6 +340,14 @@ def evaluate_predictions(
 
     if not rows:
         raise CustomerServiceGoldError("cannot evaluate an empty customer-service gold set")
+    annotation_statuses = Counter(
+        str((row.get("annotation") or {}).get("status") or "UNKNOWN") for row in rows
+    )
+    evidence_status = (
+        HUMAN_STATUS
+        if annotation_statuses and all(status == HUMAN_STATUS for status in annotation_statuses)
+        else PROVISIONAL_STATUS
+    )
     cases: list[dict[str, Any]] = []
     intent_labels = sorted(
         {str((row.get("expected") or {}).get("intent") or "") for row in rows}
@@ -445,6 +498,7 @@ def evaluate_predictions(
             interval=macro_interval,
             badcase_ids=intent_badcases,
             definition="Gold intent labels are macro-averaged across the observed label set; prediction outside the set is counted as a miss/false positive.",
+            evidence_status=evidence_status,
         ),
         "highRiskIntentRecall": _metric(
             "highRiskIntentRecall",
@@ -454,6 +508,7 @@ def evaluate_predictions(
             interval=_wilson(high_risk_hits, high_risk_total),
             badcase_ids=risk_badcases,
             definition="Recall of cases independently labelled riskLevel=HIGH, requiring predicted riskLevel=HIGH.",
+            evidence_status=evidence_status,
         ),
         "slotEntitySpanF1": _metric(
             "slotEntitySpanF1",
@@ -463,6 +518,7 @@ def evaluate_predictions(
             interval=slot_interval,
             badcase_ids=slot_badcases,
             definition="Micro character-span F1 over expected and predicted structured entity values; extra predicted fields count as false positives.",
+            evidence_status=evidence_status,
         ),
         "slotExactMatch": _metric(
             "slotExactMatch",
@@ -472,6 +528,7 @@ def evaluate_predictions(
             interval=_wilson(slot_em_numerator, slot_em_denominator),
             badcase_ids=slot_badcases,
             definition="Request-level exact equality of all expected slots; cases with no expected slots are excluded from the denominator.",
+            evidence_status=evidence_status,
         ),
         "handoffRecall": _metric(
             "handoffRecall",
@@ -481,6 +538,7 @@ def evaluate_predictions(
             interval=_wilson(handoff_hits, handoff_total),
             badcase_ids=handoff_badcases,
             definition="Among gold shouldHandoff=true cases, only next_action=HANDOFF counts as immediate handoff; HANDOFF_SUGGESTED does not.",
+            evidence_status=evidence_status,
         ),
         "criticalHandoffMissRate": _metric(
             "criticalHandoffMissRate",
@@ -490,6 +548,7 @@ def evaluate_predictions(
             interval=_wilson(critical_handoff_misses, critical_handoff_total),
             badcase_ids=critical_handoff_badcases,
             definition="Severe漏转人工率 among gold handoffSeverity=CRITICAL cases; lower is better.",
+            evidence_status=evidence_status,
         ),
     }
     all_badcase_ids = sorted(
@@ -531,9 +590,6 @@ def evaluate_predictions(
                 ),
             }
         )
-    annotation_statuses = Counter(
-        str((row.get("annotation") or {}).get("status") or "UNKNOWN") for row in rows
-    )
     target_specs = {
         "intentMacroF1": (0.90, "higher"),
         "highRiskIntentRecall": (1.0, "higher"),
@@ -557,16 +613,15 @@ def evaluate_predictions(
         }
     return {
         "schemaVersion": REPORT_SCHEMA,
-        "status": PROVISIONAL_STATUS
-        if any(value != HUMAN_STATUS for value in annotation_statuses)
-        else HUMAN_STATUS,
+        "status": evidence_status,
         "releaseGateEligible": False,
         "humanReviewPlan": {
-            "status": "PENDING_INDEPENDENT_REVIEW",
+            "status": "COMPLETE" if evidence_status == HUMAN_STATUS else "PENDING_INDEPENDENT_REVIEW",
             "requiredAnnotators": 2,
             "blindedFirstPass": True,
             "adjudicationRequired": True,
             "freezeAfterAdjudication": True,
+            "adjudicationComplete": evidence_status == HUMAN_STATUS,
             "fields": [
                 "intent",
                 "riskLevel",
@@ -581,7 +636,11 @@ def evaluate_predictions(
                 "slotExactMatch",
                 "handoffRecall",
             ],
-            "note": "Current labels are assistant drafts; do not claim human accuracy or release eligibility before independent review and adjudication.",
+            "note": (
+                "Labels were independently reviewed and adjudicated; release publication still requires an explicit project gate decision."
+                if evidence_status == HUMAN_STATUS
+                else "Current labels are assistant drafts; do not claim human accuracy or release eligibility before independent review and adjudication."
+            ),
         },
         "dataset": {
             "path": str(provenance.get("datasetPath") if provenance else ""),
@@ -608,9 +667,11 @@ def evaluate_predictions(
         "cases": cases,
         "badcases": badcase_rows,
         "limitations": [
-            "Labels are not independently human reviewed; this is a provisional routing baseline, not human accuracy.",
+            "Labels are not independently human reviewed; this is a provisional routing baseline, not human accuracy."
+            if evidence_status != HUMAN_STATUS
+            else "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
             "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
-            "The four metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion.",
+            "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion.",
         ],
     }
 
@@ -618,13 +679,41 @@ def evaluate_predictions(
 def render_markdown(report: Mapping[str, Any]) -> str:
     metrics = report.get("metrics") or {}
     dataset = report.get("dataset") or {}
+    human_verified = report.get("status") == HUMAN_STATUS
+    review_intro = (
+        "当前数据集已完成双人独立复核并冻结；以下命令仅用于复核流程复现和新版本生成。"
+        if human_verified
+        else "当前仓库只冻结 draft 数据，人工复核工具已就绪但尚未产生人工标签。"
+    )
     lines = [
         "# AI 客服金标评测（v1）",
         "",
-        f"> 状态：`{report.get('status')}`；`releaseGateEligible=false`。标签未完成独立人工复核，不能称为人工准确率。",
-        "> 本报告只测客服理解/转接的四项高价值证据；Agent `pass^k`、工具契约和终态门禁不计入下表。",
+        (
+            f"> 状态：`{report.get('status')}`；`releaseGateEligible=false`。标签已完成独立人工复核，但结果仍是离线理解指标。"
+            if human_verified
+            else f"> 状态：`{report.get('status')}`；`releaseGateEligible=false`。标签未完成独立人工复核，不能称为人工准确率。"
+        ),
+        "> 本报告只测客服理解/转接的核心质量证据；Agent `pass^k`、工具契约和终态门禁不计入下表。",
         "",
         f"数据集：`{dataset.get('caseCount', 0)}` 条；SHA-256：`{dataset.get('sha256') or '未记录'}`；模式：`{(report.get('provenance') or {}).get('mode', 'unknown')}`。",
+        "",
+        "## 人工金标闭环",
+        "",
+        review_intro,
+        "",
+        "```bash",
+        "conda activate shop",
+        "cd AI_Shop-backend/AI_Shop-agent",
+        "python -m evaluation.cli customer-service-review export --annotator reviewer-a --output /tmp/reviewer-a.open.jsonl",
+        "python -m evaluation.cli customer-service-review export --annotator reviewer-b --output /tmp/reviewer-b.open.jsonl",
+        "# 两位标注者独立填写 labels 后分别封存",
+        "python -m evaluation.cli customer-service-review seal --review /tmp/reviewer-a.open.jsonl --output /tmp/reviewer-a.sealed.jsonl",
+        "python -m evaluation.cli customer-service-review seal --review /tmp/reviewer-b.open.jsonl --output /tmp/reviewer-b.sealed.jsonl",
+        "python -m evaluation.cli customer-service-review merge --review-a /tmp/reviewer-a.sealed.jsonl --review-b /tmp/reviewer-b.sealed.jsonl --output-dataset /tmp/customer-service-human-v1.jsonl --evidence /tmp/customer-service-human-v1.evidence.json",
+        "# 如 validate/merge 报告 reviewer disagreement，再追加 --adjudication /tmp/adjudication.jsonl",
+        "```",
+        "",
+        "流程为 `OPEN -> SEALED -> HUMAN_VERIFIED`；sheet 带源数据/内容 SHA-256，禁止写入 `expected`、模型预测或隐藏字段，冲突必须逐 case 仲裁。人工完成前不能把下表称为人工准确率，也不能把人工结果自动纳入 release gate。",
         "",
         "## 核心指标",
         "",
@@ -662,7 +751,11 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"slot EM `{((baseline.get('metrics') or {}).get('slotExactMatch') or {}).get('value')}`、"
             f"handoff Recall `{((baseline.get('metrics') or {}).get('handoffRecall') or {}).get('value')}`；"
             f"历史 badcase：{', '.join(baseline.get('badcaseIds') or [])}。",
-            f"当前扩展到 {dataset.get('caseCount', 0)} 条并修复规则后，点估计通过参考门槛；标签仍未独立人工复核，样本量也不足以推出行业级稳定性。",
+            (
+                f"当前扩展到 {dataset.get('caseCount', 0)} 条并完成双人复核，点估计通过参考门槛；样本量仍不足以推出行业级稳定性。"
+                if human_verified
+                else f"当前扩展到 {dataset.get('caseCount', 0)} 条并修复规则后，点估计通过参考门槛；标签仍未独立人工复核，样本量也不足以推出行业级稳定性。"
+            ),
             "扩展切片：" + "; ".join(
                 f"{tag}={count}" for tag, count in sorted((dataset.get('sliceCounts') or {}).items())
             ),
@@ -692,7 +785,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                 f"- 切片/难度：`{', '.join(badcase.get('sliceTags') or []) or '未标注'}` / `{badcase.get('difficulty') or '未标注'}`",
                 f"- 期望：`{json.dumps(badcase.get('expected'), ensure_ascii=False, sort_keys=True)}`",
                 f"- 实际：`{json.dumps(badcase.get('predicted'), ensure_ascii=False, sort_keys=True)}`",
-                f"- 初步根因：`{badcase.get('rootCause')}`；人工复核后需补充最终根因和回归 case ID。",
+                f"- 初步根因：`{badcase.get('rootCause')}`；{'已完成仲裁，仍需补充回归 case ID。' if human_verified else '人工复核后需补充最终根因和回归 case ID。'}",
                 "",
             ]
         )
@@ -700,7 +793,11 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         [
             "## 口径与限制",
             "",
-            "- 人工金标冻结流程：两名标注者盲标 intent/risk/转人工/严重度/slot，冲突仲裁后固定版本；当前状态为 `PENDING_INDEPENDENT_REVIEW`，未产生人工准确率。",
+            (
+                "- 人工金标冻结流程已完成：两名标注者盲标 intent/risk/转人工/严重度/slot，并完成冲突仲裁；当前标签版本可复核，但仍不代表线上客服成功率。"
+                if human_verified
+                else "- 人工金标冻结流程：两名标注者盲标 intent/risk/转人工/严重度/slot，冲突仲裁后固定版本；当前状态为 `PENDING_INDEPENDENT_REVIEW`，未产生人工准确率。"
+            ),
             "- 高风险 Recall 的正类是独立标签 `riskLevel=HIGH`，不是模型自报风险；严重漏转人工只统计 `handoffSeverity=CRITICAL`。",
             "- slot Entity/Span F1 使用 NFKC 后的字符 span；`slotExactMatch` 只在存在 gold slot 的请求上计分，空 slot 不抬高结果。",
             "- `HANDOFF_SUGGESTED` 不算即时转人工成功；远程结果未知、Provider 失败和人工校准不在本基线中伪造。",
