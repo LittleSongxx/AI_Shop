@@ -1,0 +1,1738 @@
+{
+  "badcases": [
+    {
+      "caseId": "search-fin-v9-11-office",
+      "expectedProductIds": [
+        "301841010226518",
+        "650980987345712"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "mrrAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6934264036172708,
+        "ndcgAt5": 0.6934264036172708,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.5,
+        "unsafeAnswerCount": 0
+      },
+      "query": "想找一台稳定耐用的办公台式主机",
+      "ranks": {
+        "301841010226518": 3,
+        "650980987345712": 2
+      },
+      "returnedProductIds": [
+        "995230446006541",
+        "650980987345712",
+        "301841010226518"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20002",
+          "productId": "995230446006541",
+          "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "650980987345712",
+          "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "301841010226518",
+          "productName": "华硕破晓6X 台式机台式电脑主机"
+        }
+      ],
+      "slice": "chinese-synonym-oral",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-11-office",
+      "expectedProductIds": [
+        "301841010226518",
+        "650980987345712"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6934264036172708,
+        "ndcgAt5": 0.6934264036172708,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.693426,
+        "unsafeAnswerCount": 0
+      },
+      "query": "想找一台稳定耐用的办公台式主机",
+      "ranks": {
+        "301841010226518": 3,
+        "650980987345712": 2
+      },
+      "returnedProductIds": [
+        "995230446006541",
+        "650980987345712",
+        "301841010226518"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20002",
+          "productId": "995230446006541",
+          "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "650980987345712",
+          "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "301841010226518",
+          "productName": "华硕破晓6X 台式机台式电脑主机"
+        }
+      ],
+      "slice": "chinese-synonym-oral",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-23-snack-100",
+      "expectedProductIds": [
+        "065293686460191",
+        "303019597302892",
+        "438316828084252"
+      ],
+      "expectedProducts": [
+        {
+          "categoryId": "20022",
+          "productId": "065293686460191",
+          "productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食膨化休闲食品饼干糕点"
+        },
+        {
+          "categoryId": "20023",
+          "productId": "303019597302892",
+          "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐"
+        },
+        {
+          "categoryId": "20021",
+          "productId": "438316828084252",
+          "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃"
+        }
+      ],
+      "kind": "search-recall-miss",
+      "metric": "Recall@10",
+      "missingProductIds": [
+        "303019597302892",
+        "438316828084252"
+      ],
+      "missingProducts": [
+        {
+          "categoryId": "20023",
+          "productId": "303019597302892",
+          "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐"
+        },
+        {
+          "categoryId": "20021",
+          "productId": "438316828084252",
+          "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃"
+        }
+      ],
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.6735439182299785,
+        "ndcgAt5": 0.6735439182299785,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 0.3333333333333333,
+        "recallAt3": 0.3333333333333333,
+        "recallAt5": 0.3333333333333333,
+        "unsafeAnswerCount": 0
+      },
+      "query": "100元以内旺旺雪饼和可乐零食",
+      "ranks": {
+        "065293686460191": 1,
+        "303019597302892": null,
+        "438316828084252": null
+      },
+      "returnedProductIds": [
+        "065293686460191"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20022",
+          "productId": "065293686460191",
+          "productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食膨化休闲食品饼干糕点"
+        }
+      ],
+      "slice": "budget-structured",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-23-snack-100",
+      "expectedProductIds": [
+        "065293686460191",
+        "303019597302892",
+        "438316828084252"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.6735439182299785,
+        "ndcgAt5": 0.6735439182299785,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 0.3333333333333333,
+        "recallAt3": 0.3333333333333333,
+        "recallAt5": 0.3333333333333333,
+        "recomputedValue": 0.673544,
+        "unsafeAnswerCount": 0
+      },
+      "query": "100元以内旺旺雪饼和可乐零食",
+      "ranks": {
+        "065293686460191": 1,
+        "303019597302892": null,
+        "438316828084252": null
+      },
+      "returnedProductIds": [
+        "065293686460191"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20022",
+          "productId": "065293686460191",
+          "productName": "旺旺 雪饼 厚烧海苔 原味 385g 零食膨化休闲食品饼干糕点"
+        }
+      ],
+      "slice": "budget-structured",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-28-lip-100",
+      "expectedProductIds": [
+        "664740861226404"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "mrrAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.25,
+        "ndcgAt10": 0.43067655807339306,
+        "ndcgAt5": 0.43067655807339306,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 0.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.25,
+        "unsafeAnswerCount": 0
+      },
+      "query": "100元以内不沾杯雾面口红唇釉",
+      "ranks": {
+        "664740861226404": 4
+      },
+      "returnedProductIds": [
+        "298286497857602",
+        "843304724668395",
+        "763086281772264",
+        "664740861226404"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20012",
+          "productId": "298286497857602",
+          "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "843304724668395",
+          "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红"
+        },
+        {
+          "categoryId": "20011",
+          "productId": "763086281772264",
+          "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "664740861226404",
+          "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+        }
+      ],
+      "slice": "budget-structured",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-28-lip-100",
+      "expectedProductIds": [
+        "664740861226404"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.25,
+        "ndcgAt10": 0.43067655807339306,
+        "ndcgAt5": 0.43067655807339306,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 0.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.430677,
+        "unsafeAnswerCount": 0
+      },
+      "query": "100元以内不沾杯雾面口红唇釉",
+      "ranks": {
+        "664740861226404": 4
+      },
+      "returnedProductIds": [
+        "298286497857602",
+        "843304724668395",
+        "763086281772264",
+        "664740861226404"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20012",
+          "productId": "298286497857602",
+          "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "843304724668395",
+          "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红"
+        },
+        {
+          "categoryId": "20011",
+          "productId": "763086281772264",
+          "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "664740861226404",
+          "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+        }
+      ],
+      "slice": "budget-structured",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-33-coat-no-outdoor",
+      "expectedProductIds": [
+        "864824304719236"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "mrrAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6309297535714575,
+        "ndcgAt5": 0.6309297535714575,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.5,
+        "unsafeAnswerCount": 0
+      },
+      "query": "男士冬季棉服不要户外软壳",
+      "ranks": {
+        "864824304719236": 2
+      },
+      "returnedProductIds": [
+        "917186661226040",
+        "864824304719236",
+        "422543322296606",
+        "435499775288057",
+        "664740861226404",
+        "519183041848998"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "88409",
+          "productId": "917186661226040",
+          "productName": "卡皮巴拉软握按动中性笔高颜值胖胖笔熊猫笔减负速干欧包笔 0.5黑色水笔大容量刷题笔st笔头考试专用开学文具"
+        },
+        {
+          "categoryId": "20008",
+          "productId": "864824304719236",
+          "productName": "假两件格纹翻领棉服外套男冬季新款宽松加绒加厚大码男生夹克"
+        },
+        {
+          "categoryId": "20007",
+          "productId": "422543322296606",
+          "productName": "女大童加绒加厚毛衣女秋冬15岁18初高中学生水貂绒翻领针织打底衫"
+        },
+        {
+          "categoryId": "20031",
+          "productId": "435499775288057",
+          "productName": "点氛车载香薰固体香膏男士专用持久留香汽车香水车内香氛古刹檀香"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "664740861226404",
+          "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+        },
+        {
+          "categoryId": "20047",
+          "productId": "519183041848998",
+          "productName": "任天堂港服NS充值卡香港Switch点卡100 200 300 400 500港区eshop预付卡"
+        }
+      ],
+      "slice": "negative-exclusion",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-33-coat-no-outdoor",
+      "expectedProductIds": [
+        "864824304719236"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6309297535714575,
+        "ndcgAt5": 0.6309297535714575,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.63093,
+        "unsafeAnswerCount": 0
+      },
+      "query": "男士冬季棉服不要户外软壳",
+      "ranks": {
+        "864824304719236": 2
+      },
+      "returnedProductIds": [
+        "917186661226040",
+        "864824304719236",
+        "422543322296606",
+        "435499775288057",
+        "664740861226404",
+        "519183041848998"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "88409",
+          "productId": "917186661226040",
+          "productName": "卡皮巴拉软握按动中性笔高颜值胖胖笔熊猫笔减负速干欧包笔 0.5黑色水笔大容量刷题笔st笔头考试专用开学文具"
+        },
+        {
+          "categoryId": "20008",
+          "productId": "864824304719236",
+          "productName": "假两件格纹翻领棉服外套男冬季新款宽松加绒加厚大码男生夹克"
+        },
+        {
+          "categoryId": "20007",
+          "productId": "422543322296606",
+          "productName": "女大童加绒加厚毛衣女秋冬15岁18初高中学生水貂绒翻领针织打底衫"
+        },
+        {
+          "categoryId": "20031",
+          "productId": "435499775288057",
+          "productName": "点氛车载香薰固体香膏男士专用持久留香汽车香水车内香氛古刹檀香"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "664740861226404",
+          "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+        },
+        {
+          "categoryId": "20047",
+          "productId": "519183041848998",
+          "productName": "任天堂港服NS充值卡香港Switch点卡100 200 300 400 500港区eshop预付卡"
+        }
+      ],
+      "slice": "negative-exclusion",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-34-snack-no-wangwang",
+      "expectedProductIds": [
+        "303019597302892",
+        "438316828084252"
+      ],
+      "expectedProducts": [
+        {
+          "categoryId": "20023",
+          "productId": "303019597302892",
+          "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐"
+        },
+        {
+          "categoryId": "20021",
+          "productId": "438316828084252",
+          "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃"
+        }
+      ],
+      "kind": "search-recall-miss",
+      "metric": "Recall@10",
+      "missingProductIds": [
+        "303019597302892"
+      ],
+      "missingProducts": [
+        {
+          "categoryId": "20023",
+          "productId": "303019597302892",
+          "productName": "可口可乐（Coca-Cola）可乐*12+雪碧*8+芬达*4 有糖汽水 碳酸饮料 330ml*24罐"
+        }
+      ],
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.3373519727104165,
+        "ndcgAt5": 0.3373519727104165,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 0.5,
+        "recallAt3": 0.5,
+        "recallAt5": 0.5,
+        "unsafeAnswerCount": 0
+      },
+      "query": "平价零食不要旺旺雪饼",
+      "ranks": {
+        "303019597302892": null,
+        "438316828084252": 1
+      },
+      "returnedProductIds": [
+        "438316828084252"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20021",
+          "productId": "438316828084252",
+          "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃"
+        }
+      ],
+      "slice": "negative-exclusion",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-34-snack-no-wangwang",
+      "expectedProductIds": [
+        "303019597302892",
+        "438316828084252"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.3373519727104165,
+        "ndcgAt5": 0.3373519727104165,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 0.5,
+        "recallAt3": 0.5,
+        "recallAt5": 0.5,
+        "recomputedValue": 0.337352,
+        "unsafeAnswerCount": 0
+      },
+      "query": "平价零食不要旺旺雪饼",
+      "ranks": {
+        "303019597302892": null,
+        "438316828084252": 1
+      },
+      "returnedProductIds": [
+        "438316828084252"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20021",
+          "productId": "438316828084252",
+          "productName": "芒果奶糕牛扎芒果干之恋草莓奶糯酪条办公室解馋网红休闲零食小吃"
+        }
+      ],
+      "slice": "negative-exclusion",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-43-partial-headset",
+      "expectedProductIds": [
+        "231335860060520",
+        "350000232815799"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.8339912323981488,
+        "ndcgAt5": 0.8339912323981488,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.833991,
+        "unsafeAnswerCount": 0
+      },
+      "query": "检索服务不完整时返回真实的索尼降噪耳机",
+      "ranks": {
+        "231335860060520": 2,
+        "350000232815799": 1
+      },
+      "returnedProductIds": [
+        "350000232815799",
+        "231335860060520"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20003",
+          "productId": "350000232815799",
+          "productName": "索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机"
+        },
+        {
+          "categoryId": "20003",
+          "productId": "231335860060520",
+          "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生"
+        }
+      ],
+      "slice": "fallback-partial-provider",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-44-partial-office",
+      "expectedProductIds": [
+        "301841010226518",
+        "650980987345712"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "mrrAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6509209298071325,
+        "ndcgAt5": 0.6509209298071325,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 0.5,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.5,
+        "unsafeAnswerCount": 0
+      },
+      "query": "办公电脑供应商部分异常也不能编造商品",
+      "ranks": {
+        "301841010226518": 4,
+        "650980987345712": 2
+      },
+      "returnedProductIds": [
+        "995230446006541",
+        "650980987345712",
+        "869004898763662",
+        "301841010226518"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20002",
+          "productId": "995230446006541",
+          "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "650980987345712",
+          "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "869004898763662",
+          "productName": "Apple/苹果AI笔记本/MacBookPro14英寸M5(10+10核)16G 1T银色笔记本电脑MDE54CH/A"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "301841010226518",
+          "productName": "华硕破晓6X 台式机台式电脑主机"
+        }
+      ],
+      "slice": "fallback-partial-provider",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-44-partial-office",
+      "expectedProductIds": [
+        "301841010226518",
+        "650980987345712"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6509209298071325,
+        "ndcgAt5": 0.6509209298071325,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 0.5,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.650921,
+        "unsafeAnswerCount": 0
+      },
+      "query": "办公电脑供应商部分异常也不能编造商品",
+      "ranks": {
+        "301841010226518": 4,
+        "650980987345712": 2
+      },
+      "returnedProductIds": [
+        "995230446006541",
+        "650980987345712",
+        "869004898763662",
+        "301841010226518"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20002",
+          "productId": "995230446006541",
+          "productName": "戴尔（DELL）Tower Plus 2025新款旗舰商用办公台式电脑主机 AI大模型设计渲染企业采购整机全套 ZC40 Ultra7-265K 64G 2TB固态 RTX4090D-24G独显 定制"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "650980987345712",
+          "productName": "AOC台式机i9高性能家用办公商用电脑整机荣光T260"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "869004898763662",
+          "productName": "Apple/苹果AI笔记本/MacBookPro14英寸M5(10+10核)16G 1T银色笔记本电脑MDE54CH/A"
+        },
+        {
+          "categoryId": "20002",
+          "productId": "301841010226518",
+          "productName": "华硕破晓6X 台式机台式电脑主机"
+        }
+      ],
+      "slice": "fallback-partial-provider",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-47-compare-xm",
+      "expectedProductIds": [
+        "231335860060520",
+        "350000232815799"
+      ],
+      "expectedProducts": [
+        {
+          "categoryId": "20003",
+          "productId": "231335860060520",
+          "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生"
+        },
+        {
+          "categoryId": "20003",
+          "productId": "350000232815799",
+          "productName": "索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机"
+        }
+      ],
+      "kind": "search-recall-miss",
+      "metric": "Recall@10",
+      "missingProductIds": [
+        "350000232815799"
+      ],
+      "missingProducts": [
+        {
+          "categoryId": "20003",
+          "productId": "350000232815799",
+          "productName": "索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机"
+        }
+      ],
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.7871546029909718,
+        "ndcgAt5": 0.7871546029909718,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 0.5,
+        "recallAt3": 0.5,
+        "recallAt5": 0.5,
+        "unsafeAnswerCount": 0
+      },
+      "query": "WH-1000XM6和十周年版降噪耳机如何比较",
+      "ranks": {
+        "231335860060520": 1,
+        "350000232815799": null
+      },
+      "returnedProductIds": [
+        "231335860060520"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20003",
+          "productId": "231335860060520",
+          "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生"
+        }
+      ],
+      "slice": "category-brand-comparison",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-47-compare-xm",
+      "expectedProductIds": [
+        "231335860060520",
+        "350000232815799"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.7871546029909718,
+        "ndcgAt5": 0.7871546029909718,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 0.5,
+        "recallAt3": 0.5,
+        "recallAt5": 0.5,
+        "recomputedValue": 0.787155,
+        "unsafeAnswerCount": 0
+      },
+      "query": "WH-1000XM6和十周年版降噪耳机如何比较",
+      "ranks": {
+        "231335860060520": 1,
+        "350000232815799": null
+      },
+      "returnedProductIds": [
+        "231335860060520"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20003",
+          "productId": "231335860060520",
+          "productName": "索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生"
+        }
+      ],
+      "slice": "category-brand-comparison",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-49-compare-lip",
+      "expectedProductIds": [
+        "664740861226404"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "mrrAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6309297535714575,
+        "ndcgAt5": 0.6309297535714575,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.5,
+        "unsafeAnswerCount": 0
+      },
+      "query": "水光唇釉和雾面哑光唇釉有什么不同",
+      "ranks": {
+        "664740861226404": 2
+      },
+      "returnedProductIds": [
+        "843304724668395",
+        "664740861226404",
+        "298286497857602",
+        "100766326868880",
+        "811128851953351",
+        "763086281772264"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20012",
+          "productId": "843304724668395",
+          "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "664740861226404",
+          "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "298286497857602",
+          "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g"
+        },
+        {
+          "categoryId": "20015",
+          "productId": "100766326868880",
+          "productName": "CHANEL【官方正品】香奈儿邂逅系列套组 香水礼盒套装 女士 生日礼物 邂逅柔情淡香水50ml+双效持色唇釉174号"
+        },
+        {
+          "categoryId": "20013",
+          "productId": "811128851953351",
+          "productName": "欧莱雅第四代小蜜罐胶原面霜滋润紧致抗皱抗老补水保湿护肤品送妈妈礼物 第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml 女士优选"
+        },
+        {
+          "categoryId": "20011",
+          "productId": "763086281772264",
+          "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女"
+        }
+      ],
+      "slice": "category-brand-comparison",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-49-compare-lip",
+      "expectedProductIds": [
+        "664740861226404"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.6309297535714575,
+        "ndcgAt5": 0.6309297535714575,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.63093,
+        "unsafeAnswerCount": 0
+      },
+      "query": "水光唇釉和雾面哑光唇釉有什么不同",
+      "ranks": {
+        "664740861226404": 2
+      },
+      "returnedProductIds": [
+        "843304724668395",
+        "664740861226404",
+        "298286497857602",
+        "100766326868880",
+        "811128851953351",
+        "763086281772264"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20012",
+          "productId": "843304724668395",
+          "productName": "一头哑光一头镜面SHAQINUO双头唇釉镜面水光唇蜜雾面哑光丝绒口红"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "664740861226404",
+          "productName": "迷你空气唇釉唇露丝绒雾面哑光口红女1g女生不沾杯"
+        },
+        {
+          "categoryId": "20012",
+          "productId": "298286497857602",
+          "productName": "全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g全新升级晶冻水光唇釉持久口红01号乌木甜茶1.3g"
+        },
+        {
+          "categoryId": "20015",
+          "productId": "100766326868880",
+          "productName": "CHANEL【官方正品】香奈儿邂逅系列套组 香水礼盒套装 女士 生日礼物 邂逅柔情淡香水50ml+双效持色唇釉174号"
+        },
+        {
+          "categoryId": "20013",
+          "productId": "811128851953351",
+          "productName": "欧莱雅第四代小蜜罐胶原面霜滋润紧致抗皱抗老补水保湿护肤品送妈妈礼物 第4代丨小蜜罐滋润霜60ml+30ml*2|到手120ml 女士优选"
+        },
+        {
+          "categoryId": "20011",
+          "productId": "763086281772264",
+          "productName": "星月糖闺蜜梦幻变色星空项链女 可爱简约星星月亮锁骨链女"
+        }
+      ],
+      "slice": "category-brand-comparison",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-50-compare-home",
+      "expectedProductIds": [
+        "055216728343001",
+        "547755968243478"
+      ],
+      "kind": "search-ranking-order",
+      "metric": "ndcgAt10",
+      "observedMetrics": {
+        "constraintViolationCount": 0,
+        "hardConstraintBypassCount": 0,
+        "hardConstraintSatisfaction": 1,
+        "mrrAt10": 1.0,
+        "ndcgAt10": 0.8339912323981488,
+        "ndcgAt5": 0.8339912323981488,
+        "noResultAccuracy": 1,
+        "providerCompleteness": 1,
+        "recallAt10": 1.0,
+        "recallAt3": 1.0,
+        "recallAt5": 1.0,
+        "recomputedValue": 0.833991,
+        "unsafeAnswerCount": 0
+      },
+      "query": "净水器和空气净化器分别适合什么场景",
+      "ranks": {
+        "055216728343001": 2,
+        "547755968243478": 1
+      },
+      "returnedProductIds": [
+        "547755968243478",
+        "055216728343001"
+      ],
+      "returnedProducts": [
+        {
+          "categoryId": "20004",
+          "productId": "547755968243478",
+          "productName": "352空气净化器除甲醛除花粉除菌猫毛宠物TVOC异味 除过敏认证新房家用塔式双风机Z90"
+        },
+        {
+          "categoryId": "20004",
+          "productId": "055216728343001",
+          "productName": "COLMO北极星净水器C3套装 家用厨下十年RO反渗透母婴直饮机 触控龙头 1200G大通量净水器管线机套装 2件套丨C3净水器+A1管线机"
+        }
+      ],
+      "slice": "category-brand-comparison",
+      "status": "PASSED"
+    },
+    {
+      "caseId": "search-fin-v9-31-lip-no-chanel",
+      "kind": "latency-tail",
+      "latencyMs": 1012.293343,
+      "query": "女士口红唇釉不要香奈儿",
+      "slice": "negative-exclusion",
+      "thresholdP95Ms": 797.323967
+    },
+    {
+      "caseId": "search-fin-v9-17-matte-lip",
+      "kind": "latency-tail",
+      "latencyMs": 866.016092,
+      "query": "想要女生不沾杯的雾面哑光唇釉",
+      "slice": "chinese-synonym-oral",
+      "thresholdP95Ms": 797.323967
+    },
+    {
+      "caseId": "search-fin-v9-36-sony-no-xm6",
+      "kind": "latency-tail",
+      "latencyMs": 850.961386,
+      "query": "无线降噪耳机排除XM6保留十周年版",
+      "slice": "negative-exclusion",
+      "thresholdP95Ms": 797.323967
+    },
+    {
+      "caseId": "rag-fin-v9-31-mail-memory",
+      "kind": "latency-tail",
+      "latencyMs": 4631.296004,
+      "query": "系统能否读取我的邮箱历史并永久保存？",
+      "thresholdP95Ms": 4246.679911
+    },
+    {
+      "caseId": "rag-fin-v9-28-drone-street",
+      "kind": "latency-tail",
+      "latencyMs": 4415.039762,
+      "query": "无人机冷链能否覆盖到具体街道门牌？",
+      "thresholdP95Ms": 4246.679911
+    },
+    {
+      "caseId": "rag-fin-v9-49-grounding-term",
+      "kind": "latency-tail",
+      "latencyMs": 4263.297177,
+      "query": "RAG检索不足时grounding的可审计含义是什么？",
+      "thresholdP95Ms": 4246.679911
+    },
+    {
+      "caseId": "rag-fin-v9-28-drone-street",
+      "failureCount": 1,
+      "interpretation": "安全 deterministic fallback；不是答案质量失败，但应在面试中披露。",
+      "kind": "rag-provider-diagnostic",
+      "metric": "queryExpansionFailureCount",
+      "normalQualityDenominator": true,
+      "providerRequests": 1,
+      "providerSuccesses": 0,
+      "query": "无人机冷链能否覆盖到具体街道门牌？",
+      "safeFallbackObserved": true,
+      "slice": "no-answer"
+    },
+    {
+      "caseId": "rag-fin-v9-31-mail-memory",
+      "failureCount": 1,
+      "interpretation": "安全 deterministic fallback；不是答案质量失败，但应在面试中披露。",
+      "kind": "rag-provider-diagnostic",
+      "metric": "queryExpansionFailureCount",
+      "normalQualityDenominator": true,
+      "providerRequests": 1,
+      "providerSuccesses": 0,
+      "query": "系统能否读取我的邮箱历史并永久保存？",
+      "safeFallbackObserved": true,
+      "slice": "no-answer"
+    },
+    {
+      "caseId": "rag-fin-v9-44-policy-version",
+      "failureCount": 1,
+      "interpretation": "安全 deterministic fallback；不是答案质量失败，但应在面试中披露。",
+      "kind": "rag-provider-diagnostic",
+      "metric": "queryExpansionFailureCount",
+      "normalQualityDenominator": true,
+      "providerRequests": 1,
+      "providerSuccesses": 0,
+      "query": "历史订单状态规则能否替代当前版本规则？",
+      "safeFallbackObserved": true,
+      "slice": "temporal-contradiction"
+    },
+    {
+      "caseId": "agent-fin-v9-10-memory-policy",
+      "kind": "latency-tail",
+      "latencyMs": 22113.303908,
+      "query": "平台对话记忆保存在哪些本地组件？",
+      "thresholdP95Ms": 17077.778332
+    },
+    {
+      "caseId": "agent-fin-v9-12-price-policy",
+      "kind": "latency-tail",
+      "latencyMs": 17237.05531,
+      "query": "购物车价格能否当作最终成交承诺？",
+      "thresholdP95Ms": 17077.778332
+    }
+  ],
+  "catalog": {
+    "canonicalSha256": "6b1e3b40b447419d381830f397a5e5dda82ce25d02dd629c49e7f659d57de0cb",
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/fixtures/product-catalog.v2.json"
+  },
+  "domains": {
+    "agent": {
+      "caseCount": 25,
+      "contractGates": {
+        "duplicateSideEffects": {
+          "badcaseIds": [],
+          "denominator": 25,
+          "observed": 0
+        },
+        "runtimeOrSevereSafety": {
+          "badcaseIds": [],
+          "denominator": 25,
+          "observed": 0
+        },
+        "stateDiffMatch": {
+          "badcaseIds": [],
+          "denominator": 25,
+          "observed": 25
+        },
+        "terminalStateCorrectness": {
+          "badcaseIds": [],
+          "denominator": 25,
+          "observed": 25
+        }
+      },
+      "primaryMetrics": {
+        "Agent P95 latency": {
+          "badcaseCount": 2,
+          "badcaseIds": [
+            "agent-fin-v9-10-memory-policy",
+            "agent-fin-v9-12-price-policy"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 8745.09174,
+            "method": "percentile-bootstrap",
+            "upper": 22113.303908
+          },
+          "definition": "客户端观测的本地完整链路 P95；不是生产 SLO。超过观测 P95 的 case 作为长尾诊断。",
+          "denominator": 25,
+          "name": "Agent P95 latency",
+          "notes": [
+            "P95_SAMPLE_COUNT_BELOW_100_DESCRIPTIVE_ONLY"
+          ],
+          "numerator": null,
+          "role": "RUNTIME_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ms",
+          "value": 17077.778332
+        },
+        "Tool argument accuracy": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "预声明字段与实际工具参数一致率；字段级错误应单独回放。",
+          "denominator": 25,
+          "name": "Tool argument accuracy",
+          "notes": [
+            "not_independent_human_intent_annotation"
+          ],
+          "numerator": 25.0,
+          "role": "CONTRACT_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "Tool routing accuracy": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.866808,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "预声明工具与实际工具选择一致率；当前是规则/契约真值，不是客服意图人工 F1。",
+          "denominator": 25,
+          "name": "Tool routing accuracy",
+          "notes": [
+            "not_independent_human_intent_annotation"
+          ],
+          "numerator": 25.0,
+          "role": "CONTRACT_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        }
+      }
+    },
+    "rag": {
+      "caseCount": 50,
+      "contractGates": {
+        "invalidCitation": {
+          "badcaseIds": [],
+          "denominator": 50,
+          "observed": 0
+        },
+        "runtimeError": {
+          "badcaseIds": [],
+          "denominator": 50,
+          "observed": 0
+        },
+        "severeSafetyViolation": {
+          "badcaseIds": [],
+          "denominator": 50,
+          "observed": 0
+        }
+      },
+      "diagnostics": {
+        "queryExpansionFailureCount": 3,
+        "semanticShadowDisagreementCount": 0,
+        "semanticShadowUnavailableCaseIds": []
+      },
+      "primaryMetrics": {
+        "Citation support": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "definition": "回答中的引用是否指向允许的证据；不等于人工语义正确率。",
+          "denominator": 50,
+          "name": "Citation support",
+          "notes": [],
+          "numerator": 50.0,
+          "role": "SUPPORTING_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "Generation correctness": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "冻结 case 的结构化生成契约；不替代独立人工盲评。",
+          "denominator": 50,
+          "name": "Generation correctness",
+          "notes": [
+            "shadow_or_contract_dataset_only"
+          ],
+          "numerator": 50.0,
+          "role": "CONTRACT_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "Grounded faithfulness": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "definition": "回答事实是否能被证据支持；当前为 lexical/claim 证据下界。",
+          "denominator": 50,
+          "name": "Grounded faithfulness",
+          "notes": [],
+          "numerator": 50.0,
+          "role": "SUPPORTING_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "No-answer accuracy": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "证据不足/权限边界/冲突时是否拒答或转人工，而不是编造。",
+          "denominator": 50,
+          "name": "No-answer accuracy",
+          "notes": [],
+          "numerator": 50.0,
+          "role": "SUPPORTING_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "RAG P95 latency": {
+          "badcaseCount": 3,
+          "badcaseIds": [
+            "rag-fin-v9-31-mail-memory",
+            "rag-fin-v9-28-drone-street",
+            "rag-fin-v9-49-grounding-term"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 2953.377428,
+            "method": "percentile-bootstrap",
+            "upper": 4533.980695
+          },
+          "definition": "客户端观测的本地完整链路 P95；不是生产 SLO。超过观测 P95 的 case 作为长尾诊断。",
+          "denominator": 50,
+          "name": "RAG P95 latency",
+          "notes": [
+            "P95_SAMPLE_COUNT_BELOW_100_DESCRIPTIVE_ONLY"
+          ],
+          "numerator": null,
+          "role": "RUNTIME_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ms",
+          "value": 4246.679911
+        },
+        "Retrieval Recall@5": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.88303,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "仅在有 canonical qrel 的 answerable query 上统计。",
+          "denominator": 29,
+          "name": "Retrieval Recall@5",
+          "notes": [],
+          "numerator": 29.0,
+          "role": "SUPPORTING_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "Semantic shadow availability": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "judge 有完整追踪的比例；shadowOnly，不是人工真值，也不进入 release gate。",
+          "denominator": 50,
+          "name": "Semantic shadow availability",
+          "notes": [],
+          "numerator": 50.0,
+          "role": "DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        }
+      }
+    },
+    "search": {
+      "caseCount": 50,
+      "contractGates": {
+        "hardConstraintViolations": {
+          "badcaseIds": [],
+          "denominator": 50,
+          "observed": 0
+        },
+        "noResultAccuracy": {
+          "badcaseIds": [],
+          "denominator": 50,
+          "observed": 50
+        },
+        "providerCompleteness": {
+          "badcaseIds": [],
+          "denominator": 50,
+          "observed": 50
+        },
+        "recomputeMismatch": {
+          "badcaseIds": [],
+          "denominator": 44,
+          "observed": 0
+        }
+      },
+      "judgedQueryCount": 44,
+      "primaryMetrics": {
+        "MRR@10 macro/query": {
+          "badcaseCount": 5,
+          "badcaseIds": [
+            "search-fin-v9-11-office",
+            "search-fin-v9-28-lip-100",
+            "search-fin-v9-33-coat-no-outdoor",
+            "search-fin-v9-44-partial-office",
+            "search-fin-v9-49-compare-lip"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.880682,
+            "method": "percentile-bootstrap",
+            "upper": 0.988636
+          },
+          "definition": "有 qrel 的 query 上逐 query MRR@10 的宏平均；越接近 1 越好。",
+          "denominator": 44,
+          "name": "MRR@10 macro/query",
+          "notes": [
+            "qrel_queries_only"
+          ],
+          "numerator": null,
+          "role": "PRIMARY_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 0.9375
+        },
+        "NDCG@10 macro/query": {
+          "badcaseCount": 10,
+          "badcaseIds": [
+            "search-fin-v9-11-office",
+            "search-fin-v9-23-snack-100",
+            "search-fin-v9-28-lip-100",
+            "search-fin-v9-33-coat-no-outdoor",
+            "search-fin-v9-34-snack-no-wangwang",
+            "search-fin-v9-43-partial-headset",
+            "search-fin-v9-44-partial-office",
+            "search-fin-v9-47-compare-xm",
+            "search-fin-v9-49-compare-lip",
+            "search-fin-v9-50-compare-home"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.868709,
+            "method": "percentile-bootstrap",
+            "upper": 0.964456
+          },
+          "definition": "有 qrel 的 query 上逐 query NDCG@10 的宏平均；越接近 1 越好。",
+          "denominator": 44,
+          "name": "NDCG@10 macro/query",
+          "notes": [
+            "qrel_queries_only"
+          ],
+          "numerator": null,
+          "role": "PRIMARY_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 0.920521
+        },
+        "No-result accuracy": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.928652,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "预声明无结果/有结果意图与实际空 slate 是否一致；不能靠静默放宽约束修复。",
+          "denominator": 50,
+          "name": "No-result accuracy",
+          "notes": [],
+          "numerator": 50.0,
+          "role": "CONTRACT_GATE",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "Recall@10 macro/query": {
+          "badcaseCount": 3,
+          "badcaseIds": [
+            "search-fin-v9-23-snack-100",
+            "search-fin-v9-34-snack-no-wangwang",
+            "search-fin-v9-47-compare-xm"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.916667,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "definition": "有 qrel 的 query 上逐 query Recall@10 的宏平均；与 v9 published summary 口径兼容。",
+          "denominator": 44,
+          "name": "Recall@10 macro/query",
+          "notes": [
+            "qrel_queries_only"
+          ],
+          "numerator": null,
+          "role": "PRIMARY_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 0.962121
+        },
+        "Recall@10 micro/qrel": {
+          "badcaseCount": 3,
+          "badcaseIds": [
+            "search-fin-v9-23-snack-100",
+            "search-fin-v9-34-snack-no-wangwang",
+            "search-fin-v9-47-compare-xm"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.830246,
+            "method": "wilson",
+            "upper": 0.971874
+          },
+          "definition": "所有有 qrel 的相关商品 judgment 汇总后的 micro Recall@10；用于直观看漏掉了多少相关商品。",
+          "denominator": 56,
+          "name": "Recall@10 micro/qrel",
+          "notes": [
+            "supplemental_micro_view"
+          ],
+          "numerator": 52.0,
+          "role": "PRIMARY_QUALITY",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 0.928571
+        },
+        "Recall@3 macro/query": {
+          "badcaseCount": 5,
+          "badcaseIds": [
+            "search-fin-v9-23-snack-100",
+            "search-fin-v9-28-lip-100",
+            "search-fin-v9-34-snack-no-wangwang",
+            "search-fin-v9-44-partial-office",
+            "search-fin-v9-47-compare-xm"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.859848,
+            "method": "percentile-bootstrap",
+            "upper": 0.984848
+          },
+          "definition": "有 qrel 的 query 上逐 query Recall@3 的宏平均；与 v9 published summary 口径兼容。",
+          "denominator": 44,
+          "name": "Recall@3 macro/query",
+          "notes": [
+            "qrel_queries_only"
+          ],
+          "numerator": null,
+          "role": "SUPPORTING_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 0.92803
+        },
+        "Recall@5 macro/query": {
+          "badcaseCount": 3,
+          "badcaseIds": [
+            "search-fin-v9-23-snack-100",
+            "search-fin-v9-34-snack-no-wangwang",
+            "search-fin-v9-47-compare-xm"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.912879,
+            "method": "percentile-bootstrap",
+            "upper": 1.0
+          },
+          "definition": "有 qrel 的 query 上逐 query Recall@5 的宏平均；与 v9 published summary 口径兼容。",
+          "denominator": 44,
+          "name": "Recall@5 macro/query",
+          "notes": [
+            "qrel_queries_only"
+          ],
+          "numerator": null,
+          "role": "SUPPORTING_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ratio",
+          "value": 0.962121
+        },
+        "Search P95 latency": {
+          "badcaseCount": 3,
+          "badcaseIds": [
+            "search-fin-v9-31-lip-no-chanel",
+            "search-fin-v9-17-matte-lip",
+            "search-fin-v9-36-sony-no-xm6"
+          ],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 519.277402,
+            "method": "percentile-bootstrap",
+            "upper": 946.46858
+          },
+          "definition": "客户端观测的本地完整链路 P95；不是生产 SLO。超过观测 P95 的 case 作为长尾诊断。",
+          "denominator": 50,
+          "name": "Search P95 latency",
+          "notes": [
+            "P95_SAMPLE_COUNT_BELOW_100_DESCRIPTIVE_ONLY"
+          ],
+          "numerator": null,
+          "role": "RUNTIME_DIAGNOSTIC",
+          "status": "MEASURED",
+          "unit": "ms",
+          "value": 797.323967
+        }
+      },
+      "slices": {
+        "budget-structured": {
+          "badcaseCount": 2,
+          "badcaseIds": [
+            "search-fin-v9-23-snack-100",
+            "search-fin-v9-28-lip-100"
+          ],
+          "caseCount": 8,
+          "judgedQueryCount": 8,
+          "mrrAt10": 0.90625,
+          "ndcgAt10": 0.888028,
+          "recallAt10": 0.916667
+        },
+        "category-brand-comparison": {
+          "badcaseCount": 3,
+          "badcaseIds": [
+            "search-fin-v9-47-compare-xm",
+            "search-fin-v9-49-compare-lip",
+            "search-fin-v9-50-compare-home"
+          ],
+          "caseCount": 4,
+          "judgedQueryCount": 4,
+          "mrrAt10": 0.875,
+          "ndcgAt10": 0.813019,
+          "recallAt10": 0.875
+        },
+        "chinese-synonym-oral": {
+          "badcaseCount": 1,
+          "badcaseIds": [
+            "search-fin-v9-11-office"
+          ],
+          "caseCount": 10,
+          "judgedQueryCount": 10,
+          "mrrAt10": 0.95,
+          "ndcgAt10": 0.969343,
+          "recallAt10": 1.0
+        },
+        "exact-model-number-brand": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "caseCount": 10,
+          "judgedQueryCount": 10,
+          "mrrAt10": 1.0,
+          "ndcgAt10": 1.0,
+          "recallAt10": 1.0
+        },
+        "fallback-partial-provider": {
+          "badcaseCount": 2,
+          "badcaseIds": [
+            "search-fin-v9-43-partial-headset",
+            "search-fin-v9-44-partial-office"
+          ],
+          "caseCount": 4,
+          "judgedQueryCount": 4,
+          "mrrAt10": 0.875,
+          "ndcgAt10": 0.871228,
+          "recallAt10": 1.0
+        },
+        "negative-exclusion": {
+          "badcaseCount": 2,
+          "badcaseIds": [
+            "search-fin-v9-33-coat-no-outdoor",
+            "search-fin-v9-34-snack-no-wangwang"
+          ],
+          "caseCount": 8,
+          "judgedQueryCount": 8,
+          "mrrAt10": 0.9375,
+          "ndcgAt10": 0.871035,
+          "recallAt10": 0.9375
+        },
+        "no-result-conflict": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "caseCount": 6,
+          "judgedQueryCount": 0,
+          "mrrAt10": null,
+          "ndcgAt10": null,
+          "recallAt10": null
+        }
+      }
+    }
+  },
+  "evidence": {
+    "completedAt": "2026-08-22T04:58:47.104Z",
+    "datasetSha256": "d02e89e644fc115e55c5553baeb98681178822d3cc2e7395003b7cfc3bb5cd07",
+    "immutable": true,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",
+    "releaseId": "release-20260822-ai-quality-v9",
+    "runId": "final-20260822-ai-quality-v9",
+    "sha256SumsSha256": "94edeb894f3e2d36f597cb9cc9796d6e0e6f6b81da08f030b8723435e441c11a",
+    "split": "final"
+  },
+  "holdout": {
+    "caseCount": 125,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/.holdouts/final-holdout-20260822-ai-quality-v9.jsonl",
+    "requiredForSearchQrels": true,
+    "sha256": "a04f4ca95cae3c7c41356625d4f58b05c251ae45503e0423905b83830d25c85f"
+  },
+  "interpretation": {
+    "contractGatesAreNotShowcaseMetrics": true,
+    "customerServiceIntentMetricsNotMeasured": true,
+    "localLatencyIsNotProductionSlo": true,
+    "qualityFirst": true,
+    "semanticJudgeIsShadowOnly": true
+  },
+  "schemaVersion": "aishop-quality-scorecard/v1"
+}

@@ -9,6 +9,8 @@
 
 本轮优化、排错过程、阶段指标和新版面试报告复核见 [AI质量闭环工作记录](AI质量闭环工作记录_20260822.md)；方法成熟度和外部资料对照见
 [AI主线方法成熟度与后续优化路线](AI主线方法成熟度与后续优化路线_20260820.md)。
+质量主指标、95% 置信区间和指标级 badcase 以 [AI质量指标与Badcase索引](AI质量指标与Badcase索引_20260822.md) 为准，
+机器可读版本为 [AI质量指标与Badcase索引.json](AI质量指标与Badcase索引_20260822.json)。
 
 ## 项目闭环
 
@@ -48,17 +50,21 @@ Final 分层固定为 Search `10/10/8/8/6/4/4`（精确型号数字品牌、中�
 fallback/partial provider、类目品牌比较）；RAG `25/8/8/5/4`（answerable、no-answer、injection、temporal/contradiction、
 terminology/citation）；Agent `8/7/4/6`（shopping、RAG/政策、handoff/safety、confirmation/idempotency/write）。
 
-## 当前 final 结果
+## 当前 final 质量结果
 
-| 域 | 结果 | 关键点估计 | 硬门禁 |
-|---|---:|---|---|
-| Search | 50/50 | Recall@3 `0.928030`、Recall@5/10 `0.962121`、MRR@10 `0.937500`、NDCG@10 `0.920521` | case/slice `1.0`、约束违规 `0`、provider completeness `1.0` |
-| RAG | 50/50 | retrieval、generation、required claim、citation、grounded faithfulness、no-answer、injection 均通过 | invalid citation、严重安全违规、runtime error 均 `0` |
-| Agent | 25/25；200/200 trials | `pass^8=1.0`、critical workflow pass power `1.0`、terminal/state diff `1.0` | 重复副作用、runtime error、严重安全违规均 `0` |
+| 域 | 主质量指标 | 分母与 badcase | 必须 100% 的契约门禁 |
+|---|---|---|---|
+| Search | Recall@10 macro/query `0.962121`；micro/qrel `52/56=0.928571`；MRR@10 `0.937500`；NDCG@10 `0.920521` | 44 个有 qrel query；3 个 query、4 个相关商品漏召回；5 个 MRR、10 个 NDCG badcase | 硬约束、no-result、Provider completeness、unknown product、runtime error |
+| RAG | grounded faithfulness/citation/no-answer `1.0`；retrieval Recall@5 `1.0`（29 个 answerable qrel） | 50 条；当前 lexical/规则下界无坏例；3 个 Provider failure 作为诊断保留 | invalid citation、严重安全、runtime error、unsafe answer |
+| Agent | tool routing/argument `1.0`（规则/契约 case）；P95 本地延迟 `17077.8 ms`（诊断） | 25 条；两个长尾 case；未测客服 intent/slot 人工 F1 | 终态、state diff、重复副作用、runtime/safety error |
 
-Search 每个正常 slice 独立报告 Recall/MRR/NDCG、no-result、hard constraint、provider completeness、casePassRate、P50/P95/P99、
-fallback/partial/deadline 和拒绝原因；不计算加权总分掩盖单 slice 失败。变形检查覆盖预算单调性、排除品牌、无结果不放宽、
+Search 每个正常 slice 独立报告 Recall@10、MRR@10、NDCG@10 和对应 badcase；no-result、hard constraint、provider completeness、
+fallback/partial/deadline 属于门禁或诊断，不计算加权总分掩盖单 slice 失败。变形检查覆盖预算单调性、排除品牌、无结果不放宽、
 精确型号不被宽泛变体覆盖、partial provider 不引入不存在商品。
+
+`50/50`、`25/25` 和 `pass^8=1.0` 属于发布契约/可靠性门禁，不作为主要成果展示；通过门禁不等于推荐排序、客服意图理解或
+真实用户收益达到行业满分。Search 的具体漏召回商品、返回顺序和复盘假设见 scorecard；runtime `bad-cases.jsonl` 为空也不能推出
+“没有质量 badcase”。
 
 ## RAG semantic shadow judge
 
@@ -92,6 +98,12 @@ failure trace、降级标识、deadline、硬约束、RAG 拒答/降级、Agent 
 `costCny=null`，绝不写成零。v9 final 的 RAG usage 有 token 记录但单价未知，Search/部分 Agent deterministic path 有缺 usage，
 因此没有启用费用预算硬门禁。二项指标使用 Wilson 区间，连续/ranking 指标使用 percentile bootstrap；P99 在样本少于 100 时标为
 描述性统计。所有延迟边界是本地完整链路观测，不是生产 SLO。
+
+## AI 客服质量指标缺口
+
+当前 Agent evidence 证明的是工具契约、状态终态和幂等，不是独立客服理解准确率。下一轮只补一套小型人工金标，优先测四项：
+`intent Macro-F1`（附逐 intent F1/confusion matrix）、高风险 intent Recall、关键 slot entity/span F1 与请求级 Exact Match、handoff Recall
+与严重漏转人工率。没有标注集前不声称 intent、slot、情绪或转人工准确率。
 
 ## 证据生命周期
 

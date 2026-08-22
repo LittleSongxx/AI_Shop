@@ -59,9 +59,15 @@ from evaluation.core.fault_injection import (
     fault_evidence_level,
     load_fault_scenarios,
 )
-from evaluation.core.io import RUNS_ROOT, load_json, load_jsonl, utc_now
+from evaluation.core.io import EVIDENCE_ROOT, RUNS_ROOT, load_json, load_jsonl, utc_now
 from evaluation.core.metrics import aggregate_domain
 from evaluation.core.fingerprints import environment_facts, source_fingerprint
+from evaluation.quality_scorecard import (
+    DEFAULT_CATALOG,
+    DEFAULT_HOLDOUT,
+    build_scorecard,
+    write_scorecard,
+)
 from evaluation.db_benchmark import benchmark_db_sizes, write_db_benchmark_evidence
 from evaluation.repeat_runner import run_repeated_agent_cases
 from evaluation.repeat_runner import trial_context
@@ -144,6 +150,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="explicitly use the application database (diagnostic only; not isolated)",
     )
+    scorecard = commands.add_parser(
+        "scorecard",
+        help="derive quality-first metrics and metric-specific badcases from immutable evidence",
+    )
+    scorecard.add_argument("--evidence", type=Path, default=None)
+    scorecard.add_argument("--holdout", type=Path, default=DEFAULT_HOLDOUT)
+    scorecard.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
+    scorecard.add_argument("--output", type=Path, required=True, help="Markdown scorecard path")
+    scorecard.add_argument("--json-output", type=Path, help="optional structured JSON path")
     seal = commands.add_parser(
         "seal-auxiliary",
         help="copy a verified fault/repeat run into an immutable diagnostic package",
@@ -745,6 +760,28 @@ async def _main(args: argparse.Namespace) -> int:
         return 0
     if args.command == "verify":
         _print(verify_evidence(args.path) if args.path else verify_evidence())
+        return 0
+    if args.command == "scorecard":
+        scorecard = build_scorecard(
+            args.evidence or EVIDENCE_ROOT,
+            holdout_path=args.holdout,
+            catalog_path=args.catalog,
+        )
+        markdown_path, json_path = write_scorecard(
+            scorecard,
+            args.output,
+            args.json_output,
+            evidence_path=args.evidence or EVIDENCE_ROOT,
+        )
+        _print(
+            {
+                "schemaVersion": scorecard.get("schemaVersion"),
+                "runId": (scorecard.get("evidence") or {}).get("runId"),
+                "markdown": str(markdown_path),
+                "json": str(json_path),
+                "badcaseCount": len(scorecard.get("badcases") or []),
+            }
+        )
         return 0
     if args.command == "slices":
         return await _slices(args)

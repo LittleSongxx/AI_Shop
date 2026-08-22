@@ -52,7 +52,7 @@
 | 工具调用 | MCP（Model Context Protocol）双向通信 |
 | 会话记忆 | Redis 短期 + MySQL 长期持久化 |
 | 可观测 | OpenTelemetry（OTLP）+ Prometheus 指标 |
-| 评测与测试 | pytest + `aishop-evaluation/v3`；Conda `shop` 环境、development/regression 数据锁、一次性 final、逐域/切片门禁和哈希证据包 |
+| 评测与测试 | pytest + `aishop-evaluation/v3`；Conda `shop` 环境、quality scorecard（Search 主指标 + badcase）、development/regression 数据锁、一次性 final 和哈希证据包 |
 
 ### 前端
 
@@ -195,7 +195,7 @@ mvn -DskipTests package
 ```bash
 cd AI_Shop-backend/AI_Shop-agent
 
-python -m venv .venv && source .venv/bin/activate
+conda activate shop
 pip install -e ".[dev]"
 
 cp .env.example .env   # 填入 LLM API Key、DB 连接、内部 Token
@@ -250,7 +250,8 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ## 数据与指标口径
 
-人工阅读入口为 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)，固定指标、统计方法和门禁见
+人工阅读入口为 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)，质量主指标、95% CI 和指标级 badcase 见
+[AI质量指标与Badcase索引](docs/AI质量指标与Badcase索引_20260822.md)，固定统计方法和门禁见
 [性能与质量证据](docs/性能与质量证据_20260820.md)，机器入口为
 [evidence-manifest.json](docs/evidence-manifest.json)。运行 `python scripts/check_evidence_manifest.py` 会交叉校验 suite、
 development/regression 数据锁、文件 SHA、case 数、域分布、集合互斥、失败 final 和文档边界。
@@ -265,12 +266,13 @@ regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
 `development-20260822-ai-quality-v9` 和 `regression-20260822-ai-quality-v9`，源码指纹均为
 `e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69`。
 
-当前唯一发布结果是 `release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`：Search、RAG、Agent
-分别 `50/50`、`50/50`、`25/25`，三域硬门禁通过；Agent `200/200` 重复 trial 的 `pass^8=1.0`，终态和
-authoritative Java 状态 diff 均 `1.0`，重复副作用为 `0`。Search Recall@10=`0.962121`、MRR@10=`0.9375`、
-NDCG@10=`0.920521`，硬约束违规为 `0`、Provider completeness=`1.0`；RAG retrieval、generation、claim、
-citation、faithfulness 和安全门禁均通过。Final 的 semantic judge `50/50` 可追溯，但始终是 shadow 信号，
-不是人工真值、人工准确率或人工一致性。
+当前唯一发布结果是 `release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`。主质量结果是 Search
+`Recall@10 macro/query=0.962121`、补充的 `Recall@10 micro/qrel=52/56=0.928571`、`MRR@10=0.937500`、
+`NDCG@10=0.920521`；scorecard 列出 3 个漏召回 query、4 个漏召回商品和每个排序 badcase。RAG 只保留最小事实安全证据，
+Agent 只保留工具契约/延迟诊断；客服 intent/slot/handoff 尚无独立人工金标。
+
+`50/50`、`25/25`、`pass^8=1.0`、终态/state diff 和重复副作用为必须满足的发布/可靠性门禁，不是优展示指标；门禁通过不等于
+客服意图准确率或线上推荐收益。Final semantic judge `50/50` 可追溯，但始终是 shadow 信号，不是人工真值、人工准确率或人工一致性。
 
 质量报告不隐藏诊断信号：final 有 `3` 次 query-expansion provider failure，均走安全 deterministic fallback；
 regression 有 `1` 次同类诊断和 `1` 次 semantic judge unavailable。它们不会被改写为零，也不会进入不适用的正常质量分母。
