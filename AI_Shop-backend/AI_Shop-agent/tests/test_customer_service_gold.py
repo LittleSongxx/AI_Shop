@@ -1,0 +1,127 @@
+from pathlib import Path
+
+import pytest
+
+from evaluation.customer_service_gold import (
+    CustomerServiceGoldError,
+    evaluate_predictions,
+    load_gold_dataset,
+)
+
+DATASET = Path(__file__).parents[1] / "evaluation" / "datasets" / "customer_service" / "gold-v1.jsonl"
+
+
+def _perfect_predictions(rows):
+    return {
+        row["id"]: {
+            "intent": row["expected"]["intent"],
+            "riskLevel": row["expected"]["riskLevel"],
+            "shouldHandoff": row["expected"]["shouldHandoff"],
+            "nextAction": "HANDOFF" if row["expected"]["shouldHandoff"] else "ANSWER",
+            "entities": row["expected"]["slots"],
+        }
+        for row in rows
+    }
+
+
+def test_gold_dataset_is_independent_and_valid():
+    rows = load_gold_dataset(DATASET)
+    assert len(rows) == 60
+    assert all(row["annotation"]["status"] == "DRAFT_NEEDS_HUMAN_REVIEW" for row in rows)
+    assert rows[-1]["sliceTags"] == ["chat", "acknowledgement", "low-risk-chat"]
+
+
+def test_report_exposes_pending_blinded_human_review_plan():
+    rows = load_gold_dataset(DATASET)[:1]
+    report = evaluate_predictions(rows, _perfect_predictions(rows), provenance={"mode": "fixture"})
+    plan = report["humanReviewPlan"]
+    assert plan["status"] == "PENDING_INDEPENDENT_REVIEW"
+    assert plan["requiredAnnotators"] == 2
+    assert plan["blindedFirstPass"] is True
+    assert plan["adjudicationRequired"] is True
+    assert report["releaseGateEligible"] is False
+
+
+def test_metrics_keep_handoff_suggested_out_of_handoff_recall():
+    rows = load_gold_dataset(DATASET)[:1]
+    row = rows[0]
+    row["expected"] = {
+        "intent": "CHAT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": True,
+        "handoffSeverity": "CRITICAL",
+        "slots": {},
+    }
+    report = evaluate_predictions(
+        rows,
+        {
+            row["id"]: {
+                "intent": "CHAT",
+                "riskLevel": "HIGH",
+                "nextAction": "HANDOFF_SUGGESTED",
+                "shouldHandoff": False,
+                "entities": {},
+            }
+        },
+        provenance={"mode": "fixture"},
+    )
+    assert report["metrics"]["handoffRecall"]["value"] == 0.0
+    assert report["metrics"]["criticalHandoffMissRate"]["value"] == 1.0
+    assert report["status"] == "PROVISIONAL_NOT_HUMAN_GOLD"
+    assert report["releaseGateEligible"] is False
+
+
+def test_slot_metrics_use_non_empty_slot_denominator_only():
+    rows = load_gold_dataset(DATASET)[:2]
+    predictions = _perfect_predictions(rows)
+    report = evaluate_predictions(rows, predictions, provenance={"mode": "fixture"})
+    metric = report["metrics"]["slotExactMatch"]
+    assert metric["numerator"] == metric["denominator"] == 2
+    assert metric["value"] == 1.0
+
+
+def test_missing_prediction_is_a_badcase_not_a_silent_pass():
+    rows = load_gold_dataset(DATASET)[:1]
+    report = evaluate_predictions(rows, {}, provenance={"mode": "fixture"})
+    assert report["cases"][0]["predicted"]["intent"] == "__MISSING__"
+    assert report["metrics"]["intentMacroF1"]["badcaseCount"] == 1
+
+
+def test_critical_handoff_miss_is_present_in_badcase_rows():
+    rows = load_gold_dataset(DATASET)[:1]
+    row = rows[0]
+    row["expected"] = {
+        "intent": "CHAT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": True,
+        "handoffSeverity": "CRITICAL",
+        "slots": {},
+    }
+    report = evaluate_predictions(
+        rows,
+        {
+            row["id"]: {
+                "intent": "CHAT",
+                "riskLevel": "HIGH",
+                "shouldHandoff": False,
+                "nextAction": "ANSWER",
+                "entities": {},
+            }
+        },
+        provenance={"mode": "fixture"},
+    )
+    assert report["metrics"]["criticalHandoffMissRate"]["badcaseIds"] == [row["id"]]
+    assert report["badcases"][0]["caseId"] == row["id"]
+
+
+def test_invalid_annotation_status_fails_closed(tmp_path):
+    target = tmp_path / "bad.jsonl"
+    target.write_text(
+        '{"schemaVersion":"aishop-customer-service-gold/v1","id":"x",'
+        '"input":{"message":"hi"},"expected":{"intent":"CHAT",'
+        '"riskLevel":"LOW","shouldHandoff":false,"slots":{}},'
+        '"annotation":{"status":"MODEL_VERIFIED"}}\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(CustomerServiceGoldError):
+        load_gold_dataset(target)

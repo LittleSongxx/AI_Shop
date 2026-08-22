@@ -68,6 +68,12 @@ from evaluation.quality_scorecard import (
     build_scorecard,
     write_scorecard,
 )
+from evaluation.customer_service_gold import (
+    DEFAULT_DATASET as DEFAULT_CUSTOMER_SERVICE_DATASET,
+    DEFAULT_JSON_REPORT as DEFAULT_CUSTOMER_SERVICE_JSON_REPORT,
+    DEFAULT_REPORT as DEFAULT_CUSTOMER_SERVICE_REPORT,
+    run_customer_service_gold,
+)
 from evaluation.db_benchmark import benchmark_db_sizes, write_db_benchmark_evidence
 from evaluation.repeat_runner import run_repeated_agent_cases
 from evaluation.repeat_runner import trial_context
@@ -159,6 +165,16 @@ def build_parser() -> argparse.ArgumentParser:
     scorecard.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     scorecard.add_argument("--output", type=Path, required=True, help="Markdown scorecard path")
     scorecard.add_argument("--json-output", type=Path, help="optional structured JSON path")
+    customer_service = commands.add_parser(
+        "customer-service-gold",
+        help="measure provisional customer-service intent, risk, slot, and handoff quality",
+    )
+    customer_service.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
+    customer_service.add_argument("--mode", choices=["rule"], default="rule")
+    customer_service.add_argument("--output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_REPORT)
+    customer_service.add_argument(
+        "--json-output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_JSON_REPORT
+    )
     seal = commands.add_parser(
         "seal-auxiliary",
         help="copy a verified fault/repeat run into an immutable diagnostic package",
@@ -780,6 +796,26 @@ async def _main(args: argparse.Namespace) -> int:
                 "markdown": str(markdown_path),
                 "json": str(json_path),
                 "badcaseCount": len(scorecard.get("badcases") or []),
+            }
+        )
+        return 0
+    if args.command == "customer-service-gold":
+        report = await run_customer_service_gold(
+            args.dataset,
+            mode=args.mode,
+            output_path=args.output,
+            json_output_path=args.json_output,
+        )
+        _print(
+            {
+                "schemaVersion": report.get("schemaVersion"),
+                "status": report.get("status"),
+                "releaseGateEligible": report.get("releaseGateEligible"),
+                "dataset": report.get("dataset"),
+                "metrics": report.get("metrics"),
+                "markdown": str(args.output),
+                "json": str(args.json_output),
+                "badcaseCount": len(report.get("badcases") or []),
             }
         )
         return 0

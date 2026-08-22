@@ -105,6 +105,18 @@ def test_repository_accepts_published_final_when_required() -> None:
     )
 
 
+def test_current_customer_service_report_keeps_human_review_fail_closed() -> None:
+    manifest = json.loads((Path(__file__).parents[1] / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = manifest["evaluation"]["customerServiceGold"]
+    report_path = Path(__file__).parents[1] / descriptor["reportPath"]
+    report = json.loads(report_path.read_text("utf-8"))
+
+    assert descriptor["status"] == "PROVISIONAL_NOT_HUMAN_GOLD"
+    assert report["humanReviewPlan"]["status"] == "PENDING_INDEPENDENT_REVIEW"
+    assert report["humanReviewPlan"]["requiredAnnotators"] == 2
+    assert report["humanReviewPlan"]["blindedFirstPass"] is True
+
+
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:
     package = tmp_path / "evaluation/.runs/final-failed"
     package.mkdir(parents=True)

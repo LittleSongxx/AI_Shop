@@ -21,7 +21,7 @@
 - **第二入口：Java 电商后端**——订单/库存/支付事务、Redis、RabbitMQ、一致性、幂等和故障恢复。
 - **视觉搜索**属于推荐主线；**Text2SQL**目前只是带权限、扫描预算、分页、导出审计的治理实验，未达门槛前不包装为第三主线。
 
-面试可陈述的功能闭环、真实样本和未采集边界见 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)。
+面试可陈述的功能闭环、真实样本和未采集边界见 [AI_Shop 主线与开发记录](docs/project/AI_Shop主线与开发记录.md)。
 
 ---
 
@@ -250,14 +250,15 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 
 ## 数据与指标口径
 
-人工阅读入口为 [AI 应用求职项目证据总览](docs/AI应用求职项目证据总览.md)，质量主指标、95% CI 和指标级 badcase 见
-[AI质量指标与Badcase索引](docs/AI质量指标与Badcase索引_20260822.md)，固定统计方法和门禁见
-[性能与质量证据](docs/性能与质量证据_20260820.md)，机器入口为
+人工阅读入口为 [AI_Shop 主线与开发记录](docs/project/AI_Shop主线与开发记录.md)，质量主指标、95% CI 和指标级 badcase 见
+[AI质量评测与Badcase](docs/evaluation/AI质量评测与Badcase.md)，机器 scorecard 见
+[AI质量评测与Badcase.json](docs/evaluation/AI质量评测与Badcase.json)，机器总索引为
 [evidence-manifest.json](docs/evidence-manifest.json)。运行 `python scripts/check_evidence_manifest.py` 会交叉校验 suite、
 development/regression 数据锁、文件 SHA、case 数、域分布、集合互斥、失败 final 和文档边界。
 
-本轮核心排错、阶段指标、外部调研和后续优先级记录在
-[AI质量闭环工作记录](docs/AI质量闭环工作记录_20260822.md)；新版面试题入口为
+客服 intent/风险/slot/handoff 的 provisional 证据见
+[客服金标评测](docs/evaluation/customer-service/客服金标评测.md)；本轮核心排错、阶段指标、外部调研和后续优先级已合并到
+[主线与开发记录](docs/project/AI_Shop主线与开发记录.md)；新版面试题入口为
 [AI应用开发_Java后端_真实面试题与备考报告_20260821.md](AI应用开发_Java后端_真实面试题与备考报告_20260821.md)。
 
 当前评测协议为 `aishop-evaluation/v3`，Python 命令必须使用 Conda `shop` 环境：
@@ -269,7 +270,9 @@ regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
 当前唯一发布结果是 `release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`。主质量结果是 Search
 `Recall@10 macro/query=0.962121`、补充的 `Recall@10 micro/qrel=52/56=0.928571`、`MRR@10=0.937500`、
 `NDCG@10=0.920521`；scorecard 列出 3 个漏召回 query、4 个漏召回商品和每个排序 badcase。RAG 只保留最小事实安全证据，
-Agent 只保留工具契约/延迟诊断；客服 intent/slot/handoff 尚无独立人工金标。
+Agent 只保留工具契约/延迟诊断；客服 intent/slot/handoff 当前为 60 条 provisional draft gold，尚未完成独立人工复核。
+
+客服规则预路由的当前 provisional 点估计为 Intent Macro-F1 `1.000`、高风险 intent Recall `1.000`、slot span F1 `1.000`、slot EM `1.000`、handoff Recall `1.000`（当前 0 badcase；95% CI 与逐 case 历史 badcase 见报告）。这不是人工准确率，也不是线上客服成功率；优化前 8 个 badcase 和根因仍保留在机器证据中。
 
 `50/50`、`25/25`、`pass^8=1.0`、终态/state diff 和重复副作用为必须满足的发布/可靠性门禁，不是优展示指标；门禁通过不等于
 客服意图准确率或线上推荐收益。Final semantic judge `50/50` 可追溯，但始终是 shadow 信号，不是人工真值、人工准确率或人工一致性。
@@ -282,8 +285,8 @@ offer/decision feature 为一次 round trip，而 N+1 随候选数线性增长�
 
 历史 `final-20260820-ai-quality-v2` 保留为只读 archive，`v3` 至 `v8` 是只读失败 final archive；它们不代表当前结果，
 也不会被删除后重新计算。项目没有 CTR/CVR/GMV、工业级个性化推荐、生产容量或支付合规证据。逐 case、切片、故障、
-usage、状态 diff、生命周期和 SHA-256 入口见 [项目证据总览](docs/AI应用求职项目证据总览.md)、
-[性能与质量证据](docs/性能与质量证据_20260820.md) 和 [机器清单](docs/evidence-manifest.json)。
+usage、状态 diff、生命周期和 SHA-256 入口见 [质量评测与 Badcase](docs/evaluation/AI质量评测与Badcase.md)、
+[主线与开发记录](docs/project/AI_Shop主线与开发记录.md) 和 [机器清单](docs/evidence-manifest.json)。
 
 ---
 

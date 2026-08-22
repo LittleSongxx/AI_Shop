@@ -18,6 +18,16 @@
         "sha256": "5451b5de4c64e2174981722a4c5c71c9e674530d88d5c4992b87ed2709cfa5d1"
       }
     ],
+    "customerServiceGold": {
+      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+      "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+      "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
+      "reportSha256": "f31cceadd3e30832cafa13e7ec664c4b41d1bef3c6e0e5a25e95658343a74d5d",
+      "caseCount": 60,
+      "status": "PROVISIONAL_NOT_HUMAN_GOLD",
+      "releaseGateEligible": false,
+      "annotationPolicy": "INDEPENDENT_HUMAN_REVIEW_REQUIRED_BEFORE_ACCURACY_CLAIM"
+    },
     "currentEvidence": {
       "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",
       "runId": "final-20260822-ai-quality-v9",
@@ -248,12 +258,44 @@
   },
   "claimDocuments": [
     "README.md",
-    "docs/AI应用求职项目证据总览.md",
-    "docs/性能与质量证据_20260820.md",
-    "docs/AI质量指标与Badcase索引_20260822.md",
-    "docs/AI质量指标与Badcase索引_20260822.json",
-    "docs/AI主线方法成熟度与后续优化路线_20260820.md",
-    "docs/AI质量闭环工作记录_20260822.md",
+    "docs/README.md",
+    "docs/project/AI_Shop主线与开发记录.md",
+    "docs/evaluation/AI质量评测与Badcase.md",
+    "docs/evaluation/AI质量评测与Badcase.json",
+    "docs/evaluation/customer-service/客服金标评测.md",
+    "docs/evaluation/customer-service/客服金标评测.json",
     "AI应用开发_Java后端_真实面试题与备考报告_20260821.md"
+  ],
+  "documentationConsistency": [
+    {
+      "path": "README.md",
+      "requiredTokens": ["docs/project/AI_Shop主线与开发记录.md", "docs/evaluation/AI质量评测与Badcase.md", "docs/evaluation/customer-service/客服金标评测.md"],
+      "forbiddenTokens": ["docs/AI应用求职项目证据总览.md", "docs/性能与质量证据_20260820.md", "docs/AI质量闭环工作记录_20260822.md"]
+    },
+    {
+      "path": "docs/README.md",
+      "requiredTokens": ["project/AI_Shop主线与开发记录.md", "evaluation/AI质量评测与Badcase.md", "customer-service/客服金标评测.md"],
+      "forbiddenTokens": ["_20260820.md", "_20260822.md"]
+    },
+    {
+      "path": "docs/project/AI_Shop主线与开发记录.md",
+      "requiredTokens": ["2026-08-20", "2026-08-21", "2026-08-22", "PROVISIONAL_NOT_HUMAN_GOLD"],
+      "forbiddenTokens": ["AI应用求职项目证据总览.md", "AI主线方法成熟度与后续优化路线_20260820.md"]
+    },
+    {
+      "path": "docs/evaluation/AI质量评测与Badcase.md",
+      "requiredTokens": ["Recall@10", "NDCG@10", "Intent Macro-F1", "badcase"],
+      "forbiddenTokens": ["AI质量指标与Badcase索引_20260822.md", "性能与质量证据_20260820.md"]
+    },
+    {
+      "path": "docs/evaluation/customer-service/客服金标评测.md",
+      "requiredTokens": ["PROVISIONAL_NOT_HUMAN_GOLD", "intentMacroF1", "releaseGateEligible=false"],
+      "forbiddenTokens": ["HUMAN_VERIFIED_RESULT"]
+    },
+    {
+      "path": "AI应用开发_Java后端_真实面试题与备考报告_20260821.md",
+      "requiredTokens": ["docs/evaluation/AI质量评测与Badcase.md", "docs/project/AI_Shop主线与开发记录.md"],
+      "forbiddenTokens": ["docs/AI质量指标与Badcase索引_20260822.md", "docs/AI应用求职项目证据总览.md"]
+    }
   ]
 }

@@ -105,11 +105,21 @@ FUND_AT_RISK = (
     "扣了钱",
     "钱扣了",
     "重复支付",
+    "重复扣款",
+    "扣了两次",
+    "扣了两笔",
+    "银行卡被扣",
     "钱没退",
     "退款没到账",
+    "退款还没到账",
+    "退款未到账",
     "支付成功没订单",
+    "付款成功但订单没生成",
+    "支付成功但订单没生成",
     "资金",
     "盗刷",
+    "未授权支付",
+    "不是我操作",
 )
 PAYMENT_BLOCKED = (
     "支付失败",
@@ -117,6 +127,26 @@ PAYMENT_BLOCKED = (
     "支付异常",
 )
 PAYMENT_ISSUE_HINTS = FUND_AT_RISK + PAYMENT_BLOCKED
+_PAYMENT_INFORMATION_HINTS = (
+    "支付方式",
+    "付款方式",
+    "支付渠道",
+    "怎么支付",
+    "如何支付",
+    "支持什么支付",
+)
+_FUND_NEGATED_HINTS = (
+    "没有扣款",
+    "未扣款",
+    "没扣款",
+    "没有扣钱",
+    "未扣钱",
+    "没扣钱",
+    "没有被扣",
+    "扣款没有成功",
+    "扣款未成功",
+    "扣款没成功",
+)
 _FUND_INFORMATION_QUESTION_HINTS = (
     "会不会",
     "是否",
@@ -136,13 +166,176 @@ _FUND_INCIDENT_HINTS = (
     "扣了钱",
     "钱扣了",
     "重复支付",
+    "重复扣款",
+    "扣了两次",
+    "扣了两笔",
+    "银行卡被扣",
     "钱没退",
     "退款没到账",
+    "退款还没到账",
+    "退款未到账",
     "支付成功没订单",
     "盗刷了",
     "被盗刷",
+    "未授权支付",
+    "不是我操作",
+    "付款成功但订单没生成",
+    "支付成功但订单没生成",
 )
-_UNRESOLVED_HINTS = ("还是没解决", "没有解决", "又不行", "还是不行", "说了没用", "重复问")
+_UNRESOLVED_HINTS = (
+    "还是没解决",
+    "没有解决",
+    "又不行",
+    "还是不行",
+    "说了没用",
+    "重复问",
+    "问了三次",
+    "问了几次",
+    "反复咨询",
+    "一直没人解决",
+    "一直没人处理",
+)
+_PRIVACY_REQUEST_HINTS = (
+    "读取我的邮箱",
+    "访问我的邮箱",
+    "读取邮箱历史",
+    "获取邮箱历史",
+    "读取我的聊天记录",
+    "导出我的个人信息",
+    "查看我的隐私数据",
+    "删除我的个人资料",
+    "导出我的账户数据",
+    "把聊天记录发给我",
+    "查看我的个人资料",
+)
+_PRODUCT_ENTITY_MARKERS = (
+    "手机壳", "安卓手机", "降噪耳机", "轻薄本", "手机", "耳机", "电脑", "笔记本",
+    "平板", "外套", "衣服", "鞋", "零食", "饮料", "相机", "键盘", "鼠标", "音箱",
+    "空气净化器", "净水器", "吉他", "玩具",
+)
+
+_PRIVACY_DATA_TERMS = (
+    "邮箱",
+    "聊天记录",
+    "个人信息",
+    "个人资料",
+    "账户数据",
+    "账号数据",
+    "隐私数据",
+    "个人数据",
+)
+_PRIVACY_ACTION_TERMS = (
+    "读取",
+    "访问",
+    "查看",
+    "看看",
+    "看一下",
+    "查阅",
+    "导出",
+    "删除",
+    "清除",
+    "发给我",
+    "提供",
+)
+
+
+def _is_privacy_request(text: str) -> bool:
+    value = text or ""
+    return any(term in value for term in _PRIVACY_REQUEST_HINTS) or (
+        any(term in value for term in _PRIVACY_DATA_TERMS)
+        and any(term in value for term in _PRIVACY_ACTION_TERMS)
+    )
+
+
+_ACCOUNT_SECURITY_HINTS = ("账号被盗", "账户被盗", "账号被盗了", "账户被盗了")
+
+
+def _is_account_security_request(text: str) -> bool:
+    return any(term in (text or "") for term in _ACCOUNT_SECURITY_HINTS)
+
+
+_HUMAN_NEGATION_MARKERS = ("不要", "不用", "无需", "先别", "暂不", "暂时不", "不想")
+
+
+def _has_explicit_human_request(text: str) -> bool:
+    """Recognize a human request without treating negated mentions as intent."""
+
+    for clause in re.split(r"[，,。！？!?；;\n]+", str(text or "")):
+        for hint in _HUMAN_HINTS:
+            start = clause.find(hint)
+            while start >= 0:
+                if not any(marker in clause[:start] for marker in _HUMAN_NEGATION_MARKERS):
+                    return True
+                start = clause.find(hint, start + len(hint))
+    return False
+
+
+def _extract_product_name(text: str) -> str | None:
+    """Extract a conservative product span for slot evidence.
+
+    This is a bounded entity hint, not an LLM-generated catalog item.  It only
+    emits a span when a product category/model marker is present, so ordinary
+    support messages do not gain a fabricated product entity.
+    """
+
+    value = str(text or "").strip()
+    if not value or not (
+        any(marker in value for marker in _PRODUCT_ENTITY_MARKERS)
+        or re.search(r"[A-Za-z]{2,}\s*[-]?\d|\b[A-Z]{2,}\d", value)
+    ):
+        return None
+    consult = re.search(
+        r"(?:这款|这副|这个|该款|此款)\s*([^，,。！？!?；;]{1,16}?)(?=支持|有|能|可以|是否|吗|$)",
+        value,
+    )
+    if consult:
+        candidate = consult.group(1).strip()
+        # Stop at comparison/attribute language. Without this boundary,
+        # ``这款手机续航怎么样`` becomes the false span ``手机续航怎么样``.
+        candidate = re.split(
+            r"(?:支持|有|能|可以|是否|吗|怎么样|如何|哪个好|相比|对比|适配|兼容|续航|音质|价格|库存|颜色|尺寸|配置|性能|质量)",
+            candidate,
+            maxsplit=1,
+        )[0].strip()
+        candidate = re.split(r"(?:和|与|跟)\s*另一款", candidate, maxsplit=1)[0].strip()
+        if any(term in value for term in ("相比", "对比", "哪个好", "比较")):
+            candidate = re.split(r"\s*(?:和|与|跟)\s*", candidate, maxsplit=1)[0].strip()
+        if any(marker in candidate for marker in _PRODUCT_ENTITY_MARKERS):
+            return candidate
+    search = re.search(
+        r"(?:买|找|推荐|想要|需要)\s*(?:一款|一台|一个|个|些|点)?\s*([^，,。！？!?；;]{2,30})",
+        value,
+    )
+    if search:
+        candidate = re.split(r"预算|价格|以内|不要|不超过", search.group(1), maxsplit=1)[0]
+        candidate = candidate.strip(" ：:、 ")
+        if candidate and not re.fullmatch(r"[\d\s元￥¥.]+", candidate) and (
+            any(marker in candidate for marker in _PRODUCT_ENTITY_MARKERS)
+            or re.search(r"[A-Za-z]{2,}|\d", candidate)
+        ):
+            return candidate
+    for marker in sorted(_PRODUCT_ENTITY_MARKERS, key=len, reverse=True):
+        marker_end = value.rfind(marker)
+        if marker_end >= 0:
+            start_candidates = [
+                value.rfind("的", 0, marker_end),
+                value.rfind("、", 0, marker_end),
+                value.rfind(",", 0, marker_end),
+                value.rfind("，", 0, marker_end),
+            ]
+            start = max(start_candidates) + 1
+            candidate = value[start : marker_end + len(marker)].strip(" ：:、，, ")
+            candidate = re.sub(r"^(?:不要|不想要|预算[^的]*的)", "", candidate).strip()
+            candidate = re.sub(
+                r"^(?:这款|这副|这个|该款|此款|这台|包裹少了|少了|缺少|漏发|少发|收到的包裹少了)",
+                "",
+                candidate,
+            ).strip()
+            if any(term in value for term in ("相比", "对比", "哪个好", "比较")):
+                candidate = re.split(r"\s*(?:和|与|跟)\s*", candidate, maxsplit=1)[0].strip()
+            if candidate:
+                return candidate
+    return None
 
 
 def _is_informational_fund_question(text: str) -> bool:
@@ -161,9 +354,14 @@ def _is_informational_fund_question(text: str) -> bool:
 
 
 def _funds_at_risk(text: str) -> bool:
-    return any(term in text for term in FUND_AT_RISK) and not _is_informational_fund_question(
-        text
-    )
+    # ``支付失败但没有扣款`` is a blocked payment, not a confirmed loss.
+    # Keep the high-risk route when another confirmed incident appears in the
+    # same sentence (for example, a successful payment with no order).
+    if any(term in text for term in _FUND_NEGATED_HINTS) and not any(
+        term in text for term in _FUND_INCIDENT_HINTS
+    ):
+        return False
+    return any(term in text for term in FUND_AT_RISK) and not _is_informational_fund_question(text)
 
 _TOOL_INTENTS = frozenset(
     {
@@ -418,7 +616,7 @@ def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     """Deterministically separate information, reads, and proposed writes."""
 
     text = str(user_text or "").strip()
-    if intent == IntentKind.HUMAN_REQUEST or any(hint in text for hint in _HUMAN_HINTS):
+    if intent == IntentKind.HUMAN_REQUEST or _has_explicit_human_request(text):
         return RequestMode.HUMAN_SUPPORT
 
     action_cues = _ACTION_CUES.get(intent, ())
@@ -522,28 +720,120 @@ def classify_intent_by_rules(
     if structural:
         return structural
 
-    if any(hint in text for hint in _HUMAN_HINTS):
+    if _has_explicit_human_request(text):
+        return IntentKind.HUMAN_REQUEST
+    # Privacy/authority requests are safety-sensitive even when the user does
+    # not literally say "转人工".  Route them to the human-support boundary
+    # before generic chat or product rules can consume the turn.
+    if _is_privacy_request(text):
+        return IntentKind.HUMAN_REQUEST
+    if _is_account_security_request(text):
         return IntentKind.HUMAN_REQUEST
     # refund-007：进度问法只写死了「退款到账」，补上带时间词的问法——
     # 「退款要多久到账」之前被后面的「退款」泛匹配抢走判成 REFUND。
     if any(k in text for k in (
         "退款进度", "退款到哪", "退款到账", "退款什么时候", "退款状态",
+        "退款还没到账", "退款未到账",
         "多久到账", "几天到账", "何时到账", "什么时候到账", "多久退", "几天退",
     )):
         personal_refund = any(
             k in text
             for k in ("我的退款", "这笔退款", "那笔退款", "退款单", "我退的", "给我退")
-        ) or bool(extract_order_id(text) or extract_order_item_id(text))
+        ) or bool(extract_order_id(text) or extract_order_item_id(text)) or any(
+            k in text for k in ("退款还没到账", "退款未到账")
+        )
         generic_policy = any(k in text for k in ("一般", "通常", "大概", "规则", "正常"))
-        if personal_refund or not generic_policy and not re.search(r"^(退款|退货).*(多久|几天|何时|什么时候)", text):
+        if personal_refund or (
+            not generic_policy
+            and not re.search(r"^(退款|退货).*(?:多久|几天|何时|什么时候)", text)
+        ):
+            return IntentKind.REFUND_STATUS
+        if "政策" in text or "规则" in text:
             return IntentKind.REFUND_STATUS
         return IntentKind.CHAT
     if _is_informational_fund_question(text):
         return IntentKind.CHAT
     if any(k in text for k in PAYMENT_ISSUE_HINTS):
         return IntentKind.PAYMENT_ISSUE
-    if any(k in text for k in ("破损", "损坏", "坏了", "碎了", "错发", "发错", "漏发", "少发", "缺件", "质量问题", "假货")):
+    if any(
+        k in text
+        for k in (
+            "破损",
+            "损坏",
+            "坏了",
+            "坏的",
+            "碎了",
+            "错发",
+            "发错",
+            "漏发",
+            "少发",
+            "少了",
+            "缺件",
+            "缺少",
+            "配件不全",
+            "错的颜色",
+            "颜色不对",
+            "质量问题",
+            "想换货",
+            "换货",
+            "假货",
+        )
+    ):
         return IntentKind.DAMAGED_OR_WRONG_ITEM
+
+    if any(term in text for term in _UNRESOLVED_HINTS) and any(
+        marker in text for marker in ("问题", "处理", "客服", "投诉", "解决")
+    ):
+        return IntentKind.COMPLAINT
+
+    # Product search constraints must win over the generic consultation
+    # question route. ``有没有适合学生的平板，预算 2000`` is a search request,
+    # while ``耳机有主动降噪吗`` remains a product consultation.
+    if (
+        not _has_order_action_cue(text)
+        and any(marker in text for marker in _PRODUCT_ENTITY_MARKERS)
+        and any(
+        marker in text
+        for marker in (
+            "适合",
+            "预算",
+            "不超过",
+            "以内",
+            "不要",
+            "不想要",
+            "不含",
+            "无糖",
+            "少糖",
+            "推荐",
+            "买",
+            "找",
+            "搜索",
+            "怎么选",
+            "如何选",
+            "哪个好",
+            "对比",
+            "比较",
+        )
+        )
+    ):
+        return IntentKind.PRODUCT_SEARCH
+
+    # A specification question mentioning a product is consultation, not a
+    # fresh search.  This must run before the short-text product keyword rule
+    # ("耳机" alone is otherwise a direct search keyword).
+    from app.domain.intent.rules import looks_like_consult_question
+
+    if (
+        (
+            looks_like_consult_question(text)
+            or re.search(r"(?:有|支持|适配|兼容).*(?:吗|么|嘛|呢|？|\?)$", text)
+        )
+        and not _has_order_action_cue(text)
+        and any(marker in text for marker in _PRODUCT_ENTITY_MARKERS)
+        and not any(verb in text for verb in ("买", "找", "推荐", "搜索"))
+        and not any(marker in text for marker in ("怎么选", "如何选", "哪个好", "对比", "比较"))
+    ):
+        return IntentKind.PRODUCT_CONSULT
 
     if (
         not any(k in text for k in (
@@ -728,6 +1018,11 @@ def classify_intent_by_rules(
     if is_similar_or_recommend_request(text) or looks_like_new_product_search(text):
         return IntentKind.PRODUCT_SEARCH
 
+    if re.search(r"商品(?:ID|id)?[：:\s]*[A-Za-z0-9_-]{3,32}", text) and any(
+        marker in text for marker in ("详情", "参数", "介绍", "查")
+    ):
+        return IntentKind.PRODUCT_CONSULT
+
     consult_name = (consult_card or {}).get("productName") or (consult_card or {}).get(
         "product_name"
     )
@@ -745,7 +1040,17 @@ def classify_intent_by_rules(
             return IntentKind(session_intent)
         except ValueError:
             return None
-    if lower in {"你好", "您好", "hello", "hi", "在吗", "谢谢"}:
+    if lower in {
+        "你好",
+        "您好",
+        "hello",
+        "hi",
+        "在吗",
+        "谢谢",
+        "谢谢你",
+        "感谢",
+        "多谢",
+    }:
         return IntentKind.CHAT
     return None
 
@@ -838,12 +1143,19 @@ def extract_entities(user_text: str, data: str = "") -> dict[str, str]:
         entities["orderItemId"] = order_item_id
     if order_id:
         entities["orderId"] = order_id
-    amount = re.search(r"(?:¥|￥)?\s*(\d+(?:\.\d{1,2})?)\s*元", text)
+    amount = re.search(
+        r"(?:[¥￥]\s*(\d+(?:\.\d{1,2})?)\s*(?:元|块)?|"
+        r"(\d+(?:\.\d{1,2})?)\s*(?:元|块))",
+        text,
+    )
     if amount:
-        entities["amount"] = amount.group(1)
+        entities["amount"] = amount.group(1) or amount.group(2)
     product_id = re.search(r"(?:商品(?:ID|id)?)[：:\s]*([A-Za-z0-9_-]{3,32})", text)
     if product_id:
         entities["productId"] = product_id.group(1)
+    product_name = _extract_product_name(text)
+    if product_name:
+        entities["productName"] = product_name
     return entities
 
 
@@ -1238,7 +1550,14 @@ def _build_decision(
     after_sales_workflow: bool = False,
 ) -> IntentDecision:
     sentiment = analyze_sentiment(user_text)
-    risk = RiskLevel.HIGH if _funds_at_risk(user_text) else RiskLevel.LOW
+    risk = (
+        RiskLevel.HIGH
+        if _funds_at_risk(user_text)
+        or _is_privacy_request(user_text)
+        or _is_account_security_request(user_text)
+        or (intent == IntentKind.COMPLAINT and sentiment == SentimentKind.VERY_NEGATIVE)
+        else RiskLevel.LOW
+    )
     if risk == RiskLevel.LOW and intent in {
         IntentKind.PAYMENT_ISSUE,
         IntentKind.COMPLAINT,
@@ -1342,8 +1661,8 @@ def _apply_handoff_policy(
     unresolved_count: int,
     recent_intents: list[str] | None = None,
 ) -> IntentDecision:
-    explicit_human = decision.intent == IntentKind.HUMAN_REQUEST or any(
-        hint in user_text for hint in _HUMAN_HINTS
+    explicit_human = decision.intent == IntentKind.HUMAN_REQUEST or _has_explicit_human_request(
+        user_text
     )
     threshold = get_settings().intent_handoff_confidence
     current_unresolved = (
@@ -1405,6 +1724,24 @@ def _apply_handoff_policy(
         looks_like_ack_or_greeting,
         looks_like_intent_continuation,
     )
+
+    # A greeting or an explicit payment-method question is a known harmless
+    # CHAT turn. The default classifier confidence is intentionally low, but a
+    # first such turn must not immediately suggest a human handoff. Repeated
+    # unresolved turns still follow the existing escalation contract.
+    safe_chat = decision.intent == IntentKind.CHAT and (
+        looks_like_ack_or_greeting(user_text)
+        or any(marker in user_text for marker in _PAYMENT_INFORMATION_HINTS)
+    )
+    if (
+        safe_chat
+        and unresolved_count == 0
+        and decision.next_action
+        in {NextAction.ASK_CLARIFICATION, NextAction.HANDOFF_SUGGESTED}
+    ):
+        return decision.model_copy(
+            update={"next_action": NextAction.ANSWER, "handoff_reason": None}
+        )
 
     # recent_intents 只包含已经落库的历史轮次，不包含当前 decision。因此
     # “当前轮 + 最近两轮”才是连续 3 轮；要求三条历史会拖到第 4 轮才触发。

@@ -198,6 +198,81 @@ def _validate_lock(
     return rows
 
 
+def _validate_customer_service_gold(
+    root: Path,
+    descriptor: Any,
+    errors: list[str],
+) -> None:
+    """Cross-check the independent客服 quality dataset and generated report."""
+
+    label = "evaluation.customerServiceGold"
+    if not isinstance(descriptor, dict):
+        errors.append(f"{label} must be an object")
+        return
+    dataset_relative = str(descriptor.get("datasetPath") or "")
+    report_relative = str(descriptor.get("reportPath") or "")
+    try:
+        dataset_path = _resolve(root, dataset_relative)
+        report_path = _resolve(root, report_relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not dataset_path.is_file():
+        errors.append(f"{label} dataset is missing: {dataset_relative}")
+        return
+    if not report_path.is_file():
+        errors.append(f"{label} report is missing: {report_relative}")
+        return
+    expected_dataset_sha = str(descriptor.get("datasetSha256") or "")
+    actual_dataset_sha = _sha256(dataset_path)
+    if not HEX64.fullmatch(expected_dataset_sha) or expected_dataset_sha != actual_dataset_sha:
+        errors.append(f"{label} dataset hash mismatch: {dataset_relative}")
+    expected_report_sha = str(descriptor.get("reportSha256") or "")
+    actual_report_sha = _sha256(report_path)
+    if not HEX64.fullmatch(expected_report_sha) or expected_report_sha != actual_report_sha:
+        errors.append(f"{label} report hash mismatch: {report_relative}")
+    try:
+        rows = _jsonl(dataset_path)
+        report = _json(report_path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(f"{label} payload is invalid: {exc}")
+        return
+    case_count = descriptor.get("caseCount")
+    if case_count != len(rows):
+        errors.append(f"{label} caseCount differs from dataset: {case_count!r} != {len(rows)}")
+    ids = [str(row.get("id") or "") for row in rows]
+    if not ids or "" in ids or len(ids) != len(set(ids)):
+        errors.append(f"{label} dataset IDs are empty or duplicated")
+    if any(row.get("schemaVersion") != "aishop-customer-service-gold/v1" for row in rows):
+        errors.append(f"{label} dataset contains an unsupported schema")
+    if report.get("schemaVersion") != "aishop-customer-service-evidence/v1":
+        errors.append(f"{label} report schema is invalid")
+    review_plan = report.get("humanReviewPlan")
+    if not isinstance(review_plan, dict):
+        errors.append(f"{label} humanReviewPlan is missing")
+    elif descriptor.get("status") == "PROVISIONAL_NOT_HUMAN_GOLD":
+        if review_plan.get("status") != "PENDING_INDEPENDENT_REVIEW":
+            errors.append(f"{label} provisional report must keep human review pending")
+        if review_plan.get("requiredAnnotators") != 2:
+            errors.append(f"{label} provisional report must require two annotators")
+        if review_plan.get("blindedFirstPass") is not True:
+            errors.append(f"{label} provisional report must require a blinded first pass")
+    report_dataset = report.get("dataset") or {}
+    if report_dataset.get("caseCount") != len(rows):
+        errors.append(f"{label} report dataset caseCount is stale")
+    if report_dataset.get("sha256") != actual_dataset_sha:
+        errors.append(f"{label} report dataset hash is stale")
+    if report.get("status") != descriptor.get("status"):
+        errors.append(f"{label} status differs from project manifest")
+    if report.get("releaseGateEligible") is not False or descriptor.get("releaseGateEligible") is not False:
+        errors.append(f"{label} draft gold must remain releaseGateEligible=false")
+    known_ids = set(ids)
+    for badcase in report.get("badcases") or []:
+        if not isinstance(badcase, dict) or str(badcase.get("caseId") or "") not in known_ids:
+            errors.append(f"{label} contains a badcase ID absent from dataset")
+            break
+
+
 def _parse_sums(root: Path, errors: list[str]) -> dict[str, str]:
     sums_path = root / "SHA256SUMS"
     if not sums_path.is_file():
@@ -827,6 +902,11 @@ def validate_repository(
                 locked_dataset_hashes[split] = _canonical_sha256(
                     sorted(rows, key=lambda row: str(row.get("id") or ""))
                 )
+    _validate_customer_service_gold(
+        root,
+        evaluation.get("customerServiceGold"),
+        errors,
+    )
     ids = [str(row.get("id") or "") for row in all_rows]
     inputs = [
         _canonical_sha256({"domain": row.get("domain"), "input": row.get("input")})

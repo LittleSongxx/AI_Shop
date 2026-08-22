@@ -7,18 +7,18 @@ import json
 from pathlib import Path
 from typing import Any
 
-from check_evidence_manifest import DEFAULT_MANIFEST, REPO_ROOT, validate_manifest
+from check_evidence_manifest import DEFAULT_MANIFEST, REPO_ROOT, validate_repository
 
 
 def _load_object(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{path} must contain a JSON object")
+        raise TypeError(f"{path} must contain a JSON object")
     return payload
 
 
 def validate_documentation(payload: dict[str, Any]) -> list[str]:
-    errors = validate_manifest(payload, check_local_results=False)
+    errors = validate_repository(DEFAULT_MANIFEST, require_current=False)
     expectations = payload.get("documentationConsistency")
     if not isinstance(expectations, list) or not expectations:
         return [*errors, "documentationConsistency must be a non-empty array"]

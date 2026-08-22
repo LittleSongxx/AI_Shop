@@ -128,6 +128,102 @@ def test_rule_chat_returns_none_without_keywords():
     assert classify_intent_by_rules("你好呀") is None
 
 
+@pytest.mark.asyncio
+async def test_text_only_product_spec_question_uses_consult_route():
+    decision = await resolve_intent(
+        "u1", "这款耳机支持蓝牙 5.4 吗", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.PRODUCT_CONSULT
+    assert decision.entities["productName"] == "耳机"
+
+
+@pytest.mark.asyncio
+async def test_privacy_request_is_high_risk_immediate_handoff():
+    decision = await resolve_intent(
+        "u1", "你们能读取我的邮箱历史吗", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.HUMAN_REQUEST
+    assert decision.risk_level == RiskLevel.HIGH
+    assert decision.next_action == NextAction.HANDOFF
+
+
+@pytest.mark.asyncio
+async def test_generic_refund_policy_keeps_refund_taxonomy():
+    decision = await resolve_intent(
+        "u1", "退款政策一般多久到账", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.REFUND_STATUS
+    assert decision.request_mode == RequestMode.INFORMATIONAL
+
+
+@pytest.mark.asyncio
+async def test_short_damage_statement_is_after_sales_intent():
+    decision = await resolve_intent(
+        "u1", "收到商品是坏的", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.DAMAGED_OR_WRONG_ITEM
+
+
+@pytest.mark.asyncio
+async def test_unresolved_support_statement_is_complaint_and_handoff():
+    decision = await resolve_intent(
+        "u1",
+        "这个问题一直没解决，还是不行，帮我处理",
+        allow_llm=False,
+        record_metrics=False,
+    )
+    assert decision.intent == IntentKind.COMPLAINT
+    assert decision.next_action == NextAction.HANDOFF
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("text", "intent", "risk", "next_action"),
+    [
+        ("付款成功但订单没生成", IntentKind.PAYMENT_ISSUE, RiskLevel.HIGH, NextAction.HANDOFF),
+        ("银行卡被扣了两次", IntentKind.PAYMENT_ISSUE, RiskLevel.HIGH, NextAction.HANDOFF),
+        ("支付失败但没有扣款，怎么办", IntentKind.PAYMENT_ISSUE, RiskLevel.MEDIUM, NextAction.ANSWER),
+        ("删除我的个人资料", IntentKind.HUMAN_REQUEST, RiskLevel.HIGH, NextAction.HANDOFF),
+        ("我已经问了三次还没解决", IntentKind.COMPLAINT, RiskLevel.MEDIUM, NextAction.HANDOFF),
+        ("收到的是错的颜色", IntentKind.DAMAGED_OR_WRONG_ITEM, RiskLevel.MEDIUM, NextAction.ANSWER),
+        ("退款多久到账呀", IntentKind.CHAT, RiskLevel.LOW, NextAction.ANSWER),
+        ("谢谢你", IntentKind.CHAT, RiskLevel.LOW, NextAction.ANSWER),
+        ("账号被盗了怎么办", IntentKind.HUMAN_REQUEST, RiskLevel.HIGH, NextAction.HANDOFF),
+        ("我想投诉但先别转人工", IntentKind.COMPLAINT, RiskLevel.MEDIUM, NextAction.ANSWER),
+        ("我的退款还没到账但客服说已完成", IntentKind.REFUND_STATUS, RiskLevel.HIGH, NextAction.HANDOFF),
+    ],
+)
+async def test_customer_service_boundary_cases_are_safe(text, intent, risk, next_action):
+    decision = await resolve_intent("boundary", text, allow_llm=False, record_metrics=False)
+    assert decision.intent == intent
+    assert decision.risk_level == risk
+    assert decision.next_action == next_action
+
+
+@pytest.mark.asyncio
+async def test_product_search_constraints_beat_consult_and_keep_spans_bounded():
+    search = await resolve_intent(
+        "boundary", "有没有适合学生的平板，预算2000元", allow_llm=False, record_metrics=False
+    )
+    assert search.intent == IntentKind.PRODUCT_SEARCH
+    assert search.entities == {"amount": "2000", "productName": "平板"}
+
+    consult = await resolve_intent(
+        "boundary", "这款手机续航怎么样", allow_llm=False, record_metrics=False
+    )
+    assert consult.intent == IntentKind.PRODUCT_CONSULT
+    assert consult.entities["productName"] == "手机"
+
+
+@pytest.mark.asyncio
+async def test_negated_handoff_and_comparison_product_span_are_bounded():
+    decision = await resolve_intent(
+        "boundary", "这款手机和华为哪个好", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.PRODUCT_SEARCH
+    assert decision.entities["productName"] == "手机"
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -594,6 +690,17 @@ async def test_second_low_confidence_turn_does_not_force_handoff():
 
     assert decision.next_action == NextAction.HANDOFF_SUGGESTED
     assert decision.handoff_reason == "LOW_CONFIDENCE"
+
+
+@pytest.mark.asyncio
+async def test_first_payment_method_question_answers_without_handoff_suggestion():
+    decision = await resolve_intent(
+        "u1", "支付方式有哪些", allow_llm=False, unresolved_count=0
+    )
+
+    assert decision.intent == IntentKind.CHAT
+    assert decision.next_action == NextAction.ANSWER
+    assert decision.handoff_reason is None
 
 
 @pytest.mark.asyncio
