@@ -1,0 +1,12 @@
+{
+  "artifact": "CUSTOMER_SERVICE_REVIEW_AGREEMENT",
+  "createdAt": "2026-08-23T06:43:18.450Z",
+  "lifecycle": "PENDING_ADJUDICATION",
+  "releaseGateEligible": false,
+  "sourceDatasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+  "reviewerASealedSha256": "738ad33ac03c9dfdaee4801adca722073bd216678bf867258b81bdc73d630838",
+  "reviewerBSealedSha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c",
+  "adjudicationRequired": true,
+  "adjudicationComplete": false,
+  "note": "Two independent labels are preserved; 25 case-level conflicts require a lead reviewer."
+}

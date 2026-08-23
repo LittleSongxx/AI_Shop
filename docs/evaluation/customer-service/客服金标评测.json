@@ -2529,6 +2529,28 @@
       "slots"
     ],
     "freezeAfterAdjudication": true,
+    "agreementEvidence": {
+      "caseCount": 60,
+      "exactAgreementCaseCount": 35,
+      "disagreementCaseCount": 25,
+      "caseAgreementRate": 0.583333,
+      "fieldAgreementRates": {
+        "intent": 0.95,
+        "riskLevel": 0.933333,
+        "shouldHandoff": 1.0,
+        "handoffSeverity": 0.933333,
+        "slots": 0.75
+      },
+      "cohenKappa": {
+        "intent": 0.945913,
+        "riskLevel": 0.889908,
+        "shouldHandoff": 1.0,
+        "handoffSeverity": 0.825581,
+        "slots": 0.662035
+      },
+      "status": "PENDING_ADJUDICATION",
+      "note": "Pre-adjudication label reliability evidence; not a model score and not a substitute for lead-reviewer adjudication."
+    },
     "metricsAfterFreeze": [
       "intentMacroF1",
       "highRiskIntentRecall",
@@ -2541,7 +2563,7 @@
     "status": "PENDING_INDEPENDENT_REVIEW"
   },
   "limitations": [
-    "Labels are not independently human reviewed; this is a provisional routing baseline, not human accuracy.",
+    "Two independent blind labels exist but are not yet adjudicated; this is a provisional routing baseline, not human accuracy.",
     "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
     "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion."
   ],

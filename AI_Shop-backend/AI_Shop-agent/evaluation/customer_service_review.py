@@ -32,6 +32,7 @@ from evaluation.customer_service_gold import HUMAN_STATUS, load_gold_dataset
 REVIEW_SCHEMA = "aishop-customer-service-review/v1"
 ADJUDICATION_SCHEMA = "aishop-customer-service-adjudication/v1"
 REVIEW_EVIDENCE_SCHEMA = "aishop-customer-service-review-evidence/v1"
+AGREEMENT_EVIDENCE_SCHEMA = "aishop-customer-service-review-agreement/v1"
 GUIDELINES_VERSION = "customer-service-gold-v1"
 
 _LABEL_FIELDS = ("intent", "riskLevel", "shouldHandoff", "handoffSeverity", "slots")
@@ -218,8 +219,6 @@ def _validate_common_row(row: Mapping[str, Any], *, label: str) -> None:
         "schemaVersion",
         "id",
         "input",
-        "sliceTags",
-        "difficulty",
         "reviewerId",
         "guidelinesVersion",
         "labels",
@@ -273,8 +272,6 @@ def export_review_sheet(
             "schemaVersion": REVIEW_SCHEMA,
             "id": str(row["id"]),
             "input": {"message": (row.get("input") or {}).get("message")},
-            "sliceTags": list(row.get("sliceTags") or []),
-            "difficulty": row.get("difficulty"),
             "reviewerId": reviewer,
             "guidelinesVersion": GUIDELINES_VERSION,
             "labels": _blank_labels(),
@@ -385,10 +382,6 @@ def _load_review_sheet(
             raise CustomerServiceReviewError(f"{label}: reviewerId differs from manifest")
         if row["input"].get("message") != (source_by_id[case_id].get("input") or {}).get("message"):
             raise CustomerServiceReviewError(f"{label}: input message differs from source dataset")
-        if list(row.get("sliceTags") or []) != list(source_by_id[case_id].get("sliceTags") or []):
-            raise CustomerServiceReviewError(f"{label}: sliceTags differ from source dataset")
-        if row.get("difficulty") != source_by_id[case_id].get("difficulty"):
-            raise CustomerServiceReviewError(f"{label}: difficulty differs from source dataset")
         labels = _validate_labels(
             row["labels"],
             label=f"{label}.labels",
@@ -410,10 +403,22 @@ def validate_review_sheet(
 ) -> dict[str, Any]:
     """Validate a sheet and return its immutable manifest."""
 
+    # An OPEN sheet is expected to change while a reviewer fills labels.  The
+    # source hash, row identity, taxonomy and blinded shape remain enforced;
+    # the content hash is refreshed only when seal creates the immutable
+    # artifact. SEALED sheets keep strict hash verification.
+    lifecycle = None
+    manifest_path = _sidecar_path(sheet_path)
+    if manifest_path.is_file():
+        try:
+            lifecycle = str(load_json(manifest_path).get("lifecycle") or "")
+        except (OSError, ValueError, json.JSONDecodeError):
+            lifecycle = None
     manifest, _ = _load_review_sheet(
         dataset_path,
         sheet_path,
         require_complete=require_complete,
+        check_sheet_hash=lifecycle != "OPEN",
     )
     return manifest
 
@@ -500,6 +505,212 @@ def _load_adjudications(
 
 def _field_disagreements(left: Mapping[str, Any], right: Mapping[str, Any]) -> list[str]:
     return [field for field in _LABEL_FIELDS if _canonical(left.get(field)) != _canonical(right.get(field))]
+
+
+def _categorical_agreement(
+    left_values: Sequence[Any],
+    right_values: Sequence[Any],
+) -> dict[str, Any]:
+    """Return observed agreement and Cohen's kappa for one label field.
+
+    ``None`` is a real category here (for example, no handoff severity), so
+    it is represented explicitly instead of being dropped from the denominator.
+    Kappa is reported as ``None`` when the expected agreement is one and the
+    statistic is mathematically undefined.
+    """
+
+    if len(left_values) != len(right_values) or not left_values:
+        raise CustomerServiceReviewError("categorical agreement requires equal non-empty inputs")
+    left = [_canonical(value) for value in left_values]
+    right = [_canonical(value) for value in right_values]
+    count = len(left)
+    observed_count = sum(a == b for a, b in zip(left, right))
+    left_counts = Counter(left)
+    right_counts = Counter(right)
+    expected = sum(
+        left_counts[label] * right_counts[label] for label in set(left_counts) | set(right_counts)
+    ) / (count * count)
+    observed = observed_count / count
+    kappa = None if expected >= 1.0 else (observed - expected) / (1.0 - expected)
+    return {
+        "agreementCount": observed_count,
+        "caseCount": count,
+        "agreementRate": observed,
+        "expectedAgreement": expected,
+        "cohenKappa": kappa,
+    }
+
+
+def compare_human_reviews(
+    dataset_path: Path,
+    review_a_path: Path,
+    review_b_path: Path,
+) -> dict[str, Any]:
+    """Compare two complete sealed sheets without creating a gold dataset.
+
+    This is intentionally a separate, pre-adjudication artifact.  It keeps
+    the original labels and source messages for conflict review, but never
+    exposes the draft ``expected`` labels and never treats either reviewer as
+    truth.
+    """
+
+    dataset_rows, dataset_sha, _ = _dataset_context(dataset_path)
+    manifest_a, sheet_a = _load_review_sheet(dataset_path, review_a_path, require_complete=True)
+    manifest_b, sheet_b = _load_review_sheet(dataset_path, review_b_path, require_complete=True)
+    if manifest_a.get("lifecycle") != "SEALED" or manifest_b.get("lifecycle") != "SEALED":
+        raise CustomerServiceReviewError("agreement comparison accepts only SEALED review sheets")
+    reviewer_a = str(manifest_a["reviewerId"])
+    reviewer_b = str(manifest_b["reviewerId"])
+    if reviewer_a == reviewer_b:
+        raise CustomerServiceReviewError("reviewers must be independent and have different IDs")
+
+    field_agreement = Counter()
+    slot_key_agreement = 0
+    common_slot_count = 0
+    common_slot_value_agreement = 0
+    disagreement_cases: list[dict[str, Any]] = []
+    field_values_a: dict[str, list[Any]] = {field: [] for field in _LABEL_FIELDS}
+    field_values_b: dict[str, list[Any]] = {field: [] for field in _LABEL_FIELDS}
+    for source in dataset_rows:
+        case_id = str(source["id"])
+        left = sheet_a[case_id]["labels"]
+        right = sheet_b[case_id]["labels"]
+        for field in _LABEL_FIELDS:
+            field_values_a[field].append(left[field])
+            field_values_b[field].append(right[field])
+            if _canonical(left[field]) == _canonical(right[field]):
+                field_agreement[field] += 1
+        left_slots = left["slots"]
+        right_slots = right["slots"]
+        if set(left_slots) == set(right_slots):
+            slot_key_agreement += 1
+        common_keys = set(left_slots) & set(right_slots)
+        common_slot_count += len(common_keys)
+        common_slot_value_agreement += sum(
+            _canonical(left_slots[key]) == _canonical(right_slots[key]) for key in common_keys
+        )
+        fields = _field_disagreements(left, right)
+        if fields:
+            disagreement_cases.append(
+                {
+                    "caseId": case_id,
+                    "message": (source.get("input") or {}).get("message"),
+                    "fields": fields,
+                    "reviewerA": copy.deepcopy(left),
+                    "reviewerB": copy.deepcopy(right),
+                    "comments": {
+                        "reviewerA": sheet_a[case_id]["row"].get("comment") or "",
+                        "reviewerB": sheet_b[case_id]["row"].get("comment") or "",
+                    },
+                }
+            )
+
+    field_stats = {
+        field: _categorical_agreement(field_values_a[field], field_values_b[field])
+        for field in _LABEL_FIELDS
+    }
+    case_count = len(dataset_rows)
+    exact_case_count = case_count - len(disagreement_cases)
+    return {
+        "schemaVersion": AGREEMENT_EVIDENCE_SCHEMA,
+        "status": "PENDING_ADJUDICATION",
+        "releaseGateEligible": False,
+        "sourceDatasetPath": _path_label(dataset_path),
+        "sourceDatasetSha256": dataset_sha,
+        "reviewA": {
+            "path": _path_label(review_a_path),
+            "sha256": manifest_a["sheetSha256"],
+            "reviewerId": reviewer_a,
+        },
+        "reviewB": {
+            "path": _path_label(review_b_path),
+            "sha256": manifest_b["sheetSha256"],
+            "reviewerId": reviewer_b,
+        },
+        "caseCount": case_count,
+        "exactAgreementCaseCount": exact_case_count,
+        "disagreementCaseCount": len(disagreement_cases),
+        "caseAgreementRate": exact_case_count / case_count if case_count else None,
+        "fieldAgreement": dict(field_agreement),
+        "fieldStats": field_stats,
+        "slotStats": {
+            "keySetAgreementCount": slot_key_agreement,
+            "keySetAgreementRate": slot_key_agreement / case_count if case_count else None,
+            "commonSlotCount": common_slot_count,
+            "commonSlotValueAgreementCount": common_slot_value_agreement,
+            "commonSlotValueAgreementRate": (
+                common_slot_value_agreement / common_slot_count if common_slot_count else None
+            ),
+            "note": (
+                "Raw slot-key agreement is reported separately because the current draft "
+                "guideline does not yet freeze an operational slot taxonomy."
+            ),
+        },
+        "disagreements": disagreement_cases,
+        "createdAt": utc_now(),
+        "note": (
+            "Pre-adjudication inter-annotator evidence only. It is not a model score, "
+            "not an accuracy estimate, and must not replace independent adjudication."
+        ),
+    }
+
+
+def render_agreement_markdown(evidence: Mapping[str, Any]) -> str:
+    """Render a concise, blind-safe human-review agreement report."""
+
+    def cell(value: Any) -> str:
+        return str(value or "").replace("|", "\\|").replace("\n", " ").strip()
+
+    lines = [
+        "# 客服双人工一致性证据",
+        "",
+        f"> 状态：`{cell(evidence.get('status'))}`；此报告只描述标注可靠性，不是模型准确率，也不进入 release gate。",
+        "",
+        f"数据集 SHA-256：`{cell(evidence.get('sourceDatasetSha256'))}`；案件数：`{evidence.get('caseCount', 0)}`；",
+        f"案件级完全一致：`{evidence.get('exactAgreementCaseCount', 0)}/{evidence.get('caseCount', 0)}`；",
+        f"案件级一致率：`{evidence.get('caseAgreementRate')}`。",
+        "",
+        "## 字段一致性",
+        "",
+        "| 字段 | 一致数 | 一致率 | Cohen κ |",
+        "|---|---:|---:|---:|",
+    ]
+    for field in _LABEL_FIELDS:
+        stats = (evidence.get("fieldStats") or {}).get(field) or {}
+        lines.append(
+            f"| `{field}` | {stats.get('agreementCount', 0)}/{stats.get('caseCount', 0)} | "
+            f"{stats.get('agreementRate')} | {stats.get('cohenKappa')} |"
+        )
+    slot_stats = evidence.get("slotStats") or {}
+    lines.extend(
+        [
+            "",
+            "## 槽位诊断",
+            "",
+            f"- key-set 一致：`{slot_stats.get('keySetAgreementCount', 0)}/{evidence.get('caseCount', 0)}`（{slot_stats.get('keySetAgreementRate')}）。",
+            f"- 两位标注者共同填写的槽位值一致：`{slot_stats.get('commonSlotValueAgreementCount', 0)}/{slot_stats.get('commonSlotCount', 0)}`（{slot_stats.get('commonSlotValueAgreementRate')}）。",
+            "- 当前 raw slot 一致率受 `budget/amount`、`brand/productName` 等未冻结的槽位 taxonomy 影响；仲裁前不能直接作为模型 Slot F1。",
+            "",
+            "## 冲突 Badcase",
+            "",
+            "| Case | 冲突字段 | 用户原话 |",
+            "|---|---|---|",
+        ]
+    )
+    for item in evidence.get("disagreements") or []:
+        lines.append(
+            f"| `{cell(item.get('caseId'))}` | `{cell(', '.join(item.get('fields') or []))}` | {cell(item.get('message'))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 下一步",
+            "",
+            "1. 先冻结 core slot taxonomy（建议先覆盖生产已支持的 `orderId`、`amount`、`productName`、`orderItemId`、`productId`）。",
+            "2. 由 lead reviewer 只仲裁冲突 case，并在 adjudication JSONL 写明理由；未完成前禁止生成 `HUMAN_VERIFIED` 数据集。",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 def merge_human_reviews(

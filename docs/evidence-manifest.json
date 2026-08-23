@@ -22,11 +22,20 @@
       "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
       "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
       "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
-      "reportSha256": "a81ab063995b73c0a51b117fc6b651038ad3f1d6c4167a5146d70801228498cc",
+      "reportSha256": "0715b6c75fa09dceecbe07d062e6f21eef4d5f821ecda5b5eaa855c4abc1a9fc",
       "caseCount": 60,
       "status": "PROVISIONAL_NOT_HUMAN_GOLD",
       "releaseGateEligible": false,
-      "annotationPolicy": "INDEPENDENT_HUMAN_REVIEW_REQUIRED_BEFORE_ACCURACY_CLAIM"
+      "annotationPolicy": "INDEPENDENT_HUMAN_REVIEW_REQUIRED_BEFORE_ACCURACY_CLAIM",
+      "reviewEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-review-v1-pending-adjudication",
+        "lifecycle": "PENDING_ADJUDICATION",
+        "sha256SumsSha256": "1b16e52d67d995c4c28d78eb702ad99477fad0bcb71e6f4233d08760df2a7480",
+        "exactAgreementCaseCount": 35,
+        "disagreementCaseCount": 25,
+        "caseAgreementRate": 0.5833333333333334,
+        "releaseGateEligible": false
+      }
     },
     "currentEvidence": {
       "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",

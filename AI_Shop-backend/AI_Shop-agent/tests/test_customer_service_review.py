@@ -8,8 +8,10 @@ from evaluation.customer_service_gold import HUMAN_STATUS, load_gold_dataset
 from evaluation.customer_service_review import (
     ADJUDICATION_SCHEMA,
     CustomerServiceReviewError,
+    compare_human_reviews,
     export_review_sheet,
     merge_human_reviews,
+    render_agreement_markdown,
     seal_review_sheet,
     validate_review_sheet,
 )
@@ -75,6 +77,9 @@ def test_export_is_blinded_and_validate_does_not_leak_expected(tmp_path: Path):
         "slots",
     ]
     assert all("expected" not in row and "predicted" not in row for row in rows)
+    # Derived metadata such as slice tags can reveal the draft label and must
+    # not be shown to either independent reviewer.
+    assert all("sliceTags" not in row and "difficulty" not in row for row in rows)
     assert all(all(value is None for value in row["labels"].values()) for row in rows)
     assert validate_review_sheet(DATASET, sheet)["reviewerId"] == "annotator-a"
     with pytest.raises(CustomerServiceReviewError, match="labels are incomplete"):
@@ -101,6 +106,46 @@ def test_seal_refreshes_hash_and_merge_produces_human_verified_dataset(tmp_path:
     assert report["exactAgreementCaseCount"] == 60
     assert report["disagreementCaseCount"] == 0
     assert report["releaseGateEligible"] is False
+
+
+def test_open_sheet_can_be_validated_after_label_edits(tmp_path: Path):
+    sheet = tmp_path / "review-edited.open.jsonl"
+    export_review_sheet(DATASET, sheet, reviewer_id="annotator-a")
+    _fill_open_sheet(sheet, "annotator-a")
+    manifest = validate_review_sheet(DATASET, sheet, require_complete=True)
+    assert manifest["lifecycle"] == "OPEN"
+
+
+def test_compare_reports_pre_adjudication_agreement_and_conflict_badcases(tmp_path: Path):
+    sealed_a, _ = _export_pair(tmp_path)
+
+    def mutate(row):
+        if row["id"] == "cs-gold-v1-041":
+            row["labels"]["intent"] = "PRODUCT_SEARCH"
+
+    open_b = tmp_path / "review-b-conflict.open.jsonl"
+    export_review_sheet(DATASET, open_b, reviewer_id="annotator-c", seed=31)
+    _fill_open_sheet(open_b, "annotator-c", mutate=mutate)
+    sealed_b = tmp_path / "review-b-conflict.sealed.jsonl"
+    seal_review_sheet(DATASET, open_b, sealed_b)
+
+    report = compare_human_reviews(DATASET, sealed_a, sealed_b)
+
+    assert report["status"] == "PENDING_ADJUDICATION"
+    assert report["releaseGateEligible"] is False
+    assert report["caseCount"] == 60
+    assert report["exactAgreementCaseCount"] == 59
+    assert report["disagreementCaseCount"] == 1
+    assert report["fieldStats"]["intent"]["agreementCount"] == 59
+    assert report["fieldStats"]["intent"]["cohenKappa"] < 1
+    conflict = report["disagreements"][0]
+    assert conflict["caseId"] == "cs-gold-v1-041"
+    rendered = json.dumps(report, ensure_ascii=False)
+    assert '"expected":' not in rendered
+    assert '"predicted":' not in rendered
+    markdown = render_agreement_markdown(report)
+    assert "cs-gold-v1-041" in markdown
+    assert "模型准确率" in markdown
 
 
 def test_merge_requires_adjudication_for_disagreement(tmp_path: Path):
@@ -193,14 +238,14 @@ def test_nested_model_field_leak_is_rejected(tmp_path: Path):
         seal_review_sheet(DATASET, sheet, tmp_path / "leaky-nested.sealed.jsonl")
 
 
-def test_context_slice_cannot_be_edited_after_export(tmp_path: Path):
-    sheet = tmp_path / "slice-tamper.open.jsonl"
+def test_blinded_sheet_rejects_derived_context_leak(tmp_path: Path):
+    sheet = tmp_path / "derived-context.open.jsonl"
     export_review_sheet(DATASET, sheet, reviewer_id="annotator-a")
     rows = load_jsonl(sheet)
-    rows[0]["sliceTags"] = ["invented-slice"]
+    rows[0]["sliceTags"] = ["critical-handoff"]
     atomic_write_jsonl(sheet, rows)
-    with pytest.raises(CustomerServiceReviewError, match="sliceTags differ"):
-        seal_review_sheet(DATASET, sheet, tmp_path / "slice-tamper.sealed.jsonl")
+    with pytest.raises(CustomerServiceReviewError, match="unknown review fields"):
+        seal_review_sheet(DATASET, sheet, tmp_path / "derived-context.sealed.jsonl")
 
 
 def test_adjudication_cannot_override_agreement(tmp_path: Path):

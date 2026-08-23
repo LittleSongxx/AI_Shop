@@ -1,0 +1,61 @@
+{
+  "artifact": "SEALED_REVIEW_SHEET",
+  "caseCount": 60,
+  "containsExpectedOrPredicted": false,
+  "createdAt": "2026-08-23T06:29:26.037Z",
+  "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+  "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+  "guidelinesVersion": "customer-service-gold-v1",
+  "labelSchema": {
+    "conditionalFields": {
+      "handoffSeverity": "required when shouldHandoff=true; empty otherwise"
+    },
+    "handoffSeverityValues": [
+      "CRITICAL",
+      "NORMAL"
+    ],
+    "intentValues": [
+      "ADDRESS_CHANGE",
+      "AFTERSALES_UNKNOWN",
+      "CANCEL_ORDER",
+      "CHAT",
+      "COMPLAINT",
+      "CONFIRM_RECEIPT",
+      "DAMAGED_OR_WRONG_ITEM",
+      "HUMAN_REQUEST",
+      "INVOICE",
+      "PAYMENT_ISSUE",
+      "PRODUCT_CONSULT",
+      "PRODUCT_REVIEW",
+      "PRODUCT_SEARCH",
+      "QUERY_COUPON",
+      "QUERY_FULFILLMENT",
+      "QUERY_LOGISTICS",
+      "QUERY_ORDER",
+      "RECOMMENT",
+      "REFUND",
+      "REFUND_STATUS"
+    ],
+    "requiredFields": [
+      "intent",
+      "riskLevel",
+      "shouldHandoff",
+      "slots"
+    ],
+    "riskLevelValues": [
+      "HIGH",
+      "LOW",
+      "MEDIUM"
+    ]
+  },
+  "lifecycle": "SEALED",
+  "openSheetSha256AtExport": "e78deca846fbec71779f7c17c29d34ef20065c98de6a9e486a7b9cd4b1cbc6e4",
+  "orderSeed": 12569205730833339314,
+  "reviewerId": "reviewer-b",
+  "schemaVersion": "aishop-customer-service-review/v1",
+  "sealedAt": "2026-08-23T06:29:53.449Z",
+  "sheetPath": "/tmp/aishop-customer-service-review-20260823/submitted/reviewer-b.sealed.jsonl",
+  "sheetSha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c",
+  "sourceOpenSheetPath": "/tmp/aishop-customer-service-review-20260823/submitted/reviewer-b.open.jsonl",
+  "sourceOpenSheetSha256": "11bcbbf62955742d315e18430549ad8f2e26ee38d128a315740d6ef8978b130e"
+}

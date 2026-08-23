@@ -1,0 +1,808 @@
+{
+  "caseAgreementRate": 0.5833333333333334,
+  "caseCount": 60,
+  "createdAt": "2026-08-23T06:43:18.450Z",
+  "disagreementCaseCount": 25,
+  "disagreements": [
+    {
+      "caseId": "cs-gold-v1-001",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "我想买索尼 WH-1000XM6，预算 2000 元",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "brand": "索尼",
+          "budget": "2000元",
+          "productName": "WH-1000XM6"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "2000 元",
+          "productName": "索尼 WH-1000XM6"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-002",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "我想买华为手机，预算 3000 元",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "brand": "华为",
+          "budget": "3000元",
+          "productCategory": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000 元",
+          "productName": "华为手机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-003",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这款耳机支持蓝牙 5.4 吗",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "bluetoothVersion": "5.4",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "bluetoothVersion": "5.4",
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-007",
+      "comments": {
+        "reviewerA": "“还没发货”询问的是发货/履约进度，主意图为 QUERY_FULFILLMENT；备选为 QUERY_LOGISTICS。",
+        "reviewerB": ""
+      },
+      "fields": [
+        "riskLevel"
+      ],
+      "message": "订单 SM202608050002 怎么还没发货",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-008",
+      "comments": {
+        "reviewerA": "核心诉求是物流停滞查询，主意图为 QUERY_LOGISTICS；备选为 COMPLAINT。",
+        "reviewerB": ""
+      },
+      "fields": [
+        "riskLevel"
+      ],
+      "message": "物流一直不动怎么办，订单 SM202608050002",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-014",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "riskLevel"
+      ],
+      "message": "订单 SM202608050002 我已经收到货了，帮我确认收货",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-025",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "handoffSeverity"
+      ],
+      "message": "支付失败了但是钱扣了",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-029",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "帮我找 500 元以内、不要户外款的男士外套",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "budget": "500元以内",
+          "excludedStyle": "户外款",
+          "productCategory": "男士外套"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "500 元",
+          "excludedProductType": "户外款",
+          "productName": "男士外套"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-030",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "我要退款，金额 88 元",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "88元"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "88 元"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-033",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这副耳机有没有主动降噪",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "主动降噪",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-034",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "推荐 1000 元以内的降噪耳机",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "budget": "1000元以内",
+          "feature": "降噪",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1000 元",
+          "productName": "降噪耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-037",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "handoffSeverity"
+      ],
+      "message": "订单 SM202608050002 重复支付了两次",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-039",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "收到的耳机碎了",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-041",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这款手机续航怎么样",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "续航",
+          "productCategory": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "手机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-042",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "有没有适合学生的平板，预算2000元",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "audience": "学生",
+          "budget": "2000元",
+          "productCategory": "平板"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "2000元",
+          "productName": "平板"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-043",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "不要苹果，推荐安卓手机",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productCategory": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "productName": "安卓手机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-044",
+      "comments": {
+        "reviewerA": "比较两款耳机属于商品属性/体验咨询，主意图为 PRODUCT_CONSULT；备选为 PRODUCT_SEARCH。",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这款耳机和另一款相比哪个好",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-045",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "耳机有主动降噪嘛",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "主动降噪",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-046",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "handoffSeverity"
+      ],
+      "message": "银行卡被扣了两次",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-047",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "handoffSeverity"
+      ],
+      "message": "付款成功但订单没生成",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-049",
+      "comments": {
+        "reviewerA": "这是支付方式咨询，枚举中没有独立的支付咨询意图，按 PAYMENT_ISSUE 归类；备选为 CHAT。",
+        "reviewerB": "支付方式咨询不属于 PAYMENT_ISSUE 定义，固定枚举中归为 CHAT。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "支付方式有哪些",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-055",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "少了一个配件，订单SM202608050002",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "missingItem": "一个配件",
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002",
+          "productName": "配件",
+          "quantity": "1"
+        }
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-056",
+      "comments": {
+        "reviewerA": "商品质量问题并明确要换货，按收货异常 DAMAGED_OR_WRONG_ITEM 归类；备选为 AFTERSALES_UNKNOWN。",
+        "reviewerB": "仅提到质量问题和换货，未明确破损、错发或少件，归为 AFTERSALES_UNKNOWN。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "商品质量有问题想换货",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-057",
+      "comments": {
+        "reviewerA": "未指向具体已发起退款，仅询问一般到账时间，主意图为 REFUND；备选为 REFUND_STATUS。",
+        "reviewerB": "未提供退款订单，但询问到账时间，按退款到账查询归为 REFUND_STATUS。"
+      },
+      "fields": [
+        "intent",
+        "riskLevel"
+      ],
+      "message": "退款多久到账呀",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-gold-v1-059",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": ""
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "手机壳有没有适配 iPhone 15",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "compatibleModel": "iPhone 15",
+          "productCategory": "手机壳"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "compatibleWith": "iPhone 15",
+          "productName": "手机壳"
+        }
+      }
+    }
+  ],
+  "exactAgreementCaseCount": 35,
+  "fieldAgreement": {
+    "handoffSeverity": 56,
+    "intent": 57,
+    "riskLevel": 56,
+    "shouldHandoff": 60,
+    "slots": 45
+  },
+  "fieldStats": {
+    "handoffSeverity": {
+      "agreementCount": 56,
+      "agreementRate": 0.9333333333333333,
+      "caseCount": 60,
+      "cohenKappa": 0.8255813953488372,
+      "expectedAgreement": 0.6177777777777778
+    },
+    "intent": {
+      "agreementCount": 57,
+      "agreementRate": 0.95,
+      "caseCount": 60,
+      "cohenKappa": 0.9459134615384615,
+      "expectedAgreement": 0.07555555555555556
+    },
+    "riskLevel": {
+      "agreementCount": 56,
+      "agreementRate": 0.9333333333333333,
+      "caseCount": 60,
+      "cohenKappa": 0.8899082568807339,
+      "expectedAgreement": 0.39444444444444443
+    },
+    "shouldHandoff": {
+      "agreementCount": 60,
+      "agreementRate": 1.0,
+      "caseCount": 60,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.6422222222222222
+    },
+    "slots": {
+      "agreementCount": 45,
+      "agreementRate": 0.75,
+      "caseCount": 60,
+      "cohenKappa": 0.6620352985354864,
+      "expectedAgreement": 0.2602777777777778
+    }
+  },
+  "note": "Pre-adjudication inter-annotator evidence only. It is not a model score, not an accuracy estimate, and must not replace independent adjudication.",
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "/tmp/aishop-customer-service-review-20260823/submitted/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "738ad33ac03c9dfdaee4801adca722073bd216678bf867258b81bdc73d630838"
+  },
+  "reviewB": {
+    "path": "/tmp/aishop-customer-service-review-20260823/submitted/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c"
+  },
+  "schemaVersion": "aishop-customer-service-review-agreement/v1",
+  "slotStats": {
+    "commonSlotCount": 26,
+    "commonSlotValueAgreementCount": 24,
+    "commonSlotValueAgreementRate": 0.9230769230769231,
+    "keySetAgreementCount": 46,
+    "keySetAgreementRate": 0.7666666666666667,
+    "note": "Raw slot-key agreement is reported separately because the current draft guideline does not yet freeze an operational slot taxonomy."
+  },
+  "sourceDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+  "sourceDatasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+  "status": "PENDING_ADJUDICATION"
+}

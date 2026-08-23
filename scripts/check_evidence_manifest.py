@@ -53,6 +53,18 @@ def _jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _contains_forbidden_key(value: Any, forbidden: set[str]) -> bool:
+    """Check nested evidence objects without matching harmless field names."""
+
+    if isinstance(value, dict):
+        if any(str(key) in forbidden for key in value):
+            return True
+        return any(_contains_forbidden_key(child, forbidden) for child in value.values())
+    if isinstance(value, list):
+        return any(_contains_forbidden_key(child, forbidden) for child in value)
+    return False
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -271,6 +283,106 @@ def _validate_customer_service_gold(
         if not isinstance(badcase, dict) or str(badcase.get("caseId") or "") not in known_ids:
             errors.append(f"{label} contains a badcase ID absent from dataset")
             break
+    review_evidence = descriptor.get("reviewEvidence")
+    if review_evidence is not None:
+        _validate_customer_service_review_evidence(
+            root,
+            review_evidence,
+            errors,
+            dataset_sha=actual_dataset_sha,
+            case_count=len(rows),
+        )
+
+
+def _validate_customer_service_review_evidence(
+    root: Path,
+    descriptor: Any,
+    errors: list[str],
+    *,
+    dataset_sha: str,
+    case_count: int,
+) -> None:
+    """Validate the pending two-person客服 review package and its hashes."""
+
+    label = "evaluation.customerServiceGold.reviewEvidence"
+    if not isinstance(descriptor, dict):
+        errors.append(f"{label} must be an object")
+        return
+    relative = str(descriptor.get("path") or "")
+    try:
+        package_root = _resolve(root, relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not package_root.is_dir():
+        errors.append(f"{label} directory is missing: {relative}")
+        return
+    sums = _parse_sums(package_root, errors)
+    sums_path = package_root / "SHA256SUMS"
+    expected_sums = str(descriptor.get("sha256SumsSha256") or "")
+    if not HEX64.fullmatch(expected_sums) or not sums_path.is_file() or _sha256(sums_path) != expected_sums:
+        errors.append(f"{label} SHA256SUMS digest differs from project manifest")
+    required = {
+        "adjudication-needed.md",
+        "adjudication.template.jsonl",
+        "agreement.json",
+        "agreement.md",
+        "evidence-manifest.json",
+        "lifecycle.json",
+        "reviewer-a.sealed.jsonl",
+        "reviewer-a.sealed.jsonl.manifest.json",
+        "reviewer-b.sealed.jsonl",
+        "reviewer-b.sealed.jsonl.manifest.json",
+    }
+    if not required.issubset(sums):
+        errors.append(f"{label} is missing files: {sorted(required - set(sums))}")
+        return
+    try:
+        package_manifest = _json(package_root / "evidence-manifest.json")
+        lifecycle = _json(package_root / "lifecycle.json")
+        agreement = _json(package_root / "agreement.json")
+        reviewer_manifests = [
+            _json(package_root / "reviewer-a.sealed.jsonl.manifest.json"),
+            _json(package_root / "reviewer-b.sealed.jsonl.manifest.json"),
+        ]
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(f"{label} JSON is invalid: {exc}")
+        return
+    if package_manifest.get("schemaVersion") != "aishop-customer-service-review-package/v1":
+        errors.append(f"{label} package schema is invalid")
+    if package_manifest.get("lifecycle") != "PENDING_ADJUDICATION":
+        errors.append(f"{label} package lifecycle is invalid")
+    inventory = {
+        name: {"bytes": (package_root / name).stat().st_size, "sha256": _sha256(package_root / name)}
+        for name in sums
+        if name != "evidence-manifest.json"
+    }
+    if package_manifest.get("files") != inventory:
+        errors.append(f"{label} file inventory is stale")
+    if lifecycle.get("lifecycle") != "PENDING_ADJUDICATION" or lifecycle.get("releaseGateEligible") is not False:
+        errors.append(f"{label} lifecycle evidence is invalid")
+    if lifecycle.get("sourceDatasetSha256") != dataset_sha:
+        errors.append(f"{label} source dataset hash differs")
+    if agreement.get("schemaVersion") != "aishop-customer-service-review-agreement/v1":
+        errors.append(f"{label} agreement schema is invalid")
+    if agreement.get("status") != "PENDING_ADJUDICATION" or agreement.get("releaseGateEligible") is not False:
+        errors.append(f"{label} agreement lifecycle is invalid")
+    if agreement.get("sourceDatasetSha256") != dataset_sha or agreement.get("caseCount") != case_count:
+        errors.append(f"{label} agreement source/count differs")
+    if agreement.get("disagreementCaseCount") != descriptor.get("disagreementCaseCount"):
+        errors.append(f"{label} disagreement count differs from project manifest")
+    if agreement.get("exactAgreementCaseCount") != descriptor.get("exactAgreementCaseCount"):
+        errors.append(f"{label} agreement count differs from project manifest")
+    if _contains_forbidden_key(agreement, {"expected", "predicted", "modelOutput", "modelPrediction"}):
+        errors.append(f"{label} leaks draft/model fields")
+    for suffix, manifest in zip(("a", "b"), reviewer_manifests):
+        sealed_name = f"reviewer-{suffix}.sealed.jsonl"
+        if manifest.get("lifecycle") != "SEALED" or manifest.get("artifact") != "SEALED_REVIEW_SHEET":
+            errors.append(f"{label} reviewer-{suffix} manifest is not sealed")
+        if manifest.get("datasetSha256") != dataset_sha:
+            errors.append(f"{label} reviewer-{suffix} source hash differs")
+        if manifest.get("sheetSha256") != _sha256(package_root / sealed_name):
+            errors.append(f"{label} reviewer-{suffix} sheet hash differs")
 
 
 def _parse_sums(root: Path, errors: list[str]) -> dict[str, str]:

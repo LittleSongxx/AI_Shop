@@ -59,7 +59,15 @@ from evaluation.core.fault_injection import (
     fault_evidence_level,
     load_fault_scenarios,
 )
-from evaluation.core.io import EVIDENCE_ROOT, RUNS_ROOT, load_json, load_jsonl, utc_now
+from evaluation.core.io import (
+    EVIDENCE_ROOT,
+    RUNS_ROOT,
+    atomic_write_json,
+    atomic_write_text,
+    load_json,
+    load_jsonl,
+    utc_now,
+)
 from evaluation.core.metrics import aggregate_domain
 from evaluation.core.fingerprints import environment_facts, source_fingerprint
 from evaluation.quality_scorecard import (
@@ -75,8 +83,10 @@ from evaluation.customer_service_gold import (
     run_customer_service_gold,
 )
 from evaluation.customer_service_review import (
+    compare_human_reviews,
     export_review_sheet,
     merge_human_reviews,
+    render_agreement_markdown,
     seal_review_sheet,
     validate_review_sheet,
 )
@@ -200,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
     review_validate.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
     review_validate.add_argument("--review", type=Path, required=True)
     review_validate.add_argument("--complete", action="store_true")
+    review_compare = review_commands.add_parser(
+        "compare",
+        help="compare two sealed sheets and write pre-adjudication agreement evidence",
+    )
+    review_compare.add_argument("--dataset", type=Path, default=DEFAULT_CUSTOMER_SERVICE_DATASET)
+    review_compare.add_argument("--review-a", type=Path, required=True)
+    review_compare.add_argument("--review-b", type=Path, required=True)
+    review_compare.add_argument("--output", type=Path, required=True)
+    review_compare.add_argument("--markdown-output", type=Path)
     review_seal = review_commands.add_parser(
         "seal", help="seal a completed open sheet into a new hashed artifact"
     )
@@ -875,6 +894,29 @@ async def _main(args: argparse.Namespace) -> int:
                 require_complete=args.complete,
             )
             _print({"valid": True, "manifest": manifest})
+            return 0
+        if args.review_command == "compare":
+            agreement = compare_human_reviews(args.dataset, args.review_a, args.review_b)
+            atomic_write_json(args.output, agreement, overwrite=False)
+            if args.markdown_output:
+                atomic_write_text(
+                    args.markdown_output,
+                    render_agreement_markdown(agreement),
+                    overwrite=False,
+                )
+            _print(
+                {
+                    "status": agreement["status"],
+                    "caseCount": agreement["caseCount"],
+                    "exactAgreementCaseCount": agreement["exactAgreementCaseCount"],
+                    "disagreementCaseCount": agreement["disagreementCaseCount"],
+                    "caseAgreementRate": agreement["caseAgreementRate"],
+                    "fieldStats": agreement["fieldStats"],
+                    "slotStats": agreement["slotStats"],
+                    "output": str(args.output),
+                    "markdownOutput": str(args.markdown_output) if args.markdown_output else None,
+                }
+            )
             return 0
         if args.review_command == "seal":
             manifest = seal_review_sheet(args.dataset, args.review, args.output)
