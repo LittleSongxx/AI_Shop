@@ -70,6 +70,22 @@
 - 客服 HTTP 本地 P50/P95/P99 为 `1014.1/15212.5/60141.6 ms`；token `114720/6649`，32 次 Provider call 中 31 次未定价、1 次缺 usage，因此 `costCny=null`。这些是本地诊断，不是生产 SLO。
 - 验收：新增专项与 manifest 联合回归 `41 passed`，Python 全量 `1279 passed/7 skipped`；随后在真实 MySQL 上补跑 migration `8 passed`，Java 26 模块 Maven reactor `BUILD SUCCESS`。
 
+## 关键踩坑、排错与效果
+
+下表只把同一数据、同一 observation 或同一候选规模的结果称为“前后对比”。不同 final 使用不同 dataset/source hash，只能作为排错生命周期，不能包装成严格 A/B。
+
+| 问题 | 排查结论与处理 | 前后效果 | 陈述边界 |
+|---|---|---|---|
+| 60 条 draft 自评全部 `1.0` | draft 标签来自构造过程，不能当人工真值；改为双人盲标、25 条仲裁并冻结 HUMAN_VERIFIED 包 | 人工结果为 Intent Macro-F1 `0.955299`、full-slot F1 `0.907652`、EM `0.558824` | 这是证据可信度修正，不是模型质量下降 |
+| Slot F1/CI 统计量不一致 | F1 统一为 `2TP/(2TP+FP+FN)`；bootstrap 每次按 `intent×risk×handoff` 抽完整 case 并重算统计量 | 点估计仍为 `0.907652`；展示由 `344/414` 改为 `688/758`，CI 由 `[0.884563,0.961881]` 修正为 `[0.888889,0.926454]` | 同一预测重算，不能称质量提升 |
+| HTTP 槽位跨脱敏边界评分 | Episode 已将订单号等值脱敏，无法与原始 gold 做 span 比较 | HTTP Slot F1/EM 从错误可评分假设改为 `UNAVAILABLE`；规则预路由 slot 指标单独保留 | `UNAVAILABLE` 比伪造 0/1 更可信 |
+| HTTP 引用结构出现 6 条告警 | 最终 envelope 未复制 `sourceRefs`，但 `RAG_RETRIEVAL` trace 保存了实际来源；从原 observation 离线重建 | citation contract invalid `6 -> 0`，Provider 未重跑 | 只修复引用链路提取，不等于答案语义正确 |
+| Search 难例可能被“修指标”掩盖 | 固定 v9 qrels/ranking，真实 Provider 对 10 条难例做 paired replay | Recall/MRR/NDCG delta 全为 `0`，约束违规 `0`；`23/34/47` 仍失败 | 结论是无回归，不是质量提升 |
+| 候选快照存在 N+1 风险 | 同一隔离 MySQL、同一 `100` 候选比较 batch/N+1，并校验结果等价与 rollback | offer P50 `89.805 -> 23.864 ms`，降低 `73.4%`；decision P50 `70.501 -> 2.405 ms`，降低 `96.6%`；round trip `100 -> 1` | 本地受控 benchmark，不是生产 SLO |
+| Provider usage/费用容易被记成零 | usage 缺失记 `MISSING_USAGE`，无可信价格记 `UNPRICED`，费用保持 `null` | 消除“未知成本=0”的错误结论 | 尚不能给出单请求成本门禁 |
+
+历史 final 的排错趋势保留在 immutable archive：v3 的 Search/RAG/Agent case pass 为 `42/50、36/50、16/25`，Agent `pass^8=0.60`、critical power `0.50`；v5 为 `50/50、47/50、25/25` 和 `0.92/0.833`；v8 为 `50/50、49/50、24/25` 和 `0.96/0.833`；v9 为 `50/50、50/50、25/25` 和 `1.0/1.0`。主要暴露过 Provider 不完整、RAG injection/no-answer、Episode 未终态、confirmation actionToken 缺失、state diff 和重复试验隔离问题。由于各版本 holdout/source hash 不同，这组数值只能说明 fail-closed 排错逐步收敛，不能用于声称同集质量提升。
+
 ## 方法成熟度判断
 
 | 能力 | 判断 | 依据与边界 |

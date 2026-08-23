@@ -1907,5 +1907,72 @@
       "normalQualityDenominatorExcluded": true
     }
   },
+  "optimizationHistory": {
+    "comparisonPolicy": "Only same-dataset, same-observation, or same-fixture comparisons are treated as before/after evidence. Historical final attempts used different dataset/source hashes and are diagnostic lifecycle evidence only.",
+    "comparableEvidence": [
+      {
+        "id": "customer-gold-human-correction",
+        "kind": "EVIDENCE_QUALITY_CORRECTION",
+        "before": {"status": "PROVISIONAL_DRAFT", "headlineMetrics": "all 1.0"},
+        "after": {"status": "HUMAN_VERIFIED", "intentMacroF1": 0.955299, "slotEntitySpanF1": 0.907652, "slotExactMatch": 0.558824},
+        "qualityGainClaimAllowed": false
+      },
+      {
+        "id": "slot-statistic-correction",
+        "kind": "SAME_PREDICTIONS_STATISTICAL_CORRECTION",
+        "before": {"displayedFraction": "344/414", "confidenceInterval95": [0.884563, 0.961881]},
+        "after": {"formula": "2TP/(2TP+FP+FN)", "displayedFraction": "688/758", "value": 0.907652, "confidenceInterval95": [0.888889, 0.926454]},
+        "qualityGainClaimAllowed": false
+      },
+      {
+        "id": "http-citation-linkage",
+        "kind": "SAME_OBSERVATIONS_DIAGNOSTIC_REBUILD",
+        "beforeInvalidCases": 6,
+        "afterInvalidCases": 0,
+        "providerCallsReexecuted": false,
+        "semanticAnswerQualityMeasured": false
+      },
+      {
+        "id": "search-hard-negative-paired-replay",
+        "kind": "PAIRED_SAME_QRELS",
+        "caseCount": 10,
+        "delta": {"recallAt10": 0.0, "recallAt10Micro": 0.0, "mrrAt10": 0.0, "ndcgAt10": 0.0},
+        "remainingBadcaseIds": ["search-fin-v9-23-snack-100", "search-fin-v9-34-snack-no-wangwang", "search-fin-v9-47-compare-xm"],
+        "qualityGainClaimAllowed": false
+      },
+      {
+        "id": "db-batch-vs-n-plus-one-100",
+        "kind": "CONTROLLED_SAME_DATABASE_AND_CANDIDATES",
+        "roundTrips": {"before": 100, "after": 1},
+        "offerSnapshotP50Ms": {"before": 89.805, "after": 23.864, "reductionPercent": 73.427},
+        "decisionFeatureP50Ms": {"before": 70.501, "after": 2.405, "reductionPercent": 96.589},
+        "notProductionSlo": true
+      }
+    ],
+    "finalLifecycleTrend": {
+      "strictBeforeAfter": false,
+      "reason": "Each final attempt has a distinct dataset/source hash.",
+      "checkpoints": [
+        {"version": "v3", "casePass": {"search": "42/50", "rag": "36/50", "agent": "16/25"}, "agentPassPower": 0.6, "criticalWorkflowPassPower": 0.5},
+        {"version": "v5", "casePass": {"search": "50/50", "rag": "47/50", "agent": "25/25"}, "agentPassPower": 0.92, "criticalWorkflowPassPower": 0.833333},
+        {"version": "v8", "casePass": {"search": "50/50", "rag": "49/50", "agent": "24/25"}, "agentPassPower": 0.96, "criticalWorkflowPassPower": 0.833333},
+        {"version": "v9", "casePass": {"search": "50/50", "rag": "50/50", "agent": "25/25"}, "agentPassPower": 1.0, "criticalWorkflowPassPower": 1.0}
+      ]
+    }
+  },
+  "readinessAssessment": {
+    "status": "CONTROLLED_PRE_PRODUCTION_USABLE",
+    "productionReadinessEstablished": false,
+    "searchQualityGate": "PASSED",
+    "ragQualityGate": "PASSED_LEXICAL_AND_CONTRACT_ONLY",
+    "customerIntentAndHandoff": "PASSED_ON_60_HUMAN_VERIFIED_CASES",
+    "customerFullSlotQuality": "BELOW_PROVISIONAL_TARGET",
+    "httpAnswerQuality": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+    "agentReliability": "PASSED_ON_25_CASES_AND_200_TRIALS",
+    "latency": "SEARCH_USABLE_GENERATIVE_LONG_TAIL_HIGH",
+    "capacityAndCost": "NOT_ESTABLISHED",
+    "supportedUse": "Small-catalog, low-concurrency, human-backed demo or controlled pre-production use.",
+    "unsupportedClaim": "Unattended high-concurrency production readiness, production SLO, online business lift, CSAT/FCR, or unit economics."
+  },
   "schemaVersion": "aishop-quality-scorecard/v1"
 }

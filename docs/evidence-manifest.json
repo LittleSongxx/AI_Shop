@@ -8,7 +8,7 @@
     },
     "scorecard": {
       "path": "docs/evaluation/AI质量评测与Badcase.json",
-      "sha256": "66f463c805cb5403ae274a7789a1428c3af4ddda6a9efeec42f51da353e38976",
+      "sha256": "0c1be92fa6cef608838243fb75710a19c38640d6e87787d98f9c8b43a3b8e731",
       "schemaVersion": "aishop-quality-scorecard/v1",
       "derivedFrom": "evaluation.currentEvidence"
     },
@@ -407,7 +407,8 @@
         "2026-08-21",
         "2026-08-22",
         "2026-08-23",
-        "HUMAN_VERIFIED"
+        "HUMAN_VERIFIED",
+        "关键踩坑、排错与效果"
       ],
       "forbiddenTokens": [
         "AI应用求职项目证据总览.md",
@@ -420,7 +421,8 @@
         "Recall@10",
         "NDCG@10",
         "Intent Macro-F1",
-        "badcase"
+        "badcase",
+        "当前达标与可用性"
       ],
       "forbiddenTokens": [
         "AI质量指标与Badcase索引_20260822.md",

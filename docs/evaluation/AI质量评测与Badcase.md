@@ -27,11 +27,26 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 | 证据 | 当前可用程度 | 可以怎么说 | 不能怎么说 |
 |---|---|---|---|
 | Search 50 条离线 qrel | **可用于简历/面试** | `n=50`、44 条有 qrel 的 Recall/MRR/NDCG、95% CI、切片和漏召回/错排 case | 线上 CTR、个性化推荐收益或生产 SLO |
-| 客服 60 条 HUMAN_VERIFIED | **可用于简历/面试** | 双人盲标、25 条 lead 仲裁后的 intent Macro-F1、风险 Recall、slot F1/EM、handoff Recall | 线上客服准确率、CSAT/FCR；当前规则预路由也不是完整 HTTP Agent |
+| 客服 60 条 HUMAN_VERIFIED | **可用于简历/面试** | 双人盲标、25 条 lead 仲裁后的 intent Macro-F1、风险 Recall、slot F1/EM、handoff Recall | 线上客服准确率、CSAT/FCR；HTTP 答案质量仍待盲审，slot 仍是规则预路由口径 |
 | RAG 50 条、Agent 25 条 | **工程诊断可用** | RAG 检索/引用/拒答下界，Agent 幂等、终态和状态 diff 契约 | 人工语义准确率、开放世界 Agent 成功率 |
 | 本地延迟、token、DB、故障矩阵 | **复盘/设计证据可用** | 环境、样本、P50/P95/P99、usage unknown、batch/N+1 和恢复契约 | 生产容量、费用为 0、线上 SLO |
 
 门禁通过（`50/50`、`25/25`、`pass^8`、安全与终态为 100%）只是发布前置条件，不是质量提升分数；质量指标必须和 badcase 一起展示。
+
+### 当前达标与可用性
+
+这里的“达标”指预先声明的项目离线门禁，不是统一行业认证或生产 SLO。
+
+| 维度 | 判断 | 依据 | 对系统可用性的含义 |
+|---|---|---|---|
+| Search 相关性与约束 | **达标** | Recall@10 `0.9621`、MRR `0.9375`、NDCG `0.9205`，硬约束违规 `0` | 足以支撑当前 47 商品、小流量场景的可用搜索/导购；多对象和比较型难例仍需 fallback/澄清 |
+| RAG 受控问答 | **有条件达标** | answerable Recall@5 `29/29`，lexical grounded/citation/no-answer 门禁通过 | 足以支撑封闭知识库 FAQ；没有独立人工语义真值，不能证明开放域答案准确率 |
+| 客服理解与转人工 | **核心达标，槽位部分达标** | Intent Macro-F1 `0.9553`、高风险和 handoff Recall `1.0`；full-slot F1 `0.9077`、EM `0.5588`，canonical F1 `0.9928`、EM `0.8824` | 可用于带澄清和人工兜底的客服路由；不适合依赖扩展槽位直接执行高风险操作 |
+| Agent 交易可靠性 | **冻结场景达标** | 25 case、200 trials，`pass^8=1.0`，state diff/终态全匹配，重复副作用 `0`；故障 contract `11/11 HARD + 1/1 SHADOW` | 支撑受控交易提案、确认和幂等执行；不等于开放世界 Agent 成功率 |
+| 单请求交互延迟 | **Search 可用，生成链路长尾偏高** | 本地 Search P95 `0.80s`、RAG `4.25s`、Agent `17.08s`、客服 HTTP `15.21s`，客服 P99 `60.14s` | 搜索体验可用；Agent/客服需要流式反馈、超时降级和长尾优化，不能承诺生产 SLO |
+| 容量与成本 | **尚未证明** | 无并发/QPS/资源曲线；大量 usage 缺失或未定价，`costCny=null` | 不能据此判断生产容量、峰值稳定性或单位经济性 |
+
+综合结论：当前证据足以支撑一个小商品集、低并发、有人工作为最终兜底的可用演示或受控预生产系统，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。阻碍生产结论的主要不是离线 Search 分数，而是 HTTP 答案盲审缺失、Agent/客服长尾、负载/成本数据缺失和客服样本量仍小。
 
 ### Search slice（不加权掩盖失败）
 
