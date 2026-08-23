@@ -1,111 +1,6 @@
 {
   "badcases": [
     {
-      "caseId": "cs-gold-v1-001",
-      "difficulty": null,
-      "expected": {
-        "intent": "PRODUCT_SEARCH",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "amount": "2000",
-          "brand": "索尼",
-          "budget": "2000元",
-          "productName": "索尼 WH-1000XM6"
-        }
-      },
-      "message": "我想买索尼 WH-1000XM6，预算 2000 元",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "amount": "2000",
-          "productName": "索尼 WH-1000XM6"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": []
-    },
-    {
-      "caseId": "cs-gold-v1-002",
-      "difficulty": null,
-      "expected": {
-        "intent": "PRODUCT_SEARCH",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "amount": "3000",
-          "brand": "华为",
-          "budget": "3000元",
-          "productName": "华为手机"
-        }
-      },
-      "message": "我想买华为手机，预算 3000 元",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "amount": "3000",
-          "productName": "华为手机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": []
-    },
-    {
-      "caseId": "cs-gold-v1-003",
-      "difficulty": null,
-      "expected": {
-        "intent": "PRODUCT_CONSULT",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "bluetoothVersion": "5.4",
-          "productName": "耳机"
-        }
-      },
-      "message": "这款耳机支持蓝牙 5.4 吗",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "耳机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_CONSULT",
-        "nextAction": "ANSWER",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": []
-    },
-    {
       "caseId": "cs-gold-v1-009",
       "difficulty": null,
       "expected": {
@@ -201,225 +96,6 @@
       "sliceTags": []
     },
     {
-      "caseId": "cs-gold-v1-029",
-      "difficulty": null,
-      "expected": {
-        "intent": "PRODUCT_SEARCH",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "amount": "500",
-          "budget": "500元以内",
-          "excludedStyle": "户外款",
-          "productName": "男士外套"
-        }
-      },
-      "message": "帮我找 500 元以内、不要户外款的男士外套",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "amount": "500",
-          "productName": "男士外套"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": []
-    },
-    {
-      "caseId": "cs-gold-v1-033",
-      "difficulty": null,
-      "expected": {
-        "intent": "PRODUCT_CONSULT",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "feature": "主动降噪",
-          "productName": "耳机"
-        }
-      },
-      "message": "这副耳机有没有主动降噪",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "耳机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_CONSULT",
-        "nextAction": "ANSWER",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": []
-    },
-    {
-      "caseId": "cs-gold-v1-034",
-      "difficulty": null,
-      "expected": {
-        "intent": "PRODUCT_SEARCH",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "amount": "1000",
-          "budget": "1000元以内",
-          "feature": "降噪",
-          "productName": "降噪耳机"
-        }
-      },
-      "message": "推荐 1000 元以内的降噪耳机",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "amount": "1000",
-          "productName": "降噪耳机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": []
-    },
-    {
-      "caseId": "cs-gold-v1-041",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "PRODUCT_CONSULT",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "feature": "续航",
-          "productName": "手机"
-        }
-      },
-      "message": "这款手机续航怎么样",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "手机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_CONSULT",
-        "nextAction": "ANSWER",
-        "requestMode": "INFORMATIONAL",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": [
-        "product-consult",
-        "attribute-question"
-      ]
-    },
-    {
-      "caseId": "cs-gold-v1-042",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "PRODUCT_SEARCH",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "amount": "2000",
-          "audience": "学生",
-          "budget": "2000元",
-          "productName": "平板"
-        }
-      },
-      "message": "有没有适合学生的平板，预算2000元",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "amount": "2000",
-          "productName": "平板"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": [
-        "product-search",
-        "budget-constraint",
-        "consult-search-boundary"
-      ]
-    },
-    {
-      "caseId": "cs-gold-v1-043",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "PRODUCT_SEARCH",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "excludedBrand": "苹果",
-          "operatingSystem": "安卓",
-          "productName": "安卓手机"
-        }
-      },
-      "message": "不要苹果，推荐安卓手机",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "安卓手机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": [
-        "product-search",
-        "negative-constraint",
-        "brand"
-      ]
-    },
-    {
       "caseId": "cs-gold-v1-044",
       "difficulty": "hard",
       "expected": {
@@ -452,80 +128,6 @@
         "product-search",
         "comparison",
         "consult-search-boundary"
-      ]
-    },
-    {
-      "caseId": "cs-gold-v1-045",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "PRODUCT_CONSULT",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "feature": "主动降噪",
-          "productName": "耳机"
-        }
-      },
-      "message": "耳机有主动降噪嘛",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "耳机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_CONSULT",
-        "nextAction": "ANSWER",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": [
-        "product-consult",
-        "attribute-question"
-      ]
-    },
-    {
-      "caseId": "cs-gold-v1-055",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "DAMAGED_OR_WRONG_ITEM",
-        "riskLevel": "MEDIUM",
-        "shouldHandoff": false,
-        "slots": {
-          "orderId": "SM202608050002",
-          "productName": "配件",
-          "quantity": "1"
-        }
-      },
-      "message": "少了一个配件，订单SM202608050002",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.96,
-        "entities": {
-          "orderId": "SM202608050002"
-        },
-        "handoffReason": null,
-        "intent": "DAMAGED_OR_WRONG_ITEM",
-        "nextAction": "ANSWER",
-        "requestMode": "INFORMATIONAL",
-        "riskLevel": "MEDIUM",
-        "shouldHandoff": false,
-        "source": "rule_priority"
-      },
-      "rootCause": "SLOT_EXTRACTION_GAP",
-      "sliceTags": [
-        "after-sales",
-        "missing-item",
-        "slot-order-id"
       ]
     },
     {
@@ -593,43 +195,6 @@
         "invoice",
         "currency-slot"
       ]
-    },
-    {
-      "caseId": "cs-gold-v1-059",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "PRODUCT_CONSULT",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "compatibleModel": "iPhone 15",
-          "productName": "手机壳"
-        }
-      },
-      "message": "手机壳有没有适配 iPhone 15",
-      "metrics": [
-        "slotEntitySpanF1",
-        "slotExactMatch"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "手机壳"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_CONSULT",
-        "nextAction": "ANSWER",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
-      "sliceTags": [
-        "product-consult",
-        "compatibility",
-        "slot-product-name"
-      ]
     }
   ],
   "bootstrapPolicy": {
@@ -659,56 +224,54 @@
     "extensionOnlyCaseCount": 0,
     "metrics": {
       "canonicalSlotEntitySpanF1": {
-        "badcaseCount": 4,
+        "badcaseCount": 3,
         "badcaseIds": [
           "cs-gold-v1-009",
           "cs-gold-v1-020",
-          "cs-gold-v1-055",
           "cs-gold-v1-058"
         ],
         "componentCounts": {
-          "falseNegative": 5,
+          "falseNegative": 3,
           "falsePositive": 0,
-          "truePositive": 344
+          "truePositive": 346
         },
         "confidenceInterval95": {
           "confidenceLevel": 0.95,
-          "lower": 0.98727,
+          "lower": 0.994135,
           "method": "stratified-case-bootstrap-micro-F1",
           "stratumCount": 16,
-          "upper": 0.997041
+          "upper": 0.997191
         },
         "definition": "Diagnostic micro character-span F1 after projecting both sides to the five fields currently emitted by the production pre-router; it does not replace the full human-schema slot metric.",
-        "denominator": 693,
+        "denominator": 695,
         "name": "canonicalSlotEntitySpanF1",
-        "numerator": 688,
+        "numerator": 692,
         "releaseGateEligible": false,
         "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
         "status": "MEASURED",
-        "value": 0.992785
+        "value": 0.995683
       },
       "canonicalSlotExactMatch": {
-        "badcaseCount": 4,
+        "badcaseCount": 3,
         "badcaseIds": [
           "cs-gold-v1-009",
           "cs-gold-v1-020",
-          "cs-gold-v1-055",
           "cs-gold-v1-058"
         ],
         "confidenceInterval95": {
           "confidenceLevel": 0.95,
-          "lower": 0.733792,
+          "lower": 0.770395,
           "method": "wilson",
-          "upper": 0.953286
+          "upper": 0.969534
         },
         "definition": "Diagnostic request-level exact match after projecting to production canonical slots; extension-only human slots are excluded from this denominator.",
         "denominator": 34,
         "name": "canonicalSlotExactMatch",
-        "numerator": 30,
+        "numerator": 31,
         "releaseGateEligible": false,
         "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
         "status": "MEASURED",
-        "value": 0.882353
+        "value": 0.911765
       }
     },
     "note": "This projection is a schema-alignment diagnostic. Full human-schema slot metrics remain the primary reported quality signal.",
@@ -739,13 +302,15 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "我想买索尼 WH-1000XM6，预算 2000 元",
       "predicted": {
         "confidence": 0.9,
         "entities": {
           "amount": "2000",
+          "brand": "索尼",
+          "budget": "2000元",
           "productName": "索尼 WH-1000XM6"
         },
         "handoffReason": null,
@@ -776,13 +341,15 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "我想买华为手机，预算 3000 元",
       "predicted": {
         "confidence": 0.9,
         "entities": {
           "amount": "3000",
+          "brand": "华为",
+          "budget": "3000元",
           "productName": "华为手机"
         },
         "handoffReason": null,
@@ -811,12 +378,13 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "这款耳机支持蓝牙 5.4 吗",
       "predicted": {
         "confidence": 0.9,
         "entities": {
+          "bluetoothVersion": "5.4",
           "productName": "耳机"
         },
         "handoffReason": null,
@@ -1644,13 +1212,15 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "帮我找 500 元以内、不要户外款的男士外套",
       "predicted": {
         "confidence": 0.9,
         "entities": {
           "amount": "500",
+          "budget": "500元以内",
+          "excludedStyle": "户外款",
           "productName": "男士外套"
         },
         "handoffReason": null,
@@ -1771,12 +1341,13 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "这副耳机有没有主动降噪",
       "predicted": {
         "confidence": 0.9,
         "entities": {
+          "feature": "主动降噪",
           "productName": "耳机"
         },
         "handoffReason": null,
@@ -1807,13 +1378,15 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "推荐 1000 元以内的降噪耳机",
       "predicted": {
         "confidence": 0.9,
         "entities": {
           "amount": "1000",
+          "budget": "1000元以内",
+          "feature": "降噪",
           "productName": "降噪耳机"
         },
         "handoffReason": null,
@@ -2031,12 +1604,13 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "这款手机续航怎么样",
       "predicted": {
         "confidence": 0.9,
         "entities": {
+          "feature": "续航",
           "productName": "手机"
         },
         "handoffReason": null,
@@ -2070,13 +1644,15 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "有没有适合学生的平板，预算2000元",
       "predicted": {
         "confidence": 0.9,
         "entities": {
           "amount": "2000",
+          "audience": "学生",
+          "budget": "2000元",
           "productName": "平板"
         },
         "handoffReason": null,
@@ -2110,12 +1686,14 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "不要苹果，推荐安卓手机",
       "predicted": {
         "confidence": 0.9,
         "entities": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
           "productName": "安卓手机"
         },
         "handoffReason": null,
@@ -2185,12 +1763,13 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "耳机有主动降噪嘛",
       "predicted": {
         "confidence": 0.9,
         "entities": {
+          "feature": "主动降噪",
           "productName": "耳机"
         },
         "handoffReason": null,
@@ -2523,13 +2102,15 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "少了一个配件，订单SM202608050002",
       "predicted": {
         "confidence": 0.96,
         "entities": {
-          "orderId": "SM202608050002"
+          "orderId": "SM202608050002",
+          "productName": "配件",
+          "quantity": "1"
         },
         "handoffReason": null,
         "intent": "DAMAGED_OR_WRONG_ITEM",
@@ -2662,12 +2243,13 @@
         "handoff": true,
         "intent": true,
         "riskLevel": true,
-        "slotExactMatch": false
+        "slotExactMatch": true
       },
       "message": "手机壳有没有适配 iPhone 15",
       "predicted": {
         "confidence": 0.9,
         "entities": {
+          "compatibleModel": "iPhone 15",
           "productName": "手机壳"
         },
         "handoffReason": null,
@@ -2701,7 +2283,7 @@
       },
       "message": "谢谢你",
       "predicted": {
-        "confidence": 0.9,
+        "confidence": 0.99,
         "entities": {},
         "handoffReason": null,
         "intent": "CHAT",
@@ -2709,7 +2291,7 @@
         "requestMode": "INFORMATIONAL",
         "riskLevel": "LOW",
         "shouldHandoff": false,
-        "source": "rule"
+        "source": "deterministic_social"
       },
       "sliceTags": [
         "chat",
@@ -3375,73 +2957,49 @@
       "value": 0.955299
     },
     "slotEntitySpanF1": {
-      "badcaseCount": 15,
+      "badcaseCount": 3,
       "badcaseIds": [
-        "cs-gold-v1-001",
-        "cs-gold-v1-002",
-        "cs-gold-v1-003",
         "cs-gold-v1-009",
         "cs-gold-v1-020",
-        "cs-gold-v1-029",
-        "cs-gold-v1-033",
-        "cs-gold-v1-034",
-        "cs-gold-v1-041",
-        "cs-gold-v1-042",
-        "cs-gold-v1-043",
-        "cs-gold-v1-045",
-        "cs-gold-v1-055",
-        "cs-gold-v1-058",
-        "cs-gold-v1-059"
+        "cs-gold-v1-058"
       ],
       "componentCounts": {
-        "falseNegative": 70,
+        "falseNegative": 3,
         "falsePositive": 0,
-        "truePositive": 344
+        "truePositive": 411
       },
       "confidenceInterval95": {
         "confidenceLevel": 0.95,
-        "lower": 0.888889,
+        "lower": 0.995061,
         "method": "stratified-case-bootstrap-micro-F1",
         "stratumCount": 27,
-        "upper": 0.926454
+        "upper": 0.997636
       },
       "definition": "Micro character-span F1 over expected and predicted structured entity values; extra predicted fields count as false positives.",
-      "denominator": 758,
+      "denominator": 825,
       "name": "slotEntitySpanF1",
       "notes": [
-        "componentCounts: TP=344, FP=0, FN=70",
+        "componentCounts: TP=411, FP=0, FN=3",
         "HUMAN_VERIFIED"
       ],
-      "numerator": 688,
+      "numerator": 822,
       "releaseGateEligible": false,
       "role": "PRIMARY_QUALITY",
       "status": "MEASURED",
-      "value": 0.907652
+      "value": 0.996364
     },
     "slotExactMatch": {
-      "badcaseCount": 15,
+      "badcaseCount": 3,
       "badcaseIds": [
-        "cs-gold-v1-001",
-        "cs-gold-v1-002",
-        "cs-gold-v1-003",
         "cs-gold-v1-009",
         "cs-gold-v1-020",
-        "cs-gold-v1-029",
-        "cs-gold-v1-033",
-        "cs-gold-v1-034",
-        "cs-gold-v1-041",
-        "cs-gold-v1-042",
-        "cs-gold-v1-043",
-        "cs-gold-v1-045",
-        "cs-gold-v1-055",
-        "cs-gold-v1-058",
-        "cs-gold-v1-059"
+        "cs-gold-v1-058"
       ],
       "confidenceInterval95": {
         "confidenceLevel": 0.95,
-        "lower": 0.394539,
+        "lower": 0.770395,
         "method": "wilson",
-        "upper": 0.711165
+        "upper": 0.969534
       },
       "definition": "Request-level exact equality of all expected slots; cases with no expected slots are excluded from the denominator.",
       "denominator": 34,
@@ -3449,11 +3007,11 @@
       "notes": [
         "HUMAN_VERIFIED"
       ],
-      "numerator": 19,
+      "numerator": 31,
       "releaseGateEligible": false,
       "role": "PRIMARY_QUALITY",
       "status": "MEASURED",
-      "value": 0.558824
+      "value": 0.911765
     }
   },
   "perIntent": {
@@ -3630,7 +3188,7 @@
     "mode": "rule",
     "productionResolver": "app.domain.intent.classifier.resolve_intent",
     "providerFingerprint": "DETERMINISTIC_RULE_BASELINE",
-    "resolverSourceSha256": "9d9e9cd1d08c74d9b38f6a158e70f154d0995be380cda2cd70a3f046d3799358"
+    "resolverSourceSha256": "1a854779c1d0901f1d96cc3f41c2a650b230f457bf2b1a7a4bbb951b7a98924b"
   },
   "provisionalTargets": {
     "criticalHandoffMissRate": {
@@ -3660,13 +3218,13 @@
     "slotEntitySpanF1": {
       "direction": "higher",
       "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
-      "pointEstimatePasses": false,
+      "pointEstimatePasses": true,
       "target": 0.95
     },
     "slotExactMatch": {
       "direction": "higher",
       "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
-      "pointEstimatePasses": false,
+      "pointEstimatePasses": true,
       "target": 0.9
     }
   },

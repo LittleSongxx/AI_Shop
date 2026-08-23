@@ -5,7 +5,7 @@
 | 目录/文件 | 内容 | 证据等级 |
 |---|---|---|
 | [project/AI_Shop主线与开发记录](project/AI_Shop主线与开发记录.md) | AI 主线、方法判断、关键改造、阶段性取舍和后续路线 | 源码与运行证据汇总 |
-| [evaluation/AI质量评测与Badcase](evaluation/AI质量评测与Badcase.md) | Search/RAG/Agent 质量指标、门禁、badcase、性能和限制 | current/archive 证据包投影 |
+| [evaluation/AI质量评测与Badcase](evaluation/AI质量评测与Badcase.md) | Search/RAG/Agent/客服质量、badcase、槽位优化及本地容量边界 | current/archive 与诊断证据包投影 |
 | [evaluation/AI质量评测与Badcase.json](evaluation/AI质量评测与Badcase.json) | Search/RAG/Agent 指标、延迟诊断、usage 状态及逐指标 badcase 的机器可读结果 | immutable scorecard 投影 |
 | [evaluation/customer-service/客服金标评测](evaluation/customer-service/客服金标评测.md) | 60 条双人盲标+第三人仲裁的 intent、风险、slot、handoff 质量证据 | `HUMAN_VERIFIED` 离线证据，仍不进入 release gate |
 | [evaluation/customer-service/客服金标评测.json](evaluation/customer-service/客服金标评测.json) | 客服评测逐 case、canonical slot 诊断和 badcase | 可复核机器证据 |
@@ -40,7 +40,7 @@ python -m evaluation.cli customer-service-http rebuild --source-report <raw-repo
 ```
 
 当前质量主张的最小复核顺序：先看 `docs/evaluation/AI质量评测与Badcase.md` 的点估计、分母、CI 和 badcase，再看 current 的原始
-`cases.jsonl/bad-cases.jsonl/summary.json`；故障矩阵、DB benchmark、`pass^k` 和本地延迟属于独立诊断，不能替代 Search 或客服质量指标。
+`cases.jsonl/bad-cases.jsonl/summary.json`；故障矩阵、DB/capacity benchmark、`pass^k` 和本地延迟属于独立诊断，不能替代 Search 或客服质量指标，也不能写成生产 SLO。
 
 客服当前主数据已完成两名标注者盲标和 lead reviewer 冲突仲裁，冻结包位于
 `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/`；

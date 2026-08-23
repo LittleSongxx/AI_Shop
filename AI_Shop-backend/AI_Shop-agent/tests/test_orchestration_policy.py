@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.graph.nodes import deterministic_workflow_node, orchestration_router_node
-from app.graph.orchestration_policy import select_orchestration
+from app.graph.orchestration_policy import fast_support_eligible, select_orchestration
 from app.harness.observation import CONTAMINATED_CONTENT_PLACEHOLDER
 from app.services.tool_invoke_result import ToolInvokeResult
 
@@ -34,6 +34,32 @@ def test_adaptive_router_uses_workflow_for_plain_product_search():
 
     assert decision.mode == "workflow"
     assert decision.route == "deterministic_workflow"
+
+
+def test_adaptive_router_uses_workflow_only_for_strict_deterministic_social_text():
+    decision = select_orchestration(
+        {
+            "intent": "CHAT",
+            "request_mode": "INFORMATIONAL",
+            "user_text": "谢谢你",
+            "intent_decision": {"source": "deterministic_social"},
+            "input_security_flags": [],
+        }
+    )
+
+    assert decision.mode == "workflow"
+    assert decision.reason == "deterministic_business_path"
+
+    business_text = select_orchestration(
+        {
+            "intent": "CHAT",
+            "request_mode": "INFORMATIONAL",
+            "user_text": "你好，今天有什么活动？",
+            "intent_decision": {"source": "deterministic_social"},
+            "input_security_flags": [],
+        }
+    )
+    assert business_text.mode == "single_agent"
 
 
 @pytest.mark.asyncio
@@ -122,6 +148,22 @@ def test_multi_agent_kill_switch_falls_back_to_one_agent():
     assert decision.mode == "single_agent"
 
 
+def test_fast_support_is_limited_to_low_risk_read_only_first_turn():
+    base = {
+        "react_round": 0,
+        "request_mode": "READ_QUERY",
+        "intent_decision": {"risk_level": "LOW", "next_action": "ANSWER"},
+    }
+    assert fast_support_eligible(base)
+    assert not fast_support_eligible({**base, "react_round": 1})
+    assert not fast_support_eligible({**base, "rag_evidence_required": True})
+    assert not fast_support_eligible({**base, "input_security_flags": ["prompt_injection"]})
+    assert not fast_support_eligible({**base, "request_mode": "ACTION_PROPOSAL"})
+    assert not fast_support_eligible(
+        {**base, "intent_decision": {"risk_level": "HIGH", "next_action": "HANDOFF"}}
+    )
+
+
 @pytest.mark.parametrize(
     ("configured_mode", "enabled", "expected_mode", "expected_reason"),
     [
@@ -202,6 +244,38 @@ async def test_workflow_executes_only_the_preverified_tool(monkeypatch):
     )
     assert update["tools_called"] == ["PROPOSE_REFUND"]
     assert update["route"] == "finalize"
+
+
+@pytest.mark.asyncio
+async def test_workflow_returns_auditable_social_reply_without_provider_or_tool(monkeypatch):
+    record = Mock()
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", record)
+
+    update = await deterministic_workflow_node(
+        {
+            "user_id": "u1",
+            "message_id": 41,
+            "intent": "CHAT",
+            "intent_decision": {"source": "deterministic_social"},
+            "user_text": "谢谢你",
+            "llm_messages": [],
+        }
+    )
+
+    assert update["chunks"] == ["不客气，有需要可以继续告诉我。"]
+    assert update["tools_called"] == []
+    assert update["route"] == "finalize"
+    record.assert_called_once_with(
+        "AGENT_POLICY",
+        node_name="deterministic_workflow",
+        output_data={
+            "policy": "DETERMINISTIC_SOCIAL_REPLY",
+            "deterministicSocialReply": True,
+            "llmSkipped": True,
+            "ragSkipped": True,
+            "sideEffectAllowed": False,
+        },
+    )
 
 
 @pytest.mark.asyncio

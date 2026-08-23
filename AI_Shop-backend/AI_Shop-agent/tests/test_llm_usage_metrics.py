@@ -87,13 +87,16 @@ def test_non_streaming_token_usage():
             "model_name": "claude-opus-5",
         },
     )
-    record_llm_usage(msg)
+    usage = record_llm_usage(msg)
     after = _snapshot(queries)
 
     assert _delta(before, after, *token_input) == 120
     assert _delta(before, after, *token_output) == 34
     assert _delta(before, after, *unpriced_total) == 154
     assert _delta(before, after, *_call_labels("claude-opus-5", False)) == 1
+    assert usage["costStatus"] == "UNPRICED"
+    assert usage["costCny"] is None
+    assert usage["usageSource"] == "response_metadata.token_usage"
 
 
 def test_streaming_usage_metadata():
@@ -123,12 +126,16 @@ def test_no_usage_still_counts_call():
     queries = [token_input, token_output, _call_labels("unknown", False)]
     before = _snapshot(queries)
     msg = AIMessage(content="hi", response_metadata={"finish_reason": "stop"})
-    record_llm_usage(msg)
+    usage = record_llm_usage(msg)
     after = _snapshot(queries)
 
     assert _delta(before, after, *token_input) == 0
     assert _delta(before, after, *token_output) == 0
     assert _delta(before, after, *_call_labels("unknown", False)) == 1
+    assert usage["costStatus"] == "MISSING_USAGE"
+    assert usage["costCny"] is None
+    assert usage["missingReason"] == "provider_omitted_usage"
+    assert usage["usageSource"] == "none"
 
 
 def test_none_response_ignored():
@@ -152,12 +159,14 @@ def test_wrong_or_incomplete_keys_never_count_tokens(response_metadata):
     queries = [token_input, token_output, _call_labels("unknown", False)]
     before = _snapshot(queries)
     msg = AIMessage(content="hi", response_metadata=response_metadata)
-    record_llm_usage(msg)
+    usage = record_llm_usage(msg)
     after = _snapshot(queries)
 
     assert _delta(before, after, *token_input) == 0
     assert _delta(before, after, *token_output) == 0
     assert _delta(before, after, *_call_labels("unknown", False)) == 1
+    assert usage["costCny"] is None
+    assert usage["costStatus"] == "MISSING_USAGE"
 
 
 def test_configured_price_records_input_output_and_total_cost(monkeypatch):
@@ -183,13 +192,15 @@ def test_configured_price_records_input_output_and_total_cost(monkeypatch):
         },
     )
 
-    record_llm_usage(msg)
+    usage = record_llm_usage(msg)
     after = _snapshot(queries)
 
     assert _delta(before, after, *cost_input) == pytest.approx(0.002)
     assert _delta(before, after, *cost_output) == pytest.approx(0.004)
     assert _delta(before, after, *cost_total) == pytest.approx(0.006)
     assert _delta(before, after, *unpriced) == 0
+    assert usage["costStatus"] == "PRICED"
+    assert usage["costCny"] == pytest.approx(0.006)
 
 
 def test_structured_output_wrapper_preserves_raw_usage():
@@ -228,6 +239,31 @@ async def test_failed_invocation_counts_one_error_and_no_success():
 
 
 @pytest.mark.asyncio
+async def test_non_streaming_invocation_has_a_whole_call_deadline(monkeypatch):
+    steps = []
+
+    async def never_returns(_messages):
+        await asyncio.Event().wait()
+
+    llm = SimpleNamespace(model_name="slow-model", ainvoke=never_returns)
+    monkeypatch.setattr(
+        "app.observability.llm_metrics.episode_service.record_step",
+        lambda *args, **kwargs: steps.append((args, kwargs)),
+    )
+
+    with pytest.raises(TimeoutError):
+        await invoke_llm_with_metrics(llm, [], timeout_seconds=0.01)
+
+    assert len(steps) == 1
+    assert steps[0][1]["status"] == "ERROR"
+    assert steps[0][1]["input_data"]["hardDeadlineSeconds"] == 0.01
+    assert (
+        steps[0][1]["output_data"]["missingReason"]
+        == "call_deadline_exceeded_before_usage"
+    )
+
+
+@pytest.mark.asyncio
 async def test_cancelled_stream_counts_one_error_and_no_success(monkeypatch):
     model = "stream-model"
     error_call = _call_labels(model, False, "error")
@@ -257,3 +293,42 @@ async def test_cancelled_stream_counts_one_error_and_no_success(monkeypatch):
     after = _snapshot([error_call, success_call])
     assert _delta(before, after, *error_call) == 1
     assert _delta(before, after, *success_call) == 0
+
+
+@pytest.mark.asyncio
+async def test_streaming_invocation_has_a_whole_call_deadline(monkeypatch):
+    steps = []
+
+    class _SlowStreamingLlm:
+        model_name = "slow-stream-model"
+
+        async def astream(self, _messages):
+            await asyncio.Event().wait()
+            yield AIMessage(content="unreachable")
+
+    monkeypatch.setattr(
+        "app.services.agent_runtime.is_cancelled", AsyncMock(return_value=False)
+    )
+    monkeypatch.setattr(
+        "app.services.agent_runtime.episode_service.record_step",
+        lambda *args, **kwargs: steps.append((args, kwargs)),
+    )
+
+    with pytest.raises(TimeoutError):
+        await stream_llm_turn(
+            _SlowStreamingLlm(),
+            [],
+            "u1",
+            1,
+            "hello",
+            [],
+            timeout_seconds=0.01,
+        )
+
+    assert len(steps) == 1
+    assert steps[0][1]["status"] == "ERROR"
+    assert steps[0][1]["input_data"]["hardDeadlineSeconds"] == 0.01
+    assert (
+        steps[0][1]["output_data"]["missingReason"]
+        == "call_deadline_exceeded_before_usage"
+    )

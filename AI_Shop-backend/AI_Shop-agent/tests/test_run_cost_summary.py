@@ -17,6 +17,7 @@ from app.observability.llm_metrics import (
     reset_run_cost,
     snapshot_cost_summary,
 )
+from evaluation.core.usage import merge_usage
 
 PRICED = {"priced-model": {"input": 2.0, "output": 8.0}}
 
@@ -67,14 +68,14 @@ def test_heavy_path_when_tools_called_even_with_single_call():
 
 
 def test_none_path_without_any_call():
-    assert snapshot_cost_summary() == {
-        "path": "none",
-        "llmCalls": 0,
-        "inputTokens": 0,
-        "outputTokens": 0,
-        "costCny": 0.0,
-        "models": [],
-    }
+    summary = snapshot_cost_summary()
+    assert summary["path"] == "none"
+    assert summary["llmCalls"] == 0
+    assert summary["costCny"] is None
+    assert summary["costStatus"] == "NOT_APPLICABLE"
+    assert summary["missingUsageCalls"] == 0
+    assert summary["usageSources"] == ["not_applicable"]
+    assert summary["notApplicableReason"] == "no_llm_call"
 
 
 def test_models_deduplicated_and_sorted():
@@ -93,7 +94,7 @@ def test_reset_clears_accumulator_between_requests():
     assert snapshot_cost_summary()["path"] == "none"
 
 
-def test_unpriced_tokens_count_calls_but_zero_cost():
+def test_unpriced_tokens_count_calls_but_keep_cost_unknown():
     record_llm_usage(
         AIMessage(
             content="hi",
@@ -106,8 +107,43 @@ def test_unpriced_tokens_count_calls_but_zero_cost():
     summary = snapshot_cost_summary()
     assert summary["llmCalls"] == 1
     assert summary["inputTokens"] == 10
-    assert summary["costCny"] == 0.0
+    assert summary["costCny"] is None
+    assert summary["costStatus"] == "UNPRICED"
+    assert summary["unpricedCalls"] == 1
     assert summary["models"] == ["unpriced-model"]
+
+
+def test_nested_usage_summary_preserves_sources_and_exact_missing_call_count():
+    aggregate = merge_usage(
+        [
+            {
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "providerCalls": 3,
+                "pricedCalls": 0,
+                "unpricedCalls": 2,
+                "missingUsageCalls": 1,
+                "costCny": None,
+                "costStatus": "MISSING_USAGE",
+                "usageSources": ["langchain.usage_metadata", "none"],
+                "missingReasons": {"provider_error_before_usage": 1},
+            },
+            {
+                "providerCalls": 0,
+                "missingUsageCalls": 0,
+                "costCny": None,
+                "costStatus": "MISSING_USAGE",
+                "usageSource": "not_applicable",
+                "missingReason": "no_llm_call",
+            },
+        ]
+    )
+
+    assert aggregate["providerCalls"] == 3
+    assert aggregate["unpricedCalls"] == 2
+    assert aggregate["missingUsageCalls"] == 1
+    assert aggregate["usageSources"] == ["langchain.usage_metadata", "none"]
+    assert aggregate["missingReasons"] == {"provider_error_before_usage": 1}
 
 
 def test_worker_reset_and_snapshot_flow():

@@ -74,6 +74,7 @@ class CostStatus(StrEnum):
     PRICED = "PRICED"
     UNPRICED = "UNPRICED"
     MISSING_USAGE = "MISSING_USAGE"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
 class SemanticLabel(StrEnum):

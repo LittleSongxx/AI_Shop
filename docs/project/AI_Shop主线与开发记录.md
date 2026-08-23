@@ -1,7 +1,7 @@
 # AI_Shop 主线与开发记录
 
 > 当前发布：`release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`
-> 最近更新：2026-08-23（Asia/Shanghai）
+> 最近更新：2026-08-24（Asia/Shanghai）
 > Python 评测环境：Conda `shop`
 
 ## 结论
@@ -17,7 +17,7 @@
 ```
 
 模型不直接生成可执行商品事实，也不直接写订单、库存或支付；最终状态以 Java 权威数据和持久化 Episode 为准。当前闭环工程完整，
-但不等于已经证明 CTR、CVR、GMV、生产容量或人工客服准确率。
+但不等于已经证明 CTR、CVR、GMV、生产容量或端到端客服答案准确率。
 
 ## 按开发阶段的增量记录
 
@@ -70,6 +70,24 @@
 - 客服 HTTP 本地 P50/P95/P99 为 `1014.1/15212.5/60141.6 ms`；token `114720/6649`，32 次 Provider call 中 31 次未定价、1 次缺 usage，因此 `costCny=null`。这些是本地诊断，不是生产 SLO。
 - 验收：新增专项与 manifest 联合回归 `41 passed`，Python 全量 `1279 passed/7 skipped`；随后在真实 MySQL 上补跑 migration `8 passed`，Java 26 模块 Maven reactor `BUILD SUCCESS`。
 
+### 2026-08-23：槽位质量与本地容量限制收敛
+
+- 在冻结的 60 条 HUMAN_VERIFIED gold 上扩展确定性槽位抽取：brand/budget/feature/兼容型号/排除条件/受众/数量等进入结构化 entities；paired replay 的 full-slot Span F1 `0.907652 -> 0.996364`、EM `0.558824 -> 0.911765`，修复 12 case、回归 0，残余 `009/020/058` 为严格金额格式差异。
+- 意图分类固定关闭 thinking；新增严格整句纯社交短路，业务混合句不会命中。纯社交直接走 deterministic workflow，Episode 明确记录 `deterministicSocialReply/llmSkipped/ragSkipped/sideEffectAllowed`；可选 fast-support 生成模式默认关闭。
+- 统一 usage 语义：有 token 无可信价格为 `UNPRICED`，Provider 调用无 usage 为 `MISSING_USAGE`，审计确认无 LLM 调用才是 `NOT_APPLICABLE/no_llm_call`；费用未知始终保持 `null`。
+- 新增 `benchmark-capacity`：固定 HUMAN_VERIFIED 只读 case，按并发输出 QPS、P50/P95/P99、stage、usage、资源和 badcase，答案只存 hash/长度；所有包声明 `notProductionSlo=true` 且不进入质量分母。
+- 同 4 case、每档 8 请求的 v2/v4 对照中，v4 `32/32`；c2/c4/c8 QPS `0.433/0.371/0.429 -> 0.694/0.684/0.905`，LLM 路径 P95 `15.015/19.912/18.404s -> 9.129/11.541/8.800s`。c1 P95 `14.852s -> 24.666s`，外部 Provider 波动如实保留，不能概括成全档改善。
+- 纯社交最终审计探针 v4 为 `5/5`，P50/P95/P99 `629.6/716.1/726.6ms`，Provider calls/token `0`，每条 observation 均含 `deterministicSocialReply=true`。启动器重启动态层后因端口预占探测自动迁移到 Agent `7092`、Worker `7093`；评测器通过 `run/runtime.env` 正确跟随。
+
+### 2026-08-24：重启复核、容量证据升级与成本口径收敛
+
+- 重启后 readiness 复核通过：MySQL、Redis、RabbitMQ、Worker、Java Gateway、MCP 和 Elasticsearch 1024 维向量 mapping 全部正常；Python 固定使用 Conda `shop`。
+- 新增 Agent 单次生成 hard deadline `AGENT_LLM_CALL_DEADLINE_SECONDS=45`，与 graph/Worker `120s` 总 deadline 分层。超时保留 `LLM_TIMEOUT`、trace 和 `MISSING_USAGE`，不伪造成功。
+- 容量 benchmark v5 加入 warm-up `4`（不进分母），正式 4 case × 并发 `1/2/4/8` × 每档 `20`，共 `80/80` 安全执行；QPS `0.396/0.641/0.965/1.353`，混合 P50/P95/P99（c8）`1051.5/10505.0/12032.6ms`，LLM 路径 P95 `10.211/9.852/10.574/12.013s`，badcase `0`。证据包 `capacity-readonly-v5-20260824`，仍明确 `notProductionSlo=true`。
+- 清理客服 HTTP 旧 v1 单人评分实现和旧空表；v2 双人盲审、封存、第三人仲裁成为唯一答案语义主线。未完成人工审查前，答案正确率、引用支持率、转人工适当率和 unsafe-answer rate 保持 pending。
+- 新增带 URL、抓取时间、区域、模型 fingerprint 和页面 SHA-256 的目录价估算证据：`qwen3.7-plus` 北京 ≤256K 原价输入/输出 `2/8 CNY per 1M tokens`。状态固定为 `ESTIMATED_LIST_PRICE`，不改运行时 `UNPRICED`，不启用费用门禁；真实合同/账单仍未知。
+- 相关单测、manifest checker、compileall 和 readiness 已通过；v5 比 v4 样本更大但仍是共享本机/外部 Provider 描述性诊断，不能声称严格因果或生产容量提升。
+
 ## 关键踩坑、排错与效果
 
 下表只把同一数据、同一 observation 或同一候选规模的结果称为“前后对比”。不同 final 使用不同 dataset/source hash，只能作为排错生命周期，不能包装成严格 A/B。
@@ -83,6 +101,9 @@
 | Search 难例可能被“修指标”掩盖 | 固定 v9 qrels/ranking，真实 Provider 对 10 条难例做 paired replay | Recall/MRR/NDCG delta 全为 `0`，约束违规 `0`；`23/34/47` 仍失败 | 结论是无回归，不是质量提升 |
 | 候选快照存在 N+1 风险 | 同一隔离 MySQL、同一 `100` 候选比较 batch/N+1，并校验结果等价与 rollback | offer P50 `89.805 -> 23.864 ms`，降低 `73.4%`；decision P50 `70.501 -> 2.405 ms`，降低 `96.6%`；round trip `100 -> 1` | 本地受控 benchmark，不是生产 SLO |
 | Provider usage/费用容易被记成零 | usage 缺失记 `MISSING_USAGE`，无可信价格记 `UNPRICED`，费用保持 `null` | 消除“未知成本=0”的错误结论 | 尚不能给出单请求成本门禁 |
+| 完整人工 slot schema 覆盖不足 | 在生产预路由补充已冻结 schema 的确定性实体抽取，并用同 gold paired replay | Span F1 `0.907652 -> 0.996364`；EM `0.558824 -> 0.911765`；12 fixed、0 regressed | 同集优化证据，不是新 holdout；3 个金额 raw-format badcase 保留 |
+| Agent 长尾缺少容量分层 | 新增只读完整链路并发 benchmark、warm-up 和 hard deadline，分开 deterministic 与 LLM path、stage 和 usage | v5 warm-up `4/4`、正式 `80/80`；c8 QPS `1.353`、LLM P95 `12.013s`；社交 path 5 次均零 Provider | 共享本机、外部 Provider，仍不是 steady-state、stress/soak 或生产 SLO |
+| “零 token”与“usage 缺失”混淆 | 从 Episode 的 LLM_CALL/AGENT_POLICY 事实判定是否实际调用 Provider | 纯社交由 `MISSING_USAGE (0 missing) -> NOT_APPLICABLE/no_llm_call` | 只有可审计确认未调用时才能使用 NOT_APPLICABLE |
 
 历史 final 的排错趋势保留在 immutable archive：v3 的 Search/RAG/Agent case pass 为 `42/50、36/50、16/25`，Agent `pass^8=0.60`、critical power `0.50`；v5 为 `50/50、47/50、25/25` 和 `0.92/0.833`；v8 为 `50/50、49/50、24/25` 和 `0.96/0.833`；v9 为 `50/50、50/50、25/25` 和 `1.0/1.0`。主要暴露过 Provider 不完整、RAG injection/no-answer、Episode 未终态、confirmation actionToken 缺失、state diff 和重复试验隔离问题。由于各版本 holdout/source hash 不同，这组数值只能说明 fail-closed 排错逐步收敛，不能用于声称同集质量提升。
 
@@ -94,7 +115,7 @@
 | 生成式导购 | 适合作为受控解释/澄清层 | 候选和交易事实不交给 LLM 生成；没有行为序列、ranker、A/B，不能称工业个性化推荐 |
 | 可信 RAG | 工程路径成熟 | 版本/注入隔离、最小证据、引用、拒答；当前 lexical 指标不是人工语义真值 |
 | 业务 Agent | 可靠执行边界清晰 | 确认后 Java 写入、幂等、未知结果和终态校验；客服理解已有 60 条 HUMAN_VERIFIED 离线金标 |
-| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标和 fail-closed；仍缺真实行为、独立答案盲评和生产压测 |
+| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标、容量诊断和 fail-closed；仍缺真实行为、独立答案盲评和生产压测 |
 
 与传统搜索和前沿生成式搜推的取舍：型号、数字、品牌、否定词必须保留倒排/结构化硬约束；向量用于同义泛化；LLM 只在候选集内做
 澄清、比较和 grounded explanation。直接让 LLM 生成商品 ID 会把幻觉、库存和报价时变性带入交易边界，不适合当前项目。
@@ -111,4 +132,6 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 完成 v2 新增 60 条的双人盲标/仲裁后，生成 120 条 HUMAN_VERIFIED v2 并重算分层 CI；当前 draft 不可报分。
 - 每次修改都要保留指标级 badcase、输入/gold/prediction、根因和新旧数据集哈希；Search hard negative 继续只做 paired replay，不改标签刷分。
 - Search 成对回放基线已固定；后续只针对 `23/34/47` 做 query decomposition/对象保留的可见集 A/B，不能改标签或重刷 final 制造提升。
-- 真实曝光/点击/购买、人工盲评、授权/合规和容量数据到位前，不新增 CTR/CVR/GMV 或生产 SLO 结论。
+- 当前容量曲线只证明本地短时只读诊断可运行；固定独占环境的 warm-up、steady-state、stress/soak 和 Provider 分层完成前，不新增生产 SLO 结论。
+- 当前真实账单价格和 endpoint 合同仍未核验；目录价估算仅用于面试中的成本量级说明，不能写成实际单请求成本。
+- 真实曝光/点击/购买、人工盲评和授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论。

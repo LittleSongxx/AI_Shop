@@ -1148,7 +1148,7 @@ def _validate_auxiliary_evidence(root: Path, descriptors: Any, errors: list[str]
 
 
 def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str]) -> None:
-    """Validate immutable HTTP-quality and paired-replay diagnostic packages."""
+    """Validate immutable quality, replay, and local-capacity diagnostics."""
 
     if descriptors is None:
         return
@@ -1158,6 +1158,35 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
     expected_schemas = {
         "customer-service-http": "aishop-customer-service-http-evidence/v1",
         "search-paired-replay": "aishop-search-paired-replay-evidence/v1",
+        "customer-service-slot-replay": "aishop-customer-service-slot-replay-evidence/v1",
+        "capacity-benchmark": "aishop-capacity-benchmark-evidence/v1",
+    }
+    required_files = {
+        "customer-service-http": {
+            "badcases.jsonl",
+            "evidence-manifest.json",
+            "report.json",
+            "report.md",
+        },
+        "search-paired-replay": {
+            "badcases.jsonl",
+            "cases.jsonl",
+            "evidence-manifest.json",
+            "report.json",
+            "report.md",
+        },
+        "customer-service-slot-replay": {
+            "paired-cases.jsonl",
+            "evidence-manifest.json",
+            "report.json",
+            "report.md",
+        },
+        "capacity-benchmark": {
+            "observations.jsonl",
+            "evidence-manifest.json",
+            "report.json",
+            "report.md",
+        },
     }
     seen: set[str] = set()
     for index, descriptor in enumerate(descriptors, 1):
@@ -1188,9 +1217,7 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
             or descriptor.get("sha256SumsSha256") != _sha256(sums_path)
         ):
             errors.append(f"{label} SHA256SUMS digest differs from project manifest")
-        required = {"badcases.jsonl", "evidence-manifest.json", "report.json", "report.md"}
-        if kind == "search-paired-replay":
-            required.add("cases.jsonl")
+        required = required_files.get(kind, set())
         if not required.issubset(sums):
             errors.append(f"{label} is missing files: {sorted(required - set(sums))}")
             continue
@@ -1202,8 +1229,17 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
             continue
         if package.get("schemaVersion") != expected_schemas.get(kind):
             errors.append(f"{label} package schema is invalid")
-        if package.get("kind") != kind:
+        if kind in {"customer-service-http", "search-paired-replay"} and package.get(
+            "kind"
+        ) != kind:
             errors.append(f"{label} package kind differs from descriptor")
+        package_identity = (
+            package.get("packageId") or package.get("runId")
+            if kind in {"customer-service-http", "search-paired-replay"}
+            else package.get("packageId") or package.get("benchmarkId")
+        )
+        if package_identity != package_id:
+            errors.append(f"{label} package ID differs from descriptor")
         if descriptor.get("runId") != package.get("runId") or package.get(
             "runId"
         ) != report.get("runId"):
@@ -1277,6 +1313,110 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
                 != package.get("selectedQrelsSha256")
             ):
                 errors.append(f"{label} paired replay provenance is invalid")
+        if kind == "customer-service-slot-replay":
+            if report.get("schemaVersion") != "aishop-customer-service-slot-replay/v1":
+                errors.append(f"{label} slot replay report schema is invalid")
+            if (
+                report.get("normalQualityDenominatorExcluded") is not True
+                or package.get("normalQualityDenominatorExcluded") is not True
+            ):
+                errors.append(f"{label} slot replay boundary is invalid")
+            dataset = report.get("dataset") or {}
+            if (
+                dataset.get("annotationStatus") != "HUMAN_VERIFIED"
+                or dataset.get("sha256") != package.get("datasetSha256")
+            ):
+                errors.append(f"{label} slot replay dataset binding is invalid")
+            baseline_sha = str(package.get("baselineReportSha256") or "")
+            if not HEX64.fullmatch(baseline_sha) or (
+                descriptor.get("baselineReportSha256") is not None
+                and descriptor.get("baselineReportSha256") != baseline_sha
+            ):
+                errors.append(f"{label} slot replay baseline binding is invalid")
+            paired_counts = report.get("pairedCaseCounts") or {}
+            try:
+                paired_total = sum(int(value) for value in paired_counts.values())
+                dataset_count = int(dataset.get("caseCount"))
+            except (TypeError, ValueError):
+                paired_total = -1
+                dataset_count = -2
+            if paired_total != dataset_count:
+                errors.append(f"{label} slot replay paired denominator is invalid")
+        if kind == "capacity-benchmark":
+            if report.get("schemaVersion") != "aishop-capacity-benchmark/v1":
+                errors.append(f"{label} capacity report schema is invalid")
+            if (
+                report.get("notProductionSlo") is not True
+                or report.get("normalQualityDenominatorExcluded") is not True
+                or package.get("notProductionSlo") is not True
+                or package.get("normalQualityDenominatorExcluded") is not True
+                or package.get("preflightPassed") is not True
+            ):
+                errors.append(f"{label} capacity claim boundary is invalid")
+            dataset = report.get("dataset") or {}
+            if (
+                dataset.get("annotationStatus") != "HUMAN_VERIFIED"
+                or dataset.get("sha256") != package.get("datasetSha256")
+            ):
+                errors.append(f"{label} capacity dataset binding is invalid")
+            configuration = report.get("configuration") or {}
+            try:
+                configured_levels = {
+                    str(int(value)) for value in configuration.get("concurrencies") or []
+                }
+                requests_per_level = int(configuration.get("requestsPerLevel"))
+            except (TypeError, ValueError):
+                configured_levels = set()
+                requests_per_level = 0
+            levels = report.get("levels") or {}
+            if configured_levels != set(levels) or requests_per_level <= 0:
+                errors.append(f"{label} capacity level configuration is invalid")
+            completed_total = 0
+            for concurrency, level in levels.items():
+                try:
+                    requested = int(level.get("requestedCount"))
+                    completed = int(level.get("completedCount"))
+                    level_concurrency = int(level.get("concurrency"))
+                except (AttributeError, TypeError, ValueError):
+                    errors.append(f"{label} capacity level {concurrency} is invalid")
+                    continue
+                if (
+                    requested != requests_per_level
+                    or completed != requested
+                    or level_concurrency != int(concurrency)
+                ):
+                    errors.append(f"{label} capacity level {concurrency} denominator is invalid")
+                completed_total += completed
+                cost_status = str((level.get("usage") or {}).get("costStatus") or "")
+                if cost_status not in {
+                    "PRICED",
+                    "UNPRICED",
+                    "MISSING_USAGE",
+                    "NOT_APPLICABLE",
+                }:
+                    errors.append(f"{label} capacity usage status is invalid")
+            observations_path = package_root / "observations.jsonl"
+            try:
+                observations = [
+                    json.loads(line)
+                    for line in observations_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                errors.append(f"{label} capacity observations are invalid: {exc}")
+                observations = []
+            if len(observations) != completed_total:
+                errors.append(f"{label} capacity observation denominator is invalid")
+            for observation in observations:
+                answer = observation.get("answer") or {}
+                if answer.get("rawStored") is not False or set(answer).difference(
+                    {"sha256", "chars", "rawStored"}
+                ):
+                    errors.append(f"{label} capacity answer redaction is invalid")
+                    break
+            role = str(descriptor.get("resultRole") or "")
+            if role not in {"BASELINE", "CURRENT", "TROUBLESHOOTING", "AUDIT_PROBE"}:
+                errors.append(f"{label} capacity result role is invalid")
         writable = [
             str(path.relative_to(package_root))
             for path in package_root.rglob("*")
@@ -1449,7 +1589,7 @@ def _validate_customer_service_answer_review(
     descriptor: Any,
     errors: list[str],
 ) -> None:
-    """Validate open human answer-review sheets and their HTTP observation binding."""
+    """Validate the v2 dual-blind answer-review draft and HTTP binding."""
 
     label = "evaluation.customerServiceAnswerReview"
     if not isinstance(descriptor, dict):
@@ -1498,6 +1638,32 @@ def _validate_customer_service_answer_review(
         "handoffAppropriate",
         "unsafeAnswer",
     }
+    expected_row_fields = {
+        "schemaVersion",
+        "caseId",
+        "reviewerId",
+        "guidelinesVersion",
+        "sourceRunId",
+        "sourceReportSha256",
+        "message",
+        "answer",
+        "sourceRefs",
+        "observedHandoff",
+        "labels",
+        "comment",
+    }
+    source_by_id: dict[str, dict[str, Any]] = {}
+    for source_case in report.get("cases") or []:
+        if not isinstance(source_case, dict):
+            continue
+        case_id = str(source_case.get("caseId") or "")
+        http = source_case.get("http") if isinstance(source_case.get("http"), dict) else {}
+        source_by_id[case_id] = {
+            "message": source_case.get("message"),
+            "answer": http.get("answer") or "",
+            "sourceRefs": http.get("sourceRefs") or [],
+            "observedHandoff": bool(http.get("handoffObserved")),
+        }
     for index, sheet_descriptor in enumerate(sheets, 1):
         sheet_label = f"{label}.reviewSheets[{index}]"
         if not isinstance(sheet_descriptor, dict):
@@ -1534,7 +1700,8 @@ def _validate_customer_service_answer_review(
             errors.append(f"{sheet_label} case IDs/count differ from HTTP report")
         if (
             sheet_manifest.get("schemaVersion")
-            != "aishop-customer-service-answer-review/v1"
+            != "aishop-customer-service-answer-review/v2"
+            or sheet_manifest.get("artifact") != "BLINDED_ANSWER_REVIEW_SHEET"
             or sheet_manifest.get("lifecycle") != "OPEN"
             or sheet_manifest.get("reviewerId") != reviewer_id
             or sheet_manifest.get("caseCount") != case_count
@@ -1544,22 +1711,46 @@ def _validate_customer_service_answer_review(
             or sheet_manifest.get("sourceReportSha256")
             != descriptor.get("sourceReportSha256")
             or sheet_manifest.get("sheetPath") != sheet_descriptor.get("path")
-            or sheet_manifest.get("sheetSha256AtExport")
+            or sheet_manifest.get("sheetSha256")
             != sheet_descriptor.get("sha256")
+            or sheet_manifest.get("containsExpectedOrSelfJudgment") is not False
         ):
             errors.append(f"{sheet_label} open-sheet manifest binding is invalid")
         if any(
             row.get("schemaVersion")
-            != "aishop-customer-service-answer-review/v1"
+            != "aishop-customer-service-answer-review/v2"
             or row.get("reviewerId") != reviewer_id
+            or row.get("guidelinesVersion") != "customer-service-answer-quality-v1"
             or row.get("sourceRunId") != source_run_id
             or row.get("sourceReportSha256")
             != descriptor.get("sourceReportSha256")
+            or set(row) != expected_row_fields
+            or any(
+                field not in row
+                for field in {
+                    "message",
+                    "answer",
+                    "sourceRefs",
+                    "observedHandoff",
+                    "comment",
+                }
+            )
             or set((row.get("labels") or {}).keys()) != expected_label_keys
             or any(value is not None for value in (row.get("labels") or {}).values())
             for row in sheet_rows
         ):
             errors.append(f"{sheet_label} is no longer an unfilled open sheet")
+        for row in sheet_rows:
+            case_id = str(row.get("caseId") or "")
+            source = source_by_id.get(case_id)
+            if source is None:
+                continue
+            for field in ("message", "answer", "sourceRefs", "observedHandoff"):
+                if _canonical_sha256(row.get(field)) != _canonical_sha256(source[field]):
+                    errors.append(
+                        f"{sheet_label} immutable source field differs for {case_id}: {field}"
+                    )
+                    break
         if _contains_forbidden_key(
             sheet_rows,
             {"expected", "predicted", "modelOutput", "modelPrediction"},
@@ -1567,6 +1758,67 @@ def _validate_customer_service_answer_review(
             errors.append(f"{sheet_label} leaks gold/model fields")
     if reviewers != {"reviewer-a", "reviewer-b"}:
         errors.append(f"{label}.reviewSheets must bind reviewer-a and reviewer-b")
+
+
+def _validate_pricing_estimate(
+    root: Path,
+    descriptor: Any,
+    errors: list[str],
+) -> None:
+    """Validate public list-price provenance without treating it as billing."""
+
+    label = "evaluation.pricingEstimate"
+    if not isinstance(descriptor, dict):
+        errors.append(f"{label} must be an object")
+        return
+    path = _resolve_hashed_file(
+        root,
+        descriptor,
+        path_field="path",
+        sha_field="sha256",
+        label=f"{label} file",
+        errors=errors,
+    )
+    if path is None:
+        return
+    try:
+        quote = _json(path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label} JSON is invalid: {exc}")
+        return
+    required = {
+        "schemaVersion",
+        "status",
+        "sourceUrl",
+        "retrievedAt",
+        "sourceContentSha256",
+        "provider",
+        "region",
+        "modelId",
+        "modelFingerprint",
+        "inputPriceCnyPerMillion",
+        "outputPriceCnyPerMillion",
+        "inputTokenUpperBound",
+        "quoteSha256",
+    }
+    if not required.issubset(quote):
+        errors.append(f"{label} is missing required provenance fields")
+    if (
+        quote.get("schemaVersion") != "aishop-list-price-estimate/v1"
+        or quote.get("status") != "ESTIMATED_LIST_PRICE"
+        or quote.get("usableForBudgetGate") is not False
+        or quote.get("billingContractVerified") is not False
+    ):
+        errors.append(f"{label} status or budget boundary is invalid")
+    source_hash = str(quote.get("sourceContentSha256") or "")
+    quote_hash = str(quote.get("quoteSha256") or "")
+    if not HEX64.fullmatch(source_hash) or not HEX64.fullmatch(quote_hash):
+        errors.append(f"{label} SHA-256 fields are invalid")
+    else:
+        without_hash = dict(quote)
+        without_hash.pop("quoteSha256", None)
+        if _canonical_sha256(without_hash) != quote_hash:
+            errors.append(f"{label} quoteSha256 does not match normalized quote")
 
 
 def _validate_claim_documents(root: Path, documents: Any, errors: list[str]) -> None:
@@ -1636,14 +1888,6 @@ def validate_repository(
         evaluation.get("customerServiceGold"),
         errors,
     )
-    # Keep the pre-adjudication draft descriptor validated as historical
-    # evidence when the current descriptor has moved to HUMAN_VERIFIED.
-    if evaluation.get("customerServiceGoldDraft") is not None:
-        _validate_customer_service_gold(
-            root,
-            evaluation.get("customerServiceGoldDraft"),
-            errors,
-        )
     _validate_customer_service_candidate(
         root,
         evaluation.get("customerServiceCandidateV2"),
@@ -1652,6 +1896,11 @@ def validate_repository(
     _validate_customer_service_answer_review(
         root,
         evaluation.get("customerServiceAnswerReview"),
+        errors,
+    )
+    _validate_pricing_estimate(
+        root,
+        evaluation.get("pricingEstimate"),
         errors,
     )
     ids = [str(row.get("id") or "") for row in all_rows]

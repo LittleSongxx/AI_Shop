@@ -1,0 +1,261 @@
+{
+  "baseline": {
+    "reportPath": "/home/song/code/Java/AI_Shop/AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/report.json",
+    "reportSha256": "d24d3b59da38ac3521f55d5c60850029a053f15db2db7184d4c8cead313d8c2a",
+    "resolverSourceSha256": "9d9e9cd1d08c74d9b38f6a158e70f154d0995be380cda2cd70a3f046d3799358"
+  },
+  "candidate": {
+    "allowLlm": false,
+    "resolverSourceSha256": "2e1444d5623148835eb53d066674ea38350671c1e836a6f71b9bcac108809117"
+  },
+  "createdAt": "2026-08-23T14:09:39.391Z",
+  "dataset": {
+    "annotationStatus": "HUMAN_VERIFIED",
+    "caseCount": 60,
+    "path": "/home/song/code/Java/AI_Shop/AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+  },
+  "intentControl": {
+    "after": {
+      "badcaseIds": [
+        "cs-gold-v1-011",
+        "cs-gold-v1-044",
+        "cs-gold-v1-057"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.929286,
+        "method": "stratified-case-bootstrap-macro-F1",
+        "stratumCount": 25,
+        "upper": 0.987409
+      },
+      "denominator": 20,
+      "numerator": 19.105978,
+      "value": 0.955299
+    },
+    "before": {
+      "badcaseIds": [
+        "cs-gold-v1-011",
+        "cs-gold-v1-044",
+        "cs-gold-v1-057"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.642094,
+        "method": "case-bootstrap-macro-F1",
+        "upper": 0.92619
+      },
+      "denominator": 20,
+      "numerator": 19.105978,
+      "value": 0.955299
+    },
+    "unchanged": true
+  },
+  "limitations": [
+    "Same-gold paired replay isolates a code change; it is not a new independent test set.",
+    "The HUMAN_VERIFIED labels and historical report are read-only and were not modified.",
+    "Raw amount formatting remains strict, so currency-prefix/suffix differences remain visible badcases.",
+    "A perfect or near-perfect result on 60 fixed cases does not establish open-world accuracy."
+  ],
+  "metrics": {
+    "slotEntitySpanF1": {
+      "absoluteDelta": 0.088712,
+      "after": {
+        "badcaseIds": [
+          "cs-gold-v1-009",
+          "cs-gold-v1-020",
+          "cs-gold-v1-058"
+        ],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.995061,
+          "method": "stratified-case-bootstrap-micro-F1",
+          "stratumCount": 27,
+          "upper": 0.997636
+        },
+        "denominator": 825,
+        "numerator": 822,
+        "value": 0.996364
+      },
+      "before": {
+        "badcaseIds": [
+          "cs-gold-v1-001",
+          "cs-gold-v1-002",
+          "cs-gold-v1-003",
+          "cs-gold-v1-009",
+          "cs-gold-v1-020",
+          "cs-gold-v1-029",
+          "cs-gold-v1-033",
+          "cs-gold-v1-034",
+          "cs-gold-v1-041",
+          "cs-gold-v1-042",
+          "cs-gold-v1-043",
+          "cs-gold-v1-045",
+          "cs-gold-v1-055",
+          "cs-gold-v1-058",
+          "cs-gold-v1-059"
+        ],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.884563,
+          "method": "percentile-bootstrap",
+          "upper": 0.961881
+        },
+        "denominator": 414,
+        "numerator": 344,
+        "value": 0.907652
+      },
+      "fixedCaseIds": [
+        "cs-gold-v1-001",
+        "cs-gold-v1-002",
+        "cs-gold-v1-003",
+        "cs-gold-v1-029",
+        "cs-gold-v1-033",
+        "cs-gold-v1-034",
+        "cs-gold-v1-041",
+        "cs-gold-v1-042",
+        "cs-gold-v1-043",
+        "cs-gold-v1-045",
+        "cs-gold-v1-055",
+        "cs-gold-v1-059"
+      ],
+      "regressedCaseIds": [],
+      "residualCaseIds": [
+        "cs-gold-v1-009",
+        "cs-gold-v1-020",
+        "cs-gold-v1-058"
+      ]
+    },
+    "slotExactMatch": {
+      "absoluteDelta": 0.352941,
+      "after": {
+        "badcaseIds": [
+          "cs-gold-v1-009",
+          "cs-gold-v1-020",
+          "cs-gold-v1-058"
+        ],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.770395,
+          "method": "wilson",
+          "upper": 0.969534
+        },
+        "denominator": 34,
+        "numerator": 31,
+        "value": 0.911765
+      },
+      "before": {
+        "badcaseIds": [
+          "cs-gold-v1-001",
+          "cs-gold-v1-002",
+          "cs-gold-v1-003",
+          "cs-gold-v1-009",
+          "cs-gold-v1-020",
+          "cs-gold-v1-029",
+          "cs-gold-v1-033",
+          "cs-gold-v1-034",
+          "cs-gold-v1-041",
+          "cs-gold-v1-042",
+          "cs-gold-v1-043",
+          "cs-gold-v1-045",
+          "cs-gold-v1-055",
+          "cs-gold-v1-058",
+          "cs-gold-v1-059"
+        ],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.394539,
+          "method": "wilson",
+          "upper": 0.711165
+        },
+        "denominator": 34,
+        "numerator": 19,
+        "value": 0.558824
+      },
+      "fixedCaseIds": [
+        "cs-gold-v1-001",
+        "cs-gold-v1-002",
+        "cs-gold-v1-003",
+        "cs-gold-v1-029",
+        "cs-gold-v1-033",
+        "cs-gold-v1-034",
+        "cs-gold-v1-041",
+        "cs-gold-v1-042",
+        "cs-gold-v1-043",
+        "cs-gold-v1-045",
+        "cs-gold-v1-055",
+        "cs-gold-v1-059"
+      ],
+      "regressedCaseIds": [],
+      "residualCaseIds": [
+        "cs-gold-v1-009",
+        "cs-gold-v1-020",
+        "cs-gold-v1-058"
+      ]
+    }
+  },
+  "normalQualityDenominatorExcluded": true,
+  "pairedCaseCounts": {
+    "FIXED": 12,
+    "NOT_APPLICABLE": 26,
+    "REGRESSED": 0,
+    "RESIDUAL": 3,
+    "UNCHANGED_PASS": 19
+  },
+  "releaseGateEligible": false,
+  "runId": "customer-service-slot-replay-v1-20260823",
+  "schemaVersion": "aishop-customer-service-slot-replay/v1",
+  "sourceFingerprint": {
+    "capturedAt": "2026-08-23T14:09:39.397Z",
+    "git": {
+      "commit": "79ffa45e0292c8580b1225fd454a6c96535462ae",
+      "worktreeDirty": true
+    },
+    "knowledge": {
+      "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+      "fileCount": 14,
+      "sha256": "d16067f3ea9ff09981aef96793c9aec7f4c993a2184ec3a60069c3f7f2feeae7"
+    },
+    "providerConfiguration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 3,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 60
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+    "source": {
+      "fileCount": 239,
+      "sha256": "7bb658b877816ca19b4b8dcae50a90f4bec5fb9067f841d5d379867a83ae8750"
+    }
+  },
+  "status": "PAIRED_REPLAY_COMPLETE"
+}

@@ -100,6 +100,8 @@ def _error_result(case: EvaluationCase, exc: Exception) -> CaseResult:
             "costCny": None,
             "costStatus": "MISSING_USAGE",
             "usageReported": False,
+            "usageSource": "none",
+            "missingReason": "evaluation_case_error_before_provider_usage",
         },
     )
 

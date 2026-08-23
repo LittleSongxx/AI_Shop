@@ -1,0 +1,4248 @@
+{
+  "claim": "LOCAL_FULL_STACK_READ_ONLY_CAPACITY_OBSERVATION",
+  "configuration": {
+    "concurrencies": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "requestIsolation": [
+      "evaluationUserId",
+      "requestId",
+      "idempotencyKey",
+      "traceId"
+    ],
+    "requestsPerLevel": 8,
+    "resourceSampleIntervalSeconds": 0.2,
+    "timeoutSeconds": 180.0
+  },
+  "createdAt": "2026-08-23T14:27:35.536Z",
+  "dataset": {
+    "annotationStatus": "HUMAN_VERIFIED",
+    "caseContracts": [
+      {
+        "caseId": "cs-gold-v1-001",
+        "intent": "PRODUCT_SEARCH",
+        "requiredProviders": [
+          "agent-runtime",
+          "llm"
+        ]
+      },
+      {
+        "caseId": "cs-gold-v1-003",
+        "intent": "PRODUCT_CONSULT",
+        "requiredProviders": [
+          "agent-runtime",
+          "llm"
+        ]
+      },
+      {
+        "caseId": "cs-gold-v1-004",
+        "intent": "QUERY_ORDER",
+        "requiredProviders": [
+          "agent-runtime"
+        ]
+      },
+      {
+        "caseId": "cs-gold-v1-028",
+        "intent": "CHAT",
+        "requiredProviders": [
+          "agent-runtime",
+          "llm"
+        ]
+      }
+    ],
+    "caseCount": 4,
+    "path": "/home/song/code/Java/AI_Shop/AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+    "selectedCaseIds": [
+      "cs-gold-v1-001",
+      "cs-gold-v1-003",
+      "cs-gold-v1-004",
+      "cs-gold-v1-028"
+    ],
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+  },
+  "levels": {
+    "1": {
+      "achievedQps": 0.236836,
+      "badcaseTrialIds": [],
+      "badcases": [],
+      "caseMetrics": {
+        "cs-gold-v1-001": {
+          "latencyMs": {
+            "max": 673.535,
+            "p50": 659.418,
+            "p95": 672.123,
+            "p99": 673.253,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-003": {
+          "latencyMs": {
+            "max": 687.567,
+            "p50": 660.53,
+            "p95": 684.863,
+            "p99": 687.026,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-004": {
+          "latencyMs": {
+            "max": 768.607,
+            "p50": 695.053,
+            "p95": 761.252,
+            "p99": 767.136,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-028": {
+          "latencyMs": {
+            "max": 14852.415,
+            "p50": 14847.033,
+            "p95": 14851.877,
+            "p99": 14852.307,
+            "sampleCount": 2
+          },
+          "providerCalls": 6,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "completedCount": 8,
+      "concurrency": 1,
+      "errorCount": 0,
+      "executionRate": 1.0,
+      "latencyMs": {
+        "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+        "max": 14852.415,
+        "p50": 680.551,
+        "p95": 14848.648,
+        "p99": 14851.662,
+        "sampleCount": 8
+      },
+      "pathMetrics": {
+        "DETERMINISTIC": {
+          "latencyMs": {
+            "max": 768.607,
+            "p50": 659.418,
+            "p95": 748.347,
+            "p99": 764.555,
+            "sampleCount": 6
+          },
+          "providerCalls": 0,
+          "requestCount": 6,
+          "successRate": 1.0,
+          "successfulCount": 6
+        },
+        "LLM": {
+          "latencyMs": {
+            "max": 14852.415,
+            "p50": 14847.033,
+            "p95": 14851.877,
+            "p99": 14852.307,
+            "sampleCount": 2
+          },
+          "providerCalls": 6,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "requestedCount": 8,
+      "resources": {
+        "hostCpuUsedPercent": {
+          "max": 66.124,
+          "p50": 6.231,
+          "p95": 43.437,
+          "p99": 56.051,
+          "sampleCount": 169
+        },
+        "hostMemoryUsedPercent": {
+          "max": 67.374,
+          "p50": 66.582,
+          "p95": 67.06,
+          "p99": 67.214,
+          "sampleCount": 169
+        },
+        "rawSamples": [
+          {
+            "hostCpuUsedPercent": 32.919,
+            "hostLoad1m": 5.123,
+            "hostMemoryAvailableMiB": 11886.297,
+            "hostMemoryUsedPercent": 67.056,
+            "observedAt": "2026-08-23T14:26:03.248Z"
+          },
+          {
+            "hostCpuUsedPercent": 23.175,
+            "hostLoad1m": 5.123,
+            "hostMemoryAvailableMiB": 11865.766,
+            "hostMemoryUsedPercent": 67.113,
+            "observedAt": "2026-08-23T14:26:03.448Z"
+          },
+          {
+            "hostCpuUsedPercent": 26.168,
+            "hostLoad1m": 5.123,
+            "hostMemoryAvailableMiB": 11835.477,
+            "hostMemoryUsedPercent": 67.197,
+            "observedAt": "2026-08-23T14:26:03.649Z"
+          },
+          {
+            "hostCpuUsedPercent": 43.396,
+            "hostLoad1m": 5.123,
+            "hostMemoryAvailableMiB": 12030.898,
+            "hostMemoryUsedPercent": 66.655,
+            "observedAt": "2026-08-23T14:26:03.850Z"
+          },
+          {
+            "hostCpuUsedPercent": 38.658,
+            "hostLoad1m": 5.123,
+            "hostMemoryAvailableMiB": 11998.48,
+            "hostMemoryUsedPercent": 66.745,
+            "observedAt": "2026-08-23T14:26:04.050Z"
+          },
+          {
+            "hostCpuUsedPercent": 48.837,
+            "hostLoad1m": 5.123,
+            "hostMemoryAvailableMiB": 11994.488,
+            "hostMemoryUsedPercent": 66.756,
+            "observedAt": "2026-08-23T14:26:04.251Z"
+          },
+          {
+            "hostCpuUsedPercent": 37.015,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12079.176,
+            "hostMemoryUsedPercent": 66.521,
+            "observedAt": "2026-08-23T14:26:04.452Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.491,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.223,
+            "hostMemoryUsedPercent": 66.538,
+            "observedAt": "2026-08-23T14:26:04.653Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.208,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.32,
+            "hostMemoryUsedPercent": 66.538,
+            "observedAt": "2026-08-23T14:26:04.854Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.05,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12072.836,
+            "hostMemoryUsedPercent": 66.539,
+            "observedAt": "2026-08-23T14:26:05.054Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.673,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.059,
+            "hostMemoryUsedPercent": 66.538,
+            "observedAt": "2026-08-23T14:26:05.255Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.135,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.113,
+            "hostMemoryUsedPercent": 66.538,
+            "observedAt": "2026-08-23T14:26:05.456Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.047,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12072.137,
+            "hostMemoryUsedPercent": 66.541,
+            "observedAt": "2026-08-23T14:26:05.657Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.562,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12072.133,
+            "hostMemoryUsedPercent": 66.541,
+            "observedAt": "2026-08-23T14:26:05.858Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.669,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12071.648,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:26:06.059Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.715,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12071.723,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:26:06.260Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.946,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12071.793,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:26:06.461Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.738,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12071.301,
+            "hostMemoryUsedPercent": 66.543,
+            "observedAt": "2026-08-23T14:26:06.661Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.395,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12071.555,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:26:06.863Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.881,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12072.297,
+            "hostMemoryUsedPercent": 66.54,
+            "observedAt": "2026-08-23T14:26:07.064Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.106,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12072.113,
+            "hostMemoryUsedPercent": 66.541,
+            "observedAt": "2026-08-23T14:26:07.264Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.125,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12071.629,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:26:07.465Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.604,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12068.109,
+            "hostMemoryUsedPercent": 66.552,
+            "observedAt": "2026-08-23T14:26:07.666Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.774,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12067.191,
+            "hostMemoryUsedPercent": 66.555,
+            "observedAt": "2026-08-23T14:26:07.867Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.403,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12067.637,
+            "hostMemoryUsedPercent": 66.553,
+            "observedAt": "2026-08-23T14:26:08.067Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.438,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12067.66,
+            "hostMemoryUsedPercent": 66.553,
+            "observedAt": "2026-08-23T14:26:08.268Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.262,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12067.66,
+            "hostMemoryUsedPercent": 66.553,
+            "observedAt": "2026-08-23T14:26:08.471Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.837,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.312,
+            "hostMemoryUsedPercent": 66.538,
+            "observedAt": "2026-08-23T14:26:08.671Z"
+          },
+          {
+            "hostCpuUsedPercent": 16.615,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.602,
+            "hostMemoryUsedPercent": 66.537,
+            "observedAt": "2026-08-23T14:26:08.872Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12072.117,
+            "hostMemoryUsedPercent": 66.541,
+            "observedAt": "2026-08-23T14:26:09.073Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.16,
+            "hostLoad1m": 4.712,
+            "hostMemoryAvailableMiB": 12073.594,
+            "hostMemoryUsedPercent": 66.537,
+            "observedAt": "2026-08-23T14:26:09.275Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.215,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12072.375,
+            "hostMemoryUsedPercent": 66.54,
+            "observedAt": "2026-08-23T14:26:09.475Z"
+          },
+          {
+            "hostCpuUsedPercent": 26.154,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12004.324,
+            "hostMemoryUsedPercent": 66.729,
+            "observedAt": "2026-08-23T14:26:09.676Z"
+          },
+          {
+            "hostCpuUsedPercent": 43.464,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 11991.758,
+            "hostMemoryUsedPercent": 66.764,
+            "observedAt": "2026-08-23T14:26:09.877Z"
+          },
+          {
+            "hostCpuUsedPercent": 35.644,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 11988.078,
+            "hostMemoryUsedPercent": 66.774,
+            "observedAt": "2026-08-23T14:26:10.078Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.812,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12073.891,
+            "hostMemoryUsedPercent": 66.536,
+            "observedAt": "2026-08-23T14:26:10.279Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.786,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12077.75,
+            "hostMemoryUsedPercent": 66.525,
+            "observedAt": "2026-08-23T14:26:10.481Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12077.77,
+            "hostMemoryUsedPercent": 66.525,
+            "observedAt": "2026-08-23T14:26:10.681Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.887,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12081.816,
+            "hostMemoryUsedPercent": 66.514,
+            "observedAt": "2026-08-23T14:26:10.882Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.625,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12078.918,
+            "hostMemoryUsedPercent": 66.522,
+            "observedAt": "2026-08-23T14:26:11.083Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.592,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12076.637,
+            "hostMemoryUsedPercent": 66.528,
+            "observedAt": "2026-08-23T14:26:11.283Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.943,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12076.52,
+            "hostMemoryUsedPercent": 66.529,
+            "observedAt": "2026-08-23T14:26:11.484Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.174,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12076.52,
+            "hostMemoryUsedPercent": 66.529,
+            "observedAt": "2026-08-23T14:26:11.685Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.631,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12076.535,
+            "hostMemoryUsedPercent": 66.529,
+            "observedAt": "2026-08-23T14:26:11.885Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.28,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12075.012,
+            "hostMemoryUsedPercent": 66.533,
+            "observedAt": "2026-08-23T14:26:12.087Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.903,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12065.566,
+            "hostMemoryUsedPercent": 66.559,
+            "observedAt": "2026-08-23T14:26:12.288Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.063,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12074.613,
+            "hostMemoryUsedPercent": 66.534,
+            "observedAt": "2026-08-23T14:26:12.489Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.231,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12073.594,
+            "hostMemoryUsedPercent": 66.537,
+            "observedAt": "2026-08-23T14:26:12.689Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.202,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12058.125,
+            "hostMemoryUsedPercent": 66.58,
+            "observedAt": "2026-08-23T14:26:12.890Z"
+          },
+          {
+            "hostCpuUsedPercent": 58.567,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12052.605,
+            "hostMemoryUsedPercent": 66.595,
+            "observedAt": "2026-08-23T14:26:13.091Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.836,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12053.836,
+            "hostMemoryUsedPercent": 66.592,
+            "observedAt": "2026-08-23T14:26:13.292Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.567,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12053.844,
+            "hostMemoryUsedPercent": 66.592,
+            "observedAt": "2026-08-23T14:26:13.492Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.27,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12051.902,
+            "hostMemoryUsedPercent": 66.597,
+            "observedAt": "2026-08-23T14:26:13.693Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.231,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 12031.137,
+            "hostMemoryUsedPercent": 66.654,
+            "observedAt": "2026-08-23T14:26:13.893Z"
+          },
+          {
+            "hostCpuUsedPercent": 18.495,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 11993.914,
+            "hostMemoryUsedPercent": 66.758,
+            "observedAt": "2026-08-23T14:26:14.094Z"
+          },
+          {
+            "hostCpuUsedPercent": 23.344,
+            "hostLoad1m": 4.334,
+            "hostMemoryAvailableMiB": 11943.117,
+            "hostMemoryUsedPercent": 66.898,
+            "observedAt": "2026-08-23T14:26:14.295Z"
+          },
+          {
+            "hostCpuUsedPercent": 25.697,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11902.691,
+            "hostMemoryUsedPercent": 67.01,
+            "observedAt": "2026-08-23T14:26:14.496Z"
+          },
+          {
+            "hostCpuUsedPercent": 16.026,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11880.309,
+            "hostMemoryUsedPercent": 67.072,
+            "observedAt": "2026-08-23T14:26:14.697Z"
+          },
+          {
+            "hostCpuUsedPercent": 14.907,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11859.395,
+            "hostMemoryUsedPercent": 67.13,
+            "observedAt": "2026-08-23T14:26:14.898Z"
+          },
+          {
+            "hostCpuUsedPercent": 16.358,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11822.574,
+            "hostMemoryUsedPercent": 67.232,
+            "observedAt": "2026-08-23T14:26:15.098Z"
+          },
+          {
+            "hostCpuUsedPercent": 41.534,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11972.031,
+            "hostMemoryUsedPercent": 66.818,
+            "observedAt": "2026-08-23T14:26:15.299Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.867,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11901.621,
+            "hostMemoryUsedPercent": 67.013,
+            "observedAt": "2026-08-23T14:26:15.500Z"
+          },
+          {
+            "hostCpuUsedPercent": 66.124,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11887.129,
+            "hostMemoryUsedPercent": 67.054,
+            "observedAt": "2026-08-23T14:26:15.701Z"
+          },
+          {
+            "hostCpuUsedPercent": 48.675,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 11965.379,
+            "hostMemoryUsedPercent": 66.837,
+            "observedAt": "2026-08-23T14:26:15.902Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.777,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12053.48,
+            "hostMemoryUsedPercent": 66.593,
+            "observedAt": "2026-08-23T14:26:16.102Z"
+          },
+          {
+            "hostCpuUsedPercent": 14.688,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12049.301,
+            "hostMemoryUsedPercent": 66.604,
+            "observedAt": "2026-08-23T14:26:16.303Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.201,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12046.984,
+            "hostMemoryUsedPercent": 66.611,
+            "observedAt": "2026-08-23T14:26:16.504Z"
+          },
+          {
+            "hostCpuUsedPercent": 14.511,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12046.496,
+            "hostMemoryUsedPercent": 66.612,
+            "observedAt": "2026-08-23T14:26:16.705Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.181,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12046.492,
+            "hostMemoryUsedPercent": 66.612,
+            "observedAt": "2026-08-23T14:26:16.905Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.247,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12045.52,
+            "hostMemoryUsedPercent": 66.615,
+            "observedAt": "2026-08-23T14:26:17.106Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.769,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12045.047,
+            "hostMemoryUsedPercent": 66.616,
+            "observedAt": "2026-08-23T14:26:17.307Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.994,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12043.711,
+            "hostMemoryUsedPercent": 66.62,
+            "observedAt": "2026-08-23T14:26:17.508Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.5,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12036.223,
+            "hostMemoryUsedPercent": 66.64,
+            "observedAt": "2026-08-23T14:26:17.710Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.669,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12041.672,
+            "hostMemoryUsedPercent": 66.625,
+            "observedAt": "2026-08-23T14:26:17.910Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.25,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12041.672,
+            "hostMemoryUsedPercent": 66.625,
+            "observedAt": "2026-08-23T14:26:18.111Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.688,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12040.887,
+            "hostMemoryUsedPercent": 66.627,
+            "observedAt": "2026-08-23T14:26:18.312Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.673,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12040.449,
+            "hostMemoryUsedPercent": 66.629,
+            "observedAt": "2026-08-23T14:26:18.513Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.188,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12048.562,
+            "hostMemoryUsedPercent": 66.606,
+            "observedAt": "2026-08-23T14:26:18.714Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12047.691,
+            "hostMemoryUsedPercent": 66.609,
+            "observedAt": "2026-08-23T14:26:18.914Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.881,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12047.691,
+            "hostMemoryUsedPercent": 66.609,
+            "observedAt": "2026-08-23T14:26:19.114Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.857,
+            "hostLoad1m": 4.468,
+            "hostMemoryAvailableMiB": 12047.449,
+            "hostMemoryUsedPercent": 66.609,
+            "observedAt": "2026-08-23T14:26:19.315Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.875,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12044.504,
+            "hostMemoryUsedPercent": 66.617,
+            "observedAt": "2026-08-23T14:26:19.516Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.572,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12044.426,
+            "hostMemoryUsedPercent": 66.618,
+            "observedAt": "2026-08-23T14:26:19.717Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.05,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12043.547,
+            "hostMemoryUsedPercent": 66.62,
+            "observedAt": "2026-08-23T14:26:19.917Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.28,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12042.48,
+            "hostMemoryUsedPercent": 66.623,
+            "observedAt": "2026-08-23T14:26:20.118Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.125,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12042.703,
+            "hostMemoryUsedPercent": 66.622,
+            "observedAt": "2026-08-23T14:26:20.318Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.477,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12040.262,
+            "hostMemoryUsedPercent": 66.629,
+            "observedAt": "2026-08-23T14:26:20.519Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.502,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12039.977,
+            "hostMemoryUsedPercent": 66.63,
+            "observedAt": "2026-08-23T14:26:20.720Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.907,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12041.258,
+            "hostMemoryUsedPercent": 66.626,
+            "observedAt": "2026-08-23T14:26:20.921Z"
+          },
+          {
+            "hostCpuUsedPercent": 28.289,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 11968.945,
+            "hostMemoryUsedPercent": 66.827,
+            "observedAt": "2026-08-23T14:26:21.121Z"
+          },
+          {
+            "hostCpuUsedPercent": 52.41,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 11961.074,
+            "hostMemoryUsedPercent": 66.849,
+            "observedAt": "2026-08-23T14:26:21.322Z"
+          },
+          {
+            "hostCpuUsedPercent": 28.094,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12045.562,
+            "hostMemoryUsedPercent": 66.614,
+            "observedAt": "2026-08-23T14:26:21.524Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.288,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12053.387,
+            "hostMemoryUsedPercent": 66.593,
+            "observedAt": "2026-08-23T14:26:21.724Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.875,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12053.141,
+            "hostMemoryUsedPercent": 66.593,
+            "observedAt": "2026-08-23T14:26:21.925Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.75,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12053.234,
+            "hostMemoryUsedPercent": 66.593,
+            "observedAt": "2026-08-23T14:26:22.126Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.984,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12058.547,
+            "hostMemoryUsedPercent": 66.578,
+            "observedAt": "2026-08-23T14:26:22.326Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.627,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12045.719,
+            "hostMemoryUsedPercent": 66.614,
+            "observedAt": "2026-08-23T14:26:22.529Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.411,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12056.555,
+            "hostMemoryUsedPercent": 66.584,
+            "observedAt": "2026-08-23T14:26:22.729Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.312,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12055.074,
+            "hostMemoryUsedPercent": 66.588,
+            "observedAt": "2026-08-23T14:26:22.930Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.75,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12054.898,
+            "hostMemoryUsedPercent": 66.589,
+            "observedAt": "2026-08-23T14:26:23.131Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.94,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12054.898,
+            "hostMemoryUsedPercent": 66.589,
+            "observedAt": "2026-08-23T14:26:23.332Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.484,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12055.148,
+            "hostMemoryUsedPercent": 66.588,
+            "observedAt": "2026-08-23T14:26:23.533Z"
+          },
+          {
+            "hostCpuUsedPercent": 18.495,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12048.805,
+            "hostMemoryUsedPercent": 66.605,
+            "observedAt": "2026-08-23T14:26:23.733Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.416,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12057.086,
+            "hostMemoryUsedPercent": 66.583,
+            "observedAt": "2026-08-23T14:26:23.934Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.242,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12057.086,
+            "hostMemoryUsedPercent": 66.583,
+            "observedAt": "2026-08-23T14:26:24.135Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.484,
+            "hostLoad1m": 4.351,
+            "hostMemoryAvailableMiB": 12057.086,
+            "hostMemoryUsedPercent": 66.583,
+            "observedAt": "2026-08-23T14:26:24.336Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.106,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12057.094,
+            "hostMemoryUsedPercent": 66.582,
+            "observedAt": "2026-08-23T14:26:24.537Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.101,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12056.074,
+            "hostMemoryUsedPercent": 66.585,
+            "observedAt": "2026-08-23T14:26:24.738Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.096,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12056.133,
+            "hostMemoryUsedPercent": 66.585,
+            "observedAt": "2026-08-23T14:26:24.939Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.047,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12055.371,
+            "hostMemoryUsedPercent": 66.587,
+            "observedAt": "2026-08-23T14:26:25.139Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.804,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12051.594,
+            "hostMemoryUsedPercent": 66.598,
+            "observedAt": "2026-08-23T14:26:25.340Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.303,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12013.836,
+            "hostMemoryUsedPercent": 66.702,
+            "observedAt": "2026-08-23T14:26:25.541Z"
+          },
+          {
+            "hostCpuUsedPercent": 20.755,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11956.344,
+            "hostMemoryUsedPercent": 66.862,
+            "observedAt": "2026-08-23T14:26:25.743Z"
+          },
+          {
+            "hostCpuUsedPercent": 22.013,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11911.781,
+            "hostMemoryUsedPercent": 66.985,
+            "observedAt": "2026-08-23T14:26:25.943Z"
+          },
+          {
+            "hostCpuUsedPercent": 19.811,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11884.035,
+            "hostMemoryUsedPercent": 67.062,
+            "observedAt": "2026-08-23T14:26:26.145Z"
+          },
+          {
+            "hostCpuUsedPercent": 14.375,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11864.84,
+            "hostMemoryUsedPercent": 67.115,
+            "observedAt": "2026-08-23T14:26:26.345Z"
+          },
+          {
+            "hostCpuUsedPercent": 15.409,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11832.148,
+            "hostMemoryUsedPercent": 67.206,
+            "observedAt": "2026-08-23T14:26:26.546Z"
+          },
+          {
+            "hostCpuUsedPercent": 33.846,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11771.645,
+            "hostMemoryUsedPercent": 67.374,
+            "observedAt": "2026-08-23T14:26:26.748Z"
+          },
+          {
+            "hostCpuUsedPercent": 37.624,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11981.008,
+            "hostMemoryUsedPercent": 66.793,
+            "observedAt": "2026-08-23T14:26:26.949Z"
+          },
+          {
+            "hostCpuUsedPercent": 41.275,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 11973.527,
+            "hostMemoryUsedPercent": 66.814,
+            "observedAt": "2026-08-23T14:26:27.150Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.009,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12059.938,
+            "hostMemoryUsedPercent": 66.575,
+            "observedAt": "2026-08-23T14:26:27.351Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.887,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12059.477,
+            "hostMemoryUsedPercent": 66.576,
+            "observedAt": "2026-08-23T14:26:27.551Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.562,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12059.469,
+            "hostMemoryUsedPercent": 66.576,
+            "observedAt": "2026-08-23T14:26:27.752Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.385,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12063.117,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:26:27.952Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.438,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12062.289,
+            "hostMemoryUsedPercent": 66.568,
+            "observedAt": "2026-08-23T14:26:28.153Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.631,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12064.996,
+            "hostMemoryUsedPercent": 66.561,
+            "observedAt": "2026-08-23T14:26:28.354Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.484,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12065.016,
+            "hostMemoryUsedPercent": 66.561,
+            "observedAt": "2026-08-23T14:26:28.555Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.702,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12063.234,
+            "hostMemoryUsedPercent": 66.565,
+            "observedAt": "2026-08-23T14:26:28.756Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.524,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12065.094,
+            "hostMemoryUsedPercent": 66.56,
+            "observedAt": "2026-08-23T14:26:28.957Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.896,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12064.547,
+            "hostMemoryUsedPercent": 66.562,
+            "observedAt": "2026-08-23T14:26:29.157Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.79,
+            "hostLoad1m": 4.082,
+            "hostMemoryAvailableMiB": 12063.531,
+            "hostMemoryUsedPercent": 66.565,
+            "observedAt": "2026-08-23T14:26:29.358Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.893,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12063.535,
+            "hostMemoryUsedPercent": 66.565,
+            "observedAt": "2026-08-23T14:26:29.559Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.484,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12063.535,
+            "hostMemoryUsedPercent": 66.565,
+            "observedAt": "2026-08-23T14:26:29.760Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.075,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12062.949,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:26:29.960Z"
+          },
+          {
+            "hostCpuUsedPercent": 17.125,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12058.512,
+            "hostMemoryUsedPercent": 66.579,
+            "observedAt": "2026-08-23T14:26:30.161Z"
+          },
+          {
+            "hostCpuUsedPercent": 15.625,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12060.125,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:26:30.362Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.453,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12060.25,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:26:30.562Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.416,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12061.402,
+            "hostMemoryUsedPercent": 66.571,
+            "observedAt": "2026-08-23T14:26:30.763Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.438,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12058.262,
+            "hostMemoryUsedPercent": 66.579,
+            "observedAt": "2026-08-23T14:26:30.963Z"
+          },
+          {
+            "hostCpuUsedPercent": 29.781,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 11997.152,
+            "hostMemoryUsedPercent": 66.749,
+            "observedAt": "2026-08-23T14:26:31.164Z"
+          },
+          {
+            "hostCpuUsedPercent": 48.243,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 11988.281,
+            "hostMemoryUsedPercent": 66.773,
+            "observedAt": "2026-08-23T14:26:31.364Z"
+          },
+          {
+            "hostCpuUsedPercent": 41.72,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 11984.031,
+            "hostMemoryUsedPercent": 66.785,
+            "observedAt": "2026-08-23T14:26:31.565Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.175,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12062.914,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:26:31.766Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.658,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12062.422,
+            "hostMemoryUsedPercent": 66.568,
+            "observedAt": "2026-08-23T14:26:31.966Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.738,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12060.465,
+            "hostMemoryUsedPercent": 66.573,
+            "observedAt": "2026-08-23T14:26:32.166Z"
+          },
+          {
+            "hostCpuUsedPercent": 23.123,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12016.152,
+            "hostMemoryUsedPercent": 66.696,
+            "observedAt": "2026-08-23T14:26:32.368Z"
+          },
+          {
+            "hostCpuUsedPercent": 40.379,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 11983.953,
+            "hostMemoryUsedPercent": 66.785,
+            "observedAt": "2026-08-23T14:26:32.569Z"
+          },
+          {
+            "hostCpuUsedPercent": 44.66,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 11964.953,
+            "hostMemoryUsedPercent": 66.838,
+            "observedAt": "2026-08-23T14:26:32.770Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.987,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12059.992,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:26:32.970Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.188,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12059.66,
+            "hostMemoryUsedPercent": 66.575,
+            "observedAt": "2026-08-23T14:26:33.171Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.635,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12058.711,
+            "hostMemoryUsedPercent": 66.578,
+            "observedAt": "2026-08-23T14:26:33.371Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.598,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12058.648,
+            "hostMemoryUsedPercent": 66.578,
+            "observedAt": "2026-08-23T14:26:33.572Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.952,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12058.438,
+            "hostMemoryUsedPercent": 66.579,
+            "observedAt": "2026-08-23T14:26:33.772Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.502,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12057.906,
+            "hostMemoryUsedPercent": 66.58,
+            "observedAt": "2026-08-23T14:26:33.974Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.631,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12057.824,
+            "hostMemoryUsedPercent": 66.58,
+            "observedAt": "2026-08-23T14:26:34.174Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.28,
+            "hostLoad1m": 3.835,
+            "hostMemoryAvailableMiB": 12058.266,
+            "hostMemoryUsedPercent": 66.579,
+            "observedAt": "2026-08-23T14:26:34.376Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.135,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12058.719,
+            "hostMemoryUsedPercent": 66.578,
+            "observedAt": "2026-08-23T14:26:34.577Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.946,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12058.977,
+            "hostMemoryUsedPercent": 66.577,
+            "observedAt": "2026-08-23T14:26:34.778Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.887,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12058.996,
+            "hostMemoryUsedPercent": 66.577,
+            "observedAt": "2026-08-23T14:26:34.978Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12074.27,
+            "hostMemoryUsedPercent": 66.535,
+            "observedAt": "2026-08-23T14:26:35.179Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.25,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12080.074,
+            "hostMemoryUsedPercent": 66.519,
+            "observedAt": "2026-08-23T14:26:35.380Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.145,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12079.117,
+            "hostMemoryUsedPercent": 66.521,
+            "observedAt": "2026-08-23T14:26:35.581Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.075,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12071.641,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:26:35.781Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.881,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12071.148,
+            "hostMemoryUsedPercent": 66.544,
+            "observedAt": "2026-08-23T14:26:35.982Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.795,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12071.148,
+            "hostMemoryUsedPercent": 66.544,
+            "observedAt": "2026-08-23T14:26:36.183Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.573,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12069.711,
+            "hostMemoryUsedPercent": 66.548,
+            "observedAt": "2026-08-23T14:26:36.384Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.27,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12067.887,
+            "hostMemoryUsedPercent": 66.553,
+            "observedAt": "2026-08-23T14:26:36.584Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.188,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12068.781,
+            "hostMemoryUsedPercent": 66.55,
+            "observedAt": "2026-08-23T14:26:36.786Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.043,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12067.305,
+            "hostMemoryUsedPercent": 66.554,
+            "observedAt": "2026-08-23T14:26:36.828Z"
+          }
+        ],
+        "sampleCount": 169,
+        "scope": "LOCAL_HOST_SHARED_WITH_OTHER_PROCESSES"
+      },
+      "stageMetrics": {
+        "GRAPH_END": {
+          "callCount": 8,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 6827.0,
+            "p50": 68.0,
+            "p95": 6562.75,
+            "p99": 6774.15,
+            "sampleCount": 8
+          }
+        },
+        "LLM_CALL": {
+          "callCount": 6,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 8289.0,
+            "p50": 3541.0,
+            "p95": 8047.0,
+            "p99": 8240.6,
+            "sampleCount": 6
+          }
+        },
+        "NODE_TRANSITION": {
+          "callCount": 64,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 4248.0,
+            "p50": 5.0,
+            "p95": 1584.65,
+            "p99": 3358.44,
+            "sampleCount": 64
+          }
+        },
+        "RAG_RETRIEVAL": {
+          "callCount": 2,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 302.0,
+            "p50": 266.0,
+            "p95": 298.4,
+            "p99": 301.28,
+            "sampleCount": 2
+          }
+        },
+        "TOOL_CALL": {
+          "callCount": 6,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 400.0,
+            "p50": 42.0,
+            "p95": 360.0,
+            "p99": 392.0,
+            "sampleCount": 6
+          }
+        }
+      },
+      "successRate": 1.0,
+      "successfulCount": 8,
+      "throughputScalingEfficiency": 1.0,
+      "timeoutCount": 0,
+      "usage": {
+        "costCny": null,
+        "costStatus": "UNPRICED",
+        "fallbackCalls": 0,
+        "inputTokens": 20071,
+        "missingReasons": {},
+        "missingUsageCalls": 0,
+        "outputTokens": 1317,
+        "pricedCalls": 0,
+        "providerCalls": 6,
+        "retryCount": 0,
+        "unpricedCalls": 6,
+        "usageReported": true,
+        "usageSources": [
+          "langchain.usage_metadata"
+        ]
+      },
+      "wallSeconds": 33.778709
+    },
+    "2": {
+      "achievedQps": 0.432744,
+      "badcaseTrialIds": [],
+      "badcases": [],
+      "caseMetrics": {
+        "cs-gold-v1-001": {
+          "latencyMs": {
+            "max": 650.98,
+            "p50": 649.234,
+            "p95": 650.805,
+            "p99": 650.945,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-003": {
+          "latencyMs": {
+            "max": 656.021,
+            "p50": 642.607,
+            "p95": 654.68,
+            "p99": 655.753,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-004": {
+          "latencyMs": {
+            "max": 645.163,
+            "p50": 629.929,
+            "p95": 643.64,
+            "p99": 644.858,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-028": {
+          "latencyMs": {
+            "max": 15258.274,
+            "p50": 12827.605,
+            "p95": 15015.207,
+            "p99": 15209.661,
+            "sampleCount": 2
+          },
+          "providerCalls": 5,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "completedCount": 8,
+      "concurrency": 2,
+      "errorCount": 0,
+      "executionRate": 1.0,
+      "latencyMs": {
+        "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+        "max": 15258.274,
+        "p50": 649.234,
+        "p95": 13556.806,
+        "p99": 14917.98,
+        "sampleCount": 8
+      },
+      "pathMetrics": {
+        "DETERMINISTIC": {
+          "latencyMs": {
+            "max": 656.021,
+            "p50": 646.325,
+            "p95": 654.761,
+            "p99": 655.769,
+            "sampleCount": 6
+          },
+          "providerCalls": 0,
+          "requestCount": 6,
+          "successRate": 1.0,
+          "successfulCount": 6
+        },
+        "LLM": {
+          "latencyMs": {
+            "max": 15258.274,
+            "p50": 12827.605,
+            "p95": 15015.207,
+            "p99": 15209.661,
+            "sampleCount": 2
+          },
+          "providerCalls": 5,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "requestedCount": 8,
+      "resources": {
+        "hostCpuUsedPercent": {
+          "max": 49.062,
+          "p50": 6.697,
+          "p95": 46.593,
+          "p99": 48.785,
+          "sampleCount": 92
+        },
+        "hostMemoryUsedPercent": {
+          "max": 67.555,
+          "p50": 66.672,
+          "p95": 67.183,
+          "p99": 67.471,
+          "sampleCount": 92
+        },
+        "rawSamples": [
+          {
+            "hostCpuUsedPercent": 22.812,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12025.703,
+            "hostMemoryUsedPercent": 66.669,
+            "observedAt": "2026-08-23T14:26:37.030Z"
+          },
+          {
+            "hostCpuUsedPercent": 28.707,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11960.023,
+            "hostMemoryUsedPercent": 66.852,
+            "observedAt": "2026-08-23T14:26:37.230Z"
+          },
+          {
+            "hostCpuUsedPercent": 22.154,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11886.0,
+            "hostMemoryUsedPercent": 67.057,
+            "observedAt": "2026-08-23T14:26:37.432Z"
+          },
+          {
+            "hostCpuUsedPercent": 35.583,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11851.059,
+            "hostMemoryUsedPercent": 67.154,
+            "observedAt": "2026-08-23T14:26:37.633Z"
+          },
+          {
+            "hostCpuUsedPercent": 20.886,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11827.91,
+            "hostMemoryUsedPercent": 67.218,
+            "observedAt": "2026-08-23T14:26:37.834Z"
+          },
+          {
+            "hostCpuUsedPercent": 34.591,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11763.82,
+            "hostMemoryUsedPercent": 67.395,
+            "observedAt": "2026-08-23T14:26:38.034Z"
+          },
+          {
+            "hostCpuUsedPercent": 47.678,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11706.258,
+            "hostMemoryUsedPercent": 67.555,
+            "observedAt": "2026-08-23T14:26:38.235Z"
+          },
+          {
+            "hostCpuUsedPercent": 46.753,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 11942.152,
+            "hostMemoryUsedPercent": 66.901,
+            "observedAt": "2026-08-23T14:26:38.430Z"
+          },
+          {
+            "hostCpuUsedPercent": 29.582,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12027.027,
+            "hostMemoryUsedPercent": 66.666,
+            "observedAt": "2026-08-23T14:26:38.631Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.438,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12026.98,
+            "hostMemoryUsedPercent": 66.666,
+            "observedAt": "2026-08-23T14:26:38.831Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.461,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12021.664,
+            "hostMemoryUsedPercent": 66.681,
+            "observedAt": "2026-08-23T14:26:39.032Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.201,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12025.09,
+            "hostMemoryUsedPercent": 66.671,
+            "observedAt": "2026-08-23T14:26:39.234Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.231,
+            "hostLoad1m": 3.528,
+            "hostMemoryAvailableMiB": 12024.602,
+            "hostMemoryUsedPercent": 66.673,
+            "observedAt": "2026-08-23T14:26:39.436Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.477,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12027.949,
+            "hostMemoryUsedPercent": 66.663,
+            "observedAt": "2026-08-23T14:26:39.637Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.785,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12030.773,
+            "hostMemoryUsedPercent": 66.655,
+            "observedAt": "2026-08-23T14:26:39.838Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.875,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12032.031,
+            "hostMemoryUsedPercent": 66.652,
+            "observedAt": "2026-08-23T14:26:40.039Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.43,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12028.398,
+            "hostMemoryUsedPercent": 66.662,
+            "observedAt": "2026-08-23T14:26:40.240Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.804,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12028.219,
+            "hostMemoryUsedPercent": 66.663,
+            "observedAt": "2026-08-23T14:26:40.441Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.715,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12025.578,
+            "hostMemoryUsedPercent": 66.67,
+            "observedAt": "2026-08-23T14:26:40.642Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.774,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12024.414,
+            "hostMemoryUsedPercent": 66.673,
+            "observedAt": "2026-08-23T14:26:40.843Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.869,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12024.414,
+            "hostMemoryUsedPercent": 66.673,
+            "observedAt": "2026-08-23T14:26:41.044Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.208,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12024.414,
+            "hostMemoryUsedPercent": 66.673,
+            "observedAt": "2026-08-23T14:26:41.246Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.325,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12014.383,
+            "hostMemoryUsedPercent": 66.701,
+            "observedAt": "2026-08-23T14:26:41.447Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.484,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12014.387,
+            "hostMemoryUsedPercent": 66.701,
+            "observedAt": "2026-08-23T14:26:41.648Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.173,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12013.402,
+            "hostMemoryUsedPercent": 66.704,
+            "observedAt": "2026-08-23T14:26:41.849Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.702,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12011.461,
+            "hostMemoryUsedPercent": 66.709,
+            "observedAt": "2026-08-23T14:26:42.051Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.863,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12011.461,
+            "hostMemoryUsedPercent": 66.709,
+            "observedAt": "2026-08-23T14:26:42.252Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.875,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12012.504,
+            "hostMemoryUsedPercent": 66.706,
+            "observedAt": "2026-08-23T14:26:42.453Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.315,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12012.082,
+            "hostMemoryUsedPercent": 66.707,
+            "observedAt": "2026-08-23T14:26:42.654Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.006,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12007.598,
+            "hostMemoryUsedPercent": 66.72,
+            "observedAt": "2026-08-23T14:26:42.856Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.604,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12017.922,
+            "hostMemoryUsedPercent": 66.691,
+            "observedAt": "2026-08-23T14:26:43.057Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.738,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12024.891,
+            "hostMemoryUsedPercent": 66.672,
+            "observedAt": "2026-08-23T14:26:43.258Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.096,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12024.652,
+            "hostMemoryUsedPercent": 66.672,
+            "observedAt": "2026-08-23T14:26:43.459Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.673,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12002.594,
+            "hostMemoryUsedPercent": 66.734,
+            "observedAt": "2026-08-23T14:26:43.659Z"
+          },
+          {
+            "hostCpuUsedPercent": 32.051,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 11965.387,
+            "hostMemoryUsedPercent": 66.837,
+            "observedAt": "2026-08-23T14:26:43.860Z"
+          },
+          {
+            "hostCpuUsedPercent": 48.366,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 11957.453,
+            "hostMemoryUsedPercent": 66.859,
+            "observedAt": "2026-08-23T14:26:44.061Z"
+          },
+          {
+            "hostCpuUsedPercent": 35.41,
+            "hostLoad1m": 3.325,
+            "hostMemoryAvailableMiB": 12041.82,
+            "hostMemoryUsedPercent": 66.625,
+            "observedAt": "2026-08-23T14:26:44.262Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.135,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12040.91,
+            "hostMemoryUsedPercent": 66.627,
+            "observedAt": "2026-08-23T14:26:44.463Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.562,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12040.91,
+            "hostMemoryUsedPercent": 66.627,
+            "observedAt": "2026-08-23T14:26:44.664Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.492,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12039.434,
+            "hostMemoryUsedPercent": 66.631,
+            "observedAt": "2026-08-23T14:26:44.865Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.123,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12036.918,
+            "hostMemoryUsedPercent": 66.638,
+            "observedAt": "2026-08-23T14:26:45.067Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.201,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12036.438,
+            "hostMemoryUsedPercent": 66.64,
+            "observedAt": "2026-08-23T14:26:45.268Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.27,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12041.031,
+            "hostMemoryUsedPercent": 66.627,
+            "observedAt": "2026-08-23T14:26:45.468Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12042.203,
+            "hostMemoryUsedPercent": 66.624,
+            "observedAt": "2026-08-23T14:26:45.669Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.943,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12042.477,
+            "hostMemoryUsedPercent": 66.623,
+            "observedAt": "2026-08-23T14:26:45.869Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.608,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12042.199,
+            "hostMemoryUsedPercent": 66.624,
+            "observedAt": "2026-08-23T14:26:46.070Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.247,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12039.246,
+            "hostMemoryUsedPercent": 66.632,
+            "observedAt": "2026-08-23T14:26:46.271Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.481,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12036.789,
+            "hostMemoryUsedPercent": 66.639,
+            "observedAt": "2026-08-23T14:26:46.472Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.918,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12006.133,
+            "hostMemoryUsedPercent": 66.724,
+            "observedAt": "2026-08-23T14:26:46.672Z"
+          },
+          {
+            "hostCpuUsedPercent": 36.842,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 11985.773,
+            "hostMemoryUsedPercent": 66.78,
+            "observedAt": "2026-08-23T14:26:46.873Z"
+          },
+          {
+            "hostCpuUsedPercent": 49.062,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 11979.762,
+            "hostMemoryUsedPercent": 66.797,
+            "observedAt": "2026-08-23T14:26:47.074Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.924,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12052.309,
+            "hostMemoryUsedPercent": 66.596,
+            "observedAt": "2026-08-23T14:26:47.274Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.625,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12052.523,
+            "hostMemoryUsedPercent": 66.595,
+            "observedAt": "2026-08-23T14:26:47.475Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.75,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12052.062,
+            "hostMemoryUsedPercent": 66.596,
+            "observedAt": "2026-08-23T14:26:47.675Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.688,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12051.027,
+            "hostMemoryUsedPercent": 66.599,
+            "observedAt": "2026-08-23T14:26:47.876Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.502,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12046.359,
+            "hostMemoryUsedPercent": 66.612,
+            "observedAt": "2026-08-23T14:26:48.077Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.75,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12036.227,
+            "hostMemoryUsedPercent": 66.64,
+            "observedAt": "2026-08-23T14:26:48.277Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.18,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 12019.902,
+            "hostMemoryUsedPercent": 66.686,
+            "observedAt": "2026-08-23T14:26:48.478Z"
+          },
+          {
+            "hostCpuUsedPercent": 14.826,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 11986.195,
+            "hostMemoryUsedPercent": 66.779,
+            "observedAt": "2026-08-23T14:26:48.679Z"
+          },
+          {
+            "hostCpuUsedPercent": 21.672,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 11919.781,
+            "hostMemoryUsedPercent": 66.963,
+            "observedAt": "2026-08-23T14:26:48.879Z"
+          },
+          {
+            "hostCpuUsedPercent": 25.237,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 11866.281,
+            "hostMemoryUsedPercent": 67.111,
+            "observedAt": "2026-08-23T14:26:49.080Z"
+          },
+          {
+            "hostCpuUsedPercent": 26.235,
+            "hostLoad1m": 3.059,
+            "hostMemoryAvailableMiB": 11855.852,
+            "hostMemoryUsedPercent": 67.14,
+            "observedAt": "2026-08-23T14:26:49.280Z"
+          },
+          {
+            "hostCpuUsedPercent": 35.35,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 11773.141,
+            "hostMemoryUsedPercent": 67.369,
+            "observedAt": "2026-08-23T14:26:49.483Z"
+          },
+          {
+            "hostCpuUsedPercent": 48.758,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 11739.465,
+            "hostMemoryUsedPercent": 67.463,
+            "observedAt": "2026-08-23T14:26:49.684Z"
+          },
+          {
+            "hostCpuUsedPercent": 46.462,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 11964.109,
+            "hostMemoryUsedPercent": 66.84,
+            "observedAt": "2026-08-23T14:26:49.885Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.978,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12045.496,
+            "hostMemoryUsedPercent": 66.615,
+            "observedAt": "2026-08-23T14:26:50.085Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.5,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12036.398,
+            "hostMemoryUsedPercent": 66.64,
+            "observedAt": "2026-08-23T14:26:50.286Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.692,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12035.004,
+            "hostMemoryUsedPercent": 66.644,
+            "observedAt": "2026-08-23T14:26:50.487Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.607,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12034.766,
+            "hostMemoryUsedPercent": 66.644,
+            "observedAt": "2026-08-23T14:26:50.689Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.887,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12032.562,
+            "hostMemoryUsedPercent": 66.65,
+            "observedAt": "2026-08-23T14:26:50.889Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.562,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12032.562,
+            "hostMemoryUsedPercent": 66.65,
+            "observedAt": "2026-08-23T14:26:51.090Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.658,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12014.594,
+            "hostMemoryUsedPercent": 66.7,
+            "observedAt": "2026-08-23T14:26:51.291Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.063,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12037.758,
+            "hostMemoryUsedPercent": 66.636,
+            "observedAt": "2026-08-23T14:26:51.491Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.785,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12033.113,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:26:51.692Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.181,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12033.113,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:26:51.893Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.562,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12033.113,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:26:52.093Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.448,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12030.16,
+            "hostMemoryUsedPercent": 66.657,
+            "observedAt": "2026-08-23T14:26:52.294Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.726,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12031.383,
+            "hostMemoryUsedPercent": 66.654,
+            "observedAt": "2026-08-23T14:26:52.494Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.583,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12025.484,
+            "hostMemoryUsedPercent": 66.67,
+            "observedAt": "2026-08-23T14:26:52.695Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.492,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12025.582,
+            "hostMemoryUsedPercent": 66.67,
+            "observedAt": "2026-08-23T14:26:52.896Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.79,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12017.914,
+            "hostMemoryUsedPercent": 66.691,
+            "observedAt": "2026-08-23T14:26:53.097Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.348,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12025.324,
+            "hostMemoryUsedPercent": 66.671,
+            "observedAt": "2026-08-23T14:26:53.297Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.642,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12024.809,
+            "hostMemoryUsedPercent": 66.672,
+            "observedAt": "2026-08-23T14:26:53.498Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.567,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12024.812,
+            "hostMemoryUsedPercent": 66.672,
+            "observedAt": "2026-08-23T14:26:53.699Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.25,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12024.812,
+            "hostMemoryUsedPercent": 66.672,
+            "observedAt": "2026-08-23T14:26:53.900Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.427,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12022.844,
+            "hostMemoryUsedPercent": 66.677,
+            "observedAt": "2026-08-23T14:26:54.101Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.938,
+            "hostLoad1m": 2.974,
+            "hostMemoryAvailableMiB": 12024.352,
+            "hostMemoryUsedPercent": 66.673,
+            "observedAt": "2026-08-23T14:26:54.301Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.994,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12023.152,
+            "hostMemoryUsedPercent": 66.677,
+            "observedAt": "2026-08-23T14:26:54.502Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12023.156,
+            "hostMemoryUsedPercent": 66.677,
+            "observedAt": "2026-08-23T14:26:54.703Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.21,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12021.93,
+            "hostMemoryUsedPercent": 66.68,
+            "observedAt": "2026-08-23T14:26:54.904Z"
+          },
+          {
+            "hostCpuUsedPercent": 27.707,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 11984.148,
+            "hostMemoryUsedPercent": 66.785,
+            "observedAt": "2026-08-23T14:26:55.105Z"
+          },
+          {
+            "hostCpuUsedPercent": 39.692,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 11958.051,
+            "hostMemoryUsedPercent": 66.857,
+            "observedAt": "2026-08-23T14:26:55.309Z"
+          }
+        ],
+        "sampleCount": 92,
+        "scope": "LOCAL_HOST_SHARED_WITH_OTHER_PROCESSES"
+      },
+      "stageMetrics": {
+        "GRAPH_END": {
+          "callCount": 8,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 7050.0,
+            "p50": 109.5,
+            "p95": 5412.7,
+            "p99": 6722.54,
+            "sampleCount": 8
+          }
+        },
+        "LLM_CALL": {
+          "callCount": 5,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 7615.0,
+            "p50": 4377.0,
+            "p95": 7576.0,
+            "p99": 7607.2,
+            "sampleCount": 5
+          }
+        },
+        "NODE_TRANSITION": {
+          "callCount": 62,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 4378.0,
+            "p50": 5.0,
+            "p95": 305.7,
+            "p99": 2968.29,
+            "sampleCount": 62
+          }
+        },
+        "RAG_RETRIEVAL": {
+          "callCount": 2,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 269.0,
+            "p50": 249.0,
+            "p95": 267.0,
+            "p99": 268.6,
+            "sampleCount": 2
+          }
+        },
+        "TOOL_CALL": {
+          "callCount": 5,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 289.0,
+            "p50": 69.0,
+            "p95": 250.2,
+            "p99": 281.24,
+            "sampleCount": 5
+          }
+        }
+      },
+      "successRate": 1.0,
+      "successfulCount": 8,
+      "throughputScalingEfficiency": 0.913594,
+      "timeoutCount": 0,
+      "usage": {
+        "costCny": null,
+        "costStatus": "UNPRICED",
+        "fallbackCalls": 0,
+        "inputTokens": 15163,
+        "missingReasons": {},
+        "missingUsageCalls": 0,
+        "outputTokens": 1192,
+        "pricedCalls": 0,
+        "providerCalls": 5,
+        "retryCount": 0,
+        "unpricedCalls": 5,
+        "usageReported": true,
+        "usageSources": [
+          "langchain.usage_metadata"
+        ]
+      },
+      "wallSeconds": 18.486662
+    },
+    "4": {
+      "achievedQps": 0.370535,
+      "badcaseTrialIds": [],
+      "badcases": [],
+      "caseMetrics": {
+        "cs-gold-v1-001": {
+          "latencyMs": {
+            "max": 808.631,
+            "p50": 720.796,
+            "p95": 799.848,
+            "p99": 806.874,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-003": {
+          "latencyMs": {
+            "max": 804.69,
+            "p50": 723.345,
+            "p95": 796.555,
+            "p99": 803.063,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-004": {
+          "latencyMs": {
+            "max": 782.196,
+            "p50": 703.269,
+            "p95": 774.303,
+            "p99": 780.617,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-028": {
+          "latencyMs": {
+            "max": 20146.159,
+            "p50": 17800.998,
+            "p95": 19911.643,
+            "p99": 20099.256,
+            "sampleCount": 2
+          },
+          "providerCalls": 6,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "completedCount": 8,
+      "concurrency": 4,
+      "errorCount": 0,
+      "executionRate": 1.0,
+      "latencyMs": {
+        "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+        "max": 20146.159,
+        "p50": 793.443,
+        "p95": 18504.546,
+        "p99": 19817.836,
+        "sampleCount": 8
+      },
+      "pathMetrics": {
+        "DETERMINISTIC": {
+          "latencyMs": {
+            "max": 808.631,
+            "p50": 712.098,
+            "p95": 807.646,
+            "p99": 808.434,
+            "sampleCount": 6
+          },
+          "providerCalls": 0,
+          "requestCount": 6,
+          "successRate": 1.0,
+          "successfulCount": 6
+        },
+        "LLM": {
+          "latencyMs": {
+            "max": 20146.159,
+            "p50": 17800.998,
+            "p95": 19911.643,
+            "p99": 20099.256,
+            "sampleCount": 2
+          },
+          "providerCalls": 6,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "requestedCount": 8,
+      "resources": {
+        "hostCpuUsedPercent": {
+          "max": 61.371,
+          "p50": 7.788,
+          "p95": 53.995,
+          "p99": 58.792,
+          "sampleCount": 108
+        },
+        "hostMemoryUsedPercent": {
+          "max": 67.479,
+          "p50": 66.665,
+          "p95": 67.326,
+          "p99": 67.445,
+          "sampleCount": 108
+        },
+        "rawSamples": [
+          {
+            "hostCpuUsedPercent": 47.078,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 11959.0,
+            "hostMemoryUsedPercent": 66.854,
+            "observedAt": "2026-08-23T14:26:55.510Z"
+          },
+          {
+            "hostCpuUsedPercent": 21.562,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12038.238,
+            "hostMemoryUsedPercent": 66.635,
+            "observedAt": "2026-08-23T14:26:55.711Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.438,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12034.918,
+            "hostMemoryUsedPercent": 66.644,
+            "observedAt": "2026-08-23T14:26:55.912Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.732,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12036.398,
+            "hostMemoryUsedPercent": 66.64,
+            "observedAt": "2026-08-23T14:26:56.113Z"
+          },
+          {
+            "hostCpuUsedPercent": 16.0,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12034.281,
+            "hostMemoryUsedPercent": 66.646,
+            "observedAt": "2026-08-23T14:26:56.314Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.832,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12033.832,
+            "hostMemoryUsedPercent": 66.647,
+            "observedAt": "2026-08-23T14:26:56.515Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.542,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12031.645,
+            "hostMemoryUsedPercent": 66.653,
+            "observedAt": "2026-08-23T14:26:56.715Z"
+          },
+          {
+            "hostCpuUsedPercent": 19.878,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12034.602,
+            "hostMemoryUsedPercent": 66.645,
+            "observedAt": "2026-08-23T14:26:56.916Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.155,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12035.203,
+            "hostMemoryUsedPercent": 66.643,
+            "observedAt": "2026-08-23T14:26:57.117Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.174,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12035.203,
+            "hostMemoryUsedPercent": 66.643,
+            "observedAt": "2026-08-23T14:26:57.318Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.821,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12035.207,
+            "hostMemoryUsedPercent": 66.643,
+            "observedAt": "2026-08-23T14:26:57.519Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.919,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12033.238,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:26:57.719Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.795,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12033.238,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:26:57.920Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.258,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12032.984,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:26:58.121Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.625,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12029.777,
+            "hostMemoryUsedPercent": 66.658,
+            "observedAt": "2026-08-23T14:26:58.322Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.572,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12029.168,
+            "hostMemoryUsedPercent": 66.66,
+            "observedAt": "2026-08-23T14:26:58.523Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.718,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12037.219,
+            "hostMemoryUsedPercent": 66.638,
+            "observedAt": "2026-08-23T14:26:58.723Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.231,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12036.332,
+            "hostMemoryUsedPercent": 66.64,
+            "observedAt": "2026-08-23T14:26:58.924Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.256,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12031.027,
+            "hostMemoryUsedPercent": 66.655,
+            "observedAt": "2026-08-23T14:26:59.125Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.05,
+            "hostLoad1m": 2.815,
+            "hostMemoryAvailableMiB": 12029.684,
+            "hostMemoryUsedPercent": 66.658,
+            "observedAt": "2026-08-23T14:26:59.326Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.812,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12029.797,
+            "hostMemoryUsedPercent": 66.658,
+            "observedAt": "2026-08-23T14:26:59.527Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.492,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12030.535,
+            "hostMemoryUsedPercent": 66.656,
+            "observedAt": "2026-08-23T14:26:59.728Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.918,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12028.336,
+            "hostMemoryUsedPercent": 66.662,
+            "observedAt": "2026-08-23T14:26:59.928Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.75,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11989.16,
+            "hostMemoryUsedPercent": 66.771,
+            "observedAt": "2026-08-23T14:27:00.129Z"
+          },
+          {
+            "hostCpuUsedPercent": 24.606,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11934.578,
+            "hostMemoryUsedPercent": 66.922,
+            "observedAt": "2026-08-23T14:27:00.329Z"
+          },
+          {
+            "hostCpuUsedPercent": 22.785,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11896.711,
+            "hostMemoryUsedPercent": 67.027,
+            "observedAt": "2026-08-23T14:27:00.532Z"
+          },
+          {
+            "hostCpuUsedPercent": 31.595,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11824.031,
+            "hostMemoryUsedPercent": 67.228,
+            "observedAt": "2026-08-23T14:27:00.732Z"
+          },
+          {
+            "hostCpuUsedPercent": 46.646,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11770.664,
+            "hostMemoryUsedPercent": 67.376,
+            "observedAt": "2026-08-23T14:27:00.933Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.037,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11745.035,
+            "hostMemoryUsedPercent": 67.447,
+            "observedAt": "2026-08-23T14:27:01.134Z"
+          },
+          {
+            "hostCpuUsedPercent": 30.96,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11810.758,
+            "hostMemoryUsedPercent": 67.265,
+            "observedAt": "2026-08-23T14:27:01.335Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.5,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12027.594,
+            "hostMemoryUsedPercent": 66.664,
+            "observedAt": "2026-08-23T14:27:01.536Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.875,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12027.402,
+            "hostMemoryUsedPercent": 66.665,
+            "observedAt": "2026-08-23T14:27:01.736Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.185,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12026.723,
+            "hostMemoryUsedPercent": 66.667,
+            "observedAt": "2026-08-23T14:27:01.937Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.896,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12026.23,
+            "hostMemoryUsedPercent": 66.668,
+            "observedAt": "2026-08-23T14:27:02.137Z"
+          },
+          {
+            "hostCpuUsedPercent": 22.36,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11986.312,
+            "hostMemoryUsedPercent": 66.779,
+            "observedAt": "2026-08-23T14:27:02.338Z"
+          },
+          {
+            "hostCpuUsedPercent": 37.908,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11963.082,
+            "hostMemoryUsedPercent": 66.843,
+            "observedAt": "2026-08-23T14:27:02.539Z"
+          },
+          {
+            "hostCpuUsedPercent": 42.901,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 11961.754,
+            "hostMemoryUsedPercent": 66.847,
+            "observedAt": "2026-08-23T14:27:02.739Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.538,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12039.027,
+            "hostMemoryUsedPercent": 66.633,
+            "observedAt": "2026-08-23T14:27:02.941Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.459,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12040.715,
+            "hostMemoryUsedPercent": 66.628,
+            "observedAt": "2026-08-23T14:27:03.141Z"
+          },
+          {
+            "hostCpuUsedPercent": 13.88,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12034.973,
+            "hostMemoryUsedPercent": 66.644,
+            "observedAt": "2026-08-23T14:27:03.342Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.774,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12047.789,
+            "hostMemoryUsedPercent": 66.608,
+            "observedAt": "2026-08-23T14:27:03.542Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.869,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12047.789,
+            "hostMemoryUsedPercent": 66.608,
+            "observedAt": "2026-08-23T14:27:03.743Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.05,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12046.406,
+            "hostMemoryUsedPercent": 66.612,
+            "observedAt": "2026-08-23T14:27:03.944Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.309,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12037.777,
+            "hostMemoryUsedPercent": 66.636,
+            "observedAt": "2026-08-23T14:27:04.145Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.477,
+            "hostLoad1m": 2.59,
+            "hostMemoryAvailableMiB": 12040.859,
+            "hostMemoryUsedPercent": 66.627,
+            "observedAt": "2026-08-23T14:27:04.346Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.05,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12041.391,
+            "hostMemoryUsedPercent": 66.626,
+            "observedAt": "2026-08-23T14:27:04.547Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.94,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12041.145,
+            "hostMemoryUsedPercent": 66.627,
+            "observedAt": "2026-08-23T14:27:04.748Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.201,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12040.078,
+            "hostMemoryUsedPercent": 66.63,
+            "observedAt": "2026-08-23T14:27:04.948Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.502,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12035.766,
+            "hostMemoryUsedPercent": 66.642,
+            "observedAt": "2026-08-23T14:27:05.149Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.125,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12034.043,
+            "hostMemoryUsedPercent": 66.646,
+            "observedAt": "2026-08-23T14:27:05.351Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.762,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12034.004,
+            "hostMemoryUsedPercent": 66.646,
+            "observedAt": "2026-08-23T14:27:05.551Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.316,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12034.004,
+            "hostMemoryUsedPercent": 66.646,
+            "observedAt": "2026-08-23T14:27:05.752Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.558,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12034.926,
+            "hostMemoryUsedPercent": 66.644,
+            "observedAt": "2026-08-23T14:27:05.953Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.389,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12034.688,
+            "hostMemoryUsedPercent": 66.645,
+            "observedAt": "2026-08-23T14:27:06.154Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.296,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12008.324,
+            "hostMemoryUsedPercent": 66.718,
+            "observedAt": "2026-08-23T14:27:06.355Z"
+          },
+          {
+            "hostCpuUsedPercent": 34.579,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11973.031,
+            "hostMemoryUsedPercent": 66.815,
+            "observedAt": "2026-08-23T14:27:06.555Z"
+          },
+          {
+            "hostCpuUsedPercent": 41.424,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11967.598,
+            "hostMemoryUsedPercent": 66.831,
+            "observedAt": "2026-08-23T14:27:06.756Z"
+          },
+          {
+            "hostCpuUsedPercent": 37.389,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12047.406,
+            "hostMemoryUsedPercent": 66.609,
+            "observedAt": "2026-08-23T14:27:06.957Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.812,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12043.777,
+            "hostMemoryUsedPercent": 66.619,
+            "observedAt": "2026-08-23T14:27:07.157Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.788,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12042.027,
+            "hostMemoryUsedPercent": 66.624,
+            "observedAt": "2026-08-23T14:27:07.358Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.838,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12037.5,
+            "hostMemoryUsedPercent": 66.637,
+            "observedAt": "2026-08-23T14:27:07.558Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.231,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12035.617,
+            "hostMemoryUsedPercent": 66.642,
+            "observedAt": "2026-08-23T14:27:07.759Z"
+          },
+          {
+            "hostCpuUsedPercent": 38.037,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11868.02,
+            "hostMemoryUsedPercent": 67.107,
+            "observedAt": "2026-08-23T14:27:07.960Z"
+          },
+          {
+            "hostCpuUsedPercent": 51.553,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11795.414,
+            "hostMemoryUsedPercent": 67.308,
+            "observedAt": "2026-08-23T14:27:08.160Z"
+          },
+          {
+            "hostCpuUsedPercent": 58.824,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11791.262,
+            "hostMemoryUsedPercent": 67.319,
+            "observedAt": "2026-08-23T14:27:08.361Z"
+          },
+          {
+            "hostCpuUsedPercent": 58.36,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11888.043,
+            "hostMemoryUsedPercent": 67.051,
+            "observedAt": "2026-08-23T14:27:08.560Z"
+          },
+          {
+            "hostCpuUsedPercent": 51.553,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11758.727,
+            "hostMemoryUsedPercent": 67.409,
+            "observedAt": "2026-08-23T14:27:08.761Z"
+          },
+          {
+            "hostCpuUsedPercent": 52.469,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11794.145,
+            "hostMemoryUsedPercent": 67.311,
+            "observedAt": "2026-08-23T14:27:08.962Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.206,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 11945.918,
+            "hostMemoryUsedPercent": 66.891,
+            "observedAt": "2026-08-23T14:27:09.163Z"
+          },
+          {
+            "hostCpuUsedPercent": 61.371,
+            "hostLoad1m": 2.382,
+            "hostMemoryAvailableMiB": 12010.977,
+            "hostMemoryUsedPercent": 66.71,
+            "observedAt": "2026-08-23T14:27:09.364Z"
+          },
+          {
+            "hostCpuUsedPercent": 56.656,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11948.711,
+            "hostMemoryUsedPercent": 66.883,
+            "observedAt": "2026-08-23T14:27:09.565Z"
+          },
+          {
+            "hostCpuUsedPercent": 45.511,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12000.691,
+            "hostMemoryUsedPercent": 66.739,
+            "observedAt": "2026-08-23T14:27:09.765Z"
+          },
+          {
+            "hostCpuUsedPercent": 53.918,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12002.898,
+            "hostMemoryUsedPercent": 66.733,
+            "observedAt": "2026-08-23T14:27:09.966Z"
+          },
+          {
+            "hostCpuUsedPercent": 38.941,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12034.172,
+            "hostMemoryUsedPercent": 66.646,
+            "observedAt": "2026-08-23T14:27:10.167Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.148,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12029.715,
+            "hostMemoryUsedPercent": 66.658,
+            "observedAt": "2026-08-23T14:27:10.367Z"
+          },
+          {
+            "hostCpuUsedPercent": 19.255,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12029.438,
+            "hostMemoryUsedPercent": 66.659,
+            "observedAt": "2026-08-23T14:27:10.568Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.07,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12028.895,
+            "hostMemoryUsedPercent": 66.661,
+            "observedAt": "2026-08-23T14:27:10.789Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.738,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12029.992,
+            "hostMemoryUsedPercent": 66.658,
+            "observedAt": "2026-08-23T14:27:10.990Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.145,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12030.188,
+            "hostMemoryUsedPercent": 66.657,
+            "observedAt": "2026-08-23T14:27:11.190Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.994,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12027.316,
+            "hostMemoryUsedPercent": 66.665,
+            "observedAt": "2026-08-23T14:27:11.391Z"
+          },
+          {
+            "hostCpuUsedPercent": 31.962,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11996.391,
+            "hostMemoryUsedPercent": 66.751,
+            "observedAt": "2026-08-23T14:27:11.592Z"
+          },
+          {
+            "hostCpuUsedPercent": 28.923,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11949.758,
+            "hostMemoryUsedPercent": 66.88,
+            "observedAt": "2026-08-23T14:27:11.792Z"
+          },
+          {
+            "hostCpuUsedPercent": 22.05,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11887.625,
+            "hostMemoryUsedPercent": 67.052,
+            "observedAt": "2026-08-23T14:27:11.993Z"
+          },
+          {
+            "hostCpuUsedPercent": 44.136,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11787.559,
+            "hostMemoryUsedPercent": 67.33,
+            "observedAt": "2026-08-23T14:27:12.193Z"
+          },
+          {
+            "hostCpuUsedPercent": 50.476,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11757.266,
+            "hostMemoryUsedPercent": 67.413,
+            "observedAt": "2026-08-23T14:27:12.394Z"
+          },
+          {
+            "hostCpuUsedPercent": 53.628,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11733.715,
+            "hostMemoryUsedPercent": 67.479,
+            "observedAt": "2026-08-23T14:27:12.595Z"
+          },
+          {
+            "hostCpuUsedPercent": 19.436,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11796.129,
+            "hostMemoryUsedPercent": 67.306,
+            "observedAt": "2026-08-23T14:27:12.796Z"
+          },
+          {
+            "hostCpuUsedPercent": 40.717,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12004.273,
+            "hostMemoryUsedPercent": 66.729,
+            "observedAt": "2026-08-23T14:27:12.997Z"
+          },
+          {
+            "hostCpuUsedPercent": 35.621,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12000.195,
+            "hostMemoryUsedPercent": 66.74,
+            "observedAt": "2026-08-23T14:27:13.198Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.101,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11998.113,
+            "hostMemoryUsedPercent": 66.746,
+            "observedAt": "2026-08-23T14:27:13.398Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.658,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12006.48,
+            "hostMemoryUsedPercent": 66.723,
+            "observedAt": "2026-08-23T14:27:13.599Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.63,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12005.254,
+            "hostMemoryUsedPercent": 66.726,
+            "observedAt": "2026-08-23T14:27:13.800Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.099,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12001.781,
+            "hostMemoryUsedPercent": 66.736,
+            "observedAt": "2026-08-23T14:27:14.001Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.75,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 12001.098,
+            "hostMemoryUsedPercent": 66.738,
+            "observedAt": "2026-08-23T14:27:14.201Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.625,
+            "hostLoad1m": 2.833,
+            "hostMemoryAvailableMiB": 11994.461,
+            "hostMemoryUsedPercent": 66.756,
+            "observedAt": "2026-08-23T14:27:14.403Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.573,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12000.551,
+            "hostMemoryUsedPercent": 66.739,
+            "observedAt": "2026-08-23T14:27:14.603Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.192,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11999.824,
+            "hostMemoryUsedPercent": 66.741,
+            "observedAt": "2026-08-23T14:27:14.806Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.893,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12000.336,
+            "hostMemoryUsedPercent": 66.74,
+            "observedAt": "2026-08-23T14:27:15.006Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.5,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12001.047,
+            "hostMemoryUsedPercent": 66.738,
+            "observedAt": "2026-08-23T14:27:15.207Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.643,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12005.285,
+            "hostMemoryUsedPercent": 66.726,
+            "observedAt": "2026-08-23T14:27:15.407Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.389,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12002.621,
+            "hostMemoryUsedPercent": 66.733,
+            "observedAt": "2026-08-23T14:27:15.608Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.562,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11999.914,
+            "hostMemoryUsedPercent": 66.741,
+            "observedAt": "2026-08-23T14:27:15.809Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.788,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12000.172,
+            "hostMemoryUsedPercent": 66.74,
+            "observedAt": "2026-08-23T14:27:16.009Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.342,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12004.492,
+            "hostMemoryUsedPercent": 66.728,
+            "observedAt": "2026-08-23T14:27:16.210Z"
+          },
+          {
+            "hostCpuUsedPercent": 21.25,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11990.855,
+            "hostMemoryUsedPercent": 66.766,
+            "observedAt": "2026-08-23T14:27:16.412Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.15,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12074.148,
+            "hostMemoryUsedPercent": 66.535,
+            "observedAt": "2026-08-23T14:27:16.612Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.79,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12068.805,
+            "hostMemoryUsedPercent": 66.55,
+            "observedAt": "2026-08-23T14:27:16.814Z"
+          },
+          {
+            "hostCpuUsedPercent": 19.259,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12066.484,
+            "hostMemoryUsedPercent": 66.556,
+            "observedAt": "2026-08-23T14:27:16.898Z"
+          }
+        ],
+        "sampleCount": 108,
+        "scope": "LOCAL_HOST_SHARED_WITH_OTHER_PROCESSES"
+      },
+      "stageMetrics": {
+        "GRAPH_END": {
+          "callCount": 8,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 8656.0,
+            "p50": 75.0,
+            "p95": 7810.4,
+            "p99": 8486.88,
+            "sampleCount": 8
+          }
+        },
+        "LLM_CALL": {
+          "callCount": 6,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 10632.0,
+            "p50": 4731.0,
+            "p95": 10029.5,
+            "p99": 10511.5,
+            "sampleCount": 6
+          }
+        },
+        "NODE_TRANSITION": {
+          "callCount": 64,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 6299.0,
+            "p50": 5.0,
+            "p95": 1457.45,
+            "p99": 4324.58,
+            "sampleCount": 64
+          }
+        },
+        "RAG_RETRIEVAL": {
+          "callCount": 2,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 312.0,
+            "p50": 264.0,
+            "p95": 307.2,
+            "p99": 311.04,
+            "sampleCount": 2
+          }
+        },
+        "TOOL_CALL": {
+          "callCount": 6,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 403.0,
+            "p50": 40.5,
+            "p95": 381.5,
+            "p99": 398.7,
+            "sampleCount": 6
+          }
+        }
+      },
+      "successRate": 1.0,
+      "successfulCount": 8,
+      "throughputScalingEfficiency": 0.39113,
+      "timeoutCount": 0,
+      "usage": {
+        "costCny": null,
+        "costStatus": "UNPRICED",
+        "fallbackCalls": 0,
+        "inputTokens": 20076,
+        "missingReasons": {},
+        "missingUsageCalls": 0,
+        "outputTokens": 1646,
+        "pricedCalls": 0,
+        "providerCalls": 6,
+        "retryCount": 0,
+        "unpricedCalls": 6,
+        "usageReported": true,
+        "usageSources": [
+          "langchain.usage_metadata"
+        ]
+      },
+      "wallSeconds": 21.590416
+    },
+    "8": {
+      "achievedQps": 0.429263,
+      "badcaseTrialIds": [],
+      "badcases": [],
+      "caseMetrics": {
+        "cs-gold-v1-001": {
+          "latencyMs": {
+            "max": 1534.191,
+            "p50": 1330.628,
+            "p95": 1513.835,
+            "p99": 1530.12,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-003": {
+          "latencyMs": {
+            "max": 1130.4,
+            "p50": 1126.885,
+            "p95": 1130.048,
+            "p99": 1130.33,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-004": {
+          "latencyMs": {
+            "max": 682.066,
+            "p50": 675.79,
+            "p95": 681.438,
+            "p99": 681.94,
+            "sampleCount": 2
+          },
+          "providerCalls": 0,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        },
+        "cs-gold-v1-028": {
+          "latencyMs": {
+            "max": 18608.847,
+            "p50": 16560.294,
+            "p95": 18403.992,
+            "p99": 18567.876,
+            "sampleCount": 2
+          },
+          "providerCalls": 6,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "completedCount": 8,
+      "concurrency": 8,
+      "errorCount": 0,
+      "executionRate": 1.0,
+      "latencyMs": {
+        "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+        "max": 18608.847,
+        "p50": 1128.732,
+        "p95": 17174.86,
+        "p99": 18322.05,
+        "sampleCount": 8
+      },
+      "pathMetrics": {
+        "DETERMINISTIC": {
+          "latencyMs": {
+            "max": 1534.191,
+            "p50": 1125.216,
+            "p95": 1433.243,
+            "p99": 1514.001,
+            "sampleCount": 6
+          },
+          "providerCalls": 0,
+          "requestCount": 6,
+          "successRate": 1.0,
+          "successfulCount": 6
+        },
+        "LLM": {
+          "latencyMs": {
+            "max": 18608.847,
+            "p50": 16560.294,
+            "p95": 18403.992,
+            "p99": 18567.876,
+            "sampleCount": 2
+          },
+          "providerCalls": 6,
+          "requestCount": 2,
+          "successRate": 1.0,
+          "successfulCount": 2
+        }
+      },
+      "requestedCount": 8,
+      "resources": {
+        "hostCpuUsedPercent": {
+          "max": 65.0,
+          "p50": 6.522,
+          "p95": 52.678,
+          "p99": 61.839,
+          "sampleCount": 93
+        },
+        "hostMemoryUsedPercent": {
+          "max": 67.39,
+          "p50": 66.574,
+          "p95": 67.24,
+          "p99": 67.36,
+          "sampleCount": 93
+        },
+        "rawSamples": [
+          {
+            "hostCpuUsedPercent": 28.135,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12062.562,
+            "hostMemoryUsedPercent": 66.567,
+            "observedAt": "2026-08-23T14:27:17.100Z"
+          },
+          {
+            "hostCpuUsedPercent": 26.625,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12054.797,
+            "hostMemoryUsedPercent": 66.589,
+            "observedAt": "2026-08-23T14:27:17.300Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.264,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12052.969,
+            "hostMemoryUsedPercent": 66.594,
+            "observedAt": "2026-08-23T14:27:17.501Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.644,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12048.086,
+            "hostMemoryUsedPercent": 66.607,
+            "observedAt": "2026-08-23T14:27:17.703Z"
+          },
+          {
+            "hostCpuUsedPercent": 38.7,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11958.965,
+            "hostMemoryUsedPercent": 66.854,
+            "observedAt": "2026-08-23T14:27:17.904Z"
+          },
+          {
+            "hostCpuUsedPercent": 53.247,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11910.285,
+            "hostMemoryUsedPercent": 66.989,
+            "observedAt": "2026-08-23T14:27:18.106Z"
+          },
+          {
+            "hostCpuUsedPercent": 65.0,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11901.066,
+            "hostMemoryUsedPercent": 67.015,
+            "observedAt": "2026-08-23T14:27:18.307Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.955,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 11976.41,
+            "hostMemoryUsedPercent": 66.806,
+            "observedAt": "2026-08-23T14:27:18.509Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.883,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12050.516,
+            "hostMemoryUsedPercent": 66.601,
+            "observedAt": "2026-08-23T14:27:18.710Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.893,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12048.547,
+            "hostMemoryUsedPercent": 66.606,
+            "observedAt": "2026-08-23T14:27:18.911Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.363,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12047.477,
+            "hostMemoryUsedPercent": 66.609,
+            "observedAt": "2026-08-23T14:27:19.112Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.524,
+            "hostLoad1m": 3.006,
+            "hostMemoryAvailableMiB": 12054.93,
+            "hostMemoryUsedPercent": 66.588,
+            "observedAt": "2026-08-23T14:27:19.312Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.0,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12059.461,
+            "hostMemoryUsedPercent": 66.576,
+            "observedAt": "2026-08-23T14:27:19.513Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.946,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12060.664,
+            "hostMemoryUsedPercent": 66.573,
+            "observedAt": "2026-08-23T14:27:19.714Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.508,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12060.461,
+            "hostMemoryUsedPercent": 66.573,
+            "observedAt": "2026-08-23T14:27:19.915Z"
+          },
+          {
+            "hostCpuUsedPercent": 8.075,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12060.082,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:27:20.116Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.702,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12058.852,
+            "hostMemoryUsedPercent": 66.578,
+            "observedAt": "2026-08-23T14:27:20.317Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.127,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12053.605,
+            "hostMemoryUsedPercent": 66.592,
+            "observedAt": "2026-08-23T14:27:20.517Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.477,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12053.113,
+            "hostMemoryUsedPercent": 66.594,
+            "observedAt": "2026-08-23T14:27:20.718Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.258,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12053.113,
+            "hostMemoryUsedPercent": 66.594,
+            "observedAt": "2026-08-23T14:27:20.919Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.385,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12056.328,
+            "hostMemoryUsedPercent": 66.585,
+            "observedAt": "2026-08-23T14:27:21.120Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.316,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12056.082,
+            "hostMemoryUsedPercent": 66.585,
+            "observedAt": "2026-08-23T14:27:21.320Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.887,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12056.09,
+            "hostMemoryUsedPercent": 66.585,
+            "observedAt": "2026-08-23T14:27:21.521Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.875,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12065.645,
+            "hostMemoryUsedPercent": 66.559,
+            "observedAt": "2026-08-23T14:27:21.722Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.469,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12073.027,
+            "hostMemoryUsedPercent": 66.538,
+            "observedAt": "2026-08-23T14:27:21.923Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.481,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12071.059,
+            "hostMemoryUsedPercent": 66.544,
+            "observedAt": "2026-08-23T14:27:22.124Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.208,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12068.367,
+            "hostMemoryUsedPercent": 66.551,
+            "observedAt": "2026-08-23T14:27:22.324Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.013,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12067.168,
+            "hostMemoryUsedPercent": 66.555,
+            "observedAt": "2026-08-23T14:27:22.525Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.062,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12072.672,
+            "hostMemoryUsedPercent": 66.539,
+            "observedAt": "2026-08-23T14:27:22.726Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.704,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12071.598,
+            "hostMemoryUsedPercent": 66.542,
+            "observedAt": "2026-08-23T14:27:22.926Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.765,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 12029.742,
+            "hostMemoryUsedPercent": 66.658,
+            "observedAt": "2026-08-23T14:27:23.127Z"
+          },
+          {
+            "hostCpuUsedPercent": 30.982,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 11994.754,
+            "hostMemoryUsedPercent": 66.755,
+            "observedAt": "2026-08-23T14:27:23.328Z"
+          },
+          {
+            "hostCpuUsedPercent": 21.25,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 11912.504,
+            "hostMemoryUsedPercent": 66.983,
+            "observedAt": "2026-08-23T14:27:23.528Z"
+          },
+          {
+            "hostCpuUsedPercent": 47.91,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 11828.461,
+            "hostMemoryUsedPercent": 67.216,
+            "observedAt": "2026-08-23T14:27:23.729Z"
+          },
+          {
+            "hostCpuUsedPercent": 61.564,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 11806.516,
+            "hostMemoryUsedPercent": 67.277,
+            "observedAt": "2026-08-23T14:27:23.930Z"
+          },
+          {
+            "hostCpuUsedPercent": 42.808,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 11789.938,
+            "hostMemoryUsedPercent": 67.323,
+            "observedAt": "2026-08-23T14:27:24.130Z"
+          },
+          {
+            "hostCpuUsedPercent": 26.524,
+            "hostLoad1m": 2.925,
+            "hostMemoryAvailableMiB": 11848.98,
+            "hostMemoryUsedPercent": 67.159,
+            "observedAt": "2026-08-23T14:27:24.331Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.159,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12068.98,
+            "hostMemoryUsedPercent": 66.55,
+            "observedAt": "2026-08-23T14:27:24.532Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.542,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12072.184,
+            "hostMemoryUsedPercent": 66.541,
+            "observedAt": "2026-08-23T14:27:24.732Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.869,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12071.965,
+            "hostMemoryUsedPercent": 66.541,
+            "observedAt": "2026-08-23T14:27:24.933Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.572,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12069.602,
+            "hostMemoryUsedPercent": 66.548,
+            "observedAt": "2026-08-23T14:27:25.134Z"
+          },
+          {
+            "hostCpuUsedPercent": 12.618,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12066.457,
+            "hostMemoryUsedPercent": 66.557,
+            "observedAt": "2026-08-23T14:27:25.334Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.862,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12065.766,
+            "hostMemoryUsedPercent": 66.558,
+            "observedAt": "2026-08-23T14:27:25.535Z"
+          },
+          {
+            "hostCpuUsedPercent": 0.94,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12065.766,
+            "hostMemoryUsedPercent": 66.558,
+            "observedAt": "2026-08-23T14:27:25.736Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.863,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12065.766,
+            "hostMemoryUsedPercent": 66.558,
+            "observedAt": "2026-08-23T14:27:25.936Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.262,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12065.293,
+            "hostMemoryUsedPercent": 66.56,
+            "observedAt": "2026-08-23T14:27:26.137Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.59,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12062.836,
+            "hostMemoryUsedPercent": 66.567,
+            "observedAt": "2026-08-23T14:27:26.338Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.464,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12063.797,
+            "hostMemoryUsedPercent": 66.564,
+            "observedAt": "2026-08-23T14:27:26.539Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.678,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12063.059,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:27:26.739Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.562,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12063.066,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:27:26.940Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.155,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12063.141,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:27:27.140Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.572,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12063.102,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:27:27.342Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.062,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12066.387,
+            "hostMemoryUsedPercent": 66.557,
+            "observedAt": "2026-08-23T14:27:27.542Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.63,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12065.805,
+            "hostMemoryUsedPercent": 66.558,
+            "observedAt": "2026-08-23T14:27:27.743Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.037,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12065.539,
+            "hostMemoryUsedPercent": 66.559,
+            "observedAt": "2026-08-23T14:27:27.944Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.738,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12061.562,
+            "hostMemoryUsedPercent": 66.57,
+            "observedAt": "2026-08-23T14:27:28.144Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.194,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12063.016,
+            "hostMemoryUsedPercent": 66.566,
+            "observedAt": "2026-08-23T14:27:28.345Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.604,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12060.324,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:27:28.546Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.309,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12069.215,
+            "hostMemoryUsedPercent": 66.549,
+            "observedAt": "2026-08-23T14:27:28.746Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.334,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12069.219,
+            "hostMemoryUsedPercent": 66.549,
+            "observedAt": "2026-08-23T14:27:28.948Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.887,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12066.762,
+            "hostMemoryUsedPercent": 66.556,
+            "observedAt": "2026-08-23T14:27:29.148Z"
+          },
+          {
+            "hostCpuUsedPercent": 21.321,
+            "hostLoad1m": 2.851,
+            "hostMemoryAvailableMiB": 12027.879,
+            "hostMemoryUsedPercent": 66.663,
+            "observedAt": "2026-08-23T14:27:29.350Z"
+          },
+          {
+            "hostCpuUsedPercent": 35.275,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12000.328,
+            "hostMemoryUsedPercent": 66.74,
+            "observedAt": "2026-08-23T14:27:29.550Z"
+          },
+          {
+            "hostCpuUsedPercent": 49.18,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 11996.613,
+            "hostMemoryUsedPercent": 66.75,
+            "observedAt": "2026-08-23T14:27:29.751Z"
+          },
+          {
+            "hostCpuUsedPercent": 20.846,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12077.578,
+            "hostMemoryUsedPercent": 66.526,
+            "observedAt": "2026-08-23T14:27:29.951Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.778,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12077.086,
+            "hostMemoryUsedPercent": 66.527,
+            "observedAt": "2026-08-23T14:27:30.153Z"
+          },
+          {
+            "hostCpuUsedPercent": 1.258,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12076.598,
+            "hostMemoryUsedPercent": 66.528,
+            "observedAt": "2026-08-23T14:27:30.353Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.38,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12070.938,
+            "hostMemoryUsedPercent": 66.544,
+            "observedAt": "2026-08-23T14:27:30.554Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.407,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12068.629,
+            "hostMemoryUsedPercent": 66.551,
+            "observedAt": "2026-08-23T14:27:30.755Z"
+          },
+          {
+            "hostCpuUsedPercent": 10.123,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12066.367,
+            "hostMemoryUsedPercent": 66.557,
+            "observedAt": "2026-08-23T14:27:30.957Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.524,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12063.27,
+            "hostMemoryUsedPercent": 66.565,
+            "observedAt": "2026-08-23T14:27:31.158Z"
+          },
+          {
+            "hostCpuUsedPercent": 9.509,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12062.508,
+            "hostMemoryUsedPercent": 66.567,
+            "observedAt": "2026-08-23T14:27:31.359Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.334,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12062.07,
+            "hostMemoryUsedPercent": 66.569,
+            "observedAt": "2026-08-23T14:27:31.560Z"
+          },
+          {
+            "hostCpuUsedPercent": 14.679,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12061.527,
+            "hostMemoryUsedPercent": 66.57,
+            "observedAt": "2026-08-23T14:27:31.761Z"
+          },
+          {
+            "hostCpuUsedPercent": 5.296,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12060.145,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:27:31.961Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.522,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12060.168,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:27:32.163Z"
+          },
+          {
+            "hostCpuUsedPercent": 3.448,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12061.672,
+            "hostMemoryUsedPercent": 66.57,
+            "observedAt": "2026-08-23T14:27:32.364Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.062,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12061.816,
+            "hostMemoryUsedPercent": 66.569,
+            "observedAt": "2026-08-23T14:27:32.564Z"
+          },
+          {
+            "hostCpuUsedPercent": 7.233,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12059.324,
+            "hostMemoryUsedPercent": 66.576,
+            "observedAt": "2026-08-23T14:27:32.765Z"
+          },
+          {
+            "hostCpuUsedPercent": 4.969,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12060.148,
+            "hostMemoryUsedPercent": 66.574,
+            "observedAt": "2026-08-23T14:27:32.965Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.25,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12056.801,
+            "hostMemoryUsedPercent": 66.583,
+            "observedAt": "2026-08-23T14:27:33.166Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.484,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12056.82,
+            "hostMemoryUsedPercent": 66.583,
+            "observedAt": "2026-08-23T14:27:33.367Z"
+          },
+          {
+            "hostCpuUsedPercent": 2.812,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12056.805,
+            "hostMemoryUsedPercent": 66.583,
+            "observedAt": "2026-08-23T14:27:33.568Z"
+          },
+          {
+            "hostCpuUsedPercent": 17.105,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12003.152,
+            "hostMemoryUsedPercent": 66.732,
+            "observedAt": "2026-08-23T14:27:33.769Z"
+          },
+          {
+            "hostCpuUsedPercent": 44.72,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 11982.145,
+            "hostMemoryUsedPercent": 66.79,
+            "observedAt": "2026-08-23T14:27:33.970Z"
+          },
+          {
+            "hostCpuUsedPercent": 48.243,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 11986.172,
+            "hostMemoryUsedPercent": 66.779,
+            "observedAt": "2026-08-23T14:27:34.172Z"
+          },
+          {
+            "hostCpuUsedPercent": 11.25,
+            "hostLoad1m": 2.863,
+            "hostMemoryAvailableMiB": 12067.379,
+            "hostMemoryUsedPercent": 66.554,
+            "observedAt": "2026-08-23T14:27:34.372Z"
+          },
+          {
+            "hostCpuUsedPercent": 6.875,
+            "hostLoad1m": 2.714,
+            "hostMemoryAvailableMiB": 12033.004,
+            "hostMemoryUsedPercent": 66.649,
+            "observedAt": "2026-08-23T14:27:34.574Z"
+          },
+          {
+            "hostCpuUsedPercent": 26.266,
+            "hostLoad1m": 2.714,
+            "hostMemoryAvailableMiB": 11990.051,
+            "hostMemoryUsedPercent": 66.768,
+            "observedAt": "2026-08-23T14:27:34.775Z"
+          },
+          {
+            "hostCpuUsedPercent": 30.247,
+            "hostLoad1m": 2.714,
+            "hostMemoryAvailableMiB": 11892.086,
+            "hostMemoryUsedPercent": 67.04,
+            "observedAt": "2026-08-23T14:27:34.977Z"
+          },
+          {
+            "hostCpuUsedPercent": 52.469,
+            "hostLoad1m": 2.714,
+            "hostMemoryAvailableMiB": 11801.457,
+            "hostMemoryUsedPercent": 67.291,
+            "observedAt": "2026-08-23T14:27:35.178Z"
+          },
+          {
+            "hostCpuUsedPercent": 52.848,
+            "hostLoad1m": 2.714,
+            "hostMemoryAvailableMiB": 11777.52,
+            "hostMemoryUsedPercent": 67.357,
+            "observedAt": "2026-08-23T14:27:35.380Z"
+          },
+          {
+            "hostCpuUsedPercent": 52.564,
+            "hostLoad1m": 2.714,
+            "hostMemoryAvailableMiB": 11765.582,
+            "hostMemoryUsedPercent": 67.39,
+            "observedAt": "2026-08-23T14:27:35.535Z"
+          }
+        ],
+        "sampleCount": 93,
+        "scope": "LOCAL_HOST_SHARED_WITH_OTHER_PROCESSES"
+      },
+      "stageMetrics": {
+        "GRAPH_END": {
+          "callCount": 8,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 7942.0,
+            "p50": 79.5,
+            "p95": 7521.65,
+            "p99": 7857.93,
+            "sampleCount": 8
+          }
+        },
+        "LLM_CALL": {
+          "callCount": 6,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 10090.0,
+            "p50": 3930.5,
+            "p95": 9363.0,
+            "p99": 9944.6,
+            "sampleCount": 6
+          }
+        },
+        "NODE_TRANSITION": {
+          "callCount": 64,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 4586.0,
+            "p50": 6.0,
+            "p95": 2321.7,
+            "p99": 3761.33,
+            "sampleCount": 64
+          }
+        },
+        "RAG_RETRIEVAL": {
+          "callCount": 2,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 240.0,
+            "p50": 240.0,
+            "p95": 240.0,
+            "p99": 240.0,
+            "sampleCount": 2
+          }
+        },
+        "TOOL_CALL": {
+          "callCount": 6,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 348.0,
+            "p50": 44.5,
+            "p95": 312.75,
+            "p99": 340.95,
+            "sampleCount": 6
+          }
+        }
+      },
+      "successRate": 1.0,
+      "successfulCount": 8,
+      "throughputScalingEfficiency": 0.226561,
+      "timeoutCount": 0,
+      "usage": {
+        "costCny": null,
+        "costStatus": "UNPRICED",
+        "fallbackCalls": 0,
+        "inputTokens": 20071,
+        "missingReasons": {},
+        "missingUsageCalls": 0,
+        "outputTokens": 1459,
+        "pricedCalls": 0,
+        "providerCalls": 6,
+        "retryCount": 0,
+        "unpricedCalls": 6,
+        "usageReported": true,
+        "usageSources": [
+          "langchain.usage_metadata"
+        ]
+      },
+      "wallSeconds": 18.636607
+    }
+  },
+  "limitations": [
+    "Local single-host infrastructure and external Provider conditions; not a production SLO or capacity commitment.",
+    "Host resource samples include unrelated local processes and are diagnostic only.",
+    "The fixed four-case mix is an engineering probe, not production traffic distribution.",
+    "Answer content is hashed; this benchmark checks execution safety and capacity, not semantic answer quality.",
+    "Unknown Provider price remains null and missing usage is never inferred from text length."
+  ],
+  "normalQualityDenominatorExcluded": true,
+  "notProductionSlo": true,
+  "preflight": {
+    "checkedAt": "2026-08-23T14:26:03.044Z",
+    "checks": [
+      {
+        "name": "java-gateway",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:8081/actuator/health"
+      },
+      {
+        "name": "elasticsearch",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:9200/_cluster/health"
+      },
+      {
+        "name": "agent-readiness",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:7082/health/ready"
+      },
+      {
+        "name": "redis",
+        "ok": true
+      },
+      {
+        "name": "mysql",
+        "ok": true
+      },
+      {
+        "facts": {
+          "canonicalSha256": "6b1e3b40b447419d381830f397a5e5dda82ce25d02dd629c49e7f659d57de0cb",
+          "index": "aishop-index",
+          "matchesFixture": true,
+          "productCount": 47
+        },
+        "name": "product-catalog",
+        "ok": true
+      },
+      {
+        "model": "qwen3.7-plus",
+        "name": "llm-provider",
+        "ok": true
+      }
+    ],
+    "configuration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 3,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 60
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "passed": true,
+    "requiredProviders": [
+      "agent-runtime",
+      "llm"
+    ],
+    "schemaVersion": "aishop-evaluation-preflight/v2"
+  },
+  "runId": "capacity-readonly-v2-20260823",
+  "schemaVersion": "aishop-capacity-benchmark/v1",
+  "sourceFingerprint": {
+    "capturedAt": "2026-08-23T14:27:35.543Z",
+    "git": {
+      "commit": "79ffa45e0292c8580b1225fd454a6c96535462ae",
+      "worktreeDirty": true
+    },
+    "knowledge": {
+      "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+      "fileCount": 14,
+      "sha256": "d16067f3ea9ff09981aef96793c9aec7f4c993a2184ec3a60069c3f7f2feeae7"
+    },
+    "providerConfiguration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 3,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 60
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+    "source": {
+      "fileCount": 239,
+      "sha256": "2c3cf933f42489f2b35f973aa35878f10f40e5190213ab021caa20431c87350a"
+    }
+  }
+}

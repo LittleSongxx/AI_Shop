@@ -41,6 +41,11 @@ def reset_run_cost() -> None:
             "input_tokens": 0,
             "output_tokens": 0,
             "cost_cny": 0.0,
+            "priced_calls": 0,
+            "unpriced_calls": 0,
+            "missing_usage_calls": 0,
+            "usage_sources": set(),
+            "missing_reasons": {},
             "models": set(),
         }
     )
@@ -54,6 +59,11 @@ def _run_cost_state() -> dict:
             "input_tokens": 0,
             "output_tokens": 0,
             "cost_cny": 0.0,
+            "priced_calls": 0,
+            "unpriced_calls": 0,
+            "missing_usage_calls": 0,
+            "usage_sources": set(),
+            "missing_reasons": {},
             "models": set(),
         }
         _RUN_COST.set(state)
@@ -84,20 +94,33 @@ def record_llm_usage(
     metric_response = metric_response or response
     metadata = getattr(metric_response, "response_metadata", None) or {}
     usage_meta = getattr(metric_response, "usage_metadata", None)
+    usage_source = "none"
+    missing_reason: str | None = None
     if isinstance(usage_meta, dict) and (
         usage_meta.get("input_tokens") is not None
         or usage_meta.get("output_tokens") is not None
     ):
         prompt = usage_meta.get("input_tokens")
         completion = usage_meta.get("output_tokens")
+        usage_source = (
+            "langchain.usage_metadata"
+            if prompt is not None and completion is not None
+            else "langchain.usage_metadata_partial"
+        )
     else:
         token_usage = metadata.get("token_usage")
         if isinstance(token_usage, dict):
             prompt = token_usage.get("prompt_tokens")
             completion = token_usage.get("completion_tokens")
+            usage_source = (
+                "response_metadata.token_usage"
+                if prompt is not None and completion is not None
+                else "response_metadata.token_usage_partial"
+            )
         else:
             prompt = None
             completion = None
+            missing_reason = "provider_omitted_usage"
     response_model = str(
         metadata.get("model_name")
         or getattr(metric_response, "model", None)
@@ -110,6 +133,13 @@ def record_llm_usage(
         "input": prompt if isinstance(prompt, int) and prompt >= 0 else None,
         "output": completion if isinstance(completion, int) and completion >= 0 else None,
     }
+    usage_reported = token_counts["input"] is not None and token_counts["output"] is not None
+    if not usage_reported and missing_reason is None:
+        missing_reason = "provider_partial_usage"
+    if usage_reported:
+        usage_status = "PRICED" if pricing is not None else "UNPRICED"
+    else:
+        usage_status = "MISSING_USAGE"
     total_cost = 0.0
     for kind, count in token_counts.items():
         if count is None:
@@ -151,12 +181,31 @@ def record_llm_usage(
     if token_counts["output"] is not None:
         state["output_tokens"] += token_counts["output"]
     state["cost_cny"] += total_cost
+    if usage_status == "PRICED":
+        state["priced_calls"] += 1
+    elif usage_status == "UNPRICED":
+        state["unpriced_calls"] += 1
+    else:
+        state["missing_usage_calls"] += 1
+        reasons = state.setdefault("missing_reasons", {})
+        reasons[missing_reason or "provider_usage_not_reported"] = (
+            int(reasons.get(missing_reason or "provider_usage_not_reported", 0)) + 1
+        )
+    state.setdefault("usage_sources", set()).add(usage_source)
     state["models"].add(response_model)
     return {
         "model": response_model,
         "inputTokens": token_counts["input"],
         "outputTokens": token_counts["output"],
-        "costCny": total_cost,
+        "costCny": total_cost if usage_status == "PRICED" else None,
+        "providerCalls": 1,
+        "pricedCalls": 1 if usage_status == "PRICED" else 0,
+        "unpricedCalls": 1 if usage_status == "UNPRICED" else 0,
+        "missingUsageCalls": 1 if usage_status == "MISSING_USAGE" else 0,
+        "costStatus": usage_status,
+        "usageReported": usage_reported,
+        "usageSource": usage_source,
+        "missingReason": missing_reason,
     }
 
 
@@ -172,12 +221,37 @@ def snapshot_cost_summary(*, tools_called: list[str] | None = None) -> dict:
     state = _RUN_COST.get() or {}
     calls = int(state.get("calls") or 0)
     path = "heavy" if tools_called else ("light" if calls else "none")
+    missing_usage_calls = int(state.get("missing_usage_calls") or 0)
+    unpriced_calls = int(state.get("unpriced_calls") or 0)
+    priced_calls = int(state.get("priced_calls") or 0)
+    if missing_usage_calls:
+        cost_status = "MISSING_USAGE"
+        cost = None
+    elif unpriced_calls:
+        cost_status = "UNPRICED"
+        cost = None
+    elif priced_calls:
+        cost_status = "PRICED"
+        cost = round(float(state.get("cost_cny") or 0.0), 6)
+    else:
+        cost_status = "NOT_APPLICABLE"
+        cost = None
     return {
         "path": path,
         "llmCalls": calls,
         "inputTokens": int(state.get("input_tokens") or 0),
         "outputTokens": int(state.get("output_tokens") or 0),
-        "costCny": round(float(state.get("cost_cny") or 0.0), 6),
+        "providerCalls": calls,
+        "pricedCalls": priced_calls,
+        "unpricedCalls": unpriced_calls,
+        "missingUsageCalls": missing_usage_calls,
+        "costCny": cost,
+        "costStatus": cost_status,
+        "usageSources": sorted(state.get("usage_sources") or [])
+        if calls
+        else ["not_applicable"],
+        "missingReasons": dict(sorted((state.get("missing_reasons") or {}).items())),
+        "notApplicableReason": "no_llm_call" if not calls else None,
         "models": sorted(state.get("models") or []),
     }
 
@@ -197,9 +271,17 @@ async def invoke_llm_with_metrics(
     *,
     fallback: bool = False,
     model: str | None = None,
+    timeout_seconds: float | None = None,
 ):
-    """Invoke a non-streaming LLM and account for the call exactly once."""
+    """Invoke a non-streaming LLM once within an application wall-clock bound."""
     resolved_model = resolve_llm_model(llm, model)
+    effective_timeout = (
+        get_settings().agent_llm_call_deadline_seconds
+        if timeout_seconds is None
+        else float(timeout_seconds)
+    )
+    if effective_timeout <= 0:
+        raise ValueError("LLM call timeout_seconds must be positive")
     started = time.perf_counter()
     usage: dict[str, Any] = {}
     error: Exception | None = None
@@ -207,14 +289,24 @@ async def invoke_llm_with_metrics(
         span.set_attribute("gen_ai.request.model", resolved_model)
         span.set_attribute("agent.llm.fallback", bool(fallback))
         try:
-            response = await llm.ainvoke(messages)
+            async with asyncio.timeout(effective_timeout):
+                response = await llm.ainvoke(messages)
         except asyncio.CancelledError:
             record_llm_failure(resolved_model, fallback=fallback)
             episode_service.record_step(
                 "LLM_CALL",
                 node_name="llm",
                 status="CANCELLED",
-                input_data={"messages": messages, "fallback": fallback},
+                input_data={
+                    "messages": messages,
+                    "fallback": fallback,
+                    "hardDeadlineSeconds": effective_timeout,
+                },
+                output_data={
+                    "usageStatus": "MISSING_USAGE",
+                    "usageSource": "none",
+                    "missingReason": "cancelled_before_usage",
+                },
                 model_name=resolved_model,
                 error_code="CANCELLED",
                 latency_ms=round((time.perf_counter() - started) * 1_000),
@@ -239,7 +331,20 @@ async def invoke_llm_with_metrics(
                     "LLM_CALL",
                     node_name="llm",
                     status="ERROR",
-                    input_data={"messages": messages, "fallback": fallback},
+                    input_data={
+                        "messages": messages,
+                        "fallback": fallback,
+                        "hardDeadlineSeconds": effective_timeout,
+                    },
+                    output_data={
+                        "usageStatus": "MISSING_USAGE",
+                        "usageSource": "none",
+                        "missingReason": (
+                            "call_deadline_exceeded_before_usage"
+                            if isinstance(error, TimeoutError)
+                            else "provider_error_before_usage"
+                        ),
+                    },
                     model_name=resolved_model,
                     error_code=type(error).__name__,
                     error_message=str(error),
@@ -249,7 +354,11 @@ async def invoke_llm_with_metrics(
                 episode_service.record_step(
                     "LLM_CALL",
                     node_name="llm",
-                    input_data={"messages": messages, "fallback": fallback},
+                    input_data={
+                        "messages": messages,
+                        "fallback": fallback,
+                        "hardDeadlineSeconds": effective_timeout,
+                    },
                     output_data=usage,
                     model_name=resolved_model,
                     latency_ms=round(elapsed * 1_000),

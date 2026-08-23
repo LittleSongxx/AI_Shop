@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from langchain_core.messages import AIMessage
@@ -13,8 +13,10 @@ from app.domain.intent.classifier import (
     classify_intent_by_llm,
     classify_intent_by_rules,
     classify_request_mode,
+    extract_entities,
     resolve_intent,
 )
+from app.domain.intent.rules import deterministic_social_reply
 from app.domain.intent.types import (
     IntentDecision,
     IntentKind,
@@ -128,6 +130,87 @@ def test_rule_chat_returns_none_without_keywords():
     assert classify_intent_by_rules("你好呀") is None
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("你好！", "你好，我是 AI Shop 客服。请问需要查询订单、物流、优惠，还是推荐商品？"),
+        ("谢谢你", "不客气，有需要可以继续告诉我。"),
+        ("好的呢。", "好的。"),
+        ("再见", "再见，祝你购物愉快。"),
+        ("你好，今天有什么活动？", None),
+        ("你好，帮我退款", None),
+        ("谢谢，顺便查一下订单", None),
+    ],
+)
+def test_deterministic_social_reply_requires_a_complete_social_utterance(text, expected):
+    assert deterministic_social_reply(text) == expected
+
+
+@pytest.mark.asyncio
+async def test_pure_social_intent_skips_llm_and_is_high_confidence(monkeypatch):
+    llm = AsyncMock(side_effect=AssertionError("pure social text must skip intent LLM"))
+    monkeypatch.setattr("app.domain.intent.classifier.classify_intent_by_llm", llm)
+
+    decision = await resolve_intent("u1", "谢谢你", allow_llm=True)
+
+    assert decision.intent == IntentKind.CHAT
+    assert decision.source == "deterministic_social"
+    assert decision.confidence == 0.99
+    assert decision.next_action == NextAction.ANSWER
+    assert decision.request_mode == RequestMode.INFORMATIONAL
+    llm.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "我想买索尼 WH-1000XM6，预算 2000 元",
+            {
+                "amount": "2000",
+                "brand": "索尼",
+                "budget": "2000元",
+                "productName": "索尼 WH-1000XM6",
+            },
+        ),
+        (
+            "帮我找 500 元以内、不要户外款的男士外套",
+            {
+                "amount": "500",
+                "budget": "500元以内",
+                "excludedStyle": "户外款",
+                "productName": "男士外套",
+            },
+        ),
+        (
+            "不要苹果，推荐安卓手机",
+            {"excludedBrand": "苹果", "operatingSystem": "安卓", "productName": "安卓手机"},
+        ),
+        (
+            "少了一个配件，订单SM202608050002",
+            {"orderId": "SM202608050002", "productName": "配件", "quantity": "1"},
+        ),
+        (
+            "手机壳有没有适配 iPhone 15",
+            {"compatibleModel": "iPhone 15", "productName": "手机壳"},
+        ),
+    ],
+)
+def test_extended_customer_service_slots_are_bounded_and_explainable(text, expected):
+    assert extract_entities(text) == expected
+
+
+def test_feature_and_bluetooth_slots_keep_original_user_spans():
+    assert extract_entities("这款耳机支持蓝牙 5.4 吗") == {
+        "bluetoothVersion": "5.4",
+        "productName": "耳机",
+    }
+    assert extract_entities("这副耳机有没有主动降噪") == {
+        "feature": "主动降噪",
+        "productName": "耳机",
+    }
+
+
 @pytest.mark.asyncio
 async def test_text_only_product_spec_question_uses_consult_route():
     decision = await resolve_intent(
@@ -206,7 +289,10 @@ async def test_product_search_constraints_beat_consult_and_keep_spans_bounded():
         "boundary", "有没有适合学生的平板，预算2000元", allow_llm=False, record_metrics=False
     )
     assert search.intent == IntentKind.PRODUCT_SEARCH
-    assert search.entities == {"amount": "2000", "productName": "平板"}
+    assert search.entities["amount"] == "2000"
+    assert search.entities["productName"] == "平板"
+    assert search.entities["audience"] == "学生"
+    assert search.entities["budget"] == "2000元"
 
     consult = await resolve_intent(
         "boundary", "这款手机续航怎么样", allow_llm=False, record_metrics=False
@@ -341,7 +427,10 @@ async def test_llm_intent_prefers_provider_structured_output(monkeypatch):
         return "用户 %s 的问题是 %s"
 
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
-    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.create_memory_llm",
+        lambda **kwargs: FakeLlm(),
+    )
 
     try:
         decision = await classify_intent_by_llm("u1", "查物流")
@@ -372,7 +461,10 @@ async def test_llm_intent_falls_back_to_text_json_when_schema_unsupported(monkey
         return "用户 %s 的问题是 %s"
 
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
-    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.create_memory_llm",
+        lambda **kwargs: FakeLlm(),
+    )
 
     try:
         decision = await classify_intent_by_llm("u1", "查优惠券")
@@ -403,7 +495,10 @@ async def test_llm_intent_can_skip_known_unsupported_schema_mode(monkeypatch):
         return "用户 %s 的问题是 %s"
 
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
-    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+    monkeypatch.setattr(
+        "app.domain.intent.classifier.create_memory_llm",
+        lambda **kwargs: FakeLlm(),
+    )
 
     try:
         decision = await classify_intent_by_llm("u1", "查优惠券")
@@ -439,7 +534,8 @@ async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monke
         return "用户 %s 的问题是 %s"
 
     monkeypatch.setattr("app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt)
-    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", FakeLlm)
+    factory = Mock(side_effect=lambda **kwargs: FakeLlm())
+    monkeypatch.setattr("app.domain.intent.classifier.create_memory_llm", factory)
 
     try:
         decision = await classify_intent_by_llm("u1", "随便操作")
@@ -450,6 +546,7 @@ async def test_invalid_schema_and_text_output_returns_non_tool_safe_intent(monke
     assert decision.intent == IntentKind.CHAT
     assert decision.next_action == NextAction.ASK_CLARIFICATION
     assert decision.source == "llm_invalid"
+    factory.assert_called_once_with(disable_thinking=True)
 
 
 @pytest.mark.asyncio
@@ -497,7 +594,7 @@ async def test_intent_llm_call_is_bounded_by_dedicated_timeout(monkeypatch):
         "app.domain.intent.classifier.load_user_intent_classifier_prompt", prompt
     )
     monkeypatch.setattr(
-        "app.domain.intent.classifier.create_memory_llm", lambda: SlowLlm()
+        "app.domain.intent.classifier.create_memory_llm", lambda **kwargs: SlowLlm()
     )
     try:
         started = asyncio.get_running_loop().time()
@@ -517,7 +614,7 @@ async def test_missing_llm_key_uses_explicit_unavailable_fallback(monkeypatch):
     monkeypatch.setenv("MEMORY_LLM_API_KEY", "")
     get_settings.cache_clear()
 
-    def fail_create():
+    def fail_create(**_kwargs):
         raise AssertionError("LLM factory must not run without credentials")
 
     monkeypatch.setattr(

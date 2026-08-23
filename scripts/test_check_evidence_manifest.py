@@ -11,6 +11,7 @@ from check_evidence_manifest import (
     _validate_diagnostic_evidence,
     _validate_failed_final_attempts,
     _validate_lock,
+    _validate_pricing_estimate,
     _validate_suite,
     _validate_visible_runs,
     validate_repository,
@@ -123,6 +124,44 @@ def test_repository_accepts_published_final_when_required() -> None:
     )
 
 
+def test_pricing_estimate_requires_provenance_and_non_gating_status(tmp_path: Path) -> None:
+    quote = {
+        "schemaVersion": "aishop-list-price-estimate/v1",
+        "status": "ESTIMATED_LIST_PRICE",
+        "sourceUrl": "https://example.test/pricing",
+        "retrievedAt": "2026-08-24T00:00:00+08:00",
+        "sourceContentSha256": "a" * 64,
+        "provider": "example",
+        "region": "cn-beijing",
+        "modelId": "model-a",
+        "modelFingerprint": "model-a-1",
+        "inputPriceCnyPerMillion": 2.0,
+        "outputPriceCnyPerMillion": 8.0,
+        "inputTokenUpperBound": 256000,
+        "priceBasis": "ORIGINAL_PUBLIC_CATALOGUE_PRICE",
+        "usableForBudgetGate": False,
+        "billingContractVerified": False,
+        "notes": [],
+    }
+    quote["quoteSha256"] = _canonical_sha256(quote)
+    path = tmp_path / "docs/evaluation/pricing.json"
+    _write_json(path, quote)
+    descriptor = {
+        "path": path.relative_to(tmp_path).as_posix(),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+    errors: list[str] = []
+    _validate_pricing_estimate(tmp_path, descriptor, errors)
+    assert errors == []
+
+    quote["usableForBudgetGate"] = True
+    _write_json(path, quote)
+    descriptor["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    errors = []
+    _validate_pricing_estimate(tmp_path, descriptor, errors)
+    assert any("status or budget boundary" in error for error in errors)
+
+
 def test_current_customer_service_report_is_human_verified_but_release_fail_closed() -> None:
     manifest = json.loads((Path(__file__).parents[1] / "docs/evidence-manifest.json").read_text("utf-8"))
     descriptor = manifest["evaluation"]["customerServiceGold"]
@@ -136,7 +175,8 @@ def test_current_customer_service_report_is_human_verified_but_release_fail_clos
     assert report["humanReviewPlan"]["requiredAnnotators"] == 2
     assert report["humanReviewPlan"]["blindedFirstPass"] is True
     assert report["humanReviewPlan"]["adjudicationComplete"] is True
-    assert manifest["evaluation"]["customerServiceGoldDraft"]["status"] == "PROVISIONAL_NOT_HUMAN_GOLD"
+    assert "customerServiceGoldDraft" not in manifest["evaluation"]
+    assert "historicalDraft" not in descriptor
 
 
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:
@@ -367,6 +407,74 @@ def _diagnostic_fixture(
             "report.json": json.dumps(report).encode() + b"\n",
             "report.md": b"# Search paired replay\n",
         }
+    elif kind == "customer-service-slot-replay":
+        dataset_sha = "d" * 64
+        baseline_sha = "e" * 64
+        report = {
+            "schemaVersion": "aishop-customer-service-slot-replay/v1",
+            "runId": run_id,
+            "dataset": {
+                "annotationStatus": "HUMAN_VERIFIED",
+                "caseCount": 2,
+                "sha256": dataset_sha,
+            },
+            "metrics": {},
+            "pairedCaseCounts": {"FIXED": 1, "UNCHANGED_PASS": 1},
+            "normalQualityDenominatorExcluded": True,
+        }
+        package_manifest = {
+            "schemaVersion": "aishop-customer-service-slot-replay-evidence/v1",
+            "packageId": package_id,
+            "runId": run_id,
+            "datasetSha256": dataset_sha,
+            "baselineReportSha256": baseline_sha,
+            "normalQualityDenominatorExcluded": True,
+        }
+        payloads = {
+            "paired-cases.jsonl": b"{}\n{}\n",
+            "report.json": json.dumps(report).encode() + b"\n",
+            "report.md": b"# Slot replay\n",
+        }
+    elif kind == "capacity-benchmark":
+        dataset_sha = "f" * 64
+        observation = {
+            "caseId": "case-1",
+            "answer": {"sha256": "a" * 64, "chars": 2, "rawStored": False},
+        }
+        report = {
+            "schemaVersion": "aishop-capacity-benchmark/v1",
+            "runId": run_id,
+            "dataset": {
+                "annotationStatus": "HUMAN_VERIFIED",
+                "caseCount": 1,
+                "sha256": dataset_sha,
+            },
+            "configuration": {"concurrencies": [1], "requestsPerLevel": 1},
+            "levels": {
+                "1": {
+                    "concurrency": 1,
+                    "requestedCount": 1,
+                    "completedCount": 1,
+                    "usage": {"costStatus": "NOT_APPLICABLE"},
+                }
+            },
+            "notProductionSlo": True,
+            "normalQualityDenominatorExcluded": True,
+        }
+        package_manifest = {
+            "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+            "benchmarkId": package_id,
+            "runId": run_id,
+            "datasetSha256": dataset_sha,
+            "notProductionSlo": True,
+            "normalQualityDenominatorExcluded": True,
+            "preflightPassed": True,
+        }
+        payloads = {
+            "observations.jsonl": json.dumps(observation).encode() + b"\n",
+            "report.json": json.dumps(report).encode() + b"\n",
+            "report.md": b"# Capacity benchmark\n",
+        }
     else:
         raise AssertionError(f"unsupported diagnostic kind: {kind}")
     for name, content in payloads.items():
@@ -399,6 +507,10 @@ def _diagnostic_fixture(
     }
     if kind == "search-paired-replay":
         descriptor["baselineRunId"] = "final-baseline"
+    if kind == "customer-service-slot-replay":
+        descriptor["baselineReportSha256"] = "e" * 64
+    if kind == "capacity-benchmark":
+        descriptor["resultRole"] = "CURRENT"
     return descriptor
 
 
@@ -445,6 +557,37 @@ def test_search_paired_replay_rejects_qrels_mutation(tmp_path: Path) -> None:
     _validate_diagnostic_evidence(tmp_path, [descriptor], errors)
 
     assert any("paired replay boundary is invalid" in error for error in errors)
+
+
+def test_slot_replay_binds_human_dataset_and_baseline(tmp_path: Path) -> None:
+    descriptor = _diagnostic_fixture(
+        tmp_path,
+        kind="customer-service-slot-replay",
+    )
+    errors: list[str] = []
+
+    _validate_diagnostic_evidence(tmp_path, [descriptor], errors)
+
+    assert errors == []
+    descriptor["baselineReportSha256"] = "0" * 64
+    errors = []
+    _validate_diagnostic_evidence(tmp_path, [descriptor], errors)
+    assert any("slot replay baseline binding is invalid" in error for error in errors)
+
+
+def test_capacity_diagnostic_requires_redacted_answers_and_explicit_role(
+    tmp_path: Path,
+) -> None:
+    descriptor = _diagnostic_fixture(tmp_path, kind="capacity-benchmark")
+    errors: list[str] = []
+
+    _validate_diagnostic_evidence(tmp_path, [descriptor], errors)
+
+    assert errors == []
+    descriptor["resultRole"] = "PRODUCTION_SLO"
+    errors = []
+    _validate_diagnostic_evidence(tmp_path, [descriptor], errors)
+    assert any("capacity result role is invalid" in error for error in errors)
 
 
 def test_db_benchmark_v2_requires_counted_equivalent_rollback_evidence(

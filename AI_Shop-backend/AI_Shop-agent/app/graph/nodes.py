@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from app.config.settings import get_settings
 from app.domain.intent.classifier import resolve_intent
 from app.domain.intent.rules import (
+    deterministic_social_reply,
     looks_like_category_switch,
     looks_like_new_product_search,
     wants_order_list_cards,
@@ -20,7 +21,7 @@ from app.graph.forced_tools import (
     forced_tool_for_intent,
     invoke_deterministic_tool,
 )
-from app.graph.orchestration_policy import select_orchestration
+from app.graph.orchestration_policy import fast_support_eligible, select_orchestration
 from app.graph.order_reference_flow import resolve_order_reference_turn
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
@@ -357,8 +358,15 @@ async def build_context_node(state: AgentGraphState) -> dict:
     grounding_system_messages: list[SystemMessage] = []
     rag_queries: list[str] = []
     rag_retrieval_count = 0
-    rag_evidence_required = requires_rag_evidence(user_text, intent)
-    prefetched = should_prefetch_rag(intent, rag_mode=rag_mode)
+    social_reply = (
+        deterministic_social_reply(user_text)
+        if decision.source == "deterministic_social"
+        else None
+    )
+    rag_evidence_required = (
+        False if social_reply is not None else requires_rag_evidence(user_text, intent)
+    )
+    prefetched = social_reply is None and should_prefetch_rag(intent, rag_mode=rag_mode)
     if prefetched:
         rag_started = time.perf_counter()
         with get_tracer().start_as_current_span("agent.rag.retrieve") as span:
@@ -427,13 +435,15 @@ async def build_context_node(state: AgentGraphState) -> dict:
                 latency_ms=round((time.perf_counter() - rag_started) * 1_000),
             )
 
-    rag_agentic_allowed = should_open_agentic_rag(
-        rag_mode=rag_mode,
-        user_text=user_text,
-        intent=intent,
-        prefetched=prefetched,
-        has_evidence=bool(rag_source_refs),
-    )
+    rag_agentic_allowed = False
+    if social_reply is None:
+        rag_agentic_allowed = should_open_agentic_rag(
+            rag_mode=rag_mode,
+            user_text=user_text,
+            intent=intent,
+            prefetched=prefetched,
+            has_evidence=bool(rag_source_refs),
+        )
 
     selected_fragments: list[dict] = []
     messages, working_turns, working_oldest_id = await context_builder.build_agent_messages(
@@ -685,11 +695,34 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
     bounded_grounded_turn = grounded_answer_turn and not state.get("rag_agentic_allowed")
     if bounded_grounded_turn:
         tool_required_first_turn = False
+    fast_support_turn = bool(
+        getattr(settings, "agent_fast_support_mode", False)
+        and fast_support_eligible(state)
+    )
+    if fast_support_turn:
+        # Keep the experiment visible in the authoritative episode instead of
+        # relying on an environment variable that is easy to lose in replay.
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "FAST_SUPPORT_FIRST_TURN",
+                "deterministicSocialReply": False,
+                "maxTokens": getattr(settings, "agent_fast_support_max_tokens", 512),
+                "disableThinking": True,
+            },
+        )
     non_stream_turn = non_stream_turn or grounded_answer_turn
     llm_options = {
         "tools_enabled": not bounded_grounded_turn,
-        "max_tokens": 384 if bounded_grounded_turn else None,
-        "disable_thinking": bounded_grounded_turn,
+        "max_tokens": (
+            384
+            if bounded_grounded_turn
+            else getattr(settings, "agent_fast_support_max_tokens", 512)
+            if fast_support_turn
+            else None
+        ),
+        "disable_thinking": bounded_grounded_turn or fast_support_turn,
     }
     llm = rt.bind_agent_llm(**llm_options)
     try:
@@ -994,6 +1027,34 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
     resolved = state.get("resolved_order_tool") or {}
     tool_name = str(resolved.get("name") or "")
     tool_args = resolved.get("args")
+    decision = state.get("intent_decision")
+    social_reply = (
+        deterministic_social_reply(str(state.get("user_text") or ""))
+        if intent == IntentKind.CHAT.value
+        and isinstance(decision, dict)
+        and decision.get("source") == "deterministic_social"
+        else None
+    )
+    if social_reply is not None:
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="deterministic_workflow",
+            output_data={
+                "policy": "DETERMINISTIC_SOCIAL_REPLY",
+                "deterministicSocialReply": True,
+                "llmSkipped": True,
+                "ragSkipped": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "llm_messages": messages,
+            "tools_called": [],
+            "biz_type": "agent",
+            "chunks": [social_reply],
+            "pending_tool_calls": [],
+            "route": "finalize",
+        }
     if tool_name and isinstance(tool_args, dict):
         return await invoke_deterministic_tool(
             messages=messages,

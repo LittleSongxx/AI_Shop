@@ -4,7 +4,7 @@
 >
 > 当前证据状态：`PUBLISHED_FINAL`；唯一当前结果、数据集哈希和可陈述边界以 [证据 manifest](docs/evidence-manifest.json) 为准
 >
-> 最后核验时间：2026-08-23（Asia/Shanghai）
+> 最后核验时间：2026-08-24（Asia/Hong_Kong）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
@@ -278,9 +278,9 @@ Search/RAG/Agent 本地完整链路 P50/P95/P99 分别为 `269.6/797.3/940.6 ms`
 `1362.5/17077.8/20943.0 ms`。样本小且只作本地诊断，RAG lexical/semantic shadow 也不等于人工语义准确率。
 
 客服规则预路由的当前点估计为 Intent Macro-F1 `0.955299`（3 个 intent badcase，分层 95% CI `[0.929286,0.987409]`）、高风险 intent Recall `1.000`（10/10）、
-完整人工 schema 的 slot micro F1 `0.907652=688/758`（15 个 badcase，95% CI `[0.888889,0.926454]`）、slot EM `0.558824`（19/34）、
+完整人工 schema 的 slot micro F1 `0.996364=822/825`（3 个 strict-format badcase，95% CI `[0.995061,0.997636]`）、slot EM `0.911765`（31/34）、
 handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
-生产 canonical slot 投影诊断为 Span F1 `0.992785`、EM `0.882353`；完整 schema 失败中有扩展槽位未映射和金额归一化差异，逐 case 根因见报告。
+同一 60 条人工 gold 的 paired replay 为 Span F1 `0.907652 -> 0.996364`、EM `0.558824 -> 0.911765`，修复 12 case、回归 0；只剩 `009/020/058` 的金额原始格式差异。该结果是同集优化证据，不是新 holdout。
 这些是离线规则预路由质量，不是线上客服成功率；`releaseGateEligible=false` 保持 fail-closed。
 
 同一 60 条 gold 已经正式 HTTP Agent/Java/RAG/LLM 路径执行 `60/60`，HTTP 转人工混淆矩阵为 `TP=14,TN=46,FP=0,FN=0`，引用结构违规 `0`。
@@ -299,7 +299,11 @@ regression 有 `1` 次同类诊断和 `1` 次 semantic judge unavailable。它�
 它不计入 final 正常质量分母，且 final summary 的 `resilienceMetrics` 仍明确为 `NOT_RUN`。真实隔离 MySQL benchmark 在候选规模
 `1/10/50/100` 下验证 batch offer/decision feature 为一次 round trip，而 N+1 随候选数线性增长；100 候选时 batch offer/decision
 P50 为 `23.864/2.405 ms`，N+1 为 `89.805/70.501 ms`。Token 只采用 Provider usage；缺 usage 标为
-`MISSING_USAGE`，没有可信单价时 `costCny=null`，不写成零成本。所有延迟都是本地完整链路的描述性数据，不是生产 SLO。
+`MISSING_USAGE`，没有可信单价时 `costCny=null`，不写成零成本。官方目录价估算另存为
+`ESTIMATED_LIST_PRICE`，带来源 URL、抓取时间、模型 fingerprint 和页面 SHA-256，不能改写运行时状态或启用费用门禁。
+所有延迟都是本地完整链路的描述性数据，不是生产 SLO。
+
+只读容量诊断固定 4 条 HUMAN_VERIFIED case，warm-up `4` 次不进分母，正式并发 `1/2/4/8`、每档 `20` 请求；当前 v5 为 `80/80`，QPS `0.396/0.641/0.965/1.353`，c8 混合 P50/P95/P99 `1.052/10.505/12.033s`，LLM 路径 P95 `10.211/9.852/10.574/12.013s`。v5 比 v4 样本更大，但仍受共享本机和外部 Provider 影响。新增单次 LLM hard deadline `45s`，总 Agent/Worker deadline `120s`。纯社交审计探针 `5/5`、P95 `716.1 ms`、Provider calls/token `0`，并在 trace 中确认 `deterministicSocialReply=true`。样本仍只用于瓶颈诊断，不是持续容量或生产 SLO。
 
 历史 `final-20260820-ai-quality-v2` 保留为只读 archive，`v3` 至 `v8` 是只读失败 final archive；它们不代表当前结果，
 也不会被删除后重新计算。项目没有 CTR/CVR/GMV、工业级个性化推荐、生产容量或支付合规证据。逐 case、切片、故障、

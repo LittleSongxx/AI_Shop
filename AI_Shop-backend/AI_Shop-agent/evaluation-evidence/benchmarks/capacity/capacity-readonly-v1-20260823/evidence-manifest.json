@@ -1,0 +1,27 @@
+{
+  "benchmarkId": "capacity-readonly-v1-20260823",
+  "benchmarkSchemaVersion": "aishop-capacity-benchmark/v1",
+  "createdAt": "2026-08-23T14:16:48.906Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "files": {
+    "observations.jsonl": {
+      "bytes": 50776,
+      "sha256": "9b1c2591e8a55ac100ca1d9d7e5393a2b84c1132ca0b8aad26f84500b4aa6581"
+    },
+    "report.json": {
+      "bytes": 146389,
+      "sha256": "2efcdfc795563b8c603a02c97e1383061548237000a39fcee3460b105ceda916"
+    },
+    "report.md": {
+      "bytes": 837,
+      "sha256": "a231c246ba52d560b661f2a53d515ae689bd13451678f383e7f82dacffcdd402"
+    }
+  },
+  "normalQualityDenominatorExcluded": true,
+  "notProductionSlo": true,
+  "preflightPassed": true,
+  "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+  "runId": "capacity-readonly-v1-20260823",
+  "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+  "sourceSha256": "7bb658b877816ca19b4b8dcae50a90f4bec5fb9067f841d5d379867a83ae8750"
+}

@@ -1,0 +1,27 @@
+{
+  "benchmarkId": "capacity-social-shortcut-v3-20260823",
+  "benchmarkSchemaVersion": "aishop-capacity-benchmark/v1",
+  "createdAt": "2026-08-23T15:05:55.723Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "files": {
+    "observations.jsonl": {
+      "bytes": 11085,
+      "sha256": "eb9c1d6c1db8d91afff650eca92767fc369c18087751bd0d6a4d98194552fa15"
+    },
+    "report.json": {
+      "bytes": 12672,
+      "sha256": "88b84fe34d05985120bc6981040a1fa4d9d15b06ccfe64c65be9caa92bceb947"
+    },
+    "report.md": {
+      "bytes": 832,
+      "sha256": "f6d5dd5a13bfb368342ba4649271664c5f264864297df2993af3d76d3b0aaa71"
+    }
+  },
+  "normalQualityDenominatorExcluded": true,
+  "notProductionSlo": true,
+  "preflightPassed": true,
+  "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+  "runId": "capacity-social-shortcut-v3-20260823",
+  "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+  "sourceSha256": "1e9af0da05062d4a4122d984d0465866537d441c70bb693591bfedb23d52018e"
+}

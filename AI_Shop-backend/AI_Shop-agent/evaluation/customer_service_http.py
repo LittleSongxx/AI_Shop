@@ -34,7 +34,6 @@ from evaluation.core.io import (
     atomic_write_text,
     canonical_json_bytes,
     load_json,
-    load_jsonl,
     relative_to_repo,
     sha256_bytes,
     sha256_file,
@@ -49,8 +48,6 @@ from evaluation.customer_service_gold import (
 )
 
 HTTP_REPORT_SCHEMA = "aishop-customer-service-http-evaluation/v1"
-ANSWER_REVIEW_SCHEMA = "aishop-customer-service-answer-review/v1"
-ANSWER_REVIEW_REPORT_SCHEMA = "aishop-customer-service-answer-review-report/v1"
 HTTP_EVIDENCE_SCHEMA = "aishop-customer-service-http-evidence/v1"
 
 _TERMINAL = {
@@ -64,14 +61,6 @@ _TERMINAL = {
     "MANUAL_REVIEW",
 }
 _CITATION_RE = re.compile(r"\[(\d+)]")
-_ANSWER_LABELS = {
-    "answerCorrect": {True, False},
-    "citationSupport": {"SUPPORTED", "UNSUPPORTED", "NOT_APPLICABLE", "UNDECIDABLE"},
-    "handoffAppropriate": {True, False},
-    "unsafeAnswer": {True, False},
-}
-
-
 class CustomerServiceHttpError(ValueError):
     """Raised when full-path evidence cannot be built without guessing."""
 
@@ -336,6 +325,8 @@ def _runtime_metrics(observations: Mapping[str, Mapping[str, Any]]) -> dict[str,
                 if fully_priced
                 else "MISSING_USAGE"
                 if missing_usage_calls
+                else "NOT_APPLICABLE"
+                if provider_calls == 0
                 else "UNPRICED"
             ),
         },
@@ -658,175 +649,6 @@ async def run_customer_service_http(
         run_id=run_id,
         preflight=preflight,
     )
-
-
-def export_answer_review_sheet(
-    report_path: Path,
-    output_path: Path,
-    *,
-    reviewer_id: str,
-) -> dict[str, Any]:
-    reviewer = str(reviewer_id or "").strip()
-    if not reviewer:
-        raise CustomerServiceHttpError("reviewer_id is required")
-    if output_path.exists():
-        raise FileExistsError(f"refusing to overwrite answer review: {output_path}")
-    report = load_json(report_path)
-    if report.get("schemaVersion") != HTTP_REPORT_SCHEMA:
-        raise CustomerServiceHttpError("answer review source is not a customer-service HTTP report")
-    rows = []
-    for case in report.get("cases") or []:
-        http = case.get("http") if isinstance(case.get("http"), Mapping) else {}
-        rows.append(
-            {
-                "schemaVersion": ANSWER_REVIEW_SCHEMA,
-                "caseId": str(case.get("caseId") or ""),
-                "reviewerId": reviewer,
-                "sourceRunId": report.get("runId"),
-                "sourceReportSha256": sha256_file(report_path),
-                "message": case.get("message"),
-                "answer": http.get("answer") or "",
-                "sourceRefs": http.get("sourceRefs") or [],
-                "observedHandoff": bool(http.get("handoffObserved")),
-                "labels": {
-                    "answerCorrect": None,
-                    "citationSupport": None,
-                    "handoffAppropriate": None,
-                    "unsafeAnswer": None,
-                },
-                "comment": "",
-            }
-        )
-    atomic_write_jsonl(output_path, rows, overwrite=False)
-    manifest = {
-        "schemaVersion": ANSWER_REVIEW_SCHEMA,
-        "lifecycle": "OPEN",
-        "reviewerId": reviewer,
-        "sourceRunId": report.get("runId"),
-        "sourceReportPath": _portable_path(report_path),
-        "sourceReportSha256": sha256_file(report_path),
-        "sheetPath": _portable_path(output_path),
-        "sheetSha256AtExport": sha256_file(output_path),
-        "caseCount": len(rows),
-        "blinding": "Gold expected labels and rule/HTTP intent predictions omitted",
-    }
-    atomic_write_json(
-        output_path.with_suffix(output_path.suffix + ".manifest.json"),
-        manifest,
-        overwrite=False,
-    )
-    return manifest
-
-
-def score_answer_review(report_path: Path, review_path: Path) -> dict[str, Any]:
-    report = load_json(report_path)
-    review_rows = load_jsonl(review_path)
-    if report.get("schemaVersion") != HTTP_REPORT_SCHEMA:
-        raise CustomerServiceHttpError("answer review source report schema is invalid")
-    expected_ids = {str(case.get("caseId") or "") for case in report.get("cases") or []}
-    observed_ids: set[str] = set()
-    reviewer_ids: set[str] = set()
-    badcases: list[dict[str, Any]] = []
-    counts = {
-        "answerCorrect": 0,
-        "citationSupported": 0,
-        "citationEligible": 0,
-        "handoffAppropriate": 0,
-        "unsafeAnswer": 0,
-    }
-    source_hash = sha256_file(report_path)
-    for index, row in enumerate(review_rows, 1):
-        label = f"{review_path}:{index}"
-        if row.get("schemaVersion") != ANSWER_REVIEW_SCHEMA:
-            raise CustomerServiceHttpError(f"{label}: answer review schema is invalid")
-        case_id = str(row.get("caseId") or "")
-        if case_id not in expected_ids or case_id in observed_ids:
-            raise CustomerServiceHttpError(f"{label}: case ID is unknown or duplicated")
-        if row.get("sourceReportSha256") != source_hash:
-            raise CustomerServiceHttpError(f"{label}: source report hash differs")
-        labels = row.get("labels")
-        if not isinstance(labels, Mapping) or set(labels) != set(_ANSWER_LABELS):
-            raise CustomerServiceHttpError(f"{label}: labels are incomplete")
-        for field, allowed in _ANSWER_LABELS.items():
-            if labels.get(field) not in allowed:
-                raise CustomerServiceHttpError(f"{label}: {field} is invalid or incomplete")
-        reviewer = str(row.get("reviewerId") or "").strip()
-        if not reviewer:
-            raise CustomerServiceHttpError(f"{label}: reviewerId is required")
-        reviewer_ids.add(reviewer)
-        observed_ids.add(case_id)
-        counts["answerCorrect"] += int(labels["answerCorrect"] is True)
-        if labels["citationSupport"] != "NOT_APPLICABLE":
-            counts["citationEligible"] += 1
-            counts["citationSupported"] += int(labels["citationSupport"] == "SUPPORTED")
-        counts["handoffAppropriate"] += int(labels["handoffAppropriate"] is True)
-        counts["unsafeAnswer"] += int(labels["unsafeAnswer"] is True)
-        failed = [
-            name
-            for name, passed in (
-                ("answerCorrect", labels["answerCorrect"] is True),
-                (
-                    "citationSupport",
-                    labels["citationSupport"] in {"SUPPORTED", "NOT_APPLICABLE"},
-                ),
-                ("handoffAppropriate", labels["handoffAppropriate"] is True),
-                ("unsafeAnswer", labels["unsafeAnswer"] is False),
-            )
-            if not passed
-        ]
-        if failed:
-            badcases.append(
-                {
-                    "caseId": case_id,
-                    "failedMetrics": failed,
-                    "labels": dict(labels),
-                    "comment": row.get("comment") or "",
-                }
-            )
-    if observed_ids != expected_ids:
-        raise CustomerServiceHttpError(
-            f"answer review coverage mismatch; missing={sorted(expected_ids - observed_ids)}"
-        )
-    total = len(expected_ids)
-    return {
-        "schemaVersion": ANSWER_REVIEW_REPORT_SCHEMA,
-        "status": "HUMAN_REVIEWED_SINGLE_RATER",
-        "releaseGateEligible": False,
-        "sourceRunId": report.get("runId"),
-        "sourceReportSha256": source_hash,
-        "reviewPath": _portable_path(review_path),
-        "reviewSha256": sha256_file(review_path),
-        "reviewerIds": sorted(reviewer_ids),
-        "caseCount": total,
-        "metrics": {
-            "answerCorrectness": _ratio_metric(
-                counts["answerCorrect"],
-                total,
-                badcase_ids=[row["caseId"] for row in badcases if "answerCorrect" in row["failedMetrics"]],
-            ),
-            "citationGroundingSupport": _ratio_metric(
-                counts["citationSupported"],
-                counts["citationEligible"],
-                badcase_ids=[row["caseId"] for row in badcases if "citationSupport" in row["failedMetrics"]],
-            ),
-            "handoffAppropriateness": _ratio_metric(
-                counts["handoffAppropriate"],
-                total,
-                badcase_ids=[row["caseId"] for row in badcases if "handoffAppropriate" in row["failedMetrics"]],
-            ),
-            "unsafeAnswerRate": _ratio_metric(
-                counts["unsafeAnswer"],
-                total,
-                badcase_ids=[row["caseId"] for row in badcases if "unsafeAnswer" in row["failedMetrics"]],
-            ),
-        },
-        "badcases": badcases,
-        "limitations": [
-            "This is one independent human rating pass, not dual-review agreement or adjudicated gold.",
-            "The Agent/LLM does not grade its own final answer.",
-        ],
-        "createdAt": utc_now(),
-    }
 
 
 def rebuild_customer_service_http_report(

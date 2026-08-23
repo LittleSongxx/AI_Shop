@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config.settings import get_settings
 from app.domain.intent.rules import HUMAN_HINTS as _HUMAN_HINTS
+from app.domain.intent.rules import deterministic_social_reply
 from app.domain.intent.types import (
     IntentDecision,
     IntentKind,
@@ -211,8 +212,24 @@ _PRIVACY_REQUEST_HINTS = (
 _PRODUCT_ENTITY_MARKERS = (
     "手机壳", "安卓手机", "降噪耳机", "轻薄本", "手机", "耳机", "电脑", "笔记本",
     "平板", "外套", "衣服", "鞋", "零食", "饮料", "相机", "键盘", "鼠标", "音箱",
-    "空气净化器", "净水器", "吉他", "玩具",
+    "空气净化器", "净水器", "吉他", "玩具", "配件",
 )
+
+# Deterministic extension slots used by the customer-service contract.  These
+# are deliberately bounded vocabularies/patterns: an LLM must not be allowed
+# to invent a brand, feature, or compatibility target that was not present in
+# the user's message.  The canonical five slots above remain unchanged for
+# downstream callers; these fields only add evidence for search/consult flows.
+_KNOWN_BRANDS = (
+    "苹果", "华为", "索尼", "小米", "荣耀", "三星", "vivo", "OPPO", "联想", "戴尔",
+    "惠普", "耐克", "阿迪达斯", "安踏", "李宁", "优衣库",
+)
+_KNOWN_AUDIENCES = (
+    "学生", "儿童", "孩子", "老人", "男士", "女士", "上班族", "通勤族", "游戏玩家",
+)
+_KNOWN_OPERATING_SYSTEMS = ("安卓", "Android", "iOS", "鸿蒙", "Windows", "macOS")
+_STYLE_SUFFIXES = ("款", "风格", "类型", "版", "风")
+_MISSING_ITEM_MARKERS = ("少了", "缺少", "漏发", "少发", "少件")
 
 _PRIVACY_DATA_TERMS = (
     "邮箱",
@@ -327,7 +344,8 @@ def _extract_product_name(text: str) -> str | None:
             candidate = value[start : marker_end + len(marker)].strip(" ：:、，, ")
             candidate = re.sub(r"^(?:不要|不想要|预算[^的]*的)", "", candidate).strip()
             candidate = re.sub(
-                r"^(?:这款|这副|这个|该款|此款|这台|包裹少了|少了|缺少|漏发|少发|收到的包裹少了)",
+                r"^(?:这款|这副|这个|该款|此款|这台|包裹少了|少了|缺少|漏发|少发|收到的包裹少了)"
+                r"\s*(?:一个|一件|一只|1个|1件|1只)?",
                 "",
                 candidate,
             ).strip()
@@ -1134,6 +1152,122 @@ def analyze_sentiment(user_text: str) -> SentimentKind:
     return SentimentKind.NEUTRAL
 
 
+def _normalize_budget_span(number: str, unit: str | None, qualifier: str | None) -> str:
+    """Keep a human-readable budget span without changing numeric ``amount``."""
+
+    value = re.sub(r"\s+", "", str(number or ""))
+    currency = str(unit or "元").strip() or "元"
+    suffix = str(qualifier or "").strip()
+    return f"{value}{currency}{suffix}"
+
+
+def _extract_budget(text: str) -> str | None:
+    # Match both ``预算 2000 元`` and ``500 元以内``.  The qualifier is part of
+    # the semantic slot, while ``amount`` continues to expose only the number.
+    patterns = (
+        r"(?:预算|预算为|预算是|价格不超过|不超过|不高于)\s*[¥￥]?\s*"
+        r"(\d+(?:\.\d{1,2})?)\s*(元|块)?\s*(以内|以下|之内)?",
+        r"[¥￥]?\s*(\d+(?:\.\d{1,2})?)\s*(元|块)\s*(以内|以下|之内)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return _normalize_budget_span(match.group(1), match.group(2), match.group(3))
+    return None
+
+
+def _extract_extended_entities(text: str) -> dict[str, str]:
+    """Extract bounded customer-service slots from the original user span."""
+
+    entities: dict[str, str] = {}
+    budget = _extract_budget(text)
+    if budget:
+        entities["budget"] = budget
+
+    # Explicit exclusions must be classified before positive brand extraction,
+    # otherwise ``不要苹果，推荐安卓手机`` would expose ``brand=苹果`` too.
+    excluded_brands: set[str] = set()
+    for brand in _KNOWN_BRANDS:
+        if re.search(
+            rf"(?:不要|不选|排除|不考虑)\s*(?:品牌\s*)?{re.escape(brand)}",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            excluded_brands.add(brand)
+    if excluded_brands:
+        entities["excludedBrand"] = next(
+            brand for brand in _KNOWN_BRANDS if brand in excluded_brands
+        )
+
+    for brand in _KNOWN_BRANDS:
+        if brand in excluded_brands:
+            continue
+        if brand in text and any(marker in text for marker in ("买", "找", "推荐", "手机", "耳机", "电脑")):
+            entities["brand"] = brand
+            break
+
+    for system in _KNOWN_OPERATING_SYSTEMS:
+        if re.search(rf"(?<![A-Za-z]){re.escape(system)}(?![A-Za-z])", text, flags=re.IGNORECASE):
+            entities["operatingSystem"] = system
+            break
+
+    bluetooth = re.search(
+        r"蓝牙\s*(?:版本|version|v)?\s*([0-9]+(?:\.[0-9]+)?)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if bluetooth:
+        entities["bluetoothVersion"] = bluetooth.group(1)
+
+    # Prefer the more specific phrase first so ``主动降噪`` is not shortened to
+    # ``降噪``.  Only phrases asked about in the message are emitted.
+    for feature in ("主动降噪", "降噪", "续航"):
+        if feature in text:
+            entities["feature"] = feature
+            break
+
+    for audience in _KNOWN_AUDIENCES:
+        if re.search(rf"适合\s*{re.escape(audience)}(?:的|用|人群|$)", text):
+            entities["audience"] = audience
+            break
+
+    exclusion = re.search(
+        r"(?:不要|不想要|排除|不考虑)\s*([^，,。！？!?；;]+)",
+        text,
+    )
+    if exclusion:
+        candidate = exclusion.group(1).strip()
+        if candidate and not any(brand in candidate for brand in _KNOWN_BRANDS):
+            # A style slot is emitted only for an explicit style/type noun.  We
+            # intentionally do not generalize every negated phrase into a slot.
+            style = re.search(
+                rf"([^\s，,。！？!?；;]+(?:{'|'.join(map(re.escape, _STYLE_SUFFIXES))}))",
+                candidate,
+            )
+            if style:
+                entities["excludedStyle"] = style.group(1)
+
+    missing_item = re.search(
+        r"(?:少了|缺少|漏发|少发)\s*(一件|一个|一只|1件|1个|1只|\d+件|\d+个|\d+只)?\s*配件",
+        text,
+    )
+    if missing_item:
+        quantity = missing_item.group(1) or "1"
+        quantity = {"一件": "1", "一个": "1", "一只": "1"}.get(quantity, quantity)
+        quantity = re.sub(r"(?:件|个|只)$", "", quantity)
+        entities["quantity"] = quantity or "1"
+
+    compatible = re.search(
+        r"(?:适配|兼容|适用于|支持)\s*"
+        r"([A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z0-9-]+)*\s*\d+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if compatible:
+        entities["compatibleModel"] = re.sub(r"\s+", " ", compatible.group(1).strip())
+    return entities
+
+
 def extract_entities(user_text: str, data: str = "") -> dict[str, str]:
     text = user_text or ""
     entities: dict[str, str] = {}
@@ -1156,6 +1290,7 @@ def extract_entities(user_text: str, data: str = "") -> dict[str, str]:
     product_name = _extract_product_name(text)
     if product_name:
         entities["productName"] = product_name
+    entities.update(_extract_extended_entities(text))
     return entities
 
 
@@ -1267,7 +1402,10 @@ async def classify_intent_by_llm(
         HumanMessage(content=prompt),
     ]
     try:
-        llm = create_memory_llm()
+        # Intent classification is bounded schema extraction, not open-ended
+        # reasoning.  Disabling thinking removes an avoidable latency/token
+        # tail while the existing schema validation and safe fallback remain.
+        llm = create_memory_llm(disable_thinking=True)
     except Exception as exc:
         INTENT_SCHEMA_TOTAL.labels(result="invalid").inc()
         logger.warning(
@@ -1438,6 +1576,24 @@ async def resolve_intent(
             user_text,
             confidence=0.99,
             source="structural",
+            after_sales_workflow=after_sales_workflow,
+        )
+        return _record_and_apply(
+            decision,
+            user_text,
+            unresolved_count,
+            recent_intents=recent_intents,
+            record_metrics=record_metrics,
+            after_sales_workflow=after_sales_workflow,
+        )
+
+    if deterministic_social_reply(user_text) is not None:
+        decision = _build_decision(
+            IntentKind.CHAT,
+            user_text,
+            confidence=0.99,
+            source="deterministic_social",
+            next_action=NextAction.ANSWER,
             after_sales_workflow=after_sales_workflow,
         )
         return _record_and_apply(

@@ -1743,12 +1743,12 @@
         "badcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"]
       },
       "highRiskIntentRecall": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseIds": []},
-      "slotEntitySpanF1": {"value": 0.907652, "numerator": 688, "denominator": 758, "componentCounts": {"truePositive": 344, "falsePositive": 0, "falseNegative": 70}, "confidenceInterval95": {"lower": 0.888889, "upper": 0.926454, "method": "stratified-case-bootstrap-micro-F1"}, "badcaseCount": 15},
-      "slotExactMatch": {"value": 0.558824, "numerator": 19, "denominator": 34, "badcaseCount": 15},
+      "slotEntitySpanF1": {"value": 0.996364, "numerator": 822, "denominator": 825, "componentCounts": {"truePositive": 411, "falsePositive": 0, "falseNegative": 3}, "confidenceInterval95": {"lower": 0.995061, "upper": 0.997636, "method": "stratified-case-bootstrap-micro-F1"}, "badcaseCount": 3, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]},
+      "slotExactMatch": {"value": 0.911765, "numerator": 31, "denominator": 34, "confidenceInterval95": {"lower": 0.770395, "upper": 0.969534, "method": "wilson"}, "badcaseCount": 3, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]},
       "handoffRecall": {"value": 1.0, "numerator": 14, "denominator": 14, "badcaseIds": []},
       "criticalHandoffMissRate": {"value": 0.0, "numerator": 0, "denominator": 6, "badcaseIds": []},
-      "canonicalSlotEntitySpanF1": {"value": 0.992785, "numerator": 688, "denominator": 693, "componentCounts": {"truePositive": 344, "falsePositive": 0, "falseNegative": 5}, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]},
-      "canonicalSlotExactMatch": {"value": 0.882353, "numerator": 30, "denominator": 34, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]}
+      "canonicalSlotEntitySpanF1": {"value": 0.995683, "numerator": 692, "denominator": 695, "componentCounts": {"truePositive": 346, "falsePositive": 0, "falseNegative": 3}, "confidenceInterval95": {"lower": 0.994135, "upper": 0.997191, "method": "stratified-case-bootstrap-micro-F1"}, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]},
+      "canonicalSlotExactMatch": {"value": 0.911765, "numerator": 31, "denominator": 34, "confidenceInterval95": {"lower": 0.770395, "upper": 0.969534, "method": "wilson"}, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]}
     },
     "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "adjudicatedCases": 25},
     "httpFullPath": {
@@ -1770,6 +1770,19 @@
       "targetTotalCaseCount": 120,
       "datasetSha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353",
       "claimEligible": false
+    },
+    "slotPairedReplay": {
+      "status": "PAIRED_REPLAY_COMPLETE",
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-slot-replay-v1-20260823",
+      "sha256SumsSha256": "76bee98fb6a5d266434c4f2bcfbff93e94f292c64099e9f8f53f202ad605ea13",
+      "sameHumanDataset": true,
+      "caseCount": 60,
+      "before": {"slotEntitySpanF1": 0.907652, "slotExactMatch": 0.558824},
+      "after": {"slotEntitySpanF1": 0.996364, "slotExactMatch": 0.911765},
+      "fixedCaseCount": 12,
+      "residualCaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"],
+      "regressedCaseIds": [],
+      "newHoldout": false
     },
     "limitations": [
       "slot F1/EM is measured on resolve_intent(..., allow_llm=false); HTTP Episode slot values are redacted and are not scored",
@@ -1832,11 +1845,62 @@
     "notes": [
       "P95/P99 samples are below 100 and are descriptive long-tail diagnostics only.",
       "These values are not production capacity or SLO evidence."
-    ]
+    ],
+    "capacityBenchmark": {
+      "scope": "LOCAL_FULL_STACK_READ_ONLY_NOT_PRODUCTION_SLO",
+      "caseCount": 4,
+      "warmupRequests": 4,
+      "requestsPerConcurrency": 20,
+      "concurrencies": [1, 2, 4, 8],
+      "currentRunId": "capacity-readonly-v5-20260824",
+      "baselineRunId": "capacity-readonly-v2-20260823",
+      "current": {
+        "success": "80/80",
+        "qps": {"1": 0.396151, "2": 0.640887, "4": 0.964707, "8": 1.353438},
+        "mixedPathP50P95P99Ms": {
+          "1": [629.313, 9242.997, 10224.327],
+          "2": [638.996, 9243.578, 9859.644],
+          "4": [1212.151, 9699.348, 10585.741],
+          "8": [1051.505, 10505.035, 12032.612]
+        },
+        "llmPathP95Ms": {"1": 10211.415, "2": 9851.537, "4": 10574.078, "8": 12012.512},
+        "maxSingleLlmCallMs": 4736.0,
+        "maxCompleteRequestMs": 12415.0,
+        "inputTokens": 181558,
+        "outputTokens": 5803,
+        "providerCalls": 56,
+        "costStatus": "UNPRICED",
+        "hardDeadlineSeconds": 45,
+        "runtimeErrors": 0,
+        "stateOrSafetyFailures": 0
+      },
+      "socialAuditProbe": {
+        "runId": "capacity-social-shortcut-v4-20260823",
+        "requests": 5,
+        "success": "5/5",
+        "latencyMs": {"p50": 629.622, "p95": 716.079, "p99": 726.597},
+        "providerCalls": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "costStatus": "NOT_APPLICABLE",
+        "policyFactsVerified": true
+      },
+      "limitations": [
+        "Warm-up 4 is excluded from the formal denominator; 20 requests per concurrency and a shared local host remain a diagnostic curve, not sustained load or a production SLO.",
+        "The larger v5 sample still depends on external Provider variance, so it does not support a strict causal improvement claim.",
+        "A 45-second per-call hard deadline is an execution guard, not a latency SLO.",
+        "The optional fast-support generation experiment remains disabled by default."
+      ]
+    }
   },
   "usageDiagnostics": {
     "source": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current/summary.json",
-    "costRule": "Provider usage is required; missing usage is MISSING_USAGE; absent trusted price leaves costCny=null.",
+    "costRule": "Provider usage is required; missing usage is MISSING_USAGE; absent trusted price leaves costCny=null. Public catalogue estimates remain ESTIMATED_LIST_PRICE and cannot enable a budget gate.",
+    "pricingEstimate": {
+      "path": "docs/evaluation/model-pricing-estimate-20260824.json",
+      "status": "ESTIMATED_LIST_PRICE",
+      "usableForBudgetGate": false
+    },
     "domains": {
       "search": {
         "providerCalls": 121,
@@ -1905,6 +1969,21 @@
       "constraintViolationCount": 0,
       "remainingBadcaseIds": ["search-fin-v9-23-snack-100", "search-fin-v9-34-snack-no-wangwang", "search-fin-v9-47-compare-xm"],
       "normalQualityDenominatorExcluded": true
+    },
+    "customerServiceSlotReplay": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-slot-replay-v1-20260823",
+      "caseCount": 60,
+      "fixedCaseCount": 12,
+      "residualCaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"],
+      "regressionCount": 0,
+      "normalQualityDenominatorExcluded": true
+    },
+    "capacityBenchmark": {
+      "baselinePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v2-20260823",
+      "currentPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v5-20260824",
+      "socialAuditPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-social-shortcut-v4-20260823",
+      "notProductionSlo": true,
+      "normalQualityDenominatorExcluded": true
     }
   },
   "optimizationHistory": {
@@ -1947,6 +2026,40 @@
         "offerSnapshotP50Ms": {"before": 89.805, "after": 23.864, "reductionPercent": 73.427},
         "decisionFeatureP50Ms": {"before": 70.501, "after": 2.405, "reductionPercent": 96.589},
         "notProductionSlo": true
+      },
+      {
+        "id": "customer-slot-paired-replay-v1",
+        "kind": "PAIRED_SAME_HUMAN_GOLD",
+        "caseCount": 60,
+        "before": {"slotEntitySpanF1": 0.907652, "slotExactMatch": 0.558824},
+        "after": {"slotEntitySpanF1": 0.996364, "slotExactMatch": 0.911765},
+        "fixedCaseCount": 12,
+        "residualCaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"],
+        "regressionCount": 0,
+        "newHoldout": false
+      },
+      {
+        "id": "readonly-capacity-v2-v4",
+        "kind": "SAME_CASE_LOCAL_CAPACITY_DIAGNOSTIC",
+        "concurrencies": [1, 2, 4, 8],
+        "requestsPerConcurrency": 8,
+        "qpsBefore": {"1": 0.236836, "2": 0.432744, "4": 0.370535, "8": 0.429263},
+        "qpsAfter": {"1": 0.205797, "2": 0.693596, "4": 0.684364, "8": 0.904753},
+        "concurrency1Improved": false,
+        "notProductionSlo": true
+      },
+      {
+        "id": "readonly-capacity-v4-v5",
+        "kind": "LARGER_SAMPLE_LOCAL_CAPACITY_DIAGNOSTIC",
+        "concurrencies": [1, 2, 4, 8],
+        "warmupRequests": 4,
+        "requestsPerConcurrency": 20,
+        "qps": {"1": 0.396151, "2": 0.640887, "4": 0.964707, "8": 1.353438},
+        "llmPathP95Seconds": {"1": 10.211, "2": 9.852, "4": 10.574, "8": 12.013},
+        "formalSuccess": "80/80",
+        "badcaseCount": 0,
+        "qualityGainClaimAllowed": false,
+        "notProductionSlo": true
       }
     ],
     "finalLifecycleTrend": {
@@ -1966,11 +2079,11 @@
     "searchQualityGate": "PASSED",
     "ragQualityGate": "PASSED_LEXICAL_AND_CONTRACT_ONLY",
     "customerIntentAndHandoff": "PASSED_ON_60_HUMAN_VERIFIED_CASES",
-    "customerFullSlotQuality": "BELOW_PROVISIONAL_TARGET",
+    "customerFullSlotQuality": "POINT_ESTIMATE_PASSES_PROJECT_REFERENCE_TARGET_ON_60_CASES",
     "httpAnswerQuality": "PENDING_INDEPENDENT_HUMAN_REVIEW",
     "agentReliability": "PASSED_ON_25_CASES_AND_200_TRIALS",
     "latency": "SEARCH_USABLE_GENERATIVE_LONG_TAIL_HIGH",
-    "capacityAndCost": "NOT_ESTABLISHED",
+    "capacityAndCost": "LOCAL_READ_ONLY_CURVE_OBSERVED_COST_NOT_ESTABLISHED",
     "supportedUse": "Small-catalog, low-concurrency, human-backed demo or controlled pre-production use.",
     "unsupportedClaim": "Unattended high-concurrency production readiness, production SLO, online business lift, CSAT/FCR, or unit economics."
   },

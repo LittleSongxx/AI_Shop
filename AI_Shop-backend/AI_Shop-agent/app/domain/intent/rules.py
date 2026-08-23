@@ -272,6 +272,54 @@ _ACK_WORDS = frozenset({
     "再见", "拜拜", "没事", "没事了", "没了", "没了呢", "好哒",
 })
 
+_DETERMINISTIC_SOCIAL_REPLIES = {
+    "greeting": (
+        frozenset({
+            "你好", "你好啊", "您好", "您好啊", "哈喽", "哈喽啊", "hello", "hi", "嗨",
+            "在吗", "在不在", "在么",
+        }),
+        "你好，我是 AI Shop 客服。请问需要查询订单、物流、优惠，还是推荐商品？",
+    ),
+    "acknowledgement": (
+        frozenset({
+            "好", "好的", "好的呢", "好嘞", "好哒", "收到", "明白", "知道了", "嗯", "嗯嗯",
+            "嗯呢", "哦", "行", "行吧", "没问题", "可以", "对", "对的",
+        }),
+        "好的。",
+    ),
+    "thanks": (
+        frozenset({"谢谢", "谢谢你", "感谢", "感谢你", "多谢", "辛苦了"}),
+        "不客气，有需要可以继续告诉我。",
+    ),
+    "farewell": (
+        frozenset({"再见", "拜拜", "回见"}),
+        "再见，祝你购物愉快。",
+    ),
+}
+
+
+def deterministic_social_reply(user_text: str | None) -> str | None:
+    """Return a fixed reply only for a complete, bounded social utterance.
+
+    This predicate is deliberately narrower than ``looks_like_ack_or_greeting``.
+    The latter protects conversation-state heuristics and may accept a greeting
+    embedded in a longer sentence; this function is a serving-path decision and
+    therefore requires a full-string match.  Business-bearing text such as
+    ``你好，帮我退款`` must continue through the normal classifier and Agent.
+    """
+
+    normalized = re.sub(
+        r"^[\s~～!！?？。.,，、；;：:]+|[\s~～!！?？。.,，、；;：:]+$",
+        "",
+        str(user_text or ""),
+    ).casefold()
+    if not normalized:
+        return None
+    for phrases, reply in _DETERMINISTIC_SOCIAL_REPLIES.values():
+        if normalized in phrases:
+            return reply
+    return None
+
 def looks_like_ack_or_greeting(user_text: str | None) -> bool:
     """是否只是问候/应答/在场确认（可带语气词和标点）。
 

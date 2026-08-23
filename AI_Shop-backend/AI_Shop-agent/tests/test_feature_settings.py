@@ -63,6 +63,23 @@ def test_multi_agent_and_data_analyst_are_enabled_by_default(monkeypatch):
     assert settings.orchestration_mode == "adaptive"
     assert settings.data_analyst_enabled is True
     assert settings.multi_agent_specialist_timeout_seconds == 12
+    assert settings.agent_llm_call_deadline_seconds == 45.0
+
+
+@pytest.mark.parametrize("deadline", [4, 121])
+def test_agent_llm_call_deadline_is_bounded(deadline):
+    with pytest.raises(ValueError, match="AGENT_LLM_CALL_DEADLINE_SECONDS"):
+        Settings(_env_file=None, agent_llm_call_deadline_seconds=deadline)
+
+
+def test_agent_llm_call_deadline_leaves_time_for_controlled_termination():
+    with pytest.raises(ValueError, match="below both Agent and Worker deadlines"):
+        Settings(
+            _env_file=None,
+            agent_llm_call_deadline_seconds=60,
+            agent_budget_deadline_seconds=60,
+            agent_task_deadline_seconds=120,
+        )
 
 
 @pytest.mark.parametrize("timeout", [2, 31])

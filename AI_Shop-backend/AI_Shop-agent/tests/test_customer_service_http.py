@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -9,14 +8,11 @@ from evaluation.core.contracts import CaseResult, CaseStatus, Domain
 from evaluation.core.io import atomic_write_json, atomic_write_jsonl
 from evaluation.customer_service_gold import load_gold_dataset
 from evaluation.customer_service_http import (
-    ANSWER_REVIEW_REPORT_SCHEMA,
     CustomerServiceHttpError,
     build_http_agent_case,
     build_http_report,
-    export_answer_review_sheet,
     observe_http_result,
     rebuild_customer_service_http_report,
-    score_answer_review,
     verify_customer_service_http_evidence,
     write_customer_service_http_evidence,
 )
@@ -154,60 +150,6 @@ def test_draft_dataset_cannot_be_scored_as_full_path_gold():
             run_id="customer-http-test",
             preflight={"passed": True},
         )
-
-
-def test_answer_review_export_and_score(tmp_path: Path):
-    row = load_gold_dataset(HUMAN_DATASET)[0]
-    report = build_http_report(
-        [row],
-        rule_predictions={row["id"]: _perfect_rule(row)},
-        observations={row["id"]: observe_http_result(_result())},
-        dataset_path=HUMAN_DATASET,
-        run_id="customer-http-test",
-        preflight={"passed": True},
-    )
-    report_path = tmp_path / "report.json"
-    review_path = tmp_path / "review.jsonl"
-    atomic_write_json(report_path, report)
-    manifest = export_answer_review_sheet(
-        report_path, review_path, reviewer_id="independent-reviewer"
-    )
-    assert manifest["caseCount"] == 1
-    review = json.loads(review_path.read_text(encoding="utf-8"))
-    assert "expected" not in review
-    assert "rulePrediction" not in review
-    review["labels"] = {
-        "answerCorrect": True,
-        "citationSupport": "SUPPORTED",
-        "handoffAppropriate": True,
-        "unsafeAnswer": False,
-    }
-    review_path.write_text(
-        json.dumps(review, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
-    scored = score_answer_review(report_path, review_path)
-    assert scored["schemaVersion"] == ANSWER_REVIEW_REPORT_SCHEMA
-    assert scored["metrics"]["answerCorrectness"]["value"] == 1.0
-    assert scored["metrics"]["citationGroundingSupport"]["value"] == 1.0
-    assert scored["metrics"]["unsafeAnswerRate"]["value"] == 0.0
-
-
-def test_answer_review_rejects_model_self_review_shape(tmp_path: Path):
-    row = load_gold_dataset(HUMAN_DATASET)[0]
-    report = build_http_report(
-        [row],
-        rule_predictions={row["id"]: _perfect_rule(row)},
-        observations={row["id"]: observe_http_result(_result())},
-        dataset_path=HUMAN_DATASET,
-        run_id="customer-http-test",
-        preflight={"passed": True},
-    )
-    report_path = tmp_path / "report.json"
-    review_path = tmp_path / "review.jsonl"
-    atomic_write_json(report_path, report)
-    export_answer_review_sheet(report_path, review_path, reviewer_id="reviewer")
-    with pytest.raises(CustomerServiceHttpError, match="invalid or incomplete"):
-        score_answer_review(report_path, review_path)
 
 
 def test_offline_rebuild_and_http_evidence_are_hash_bound_and_read_only(tmp_path: Path):

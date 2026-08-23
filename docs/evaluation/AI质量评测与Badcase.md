@@ -18,7 +18,7 @@
 | Search NDCG@10 | 0.920521 | 44 query | [0.868709, 0.964456] percentile bootstrap | 10 query |
 | RAG grounded faithfulness | 1.000000 | 50/50 | [1.000000, 1.000000] percentile bootstrap | lexical/claim 下界，无语义人工真值 |
 | RAG citation support | 1.000000 | 50/50 | [1.000000, 1.000000] percentile bootstrap | 无；semantic judge 只作 shadow |
-| AI 客服 intent/slot/handoff | 见下节 | 独立 60 条双人盲标+仲裁 gold | bootstrap/Wilson | 3 intent、15 full-slot badcase |
+| AI 客服 intent/slot/handoff | 见下节 | 独立 60 条双人盲标+仲裁 gold | bootstrap/Wilson | 3 intent、3 strict-format slot badcase |
 
 Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap 区间；由于运行 summary 与 scorecard 是两次独立重采样，NDCG 和 P95 的区间端点可能有小幅差异，点估计、分母和 badcase 必须一致。这里的表格明确标注为 scorecard 区间，不能把两套端点混写成一个“线上置信区间”。
 
@@ -29,7 +29,7 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 | Search 50 条离线 qrel | **可用于简历/面试** | `n=50`、44 条有 qrel 的 Recall/MRR/NDCG、95% CI、切片和漏召回/错排 case | 线上 CTR、个性化推荐收益或生产 SLO |
 | 客服 60 条 HUMAN_VERIFIED | **可用于简历/面试** | 双人盲标、25 条 lead 仲裁后的 intent Macro-F1、风险 Recall、slot F1/EM、handoff Recall | 线上客服准确率、CSAT/FCR；HTTP 答案质量仍待盲审，slot 仍是规则预路由口径 |
 | RAG 50 条、Agent 25 条 | **工程诊断可用** | RAG 检索/引用/拒答下界，Agent 幂等、终态和状态 diff 契约 | 人工语义准确率、开放世界 Agent 成功率 |
-| 本地延迟、token、DB、故障矩阵 | **复盘/设计证据可用** | 环境、样本、P50/P95/P99、usage unknown、batch/N+1 和恢复契约 | 生产容量、费用为 0、线上 SLO |
+| 本地延迟、容量、token、DB、故障矩阵 | **复盘/设计证据可用** | 环境、样本、并发/QPS、P50/P95/P99、usage unknown、batch/N+1 和恢复契约 | 持续生产容量、费用为 0、线上 SLO |
 
 门禁通过（`50/50`、`25/25`、`pass^8`、安全与终态为 100%）只是发布前置条件，不是质量提升分数；质量指标必须和 badcase 一起展示。
 
@@ -41,12 +41,12 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 |---|---|---|---|
 | Search 相关性与约束 | **达标** | Recall@10 `0.9621`、MRR `0.9375`、NDCG `0.9205`，硬约束违规 `0` | 足以支撑当前 47 商品、小流量场景的可用搜索/导购；多对象和比较型难例仍需 fallback/澄清 |
 | RAG 受控问答 | **有条件达标** | answerable Recall@5 `29/29`，lexical grounded/citation/no-answer 门禁通过 | 足以支撑封闭知识库 FAQ；没有独立人工语义真值，不能证明开放域答案准确率 |
-| 客服理解与转人工 | **核心达标，槽位部分达标** | Intent Macro-F1 `0.9553`、高风险和 handoff Recall `1.0`；full-slot F1 `0.9077`、EM `0.5588`，canonical F1 `0.9928`、EM `0.8824` | 可用于带澄清和人工兜底的客服路由；不适合依赖扩展槽位直接执行高风险操作 |
+| 客服理解与转人工 | **当前离线点估计达标** | Intent Macro-F1 `0.9553`、高风险和 handoff Recall `1.0`；full-slot F1 `0.9964`、EM `0.9118` | 可用于带澄清和人工兜底的客服路由；只有 60 条同集回放，写操作仍须 Java 校验和确认 |
 | Agent 交易可靠性 | **冻结场景达标** | 25 case、200 trials，`pass^8=1.0`，state diff/终态全匹配，重复副作用 `0`；故障 contract `11/11 HARD + 1/1 SHADOW` | 支撑受控交易提案、确认和幂等执行；不等于开放世界 Agent 成功率 |
 | 单请求交互延迟 | **Search 可用，生成链路长尾偏高** | 本地 Search P95 `0.80s`、RAG `4.25s`、Agent `17.08s`、客服 HTTP `15.21s`，客服 P99 `60.14s` | 搜索体验可用；Agent/客服需要流式反馈、超时降级和长尾优化，不能承诺生产 SLO |
-| 容量与成本 | **尚未证明** | 无并发/QPS/资源曲线；大量 usage 缺失或未定价，`costCny=null` | 不能据此判断生产容量、峰值稳定性或单位经济性 |
+| 容量与成本 | **已有扩大后的本地诊断，生产结论未建立** | 只读 4 case、warm-up `4`、正式 `80` 请求（并发 `1/2/4/8`、每档 20）；c8 `1.353 QPS`；生成路径 P95 `10.211–12.013s`；usage 有 token 但未定价 | 可定位并发瓶颈和回归，不能据此承诺持续吞吐、生产 SLO 或单位经济性 |
 
-综合结论：当前证据足以支撑一个小商品集、低并发、有人工作为最终兜底的可用演示或受控预生产系统，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。阻碍生产结论的主要不是离线 Search 分数，而是 HTTP 答案盲审缺失、Agent/客服长尾、负载/成本数据缺失和客服样本量仍小。
+综合结论：当前证据足以支撑一个小商品集、低并发、有人工作为最终兜底的可用演示或受控预生产系统，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。主要限制是 HTTP 答案盲审缺失、Agent/客服生成链路长尾、共享本机负载仍非生产容量、真实账单价格未知，以及客服金标仍只有 60 条。
 
 ### Search slice（不加权掩盖失败）
 
@@ -84,6 +84,19 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 
 P95/P99 样本均少于 100，只作本地长尾定位；不能写成生产容量或 SLO。
 
+### 只读容量曲线（不是生产 SLO）
+
+固定 4 条 `HUMAN_VERIFIED` 只读请求，先 warm-up `4` 次（不进分母），再每个并发档正式 20 次。v2 是优化前基线，v5 是当前代码；两者均为本机完整 HTTP/Java/Worker 链路，答案只保存 hash/长度。
+
+| 并发 | v2 QPS | v5 QPS | v2 LLM 路径 P95 | v5 LLM 路径 P95 | v2/v5 输出 token |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0.237 | 0.396 | 14.852 s | 10.211 s | 1317 / 1317 |
+| 2 | 0.433 | 0.641 | 15.015 s | 9.852 s | 1192 / 1326 |
+| 4 | 0.371 | 0.965 | 19.912 s | 10.574 s | 1646 / 1617 |
+| 8 | 0.429 | 1.353 | 18.404 s | 12.013 s | 1459 / 1543 |
+
+v5 warm-up `4/4`，正式执行、状态和安全契约为 `80/80`；c1/c2/c4/c8 QPS 为 `0.396/0.641/0.965/1.353`，LLM 路径 P95 为 `10.211/9.852/10.574/12.013s`。v5 样本比 v4 更大且有 warm-up，但仍受共享本机和外部 Provider 影响，不能宣称严格因果提升。最大完整请求 `12.415s`、最大单次 LLM call `4.736s`；新增 `AGENT_LLM_CALL_DEADLINE_SECONDS=45` 只限制单次生成调用，仍服从 Agent/Worker `120s` 总 deadline。纯社交审计探针 v4 为 `5/5`，P50/P95/P99 `629.6/716.1/726.6 ms`，每条 trace 均有 `deterministicSocialReply=true`，Provider calls/token 为 `0`，usage 为 `NOT_APPLICABLE/no_llm_call`。可选 fast-support 生成实验默认关闭。
+
 ## AI 客服核心质量证据
 
 完整逐 case 金标结果见 [客服金标评测](customer-service/客服金标评测.md)，机器证据见 [客服 JSON](customer-service/客服金标评测.json)。下表的
@@ -94,8 +107,8 @@ slot 是生产 `resolve_intent(..., allow_llm=False)` 规则预路由口径；�
 |---|---:|---:|---|---:|
 | Intent Macro-F1 | 0.955299 | 19.105978/20 intents | [0.929286, 0.987409] | `011,044,057`：政策/比较边界 |
 | 高风险 intent Recall | 1.000000 | 10/10 | [0.722467, 1.000000] | 无 |
-| Slot entity/span F1（完整人工 schema） | 0.907652 | 2TP/(2TP+FP+FN)=688/758 | [0.888889, 0.926454] | 15；扩展槽位/归一化/漏抽 |
-| 请求级 Slot Exact Match（完整人工 schema） | 0.558824 | 19/34 non-empty-slot cases | [0.394539, 0.711165] | 同上 |
+| Slot entity/span F1（完整人工 schema） | 0.996364 | 2TP/(2TP+FP+FN)=822/825 | [0.995061, 0.997636] | `009/020/058` |
+| 请求级 Slot Exact Match（完整人工 schema） | 0.911765 | 31/34 non-empty-slot cases | [0.770395, 0.969534] | `009/020/058` |
 | Handoff Recall | 1.000000 | 14/14 | [0.784689, 1.000000] | 无 |
 | 严重漏转人工率 | 0.000000（越低越好） | 0/6 critical | [0.000000, 0.390334] | 无 |
 
@@ -106,10 +119,10 @@ Intent CI 已按 `intent×risk×handoff` 对完整 case 分层并每次重算 Ma
 
 - `cs-gold-v1-011` / `057`：退款政策/到账时效分别被路由到 `REFUND_STATUS`、`CHAT`，taxonomy 与政策/状态边界不一致。
 - `cs-gold-v1-044`：比较型问题被判为 `PRODUCT_SEARCH`，应进入商品咨询/比较路径。
-- `cs-gold-v1-001/002/003/029/033/034/041/042/043/045/059`：人工仲裁保留 `brand/budget/feature/兼容型号` 等扩展槽位，生产 extractor 尚未映射；不应全部归因于模型漏抽。
-- `cs-gold-v1-009/020/058`：金额币种/单位归一化差异；`cs-gold-v1-055`：canonical `productName/quantity` 仍未抽出。
+- `cs-gold-v1-001/002/003/029/033/034/041/042/043/045/055/059`：扩展槽位和少件数量已加入确定性抽取，同一人工金标 replay 全部修复。
+- `cs-gold-v1-009/020/058`：只剩 `199`、`199元`、`¥199.00` 的严格原始格式差异；业务值可用，但 strict span/EM 仍如实记错。
 
-生产 canonical slot 投影（`orderId/orderItemId/productId/productName/amount`）为 Span F1 `0.992785`、EM `0.882353`，作为 schema 对齐诊断，不替换完整人工 schema 主指标。所有指标均保留逐 case 输入、gold、prediction 和根因；当前不能外推为线上客服成功率、CSAT 或 FCR。
+同一 60 条 gold 的 paired replay：Span F1 `0.907652 -> 0.996364`、EM `0.558824 -> 0.911765`，修复 12 case、回归 0；不可变包为 [customer-service-slot-replay-v1-20260823](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-slot-replay-v1-20260823/)。这是同集代码变更证据，不是新 holdout。生产 canonical 投影为 Span F1 `0.995683`、EM `0.911765`；当前结果仍不能外推为线上客服成功率、CSAT 或 FCR。
 
 ### 客服 HTTP/LLM 全链路
 
@@ -118,7 +131,7 @@ Intent CI 已按 `intent×risk×handoff` 对完整 case 分层并每次重算 Ma
 `UNAVAILABLE`，不把脱敏占位符与 gold 直接比较。
 
 原诊断中 6 条 citation contract 失败是最终 envelope 未复制 `sourceRefs`，对应证据实际存在于 `RAG_RETRIEVAL` trace；离线重建后
-结构违规 `0`，且没有重跑 Provider。这只修复“引用是否指向已选证据”，不代表答案语义正确。两份独立答案盲审表已生成，
+结构违规 `0`，且没有重跑 Provider。这只修复“引用是否指向已选证据”，不代表答案语义正确。当前唯一答案审查主线是 v2 双人盲审表（旧 v1 已删除），
 答案正确率、引用支持率、转人工适当性和 unsafe-answer rate 仍为 `PENDING_HUMAN_REVIEW`。不可变证据包见
 [customer-service-http-v1-20260823](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/)。
 
@@ -162,6 +175,7 @@ Provider 未返回 usage 记 `MISSING_USAGE`；无可信单价时 `costCny=null`
 `271,154/36,108`，其中 `2` 次 `MISSING_USAGE`、其余为 `UNPRICED`。因此没有费用硬门禁。隔离 MySQL benchmark 在候选 `1/10/50/100`
 比较 batch 与 N+1：100 候选时 batch 1 次 round trip、N+1 100 次，错误率 0、rollback probe 通过；这是本地描述性 benchmark，不是线上容量/SLO。
 客服 HTTP 额外记录 input/output token `114,720/6,649`、Provider call `32`；`31` 次无单价、`1` 次缺 usage，所以总费用仍是 `null`。
+容量 v5 正式 input/output token 为 `181,558/5,803`，56 次 Provider call 均有 usage 但无可信账单单价，仍为 `UNPRICED`；按并发档的 output token 分别为 `1,317/1,326/1,617/1,543`，合计 `5,803`。官方目录价估算单独记录为 `ESTIMATED_LIST_PRICE`，不能改写运行时状态。纯社交确定性路径确认没有 LLM 调用，才允许记为 `NOT_APPLICABLE`，而不是把未知费用写成 0。目录价来源与 hash 见 [model-pricing-estimate-20260824.json](model-pricing-estimate-20260824.json)。
 
 ## 证据与复现
 
@@ -172,6 +186,7 @@ python -m evaluation.cli validate
 python -m evaluation.cli slices --split development
 python -m evaluation.cli scorecard --output /tmp/aishop-scorecard.md --json-output /tmp/aishop-scorecard.json
 python -m evaluation.cli customer-service-gold --mode rule
+python -m evaluation.cli benchmark-capacity --dataset <human-gold.jsonl> --run-id <new-run> --warmup-requests 4 --case-id <read-only-case>
 # 客服人工金标已完成；新版本仍必须按同一 fail-closed 流程 seal/compare/merge
 python -m evaluation.cli customer-service-review export --annotator reviewer-a --output /tmp/reviewer-a.open.jsonl
 ```
@@ -187,4 +202,4 @@ current 只指向 v9 final；v2 是历史通过 archive，v3-v8 是 immutable fa
 1. 人工完成两份 HTTP 答案盲审表，再计算答案正确率、引用支持率、转人工适当性和 unsafe-answer rate；在此之前不宣称端到端客服质量。
 2. 人工完成 v2 新增 60 条的双人盲标和仲裁，再生成 120 条 HUMAN_VERIFIED v2；新数据上复核分层 CI 和 badcase，不覆盖 v1。
 3. Search 优化只针对已固定的 `23/34/47` 多对象召回问题，先做 query decomposition/对象保留的可见集 A/B 成对回放，不修改 qrels 或 v9 final。
-4. 若需要性能结论，再在固定环境做并发/负载曲线（QPS、错误率、P50/P95/P99、资源瓶颈）；在此之前所有本地延迟仍是诊断值。
+4. 当前短容量曲线只用于定位；若需要生产性能结论，需在固定独占环境扩大请求量和持续时间，增加 warm-up、steady-state、stress/soak、外部 Provider 分层和资源瓶颈分析。

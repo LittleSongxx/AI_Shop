@@ -409,6 +409,28 @@ class Settings(BaseSettings):
     circuit_llm_recovery_timeout: int = 60
 
     graph_max_react_rounds: int = 5
+    # Hard wall-clock bound for one Agent generation call, including retries
+    # performed inside the Provider SDK. This stays below both the graph and
+    # durable Worker deadlines so a slow Provider cannot consume the entire
+    # request budget before the application can return a controlled failure.
+    agent_llm_call_deadline_seconds: float = 45.0
+    # Controlled latency ablation.  It is off by default and only affects the
+    # first turn of low-risk, read-only, non-grounded support requests; write,
+    # handoff, security, and RAG paths retain the normal reasoning budget.
+    agent_fast_support_mode: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "AGENT_FAST_SUPPORT_MODE",
+            "agent_fast_support_mode",
+        ),
+    )
+    agent_fast_support_max_tokens: int = Field(
+        default=512,
+        validation_alias=AliasChoices(
+            "AGENT_FAST_SUPPORT_MAX_TOKENS",
+            "agent_fast_support_max_tokens",
+        ),
+    )
     # Per-run guard. Session/day quotas protect aggregate spend; this guard bounds
     # one graph execution and therefore also catches runaway tool loops.
     agent_budget_enabled: bool = True
@@ -515,6 +537,19 @@ class Settings(BaseSettings):
             raise ValueError("COMPRESS_TOKEN_THRESHOLD must be less than WORKING_TOKEN_BUDGET")
         if not 1_000 <= self.agent_budget_max_tokens <= 1_000_000:
             raise ValueError("AGENT_BUDGET_MAX_TOKENS must be between 1000 and 1000000")
+        if not 128 <= self.agent_fast_support_max_tokens <= 4096:
+            raise ValueError("AGENT_FAST_SUPPORT_MAX_TOKENS must be between 128 and 4096")
+        if not 5 <= self.agent_llm_call_deadline_seconds <= 120:
+            raise ValueError(
+                "AGENT_LLM_CALL_DEADLINE_SECONDS must be between 5 and 120"
+            )
+        if self.agent_llm_call_deadline_seconds >= min(
+            self.agent_budget_deadline_seconds,
+            float(self.agent_task_deadline_seconds),
+        ):
+            raise ValueError(
+                "AGENT_LLM_CALL_DEADLINE_SECONDS must be below both Agent and Worker deadlines"
+            )
         if not 0 < self.agent_budget_max_cost_cny <= 100:
             raise ValueError("AGENT_BUDGET_MAX_COST_CNY must be in (0, 100]")
         if not 4 <= self.agent_budget_max_steps <= 100:

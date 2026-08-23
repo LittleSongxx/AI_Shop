@@ -55,7 +55,8 @@ def normalize_usage(
 ) -> dict[str, Any]:
     """Normalize LangChain/OpenAI/provider-specific usage into one shape.
 
-    ``MISSING_USAGE`` means the provider did not return token usage at all.
+    ``NOT_APPLICABLE`` means the trace proves that no provider call occurred.
+    ``MISSING_USAGE`` means a provider call occurred but returned no token usage.
     ``UNPRICED`` means tokens are known but a trusted price table is absent.
     Both states keep ``costCny`` as ``None``.
     """
@@ -80,7 +81,12 @@ def normalize_usage(
         "completionTokens",
         "completion_tokens",
     )
-    usage_reported = input_tokens is not None and output_tokens is not None
+    explicit_reported = merged.get("usageReported")
+    usage_reported = (
+        bool(explicit_reported)
+        if isinstance(explicit_reported, bool)
+        else input_tokens is not None and output_tokens is not None
+    )
     calls = _first_number(
         merged,
         "providerCalls",
@@ -93,13 +99,22 @@ def normalize_usage(
     fallback_calls = int(_first_number(merged, "fallbackCalls", "fallbackCount") or 0)
     price = _pricing(pricing)
     cost: float | None = None
-    if usage_reported and price is not None:
+    missing_reason = str(merged.get("missingReason") or "").strip() or None
+    usage_source = str(merged.get("usageSource") or "unknown").strip() or "unknown"
+    if provider_calls == 0 and not usage_reported:
+        status = CostStatus.NOT_APPLICABLE.value
+        usage_source = (
+            "not_applicable" if usage_source == "unknown" else usage_source
+        )
+        missing_reason = missing_reason or "no_provider_call"
+    elif usage_reported and price is not None:
         cost = round(float(input_tokens) * price[0] / 1_000_000 + float(output_tokens) * price[1] / 1_000_000, 8)
         status = CostStatus.PRICED.value
     elif usage_reported:
         status = CostStatus.UNPRICED.value
     else:
         status = CostStatus.MISSING_USAGE.value
+        missing_reason = missing_reason or "provider_usage_not_reported"
     return {
         "inputTokens": int(input_tokens or 0),
         "outputTokens": int(output_tokens or 0),
@@ -109,6 +124,8 @@ def normalize_usage(
         "costCny": cost,
         "costStatus": status,
         "usageReported": usage_reported,
+        "usageSource": usage_source,
+        "missingReason": missing_reason,
         "missingUsageCalls": (
             provider_calls if status == CostStatus.MISSING_USAGE.value else 0
         ),
@@ -151,9 +168,64 @@ def merge_usage(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     elif costs and priced_calls:
         status = CostStatus.PRICED.value
         cost = round(sum(costs), 8)
+    elif provider_calls == 0:
+        status = CostStatus.NOT_APPLICABLE.value
+        cost = None
     else:
         status = CostStatus.MISSING_USAGE.value
         cost = None
+    sources: set[str] = set()
+    for row in values:
+        if not int(_number(row.get("providerCalls")) or 0):
+            if provider_calls == 0:
+                sources.add(str(row.get("usageSource") or "not_applicable"))
+            continue
+        nested_sources = row.get("usageSources")
+        if isinstance(nested_sources, (list, tuple, set, frozenset)):
+            sources.update(
+                str(value).strip()
+                for value in nested_sources
+                if str(value).strip()
+            )
+        else:
+            sources.add(str(row.get("usageSource") or "unknown"))
+    missing_reasons: dict[str, int] = defaultdict(int)
+    not_applicable_reasons: dict[str, int] = defaultdict(int)
+    for row in values:
+        if (
+            int(_number(row.get("providerCalls")) or 0) == 0
+            and str(row.get("costStatus")) == CostStatus.NOT_APPLICABLE.value
+        ):
+            reason = str(row.get("missingReason") or "no_provider_call")
+            not_applicable_reasons[reason] += 1
+        row_missing_calls = int(
+            _number(row.get("missingUsageCalls"))
+            or (
+                _number(row.get("providerCalls"))
+                if str(row.get("costStatus")) == CostStatus.MISSING_USAGE.value
+                else 0
+            )
+            or 0
+        )
+        if row_missing_calls <= 0:
+            continue
+        nested_reasons = row.get("missingReasons")
+        accounted = 0
+        if isinstance(nested_reasons, Mapping):
+            for reason, count in nested_reasons.items():
+                normalized_count = min(
+                    row_missing_calls - accounted,
+                    int(_number(count) or 0),
+                )
+                if normalized_count <= 0:
+                    continue
+                missing_reasons[str(reason)] += normalized_count
+                accounted += normalized_count
+                if accounted == row_missing_calls:
+                    break
+        if accounted < row_missing_calls:
+            reason = str(row.get("missingReason") or "provider_usage_not_reported")
+            missing_reasons[reason] += row_missing_calls - accounted
     return {
         "inputTokens": input_tokens,
         "outputTokens": output_tokens,
@@ -164,6 +236,9 @@ def merge_usage(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "costStatus": status,
         "usageReported": provider_calls > 0 and not missing,
         "missingUsageCalls": missing_usage_calls,
+        "usageSources": sorted(sources),
+        "missingReasons": dict(sorted(missing_reasons.items())),
+        "notApplicableReasons": dict(sorted(not_applicable_reasons.items())),
         "retryCount": sum(int(_number(row.get("retryCount")) or 0) for row in values),
         "fallbackCalls": sum(int(_number(row.get("fallbackCalls")) or 0) for row in values),
     }

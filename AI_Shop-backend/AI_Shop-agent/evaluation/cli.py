@@ -93,11 +93,21 @@ from evaluation.customer_service_gold import (
 )
 from evaluation.customer_service_http import (
     build_http_agent_case,
-    export_answer_review_sheet,
     rebuild_customer_service_http_report,
     run_customer_service_http,
-    score_answer_review,
     write_customer_service_http_evidence,
+)
+from evaluation.customer_service_answer_review import (
+    compare_answer_reviews,
+    export_answer_adjudication_template,
+    export_answer_review_sheet,
+    merge_answer_reviews,
+    render_answer_agreement_markdown,
+    score_answer_review,
+    seal_answer_review_sheet,
+    validate_answer_review_sheet,
+    verify_answer_review_evidence,
+    write_answer_review_evidence,
 )
 from evaluation.customer_service_review import (
     compare_human_reviews,
@@ -106,6 +116,17 @@ from evaluation.customer_service_review import (
     render_agreement_markdown,
     seal_review_sheet,
     validate_review_sheet,
+)
+from evaluation.customer_service_slot_replay import (
+    build_slot_replay,
+    write_slot_replay_evidence,
+)
+from evaluation.capacity_benchmark import (
+    DEFAULT_CAPACITY_CASE_IDS,
+    benchmark_capacity,
+    load_capacity_cases,
+    parse_concurrency_levels,
+    write_capacity_evidence,
 )
 from evaluation.db_benchmark import benchmark_db_sizes, write_db_benchmark_evidence
 from evaluation.repeat_runner import run_repeated_agent_cases
@@ -189,6 +210,33 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="explicitly use the application database (diagnostic only; not isolated)",
     )
+    capacity = commands.add_parser(
+        "benchmark-capacity",
+        help="run an isolated-user, read-only local full-stack concurrency benchmark",
+    )
+    capacity.add_argument("--dataset", type=Path, required=True)
+    capacity.add_argument("--run-id", required=True)
+    capacity.add_argument("--output-id", help="immutable evidence package ID; defaults to run ID")
+    capacity.add_argument(
+        "--concurrency",
+        action="append",
+        default=None,
+        help="comma-separated level(s); repeatable (default: 1,2,4,8)",
+    )
+    capacity.add_argument("--requests-per-level", type=int, default=8)
+    capacity.add_argument(
+        "--warmup-requests",
+        type=int,
+        default=4,
+        help="read-only warm-up requests excluded from measured levels (default: 4)",
+    )
+    capacity.add_argument("--timeout-seconds", type=float, default=180.0)
+    capacity.add_argument(
+        "--case-id",
+        action="append",
+        default=[],
+        help="optional HUMAN_VERIFIED read-only case ID; repeatable",
+    )
     scorecard = commands.add_parser(
         "scorecard",
         help="derive quality-first metrics and metric-specific badcases from immutable evidence",
@@ -224,6 +272,14 @@ def build_parser() -> argparse.ArgumentParser:
     customer_service.add_argument(
         "--json-output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_JSON_REPORT
     )
+    slot_replay = commands.add_parser(
+        "customer-service-slot-replay",
+        help="compare the current deterministic slot extractor with immutable human evidence",
+    )
+    slot_replay.add_argument("--dataset", type=Path, required=True)
+    slot_replay.add_argument("--baseline-report", type=Path, required=True)
+    slot_replay.add_argument("--run-id", required=True)
+    slot_replay.add_argument("--package-id", required=True)
     customer_http = commands.add_parser(
         "customer-service-http",
         help="run or review customer-service quality through the production HTTP Agent path",
@@ -258,12 +314,46 @@ def build_parser() -> argparse.ArgumentParser:
     customer_http_export.add_argument("--report", type=Path, required=True)
     customer_http_export.add_argument("--annotator", required=True)
     customer_http_export.add_argument("--output", type=Path, required=True)
+    customer_http_export.add_argument("--seed", type=int)
     customer_http_score = customer_http_commands.add_parser(
         "review-score", help="score one complete independent final-answer review sheet"
     )
     customer_http_score.add_argument("--report", type=Path, required=True)
     customer_http_score.add_argument("--review", type=Path, required=True)
     customer_http_score.add_argument("--output", type=Path, required=True)
+    customer_http_validate = customer_http_commands.add_parser(
+        "review-validate", help="validate an answer-review sheet and its HTTP source binding"
+    )
+    customer_http_validate.add_argument("--report", type=Path, required=True)
+    customer_http_validate.add_argument("--review", type=Path, required=True)
+    customer_http_validate.add_argument("--complete", action="store_true")
+    customer_http_seal = customer_http_commands.add_parser(
+        "review-seal", help="seal one completed answer-review sheet"
+    )
+    customer_http_seal.add_argument("--report", type=Path, required=True)
+    customer_http_seal.add_argument("--review", type=Path, required=True)
+    customer_http_seal.add_argument("--output", type=Path, required=True)
+    customer_http_compare = customer_http_commands.add_parser(
+        "review-compare", help="compare two sealed answer reviews before adjudication"
+    )
+    customer_http_compare.add_argument("--report", type=Path, required=True)
+    customer_http_compare.add_argument("--review-a", type=Path, required=True)
+    customer_http_compare.add_argument("--review-b", type=Path, required=True)
+    customer_http_compare.add_argument("--output", type=Path, required=True)
+    customer_http_compare.add_argument("--markdown-output", type=Path)
+    customer_http_compare.add_argument("--adjudication-output", type=Path)
+    customer_http_merge = customer_http_commands.add_parser(
+        "review-merge", help="merge two sealed reviews and optional third-person adjudication"
+    )
+    customer_http_merge.add_argument("--report", type=Path, required=True)
+    customer_http_merge.add_argument("--review-a", type=Path, required=True)
+    customer_http_merge.add_argument("--review-b", type=Path, required=True)
+    customer_http_merge.add_argument("--adjudication", type=Path)
+    customer_http_merge.add_argument("--output-dir", type=Path, required=True)
+    customer_http_verify = customer_http_commands.add_parser(
+        "review-verify", help="verify an immutable answer-review evidence package"
+    )
+    customer_http_verify.add_argument("--evidence-dir", type=Path, required=True)
     customer_review = commands.add_parser(
         "customer-service-review",
         help="export, validate, or merge two blinded customer-service review sheets",
@@ -994,6 +1084,28 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "customer-service-slot-replay":
+        report, paired_cases = await build_slot_replay(
+            args.dataset,
+            baseline_report_path=args.baseline_report,
+            run_id=args.run_id,
+        )
+        root, digest = write_slot_replay_evidence(
+            report,
+            paired_cases,
+            package_id=args.package_id,
+        )
+        _print(
+            {
+                "schemaVersion": report.get("schemaVersion"),
+                "runId": report.get("runId"),
+                "metrics": report.get("metrics"),
+                "pairedCaseCounts": report.get("pairedCaseCounts"),
+                "evidence": str(root),
+                "sha256SumsSha256": digest,
+            }
+        )
+        return 0
     if args.command == "customer-service-http":
         if args.customer_http_command == "run":
             rows = load_gold_dataset(args.dataset)
@@ -1082,6 +1194,7 @@ async def _main(args: argparse.Namespace) -> int:
                 args.report,
                 args.output,
                 reviewer_id=args.annotator,
+                seed=args.seed,
             )
             _print(manifest)
             return 0
@@ -1097,6 +1210,87 @@ async def _main(args: argparse.Namespace) -> int:
                     "output": str(args.output),
                 }
             )
+            return 0
+        if args.customer_http_command == "review-validate":
+            manifest = validate_answer_review_sheet(
+                args.report,
+                args.review,
+                require_complete=args.complete,
+            )
+            _print({"valid": True, "manifest": manifest})
+            return 0
+        if args.customer_http_command == "review-seal":
+            manifest = seal_answer_review_sheet(
+                args.report,
+                args.review,
+                args.output,
+            )
+            _print(manifest)
+            return 0
+        if args.customer_http_command == "review-compare":
+            agreement = compare_answer_reviews(
+                args.report,
+                args.review_a,
+                args.review_b,
+            )
+            atomic_write_json(args.output, agreement, overwrite=False)
+            if args.markdown_output:
+                atomic_write_text(
+                    args.markdown_output,
+                    render_answer_agreement_markdown(agreement),
+                    overwrite=False,
+                )
+            adjudication = None
+            if args.adjudication_output:
+                adjudication = export_answer_adjudication_template(
+                    agreement, args.adjudication_output
+                )
+            _print(
+                {
+                    "status": agreement["status"],
+                    "caseCount": agreement["caseCount"],
+                    "exactAgreementCaseCount": agreement[
+                        "exactAgreementCaseCount"
+                    ],
+                    "disagreementCaseCount": agreement["disagreementCaseCount"],
+                    "caseAgreementRate": agreement["caseAgreementRate"],
+                    "fieldStats": agreement["fieldStats"],
+                    "output": str(args.output),
+                    "markdownOutput": (
+                        str(args.markdown_output) if args.markdown_output else None
+                    ),
+                    "adjudication": adjudication,
+                }
+            )
+            return 0
+        if args.customer_http_command == "review-merge":
+            final_report, agreement = merge_answer_reviews(
+                args.report,
+                args.review_a,
+                args.review_b,
+                adjudication_path=args.adjudication,
+            )
+            verification = write_answer_review_evidence(
+                final_report,
+                agreement,
+                review_a_path=args.review_a,
+                review_b_path=args.review_b,
+                adjudication_path=args.adjudication,
+                output_dir=args.output_dir,
+            )
+            _print(
+                {
+                    "status": final_report["status"],
+                    "caseCount": final_report["caseCount"],
+                    "agreement": final_report["agreement"],
+                    "metrics": final_report["metrics"],
+                    "badcaseCount": len(final_report["badcases"]),
+                    "verification": verification,
+                }
+            )
+            return 0
+        if args.customer_http_command == "review-verify":
+            _print(verify_answer_review_evidence(args.evidence_dir))
             return 0
         raise AssertionError(
             f"unhandled customer-service HTTP command: {args.customer_http_command}"
@@ -1165,6 +1359,50 @@ async def _main(args: argparse.Namespace) -> int:
         return await _repeat(args)
     if args.command == "fault-test":
         return await _fault_test(args)
+    if args.command == "benchmark-capacity":
+        concurrencies = parse_concurrency_levels(args.concurrency)
+        selected_ids = tuple(args.case_id) or DEFAULT_CAPACITY_CASE_IDS
+        _rows, cases = load_capacity_cases(args.dataset, case_ids=selected_ids)
+        await init_pool()
+        try:
+            await redis_service.ensure_connected()
+            preflight = await run_preflight(cases)
+            report, observations = await benchmark_capacity(
+                args.dataset,
+                run_id=args.run_id,
+                concurrencies=concurrencies,
+                requests_per_level=args.requests_per_level,
+                warmup_requests=args.warmup_requests,
+                timeout_seconds=args.timeout_seconds,
+                case_ids=selected_ids,
+                preflight=preflight,
+            )
+        finally:
+            await close_pool()
+        root, digest = write_capacity_evidence(
+            report,
+            observations,
+            benchmark_id=args.output_id or args.run_id,
+        )
+        _print(
+            {
+                "runId": args.run_id,
+                "levels": report["levels"],
+                "warmup": report["warmup"],
+                "notProductionSlo": True,
+                "evidence": str(root),
+                "sha256SumsSha256": digest,
+            }
+        )
+        warmup = report.get("warmup") or {}
+        warmup_ok = (
+            int(warmup.get("requestCount") or 0) == 0
+            or float(warmup.get("successRate") or 0) == 1.0
+        )
+        return 0 if warmup_ok and all(
+            float(level.get("successRate") or 0) == 1.0
+            for level in report["levels"].values()
+        ) else 2
     if args.command == "benchmark-db":
         sizes = [int(value.strip()) for value in str(args.sizes).split(",") if value.strip()]
         await init_pool()

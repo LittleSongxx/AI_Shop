@@ -1,0 +1,234 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from evaluation.core.io import atomic_write_json, atomic_write_jsonl, load_jsonl
+from evaluation.customer_service_answer_review import (
+    ANSWER_REVIEW_ADJUDICATION_SCHEMA,
+    ANSWER_REVIEW_REPORT_SCHEMA,
+    CustomerServiceAnswerReviewError,
+    compare_answer_reviews,
+    export_answer_adjudication_template,
+    export_answer_review_sheet,
+    merge_answer_reviews,
+    seal_answer_review_sheet,
+    validate_answer_review_sheet,
+    verify_answer_review_evidence,
+    write_answer_review_evidence,
+)
+from evaluation.customer_service_http import HTTP_REPORT_SCHEMA
+
+
+def _http_report(path: Path) -> Path:
+    cases = []
+    for index in range(1, 4):
+        cases.append(
+            {
+                "caseId": f"case-{index}",
+                "message": f"问题 {index}",
+                # Gold routing labels and predictions may exist in the source
+                # report, but must not be copied into the blind review sheet.
+                "expected": {"intent": "CHAT"},
+                "rulePrediction": {"intent": "CHAT"},
+                "http": {
+                    "answer": f"回答 {index} [{index}]",
+                    "sourceRefs": [
+                        {"citation": index, "factIds": [f"fact-{index}"]}
+                    ],
+                    "handoffObserved": index == 3,
+                    "prediction": {"intent": "CHAT"},
+                },
+            }
+        )
+    atomic_write_json(
+        path,
+        {
+            "schemaVersion": HTTP_REPORT_SCHEMA,
+            "runId": "customer-http-test",
+            "cases": cases,
+        },
+        overwrite=False,
+    )
+    return path
+
+
+def _labels(
+    *,
+    answer: bool = True,
+    citation: str = "SUPPORTED",
+    handoff: bool = True,
+    unsafe: bool = False,
+) -> dict:
+    return {
+        "answerCorrect": answer,
+        "citationSupport": citation,
+        "handoffAppropriate": handoff,
+        "unsafeAnswer": unsafe,
+    }
+
+
+def _fill_sheet(path: Path, labels_by_id: dict[str, dict]) -> None:
+    rows = load_jsonl(path)
+    for row in rows:
+        row["labels"] = labels_by_id[str(row["caseId"])]
+        row["comment"] = f"reviewed {row['caseId']}"
+    atomic_write_jsonl(path, rows)
+
+
+def _sealed_pair(
+    tmp_path: Path,
+    *,
+    left: dict[str, dict] | None = None,
+    right: dict[str, dict] | None = None,
+) -> tuple[Path, Path, Path]:
+    report = _http_report(tmp_path / "http-report.json")
+    default = {f"case-{index}": _labels() for index in range(1, 4)}
+    open_a = tmp_path / "reviewer-a.open.jsonl"
+    open_b = tmp_path / "reviewer-b.open.jsonl"
+    manifest_a = export_answer_review_sheet(
+        report, open_a, reviewer_id="reviewer-a"
+    )
+    manifest_b = export_answer_review_sheet(
+        report, open_b, reviewer_id="reviewer-b"
+    )
+    assert manifest_a["orderSeed"] != manifest_b["orderSeed"]
+    assert "expected" not in load_jsonl(open_a)[0]
+    assert "rulePrediction" not in load_jsonl(open_a)[0]
+    _fill_sheet(open_a, left or default)
+    _fill_sheet(open_b, right or default)
+    sealed_a = tmp_path / "reviewer-a.sealed.jsonl"
+    sealed_b = tmp_path / "reviewer-b.sealed.jsonl"
+    seal_answer_review_sheet(report, open_a, sealed_a)
+    seal_answer_review_sheet(report, open_b, sealed_b)
+    return report, sealed_a, sealed_b
+
+
+def test_answer_review_is_source_bound_and_requires_complete_labels(tmp_path: Path):
+    report = _http_report(tmp_path / "http-report.json")
+    open_sheet = tmp_path / "review.open.jsonl"
+    export_answer_review_sheet(report, open_sheet, reviewer_id="reviewer-a")
+
+    with pytest.raises(CustomerServiceAnswerReviewError, match="incomplete"):
+        validate_answer_review_sheet(
+            report, open_sheet, require_complete=True
+        )
+
+    rows = load_jsonl(open_sheet)
+    rows[0]["answer"] = "reviewer changed the model output"
+    atomic_write_jsonl(open_sheet, rows)
+    with pytest.raises(CustomerServiceAnswerReviewError, match="source field answer"):
+        validate_answer_review_sheet(report, open_sheet)
+
+
+def test_answer_review_agreement_and_adjudicated_quality_metrics(tmp_path: Path):
+    left = {f"case-{index}": _labels() for index in range(1, 4)}
+    right = {f"case-{index}": _labels() for index in range(1, 4)}
+    right["case-2"] = _labels(answer=False, citation="UNSUPPORTED")
+    right["case-3"] = _labels(unsafe=True)
+    report, sealed_a, sealed_b = _sealed_pair(
+        tmp_path, left=left, right=right
+    )
+
+    agreement = compare_answer_reviews(report, sealed_a, sealed_b)
+    assert agreement["caseAgreementRate"] == pytest.approx(1 / 3, abs=1e-6)
+    assert agreement["disagreementCaseCount"] == 2
+    assert agreement["fieldStats"]["answerCorrect"]["cohenKappa"] is not None
+
+    adjudication = tmp_path / "adjudication.open.jsonl"
+    export_answer_adjudication_template(agreement, adjudication)
+    rows = load_jsonl(adjudication)
+    for row in rows:
+        row["adjudicator"] = "reviewer-c"
+        row["reason"] = "按冻结指南复核答案和证据"
+        row["finalLabels"] = (
+            _labels(answer=False, citation="UNSUPPORTED")
+            if row["caseId"] == "case-2"
+            else _labels()
+        )
+    atomic_write_jsonl(adjudication, rows)
+
+    final_report, final_agreement = merge_answer_reviews(
+        report,
+        sealed_a,
+        sealed_b,
+        adjudication_path=adjudication,
+    )
+    assert final_report["schemaVersion"] == ANSWER_REVIEW_REPORT_SCHEMA
+    assert final_report["metrics"]["answerCorrectness"]["value"] == pytest.approx(
+        2 / 3, abs=1e-6
+    )
+    assert final_report["metrics"]["citationGroundingSupport"]["value"] == pytest.approx(
+        2 / 3, abs=1e-6
+    )
+    assert final_report["metrics"]["handoffAppropriateness"]["value"] == 1.0
+    assert final_report["metrics"]["unsafeAnswerRate"]["value"] == 0.0
+    assert final_report["metrics"]["unsafeAnswerRate"]["lowerIsBetter"] is True
+    assert final_report["metrics"]["jointQualityPassRate"]["badcaseIds"] == [
+        "case-2"
+    ]
+
+    evidence = tmp_path / "answer-review-evidence"
+    verification = write_answer_review_evidence(
+        final_report,
+        final_agreement,
+        review_a_path=sealed_a,
+        review_b_path=sealed_b,
+        adjudication_path=adjudication,
+        output_dir=evidence,
+    )
+    assert verification["verified"] is True
+    assert verify_answer_review_evidence(evidence)["caseCount"] == 3
+    assert all(
+        not path.stat().st_mode & 0o222
+        for path in evidence.rglob("*")
+        if path.is_file()
+    )
+    with pytest.raises(FileExistsError):
+        write_answer_review_evidence(
+            final_report,
+            final_agreement,
+            review_a_path=sealed_a,
+            review_b_path=sealed_b,
+            adjudication_path=adjudication,
+            output_dir=evidence,
+        )
+
+
+def test_answer_review_merge_fails_closed_without_independent_adjudication(
+    tmp_path: Path,
+):
+    left = {f"case-{index}": _labels() for index in range(1, 4)}
+    right = {f"case-{index}": _labels() for index in range(1, 4)}
+    right["case-2"] = _labels(answer=False)
+    report, sealed_a, sealed_b = _sealed_pair(
+        tmp_path, left=left, right=right
+    )
+    with pytest.raises(CustomerServiceAnswerReviewError, match="require"):
+        merge_answer_reviews(report, sealed_a, sealed_b)
+
+    agreement = compare_answer_reviews(report, sealed_a, sealed_b)
+    adjudication = tmp_path / "adjudication.jsonl"
+    export_answer_adjudication_template(agreement, adjudication)
+    rows = load_jsonl(adjudication)
+    assert rows[0]["schemaVersion"] == ANSWER_REVIEW_ADJUDICATION_SCHEMA
+    rows[0]["adjudicator"] = "reviewer-a"
+    rows[0]["reason"] = "not independent"
+    rows[0]["finalLabels"] = _labels()
+    atomic_write_jsonl(adjudication, rows)
+    with pytest.raises(CustomerServiceAnswerReviewError, match="independent"):
+        merge_answer_reviews(
+            report,
+            sealed_a,
+            sealed_b,
+            adjudication_path=adjudication,
+        )
+
+
+def test_answer_review_agreement_needs_no_adjudication_file(tmp_path: Path):
+    report, sealed_a, sealed_b = _sealed_pair(tmp_path)
+    final_report, agreement = merge_answer_reviews(report, sealed_a, sealed_b)
+    assert agreement["status"] == "AGREED_NO_ADJUDICATION"
+    assert final_report["agreement"]["disagreementCaseCount"] == 0
+    assert final_report["metrics"]["jointQualityPassRate"]["value"] == 1.0

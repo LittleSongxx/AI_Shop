@@ -397,6 +397,16 @@ def _agent_usage(episodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                     "outputTokens": output.get("outputTokens"),
                     "providerCalls": 1,
                     "fallbackCalls": int(bool(input_data.get("fallback"))),
+                    "usageReported": output.get("usageReported"),
+                    "usageSource": output.get("usageSource"),
+                    "missingReason": output.get("missingReason")
+                    or (
+                        "cancelled_before_usage"
+                        if str(step.get("status") or "").upper() == "CANCELLED"
+                        else "provider_error_before_usage"
+                        if str(step.get("status") or "").upper() == "ERROR"
+                        else None
+                    ),
                 },
                 provider="llm",
                 model=model,
@@ -409,6 +419,8 @@ def _agent_usage(episodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             {
                 "callEvidenceSource": "LLM_CALL_STEPS",
                 "missingUsageCalls": 0,
+                "usageSource": "not_applicable",
+                "missingReason": "no_llm_call",
                 "episodeInputTokens": sum(
                     int(episode.get("inputTokens") or 0) for episode in episodes
                 ),

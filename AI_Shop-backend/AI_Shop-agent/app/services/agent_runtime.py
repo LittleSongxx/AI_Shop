@@ -10,6 +10,7 @@ import structlog
 from opentelemetry import context as otel_context
 from opentelemetry import trace
 
+from app.config.settings import get_settings
 from app.domain.intent.rules import wants_order_list_cards
 from app.harness.guardrails.output_guard import strip_emojis
 from app.harness.guardrails.product_text_guard import (
@@ -166,9 +167,17 @@ async def stream_llm_turn(
     *,
     fallback: bool = False,
     model: str | None = None,
+    timeout_seconds: float | None = None,
 ):
     started = time.perf_counter()
     resolved_model = resolve_llm_model(llm, model)
+    effective_timeout = (
+        get_settings().agent_llm_call_deadline_seconds
+        if timeout_seconds is None
+        else float(timeout_seconds)
+    )
+    if effective_timeout <= 0:
+        raise ValueError("LLM stream timeout_seconds must be positive")
     gathered = None
     sent_visible = ""
     first_token_observed = False
@@ -180,28 +189,31 @@ async def stream_llm_turn(
     span.set_attribute("gen_ai.request.model", resolved_model)
     span.set_attribute("agent.llm.fallback", bool(fallback))
     try:
-        async for chunk in llm.astream(messages):
-            if await is_cancelled(user_id, message_id):
-                episode_status = "CANCELLED"
-                record_llm_failure(resolved_model, fallback=fallback)
-                return None
-            gathered = chunk if gathered is None else gathered + chunk
-            visible = strip_embedded_product_json(
-                strip_emojis(chunk_text(gathered.content))
-            )
-            delta = visible[len(sent_visible) :]
-            sent_visible = visible
-            if not delta:
-                continue
-            if not first_token_observed:
-                observe_agent_stage("first_token", time.perf_counter() - started)
-                episode_service.observe_first_token()
-                first_token_observed = True
-            chunks.append(delta)
-            # 字符数（真实口径）；旧指标同步累计保持面板兼容。
-            STREAM_CHARS.inc(len(delta))
-            STREAM_TOKENS.inc(len(delta))
-            await stream_service.push_chunk(user_id, message_id, delta, user_message)
+        async with asyncio.timeout(effective_timeout):
+            async for chunk in llm.astream(messages):
+                if await is_cancelled(user_id, message_id):
+                    episode_status = "CANCELLED"
+                    record_llm_failure(resolved_model, fallback=fallback)
+                    return None
+                gathered = chunk if gathered is None else gathered + chunk
+                visible = strip_embedded_product_json(
+                    strip_emojis(chunk_text(gathered.content))
+                )
+                delta = visible[len(sent_visible) :]
+                sent_visible = visible
+                if not delta:
+                    continue
+                if not first_token_observed:
+                    observe_agent_stage("first_token", time.perf_counter() - started)
+                    episode_service.observe_first_token()
+                    first_token_observed = True
+                chunks.append(delta)
+                # 字符数（真实口径）；旧指标同步累计保持面板兼容。
+                STREAM_CHARS.inc(len(delta))
+                STREAM_TOKENS.inc(len(delta))
+                await stream_service.push_chunk(
+                    user_id, message_id, delta, user_message
+                )
         if await is_cancelled(user_id, message_id):
             episode_status = "CANCELLED"
             record_llm_failure(resolved_model, fallback=fallback)
@@ -225,13 +237,39 @@ async def stream_llm_turn(
         elapsed = max(0.0, time.perf_counter() - started)
         LLM_LATENCY.observe(elapsed)
         observe_agent_stage("generation", elapsed)
+        usage_evidence = dict(usage)
+        if not usage_evidence:
+            usage_evidence = {
+                "providerCalls": 1,
+                "pricedCalls": 0,
+                "unpricedCalls": 0,
+                "missingUsageCalls": 1,
+                "costCny": None,
+                "costStatus": "MISSING_USAGE",
+                "usageReported": False,
+                "usageSource": "none",
+                "missingReason": (
+                    "cancelled_before_usage"
+                    if episode_status == "CANCELLED"
+                    else "call_deadline_exceeded_before_usage"
+                    if isinstance(episode_error, TimeoutError)
+                    else "provider_error_before_usage"
+                    if episode_status == "ERROR"
+                    else "provider_omitted_usage"
+                ),
+            }
         episode_service.record_step(
             "LLM_CALL",
             node_name="llm",
             status=episode_status,
-            input_data={"messages": messages, "fallback": fallback, "stream": True},
+            input_data={
+                "messages": messages,
+                "fallback": fallback,
+                "stream": True,
+                "hardDeadlineSeconds": effective_timeout,
+            },
             output_data={
-                **usage,
+                **usage_evidence,
                 "visibleChars": len(sent_visible),
                 "hasToolCalls": bool(getattr(gathered, "tool_calls", None)),
             },

@@ -516,6 +516,8 @@ def test_zero_call_usage_is_neutral_when_real_provider_usage_is_aggregated() -> 
     assert merged["missingUsageCalls"] == 0
     assert merged["costStatus"] == "UNPRICED"
     assert merged["usageReported"] is True
+    assert deterministic["costStatus"] == "NOT_APPLICABLE"
+    assert deterministic["usageSource"] == "not_applicable"
 
 
 def test_real_call_without_usage_marks_aggregate_missing() -> None:
@@ -618,7 +620,7 @@ def test_agent_usage_does_not_turn_zero_llm_calls_into_one() -> None:
 
     assert usage["providerCalls"] == 0
     assert usage["missingUsageCalls"] == 0
-    assert usage["costStatus"] == "MISSING_USAGE"
+    assert usage["costStatus"] == "NOT_APPLICABLE"
     assert usage["costCny"] is None
 
 

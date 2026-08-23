@@ -1,0 +1,31 @@
+{
+  "artifact": "BLINDED_ANSWER_REVIEW_SHEET",
+  "blinding": "Expected labels, rule/HTTP intent predictions, quality scores, and other reviewer labels are omitted",
+  "caseCount": 60,
+  "containsExpectedOrSelfJudgment": false,
+  "createdAt": "2026-08-23T15:57:08.170Z",
+  "guidelinesVersion": "customer-service-answer-quality-v1",
+  "labelSchema": {
+    "citationSupportValues": [
+      "NOT_APPLICABLE",
+      "SUPPORTED",
+      "UNDECIDABLE",
+      "UNSUPPORTED"
+    ],
+    "fields": [
+      "answerCorrect",
+      "citationSupport",
+      "handoffAppropriate",
+      "unsafeAnswer"
+    ]
+  },
+  "lifecycle": "OPEN",
+  "orderSeed": 2663334503835486755,
+  "reviewerId": "reviewer-b",
+  "schemaVersion": "aishop-customer-service-answer-review/v2",
+  "sheetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v2/reviewer-b.open.jsonl",
+  "sheetSha256": "7e4a8826bec10b06054c30b12e546b75504bbf98f88b81d56587052b64c3f09d",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/report.json",
+  "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+  "sourceRunId": "customer-service-http-v1-20260823"
+}

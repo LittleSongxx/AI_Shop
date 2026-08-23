@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
+from app.domain.intent.rules import deterministic_social_reply
 from app.domain.intent.types import IntentKind, RequestMode
 
 OrchestrationMode = Literal["workflow", "single_agent", "multi_agent"]
@@ -50,6 +51,36 @@ _DOMAIN_MARKERS: dict[str, tuple[str, ...]] = {
 }
 
 
+def fast_support_eligible(state: Mapping[str, Any]) -> bool:
+    """Whether a latency experiment may use a bounded first LLM turn.
+
+    This is intentionally stricter than "does not write": RAG grounding,
+    security-flagged input, handoff, and non-read request modes keep the normal
+    reasoning budget.  The caller still needs the explicit settings switch.
+    """
+
+    if int(state.get("react_round") or 0) != 0:
+        return False
+    if state.get("rag_evidence_required") or state.get("rag_agentic_allowed"):
+        return False
+    if state.get("input_security_flags"):
+        return False
+    request_mode = str(state.get("request_mode") or "")
+    if request_mode not in {RequestMode.READ_QUERY.value, RequestMode.INFORMATIONAL.value}:
+        return False
+    decision = state.get("intent_decision")
+    if not isinstance(decision, Mapping):
+        return False
+    if str(decision.get("risk_level") or decision.get("riskLevel") or "LOW").upper() != "LOW":
+        return False
+    if str(decision.get("next_action") or decision.get("nextAction") or "").upper() in {
+        "HANDOFF",
+        "HANDOFF_SUGGESTED",
+    }:
+        return False
+    return True
+
+
 @dataclass(frozen=True)
 class OrchestrationDecision:
     mode: OrchestrationMode
@@ -92,6 +123,15 @@ def select_orchestration(
 def _workflow_eligible(state: Mapping[str, Any]) -> bool:
     if _looks_composite(str(state.get("user_text") or "")):
         return False
+    decision = state.get("intent_decision")
+    if (
+        str(state.get("intent") or "") == IntentKind.CHAT.value
+        and isinstance(decision, Mapping)
+        and str(decision.get("source") or "") == "deterministic_social"
+        and not state.get("input_security_flags")
+        and deterministic_social_reply(str(state.get("user_text") or "")) is not None
+    ):
+        return True
     # The order resolver has already verified ownership, state eligibility,
     # and exact tool arguments. A conditional RAG prefetch must not promote a
     # single deterministic write proposal into a multi-agent policy workflow.

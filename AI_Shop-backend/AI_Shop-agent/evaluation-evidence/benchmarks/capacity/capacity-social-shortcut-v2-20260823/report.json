@@ -1,0 +1,446 @@
+{
+  "claim": "LOCAL_FULL_STACK_READ_ONLY_CAPACITY_OBSERVATION",
+  "configuration": {
+    "concurrencies": [
+      1
+    ],
+    "requestIsolation": [
+      "evaluationUserId",
+      "requestId",
+      "idempotencyKey",
+      "traceId"
+    ],
+    "requestsPerLevel": 5,
+    "resourceSampleIntervalSeconds": 0.2,
+    "timeoutSeconds": 30.0
+  },
+  "createdAt": "2026-08-23T14:57:35.998Z",
+  "dataset": {
+    "annotationStatus": "HUMAN_VERIFIED",
+    "caseContracts": [
+      {
+        "caseId": "cs-gold-v1-060",
+        "intent": "CHAT",
+        "requiredProviders": [
+          "agent-runtime",
+          "llm"
+        ]
+      }
+    ],
+    "caseCount": 1,
+    "path": "/home/song/code/Java/AI_Shop/AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+    "selectedCaseIds": [
+      "cs-gold-v1-060"
+    ],
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+  },
+  "levels": {
+    "1": {
+      "achievedQps": 1.289542,
+      "badcaseTrialIds": [],
+      "badcases": [],
+      "caseMetrics": {
+        "cs-gold-v1-060": {
+          "latencyMs": {
+            "max": 929.291,
+            "p50": 710.279,
+            "p95": 928.287,
+            "p99": 929.09,
+            "sampleCount": 5
+          },
+          "providerCalls": 0,
+          "requestCount": 5,
+          "successRate": 1.0,
+          "successfulCount": 5
+        }
+      },
+      "completedCount": 5,
+      "concurrency": 1,
+      "errorCount": 0,
+      "executionRate": 1.0,
+      "latencyMs": {
+        "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+        "max": 929.291,
+        "p50": 710.279,
+        "p95": 928.287,
+        "p99": 929.09,
+        "sampleCount": 5
+      },
+      "pathMetrics": {
+        "DETERMINISTIC": {
+          "latencyMs": {
+            "max": 929.291,
+            "p50": 710.279,
+            "p95": 928.287,
+            "p99": 929.09,
+            "sampleCount": 5
+          },
+          "providerCalls": 0,
+          "requestCount": 5,
+          "successRate": 1.0,
+          "successfulCount": 5
+        }
+      },
+      "requestedCount": 5,
+      "resources": {
+        "hostCpuUsedPercent": {
+          "max": 82.838,
+          "p50": 58.843,
+          "p95": 76.221,
+          "p99": 81.515,
+          "sampleCount": 20
+        },
+        "hostMemoryUsedPercent": {
+          "max": 70.101,
+          "p50": 69.609,
+          "p95": 70.076,
+          "p99": 70.096,
+          "sampleCount": 20
+        },
+        "rawSamples": [
+          {
+            "hostCpuUsedPercent": 59.119,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10890.148,
+            "hostMemoryUsedPercent": 69.817,
+            "observedAt": "2026-08-23T14:57:32.322Z"
+          },
+          {
+            "hostCpuUsedPercent": 60.748,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 11090.973,
+            "hostMemoryUsedPercent": 69.26,
+            "observedAt": "2026-08-23T14:57:32.523Z"
+          },
+          {
+            "hostCpuUsedPercent": 55.247,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 11042.316,
+            "hostMemoryUsedPercent": 69.395,
+            "observedAt": "2026-08-23T14:57:32.724Z"
+          },
+          {
+            "hostCpuUsedPercent": 51.988,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10868.281,
+            "hostMemoryUsedPercent": 69.877,
+            "observedAt": "2026-08-23T14:57:32.925Z"
+          },
+          {
+            "hostCpuUsedPercent": 60.502,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10824.262,
+            "hostMemoryUsedPercent": 69.999,
+            "observedAt": "2026-08-23T14:57:33.127Z"
+          },
+          {
+            "hostCpuUsedPercent": 60.856,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10859.809,
+            "hostMemoryUsedPercent": 69.901,
+            "observedAt": "2026-08-23T14:57:33.329Z"
+          },
+          {
+            "hostCpuUsedPercent": 75.873,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 11110.504,
+            "hostMemoryUsedPercent": 69.206,
+            "observedAt": "2026-08-23T14:57:33.530Z"
+          },
+          {
+            "hostCpuUsedPercent": 82.838,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 11024.887,
+            "hostMemoryUsedPercent": 69.443,
+            "observedAt": "2026-08-23T14:57:33.730Z"
+          },
+          {
+            "hostCpuUsedPercent": 73.643,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10787.594,
+            "hostMemoryUsedPercent": 70.101,
+            "observedAt": "2026-08-23T14:57:33.932Z"
+          },
+          {
+            "hostCpuUsedPercent": 62.126,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 11036.656,
+            "hostMemoryUsedPercent": 69.411,
+            "observedAt": "2026-08-23T14:57:34.132Z"
+          },
+          {
+            "hostCpuUsedPercent": 58.567,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10884.184,
+            "hostMemoryUsedPercent": 69.833,
+            "observedAt": "2026-08-23T14:57:34.333Z"
+          },
+          {
+            "hostCpuUsedPercent": 52.025,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10818.109,
+            "hostMemoryUsedPercent": 70.016,
+            "observedAt": "2026-08-23T14:57:34.534Z"
+          },
+          {
+            "hostCpuUsedPercent": 53.354,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10797.168,
+            "hostMemoryUsedPercent": 70.075,
+            "observedAt": "2026-08-23T14:57:34.736Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.489,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10828.125,
+            "hostMemoryUsedPercent": 69.989,
+            "observedAt": "2026-08-23T14:57:34.937Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.769,
+            "hostLoad1m": 4.085,
+            "hostMemoryAvailableMiB": 10920.004,
+            "hostMemoryUsedPercent": 69.734,
+            "observedAt": "2026-08-23T14:57:35.137Z"
+          },
+          {
+            "hostCpuUsedPercent": 51.553,
+            "hostLoad1m": 4.479,
+            "hostMemoryAvailableMiB": 11010.324,
+            "hostMemoryUsedPercent": 69.484,
+            "observedAt": "2026-08-23T14:57:35.339Z"
+          },
+          {
+            "hostCpuUsedPercent": 54.819,
+            "hostLoad1m": 4.479,
+            "hostMemoryAvailableMiB": 11236.758,
+            "hostMemoryUsedPercent": 68.856,
+            "observedAt": "2026-08-23T14:57:35.541Z"
+          },
+          {
+            "hostCpuUsedPercent": 59.561,
+            "hostLoad1m": 4.479,
+            "hostMemoryAvailableMiB": 11298.309,
+            "hostMemoryUsedPercent": 68.686,
+            "observedAt": "2026-08-23T14:57:35.742Z"
+          },
+          {
+            "hostCpuUsedPercent": 56.426,
+            "hostLoad1m": 4.479,
+            "hostMemoryAvailableMiB": 11260.746,
+            "hostMemoryUsedPercent": 68.79,
+            "observedAt": "2026-08-23T14:57:35.943Z"
+          },
+          {
+            "hostCpuUsedPercent": 60.674,
+            "hostLoad1m": 4.479,
+            "hostMemoryAvailableMiB": 11124.484,
+            "hostMemoryUsedPercent": 69.167,
+            "observedAt": "2026-08-23T14:57:35.998Z"
+          }
+        ],
+        "sampleCount": 20,
+        "scope": "LOCAL_HOST_SHARED_WITH_OTHER_PROCESSES"
+      },
+      "stageMetrics": {
+        "GRAPH_END": {
+          "callCount": 5,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 75.0,
+            "p50": 46.0,
+            "p95": 71.4,
+            "p99": 74.28,
+            "sampleCount": 5
+          }
+        },
+        "NODE_TRANSITION": {
+          "callCount": 40,
+          "errorCount": 0,
+          "latencyMs": {
+            "max": 14.0,
+            "p50": 1.0,
+            "p95": 11.05,
+            "p99": 13.22,
+            "sampleCount": 40
+          }
+        }
+      },
+      "successRate": 1.0,
+      "successfulCount": 5,
+      "throughputScalingEfficiency": 1.0,
+      "timeoutCount": 0,
+      "usage": {
+        "costCny": null,
+        "costStatus": "NOT_APPLICABLE",
+        "fallbackCalls": 0,
+        "inputTokens": 0,
+        "missingReasons": {},
+        "missingUsageCalls": 0,
+        "notApplicableReasons": {
+          "no_llm_call": 5
+        },
+        "outputTokens": 0,
+        "pricedCalls": 0,
+        "providerCalls": 0,
+        "retryCount": 0,
+        "unpricedCalls": 0,
+        "usageReported": false,
+        "usageSources": [
+          "not_applicable"
+        ]
+      },
+      "wallSeconds": 3.877345
+    }
+  },
+  "limitations": [
+    "Local single-host infrastructure and external Provider conditions; not a production SLO or capacity commitment.",
+    "Host resource samples include unrelated local processes and are diagnostic only.",
+    "The fixed four-case mix is an engineering probe, not production traffic distribution.",
+    "Answer content is hashed; this benchmark checks execution safety and capacity, not semantic answer quality.",
+    "Unknown Provider price remains null and missing usage is never inferred from text length."
+  ],
+  "normalQualityDenominatorExcluded": true,
+  "notProductionSlo": true,
+  "preflight": {
+    "checkedAt": "2026-08-23T14:57:32.118Z",
+    "checks": [
+      {
+        "name": "java-gateway",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:8081/actuator/health"
+      },
+      {
+        "name": "elasticsearch",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:9200/_cluster/health"
+      },
+      {
+        "name": "agent-readiness",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:7082/health/ready"
+      },
+      {
+        "name": "redis",
+        "ok": true
+      },
+      {
+        "name": "mysql",
+        "ok": true
+      },
+      {
+        "facts": {
+          "canonicalSha256": "6b1e3b40b447419d381830f397a5e5dda82ce25d02dd629c49e7f659d57de0cb",
+          "index": "aishop-index",
+          "matchesFixture": true,
+          "productCount": 47
+        },
+        "name": "product-catalog",
+        "ok": true
+      },
+      {
+        "model": "qwen3.7-plus",
+        "name": "llm-provider",
+        "ok": true
+      }
+    ],
+    "configuration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 3,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 60
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "passed": true,
+    "requiredProviders": [
+      "agent-runtime",
+      "llm"
+    ],
+    "schemaVersion": "aishop-evaluation-preflight/v2"
+  },
+  "runId": "capacity-social-shortcut-v2-20260823",
+  "schemaVersion": "aishop-capacity-benchmark/v1",
+  "sourceFingerprint": {
+    "capturedAt": "2026-08-23T14:57:36.012Z",
+    "git": {
+      "commit": "79ffa45e0292c8580b1225fd454a6c96535462ae",
+      "worktreeDirty": true
+    },
+    "knowledge": {
+      "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+      "fileCount": 14,
+      "sha256": "d16067f3ea9ff09981aef96793c9aec7f4c993a2184ec3a60069c3f7f2feeae7"
+    },
+    "providerConfiguration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 3,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 60
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "providerConfigurationSha256": "c67a4cff75dd39997e5a3bfb64e643c1db03752741194b6165b3d79e03e5502d",
+    "source": {
+      "fileCount": 239,
+      "sha256": "6bc3786332565d359e75c70db7652370042890f0f39cfba44f1e0af1f22c20ba"
+    }
+  }
+}
