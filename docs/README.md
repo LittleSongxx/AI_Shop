@@ -20,7 +20,7 @@
 | `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current/` | 唯一 current：v9 final（Search 50、RAG 50、Agent 25） | 只读；普通质量主分母 |
 | `AI_Shop-backend/AI_Shop-agent/evaluation/.runs/` | v9 development/regression/final 三个可见运行 | 只保留主线运行，旧运行已清理 |
 | `evaluation-evidence/archive/` | v2 通过 final、v3-v8 失败 final | 只读；历史审计，不参与 current 分母 |
-| `evaluation-evidence/benchmarks/` | 客服 HUMAN_VERIFIED、DB batch/N+1、Agent repeated、fault matrix | 只读辅助证据；不把门禁当质量总分 |
+| `evaluation-evidence/benchmarks/` | 客服 HUMAN_VERIFIED/HTTP、Search paired replay、DB batch/N+1、Agent repeated、fault matrix | 只读辅助证据；不把门禁当质量总分 |
 | `AI_Shop-backend/AI_Shop-agent/evaluation/.holdouts/` | final holdout（ignored）及来源指纹 | 不入 Git；只用于一次性 final 追溯 |
 
 只删除已被 v9 主线替代且没有独立审计价值的旧 benchmark、重复 sealed 文件和旧 `.runs`；历史 final、客服 pending/provisional 包保留，
@@ -34,7 +34,9 @@ Python 评测统一使用 Conda `shop` 环境，并在 Agent 目录执行：
 conda activate shop
 cd AI_Shop-backend/AI_Shop-agent
 python -m evaluation.cli validate
-python -m evaluation.cli customer-service-gold --mode rule
+python -m evaluation.cli customer-service-gold --dataset evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl --mode rule
+python -m evaluation.cli search-paired-replay --run-id <new-id> --output-dir <new-dir>
+python -m evaluation.cli customer-service-http rebuild --source-report <raw-report> --dataset <human-gold> --output-dir <new-dir>
 ```
 
 当前质量主张的最小复核顺序：先看 `docs/evaluation/AI质量评测与Badcase.md` 的点估计、分母、CI 和 badcase，再看 current 的原始
@@ -43,5 +45,9 @@ python -m evaluation.cli customer-service-gold --mode rule
 客服当前主数据已完成两名标注者盲标和 lead reviewer 冲突仲裁，冻结包位于
 `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/`；
 不得把规则基线、模型自评或 `pass^k` 当成线上成功率；当前 scorecard 同步引用 60 条 HUMAN_VERIFIED 客服 gold，但 `releaseGateEligible=false`，后续标签修订必须生成新版本。
+
+同一 60 条的正式 HTTP Agent 路径证据位于 `customer-service-http-v1-20260823/`；当前完成执行/路由/转人工口径，答案语义质量待独立人工盲审。
+新增 60 条 v2 数据及两份盲标表位于 `evaluation/datasets/customer_service/`，状态为 draft；仲裁前不与 v1 合并。Search 10 条难例回放位于
+`evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823/`，只用于已知难例回归和优化对照，不替代 v9 final。
 
 人工复核工具已内置为 fail-closed 流程：`customer-service-review export` 生成无 expected/预测的双人盲标 sheet，`seal` 生成带哈希的不可变 sheet，`compare` 输出一致性与冲突 badcase，`merge` 只接受两份 sealed sheet，并要求所有冲突有仲裁记录。归档包同时保存 sealed 原件、仲裁文件、合并证据、报告、生命周期和 `SHA256SUMS`。

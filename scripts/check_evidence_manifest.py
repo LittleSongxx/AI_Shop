@@ -1147,6 +1147,428 @@ def _validate_auxiliary_evidence(root: Path, descriptors: Any, errors: list[str]
             errors.append(f"{label} gates.passed must be boolean")
 
 
+def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str]) -> None:
+    """Validate immutable HTTP-quality and paired-replay diagnostic packages."""
+
+    if descriptors is None:
+        return
+    if not isinstance(descriptors, list):
+        errors.append("evaluation.diagnosticEvidence must be an array")
+        return
+    expected_schemas = {
+        "customer-service-http": "aishop-customer-service-http-evidence/v1",
+        "search-paired-replay": "aishop-search-paired-replay-evidence/v1",
+    }
+    seen: set[str] = set()
+    for index, descriptor in enumerate(descriptors, 1):
+        label = f"evaluation.diagnosticEvidence[{index}]"
+        if not isinstance(descriptor, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        kind = str(descriptor.get("kind") or "")
+        package_id = str(descriptor.get("packageId") or "")
+        if kind not in expected_schemas:
+            errors.append(f"{label} kind is invalid: {kind!r}")
+        if not package_id or package_id in seen:
+            errors.append(f"{label} contains duplicate/empty packageId: {package_id!r}")
+        seen.add(package_id)
+        relative = str(descriptor.get("path") or "")
+        try:
+            package_root = _resolve(root, relative)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        if not package_root.is_dir():
+            errors.append(f"{label} directory is missing: {relative}")
+            continue
+        sums = _parse_sums(package_root, errors)
+        sums_path = package_root / "SHA256SUMS"
+        if (
+            not sums_path.is_file()
+            or descriptor.get("sha256SumsSha256") != _sha256(sums_path)
+        ):
+            errors.append(f"{label} SHA256SUMS digest differs from project manifest")
+        required = {"badcases.jsonl", "evidence-manifest.json", "report.json", "report.md"}
+        if kind == "search-paired-replay":
+            required.add("cases.jsonl")
+        if not required.issubset(sums):
+            errors.append(f"{label} is missing files: {sorted(required - set(sums))}")
+            continue
+        try:
+            package = _json(package_root / "evidence-manifest.json")
+            report = _json(package_root / "report.json")
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            errors.append(f"{label} JSON is invalid: {exc}")
+            continue
+        if package.get("schemaVersion") != expected_schemas.get(kind):
+            errors.append(f"{label} package schema is invalid")
+        if package.get("kind") != kind:
+            errors.append(f"{label} package kind differs from descriptor")
+        if descriptor.get("runId") != package.get("runId") or package.get(
+            "runId"
+        ) != report.get("runId"):
+            errors.append(f"{label} run ID binding is invalid")
+        inventory = {
+            name: {
+                "sha256": _sha256(package_root / name),
+                "bytes": (package_root / name).stat().st_size,
+            }
+            for name in sums
+            if name != "evidence-manifest.json"
+        }
+        if package.get("files") != inventory:
+            errors.append(f"{label} file inventory is stale")
+        if kind == "customer-service-http":
+            if report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1":
+                errors.append(f"{label} HTTP report schema is invalid")
+            if (
+                package.get("releaseGateEligible") is not False
+                or report.get("releaseGateEligible") is not False
+                or report.get("normalQualityDenominatorExcluded") is not True
+            ):
+                errors.append(f"{label} HTTP evidence must not be a release gate")
+            if package.get("providerCallsReexecuted") is not False:
+                errors.append(f"{label} offline rebuild provenance is invalid")
+            if not HEX64.fullmatch(
+                str(package.get("sourceObservationReportSha256") or "")
+            ):
+                errors.append(f"{label} source observation digest is invalid")
+            route_metrics = ((report.get("httpRoute") or {}).get("metrics") or {})
+            for metric_name in ("slotEntitySpanF1", "slotExactMatch"):
+                if (route_metrics.get(metric_name) or {}).get("status") != "UNAVAILABLE":
+                    errors.append(f"{label} HTTP slot metric must remain unavailable")
+            observation = report.get("observationProvenance") or {}
+            if (
+                observation.get("mode") != "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS"
+                or observation.get("providerCallsReexecuted") is not False
+                or observation.get("sourceReportSha256")
+                != package.get("sourceObservationReportSha256")
+            ):
+                errors.append(f"{label} HTTP observation provenance is invalid")
+            answer_quality = report.get("answerQuality") or {}
+            if (
+                answer_quality.get("status") != "PENDING_HUMAN_REVIEW"
+                or answer_quality.get("selfJudged") is not False
+                or answer_quality.get("answerCorrectness") is not None
+                or answer_quality.get("citationGroundingSupport") is not None
+                or answer_quality.get("unsafeAnswerRate") is not None
+            ):
+                errors.append(f"{label} HTTP answer quality must remain pending human review")
+        if kind == "search-paired-replay":
+            if report.get("schemaVersion") != "aishop-search-paired-replay/v1":
+                errors.append(f"{label} paired replay report schema is invalid")
+            if (
+                report.get("normalQualityDenominatorExcluded") is not True
+                or report.get("baselineFinalModified") is not False
+                or report.get("qrelsModified") is not False
+                or package.get("normalQualityDenominatorExcluded") is not True
+                or package.get("baselineFinalModified") is not False
+                or package.get("qrelsModified") is not False
+            ):
+                errors.append(f"{label} paired replay boundary is invalid")
+            if package.get("baselineRunId") != descriptor.get("baselineRunId"):
+                errors.append(f"{label} baseline run binding is invalid")
+            provenance = report.get("provenance") or {}
+            if (
+                provenance.get("baselineRunId") != descriptor.get("baselineRunId")
+                or provenance.get("baselineEvidenceSha256SumsSha256")
+                != package.get("baselineEvidenceSha256SumsSha256")
+                or provenance.get("selectedQrelsSha256")
+                != package.get("selectedQrelsSha256")
+            ):
+                errors.append(f"{label} paired replay provenance is invalid")
+        writable = [
+            str(path.relative_to(package_root))
+            for path in package_root.rglob("*")
+            if path.is_file() and path.stat().st_mode & 0o222
+        ]
+        if writable:
+            errors.append(f"{label} contains writable files: {writable}")
+
+
+def _resolve_hashed_file(
+    root: Path,
+    descriptor: dict[str, Any],
+    *,
+    path_field: str,
+    sha_field: str,
+    label: str,
+    errors: list[str],
+) -> Path | None:
+    relative = str(descriptor.get(path_field) or "")
+    try:
+        path = _resolve(root, relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return None
+    if not path.is_file():
+        errors.append(f"{label} is missing: {relative}")
+        return None
+    expected = str(descriptor.get(sha_field) or "")
+    if not HEX64.fullmatch(expected) or _sha256(path) != expected:
+        errors.append(f"{label} hash mismatch: {relative}")
+    return path
+
+
+def _validate_customer_service_candidate(
+    root: Path,
+    descriptor: Any,
+    errors: list[str],
+) -> None:
+    """Validate the expanded客服 draft without treating it as human gold."""
+
+    label = "evaluation.customerServiceCandidateV2"
+    if not isinstance(descriptor, dict):
+        errors.append(f"{label} must be an object")
+        return
+    if (
+        descriptor.get("status") != "DRAFT_NEEDS_DUAL_HUMAN_REVIEW"
+        or descriptor.get("releaseGateEligible") is not False
+    ):
+        errors.append(f"{label} must remain a non-gating dual-review draft")
+    dataset_path = _resolve_hashed_file(
+        root,
+        descriptor,
+        path_field="datasetPath",
+        sha_field="datasetSha256",
+        label=f"{label} dataset",
+        errors=errors,
+    )
+    manifest_path = _resolve_hashed_file(
+        root,
+        descriptor,
+        path_field="manifestPath",
+        sha_field="manifestSha256",
+        label=f"{label} manifest",
+        errors=errors,
+    )
+    if dataset_path is None or manifest_path is None:
+        return
+    try:
+        rows = _jsonl(dataset_path)
+        candidate_manifest = _json(manifest_path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label} payload is invalid: {exc}")
+        return
+    case_count = int(descriptor.get("caseCount") or -1)
+    ids = [str(row.get("id") or "") for row in rows]
+    if case_count != len(rows) or not ids or "" in ids or len(ids) != len(set(ids)):
+        errors.append(f"{label} case count or IDs are invalid")
+    if any(
+        row.get("schemaVersion") != "aishop-customer-service-gold/v1"
+        or (row.get("annotation") or {}).get("status") != "DRAFT_NEEDS_HUMAN_REVIEW"
+        for row in rows
+    ):
+        errors.append(f"{label} dataset is not uniformly draft-labelled")
+    additions = candidate_manifest.get("additions") or {}
+    target = candidate_manifest.get("targetVerifiedVersion") or {}
+    if (
+        candidate_manifest.get("schemaVersion")
+        != "aishop-customer-service-candidate-manifest/v1"
+        or candidate_manifest.get("status") != descriptor.get("status")
+        or candidate_manifest.get("releaseGateEligible") is not False
+        or additions.get("path") != descriptor.get("datasetPath")
+        or additions.get("sha256") != descriptor.get("datasetSha256")
+        or additions.get("caseCount") != case_count
+        or target.get("caseCount") != descriptor.get("targetCaseCount")
+        or target.get("status") != "BLOCKED_UNTIL_DUAL_REVIEW_AND_ADJUDICATION"
+    ):
+        errors.append(f"{label} candidate manifest binding is invalid")
+
+    sheets = descriptor.get("reviewSheets")
+    if not isinstance(sheets, list) or len(sheets) != 2:
+        errors.append(f"{label}.reviewSheets must contain two open blind sheets")
+        return
+    reviewers: set[str] = set()
+    expected_ids = set(ids)
+    for index, sheet_descriptor in enumerate(sheets, 1):
+        sheet_label = f"{label}.reviewSheets[{index}]"
+        if not isinstance(sheet_descriptor, dict):
+            errors.append(f"{sheet_label} must be an object")
+            continue
+        reviewer_id = str(sheet_descriptor.get("reviewerId") or "")
+        reviewers.add(reviewer_id)
+        sheet_path = _resolve_hashed_file(
+            root,
+            sheet_descriptor,
+            path_field="path",
+            sha_field="sha256",
+            label=f"{sheet_label} sheet",
+            errors=errors,
+        )
+        sheet_manifest_path = _resolve_hashed_file(
+            root,
+            sheet_descriptor,
+            path_field="manifestPath",
+            sha_field="manifestSha256",
+            label=f"{sheet_label} manifest",
+            errors=errors,
+        )
+        if sheet_path is None or sheet_manifest_path is None:
+            continue
+        try:
+            sheet_rows = _jsonl(sheet_path)
+            sheet_manifest = _json(sheet_manifest_path)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            errors.append(f"{sheet_label} payload is invalid: {exc}")
+            continue
+        sheet_ids = {str(row.get("id") or "") for row in sheet_rows}
+        if len(sheet_rows) != case_count or sheet_ids != expected_ids:
+            errors.append(f"{sheet_label} case IDs/count differ from candidate dataset")
+        if (
+            sheet_manifest.get("schemaVersion") != "aishop-customer-service-review/v1"
+            or sheet_manifest.get("artifact") != "BLINDED_REVIEW_SHEET"
+            or sheet_manifest.get("lifecycle") != "OPEN"
+            or sheet_manifest.get("containsExpectedOrPredicted") is not False
+            or sheet_manifest.get("reviewerId") != reviewer_id
+            or sheet_manifest.get("caseCount") != case_count
+            or sheet_manifest.get("datasetPath") != descriptor.get("datasetPath")
+            or sheet_manifest.get("datasetSha256") != descriptor.get("datasetSha256")
+            or sheet_manifest.get("sheetPath") != sheet_descriptor.get("path")
+            or sheet_manifest.get("sheetSha256") != sheet_descriptor.get("sha256")
+        ):
+            errors.append(f"{sheet_label} open-sheet manifest binding is invalid")
+        if any(
+            row.get("schemaVersion") != "aishop-customer-service-review/v1"
+            or row.get("reviewerId") != reviewer_id
+            or any(value is not None for value in (row.get("labels") or {}).values())
+            for row in sheet_rows
+        ):
+            errors.append(f"{sheet_label} is no longer an unfilled open sheet")
+        if _contains_forbidden_key(
+            sheet_rows,
+            {"expected", "predicted", "modelOutput", "modelPrediction"},
+        ):
+            errors.append(f"{sheet_label} leaks draft/model fields")
+    if reviewers != {"reviewer-a", "reviewer-b"}:
+        errors.append(f"{label}.reviewSheets must bind reviewer-a and reviewer-b")
+
+
+def _validate_customer_service_answer_review(
+    root: Path,
+    descriptor: Any,
+    errors: list[str],
+) -> None:
+    """Validate open human answer-review sheets and their HTTP observation binding."""
+
+    label = "evaluation.customerServiceAnswerReview"
+    if not isinstance(descriptor, dict):
+        errors.append(f"{label} must be an object")
+        return
+    if (
+        descriptor.get("status") != "PENDING_HUMAN_REVIEW"
+        or descriptor.get("releaseGateEligible") is not False
+    ):
+        errors.append(f"{label} must remain pending and non-gating")
+    report_path = _resolve_hashed_file(
+        root,
+        descriptor,
+        path_field="sourceReportPath",
+        sha_field="sourceReportSha256",
+        label=f"{label} source report",
+        errors=errors,
+    )
+    if report_path is None:
+        return
+    try:
+        report = _json(report_path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label} source report is invalid: {exc}")
+        return
+    source_run_id = str(descriptor.get("sourceRunId") or "")
+    case_count = int(descriptor.get("caseCount") or -1)
+    report_ids = {str(row.get("caseId") or "") for row in report.get("cases") or []}
+    if (
+        report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1"
+        or report.get("runId") != source_run_id
+        or (report.get("answerQuality") or {}).get("status") != "PENDING_HUMAN_REVIEW"
+        or len(report_ids) != case_count
+        or "" in report_ids
+    ):
+        errors.append(f"{label} source report binding is invalid")
+
+    sheets = descriptor.get("reviewSheets")
+    if not isinstance(sheets, list) or len(sheets) != 2:
+        errors.append(f"{label}.reviewSheets must contain two open blind sheets")
+        return
+    reviewers: set[str] = set()
+    expected_label_keys = {
+        "answerCorrect",
+        "citationSupport",
+        "handoffAppropriate",
+        "unsafeAnswer",
+    }
+    for index, sheet_descriptor in enumerate(sheets, 1):
+        sheet_label = f"{label}.reviewSheets[{index}]"
+        if not isinstance(sheet_descriptor, dict):
+            errors.append(f"{sheet_label} must be an object")
+            continue
+        reviewer_id = str(sheet_descriptor.get("reviewerId") or "")
+        reviewers.add(reviewer_id)
+        sheet_path = _resolve_hashed_file(
+            root,
+            sheet_descriptor,
+            path_field="path",
+            sha_field="sha256",
+            label=f"{sheet_label} sheet",
+            errors=errors,
+        )
+        sheet_manifest_path = _resolve_hashed_file(
+            root,
+            sheet_descriptor,
+            path_field="manifestPath",
+            sha_field="manifestSha256",
+            label=f"{sheet_label} manifest",
+            errors=errors,
+        )
+        if sheet_path is None or sheet_manifest_path is None:
+            continue
+        try:
+            sheet_rows = _jsonl(sheet_path)
+            sheet_manifest = _json(sheet_manifest_path)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            errors.append(f"{sheet_label} payload is invalid: {exc}")
+            continue
+        sheet_ids = {str(row.get("caseId") or "") for row in sheet_rows}
+        if len(sheet_rows) != case_count or sheet_ids != report_ids:
+            errors.append(f"{sheet_label} case IDs/count differ from HTTP report")
+        if (
+            sheet_manifest.get("schemaVersion")
+            != "aishop-customer-service-answer-review/v1"
+            or sheet_manifest.get("lifecycle") != "OPEN"
+            or sheet_manifest.get("reviewerId") != reviewer_id
+            or sheet_manifest.get("caseCount") != case_count
+            or sheet_manifest.get("sourceRunId") != source_run_id
+            or sheet_manifest.get("sourceReportPath")
+            != descriptor.get("sourceReportPath")
+            or sheet_manifest.get("sourceReportSha256")
+            != descriptor.get("sourceReportSha256")
+            or sheet_manifest.get("sheetPath") != sheet_descriptor.get("path")
+            or sheet_manifest.get("sheetSha256AtExport")
+            != sheet_descriptor.get("sha256")
+        ):
+            errors.append(f"{sheet_label} open-sheet manifest binding is invalid")
+        if any(
+            row.get("schemaVersion")
+            != "aishop-customer-service-answer-review/v1"
+            or row.get("reviewerId") != reviewer_id
+            or row.get("sourceRunId") != source_run_id
+            or row.get("sourceReportSha256")
+            != descriptor.get("sourceReportSha256")
+            or set((row.get("labels") or {}).keys()) != expected_label_keys
+            or any(value is not None for value in (row.get("labels") or {}).values())
+            for row in sheet_rows
+        ):
+            errors.append(f"{sheet_label} is no longer an unfilled open sheet")
+        if _contains_forbidden_key(
+            sheet_rows,
+            {"expected", "predicted", "modelOutput", "modelPrediction"},
+        ):
+            errors.append(f"{sheet_label} leaks gold/model fields")
+    if reviewers != {"reviewer-a", "reviewer-b"}:
+        errors.append(f"{label}.reviewSheets must bind reviewer-a and reviewer-b")
+
+
 def _validate_claim_documents(root: Path, documents: Any, errors: list[str]) -> None:
     if not isinstance(documents, list) or not documents:
         errors.append("claimDocuments must be a non-empty array")
@@ -1222,6 +1644,16 @@ def validate_repository(
             evaluation.get("customerServiceGoldDraft"),
             errors,
         )
+    _validate_customer_service_candidate(
+        root,
+        evaluation.get("customerServiceCandidateV2"),
+        errors,
+    )
+    _validate_customer_service_answer_review(
+        root,
+        evaluation.get("customerServiceAnswerReview"),
+        errors,
+    )
     ids = [str(row.get("id") or "") for row in all_rows]
     inputs = [
         _canonical_sha256({"domain": row.get("domain"), "input": row.get("input")})
@@ -1261,6 +1693,7 @@ def validate_repository(
     )
     _validate_benchmarks(root, evaluation.get("benchmarks"), errors)
     _validate_auxiliary_evidence(root, evaluation.get("auxiliaryEvidence"), errors)
+    _validate_diagnostic_evidence(root, evaluation.get("diagnosticEvidence"), errors)
     if isinstance(current, dict):
         current_path = str(current.get("path") or "")
         for archive in evaluation.get("archives") or []:

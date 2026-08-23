@@ -60,6 +60,16 @@
 - 独立 DB benchmark 在真实隔离数据库完成 `1/10/50/100` 候选规模的 batch/N+1 对照；100 候选 batch offer/decision P50 `23.864/2.405 ms`，N+1 P50 `89.805/70.501 ms`，均为本地描述性证据。
 - 精确删除 19 个已被主线替代的旧 DB/repeat/fault benchmark 包，以及仓库根目录与 sealed 证据重复的 `adjudication.final.jsonl`；v2 通过 final、v3-v8 失败 final 和客服历史 pending/provisional 包仍作为只读追溯证据保留，`.runs` 只剩 v9 development/regression/final。
 
+### 2026-08-23：客服全链路、样本扩展与 Search 成对回放
+
+- 新增客服 HTTP 评测器，60 条 HUMAN_VERIFIED gold 全部走正式 Agent/Java/RAG/LLM 路径；执行 `60/60`，HTTP Intent Macro-F1 `0.955299`，handoff `TP=14/TN=46/FP=0/FN=0`。
+- 修正两个证据口径：HTTP Episode 脱敏槽位不再计分；Slot F1 改为标准 `2TP/(2TP+FP+FN)=688/758`，每次分层 bootstrap 重算 micro F1，95% CI 为 `[0.888889, 0.926454]`。
+- 原 6 条 citation contract 告警的证据实际在 `RAG_RETRIEVAL` trace；扩展来源提取并用原 observation 离线重建后违规为 `0`，没有重跑 Provider。答案语义质量仍待两份独立人工盲审。
+- 生成客服 v2 新增 60 条 draft：20 个 intent 各 3 条，hard 35，高风险 9，应转人工 16。双人盲标 sheet 已就绪，仲裁前不与 v1 合并或报分。
+- 执行 10 条 Search hard-negative 真实成对回放：Recall/MRR/NDCG 前后 delta 均为 `0`，硬约束违规 `0`；仍保留 `23/34/47` 三个多商品/集合意图/比较对象难例，未改 qrels 或 v9 final。
+- 客服 HTTP 本地 P50/P95/P99 为 `1014.1/15212.5/60141.6 ms`；token `114720/6649`，32 次 Provider call 中 31 次未定价、1 次缺 usage，因此 `costCny=null`。这些是本地诊断，不是生产 SLO。
+- 验收：新增专项与 manifest 联合回归 `41 passed`，Python 全量 `1279 passed/7 skipped`；随后在真实 MySQL 上补跑 migration `8 passed`，Java 26 模块 Maven reactor `BUILD SUCCESS`。
+
 ## 方法成熟度判断
 
 | 能力 | 判断 | 依据与边界 |
@@ -81,8 +91,8 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 ## 当前边界与下一步
 
 - 客服 gold 当前主线为 `HUMAN_VERIFIED`；release gate 仍显式关闭，避免把离线人工金标误写成线上成功率。
-- 先用同一 gold 跑完整 HTTP Agent/LLM 路径，再修复/回归 `011/044/057` 的意图边界和 `055/058` 的 canonical 槽位/金额归一化；扩展 `brand/budget/feature` 等字段需先完成生产 schema 设计。
-- 客服样本扩充到 100–200 条后按 intent/risk/handoff 分层 bootstrap，并补少量独立人工答案/引用/转人工盲评；当前 60 条规则预路由结果可用于面试，不可外推总体泛化。
+- 先完成客服 HTTP 答案的两份人工盲审，再报答案正确率、引用支持率、转人工适当性和 unsafe-answer rate。
+- 完成 v2 新增 60 条的双人盲标/仲裁后，生成 120 条 HUMAN_VERIFIED v2 并重算分层 CI；当前 draft 不可报分。
 - 每次修改都要保留指标级 badcase、输入/gold/prediction、根因和新旧数据集哈希；Search hard negative 继续只做 paired replay，不改标签刷分。
-- Search hard negative 只做记录；有时间再做同一数据集的 paired replay，不能用改标签或重刷结果制造提升。
+- Search 成对回放基线已固定；后续只针对 `23/34/47` 做 query decomposition/对象保留的可见集 A/B，不能改标签或重刷 final 制造提升。
 - 真实曝光/点击/购买、人工盲评、授权/合规和容量数据到位前，不新增 CTR/CVR/GMV 或生产 SLO 结论。

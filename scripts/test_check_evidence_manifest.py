@@ -8,6 +8,7 @@ from check_evidence_manifest import (
     _parse_sums,
     _validate_auxiliary_evidence,
     _validate_benchmarks,
+    _validate_diagnostic_evidence,
     _validate_failed_final_attempts,
     _validate_lock,
     _validate_suite,
@@ -274,6 +275,176 @@ def test_auxiliary_evidence_requires_typed_read_only_hashed_package(tmp_path: Pa
     _validate_auxiliary_evidence(tmp_path, [descriptor], errors)
 
     assert errors == []
+
+
+def _diagnostic_fixture(
+    root: Path,
+    *,
+    kind: str,
+    slot_status: str = "UNAVAILABLE",
+    qrels_modified: bool = False,
+) -> dict:
+    variant = ""
+    if slot_status != "UNAVAILABLE":
+        variant = f"-{slot_status.lower()}"
+    if qrels_modified:
+        variant = "-qrels-modified"
+    package_id = f"{kind}-contract{variant}"
+    package = root / f"evidence/benchmarks/{kind}/{package_id}"
+    package.mkdir(parents=True)
+    run_id = f"{kind}-run"
+    if kind == "customer-service-http":
+        source_observation_sha = "a" * 64
+        report = {
+            "schemaVersion": "aishop-customer-service-http-evaluation/v1",
+            "runId": run_id,
+            "releaseGateEligible": False,
+            "normalQualityDenominatorExcluded": True,
+            "httpRoute": {
+                "metrics": {
+                    "slotEntitySpanF1": {"status": slot_status},
+                    "slotExactMatch": {"status": slot_status},
+                }
+            },
+            "observationProvenance": {
+                "mode": "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS",
+                "providerCallsReexecuted": False,
+                "sourceReportSha256": source_observation_sha,
+            },
+            "answerQuality": {
+                "status": "PENDING_HUMAN_REVIEW",
+                "selfJudged": False,
+                "answerCorrectness": None,
+                "citationGroundingSupport": None,
+                "unsafeAnswerRate": None,
+            },
+        }
+        package_manifest = {
+            "schemaVersion": "aishop-customer-service-http-evidence/v1",
+            "kind": kind,
+            "packageId": package_id,
+            "runId": run_id,
+            "releaseGateEligible": False,
+            "providerCallsReexecuted": False,
+            "sourceObservationReportSha256": source_observation_sha,
+        }
+        payloads = {
+            "badcases.jsonl": b"",
+            "report.json": json.dumps(report).encode() + b"\n",
+            "report.md": b"# HTTP diagnostic\n",
+        }
+    elif kind == "search-paired-replay":
+        baseline_run_id = "final-baseline"
+        baseline_evidence_sha = "b" * 64
+        qrels_sha = "c" * 64
+        report = {
+            "schemaVersion": "aishop-search-paired-replay/v1",
+            "runId": run_id,
+            "normalQualityDenominatorExcluded": True,
+            "baselineFinalModified": False,
+            "qrelsModified": qrels_modified,
+            "provenance": {
+                "baselineRunId": baseline_run_id,
+                "baselineEvidenceSha256SumsSha256": baseline_evidence_sha,
+                "selectedQrelsSha256": qrels_sha,
+            },
+        }
+        package_manifest = {
+            "schemaVersion": "aishop-search-paired-replay-evidence/v1",
+            "kind": kind,
+            "packageId": package_id,
+            "runId": run_id,
+            "baselineRunId": baseline_run_id,
+            "baselineEvidenceSha256SumsSha256": baseline_evidence_sha,
+            "selectedQrelsSha256": qrels_sha,
+            "normalQualityDenominatorExcluded": True,
+            "baselineFinalModified": False,
+            "qrelsModified": qrels_modified,
+        }
+        payloads = {
+            "badcases.jsonl": b"",
+            "cases.jsonl": b"{}\n",
+            "report.json": json.dumps(report).encode() + b"\n",
+            "report.md": b"# Search paired replay\n",
+        }
+    else:
+        raise AssertionError(f"unsupported diagnostic kind: {kind}")
+    for name, content in payloads.items():
+        (package / name).write_bytes(content)
+    package_manifest["files"] = {
+        name: {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}
+        for name, content in payloads.items()
+    }
+    _write_json(package / "evidence-manifest.json", package_manifest)
+    sums = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in package.iterdir()
+        if path.is_file()
+    }
+    (package / "SHA256SUMS").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in sorted(sums.items())),
+        encoding="utf-8",
+    )
+    for path in package.iterdir():
+        if path.is_file():
+            path.chmod(0o444)
+    descriptor = {
+        "kind": kind,
+        "packageId": package_id,
+        "path": package.relative_to(root).as_posix(),
+        "runId": run_id,
+        "sha256SumsSha256": hashlib.sha256(
+            (package / "SHA256SUMS").read_bytes()
+        ).hexdigest(),
+    }
+    if kind == "search-paired-replay":
+        descriptor["baselineRunId"] = "final-baseline"
+    return descriptor
+
+
+def test_http_diagnostic_requires_unavailable_redacted_slots(tmp_path: Path) -> None:
+    valid = _diagnostic_fixture(tmp_path, kind="customer-service-http")
+    errors: list[str] = []
+
+    _validate_diagnostic_evidence(tmp_path, [valid], errors)
+
+    assert errors == []
+
+    invalid = _diagnostic_fixture(
+        tmp_path,
+        kind="customer-service-http",
+        slot_status="MEASURED",
+    )
+    errors = []
+    _validate_diagnostic_evidence(tmp_path, [invalid], errors)
+    assert any("HTTP slot metric must remain unavailable" in error for error in errors)
+
+
+def test_search_paired_replay_binds_baseline_and_preserves_qrels(tmp_path: Path) -> None:
+    valid = _diagnostic_fixture(tmp_path, kind="search-paired-replay")
+    errors: list[str] = []
+
+    _validate_diagnostic_evidence(tmp_path, [valid], errors)
+
+    assert errors == []
+    valid["baselineRunId"] = "different-final"
+    errors = []
+    _validate_diagnostic_evidence(tmp_path, [valid], errors)
+    assert any("baseline run binding is invalid" in error for error in errors)
+    assert any("paired replay provenance is invalid" in error for error in errors)
+
+
+def test_search_paired_replay_rejects_qrels_mutation(tmp_path: Path) -> None:
+    descriptor = _diagnostic_fixture(
+        tmp_path,
+        kind="search-paired-replay",
+        qrels_modified=True,
+    )
+    errors: list[str] = []
+
+    _validate_diagnostic_evidence(tmp_path, [descriptor], errors)
+
+    assert any("paired replay boundary is invalid" in error for error in errors)
 
 
 def test_db_benchmark_v2_requires_counted_equivalent_rollback_evidence(

@@ -277,10 +277,18 @@ RAG answerable retrieval Recall@5 为 `29/29=1.000`，lexical grounded faithfuln
 Search/RAG/Agent 本地完整链路 P50/P95/P99 分别为 `269.6/797.3/940.6 ms`、`1825.4/4246.7/4525.3 ms`、
 `1362.5/17077.8/20943.0 ms`。样本小且只作本地诊断，RAG lexical/semantic shadow 也不等于人工语义准确率。
 
-客服规则预路由的当前点估计为 Intent Macro-F1 `0.955299`（3 个 intent badcase）、高风险 intent Recall `1.000`（10/10）、完整人工 schema 的
-slot Span F1 `0.907652`（15 个 badcase）、slot EM `0.558824`（19/34）、handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
+客服规则预路由的当前点估计为 Intent Macro-F1 `0.955299`（3 个 intent badcase，分层 95% CI `[0.929286,0.987409]`）、高风险 intent Recall `1.000`（10/10）、
+完整人工 schema 的 slot micro F1 `0.907652=688/758`（15 个 badcase，95% CI `[0.888889,0.926454]`）、slot EM `0.558824`（19/34）、
+handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
 生产 canonical slot 投影诊断为 Span F1 `0.992785`、EM `0.882353`；完整 schema 失败中有扩展槽位未映射和金额归一化差异，逐 case 根因见报告。
 这些是离线规则预路由质量，不是线上客服成功率；`releaseGateEligible=false` 保持 fail-closed。
+
+同一 60 条 gold 已经正式 HTTP Agent/Java/RAG/LLM 路径执行 `60/60`，HTTP 转人工混淆矩阵为 `TP=14,TN=46,FP=0,FN=0`，引用结构违规 `0`。
+Episode 槽位经脱敏，因此 HTTP Slot F1/EM 不可测；答案正确性、引用语义支持、转人工适当性与 unsafe-answer rate 仍待独立人工盲审。
+另有 60 条 v2 draft 及双人盲标表已生成，仲裁前不与当前 60 条 HUMAN_VERIFIED 分母合并。
+
+Search 已对 10 条已知难例做真实成对回放：Recall/MRR/NDCG 与 v9 baseline 的 delta 均为 `0`，硬约束违规 `0`；仍保留 3 个多商品/集合意图/比较对象难例。
+该 replay 只证明当前无回归，不替代新 final，也不声称指标提升。
 
 `50/50`、`25/25`、`pass^8=1.0`、终态/state diff 和重复副作用为必须满足的发布/可靠性门禁，不是优展示指标；门禁通过不等于
 客服意图准确率或线上推荐收益。Final semantic judge `50/50` 可追溯，但始终是 shadow 信号，不是人工真值、人工准确率或人工一致性。

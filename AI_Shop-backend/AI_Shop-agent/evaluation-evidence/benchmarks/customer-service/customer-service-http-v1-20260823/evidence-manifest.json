@@ -1,0 +1,26 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-23T12:23:50.859Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 1595,
+      "sha256": "45c06ea6680ca24c75728059ef7d67dfb32f387aa085e0b3d65c4c90195be2ba"
+    },
+    "report.json": {
+      "bytes": 15745265,
+      "sha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f"
+    },
+    "report.md": {
+      "bytes": 1842,
+      "sha256": "dbad019001b624af1f697bcd0c88742d2b09a66c3585087a0080fa16ce86c630"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v1-20260823",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "f4a6d8f30eb7f3bbe5fa0909fee56c68eb7cbe67b2764d4adf3a2cfd8a271d43",
+  "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW"
+}

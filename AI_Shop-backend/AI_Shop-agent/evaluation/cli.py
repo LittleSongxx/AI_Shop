@@ -76,11 +76,28 @@ from evaluation.quality_scorecard import (
     build_scorecard,
     write_scorecard,
 )
+from evaluation.search_paired_replay import (
+    DEFAULT_BASELINE_EVIDENCE as DEFAULT_SEARCH_REPLAY_BASELINE,
+    DEFAULT_CASE_IDS as DEFAULT_SEARCH_REPLAY_CASE_IDS,
+    DEFAULT_V9_HOLDOUT as DEFAULT_SEARCH_REPLAY_HOLDOUT,
+    load_replay_cases,
+    run_search_paired_replay,
+    write_paired_replay_evidence,
+)
 from evaluation.customer_service_gold import (
     DEFAULT_DATASET as DEFAULT_CUSTOMER_SERVICE_DATASET,
     DEFAULT_JSON_REPORT as DEFAULT_CUSTOMER_SERVICE_JSON_REPORT,
     DEFAULT_REPORT as DEFAULT_CUSTOMER_SERVICE_REPORT,
+    load_gold_dataset,
     run_customer_service_gold,
+)
+from evaluation.customer_service_http import (
+    build_http_agent_case,
+    export_answer_review_sheet,
+    rebuild_customer_service_http_report,
+    run_customer_service_http,
+    score_answer_review,
+    write_customer_service_http_evidence,
 )
 from evaluation.customer_service_review import (
     compare_human_reviews,
@@ -181,6 +198,22 @@ def build_parser() -> argparse.ArgumentParser:
     scorecard.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     scorecard.add_argument("--output", type=Path, required=True, help="Markdown scorecard path")
     scorecard.add_argument("--json-output", type=Path, help="optional structured JSON path")
+    paired_replay = commands.add_parser(
+        "search-paired-replay",
+        help="compare current Search with immutable v9 hard-negative rankings",
+    )
+    paired_replay.add_argument(
+        "--baseline-evidence", type=Path, default=DEFAULT_SEARCH_REPLAY_BASELINE
+    )
+    paired_replay.add_argument("--holdout", type=Path, default=DEFAULT_SEARCH_REPLAY_HOLDOUT)
+    paired_replay.add_argument("--run-id", required=True)
+    paired_replay.add_argument("--output-dir", type=Path, required=True)
+    paired_replay.add_argument(
+        "--case-id",
+        action="append",
+        default=[],
+        help="optional case ID filter; repeatable (default: known v9 hard negatives/tails)",
+    )
     customer_service = commands.add_parser(
         "customer-service-gold",
         help="measure provisional customer-service intent, risk, slot, and handoff quality",
@@ -191,6 +224,46 @@ def build_parser() -> argparse.ArgumentParser:
     customer_service.add_argument(
         "--json-output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_JSON_REPORT
     )
+    customer_http = commands.add_parser(
+        "customer-service-http",
+        help="run or review customer-service quality through the production HTTP Agent path",
+    )
+    customer_http_commands = customer_http.add_subparsers(
+        dest="customer_http_command", required=True
+    )
+    customer_http_run = customer_http_commands.add_parser(
+        "run", help="execute HUMAN_VERIFIED cases through /api/agent/sendMessage"
+    )
+    customer_http_run.add_argument("--dataset", type=Path, required=True)
+    customer_http_run.add_argument("--run-id", required=True)
+    customer_http_run.add_argument("--output", type=Path, required=True)
+    customer_http_run.add_argument(
+        "--case-id", action="append", default=[], help="optional case ID filter; repeatable"
+    )
+    customer_http_run.add_argument("--timeout-seconds", type=float, default=240.0)
+    customer_http_run.add_argument("--review-a-output", type=Path)
+    customer_http_run.add_argument("--review-b-output", type=Path)
+    customer_http_rebuild = customer_http_commands.add_parser(
+        "rebuild",
+        help="rebuild metrics from preserved observations and seal an immutable benchmark",
+    )
+    customer_http_rebuild.add_argument("--source-report", type=Path, required=True)
+    customer_http_rebuild.add_argument("--dataset", type=Path, required=True)
+    customer_http_rebuild.add_argument("--output-dir", type=Path, required=True)
+    customer_http_rebuild.add_argument("--review-a-output", type=Path)
+    customer_http_rebuild.add_argument("--review-b-output", type=Path)
+    customer_http_export = customer_http_commands.add_parser(
+        "review-export", help="export a blind final-answer review sheet"
+    )
+    customer_http_export.add_argument("--report", type=Path, required=True)
+    customer_http_export.add_argument("--annotator", required=True)
+    customer_http_export.add_argument("--output", type=Path, required=True)
+    customer_http_score = customer_http_commands.add_parser(
+        "review-score", help="score one complete independent final-answer review sheet"
+    )
+    customer_http_score.add_argument("--report", type=Path, required=True)
+    customer_http_score.add_argument("--review", type=Path, required=True)
+    customer_http_score.add_argument("--output", type=Path, required=True)
     customer_review = commands.add_parser(
         "customer-service-review",
         help="export, validate, or merge two blinded customer-service review sheets",
@@ -857,6 +930,49 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "search-paired-replay":
+        selected_ids = tuple(args.case_id) or DEFAULT_SEARCH_REPLAY_CASE_IDS
+        _all_cases, selected = load_replay_cases(
+            args.holdout,
+            case_ids=selected_ids,
+        )
+        # Search can invoke rerank conditionally even when the historical case
+        # declaration required only embedding. Probe both providers before any
+        # paired query is consumed.
+        preflight_cases = [
+            replace(
+                case,
+                required_providers=tuple(
+                    sorted(set(case.required_providers) | {"embedding", "rerank"})
+                ),
+            )
+            for case in selected
+        ]
+        await init_pool()
+        try:
+            preflight = await run_preflight(preflight_cases)
+            report = await run_search_paired_replay(
+                baseline_evidence=args.baseline_evidence,
+                holdout_path=args.holdout,
+                run_id=args.run_id,
+                preflight=preflight,
+                case_ids=selected_ids,
+            )
+        finally:
+            await close_pool()
+        verification = write_paired_replay_evidence(report, args.output_dir)
+        _print(
+            {
+                "schemaVersion": report.get("schemaVersion"),
+                "runId": report.get("runId"),
+                "status": report.get("status"),
+                "caseCount": report.get("caseCount"),
+                "metrics": report.get("metrics"),
+                "badcaseCount": len(report.get("badcases") or []),
+                "verification": verification,
+            }
+        )
+        return 0
     if args.command == "customer-service-gold":
         report = await run_customer_service_gold(
             args.dataset,
@@ -878,6 +994,113 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "customer-service-http":
+        if args.customer_http_command == "run":
+            rows = load_gold_dataset(args.dataset)
+            selected = {str(value) for value in args.case_id}
+            if selected:
+                rows = [row for row in rows if str(row["id"]) in selected]
+            cases = [build_http_agent_case(row) for row in rows]
+            await init_pool()
+            try:
+                preflight = await run_preflight(cases)
+                report = await run_customer_service_http(
+                    args.dataset,
+                    run_id=args.run_id,
+                    preflight=preflight,
+                    timeout_seconds=args.timeout_seconds,
+                    case_ids=args.case_id,
+                )
+            finally:
+                await close_pool()
+            atomic_write_json(args.output, report, overwrite=False)
+            reviews: dict[str, Any] = {}
+            if args.review_a_output:
+                reviews["reviewA"] = export_answer_review_sheet(
+                    args.output,
+                    args.review_a_output,
+                    reviewer_id="reviewer-a",
+                )
+            if args.review_b_output:
+                reviews["reviewB"] = export_answer_review_sheet(
+                    args.output,
+                    args.review_b_output,
+                    reviewer_id="reviewer-b",
+                )
+            _print(
+                {
+                    "schemaVersion": report.get("schemaVersion"),
+                    "runId": report.get("runId"),
+                    "status": report.get("status"),
+                    "dataset": report.get("dataset"),
+                    "httpExecution": report.get("httpExecution"),
+                    "handoffDecision": report.get("handoffDecision"),
+                    "answerQuality": report.get("answerQuality"),
+                    "output": str(args.output),
+                    "reviews": reviews,
+                }
+            )
+            return 0
+        if args.customer_http_command == "rebuild":
+            report = rebuild_customer_service_http_report(
+                args.source_report,
+                args.dataset,
+            )
+            verification = write_customer_service_http_evidence(
+                report, args.output_dir
+            )
+            report_path = args.output_dir / "report.json"
+            reviews: dict[str, Any] = {}
+            if args.review_a_output:
+                reviews["reviewA"] = export_answer_review_sheet(
+                    report_path,
+                    args.review_a_output,
+                    reviewer_id="reviewer-a",
+                )
+            if args.review_b_output:
+                reviews["reviewB"] = export_answer_review_sheet(
+                    report_path,
+                    args.review_b_output,
+                    reviewer_id="reviewer-b",
+                )
+            _print(
+                {
+                    "schemaVersion": report.get("schemaVersion"),
+                    "runId": report.get("runId"),
+                    "status": report.get("status"),
+                    "runtimeMetrics": report.get("runtimeMetrics"),
+                    "citationContractDiagnostic": report.get(
+                        "citationContractDiagnostic"
+                    ),
+                    "verification": verification,
+                    "reviews": reviews,
+                }
+            )
+            return 0
+        if args.customer_http_command == "review-export":
+            manifest = export_answer_review_sheet(
+                args.report,
+                args.output,
+                reviewer_id=args.annotator,
+            )
+            _print(manifest)
+            return 0
+        if args.customer_http_command == "review-score":
+            report = score_answer_review(args.report, args.review)
+            atomic_write_json(args.output, report, overwrite=False)
+            _print(
+                {
+                    "status": report.get("status"),
+                    "caseCount": report.get("caseCount"),
+                    "metrics": report.get("metrics"),
+                    "badcaseCount": len(report.get("badcases") or []),
+                    "output": str(args.output),
+                }
+            )
+            return 0
+        raise AssertionError(
+            f"unhandled customer-service HTTP command: {args.customer_http_command}"
+        )
     if args.command == "customer-service-review":
         if args.review_command == "export":
             manifest = export_review_sheet(

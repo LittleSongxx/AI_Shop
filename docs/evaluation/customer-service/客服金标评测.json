@@ -632,6 +632,17 @@
       ]
     }
   ],
+  "bootstrapPolicy": {
+    "binaryMetrics": "Wilson intervals retained for directly binomial metrics",
+    "method": "stratified-percentile-bootstrap",
+    "primaryStrata": [
+      "intent",
+      "riskLevel",
+      "shouldHandoff"
+    ],
+    "samples": 2000,
+    "seed": 20260822
+  },
   "canonicalSlotDiagnostics": {
     "extensionFieldCounts": {
       "audience": 1,
@@ -655,16 +666,22 @@
           "cs-gold-v1-055",
           "cs-gold-v1-058"
         ],
+        "componentCounts": {
+          "falseNegative": 5,
+          "falsePositive": 0,
+          "truePositive": 344
+        },
         "confidenceInterval95": {
           "confidenceLevel": 0.95,
-          "lower": 0.987029,
-          "method": "percentile-bootstrap",
-          "upper": 0.99916
+          "lower": 0.98727,
+          "method": "stratified-case-bootstrap-micro-F1",
+          "stratumCount": 16,
+          "upper": 0.997041
         },
         "definition": "Diagnostic micro character-span F1 after projecting both sides to the five fields currently emitted by the production pre-router; it does not replace the full human-schema slot metric.",
-        "denominator": 349,
+        "denominator": 693,
         "name": "canonicalSlotEntitySpanF1",
-        "numerator": 344,
+        "numerator": 688,
         "releaseGateEligible": false,
         "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
         "status": "MEASURED",
@@ -3340,9 +3357,10 @@
       ],
       "confidenceInterval95": {
         "confidenceLevel": 0.95,
-        "lower": 0.642094,
-        "method": "case-bootstrap-macro-F1",
-        "upper": 0.92619
+        "lower": 0.929286,
+        "method": "stratified-case-bootstrap-macro-F1",
+        "stratumCount": 25,
+        "upper": 0.987409
       },
       "definition": "Gold intent labels are macro-averaged across the observed label set; prediction outside the set is counted as a miss/false positive.",
       "denominator": 20,
@@ -3375,19 +3393,26 @@
         "cs-gold-v1-058",
         "cs-gold-v1-059"
       ],
+      "componentCounts": {
+        "falseNegative": 70,
+        "falsePositive": 0,
+        "truePositive": 344
+      },
       "confidenceInterval95": {
         "confidenceLevel": 0.95,
-        "lower": 0.884563,
-        "method": "percentile-bootstrap",
-        "upper": 0.961881
+        "lower": 0.888889,
+        "method": "stratified-case-bootstrap-micro-F1",
+        "stratumCount": 27,
+        "upper": 0.926454
       },
       "definition": "Micro character-span F1 over expected and predicted structured entity values; extra predicted fields count as false positives.",
-      "denominator": 414,
+      "denominator": 758,
       "name": "slotEntitySpanF1",
       "notes": [
+        "componentCounts: TP=344, FP=0, FN=70",
         "HUMAN_VERIFIED"
       ],
-      "numerator": 344,
+      "numerator": 688,
       "releaseGateEligible": false,
       "role": "PRIMARY_QUALITY",
       "status": "MEASURED",

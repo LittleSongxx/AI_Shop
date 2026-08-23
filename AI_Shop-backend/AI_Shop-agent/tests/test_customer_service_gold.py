@@ -1,3 +1,4 @@
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,13 @@ from evaluation.customer_service_gold import (
 )
 
 DATASET = Path(__file__).parents[1] / "evaluation" / "datasets" / "customer_service" / "gold-v1.jsonl"
+CANDIDATE_V2_ADDITIONS = (
+    Path(__file__).parents[1]
+    / "evaluation"
+    / "datasets"
+    / "customer_service"
+    / "candidate-v2-additions.jsonl"
+)
 
 
 def _perfect_predictions(rows):
@@ -121,6 +129,59 @@ def test_missing_prediction_is_a_badcase_not_a_silent_pass():
     report = evaluate_predictions(rows, {}, provenance={"mode": "fixture"})
     assert report["cases"][0]["predicted"]["intent"] == "__MISSING__"
     assert report["metrics"]["intentMacroF1"]["badcaseCount"] == 1
+
+
+def test_customer_service_intervals_use_predeclared_stratified_bootstrap():
+    rows = load_gold_dataset(DATASET)
+    report = evaluate_predictions(
+        rows, _perfect_predictions(rows), provenance={"mode": "fixture"}
+    )
+    assert report["bootstrapPolicy"]["primaryStrata"] == [
+        "intent",
+        "riskLevel",
+        "shouldHandoff",
+    ]
+    assert (
+        report["metrics"]["intentMacroF1"]["confidenceInterval95"]["method"]
+        == "stratified-case-bootstrap-macro-F1"
+    )
+    assert (
+        report["metrics"]["slotEntitySpanF1"]["confidenceInterval95"]["method"]
+        == "stratified-case-bootstrap-micro-F1"
+    )
+
+
+def test_slot_micro_f1_interval_and_fraction_use_the_same_statistic():
+    rows = load_gold_dataset(DATASET)[:2]
+    predictions = _perfect_predictions(rows)
+    predictions[rows[0]["id"]]["entities"] = {"productName": "索尼"}
+    report = evaluate_predictions(rows, predictions, provenance={"mode": "fixture"})
+    metric = report["metrics"]["slotEntitySpanF1"]
+    assert metric["value"] == round(metric["numerator"] / metric["denominator"], 6)
+    interval = metric["confidenceInterval95"]
+    assert interval["lower"] <= metric["value"] <= interval["upper"]
+    counts = metric["componentCounts"]
+    assert metric["numerator"] == 2 * counts["truePositive"]
+    assert metric["denominator"] == (
+        2 * counts["truePositive"]
+        + counts["falsePositive"]
+        + counts["falseNegative"]
+    )
+
+
+def test_candidate_v2_additions_are_balanced_draft_not_fake_gold():
+    rows = load_gold_dataset(CANDIDATE_V2_ADDITIONS)
+    intent_counts = Counter(row["expected"]["intent"] for row in rows)
+    assert len(rows) == 60
+    assert len(intent_counts) == 20
+    assert set(intent_counts.values()) == {3}
+    assert all(
+        row["annotation"]["status"] == "DRAFT_NEEDS_HUMAN_REVIEW" for row in rows
+    )
+    assert sum(row["expected"]["riskLevel"] == "HIGH" for row in rows) >= 9
+    assert sum(row["expected"]["shouldHandoff"] for row in rows) >= 14
+    assert any("full-width-currency" in row.get("sliceTags", []) for row in rows)
+    assert any("consult-search-boundary" in row.get("sliceTags", []) for row in rows)
 
 
 def test_critical_handoff_miss_is_present_in_badcase_rows():

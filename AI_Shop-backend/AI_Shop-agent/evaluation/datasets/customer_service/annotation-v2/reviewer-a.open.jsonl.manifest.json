@@ -1,0 +1,57 @@
+{
+  "artifact": "BLINDED_REVIEW_SHEET",
+  "caseCount": 60,
+  "containsExpectedOrPredicted": false,
+  "createdAt": "2026-08-23T11:53:22.859Z",
+  "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/candidate-v2-additions.jsonl",
+  "datasetSha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353",
+  "guidelinesVersion": "customer-service-gold-v1",
+  "labelSchema": {
+    "conditionalFields": {
+      "handoffSeverity": "required when shouldHandoff=true; empty otherwise"
+    },
+    "handoffSeverityValues": [
+      "CRITICAL",
+      "NORMAL"
+    ],
+    "intentValues": [
+      "ADDRESS_CHANGE",
+      "AFTERSALES_UNKNOWN",
+      "CANCEL_ORDER",
+      "CHAT",
+      "COMPLAINT",
+      "CONFIRM_RECEIPT",
+      "DAMAGED_OR_WRONG_ITEM",
+      "HUMAN_REQUEST",
+      "INVOICE",
+      "PAYMENT_ISSUE",
+      "PRODUCT_CONSULT",
+      "PRODUCT_REVIEW",
+      "PRODUCT_SEARCH",
+      "QUERY_COUPON",
+      "QUERY_FULFILLMENT",
+      "QUERY_LOGISTICS",
+      "QUERY_ORDER",
+      "RECOMMENT",
+      "REFUND",
+      "REFUND_STATUS"
+    ],
+    "requiredFields": [
+      "intent",
+      "riskLevel",
+      "shouldHandoff",
+      "slots"
+    ],
+    "riskLevelValues": [
+      "HIGH",
+      "LOW",
+      "MEDIUM"
+    ]
+  },
+  "lifecycle": "OPEN",
+  "orderSeed": 2471857866746372805,
+  "reviewerId": "reviewer-a",
+  "schemaVersion": "aishop-customer-service-review/v1",
+  "sheetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/annotation-v2/reviewer-a.open.jsonl",
+  "sheetSha256": "0a6034ad7468788ebdf81134e62167edcb54ed0fcf1d540293be24d33dd62b32"
+}

@@ -1739,20 +1739,41 @@
         "value": 0.955299,
         "numerator": 19.105978,
         "denominator": 20,
+        "confidenceInterval95": {"lower": 0.929286, "upper": 0.987409, "method": "stratified-case-bootstrap-macro-F1"},
         "badcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"]
       },
       "highRiskIntentRecall": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseIds": []},
-      "slotEntitySpanF1": {"value": 0.907652, "numerator": 344, "denominator": 414, "badcaseCount": 15},
+      "slotEntitySpanF1": {"value": 0.907652, "numerator": 688, "denominator": 758, "componentCounts": {"truePositive": 344, "falsePositive": 0, "falseNegative": 70}, "confidenceInterval95": {"lower": 0.888889, "upper": 0.926454, "method": "stratified-case-bootstrap-micro-F1"}, "badcaseCount": 15},
       "slotExactMatch": {"value": 0.558824, "numerator": 19, "denominator": 34, "badcaseCount": 15},
       "handoffRecall": {"value": 1.0, "numerator": 14, "denominator": 14, "badcaseIds": []},
       "criticalHandoffMissRate": {"value": 0.0, "numerator": 0, "denominator": 6, "badcaseIds": []},
-      "canonicalSlotEntitySpanF1": {"value": 0.992785, "numerator": 344, "denominator": 349, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]},
+      "canonicalSlotEntitySpanF1": {"value": 0.992785, "numerator": 688, "denominator": 693, "componentCounts": {"truePositive": 344, "falsePositive": 0, "falseNegative": 5}, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]},
       "canonicalSlotExactMatch": {"value": 0.882353, "numerator": 30, "denominator": 34, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]}
     },
     "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "adjudicatedCases": 25},
+    "httpFullPath": {
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823",
+      "sha256SumsSha256": "197bfa7edce9eb897dd6c60e869b1c11d601d42f141810362c7ea8d6b6df159b",
+      "execution": "60/60",
+      "intentMacroF1": 0.955299,
+      "handoffConfusion": {"truePositive": 14, "falsePositive": 0, "falseNegative": 0, "trueNegative": 46},
+      "citationContractInvalidCases": 0,
+      "httpSlotMetrics": "UNAVAILABLE_REDACTED_EPISODE_VALUES",
+      "answerQuality": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "localLatencyMs": {"p50": 1014.106, "p95": 15212.514, "p99": 60141.617},
+      "usage": {"inputTokens": 114720, "outputTokens": 6649, "providerCalls": 32, "unpricedCalls": 31, "missingUsageCalls": 1, "costCny": null, "costStatus": "MISSING_USAGE"}
+    },
+    "candidateV2": {
+      "status": "DRAFT_NEEDS_DUAL_HUMAN_REVIEW",
+      "additionalCaseCount": 60,
+      "targetTotalCaseCount": 120,
+      "datasetSha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353",
+      "claimEligible": false
+    },
     "limitations": [
-      "rule baseline uses resolve_intent(..., allow_llm=false), not the full HTTP Agent conversation",
-      "intentMacroF1 case-bootstrap interval is sparse-label diagnostic; stratified bootstrap is still pending",
+      "slot F1/EM is measured on resolve_intent(..., allow_llm=false); HTTP Episode slot values are redacted and are not scored",
+      "full HTTP answer correctness, citation support, handoff appropriateness, and unsafe-answer rate await independent blind review",
       "offline understanding evidence does not establish online success rate, CSAT, FCR, or release quality gate"
     ]
   },
@@ -1874,6 +1895,16 @@
       "retryIdempotency": "22/22",
       "duplicateSideEffects": 0,
       "contractOnly": true
+    },
+    "searchPairedReplay": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823",
+      "caseCount": 10,
+      "baselineRunId": "final-20260822-ai-quality-v9",
+      "baselineAndCandidate": {"recallAt10": 0.833333, "recallAt10Micro": 0.777778, "mrrAt10": 0.725, "ndcgAt10": 0.650292},
+      "allMetricDeltas": 0.0,
+      "constraintViolationCount": 0,
+      "remainingBadcaseIds": ["search-fin-v9-23-snack-100", "search-fin-v9-34-snack-no-wangwang", "search-fin-v9-47-compare-xm"],
+      "normalQualityDenominatorExcluded": true
     }
   },
   "schemaVersion": "aishop-quality-scorecard/v1"

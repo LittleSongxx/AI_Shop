@@ -14,7 +14,7 @@ import asyncio
 import json
 import random
 import unicodedata
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -253,21 +253,115 @@ def _f1(precision: float, recall: float) -> float:
     return 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
 
 
-def _bootstrap_interval(values: Sequence[float], statistic, *, seed: int) -> dict[str, Any] | None:
+def _bootstrap_interval(
+    values: Sequence[float],
+    statistic,
+    *,
+    seed: int,
+    strata: Sequence[str] | None = None,
+) -> dict[str, Any] | None:
     if not values:
         return None
     rng = random.Random(seed)
     rows = [float(value) for value in values]
-    estimates = [
-        statistic([rows[rng.randrange(len(rows))] for _ in rows])
-        for _ in range(_BOOTSTRAP_SAMPLES)
-    ]
+    if strata is not None:
+        if len(strata) != len(rows):
+            raise CustomerServiceGoldError("bootstrap strata and values must have equal length")
+        grouped: dict[str, list[float]] = defaultdict(list)
+        for stratum, value in zip(strata, rows):
+            grouped[str(stratum)].append(value)
+        estimates = []
+        for _ in range(_BOOTSTRAP_SAMPLES):
+            sample = [
+                group[rng.randrange(len(group))]
+                for name in sorted(grouped)
+                for group in (grouped[name],)
+                for _item in group
+            ]
+            estimates.append(statistic(sample))
+        method = "stratified-percentile-bootstrap"
+    else:
+        estimates = [
+            statistic([rows[rng.randrange(len(rows))] for _ in rows])
+            for _ in range(_BOOTSTRAP_SAMPLES)
+        ]
+        method = "percentile-bootstrap"
     return {
         "lower": round(percentile(estimates, 0.025), 6),
         "upper": round(percentile(estimates, 0.975), 6),
-        "method": "percentile-bootstrap",
+        "method": method,
         "confidenceLevel": 0.95,
+        **(
+            {"stratumCount": len(set(str(stratum) for stratum in strata))}
+            if strata is not None
+            else {}
+        ),
     }
+
+
+def _bootstrap_micro_f1_interval(
+    counts: Sequence[tuple[int, int, int]],
+    *,
+    seed: int,
+    strata: Sequence[str],
+) -> dict[str, Any] | None:
+    """Bootstrap complete cases while preserving the reported micro-F1 statistic."""
+
+    if not counts:
+        return None
+    if len(strata) != len(counts):
+        raise CustomerServiceGoldError(
+            "bootstrap strata and slot counts must have equal length"
+        )
+    grouped: dict[str, list[tuple[int, int, int]]] = defaultdict(list)
+    for stratum, value in zip(strata, counts):
+        grouped[str(stratum)].append(value)
+    rng = random.Random(seed)
+    estimates: list[float] = []
+    for _ in range(_BOOTSTRAP_SAMPLES):
+        sample = [
+            group[rng.randrange(len(group))]
+            for name in sorted(grouped)
+            for group in (grouped[name],)
+            for _item in group
+        ]
+        tp = sum(value[0] for value in sample)
+        fp = sum(value[1] for value in sample)
+        fn = sum(value[2] for value in sample)
+        denominator = 2 * tp + fp + fn
+        estimates.append(2 * tp / denominator if denominator else 1.0)
+    return {
+        "lower": round(percentile(estimates, 0.025), 6),
+        "upper": round(percentile(estimates, 0.975), 6),
+        "method": "stratified-case-bootstrap-micro-F1",
+        "confidenceLevel": 0.95,
+        "stratumCount": len(grouped),
+    }
+
+
+def _bootstrap_stratum(case: Mapping[str, Any]) -> str:
+    expected = case.get("expected") if isinstance(case.get("expected"), Mapping) else {}
+    return "|".join(
+        (
+            str(expected.get("intent") or "UNKNOWN"),
+            str(expected.get("riskLevel") or "UNKNOWN"),
+            "HANDOFF" if bool(expected.get("shouldHandoff")) else "NO_HANDOFF",
+        )
+    )
+
+
+def _stratified_case_sample(
+    cases: Sequence[Mapping[str, Any]], rng: random.Random
+) -> list[Mapping[str, Any]]:
+    grouped: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for case in cases:
+        grouped[_bootstrap_stratum(case)].append(case)
+    return [
+        group[rng.randrange(len(group))]
+        for name in sorted(grouped)
+        for group in (grouped[name],)
+        for _item in group
+    ]
 
 
 def _wilson(successes: int, total: int) -> dict[str, Any] | None:
@@ -433,12 +527,16 @@ def evaluate_predictions(
     per_intent: dict[str, dict[str, Any]] = {}
     intent_badcases: list[str] = []
     risk_badcases: list[str] = []
-    slot_badcases: list[str] = []
-    slot_case_f1: list[float] = []
+    slot_f1_badcases: list[str] = []
+    slot_em_badcases: list[str] = []
+    slot_case_counts: list[tuple[int, int, int]] = []
+    slot_case_strata: list[str] = []
     slot_tp = slot_fp = slot_fn = 0
     slot_em_numerator = slot_em_denominator = 0
-    canonical_slot_badcases: list[str] = []
-    canonical_slot_case_f1: list[float] = []
+    canonical_slot_f1_badcases: list[str] = []
+    canonical_slot_em_badcases: list[str] = []
+    canonical_slot_case_counts: list[tuple[int, int, int]] = []
+    canonical_slot_case_strata: list[str] = []
     canonical_slot_tp = canonical_slot_fp = canonical_slot_fn = 0
     canonical_slot_em_numerator = canonical_slot_em_denominator = 0
     extension_only_slot_case_count = 0
@@ -487,11 +585,18 @@ def evaluate_predictions(
                 critical_handoff_misses += 1
                 critical_handoff_badcases.append(case_id)
 
-        tp, fp, fn, case_slot_f1 = _slot_case_counts(expected, predicted)
+        tp, fp, fn, _case_slot_f1 = _slot_case_counts(expected, predicted)
         slot_tp += tp
         slot_fp += fp
         slot_fn += fn
-        slot_case_f1.append(case_slot_f1)
+        slot_case_counts.append((tp, fp, fn))
+        if fp or fn:
+            slot_f1_badcases.append(case_id)
+        slot_case_strata.append(
+            f"{expected_intent}|{expected_risk}|"
+            f"{'HANDOFF' if expected_handoff else 'NO_HANDOFF'}|"
+            f"{'HAS_SLOT' if expected.get('slots') else 'NO_SLOT'}"
+        )
         expected_slots = expected.get("slots") or {}
         predicted_slots = predicted.get("entities") or {}
         if expected_slots:
@@ -501,7 +606,7 @@ def evaluate_predictions(
             ):
                 slot_em_numerator += 1
             else:
-                slot_badcases.append(case_id)
+                slot_em_badcases.append(case_id)
         expected_canonical_slots = _project_canonical_slots(expected_slots)
         predicted_canonical_slots = _project_canonical_slots(predicted_slots)
         extension_keys = set(expected_slots) - PRODUCTION_CANONICAL_SLOT_FIELDS
@@ -510,7 +615,7 @@ def evaluate_predictions(
         if expected_slots and not expected_canonical_slots:
             extension_only_slot_case_count += 1
         if expected_canonical_slots:
-            canonical_tp_case, canonical_fp_case, canonical_fn_case, canonical_case_f1 = (
+            canonical_tp_case, canonical_fp_case, canonical_fn_case, _canonical_case_f1 = (
                 _slot_case_counts_for_maps(
                     expected_canonical_slots,
                     predicted_canonical_slots,
@@ -519,12 +624,20 @@ def evaluate_predictions(
             canonical_slot_tp += canonical_tp_case
             canonical_slot_fp += canonical_fp_case
             canonical_slot_fn += canonical_fn_case
-            canonical_slot_case_f1.append(canonical_case_f1)
+            canonical_slot_case_counts.append(
+                (canonical_tp_case, canonical_fp_case, canonical_fn_case)
+            )
+            if canonical_fp_case or canonical_fn_case:
+                canonical_slot_f1_badcases.append(case_id)
+            canonical_slot_case_strata.append(
+                f"{expected_intent}|{expected_risk}|"
+                f"{'HANDOFF' if expected_handoff else 'NO_HANDOFF'}"
+            )
             canonical_slot_em_denominator += 1
             if _slot_maps_equal(expected_canonical_slots, predicted_canonical_slots):
                 canonical_slot_em_numerator += 1
             else:
-                canonical_slot_badcases.append(case_id)
+                canonical_slot_em_badcases.append(case_id)
         cases.append(
             {
                 "id": case_id,
@@ -538,7 +651,7 @@ def evaluate_predictions(
                     "riskLevel": expected_risk == predicted_risk,
                     "handoff": expected_handoff == predicted_handoff,
                     "slotExactMatch": bool(expected_slots)
-                    and case_id not in slot_badcases,
+                    and case_id not in slot_em_badcases,
                 },
             }
         )
@@ -568,7 +681,7 @@ def evaluate_predictions(
     rng = random.Random(_BOOTSTRAP_SEED)
     macro_samples: list[float] = []
     for _ in range(_BOOTSTRAP_SAMPLES):
-        sample = [cases[rng.randrange(len(cases))] for _ in cases]
+        sample = _stratified_case_sample(cases, rng)
         labels = sorted({case["expected"]["intent"] for case in cases} | {case["predicted"].get("intent", "__MISSING__") for case in sample})
         values: list[float] = []
         for label in labels:
@@ -580,17 +693,18 @@ def evaluate_predictions(
     macro_interval = {
         "lower": round(percentile(macro_samples, 0.025), 6),
         "upper": round(percentile(macro_samples, 0.975), 6),
-        "method": "case-bootstrap-macro-F1",
+        "method": "stratified-case-bootstrap-macro-F1",
         "confidenceLevel": 0.95,
+        "stratumCount": len({_bootstrap_stratum(case) for case in cases}),
     }
 
     slot_precision = slot_tp / (slot_tp + slot_fp) if slot_tp + slot_fp else 0.0
     slot_recall = slot_tp / (slot_tp + slot_fn) if slot_tp + slot_fn else 0.0
     slot_f1 = _f1(slot_precision, slot_recall)
-    slot_interval = _bootstrap_interval(
-        slot_case_f1,
-        lambda sample: sum(sample) / len(sample),
+    slot_interval = _bootstrap_micro_f1_interval(
+        slot_case_counts,
         seed=_BOOTSTRAP_SEED ^ 0x51,
+        strata=slot_case_strata,
     )
     canonical_slot_precision = (
         canonical_slot_tp / (canonical_slot_tp + canonical_slot_fp)
@@ -603,10 +717,10 @@ def evaluate_predictions(
         else 0.0
     )
     canonical_slot_f1 = _f1(canonical_slot_precision, canonical_slot_recall)
-    canonical_slot_interval = _bootstrap_interval(
-        canonical_slot_case_f1,
-        lambda sample: sum(sample) / len(sample),
+    canonical_slot_interval = _bootstrap_micro_f1_interval(
+        canonical_slot_case_counts,
         seed=_BOOTSTRAP_SEED ^ 0xA7,
+        strata=canonical_slot_case_strata,
     )
     metrics = {
         "intentMacroF1": _metric(
@@ -632,11 +746,12 @@ def evaluate_predictions(
         "slotEntitySpanF1": _metric(
             "slotEntitySpanF1",
             slot_f1 if slot_tp + slot_fp + slot_fn else None,
-            numerator=slot_tp,
-            denominator=slot_tp + slot_fp + slot_fn,
+            numerator=2 * slot_tp,
+            denominator=2 * slot_tp + slot_fp + slot_fn,
             interval=slot_interval,
-            badcase_ids=slot_badcases,
+            badcase_ids=slot_f1_badcases,
             definition="Micro character-span F1 over expected and predicted structured entity values; extra predicted fields count as false positives.",
+            notes=(f"componentCounts: TP={slot_tp}, FP={slot_fp}, FN={slot_fn}",),
             evidence_status=evidence_status,
         ),
         "slotExactMatch": _metric(
@@ -645,7 +760,7 @@ def evaluate_predictions(
             numerator=slot_em_numerator,
             denominator=slot_em_denominator,
             interval=_wilson(slot_em_numerator, slot_em_denominator),
-            badcase_ids=slot_badcases,
+            badcase_ids=slot_em_badcases,
             definition="Request-level exact equality of all expected slots; cases with no expected slots are excluded from the denominator.",
             evidence_status=evidence_status,
         ),
@@ -670,6 +785,11 @@ def evaluate_predictions(
             evidence_status=evidence_status,
         ),
     }
+    metrics["slotEntitySpanF1"]["componentCounts"] = {
+        "truePositive": slot_tp,
+        "falsePositive": slot_fp,
+        "falseNegative": slot_fn,
+    }
     canonical_slot_metrics = {
         "canonicalSlotEntitySpanF1": {
             "name": "canonicalSlotEntitySpanF1",
@@ -677,11 +797,18 @@ def evaluate_predictions(
             "value": round(canonical_slot_f1, 6)
             if canonical_slot_tp + canonical_slot_fp + canonical_slot_fn
             else None,
-            "numerator": canonical_slot_tp,
-            "denominator": canonical_slot_tp + canonical_slot_fp + canonical_slot_fn,
+            "numerator": 2 * canonical_slot_tp,
+            "denominator": 2 * canonical_slot_tp
+            + canonical_slot_fp
+            + canonical_slot_fn,
+            "componentCounts": {
+                "truePositive": canonical_slot_tp,
+                "falsePositive": canonical_slot_fp,
+                "falseNegative": canonical_slot_fn,
+            },
             "confidenceInterval95": canonical_slot_interval,
-            "badcaseCount": len(canonical_slot_badcases),
-            "badcaseIds": canonical_slot_badcases,
+            "badcaseCount": len(canonical_slot_f1_badcases),
+            "badcaseIds": canonical_slot_f1_badcases,
             "definition": "Diagnostic micro character-span F1 after projecting both sides to the five fields currently emitted by the production pre-router; it does not replace the full human-schema slot metric.",
             "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
             "releaseGateEligible": False,
@@ -697,8 +824,8 @@ def evaluate_predictions(
             "confidenceInterval95": _wilson(
                 canonical_slot_em_numerator, canonical_slot_em_denominator
             ),
-            "badcaseCount": len(canonical_slot_badcases),
-            "badcaseIds": canonical_slot_badcases,
+            "badcaseCount": len(canonical_slot_em_badcases),
+            "badcaseIds": canonical_slot_em_badcases,
             "definition": "Diagnostic request-level exact match after projecting to production canonical slots; extension-only human slots are excluded from this denominator.",
             "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
             "releaseGateEligible": False,
@@ -707,7 +834,8 @@ def evaluate_predictions(
     all_badcase_ids = sorted(
         set(intent_badcases)
         | set(risk_badcases)
-        | set(slot_badcases)
+        | set(slot_f1_badcases)
+        | set(slot_em_badcases)
         | set(handoff_badcases)
         | set(critical_handoff_badcases)
     )
@@ -720,8 +848,8 @@ def evaluate_predictions(
             for name, ids in (
                 ("intentMacroF1", intent_badcases),
                 ("highRiskIntentRecall", risk_badcases),
-                ("slotEntitySpanF1", slot_badcases),
-                ("slotExactMatch", slot_badcases),
+                ("slotEntitySpanF1", slot_f1_badcases),
+                ("slotExactMatch", slot_em_badcases),
                 ("handoffRecall", handoff_badcases),
                 ("criticalHandoffMissRate", critical_handoff_badcases),
             )
@@ -817,6 +945,13 @@ def evaluate_predictions(
             },
         },
         "provenance": dict(provenance or {}),
+        "bootstrapPolicy": {
+            "method": "stratified-percentile-bootstrap",
+            "samples": _BOOTSTRAP_SAMPLES,
+            "seed": _BOOTSTRAP_SEED,
+            "primaryStrata": ["intent", "riskLevel", "shouldHandoff"],
+            "binaryMetrics": "Wilson intervals retained for directly binomial metrics",
+        },
         "historicalBaseline": HISTORICAL_BASELINE,
         "metrics": metrics,
         "canonicalSlotDiagnostics": {
