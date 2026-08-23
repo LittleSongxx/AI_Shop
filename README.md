@@ -4,7 +4,7 @@
 >
 > 当前证据状态：`PUBLISHED_FINAL`；唯一当前结果、数据集哈希和可陈述边界以 [证据 manifest](docs/evidence-manifest.json) 为准
 >
-> 最后核验时间：2026-08-22（Asia/Shanghai）
+> 最后核验时间：2026-08-23（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
@@ -273,6 +273,10 @@ regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
 Agent 只保留工具契约/延迟诊断；客服当前为 60 条 `HUMAN_VERIFIED` 离线金标，证据包和哈希见
 `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/`。
 
+RAG answerable retrieval Recall@5 为 `29/29=1.000`，lexical grounded faithfulness/citation/no-answer 均为 `50/50=1.000`；
+Search/RAG/Agent 本地完整链路 P50/P95/P99 分别为 `269.6/797.3/940.6 ms`、`1825.4/4246.7/4525.3 ms`、
+`1362.5/17077.8/20943.0 ms`。样本小且只作本地诊断，RAG lexical/semantic shadow 也不等于人工语义准确率。
+
 客服规则预路由的当前点估计为 Intent Macro-F1 `0.955299`（3 个 intent badcase）、高风险 intent Recall `1.000`（10/10）、完整人工 schema 的
 slot Span F1 `0.907652`（15 个 badcase）、slot EM `0.558824`（19/34）、handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
 生产 canonical slot 投影诊断为 Span F1 `0.992785`、EM `0.882353`；完整 schema 失败中有扩展槽位未映射和金额归一化差异，逐 case 根因见报告。
@@ -283,8 +287,10 @@ slot Span F1 `0.907652`（15 个 badcase）、slot EM `0.558824`（19/34）、ha
 
 质量报告不隐藏诊断信号：final 有 `3` 次 query-expansion provider failure，均走安全 deterministic fallback；
 regression 有 `1` 次同类诊断和 `1` 次 semantic judge unavailable。它们不会被改写为零，也不会进入不适用的正常质量分母。
-12 个故障注入场景满足 recovery contract；真实隔离 MySQL benchmark 在候选规模 `1/10/50/100` 下验证 batch
-offer/decision feature 为一次 round trip，而 N+1 随候选数线性增长。Token 只采用 Provider usage；缺 usage 标为
+独立故障矩阵共 `12` 个场景，其中生产边界 HARD `11/11`、harness boundary SHADOW `1/1`，全部 recovery contract 通过；
+它不计入 final 正常质量分母，且 final summary 的 `resilienceMetrics` 仍明确为 `NOT_RUN`。真实隔离 MySQL benchmark 在候选规模
+`1/10/50/100` 下验证 batch offer/decision feature 为一次 round trip，而 N+1 随候选数线性增长；100 候选时 batch offer/decision
+P50 为 `23.864/2.405 ms`，N+1 为 `89.805/70.501 ms`。Token 只采用 Provider usage；缺 usage 标为
 `MISSING_USAGE`，没有可信单价时 `costCny=null`，不写成零成本。所有延迟都是本地完整链路的描述性数据，不是生产 SLO。
 
 历史 `final-20260820-ai-quality-v2` 保留为只读 archive，`v3` 至 `v8` 是只读失败 final archive；它们不代表当前结果，

@@ -50,6 +50,16 @@
 - 新增 production canonical slot 对齐诊断：Span F1 `0.992785`、EM `0.882353`；扩展槽位未映射与金额归一化单独分类，避免把 schema 差异误报为模型准确率下降。
 - 发现并修复两项证据链问题：归档 sealed 文件搬迁后仍可由内容哈希校验；评测 CLI 支持仓库外临时 holdout 的 provenance。后续优先回归 `011/044/057/055/058`，再决定扩展槽位生产化。
 
+### 2026-08-23：重启后全量复核与主线清理
+
+- 基础设施复核：Conda `shop` 可用；Agent 全量 `1261 passed, 7 skipped`（仅真实 MySQL 8 migration 条件跳过），脚本契约 `58 passed`；Agent 目录与本轮变更脚本 Ruff、`compileall`、manifest、文档一致性和 `git diff --check` 均通过。仓库其余 `scripts/` 仍有 16 个既有 Ruff 风格/时区告警，未伪称全仓库 lint 清零。
+- Java 后端 Maven reactor（26 个模块）`mvn -B -ntp test`：`BUILD SUCCESS`，无失败；1 个 RabbitMQ 外部依赖集成测试按条件跳过，未计入通过数。
+- 重新核对 v9 当前结果：Search `Recall@10 macro=0.962121`、`micro=52/56=0.928571`、`MRR=0.937500`、`NDCG=0.920521`；RAG answerable Recall@5 `29/29`、lexical grounded/citation/no-answer `50/50`；Agent 25 case/200 trial，`pass^8=1.0`、重复副作用 `0`。这些分别是检索质量、安全证据和可靠性契约，不合并成一个“总分”。
+- 质量报告补齐 Search/RAG/Agent 的 P50/P95/P99、usage/token 未知态、semantic shadow 可用性和指标级 badcase；客服 gold 明确记录双人一致率、仲裁数、稀疏 intent bootstrap 限制。
+- 独立故障矩阵完成 `12` 个场景：生产边界 HARD `11/11`、harness boundary SHADOW `1/1`，全部 recovery contract 通过；正常 final 的 `resilienceMetrics=NOT_RUN` 保持不变，避免把辅助故障 run 混入普通质量分母。
+- 独立 DB benchmark 在真实隔离数据库完成 `1/10/50/100` 候选规模的 batch/N+1 对照；100 候选 batch offer/decision P50 `23.864/2.405 ms`，N+1 P50 `89.805/70.501 ms`，均为本地描述性证据。
+- 精确删除 19 个已被主线替代的旧 DB/repeat/fault benchmark 包，以及仓库根目录与 sealed 证据重复的 `adjudication.final.jsonl`；v2 通过 final、v3-v8 失败 final 和客服历史 pending/provisional 包仍作为只读追溯证据保留，`.runs` 只剩 v9 development/regression/final。
+
 ## 方法成熟度判断
 
 | 能力 | 判断 | 依据与边界 |
@@ -58,7 +68,7 @@
 | 生成式导购 | 适合作为受控解释/澄清层 | 候选和交易事实不交给 LLM 生成；没有行为序列、ranker、A/B，不能称工业个性化推荐 |
 | 可信 RAG | 工程路径成熟 | 版本/注入隔离、最小证据、引用、拒答；当前 lexical 指标不是人工语义真值 |
 | 业务 Agent | 可靠执行边界清晰 | 确认后 Java 写入、幂等、未知结果和终态校验；客服理解已有 60 条 HUMAN_VERIFIED 离线金标 |
-| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥和 fail-closed；缺人工复核、真实行为和生产压测 |
+| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标和 fail-closed；仍缺真实行为、独立答案盲评和生产压测 |
 
 与传统搜索和前沿生成式搜推的取舍：型号、数字、品牌、否定词必须保留倒排/结构化硬约束；向量用于同义泛化；LLM 只在候选集内做
 澄清、比较和 grounded explanation。直接让 LLM 生成商品 ID 会把幻觉、库存和报价时变性带入交易边界，不适合当前项目。
@@ -71,7 +81,8 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 ## 当前边界与下一步
 
 - 客服 gold 当前主线为 `HUMAN_VERIFIED`；release gate 仍显式关闭，避免把离线人工金标误写成线上成功率。
-- 先修复/回归 `011/044/057` 的意图边界和 `055/058` 的 canonical 槽位/金额归一化；扩展 `brand/budget/feature` 等字段需先完成生产 schema 设计。
+- 先用同一 gold 跑完整 HTTP Agent/LLM 路径，再修复/回归 `011/044/057` 的意图边界和 `055/058` 的 canonical 槽位/金额归一化；扩展 `brand/budget/feature` 等字段需先完成生产 schema 设计。
+- 客服样本扩充到 100–200 条后按 intent/risk/handoff 分层 bootstrap，并补少量独立人工答案/引用/转人工盲评；当前 60 条规则预路由结果可用于面试，不可外推总体泛化。
 - 每次修改都要保留指标级 badcase、输入/gold/prediction、根因和新旧数据集哈希；Search hard negative 继续只做 paired replay，不改标签刷分。
 - Search hard negative 只做记录；有时间再做同一数据集的 paired replay，不能用改标签或重刷结果制造提升。
 - 真实曝光/点击/购买、人工盲评、授权/合规和容量数据到位前，不新增 CTR/CVR/GMV 或生产 SLO 结论。

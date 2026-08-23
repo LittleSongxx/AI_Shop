@@ -691,6 +691,52 @@ def _validate_current_evidence(
     )
 
 
+def _validate_scorecard(
+    root: Path,
+    descriptor: Any,
+    current_descriptor: Any,
+    errors: list[str],
+) -> None:
+    """Validate the mutable scorecard projection against immutable current evidence."""
+
+    label = "evaluation.scorecard"
+    if descriptor is None:
+        return
+    if not isinstance(descriptor, dict):
+        errors.append(f"{label} must be an object")
+        return
+    relative = str(descriptor.get("path") or "")
+    try:
+        path = _resolve(root, relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not path.is_file():
+        errors.append(f"{label} file is missing: {relative}")
+        return
+    expected_sha = str(descriptor.get("sha256") or "")
+    if not HEX64.fullmatch(expected_sha) or _sha256(path) != expected_sha:
+        errors.append(f"{label} hash mismatch: {relative}")
+    try:
+        scorecard = _json(path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label} JSON is invalid: {relative}: {exc}")
+        return
+    if scorecard.get("schemaVersion") != "aishop-quality-scorecard/v1":
+        errors.append(f"{label} schema is invalid: {relative}")
+    evidence = scorecard.get("evidence") or {}
+    if not isinstance(evidence, dict):
+        errors.append(f"{label}.evidence must be an object")
+        return
+    if isinstance(current_descriptor, dict):
+        for field in ("path", "runId", "releaseId", "datasetSha256"):
+            if evidence.get(field) != current_descriptor.get(field):
+                errors.append(f"{label} evidence {field} differs from current evidence")
+    for field in ("runtimeDiagnostics", "usageDiagnostics", "auxiliaryEvidence"):
+        if field not in scorecard:
+            errors.append(f"{label} is missing {field}")
+
+
 def _validate_archives(root: Path, descriptors: Any, errors: list[str]) -> None:
     if descriptors is None:
         return
@@ -1195,6 +1241,12 @@ def validate_repository(
         _validate_current_evidence(root, current, errors)
     else:
         errors.append("status must be NO_PUBLISHED_FINAL or PUBLISHED_FINAL")
+    _validate_scorecard(
+        root,
+        evaluation.get("scorecard"),
+        current,
+        errors,
+    )
     _validate_archives(root, evaluation.get("archives"), errors)
     _validate_failed_final_attempts(
         root,

@@ -1,9 +1,0 @@
-{
-  "domainOutcomes": {
-    "agent": true,
-    "rag": true,
-    "search": true
-  },
-  "passed": true,
-  "policy": "FAULT_CASES_ARE_EXCLUDED_FROM_NORMAL_QUALITY_DENOMINATORS"
-}

@@ -1727,12 +1727,154 @@
     "requiredForSearchQrels": true,
     "sha256": "a04f4ca95cae3c7c41356625d4f58b05c251ae45503e0423905b83830d25c85f"
   },
+  "customerService": {
+    "status": "HUMAN_VERIFIED",
+    "releaseGateEligible": false,
+    "caseCount": 60,
+    "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+    "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+    "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
+    "metrics": {
+      "intentMacroF1": {
+        "value": 0.955299,
+        "numerator": 19.105978,
+        "denominator": 20,
+        "badcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"]
+      },
+      "highRiskIntentRecall": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseIds": []},
+      "slotEntitySpanF1": {"value": 0.907652, "numerator": 344, "denominator": 414, "badcaseCount": 15},
+      "slotExactMatch": {"value": 0.558824, "numerator": 19, "denominator": 34, "badcaseCount": 15},
+      "handoffRecall": {"value": 1.0, "numerator": 14, "denominator": 14, "badcaseIds": []},
+      "criticalHandoffMissRate": {"value": 0.0, "numerator": 0, "denominator": 6, "badcaseIds": []},
+      "canonicalSlotEntitySpanF1": {"value": 0.992785, "numerator": 344, "denominator": 349, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]},
+      "canonicalSlotExactMatch": {"value": 0.882353, "numerator": 30, "denominator": 34, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-055", "cs-gold-v1-058"]}
+    },
+    "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "adjudicatedCases": 25},
+    "limitations": [
+      "rule baseline uses resolve_intent(..., allow_llm=false), not the full HTTP Agent conversation",
+      "intentMacroF1 case-bootstrap interval is sparse-label diagnostic; stratified bootstrap is still pending",
+      "offline understanding evidence does not establish online success rate, CSAT, FCR, or release quality gate"
+    ]
+  },
+  "scorecardCiProvenance": {
+    "generator": "evaluation.quality_scorecard.build_scorecard",
+    "bootstrapSeed": 20260822,
+    "runSummaryIntervalsMayDiffer": true,
+    "note": "The immutable run summary and this derived scorecard use independent fixed-seed resampling. Point estimates, denominators, and badcase IDs are the shared claim; do not mix interval endpoints."
+  },
   "interpretation": {
     "contractGatesAreNotShowcaseMetrics": true,
-    "customerServiceIntentMetricsNotMeasured": true,
+    "customerServiceIntentMetricsNotMeasured": false,
+    "customerServiceGoldIsOfflineOnly": true,
     "localLatencyIsNotProductionSlo": true,
     "qualityFirst": true,
     "semanticJudgeIsShadowOnly": true
+  },
+  "runtimeDiagnostics": {
+    "scope": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+    "sampleCounts": {
+      "search": 50,
+      "rag": 50,
+      "agent": 25
+    },
+    "latencyMs": {
+      "search": {
+        "p50": 269.589468,
+        "p95": 797.323967,
+        "p99": 940.61749,
+        "p95BadcaseIds": [
+          "search-fin-v9-31-lip-no-chanel",
+          "search-fin-v9-17-matte-lip",
+          "search-fin-v9-36-sony-no-xm6"
+        ]
+      },
+      "rag": {
+        "p50": 1825.420945,
+        "p95": 4246.679911,
+        "p99": 4525.330445,
+        "p95BadcaseIds": [
+          "rag-fin-v9-31-mail-memory",
+          "rag-fin-v9-28-drone-street",
+          "rag-fin-v9-49-grounding-term"
+        ]
+      },
+      "agent": {
+        "p50": 1362.533124,
+        "p95": 17077.778332,
+        "p99": 20943.004244,
+        "p95BadcaseIds": [
+          "agent-fin-v9-10-memory-policy",
+          "agent-fin-v9-12-price-policy"
+        ]
+      }
+    },
+    "notes": [
+      "P95/P99 samples are below 100 and are descriptive long-tail diagnostics only.",
+      "These values are not production capacity or SLO evidence."
+    ]
+  },
+  "usageDiagnostics": {
+    "source": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current/summary.json",
+    "costRule": "Provider usage is required; missing usage is MISSING_USAGE; absent trusted price leaves costCny=null.",
+    "domains": {
+      "search": {
+        "providerCalls": 121,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "missingUsageCalls": 121,
+        "unpricedCalls": 0,
+        "costStatus": "MISSING_USAGE"
+      },
+      "rag": {
+        "providerCalls": 107,
+        "inputTokens": 67267,
+        "outputTokens": 10115,
+        "missingUsageCalls": 0,
+        "unpricedCalls": 107,
+        "costStatus": "UNPRICED"
+      },
+      "agent": {
+        "providerCalls": 99,
+        "inputTokens": 271154,
+        "outputTokens": 36108,
+        "missingUsageCalls": 2,
+        "unpricedCalls": 97,
+        "costStatus": "UNPRICED_OR_MISSING_USAGE"
+      }
+    }
+  },
+  "auxiliaryEvidence": {
+    "faultMatrix": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/resilience/fault-v9-20260822",
+      "scenarioCount": 12,
+      "hardScenarioCount": 11,
+      "hardPassedCount": 11,
+      "shadowScenarioCount": 1,
+      "shadowPassedCount": 1,
+      "allContractsPassed": true,
+      "normalQualityDenominatorExcluded": true,
+      "finalSummaryStatus": "NOT_RUN"
+    },
+    "dbBenchmark": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/db/db-benchmark-v9-20260822",
+      "candidateCounts": [1, 10, 50, 100],
+      "candidate100P50Ms": {
+        "batchOfferSnapshot": 23.864,
+        "nPlusOneOfferSnapshot": 89.805,
+        "batchDecisionFeature": 2.405,
+        "nPlusOneDecisionFeature": 70.501
+      },
+      "notProductionSlo": true
+    },
+    "repeatedAgent": {
+      "finalK": 8,
+      "expectedTrials": 200,
+      "executedTrials": 200,
+      "passPower": 1.0,
+      "retryIdempotency": "22/22",
+      "duplicateSideEffects": 0,
+      "contractOnly": true
+    }
   },
   "schemaVersion": "aishop-quality-scorecard/v1"
 }

@@ -6,6 +6,12 @@
       "path": "AI_Shop-backend/AI_Shop-agent/evaluation/suite.json",
       "sha256": "d69d1cef4c8e5cc16f5cc8099d7425f3e5658a4d1e3e2d7dfd6221de55a1239c"
     },
+    "scorecard": {
+      "path": "docs/evaluation/AI质量评测与Badcase.json",
+      "sha256": "a37f35df8d4d24e2e8a031cc5678a1633904a2c35a32c046a8451354ce2f8b14",
+      "schemaVersion": "aishop-quality-scorecard/v1",
+      "derivedFrom": "evaluation.currentEvidence"
+    },
     "datasetLocks": [
       {
         "split": "development",
@@ -270,7 +276,7 @@
       }
     }
   },
-  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding now has a separate 60-case HUMAN_VERIFIED offline evidence package with two blind reviewers and 25 explicit adjudications; its releaseGateEligible remains false. Development and regression are separate visible evidence. Semantic judging is shadow-only until independent human calibration; local latency is descriptive and not a production SLO; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, production capacity, payment compliance, or industrial personalization.",
+  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding now has a separate 60-case HUMAN_VERIFIED offline evidence package with two blind reviewers and 25 explicit adjudications; its releaseGateEligible remains false. Development and regression are separate visible evidence. The independent fault matrix passed 11/11 HARD and 1/1 SHADOW recovery contracts but is excluded from the normal denominator; final resilienceMetrics remains NOT_RUN. Semantic judging is shadow-only until independent human calibration; local latency is descriptive and not a production SLO; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, production capacity, payment compliance, or industrial personalization.",
   "visibleRuns": {
     "development": {
       "runId": "development-20260822-ai-quality-v9",
