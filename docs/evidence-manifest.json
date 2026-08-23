@@ -19,22 +19,29 @@
       }
     ],
     "customerServiceGold": {
-      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
-      "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+      "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
       "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
-      "reportSha256": "0715b6c75fa09dceecbe07d062e6f21eef4d5f821ecda5b5eaa855c4abc1a9fc",
+      "reportSha256": "d24d3b59da38ac3521f55d5c60850029a053f15db2db7184d4c8cead313d8c2a",
       "caseCount": 60,
-      "status": "PROVISIONAL_NOT_HUMAN_GOLD",
+      "status": "HUMAN_VERIFIED",
       "releaseGateEligible": false,
-      "annotationPolicy": "INDEPENDENT_HUMAN_REVIEW_REQUIRED_BEFORE_ACCURACY_CLAIM",
+      "annotationPolicy": "TWO_BLIND_REVIEWERS_PLUS_EXPLICIT_LEAD_ADJUDICATION",
       "reviewEvidence": {
-        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-review-v1-pending-adjudication",
-        "lifecycle": "PENDING_ADJUDICATION",
-        "sha256SumsSha256": "1b16e52d67d995c4c28d78eb702ad99477fad0bcb71e6f4233d08760df2a7480",
-        "exactAgreementCaseCount": 35,
-        "disagreementCaseCount": 25,
-        "caseAgreementRate": 0.5833333333333334,
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823",
+        "lifecycle": "HUMAN_VERIFIED",
+        "sha256SumsSha256": "a509d68f728828d2e1ef374c752245f140caadaa1dc6bc266a6fdc2475c39e50",
+        "sourceDraftDatasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+        "humanDatasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+        "reportSha256": "d24d3b59da38ac3521f55d5c60850029a053f15db2db7184d4c8cead313d8c2a",
+        "adjudicationCaseCount": 25,
+        "adjudicationSha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e",
         "releaseGateEligible": false
+      },
+      "historicalDraft": {
+        "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+        "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+        "reportPath": "docs/evaluation/customer-service/archive/客服金标评测-provisional-v1.json"
       }
     },
     "currentEvidence": {
@@ -242,9 +249,28 @@
         "sourceRunSha256SumsSha256": "0c664acbb8daaf41973619b713a9183a1979e81634f57b27edb1693048836d3f",
         "sha256SumsSha256": "9aebf69bd9552d520829e9474f5910917de4182c9ac148b73837a289c48f1868"
       }
-    ]
+    ],
+    "customerServiceGoldDraft": {
+      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+      "datasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+      "reportPath": "docs/evaluation/customer-service/archive/客服金标评测-provisional-v1.json",
+      "reportSha256": "0715b6c75fa09dceecbe07d062e6f21eef4d5f821ecda5b5eaa855c4abc1a9fc",
+      "caseCount": 60,
+      "status": "PROVISIONAL_NOT_HUMAN_GOLD",
+      "releaseGateEligible": false,
+      "annotationPolicy": "INDEPENDENT_HUMAN_REVIEW_REQUIRED_BEFORE_ACCURACY_CLAIM",
+      "reviewEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-review-v1-pending-adjudication",
+        "lifecycle": "PENDING_ADJUDICATION",
+        "sha256SumsSha256": "1b16e52d67d995c4c28d78eb702ad99477fad0bcb71e6f4233d08760df2a7480",
+        "exactAgreementCaseCount": 35,
+        "disagreementCaseCount": 25,
+        "caseAgreementRate": 0.5833333333333334,
+        "releaseGateEligible": false
+      }
+    }
   },
-  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Development and regression are separate visible evidence. v2 is a historical passed archive; v3-v8 are immutable failed final archives and are not current. Semantic judging is shadow-only until independent human calibration; local latency is descriptive and not a production SLO; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, production capacity, payment compliance, or industrial personalization.",
+  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding now has a separate 60-case HUMAN_VERIFIED offline evidence package with two blind reviewers and 25 explicit adjudications; its releaseGateEligible remains false. Development and regression are separate visible evidence. Semantic judging is shadow-only until independent human calibration; local latency is descriptive and not a production SLO; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, production capacity, payment compliance, or industrial personalization.",
   "visibleRuns": {
     "development": {
       "runId": "development-20260822-ai-quality-v9",
@@ -278,33 +304,78 @@
   "documentationConsistency": [
     {
       "path": "README.md",
-      "requiredTokens": ["docs/project/AI_Shop主线与开发记录.md", "docs/evaluation/AI质量评测与Badcase.md", "docs/evaluation/customer-service/客服金标评测.md"],
-      "forbiddenTokens": ["docs/AI应用求职项目证据总览.md", "docs/性能与质量证据_20260820.md", "docs/AI质量闭环工作记录_20260822.md"]
+      "requiredTokens": [
+        "docs/project/AI_Shop主线与开发记录.md",
+        "docs/evaluation/AI质量评测与Badcase.md",
+        "docs/evaluation/customer-service/客服金标评测.md"
+      ],
+      "forbiddenTokens": [
+        "docs/AI应用求职项目证据总览.md",
+        "docs/性能与质量证据_20260820.md",
+        "docs/AI质量闭环工作记录_20260822.md"
+      ]
     },
     {
       "path": "docs/README.md",
-      "requiredTokens": ["project/AI_Shop主线与开发记录.md", "evaluation/AI质量评测与Badcase.md", "customer-service/客服金标评测.md"],
-      "forbiddenTokens": ["_20260820.md", "_20260822.md"]
+      "requiredTokens": [
+        "project/AI_Shop主线与开发记录.md",
+        "evaluation/AI质量评测与Badcase.md",
+        "customer-service/客服金标评测.md"
+      ],
+      "forbiddenTokens": [
+        "_20260820.md",
+        "_20260822.md"
+      ]
     },
     {
       "path": "docs/project/AI_Shop主线与开发记录.md",
-      "requiredTokens": ["2026-08-20", "2026-08-21", "2026-08-22", "PROVISIONAL_NOT_HUMAN_GOLD"],
-      "forbiddenTokens": ["AI应用求职项目证据总览.md", "AI主线方法成熟度与后续优化路线_20260820.md"]
+      "requiredTokens": [
+        "2026-08-20",
+        "2026-08-21",
+        "2026-08-22",
+        "2026-08-23",
+        "HUMAN_VERIFIED"
+      ],
+      "forbiddenTokens": [
+        "AI应用求职项目证据总览.md",
+        "AI主线方法成熟度与后续优化路线_20260820.md"
+      ]
     },
     {
       "path": "docs/evaluation/AI质量评测与Badcase.md",
-      "requiredTokens": ["Recall@10", "NDCG@10", "Intent Macro-F1", "badcase"],
-      "forbiddenTokens": ["AI质量指标与Badcase索引_20260822.md", "性能与质量证据_20260820.md"]
+      "requiredTokens": [
+        "Recall@10",
+        "NDCG@10",
+        "Intent Macro-F1",
+        "badcase"
+      ],
+      "forbiddenTokens": [
+        "AI质量指标与Badcase索引_20260822.md",
+        "性能与质量证据_20260820.md"
+      ]
     },
     {
       "path": "docs/evaluation/customer-service/客服金标评测.md",
-      "requiredTokens": ["PROVISIONAL_NOT_HUMAN_GOLD", "intentMacroF1", "releaseGateEligible=false"],
-      "forbiddenTokens": ["HUMAN_VERIFIED_RESULT"]
+      "requiredTokens": [
+        "HUMAN_VERIFIED",
+        "intentMacroF1",
+        "canonicalSlotEntitySpanF1",
+        "releaseGateEligible=false"
+      ],
+      "forbiddenTokens": [
+        "HUMAN_VERIFIED_RESULT"
+      ]
     },
     {
       "path": "AI应用开发_Java后端_真实面试题与备考报告_20260821.md",
-      "requiredTokens": ["docs/evaluation/AI质量评测与Badcase.md", "docs/project/AI_Shop主线与开发记录.md"],
-      "forbiddenTokens": ["docs/AI质量指标与Badcase索引_20260822.md", "docs/AI应用求职项目证据总览.md"]
+      "requiredTokens": [
+        "docs/evaluation/AI质量评测与Badcase.md",
+        "docs/project/AI_Shop主线与开发记录.md"
+      ],
+      "forbiddenTokens": [
+        "docs/AI质量指标与Badcase索引_20260822.md",
+        "docs/AI应用求职项目证据总览.md"
+      ]
     }
   ]
 }

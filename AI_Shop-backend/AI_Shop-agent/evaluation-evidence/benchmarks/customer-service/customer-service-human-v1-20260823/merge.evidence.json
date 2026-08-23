@@ -1,0 +1,980 @@
+{
+  "adjudication": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/adjudication.final.jsonl",
+    "sha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e"
+  },
+  "caseCount": 60,
+  "createdAt": "2026-08-23T09:04:49.421Z",
+  "disagreementCaseCount": 25,
+  "disagreements": [
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "2000",
+            "brand": "索尼",
+            "budget": "2000元",
+            "productName": "索尼 WH-1000XM6"
+          }
+        },
+        "reason": "主意图是带型号和预算的商品搜索；使用 canonical productName 与规范化 amount，同时保留原话明确的品牌和预算上限约束。"
+      },
+      "caseId": "cs-gold-v1-001",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "brand": "索尼",
+          "budget": "2000元",
+          "productName": "WH-1000XM6"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "2000 元",
+          "productName": "索尼 WH-1000XM6"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "3000",
+            "brand": "华为",
+            "budget": "3000元",
+            "productName": "华为手机"
+          }
+        },
+        "reason": "这是按品牌、品类和预算找商品；以 canonical productName/amount 便于生产抽取，并保留品牌及预算约束的原始语义。"
+      },
+      "caseId": "cs-gold-v1-002",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "brand": "华为",
+          "budget": "3000元",
+          "productCategory": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000 元",
+          "productName": "华为手机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_CONSULT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "bluetoothVersion": "5.4",
+            "productName": "耳机"
+          }
+        },
+        "reason": "询问商品属性而非找商品；耳机作为 canonical productName，蓝牙版本是原话明确且直接决定回答的属性槽位。"
+      },
+      "caseId": "cs-gold-v1-003",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "bluetoothVersion": "5.4",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "bluetoothVersion": "5.4",
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "QUERY_FULFILLMENT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "orderId": "SM202608050002"
+          }
+        },
+        "reason": "“还没发货”是履约进度查询；未陈述资金、隐私或安全损失，延迟本身不足以升为中高风险。"
+      },
+      "caseId": "cs-gold-v1-007",
+      "fields": [
+        "riskLevel"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "QUERY_LOGISTICS",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "orderId": "SM202608050002"
+          }
+        },
+        "reason": "核心是查询物流轨迹停滞；虽表达担忧，但没有确认丢件或其他实际损失，按可安全回答的物流查询定为低风险。"
+      },
+      "caseId": "cs-gold-v1-008",
+      "fields": [
+        "riskLevel"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "CONFIRM_RECEIPT",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {
+            "orderId": "SM202608050002"
+          }
+        },
+        "reason": "用户已收到货并要求执行确认收货；这是会改变订单状态、可能影响后续售后边界的操作，故为中风险但不需立即人工。"
+      },
+      "caseId": "cs-gold-v1-014",
+      "fields": [
+        "riskLevel"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": "CRITICAL",
+          "intent": "PAYMENT_ISSUE",
+          "riskLevel": "HIGH",
+          "shouldHandoff": true,
+          "slots": {}
+        },
+        "reason": "支付失败同时已扣款，已出现明确资金损失风险；按高风险立即转人工，严重度为 CRITICAL。"
+      },
+      "caseId": "cs-gold-v1-025",
+      "fields": [
+        "handoffSeverity"
+      ],
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "500",
+            "budget": "500元以内",
+            "excludedStyle": "户外款",
+            "productName": "男士外套"
+          }
+        },
+        "reason": "这是带价格上限和排除条件的商品搜索；金额按 canonical 规范化，并保留“以内”范围及“户外款”这一明确排除约束。"
+      },
+      "caseId": "cs-gold-v1-029",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "budget": "500元以内",
+          "excludedStyle": "户外款",
+          "productCategory": "男士外套"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "500 元",
+          "excludedProductType": "户外款",
+          "productName": "男士外套"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "REFUND",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "88"
+          }
+        },
+        "reason": "明确发起退款并给出金额；两位标注仅有空格差异，按生产口径将金额规范化为不带币种的字符串。"
+      },
+      "caseId": "cs-gold-v1-030",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "88元"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "88 元"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_CONSULT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "feature": "主动降噪",
+            "productName": "耳机"
+          }
+        },
+        "reason": "这是商品功能咨询；用耳机作为 canonical productName，并保留用户明确询问的主动降噪功能，不能因字段名差异丢失该约束。"
+      },
+      "caseId": "cs-gold-v1-033",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "主动降噪",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "1000",
+            "budget": "1000元以内",
+            "feature": "降噪",
+            "productName": "降噪耳机"
+          }
+        },
+        "reason": "请求推荐带预算上限和降噪功能的耳机；采用 canonical productName/amount，同时保留预算范围与功能约束以免改变搜索语义。"
+      },
+      "caseId": "cs-gold-v1-034",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "budget": "1000元以内",
+          "feature": "降噪",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1000 元",
+          "productName": "降噪耳机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": "CRITICAL",
+          "intent": "PAYMENT_ISSUE",
+          "riskLevel": "HIGH",
+          "shouldHandoff": true,
+          "slots": {
+            "orderId": "SM202608050002"
+          }
+        },
+        "reason": "同一订单发生重复支付，属于已发生的重大资金风险；必须立即转人工，严重度为 CRITICAL。"
+      },
+      "caseId": "cs-gold-v1-037",
+      "fields": [
+        "handoffSeverity"
+      ],
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "DAMAGED_OR_WRONG_ITEM",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {
+            "productName": "耳机"
+          }
+        },
+        "reason": "明确是收到的耳机破损，意图为收货异常；用耳机作为 canonical productName，不臆测订单号或其他商品信息。"
+      },
+      "caseId": "cs-gold-v1-039",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_CONSULT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "feature": "续航",
+            "productName": "手机"
+          }
+        },
+        "reason": "询问手机的续航属性；以 canonical productName 标识商品，并保留续航这一明确的功能/体验约束。"
+      },
+      "caseId": "cs-gold-v1-041",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "续航",
+          "productCategory": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "手机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "2000",
+            "audience": "学生",
+            "budget": "2000元",
+            "productName": "平板"
+          }
+        },
+        "reason": "这是按学生人群和预算寻找平板；金额采用 canonical 规范化值，同时保留预算与适用人群这两个明确搜索约束。"
+      },
+      "caseId": "cs-gold-v1-042",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "audience": "学生",
+          "budget": "2000元",
+          "productCategory": "平板"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "2000元",
+          "productName": "平板"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "excludedBrand": "苹果",
+            "operatingSystem": "安卓",
+            "productName": "安卓手机"
+          }
+        },
+        "reason": "请求推荐安卓手机且明确排除苹果；用 canonical productName，并保留操作系统与排除品牌两个直接影响检索的约束。"
+      },
+      "caseId": "cs-gold-v1-043",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productCategory": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "productName": "安卓手机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_CONSULT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "productName": "耳机"
+          }
+        },
+        "reason": "比较两款耳机属于商品体验/属性咨询；只记录原话明确的商品类别为 canonical productName，不补猜未给出的两个具体型号。"
+      },
+      "caseId": "cs-gold-v1-044",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_CONSULT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "feature": "主动降噪",
+            "productName": "耳机"
+          }
+        },
+        "reason": "询问耳机是否具备主动降噪；使用 canonical productName，并保留被直接询问的功能槽位。"
+      },
+      "caseId": "cs-gold-v1-045",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "主动降噪",
+          "productCategory": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": "CRITICAL",
+          "intent": "PAYMENT_ISSUE",
+          "riskLevel": "HIGH",
+          "shouldHandoff": true,
+          "slots": {}
+        },
+        "reason": "银行卡被重复扣款是已发生的重大资金风险；应立即转人工并以 CRITICAL 处理，不能按普通支付咨询降级。"
+      },
+      "caseId": "cs-gold-v1-046",
+      "fields": [
+        "handoffSeverity"
+      ],
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": "CRITICAL",
+          "intent": "PAYMENT_ISSUE",
+          "riskLevel": "HIGH",
+          "shouldHandoff": true,
+          "slots": {}
+        },
+        "reason": "付款已成功但订单未生成，存在资金与订单状态不一致的重大风险；立即转人工，严重度为 CRITICAL。"
+      },
+      "caseId": "cs-gold-v1-047",
+      "fields": [
+        "handoffSeverity"
+      ],
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "CHAT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {}
+        },
+        "reason": "只是询问可用支付方式，没有支付失败、扣款异常或未授权支付；固定枚举无独立支付咨询项，归 CHAT。"
+      },
+      "caseId": "cs-gold-v1-049",
+      "fields": [
+        "intent"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "DAMAGED_OR_WRONG_ITEM",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {
+            "orderId": "SM202608050002",
+            "productName": "配件",
+            "quantity": "1"
+          }
+        },
+        "reason": "少件属于收货异常；保留订单号，并将明确的一个配件表示为 canonical productName 加数量，不猜具体配件型号。"
+      },
+      "caseId": "cs-gold-v1-055",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "missingItem": "一个配件",
+          "orderId": "SM202608050002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002",
+          "productName": "配件",
+          "quantity": "1"
+        }
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "DAMAGED_OR_WRONG_ITEM",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {}
+        },
+        "reason": "质量问题并明确要换货，已能确定为收货/商品异常；虽未给出更细缺陷类型，按 DAMAGED_OR_WRONG_ITEM，不归泛化售后。"
+      },
+      "caseId": "cs-gold-v1-056",
+      "fields": [
+        "intent"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "REFUND",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {}
+        },
+        "reason": "未提到已发起的具体退款或订单，只询问一般到账时效；按退款政策/条件咨询归 REFUND、低风险，备选状态查询需有已发起上下文。"
+      },
+      "caseId": "cs-gold-v1-057",
+      "fields": [
+        "intent",
+        "riskLevel"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      }
+    },
+    {
+      "adjudication": {
+        "adjudicator": "lead-reviewer-1",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_CONSULT",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "compatibleModel": "iPhone 15",
+            "productName": "手机壳"
+          }
+        },
+        "reason": "这是手机壳对具体机型的兼容性咨询；用 canonical productName，并保留明确的 iPhone 15 兼容型号约束。"
+      },
+      "caseId": "cs-gold-v1-059",
+      "fields": [
+        "slots"
+      ],
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "compatibleModel": "iPhone 15",
+          "productCategory": "手机壳"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "compatibleWith": "iPhone 15",
+          "productName": "手机壳"
+        }
+      }
+    }
+  ],
+  "exactAgreementCaseCount": 35,
+  "fieldAgreementCounts": {
+    "handoffSeverity": 56,
+    "intent": 57,
+    "riskLevel": 56,
+    "shouldHandoff": 60,
+    "slots": 45
+  },
+  "note": "Human-verified labels are separate from the draft dataset; release publication still requires an explicit project gate decision.",
+  "outputDatasetPath": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+  "outputDatasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "738ad33ac03c9dfdaee4801adca722073bd216678bf867258b81bdc73d630838"
+  },
+  "reviewB": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c"
+  },
+  "schemaVersion": "aishop-customer-service-review-evidence/v1",
+  "sourceDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+  "sourceDatasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+  "status": "HUMAN_VERIFIED"
+}

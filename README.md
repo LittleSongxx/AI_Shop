@@ -256,7 +256,7 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 [evidence-manifest.json](docs/evidence-manifest.json)。运行 `python scripts/check_evidence_manifest.py` 会交叉校验 suite、
 development/regression 数据锁、文件 SHA、case 数、域分布、集合互斥、失败 final 和文档边界。
 
-客服 intent/风险/slot/handoff 的 provisional 证据见
+客服 intent/风险/slot/handoff 的 60 条双人盲标+第三人仲裁证据见
 [客服金标评测](docs/evaluation/customer-service/客服金标评测.md)；本轮核心排错、阶段指标、外部调研和后续优先级已合并到
 [主线与开发记录](docs/project/AI_Shop主线与开发记录.md)；新版面试题入口为
 [AI应用开发_Java后端_真实面试题与备考报告_20260821.md](AI应用开发_Java后端_真实面试题与备考报告_20260821.md)。
@@ -270,9 +270,13 @@ regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
 当前唯一发布结果是 `release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`。主质量结果是 Search
 `Recall@10 macro/query=0.962121`、补充的 `Recall@10 micro/qrel=52/56=0.928571`、`MRR@10=0.937500`、
 `NDCG@10=0.920521`；scorecard 列出 3 个漏召回 query、4 个漏召回商品和每个排序 badcase。RAG 只保留最小事实安全证据，
-Agent 只保留工具契约/延迟诊断；客服 intent/slot/handoff 当前为 60 条 provisional draft gold，尚未完成独立人工复核。
+Agent 只保留工具契约/延迟诊断；客服当前为 60 条 `HUMAN_VERIFIED` 离线金标，证据包和哈希见
+`AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/`。
 
-客服规则预路由的当前 provisional 点估计为 Intent Macro-F1 `1.000`、高风险 intent Recall `1.000`、slot span F1 `1.000`、slot EM `1.000`、handoff Recall `1.000`（当前 0 badcase；95% CI 与逐 case 历史 badcase 见报告）。这不是人工准确率，也不是线上客服成功率；优化前 8 个 badcase 和根因仍保留在机器证据中。
+客服规则预路由的当前点估计为 Intent Macro-F1 `0.955299`（3 个 intent badcase）、高风险 intent Recall `1.000`（10/10）、完整人工 schema 的
+slot Span F1 `0.907652`（15 个 badcase）、slot EM `0.558824`（19/34）、handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
+生产 canonical slot 投影诊断为 Span F1 `0.992785`、EM `0.882353`；完整 schema 失败中有扩展槽位未映射和金额归一化差异，逐 case 根因见报告。
+这些是离线规则预路由质量，不是线上客服成功率；`releaseGateEligible=false` 保持 fail-closed。
 
 `50/50`、`25/25`、`pass^8=1.0`、终态/state diff 和重复副作用为必须满足的发布/可靠性门禁，不是优展示指标；门禁通过不等于
 客服意图准确率或线上推荐收益。Final semantic judge `50/50` 可追溯，但始终是 shadow 信号，不是人工真值、人工准确率或人工一致性。

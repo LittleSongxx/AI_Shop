@@ -37,7 +37,7 @@ LEGACY_TOKENS = (
 def _json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{path} must contain a JSON object")
+        raise TypeError(f"{path} must contain a JSON object")
     return payload
 
 
@@ -48,7 +48,7 @@ def _jsonl(path: Path) -> list[dict[str, Any]]:
             continue
         value = json.loads(raw)
         if not isinstance(value, dict):
-            raise ValueError(f"{path}:{line_number} must contain a JSON object")
+            raise TypeError(f"{path}:{line_number} must contain a JSON object")
         rows.append(value)
     return rows
 
@@ -112,7 +112,7 @@ def _validate_suite(root: Path, descriptor: Any, errors: list[str]) -> dict[str,
         errors.append(f"evaluation suite hash mismatch: {relative}")
     try:
         suite = _json(path)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         errors.append(f"invalid evaluation suite {relative}: {exc}")
         return {}
     if suite.get("schemaVersion") not in SUITE_SCHEMAS:
@@ -155,7 +155,7 @@ def _validate_lock(
         errors.append(f"dataset lock hash mismatch: {relative}")
     try:
         lock = _json(path)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         errors.append(f"invalid dataset lock {relative}: {exc}")
         return []
     if lock.get("schemaVersion") not in LOCK_SCHEMAS:
@@ -186,7 +186,7 @@ def _validate_lock(
             errors.append(f"locked dataset file size mismatch: {dataset_relative}")
         try:
             rows.extend(_jsonl(dataset_path))
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             errors.append(f"invalid dataset file {dataset_relative}: {exc}")
 
     ids = [str(row.get("id") or "") for row in rows]
@@ -246,7 +246,7 @@ def _validate_customer_service_gold(
     try:
         rows = _jsonl(dataset_path)
         report = _json(report_path)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         errors.append(f"{label} payload is invalid: {exc}")
         return
     case_count = descriptor.get("caseCount")
@@ -269,6 +269,11 @@ def _validate_customer_service_gold(
             errors.append(f"{label} provisional report must require two annotators")
         if review_plan.get("blindedFirstPass") is not True:
             errors.append(f"{label} provisional report must require a blinded first pass")
+    elif descriptor.get("status") == "HUMAN_VERIFIED":
+        if review_plan.get("status") != "COMPLETE":
+            errors.append(f"{label} human report must declare a complete review plan")
+        if review_plan.get("adjudicationComplete") is not True:
+            errors.append(f"{label} human report must declare adjudicationComplete=true")
     report_dataset = report.get("dataset") or {}
     if report_dataset.get("caseCount") != len(rows):
         errors.append(f"{label} report dataset caseCount is stale")
@@ -308,6 +313,15 @@ def _validate_customer_service_review_evidence(
     if not isinstance(descriptor, dict):
         errors.append(f"{label} must be an object")
         return
+    if descriptor.get("lifecycle") == "HUMAN_VERIFIED":
+        _validate_customer_service_human_review_evidence(
+            root,
+            descriptor,
+            errors,
+            dataset_sha=dataset_sha,
+            case_count=case_count,
+        )
+        return
     relative = str(descriptor.get("path") or "")
     try:
         package_root = _resolve(root, relative)
@@ -345,7 +359,7 @@ def _validate_customer_service_review_evidence(
             _json(package_root / "reviewer-a.sealed.jsonl.manifest.json"),
             _json(package_root / "reviewer-b.sealed.jsonl.manifest.json"),
         ]
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         errors.append(f"{label} JSON is invalid: {exc}")
         return
     if package_manifest.get("schemaVersion") != "aishop-customer-service-review-package/v1":
@@ -380,6 +394,141 @@ def _validate_customer_service_review_evidence(
         if manifest.get("lifecycle") != "SEALED" or manifest.get("artifact") != "SEALED_REVIEW_SHEET":
             errors.append(f"{label} reviewer-{suffix} manifest is not sealed")
         if manifest.get("datasetSha256") != dataset_sha:
+            errors.append(f"{label} reviewer-{suffix} source hash differs")
+        if manifest.get("sheetSha256") != _sha256(package_root / sealed_name):
+            errors.append(f"{label} reviewer-{suffix} sheet hash differs")
+
+
+def _validate_customer_service_human_review_evidence(
+    root: Path,
+    descriptor: dict[str, Any],
+    errors: list[str],
+    *,
+    dataset_sha: str,
+    case_count: int,
+) -> None:
+    """Validate the immutable post-adjudication客服 evidence package."""
+
+    label = "evaluation.customerServiceGold.reviewEvidence"
+    relative = str(descriptor.get("path") or "")
+    try:
+        package_root = _resolve(root, relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not package_root.is_dir():
+        errors.append(f"{label} directory is missing: {relative}")
+        return
+    sums = _parse_sums(package_root, errors)
+    sums_path = package_root / "SHA256SUMS"
+    expected_sums = str(descriptor.get("sha256SumsSha256") or "")
+    if (
+        not HEX64.fullmatch(expected_sums)
+        or not sums_path.is_file()
+        or _sha256(sums_path) != expected_sums
+    ):
+        errors.append(f"{label} SHA256SUMS digest differs from project manifest")
+    required = {
+        "adjudication.final.jsonl",
+        "customer-service-human-v1.jsonl",
+        "evidence-manifest.json",
+        "lifecycle.json",
+        "merge.evidence.json",
+        "report.json",
+        "report.md",
+        "reviewer-a.sealed.jsonl",
+        "reviewer-a.sealed.jsonl.manifest.json",
+        "reviewer-b.sealed.jsonl",
+        "reviewer-b.sealed.jsonl.manifest.json",
+    }
+    if not required.issubset(sums):
+        errors.append(f"{label} human package is missing files: {sorted(required - set(sums))}")
+        return
+    try:
+        package_manifest = _json(package_root / "evidence-manifest.json")
+        lifecycle = _json(package_root / "lifecycle.json")
+        merge_evidence = _json(package_root / "merge.evidence.json")
+        report = _json(package_root / "report.json")
+        dataset_rows = _jsonl(package_root / "customer-service-human-v1.jsonl")
+        adjudications = _jsonl(package_root / "adjudication.final.jsonl")
+        reviewer_manifests = [
+            _json(package_root / "reviewer-a.sealed.jsonl.manifest.json"),
+            _json(package_root / "reviewer-b.sealed.jsonl.manifest.json"),
+        ]
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label} human package JSON is invalid: {exc}")
+        return
+    if package_manifest.get("schemaVersion") != "aishop-customer-service-human-package/v1":
+        errors.append(f"{label} human package schema is invalid")
+    if package_manifest.get("lifecycle") != "HUMAN_VERIFIED":
+        errors.append(f"{label} human package lifecycle is invalid")
+    inventory = {
+        name: {"bytes": (package_root / name).stat().st_size, "sha256": _sha256(package_root / name)}
+        for name in sums
+        if name != "evidence-manifest.json"
+    }
+    if package_manifest.get("files") != inventory:
+        errors.append(f"{label} human package file inventory is stale")
+    if lifecycle.get("lifecycle") != "HUMAN_VERIFIED" or lifecycle.get("releaseGateEligible") is not False:
+        errors.append(f"{label} human lifecycle evidence is invalid")
+    source_draft_sha = str(descriptor.get("sourceDraftDatasetSha256") or "")
+    if not HEX64.fullmatch(source_draft_sha):
+        errors.append(f"{label} sourceDraftDatasetSha256 is invalid")
+    if lifecycle.get("sourceDatasetSha256") != source_draft_sha:
+        errors.append(f"{label} human source dataset hash differs")
+    if lifecycle.get("caseCount") != case_count:
+        errors.append(f"{label} human lifecycle case count differs")
+    ids = [str(row.get("id") or "") for row in dataset_rows]
+    if len(dataset_rows) != case_count or not ids or len(ids) != len(set(ids)):
+        errors.append(f"{label} human dataset IDs/count are invalid")
+    if any(
+        row.get("schemaVersion") != "aishop-customer-service-gold/v1"
+        or (row.get("annotation") or {}).get("status") != "HUMAN_VERIFIED"
+        for row in dataset_rows
+    ):
+        errors.append(f"{label} human dataset is not uniformly HUMAN_VERIFIED")
+    human_dataset_sha = _sha256(package_root / "customer-service-human-v1.jsonl")
+    if descriptor.get("humanDatasetSha256") != human_dataset_sha:
+        errors.append(f"{label} human dataset hash differs from project manifest")
+    if report.get("status") != "HUMAN_VERIFIED" or report.get("releaseGateEligible") is not False:
+        errors.append(f"{label} human report status/gate is invalid")
+    report_dataset = report.get("dataset") or {}
+    if report_dataset.get("sha256") != human_dataset_sha or report_dataset.get("caseCount") != case_count:
+        errors.append(f"{label} human report dataset reference is stale")
+    if descriptor.get("reportSha256") != _sha256(package_root / "report.json"):
+        errors.append(f"{label} human report hash differs from project manifest")
+    if merge_evidence.get("schemaVersion") != "aishop-customer-service-review-evidence/v1":
+        errors.append(f"{label} merge evidence schema is invalid")
+    if merge_evidence.get("status") != "HUMAN_VERIFIED" or merge_evidence.get("caseCount") != case_count:
+        errors.append(f"{label} merge evidence status/count is invalid")
+    if merge_evidence.get("outputDatasetSha256") != human_dataset_sha:
+        errors.append(f"{label} merge evidence output hash differs")
+    if merge_evidence.get("sourceDatasetSha256") != source_draft_sha:
+        errors.append(f"{label} merge evidence source hash differs")
+    if merge_evidence.get("adjudication", {}).get("sha256") != _sha256(
+        package_root / "adjudication.final.jsonl"
+    ):
+        errors.append(f"{label} adjudication hash differs")
+    if len(adjudications) != int(descriptor.get("adjudicationCaseCount") or -1):
+        errors.append(f"{label} adjudication case count differs")
+    known_ids = set(ids)
+    adjudication_ids = [str(row.get("id") or "") for row in adjudications]
+    if any(case_id not in known_ids for case_id in adjudication_ids) or len(adjudication_ids) != len(set(adjudication_ids)):
+        errors.append(f"{label} adjudication IDs are invalid")
+    if _contains_forbidden_key(merge_evidence, {"expected", "predicted", "modelOutput", "modelPrediction"}):
+        errors.append(f"{label} merge evidence leaks model/gold fields")
+    writable = [
+        str(path.relative_to(package_root))
+        for path in package_root.rglob("*")
+        if path.is_file() and path.stat().st_mode & 0o222
+    ]
+    if writable:
+        errors.append(f"{label} human package contains writable files: {writable}")
+    for suffix, manifest in zip(("a", "b"), reviewer_manifests):
+        sealed_name = f"reviewer-{suffix}.sealed.jsonl"
+        if manifest.get("lifecycle") != "SEALED" or manifest.get("artifact") != "SEALED_REVIEW_SHEET":
+            errors.append(f"{label} reviewer-{suffix} manifest is not sealed")
+        if manifest.get("datasetSha256") != source_draft_sha:
             errors.append(f"{label} reviewer-{suffix} source hash differs")
         if manifest.get("sheetSha256") != _sha256(package_root / sealed_name):
             errors.append(f"{label} reviewer-{suffix} sheet hash differs")
@@ -467,7 +616,7 @@ def _validate_evidence_package(
             if (evidence_root / "lifecycle.json").is_file()
             else {}
         )
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         errors.append(f"{label} JSON is invalid: {exc}")
         return
     run = manifest.get("run") or {}
@@ -682,7 +831,7 @@ def _validate_visible_runs(
             package = _json(run_root / "evidence-manifest.json")
             summary = _json(run_root / "summary.json")
             gates = _json(run_root / "gates.json")
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             errors.append(f"{label} JSON is invalid: {exc}")
             continue
         run = package.get("run") or {}
@@ -755,7 +904,7 @@ def _validate_benchmarks(root: Path, descriptors: Any, errors: list[str]) -> Non
         try:
             payload = _json(benchmark_root / "benchmark.json")
             package = _json(benchmark_root / "evidence-manifest.json")
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             errors.append(f"evaluation benchmark JSON is invalid: {relative}: {exc}")
             continue
         if payload.get("benchmarkId") != benchmark_id:
@@ -909,7 +1058,7 @@ def _validate_auxiliary_evidence(root: Path, descriptors: Any, errors: list[str]
             package = _json(package_root / "evidence-manifest.json")
             summary = _json(package_root / "summary.json")
             gates = _json(package_root / "gates.json")
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             errors.append(f"{label} JSON is invalid: {exc}")
             continue
         if package.get("schemaVersion") != "aishop-auxiliary-evidence/v1":
@@ -990,7 +1139,7 @@ def validate_repository(
     errors: list[str] = []
     try:
         manifest = _json(manifest_path)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
         return [f"invalid project evidence manifest: {exc}"]
     if manifest.get("schemaVersion") != PROJECT_SCHEMA:
         errors.append(f"project evidence schema must be {PROJECT_SCHEMA}")
@@ -1019,6 +1168,14 @@ def validate_repository(
         evaluation.get("customerServiceGold"),
         errors,
     )
+    # Keep the pre-adjudication draft descriptor validated as historical
+    # evidence when the current descriptor has moved to HUMAN_VERIFIED.
+    if evaluation.get("customerServiceGoldDraft") is not None:
+        _validate_customer_service_gold(
+            root,
+            evaluation.get("customerServiceGoldDraft"),
+            errors,
+        )
     ids = [str(row.get("id") or "") for row in all_rows]
     inputs = [
         _canonical_sha256({"domain": row.get("domain"), "input": row.get("input")})

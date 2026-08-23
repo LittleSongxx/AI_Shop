@@ -361,8 +361,22 @@ def _load_review_sheet(
         raise CustomerServiceReviewError("review sheet source dataset hash differs")
     if check_sheet_hash and manifest.get("sheetSha256") != sha256_file(sheet_path):
         raise CustomerServiceReviewError("review sheet hash differs from its manifest")
-    if manifest.get("sheetPath") != _path_label(sheet_path):
-        raise CustomerServiceReviewError("review manifest sheetPath differs from artifact")
+    manifest_sheet_path = str(manifest.get("sheetPath") or "")
+    actual_sheet_path = _path_label(sheet_path)
+    if manifest_sheet_path != actual_sheet_path:
+        # Sealed review artifacts are immutable and are routinely copied from
+        # a temporary submission directory into the repository evidence
+        # archive.  The content SHA-256 below is the integrity binding; keep
+        # OPEN sheets path-bound, but allow a relocated SEALED file when its
+        # basename remains the same.  A swapped file still fails the hash
+        # check, and a renamed artifact fails this guard.
+        can_relocate = (
+            lifecycle == "SEALED"
+            and bool(manifest_sheet_path)
+            and Path(manifest_sheet_path).name == sheet_path.name
+        )
+        if not can_relocate:
+            raise CustomerServiceReviewError("review manifest sheetPath differs from artifact")
     if not _is_sha256(manifest.get("sheetSha256")):
         raise CustomerServiceReviewError("review manifest sheetSha256 is invalid")
     if manifest.get("caseCount") != len(rows) or len(rows) != len(dataset_rows):

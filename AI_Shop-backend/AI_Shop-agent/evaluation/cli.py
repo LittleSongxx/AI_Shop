@@ -871,6 +871,7 @@ async def _main(args: argparse.Namespace) -> int:
                 "releaseGateEligible": report.get("releaseGateEligible"),
                 "dataset": report.get("dataset"),
                 "metrics": report.get("metrics"),
+                "canonicalSlotDiagnostics": report.get("canonicalSlotDiagnostics"),
                 "markdown": str(args.output),
                 "json": str(args.json_output),
                 "badcaseCount": len(report.get("badcases") or []),

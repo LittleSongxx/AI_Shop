@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "aishop-customer-service-human-lifecycle/v1",
+  "artifact": "CUSTOMER_SERVICE_HUMAN_GOLD",
+  "createdAt": "2026-08-23T09:13:27Z",
+  "lifecycle": "HUMAN_VERIFIED",
+  "releaseGateEligible": false,
+  "sourceDatasetPath": "evaluation/datasets/customer_service/gold-v1.jsonl",
+  "sourceDatasetSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+  "caseCount": 60,
+  "reviewers": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "reviewerASha256": "738ad33ac03c9dfdaee4801adca722073bd216678bf867258b81bdc73d630838",
+  "reviewerBSha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c",
+  "adjudicator": "lead-reviewer-1",
+  "adjudicationPath": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/adjudication.final.jsonl",
+  "adjudicationSha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e",
+  "adjudicationCaseCount": 25,
+  "humanDatasetPath": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+  "humanDatasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "reportPath": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/report.json",
+  "reportSha256": "d24d3b59da38ac3521f55d5c60850029a053f15db2db7184d4c8cead313d8c2a",
+  "mergeEvidencePath": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/merge.evidence.json",
+  "mergeEvidenceSha256": "95378abfa4263a60ca02358c46789a6e9be4712a37c65b418628dfb816f4456d",
+  "note": "Two-person blind labels plus explicit lead-reviewer adjudication are frozen; this is offline quality evidence and is not an automatic release gate."
+}

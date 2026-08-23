@@ -161,3 +161,33 @@ def test_invalid_annotation_status_fails_closed(tmp_path):
     )
     with pytest.raises(CustomerServiceGoldError):
         load_gold_dataset(target)
+
+
+def test_canonical_slot_diagnostic_separates_unmapped_human_extensions():
+    row = load_gold_dataset(DATASET)[0]
+    row["expected"] = {
+        **row["expected"],
+        "slots": {
+            "productName": "索尼 WH-1000XM6",
+            "amount": "2000",
+            "brand": "索尼",
+        },
+    }
+    report = evaluate_predictions(
+        [row],
+        {
+            row["id"]: {
+                "intent": "PRODUCT_SEARCH",
+                "riskLevel": "LOW",
+                "shouldHandoff": False,
+                "entities": {
+                    "productName": "索尼 WH-1000XM6",
+                    "amount": "2000",
+                },
+            }
+        },
+        provenance={"mode": "fixture"},
+    )
+    diagnostics = report["canonicalSlotDiagnostics"]
+    assert diagnostics["metrics"]["canonicalSlotExactMatch"]["value"] == 1.0
+    assert report["badcases"][0]["rootCause"] == "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED"

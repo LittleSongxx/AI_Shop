@@ -10,6 +10,7 @@ from check_evidence_manifest import (
     _validate_benchmarks,
     _validate_failed_final_attempts,
     _validate_lock,
+    _validate_suite,
     _validate_visible_runs,
     validate_repository,
 )
@@ -97,6 +98,22 @@ def test_sha256sums_rejects_path_escape(tmp_path: Path) -> None:
     assert any("escapes repository" in error for error in errors)
 
 
+def test_non_object_json_is_reported_without_crashing(tmp_path: Path) -> None:
+    suite_path = tmp_path / "evaluation/suite.json"
+    suite_path.parent.mkdir(parents=True)
+    suite_path.write_text("[]\n", encoding="utf-8")
+    descriptor = {
+        "path": suite_path.relative_to(tmp_path).as_posix(),
+        "sha256": hashlib.sha256(suite_path.read_bytes()).hexdigest(),
+    }
+    errors: list[str] = []
+
+    result = _validate_suite(tmp_path, descriptor, errors)
+
+    assert result == {}
+    assert any("invalid evaluation suite" in error for error in errors)
+
+
 def test_repository_accepts_published_final_when_required() -> None:
     assert not any("published final evidence package is required" in error for error in validate_repository())
     assert not any(
@@ -105,16 +122,20 @@ def test_repository_accepts_published_final_when_required() -> None:
     )
 
 
-def test_current_customer_service_report_keeps_human_review_fail_closed() -> None:
+def test_current_customer_service_report_is_human_verified_but_release_fail_closed() -> None:
     manifest = json.loads((Path(__file__).parents[1] / "docs/evidence-manifest.json").read_text("utf-8"))
     descriptor = manifest["evaluation"]["customerServiceGold"]
     report_path = Path(__file__).parents[1] / descriptor["reportPath"]
     report = json.loads(report_path.read_text("utf-8"))
 
-    assert descriptor["status"] == "PROVISIONAL_NOT_HUMAN_GOLD"
-    assert report["humanReviewPlan"]["status"] == "PENDING_INDEPENDENT_REVIEW"
+    assert descriptor["status"] == "HUMAN_VERIFIED"
+    assert descriptor["releaseGateEligible"] is False
+    assert report["status"] == "HUMAN_VERIFIED"
+    assert report["humanReviewPlan"]["status"] == "COMPLETE"
     assert report["humanReviewPlan"]["requiredAnnotators"] == 2
     assert report["humanReviewPlan"]["blindedFirstPass"] is True
+    assert report["humanReviewPlan"]["adjudicationComplete"] is True
+    assert manifest["evaluation"]["customerServiceGoldDraft"]["status"] == "PROVISIONAL_NOT_HUMAN_GOLD"
 
 
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:

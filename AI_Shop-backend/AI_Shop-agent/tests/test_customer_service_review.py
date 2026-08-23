@@ -228,6 +228,30 @@ def test_seal_accepts_only_open_artifact(tmp_path: Path):
         seal_review_sheet(DATASET, sealed, tmp_path / "second.sealed.jsonl")
 
 
+def test_relocated_sealed_artifact_is_validated_by_content_hash(tmp_path: Path):
+    sealed_a, sealed_b = _export_pair(tmp_path)
+    relocated = tmp_path / "archive" / sealed_a.name
+    relocated.parent.mkdir()
+    relocated.write_bytes(sealed_a.read_bytes())
+    relocated_manifest = relocated.with_suffix(relocated.suffix + ".manifest.json")
+    relocated_manifest.write_bytes(
+        sealed_a.with_suffix(sealed_a.suffix + ".manifest.json").read_bytes()
+    )
+
+    manifest = validate_review_sheet(DATASET, relocated, require_complete=True)
+    assert manifest["lifecycle"] == "SEALED"
+    output = tmp_path / "relocated-human.jsonl"
+    evidence = tmp_path / "relocated-human.json"
+    report = merge_human_reviews(
+        DATASET,
+        relocated,
+        sealed_b,
+        output_dataset_path=output,
+        evidence_path=evidence,
+    )
+    assert report["caseCount"] == 60
+
+
 def test_nested_model_field_leak_is_rejected(tmp_path: Path):
     sheet = tmp_path / "leaky-nested.open.jsonl"
     export_review_sheet(DATASET, sheet, reviewer_id="annotator-a")

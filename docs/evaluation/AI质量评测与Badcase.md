@@ -18,7 +18,7 @@
 | Search NDCG@10 | 0.920521 | 44 query | bootstrap | 10 query |
 | RAG grounded faithfulness | 1.000000 | 50/50 | Wilson | 规则 lexical 下界，无语义人工真值 |
 | RAG citation support | 1.000000 | 50/50 | Wilson | 无；semantic judge 只作 shadow |
-| AI 客服 intent/slot/handoff | 见下节 | 独立 60 条 draft gold | bootstrap/Wilson | 当前 0；优化前 8 条保留 |
+| AI 客服 intent/slot/handoff | 见下节 | 独立 60 条双人盲标+仲裁 gold | bootstrap/Wilson | 3 intent、15 full-slot badcase |
 
 ### Search slice（不加权掩盖失败）
 
@@ -36,37 +36,36 @@
 
 ## AI 客服四项关键证据
 
-完整逐 case 结果见 [客服金标评测](customer-service/客服金标评测.md)，机器证据见 [客服 JSON](customer-service/客服金标评测.json)。当前是
-规则预路由基线，不是完整 HTTP Agent，也不是人工真值。数据集已从 40 条扩展到 60 条，新增难样本集中在商品咨询/搜索边界、支付风险、隐私、否定、少件和槽位格式。
+完整逐 case 结果见 [客服金标评测](customer-service/客服金标评测.md)，机器证据见 [客服 JSON](customer-service/客服金标评测.json)。这是
+生产 `resolve_intent(..., allow_llm=False)` 规则预路由基线，不是完整 HTTP Agent；标签已完成双人盲标和 lead reviewer 仲裁，状态为
+`HUMAN_VERIFIED`，但仍是离线证据且不自动进入 release gate。数据集 60 条，覆盖商品咨询/搜索边界、支付风险、隐私、否定、少件和槽位格式。
 
 | 指标 | 当前值 | 分子/分母 | 95% CI | badcase |
 |---|---:|---:|---|---:|
-| Intent Macro-F1 | 1.000000 | 20 observed intents | [0.700000, 0.950000] | 当前无；历史 001/003/011/026/031/032 |
-| 高风险 intent Recall | 1.000000 | 10/10 | [0.722467, 1.000000] | 当前无；历史 022/026 |
-| Slot entity/span F1 | 1.000000 | 344/344 span chars | [1.000000, 1.000000] | 当前无；历史 001/002/003 |
-| 请求级 Slot Exact Match | 1.000000 | 34/34 non-empty-slot cases | [0.898485, 1.000000] | 当前无；历史 001/002/003 |
-| Handoff Recall | 1.000000 | 14/14 | [0.784689, 1.000000] | 当前无；历史 026 |
-| 严重漏转人工率 | 0.000000（越低越好） | 0/10 critical | [0.000000, 0.277533] | 当前无；历史 026 |
+| Intent Macro-F1 | 0.955299 | 19.105978/20 intents | [0.642094, 0.926190] | `011,044,057`：政策/比较边界 |
+| 高风险 intent Recall | 1.000000 | 10/10 | [0.722467, 1.000000] | 无 |
+| Slot entity/span F1（完整人工 schema） | 0.907652 | 344/414 chars | [0.884563, 0.961881] | 15；扩展槽位/归一化/漏抽 |
+| 请求级 Slot Exact Match（完整人工 schema） | 0.558824 | 19/34 non-empty-slot cases | [0.394539, 0.711165] | 同上 |
+| Handoff Recall | 1.000000 | 14/14 | [0.784689, 1.000000] | 无 |
+| 严重漏转人工率 | 0.000000（越低越好） | 0/6 critical | [0.000000, 0.390334] | 无 |
 
 关键 badcase 和根因素材：
 
-- `cs-gold-v1-003`：商品规格咨询被生产规则判为 `PRODUCT_SEARCH`，且没有 productName entity。
-- `cs-gold-v1-011`：泛化退款到账政策落到 `CHAT`，需要区分政策问法与个人退款进度。
-- `cs-gold-v1-022`：投诉/报警已正确转人工但 risk 仅为 `MEDIUM`，高风险识别漏标。
-- `cs-gold-v1-026`：邮箱历史请求落到 `CHAT + HANDOFF_SUGGESTED`，严重隐私请求未即时转人工。
-- `cs-gold-v1-032`：短句“收到商品是坏的”落到 `CHAT`，破损售后意图漏识别。
-- `cs-gold-v1-001/002`：订单/金额能抽取，但商品名没有进入结构化 entities，slot EM 失败。
+- `cs-gold-v1-011` / `057`：退款政策/到账时效分别被路由到 `REFUND_STATUS`、`CHAT`，taxonomy 与政策/状态边界不一致。
+- `cs-gold-v1-044`：比较型问题被判为 `PRODUCT_SEARCH`，应进入商品咨询/比较路径。
+- `cs-gold-v1-001/002/003/029/033/034/041/042/043/045/059`：人工仲裁保留 `brand/budget/feature/兼容型号` 等扩展槽位，生产 extractor 尚未映射；不应全部归因于模型漏抽。
+- `cs-gold-v1-009/020/058`：金额币种/单位归一化差异；`cs-gold-v1-055`：canonical `productName/quantity` 仍未抽出。
 
-标签尚未独立人工复核，所有指标标记 `PROVISIONAL_NOT_HUMAN_GOLD`、`releaseGateEligible=false`；点估计 1.0 只说明这 60 条规则诊断样本全部命中，不能外推为人工准确率或生产稳定性。复核后必须重新冻结并运行，不能覆盖本 provisional 结果。
+生产 canonical slot 投影（`orderId/orderItemId/productId/productName/amount`）为 Span F1 `0.992785`、EM `0.882353`，作为 schema 对齐诊断，不替换完整人工 schema 主指标。所有指标均保留逐 case 输入、gold、prediction 和根因；当前不能外推为线上客服成功率、CSAT 或 FCR。
 
-最近一次修复了首轮低风险“支付方式有哪些”误建议转人工的策略边界；客服相关规则/路由回归 `155 passed`，全量 Python `1257 passed, 7 skipped`（跳过项均要求真实 MySQL 8）。
+最近一次修复了首轮低风险“支付方式有哪些”误建议转人工的策略边界；人工闭环和 canonical 诊断专项测试已通过，完整测试结果以 CI 输出为准。
 
 ## RAG 与 Agent 边界
 
 - RAG 保留 lexical claim、事实 ID、引用支持和 no-answer 作为安全下界；semantic shadow judge 记录 prompt/model/provider/claim/证据和
   disagreement，但未完成校准前不进入门禁，不称人工准确率。
 - Agent `pass^5`/`pass^8`、tool routing、终态、state diff、幂等和重复副作用是可靠性门禁，不是客服 intent F1，也不是开放世界成功率。
-- 当前 Agent final 25 条、200 trials 的 `pass^8=1.0` 只说明冻结任务集中的声明契约满足；本报告的 60 条客服 draft gold 才开始测理解质量。
+- 当前 Agent final 25 条、200 trials 的 `pass^8=1.0` 只说明冻结任务集中的声明契约满足；本报告的 60 条客服 HUMAN_VERIFIED gold 才测理解质量。
 
 ## 必须 100% 的发布契约
 
@@ -87,7 +86,7 @@ cd AI_Shop-backend/AI_Shop-agent
 python -m evaluation.cli validate
 python -m evaluation.cli slices --split development
 python -m evaluation.cli customer-service-gold --mode rule
-# 客服人工金标：两位标注者独立填写后再 seal/merge，不能跳过人工步骤
+# 客服人工金标已完成；新版本仍必须按同一 fail-closed 流程 seal/compare/merge
 python -m evaluation.cli customer-service-review export --annotator reviewer-a --output /tmp/reviewer-a.open.jsonl
 ```
 
@@ -96,5 +95,5 @@ current 只指向 v9 final；v2 是历史通过 archive，v3-v8 是 immutable fa
 
 ## 当前不做的外推
 
-没有真实曝光/点击/购买、人工盲评、生产并发、支付合规或长期线上实验，因此不能声称 CTR/CVR/GMV、工业级个性化推荐、生产 SLO、人工语义
-准确率或开放世界客服成功率。下一步优先级是独立人工复核 60 条标签、补充一批真实脱敏对话并冻结版本；Search hard negative 延后做 paired replay。
+没有真实曝光/点击/购买、客服满意度盲评、生产并发、支付合规或长期线上实验，因此不能声称 CTR/CVR/GMV、工业级个性化推荐、生产 SLO、CSAT/FCR
+或开放世界客服成功率。下一步优先级是将 `011/044/057` 路由边界和 `055/058` canonical 槽位/金额归一化加入回归切片，再对扩展槽位决定是否纳入生产 extractor；Search hard negative 延后做 paired replay。

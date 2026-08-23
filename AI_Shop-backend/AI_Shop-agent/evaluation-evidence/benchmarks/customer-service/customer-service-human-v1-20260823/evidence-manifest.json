@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "aishop-customer-service-human-package/v1",
+  "artifactId": "customer-service-human-v1-20260823",
+  "createdAt": "2026-08-23T09:13:27Z",
+  "lifecycle": "HUMAN_VERIFIED",
+  "releaseGateEligible": false,
+  "notModelScore": true,
+  "notProductionAccuracy": true,
+  "sourceDataset": {
+    "path": "evaluation/datasets/customer_service/gold-v1.jsonl",
+    "sha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+    "caseCount": 60
+  },
+  "humanDataset": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+    "caseCount": 60
+  },
+  "report": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/report.json",
+    "sha256": "d24d3b59da38ac3521f55d5c60850029a053f15db2db7184d4c8cead313d8c2a"
+  },
+  "mergeEvidence": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/merge.evidence.json",
+    "sha256": "95378abfa4263a60ca02358c46789a6e9be4712a37c65b418628dfb816f4456d"
+  },
+  "adjudication": {
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/adjudication.final.jsonl",
+    "sha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e",
+    "caseCount": 25
+  },
+  "files": {
+    "adjudication.final.jsonl": {
+      "bytes": 10614,
+      "sha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e"
+    },
+    "customer-service-human-v1.jsonl": {
+      "bytes": 51078,
+      "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+    },
+    "lifecycle.json": {
+      "bytes": 1748,
+      "sha256": "977cc9c1543a0a3faed81d3efb2cfbdfaaee8977bafc60fc336e732d98564e1a"
+    },
+    "merge.evidence.json": {
+      "bytes": 28376,
+      "sha256": "95378abfa4263a60ca02358c46789a6e9be4712a37c65b418628dfb816f4456d"
+    },
+    "report.json": {
+      "bytes": 94076,
+      "sha256": "d24d3b59da38ac3521f55d5c60850029a053f15db2db7184d4c8cead313d8c2a"
+    },
+    "report.md": {
+      "bytes": 18096,
+      "sha256": "a2b247ebbe0bc8b1258cfb1b74521b466c5844706d7c1fa74b88cd1cacc53e11"
+    },
+    "reviewer-a.sealed.jsonl": {
+      "bytes": 22535,
+      "sha256": "738ad33ac03c9dfdaee4801adca722073bd216678bf867258b81bdc73d630838"
+    },
+    "reviewer-a.sealed.jsonl.manifest.json": {
+      "bytes": 1911,
+      "sha256": "d397671468ddaf5717e632df917076a6d994556830c4c688384238efa960d8fc"
+    },
+    "reviewer-b.sealed.jsonl": {
+      "bytes": 21588,
+      "sha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c"
+    },
+    "reviewer-b.sealed.jsonl.manifest.json": {
+      "bytes": 1912,
+      "sha256": "2fa175e5ce11272c1869f4f8f01cadefd8fda989f2d8a5c1c0325a8aa6c73b4d"
+    }
+  }
+}

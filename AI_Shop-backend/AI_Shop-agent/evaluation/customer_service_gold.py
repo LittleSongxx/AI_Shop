@@ -1,12 +1,11 @@
 """Customer-service understanding evidence on an independently reviewed gold set.
 
-The evaluator is deliberately separate from the Agent pass^k evidence.  It
+The evaluator is deliberately separate from the Agent pass^k evidence. It
 measures the production intent pre-router and keeps four high-value support
 signals visible: intent Macro-F1, high-risk routing recall, slot span F1/EM,
-and handoff recall.  The checked-in v1 labels are a draft annotation set, so
-the current report uses ``PROVISIONAL_NOT_HUMAN_GOLD``.  A separately frozen
-dataset with review evidence can be reported as ``HUMAN_VERIFIED`` but still
-does not become a release gate automatically.
+and handoff recall. The default source file is a draft-compatible dataset;
+when a separately frozen review package is supplied, the report is marked
+``HUMAN_VERIFIED`` but still does not become a release gate automatically.
 """
 
 from __future__ import annotations
@@ -44,6 +43,14 @@ DEFAULT_REPORT = (
     / "客服金标评测.md"
 ).resolve()
 DEFAULT_JSON_REPORT = DEFAULT_REPORT.with_suffix(".json")
+
+# These are the fields currently emitted by the production intent pre-router.
+# Human reviewers may label richer business slots; those remain in the primary
+# human-gold score, while the projection below is a diagnostic of extractor
+# coverage rather than a replacement denominator.
+PRODUCTION_CANONICAL_SLOT_FIELDS = frozenset(
+    {"orderId", "orderItemId", "productId", "productName", "amount"}
+)
 
 # This is the sealed diagnostic snapshot captured before the first resolver
 # patch.  It is intentionally retained in the new report so a reader can see
@@ -90,6 +97,15 @@ def _public(value: Any) -> Any:
 def _is_sha256(value: Any) -> bool:
     text = str(value or "")
     return len(text) == 64 and all(char in "0123456789abcdef" for char in text.casefold())
+
+
+def _path_provenance(path: Path) -> str:
+    """Keep CLI reports usable for temporary holdouts outside the repository."""
+
+    try:
+        return relative_to_repo(path)
+    except ValueError:
+        return str(path.resolve())
 
 
 def load_gold_dataset(path: Path) -> list[dict[str, Any]]:
@@ -300,9 +316,10 @@ def _span_tokens(value: Any) -> list[str]:
     return [char for char in _norm(value) if not char.isspace()]
 
 
-def _slot_case_counts(expected: Mapping[str, Any], predicted: Mapping[str, Any]) -> tuple[int, int, int, float]:
-    expected_slots = expected.get("slots") or {}
-    predicted_slots = predicted.get("entities") or {}
+def _slot_case_counts_for_maps(
+    expected_slots: Mapping[str, Any],
+    predicted_slots: Mapping[str, Any],
+) -> tuple[int, int, int, float]:
     if not isinstance(expected_slots, Mapping) or not isinstance(predicted_slots, Mapping):
         return 0, 0, 0, 0.0
     tp = fp = fn = 0
@@ -317,6 +334,63 @@ def _slot_case_counts(expected: Mapping[str, Any], predicted: Mapping[str, Any])
     precision = tp / (tp + fp) if tp + fp else 1.0 if not expected_slots else 0.0
     recall = tp / (tp + fn) if tp + fn else 1.0
     return tp, fp, fn, _f1(precision, recall)
+
+
+def _slot_case_counts(expected: Mapping[str, Any], predicted: Mapping[str, Any]) -> tuple[int, int, int, float]:
+    return _slot_case_counts_for_maps(
+        expected.get("slots") or {},
+        predicted.get("entities") or {},
+    )
+
+
+def _project_canonical_slots(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(key): raw
+        for key, raw in value.items()
+        if str(key) in PRODUCTION_CANONICAL_SLOT_FIELDS and raw not in (None, "")
+    }
+
+
+def _slot_maps_equal(expected_slots: Mapping[str, Any], predicted_slots: Mapping[str, Any]) -> bool:
+    return (
+        {str(key): _norm(value) for key, value in expected_slots.items()}
+        == {str(key): _norm(value) for key, value in predicted_slots.items()}
+    )
+
+
+def _slot_badcase_root_cause(
+    expected_slots: Mapping[str, Any],
+    predicted_slots: Mapping[str, Any],
+) -> str:
+    """Separate schema coverage and formatting gaps from genuine canonical misses."""
+
+    expected_canonical = _project_canonical_slots(expected_slots)
+    predicted_canonical = _project_canonical_slots(predicted_slots)
+    extension_keys = set(expected_slots) - PRODUCTION_CANONICAL_SLOT_FIELDS
+    canonical_tp, canonical_fp, canonical_fn, _ = _slot_case_counts_for_maps(
+        expected_canonical,
+        predicted_canonical,
+    )
+    if extension_keys and canonical_fn == 0 and canonical_fp == 0:
+        return "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED"
+    if expected_canonical and _slot_maps_equal(expected_canonical, predicted_canonical) and extension_keys:
+        return "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED"
+    if (
+        expected_canonical
+        and set(expected_canonical) == set(predicted_canonical)
+        and canonical_tp
+        and not _slot_maps_equal(expected_canonical, predicted_canonical)
+    ):
+        # A value overlap with a key/value mismatch is most often a currency or
+        # whitespace normalization issue; preserve it as a separate replay
+        # category instead of calling it an extraction miss.
+        expected_values = {_norm(value) for value in expected_canonical.values()}
+        predicted_values = {_norm(value) for value in predicted_canonical.values()}
+        if expected_values & predicted_values:
+            return "SLOT_NORMALIZATION_GAP"
+    return "SLOT_EXTRACTION_GAP"
 
 
 def _empty_prediction() -> dict[str, Any]:
@@ -363,6 +437,12 @@ def evaluate_predictions(
     slot_case_f1: list[float] = []
     slot_tp = slot_fp = slot_fn = 0
     slot_em_numerator = slot_em_denominator = 0
+    canonical_slot_badcases: list[str] = []
+    canonical_slot_case_f1: list[float] = []
+    canonical_slot_tp = canonical_slot_fp = canonical_slot_fn = 0
+    canonical_slot_em_numerator = canonical_slot_em_denominator = 0
+    extension_only_slot_case_count = 0
+    extension_field_counts: Counter[str] = Counter()
     handoff_badcases: list[str] = []
     critical_handoff_badcases: list[str] = []
     high_risk_total = high_risk_hits = 0
@@ -413,15 +493,38 @@ def evaluate_predictions(
         slot_fn += fn
         slot_case_f1.append(case_slot_f1)
         expected_slots = expected.get("slots") or {}
+        predicted_slots = predicted.get("entities") or {}
         if expected_slots:
             slot_em_denominator += 1
-            pred_slots = predicted.get("entities") or {}
-            if isinstance(pred_slots, Mapping) and {
-                str(key): _norm(value) for key, value in pred_slots.items()
-            } == {str(key): _norm(value) for key, value in expected_slots.items()}:
+            if isinstance(predicted_slots, Mapping) and _slot_maps_equal(
+                expected_slots, predicted_slots
+            ):
                 slot_em_numerator += 1
             else:
                 slot_badcases.append(case_id)
+        expected_canonical_slots = _project_canonical_slots(expected_slots)
+        predicted_canonical_slots = _project_canonical_slots(predicted_slots)
+        extension_keys = set(expected_slots) - PRODUCTION_CANONICAL_SLOT_FIELDS
+        if extension_keys:
+            extension_field_counts.update(extension_keys)
+        if expected_slots and not expected_canonical_slots:
+            extension_only_slot_case_count += 1
+        if expected_canonical_slots:
+            canonical_tp_case, canonical_fp_case, canonical_fn_case, canonical_case_f1 = (
+                _slot_case_counts_for_maps(
+                    expected_canonical_slots,
+                    predicted_canonical_slots,
+                )
+            )
+            canonical_slot_tp += canonical_tp_case
+            canonical_slot_fp += canonical_fp_case
+            canonical_slot_fn += canonical_fn_case
+            canonical_slot_case_f1.append(canonical_case_f1)
+            canonical_slot_em_denominator += 1
+            if _slot_maps_equal(expected_canonical_slots, predicted_canonical_slots):
+                canonical_slot_em_numerator += 1
+            else:
+                canonical_slot_badcases.append(case_id)
         cases.append(
             {
                 "id": case_id,
@@ -489,6 +592,22 @@ def evaluate_predictions(
         lambda sample: sum(sample) / len(sample),
         seed=_BOOTSTRAP_SEED ^ 0x51,
     )
+    canonical_slot_precision = (
+        canonical_slot_tp / (canonical_slot_tp + canonical_slot_fp)
+        if canonical_slot_tp + canonical_slot_fp
+        else 0.0
+    )
+    canonical_slot_recall = (
+        canonical_slot_tp / (canonical_slot_tp + canonical_slot_fn)
+        if canonical_slot_tp + canonical_slot_fn
+        else 0.0
+    )
+    canonical_slot_f1 = _f1(canonical_slot_precision, canonical_slot_recall)
+    canonical_slot_interval = _bootstrap_interval(
+        canonical_slot_case_f1,
+        lambda sample: sum(sample) / len(sample),
+        seed=_BOOTSTRAP_SEED ^ 0xA7,
+    )
     metrics = {
         "intentMacroF1": _metric(
             "intentMacroF1",
@@ -551,6 +670,40 @@ def evaluate_predictions(
             evidence_status=evidence_status,
         ),
     }
+    canonical_slot_metrics = {
+        "canonicalSlotEntitySpanF1": {
+            "name": "canonicalSlotEntitySpanF1",
+            "status": "MEASURED" if canonical_slot_tp + canonical_slot_fp + canonical_slot_fn else "UNAVAILABLE",
+            "value": round(canonical_slot_f1, 6)
+            if canonical_slot_tp + canonical_slot_fp + canonical_slot_fn
+            else None,
+            "numerator": canonical_slot_tp,
+            "denominator": canonical_slot_tp + canonical_slot_fp + canonical_slot_fn,
+            "confidenceInterval95": canonical_slot_interval,
+            "badcaseCount": len(canonical_slot_badcases),
+            "badcaseIds": canonical_slot_badcases,
+            "definition": "Diagnostic micro character-span F1 after projecting both sides to the five fields currently emitted by the production pre-router; it does not replace the full human-schema slot metric.",
+            "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
+            "releaseGateEligible": False,
+        },
+        "canonicalSlotExactMatch": {
+            "name": "canonicalSlotExactMatch",
+            "status": "MEASURED" if canonical_slot_em_denominator else "UNAVAILABLE",
+            "value": round(canonical_slot_em_numerator / canonical_slot_em_denominator, 6)
+            if canonical_slot_em_denominator
+            else None,
+            "numerator": canonical_slot_em_numerator,
+            "denominator": canonical_slot_em_denominator,
+            "confidenceInterval95": _wilson(
+                canonical_slot_em_numerator, canonical_slot_em_denominator
+            ),
+            "badcaseCount": len(canonical_slot_badcases),
+            "badcaseIds": canonical_slot_badcases,
+            "definition": "Diagnostic request-level exact match after projecting to production canonical slots; extension-only human slots are excluded from this denominator.",
+            "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
+            "releaseGateEligible": False,
+        },
+    }
     all_badcase_ids = sorted(
         set(intent_badcases)
         | set(risk_badcases)
@@ -584,8 +737,13 @@ def evaluate_predictions(
                 "expected": case["expected"],
                 "predicted": case["predicted"],
                 "rootCause": (
-                    "SLOT_EXTRACTION_GAP" if any(name.startswith("slot") for name in metric_names)
-                    else "HANDOFF_OR_RISK_POLICY_GAP" if any("handoff" in name.lower() or "risk" in name.lower() for name in metric_names)
+                    _slot_badcase_root_cause(
+                        case["expected"].get("slots") or {},
+                        case["predicted"].get("entities") or {},
+                    )
+                    if any(name.startswith("slot") for name in metric_names)
+                    else "HANDOFF_OR_RISK_POLICY_GAP"
+                    if any("handoff" in name.lower() or "risk" in name.lower() for name in metric_names)
                     else "INTENT_ROUTING_OR_TAXONOMY_GAP"
                 ),
             }
@@ -661,6 +819,13 @@ def evaluate_predictions(
         "provenance": dict(provenance or {}),
         "historicalBaseline": HISTORICAL_BASELINE,
         "metrics": metrics,
+        "canonicalSlotDiagnostics": {
+            "productionFields": sorted(PRODUCTION_CANONICAL_SLOT_FIELDS),
+            "extensionOnlyCaseCount": extension_only_slot_case_count,
+            "extensionFieldCounts": dict(sorted(extension_field_counts.items())),
+            "metrics": canonical_slot_metrics,
+            "note": "This projection is a schema-alignment diagnostic. Full human-schema slot metrics remain the primary reported quality signal.",
+        },
         "provisionalTargets": provisional_targets,
         "perIntent": per_intent,
         "confusionMatrix": confusion,
@@ -709,11 +874,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         "# 两位标注者独立填写 labels 后分别封存",
         "python -m evaluation.cli customer-service-review seal --review /tmp/reviewer-a.open.jsonl --output /tmp/reviewer-a.sealed.jsonl",
         "python -m evaluation.cli customer-service-review seal --review /tmp/reviewer-b.open.jsonl --output /tmp/reviewer-b.sealed.jsonl",
-        "python -m evaluation.cli customer-service-review merge --review-a /tmp/reviewer-a.sealed.jsonl --review-b /tmp/reviewer-b.sealed.jsonl --output-dataset /tmp/customer-service-human-v1.jsonl --evidence /tmp/customer-service-human-v1.evidence.json",
-        "# 如 validate/merge 报告 reviewer disagreement，再追加 --adjudication /tmp/adjudication.jsonl",
+        "python -m evaluation.cli customer-service-review merge --review-a /tmp/reviewer-a.sealed.jsonl --review-b /tmp/reviewer-b.sealed.jsonl --adjudication /tmp/adjudication.final.jsonl --output-dataset /tmp/customer-service-human-v1.jsonl --evidence /tmp/customer-service-human-v1.evidence.json",
         "```",
         "",
-        "流程为 `OPEN -> SEALED -> HUMAN_VERIFIED`；sheet 带源数据/内容 SHA-256，禁止写入 `expected`、模型预测或隐藏字段，冲突必须逐 case 仲裁。人工完成前不能把下表称为人工准确率，也不能把人工结果自动纳入 release gate。",
+        "流程为 `OPEN -> SEALED -> HUMAN_VERIFIED`；sheet 带源数据/内容 SHA-256，禁止写入 `expected`、模型预测或隐藏字段，冲突必须逐 case 仲裁。当前结果虽已完成人工复核，仍是离线质量证据，且不会自动进入 release gate。",
         "",
         "## 核心指标",
         "",
@@ -743,6 +907,30 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     baseline = report.get("historicalBaseline") or {}
     lines.extend(
         [
+            "",
+            "## 生产槽位对齐诊断",
+            "",
+            "以下投影只覆盖当前生产抽取器已实现的 `orderId/orderItemId/productId/productName/amount`，不替换上面的完整人工 schema 主指标。",
+        ]
+    )
+    canonical = (report.get("canonicalSlotDiagnostics") or {}).get("metrics") or {}
+    for name in ("canonicalSlotEntitySpanF1", "canonicalSlotExactMatch"):
+        metric = canonical.get(name) or {}
+        interval = metric.get("confidenceInterval95") or {}
+        ci = (
+            f"[{interval.get('lower')}, {interval.get('upper')}]"
+            if interval
+            else "不可得"
+        )
+        lines.append(
+            f"- `{name}`：{metric.get('value') if metric.get('value') is not None else '不可得'} "
+            f"（{metric.get('numerator')}/{metric.get('denominator')}，95% CI {ci}，"
+            f"badcase `{', '.join(metric.get('badcaseIds') or []) or '无'}`）。"
+        )
+    lines.extend(
+        [
+            f"- 扩展 schema-only 案件：`{(report.get('canonicalSlotDiagnostics') or {}).get('extensionOnlyCaseCount', 0)}`；"
+            "这些案件不应直接归因于生产 extractor 漏抽。",
             "",
             "## 优化前后诊断（不是 A/B 或人工真值）",
             "",
@@ -785,7 +973,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                 f"- 切片/难度：`{', '.join(badcase.get('sliceTags') or []) or '未标注'}` / `{badcase.get('difficulty') or '未标注'}`",
                 f"- 期望：`{json.dumps(badcase.get('expected'), ensure_ascii=False, sort_keys=True)}`",
                 f"- 实际：`{json.dumps(badcase.get('predicted'), ensure_ascii=False, sort_keys=True)}`",
-                f"- 初步根因：`{badcase.get('rootCause')}`；{'已完成仲裁，仍需补充回归 case ID。' if human_verified else '人工复核后需补充最终根因和回归 case ID。'}",
+                f"- 根因分类：`{badcase.get('rootCause')}`；标签已冻结，需将该 case 纳入对应回归切片。",
                 "",
             ]
         )
@@ -801,7 +989,11 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             "- 高风险 Recall 的正类是独立标签 `riskLevel=HIGH`，不是模型自报风险；严重漏转人工只统计 `handoffSeverity=CRITICAL`。",
             "- slot Entity/Span F1 使用 NFKC 后的字符 span；`slotExactMatch` 只在存在 gold slot 的请求上计分，空 slot 不抬高结果。",
             "- `HANDOFF_SUGGESTED` 不算即时转人工成功；远程结果未知、Provider 失败和人工校准不在本基线中伪造。",
-            "- 独立人工复核完成后，必须冻结标签版本、重新运行并保留本 provisional 包，不得覆盖历史结果。",
+            (
+                "- 本版本人工复核已完成；后续修订必须生成新数据集版本并保留当前包，不得覆盖历史结果。"
+                if human_verified
+                else "- 独立人工复核完成后，必须冻结标签版本、重新运行并保留本 provisional 包，不得覆盖历史结果。"
+            ),
         ]
     )
     return "\n".join(lines) + "\n"
@@ -821,7 +1013,7 @@ async def run_customer_service_gold(
     classifier_path = Path(__file__).resolve().parents[1] / "app" / "domain" / "intent" / "classifier.py"
     provenance = {
         "mode": mode,
-        "datasetPath": relative_to_repo(dataset_path),
+        "datasetPath": _path_provenance(dataset_path),
         "datasetSha256": sha256_file(dataset_path),
         "productionResolver": "app.domain.intent.classifier.resolve_intent",
         "allowLlm": False,
