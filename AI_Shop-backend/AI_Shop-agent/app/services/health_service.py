@@ -12,6 +12,7 @@ from app.rag.index_contract import vector_index_contract
 from app.services.episode_service import episode_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.redis_service import redis_service
+from app.services.runtime_identity import current_runtime_identity
 from app.visual.index import visual_product_index
 
 logger = structlog.get_logger()
@@ -57,12 +58,46 @@ class HealthService:
             logger.warning("health_rabbitmq_failed", error=type(exc).__name__)
             return False
 
-    async def _check_worker(self) -> bool:
+    async def _check_worker(self) -> dict:
         try:
-            return await redis_service.worker_is_alive()
+            alive, metadata = await asyncio.gather(
+                redis_service.worker_is_alive(),
+                redis_service.worker_heartbeat_metadata(),
+            )
+            api_identity = current_runtime_identity()
+            api_source = ((api_identity or {}).get("source") or {}).get("sha256")
+            worker_source = ((metadata or {}).get("source") or {}).get("sha256")
+            source_match = bool(
+                alive
+                and api_identity
+                and metadata
+                and api_identity.get("processRole") == "api"
+                and metadata.get("processRole") == "worker"
+                and api_source
+                and api_source == worker_source
+            )
+            return {
+                "ok": source_match,
+                "alive": bool(alive),
+                "sourceFingerprintMatch": source_match,
+                "apiRuntimeIdentity": api_identity,
+                "workerRuntimeIdentity": metadata,
+                "reason": (
+                    None
+                    if source_match
+                    else "WORKER_HEARTBEAT_METADATA_MISSING_OR_SOURCE_MISMATCH"
+                ),
+            }
         except Exception as exc:
             logger.warning("health_worker_failed", error=type(exc).__name__)
-            return False
+            return {
+                "ok": False,
+                "alive": False,
+                "sourceFingerprintMatch": False,
+                "apiRuntimeIdentity": current_runtime_identity(),
+                "workerRuntimeIdentity": None,
+                "reason": "WORKER_HEALTH_CHECK_ERROR",
+            }
 
     async def _check_java_gateway(self) -> bool:
         settings = get_settings()
@@ -82,6 +117,49 @@ class HealthService:
         except Exception as exc:
             logger.warning("health_mcp_failed", error=type(exc).__name__)
             return False
+
+    async def _check_mcp_runtime(self) -> dict:
+        """Require MCP's live source fingerprint to match the HTTP API.
+
+        Product search and several write proposals run in a standalone MCP
+        process.  A successful ``MCP_CONTRACT`` probe alone only proves that a
+        compatible endpoint is reachable; it cannot prove that endpoint loaded
+        the current business-rule source.
+        """
+
+        try:
+            metadata = await mcp_streamable_client.runtime_identity()
+            api_identity = current_runtime_identity()
+            api_source = ((api_identity or {}).get("source") or {}).get("sha256")
+            mcp_source = ((metadata or {}).get("source") or {}).get("sha256")
+            source_match = bool(
+                api_identity
+                and metadata
+                and api_identity.get("processRole") == "api"
+                and metadata.get("processRole") == "mcp"
+                and api_source
+                and api_source == mcp_source
+            )
+            return {
+                "ok": source_match,
+                "sourceFingerprintMatch": source_match,
+                "apiRuntimeIdentity": api_identity,
+                "mcpRuntimeIdentity": metadata,
+                "reason": (
+                    None
+                    if source_match
+                    else "MCP_RUNTIME_IDENTITY_MISSING_OR_SOURCE_MISMATCH"
+                ),
+            }
+        except Exception as exc:
+            logger.warning("health_mcp_runtime_failed", error=type(exc).__name__)
+            return {
+                "ok": False,
+                "sourceFingerprintMatch": False,
+                "apiRuntimeIdentity": current_runtime_identity(),
+                "mcpRuntimeIdentity": None,
+                "reason": "MCP_RUNTIME_IDENTITY_CHECK_ERROR",
+            }
 
     async def _check_es_mapping(self) -> dict:
         return await vector_index_contract.check()
@@ -146,13 +224,14 @@ class HealthService:
         }
 
     async def check_readiness(self) -> dict:
-        mysql, redis, rabbitmq, worker, java_gateway, mcp, mapping = await asyncio.gather(
+        mysql, redis, rabbitmq, worker, java_gateway, mcp, mcp_runtime, mapping = await asyncio.gather(
             self._check_mysql(),
             self._check_redis(),
             self._check_rabbitmq(),
             self._check_worker(),
             self._check_java_gateway(),
             self._check_mcp(),
+            self._check_mcp_runtime(),
             self._check_es_mapping(),
         )
         checks = {
@@ -162,13 +241,19 @@ class HealthService:
             "worker": worker,
             "javaGateway": java_gateway,
             "mcp": mcp,
+            "mcpRuntime": mcp_runtime,
             "elasticsearchMapping": mapping,
         }
         ready = all(
             value is True or (isinstance(value, dict) and value.get("ok") is True)
             for value in checks.values()
         )
-        return {"status": "ready" if ready else "not_ready", "ready": ready, "checks": checks}
+        return {
+            "status": "ready" if ready else "not_ready",
+            "ready": ready,
+            "checks": checks,
+            "runtimeIdentity": current_runtime_identity(),
+        }
 
     async def check_all(self) -> dict:
         readiness, dependencies = await asyncio.gather(

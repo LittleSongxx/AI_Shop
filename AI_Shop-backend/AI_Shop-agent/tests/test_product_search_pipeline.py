@@ -76,6 +76,54 @@ def test_runtime_filter_uses_only_verified_available_fields():
     assert {row["reason"] for row in rejected} == {"OVER_BUDGET", "BRAND_REQUIRED"}
 
 
+def test_runtime_filter_checks_category_even_when_exclusion_passes():
+    eligible, rejected = filter_products_by_runtime_constraints(
+        [
+            {
+                "id": "wrong-category",
+                "productName": "帐篷",
+                "category": "户外用品",
+                "price": 300,
+            },
+            {
+                "id": "right-category",
+                "productName": "男士休闲外套",
+                "category": "外套",
+                "price": 300,
+            },
+        ],
+        ProductRuntimeConstraints(category="外套", excluded_terms=("户外",)),
+    )
+
+    assert [row["id"] for row in eligible] == ["right-category"]
+    assert rejected == [
+        {"productId": "wrong-category", "reason": "CATEGORY_REQUIRED"}
+    ]
+
+
+def test_query_plan_carries_explicit_negative_style_and_phone_case_surface():
+    plan = build_product_query_plan(
+        "500元以内、不要户外款的男士外套",
+        {
+            "category": "外套",
+            "hardConstraints": {"budgetMax": 500},
+            "exclusions": {"terms": ["户外"]},
+        },
+    )
+    assert plan.constraints.excluded_terms == ("户外",)
+
+    case_plan = build_product_query_plan("手机壳有没有适配 iPhone 15", {})
+    eligible, rejected = filter_products_for_query_plan(
+        [
+            {"id": "case", "productName": "适用于 iPhone 15 的透明手机壳"},
+            {"id": "phone", "productName": "Apple iPhone 15 手机"},
+        ],
+        case_plan,
+    )
+    assert [row["id"] for row in eligible] == ["case"]
+    assert rejected == [{"productId": "phone", "reason": "MANAGED_CATEGORY_SURFACE_MISMATCH"}]
+
+
 def test_runtime_filter_resolves_required_brand_from_verified_product_name():
     constraints = ProductRuntimeConstraints(required_brands=("苹果",))
     products = [

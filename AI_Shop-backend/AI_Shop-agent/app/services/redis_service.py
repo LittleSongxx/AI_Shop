@@ -2,6 +2,7 @@ import hashlib
 import json
 import random
 import time
+from collections.abc import Mapping
 
 import redis.asyncio as aioredis
 import structlog
@@ -30,6 +31,7 @@ from app.constants import (
     REDIS_AGENT_SHOPPING_PROFILE,
     REDIS_AGENT_USER_LOCK,
     REDIS_AGENT_WORKER_HEARTBEAT,
+    REDIS_AGENT_WORKER_HEARTBEAT_METADATA,
     REDIS_CANCEL_AGENT,
     REDIS_HEARTBEAT_TTL,
     REDIS_PROMPT,
@@ -555,26 +557,91 @@ class RedisService:
         )
         return result == 1
 
-    async def set_worker_heartbeat(self, worker_id: str, ttl_seconds: int) -> None:
-        await self.client.setex(
-            REDIS_AGENT_WORKER_HEARTBEAT,
-            max(5, int(ttl_seconds)),
-            worker_id,
-        )
+    async def set_worker_heartbeat(
+        self,
+        worker_id: str,
+        ttl_seconds: int,
+        *,
+        metadata: Mapping[str, object] | None = None,
+    ) -> None:
+        """Refresh the legacy heartbeat and its safe runtime identity together.
+
+        The primary key remains a worker ID for the ownership-aware Lua cleanup
+        below.  Metadata is optional only for rollout compatibility; readiness
+        treats a live heartbeat without valid metadata as not ready.
+        """
+
+        ttl = max(5, int(ttl_seconds))
+        pipeline = self.client.pipeline(transaction=True)
+        pipeline.setex(REDIS_AGENT_WORKER_HEARTBEAT, ttl, worker_id)
+        if metadata is None:
+            pipeline.delete(REDIS_AGENT_WORKER_HEARTBEAT_METADATA)
+        else:
+            source = dict(metadata.get("source") or {})
+            safe_metadata = {
+                "schemaVersion": str(metadata.get("schemaVersion") or ""),
+                "processRole": str(metadata.get("processRole") or ""),
+                "startedAt": str(metadata.get("startedAt") or ""),
+                "pid": int(metadata.get("pid") or 0),
+                "workerId": worker_id,
+                "source": {
+                    "scope": str(source.get("scope") or ""),
+                    "sha256": str(source.get("sha256") or ""),
+                    "fileCount": int(source.get("fileCount") or 0),
+                },
+            }
+            pipeline.setex(
+                REDIS_AGENT_WORKER_HEARTBEAT_METADATA,
+                ttl,
+                json.dumps(safe_metadata, ensure_ascii=False, sort_keys=True),
+            )
+        await pipeline.execute()
 
     async def worker_is_alive(self) -> bool:
         return await self.client.exists(REDIS_AGENT_WORKER_HEARTBEAT) > 0
+
+    async def worker_heartbeat_metadata(self) -> dict[str, object] | None:
+        """Read only the public, Worker-owned heartbeat metadata."""
+
+        raw = await self.client.get(REDIS_AGENT_WORKER_HEARTBEAT_METADATA)
+        if not raw:
+            return None
+        try:
+            value = json.loads(raw)
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(value, dict):
+            return None
+        source = value.get("source")
+        if (
+            not str(value.get("workerId") or "").strip()
+            or str(value.get("processRole") or "") != "worker"
+            or not isinstance(source, dict)
+            or len(str(source.get("sha256") or "")) != 64
+        ):
+            return None
+        return value
 
     async def clear_worker_heartbeat(self, worker_id: str) -> None:
         await self.client.eval(
             """
             if redis.call('get', KEYS[1]) == ARGV[1] then
-                return redis.call('del', KEYS[1])
+                local removed = redis.call('del', KEYS[1])
+                local raw = redis.call('get', KEYS[2])
+                if raw then
+                    local parsed, metadata = pcall(cjson.decode, raw)
+                    if parsed and type(metadata) == 'table'
+                        and tostring(metadata.workerId or '') == ARGV[1] then
+                        redis.call('del', KEYS[2])
+                    end
+                end
+                return removed
             end
             return 0
             """,
-            1,
+            2,
             REDIS_AGENT_WORKER_HEARTBEAT,
+            REDIS_AGENT_WORKER_HEARTBEAT_METADATA,
             worker_id,
         )
 

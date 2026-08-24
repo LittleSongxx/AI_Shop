@@ -494,7 +494,7 @@ async def test_worker_heartbeat_loop_survives_transient_refresh_failure():
     calls = 0
     real_sleep = asyncio.sleep
 
-    async def refresh(*_args):
+    async def refresh(*_args, **_kwargs):
         nonlocal calls
         calls += 1
         if calls == 1:

@@ -26,6 +26,11 @@ REDIS_SENSITIVE_WORD_PAYLOAD = f"{REDIS_PREFIX}sensitive:word:payload"
 REDIS_WS_USER_HEARTBEAT = f"{REDIS_PREFIX}user:heartBeat:"
 REDIS_AGENT_USER_LOCK = f"{REDIS_PREFIX}agent:worker:user-lock:"
 REDIS_AGENT_WORKER_HEARTBEAT = f"{REDIS_PREFIX}agent:worker:heartbeat"
+# Keep the original heartbeat value as a plain worker ID: clear_worker_heartbeat
+# uses a compare-and-delete Lua script against it.  Source-version metadata is
+# deliberately stored in this separate key so the old ownership semantics stay
+# valid during rollout.
+REDIS_AGENT_WORKER_HEARTBEAT_METADATA = f"{REDIS_PREFIX}agent:worker:heartbeat:metadata"
 REDIS_TOKEN_ADMIN = f"{REDIS_PREFIX}token:admin:"
 
 AGENT_QUEUE_HIGH = "agent.support.high"

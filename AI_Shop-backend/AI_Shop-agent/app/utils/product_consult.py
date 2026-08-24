@@ -51,6 +51,7 @@ def is_product_consult_turn(
         looks_like_consult_followup,
         looks_like_consult_question,
         looks_like_new_product_search,
+        looks_like_same_product_comparison,
     )
     from app.services.product_service import is_similar_or_recommend_request
 
@@ -64,6 +65,10 @@ def is_product_consult_turn(
         # 转人工永远优先于商品咨询：用户在咨询中要求转人工，
         # 不能被 PRODUCT_CONSULT 分支吃掉。
         return False
+    if looks_like_same_product_comparison(user_text):
+        # No selected IDs means the specialist must clarify, not widen the
+        # request into an arbitrary product shelf.
+        return True
     if is_similar_or_recommend_request(user_text):
         return False
     if looks_like_category_switch(user_text, consult_name):
@@ -87,6 +92,21 @@ def is_product_consult_turn(
         # （"谢谢""嗯"这类寒暄不进咨询分支）。
         return looks_like_consult_question(user_text)
     return False
+
+
+def product_consult_clarification(user_text: str | None) -> str:
+    """Ask for the minimum identity needed to answer an attribute question."""
+
+    text = str(user_text or "")
+    if any(marker in text for marker in ("蓝牙", "版本")):
+        return "要核对蓝牙或版本规格，请提供具体商品品牌/型号，或发送商品卡片。"
+    if any(marker in text for marker in ("主动降噪", "降噪")):
+        return "要核对是否支持主动降噪，请提供具体耳机品牌/型号，或发送商品卡片。"
+    if "续航" in text:
+        return "要判断续航表现，请提供具体手机品牌/型号，或发送商品卡片。"
+    if any(marker in text for marker in ("适配", "兼容")):
+        return "要核对兼容性，请提供具体商品型号和手机型号，或发送商品卡片。"
+    return "请提供具体商品名称、型号或商品卡片，我才能核对该商品的规格与兼容性。"
 
 async def resolve_consult_card(
     user_id: str,

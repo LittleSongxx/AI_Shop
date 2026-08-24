@@ -34,6 +34,11 @@ from evaluation.core.io import (
     utc_now,
 )
 from evaluation.core.metrics import wilson_interval
+from evaluation.core.redaction import (
+    REDACTION_PROFILE,
+    contains_unredacted_sensitive,
+    redact,
+)
 from evaluation.customer_service_http import HTTP_REPORT_SCHEMA
 
 ANSWER_REVIEW_SCHEMA = "aishop-customer-service-answer-review/v2"
@@ -52,6 +57,13 @@ ANSWER_REVIEW_PENDING_LIFECYCLE_SCHEMA = (
     "aishop-customer-service-answer-review-pending-lifecycle/v1"
 )
 ANSWER_REVIEW_GUIDELINES_VERSION = "customer-service-answer-quality-v1"
+_PRESENTATION_REDACTION = {
+    "profile": REDACTION_PROFILE,
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "fields": ["message", "answer", "sourceRefs", "observedHandoff"],
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES",
+    "rawInputPersistedByExporter": False,
+}
 
 _LABEL_FIELDS = (
     "answerCorrect",
@@ -134,6 +146,38 @@ def _blank_labels() -> dict[str, Any]:
     }
 
 
+def _presentation_redaction_enabled(manifest: Mapping[str, Any]) -> bool:
+    """Return the source projection mode declared by a review artifact.
+
+    Earlier v2 sheets are immutable historical evidence and predate this
+    marker.  They remain readable in legacy mode.  Every newly exported sheet
+    carries the exact descriptor below and is rejected if it is weakened.
+    """
+
+    declaration = manifest.get("presentationRedaction")
+    if declaration is None:
+        return False
+    if not isinstance(declaration, Mapping) or _canonical(declaration) != _canonical(
+        _PRESENTATION_REDACTION
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review presentation redaction declaration is invalid"
+        )
+    return True
+
+
+def _shared_presentation_redaction(
+    left: Mapping[str, Any], right: Mapping[str, Any]
+) -> bool:
+    left_enabled = _presentation_redaction_enabled(left)
+    right_enabled = _presentation_redaction_enabled(right)
+    if left_enabled != right_enabled:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review sheets use different presentation redaction modes"
+        )
+    return left_enabled
+
+
 def _validate_labels(
     value: Any,
     *,
@@ -168,7 +212,7 @@ def _validate_labels(
 
 
 def _report_context(
-    report_path: Path,
+    report_path: Path, *, presentation_redaction: bool = False
 ) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
     report = load_json(report_path)
     if report.get("schemaVersion") != HTTP_REPORT_SCHEMA:
@@ -188,7 +232,7 @@ def _report_context(
                 f"source report case {index} has a missing or duplicate caseId"
             )
         http = value.get("http") if isinstance(value.get("http"), Mapping) else {}
-        cases[case_id] = {
+        presentation: dict[str, Any] = {
             "caseId": case_id,
             "sourceRunId": report.get("runId"),
             "sourceReportSha256": report_sha,
@@ -197,6 +241,14 @@ def _report_context(
             "sourceRefs": copy.deepcopy(http.get("sourceRefs") or []),
             "observedHandoff": bool(http.get("handoffObserved")),
         }
+        if presentation_redaction:
+            redacted = redact(presentation)
+            if not isinstance(redacted, Mapping) or contains_unredacted_sensitive(redacted):
+                raise CustomerServiceAnswerReviewError(
+                    "answer-review source projection contains sensitive data"
+                )
+            presentation = dict(redacted)
+        cases[case_id] = presentation
     if not cases:
         raise CustomerServiceAnswerReviewError("source report contains no cases")
     return report, report_sha, cases
@@ -233,7 +285,9 @@ def export_answer_review_sheet(
     reviewer = str(reviewer_id or "").strip()
     if not reviewer:
         raise CustomerServiceAnswerReviewError("reviewer_id is required")
-    report, report_sha, cases = _report_context(report_path)
+    report, report_sha, cases = _report_context(
+        report_path, presentation_redaction=True
+    )
     if seed is None:
         seed_material = f"{reviewer}\0{report_sha}".encode()
         seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:8], "big")
@@ -242,6 +296,10 @@ def export_answer_review_sheet(
     ordered = list(cases.values())
     random.Random(seed).shuffle(ordered)
     rows = [_sheet_source_row(source, reviewer=reviewer) for source in ordered]
+    if contains_unredacted_sensitive(rows):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review export contains unredacted sensitive data"
+        )
     atomic_write_jsonl(output_path, rows, overwrite=False)
     manifest = {
         "schemaVersion": ANSWER_REVIEW_SCHEMA,
@@ -265,6 +323,7 @@ def export_answer_review_sheet(
             "other reviewer labels are omitted"
         ),
         "containsExpectedOrSelfJudgment": False,
+        "presentationRedaction": dict(_PRESENTATION_REDACTION),
         "createdAt": utc_now(),
     }
     atomic_write_json(output_manifest, manifest, overwrite=False)
@@ -278,7 +337,6 @@ def _load_answer_review_sheet(
     require_complete: bool,
     check_sheet_hash: bool,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
-    report, report_sha, sources = _report_context(report_path)
     manifest_path = _sidecar_path(sheet_path)
     if not manifest_path.is_file():
         raise CustomerServiceAnswerReviewError(
@@ -286,6 +344,10 @@ def _load_answer_review_sheet(
         )
     manifest = load_json(manifest_path)
     rows = load_jsonl(sheet_path)
+    presentation_redaction = _presentation_redaction_enabled(manifest)
+    report, report_sha, sources = _report_context(
+        report_path, presentation_redaction=presentation_redaction
+    )
     if manifest.get("schemaVersion") != ANSWER_REVIEW_SCHEMA:
         raise CustomerServiceAnswerReviewError("answer-review manifest schema is invalid")
     lifecycle = str(manifest.get("lifecycle") or "")
@@ -375,6 +437,10 @@ def _load_answer_review_sheet(
         comment = row.get("comment")
         if not isinstance(comment, str):
             raise CustomerServiceAnswerReviewError(f"{label}: comment must be text")
+        if presentation_redaction and contains_unredacted_sensitive(row):
+            raise CustomerServiceAnswerReviewError(
+                f"{label}: contains unredacted sensitive data"
+            )
         reviewed[case_id] = {
             "row": dict(row),
             "labels": labels,
@@ -574,13 +640,16 @@ def _score_final_labels(
 def score_answer_review(report_path: Path, review_path: Path) -> dict[str, Any]:
     """Score one complete rater pass for diagnostics, never as adjudicated truth."""
 
-    report, report_sha, sources = _report_context(report_path)
     manifest, reviewed = _load_answer_review_sheet(
         report_path,
         review_path,
         require_complete=True,
         check_sheet_hash=load_json(_sidecar_path(review_path)).get("lifecycle")
         != "OPEN",
+    )
+    presentation_redaction = _presentation_redaction_enabled(manifest)
+    report, report_sha, sources = _report_context(
+        report_path, presentation_redaction=presentation_redaction
     )
     labels = {case_id: item["labels"] for case_id, item in reviewed.items()}
     comments = {case_id: item["comment"] for case_id, item in reviewed.items()}
@@ -639,7 +708,6 @@ def compare_answer_reviews(
 ) -> dict[str, Any]:
     """Measure agreement between two complete, independently sealed sheets."""
 
-    report, report_sha, sources = _report_context(report_path)
     manifest_a, review_a = _load_answer_review_sheet(
         report_path, review_a_path, require_complete=True, check_sheet_hash=True
     )
@@ -650,6 +718,10 @@ def compare_answer_reviews(
         raise CustomerServiceAnswerReviewError(
             "agreement comparison accepts only SEALED answer-review sheets"
         )
+    presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    report, report_sha, sources = _report_context(
+        report_path, presentation_redaction=presentation_redaction
+    )
     reviewer_a = str(manifest_a["reviewerId"])
     reviewer_b = str(manifest_b["reviewerId"])
     if reviewer_a == reviewer_b:
@@ -717,6 +789,9 @@ def compare_answer_reviews(
         "caseAgreementRate": round(exact_count / len(sources), 6),
         "fieldStats": field_stats,
         "disagreements": disagreements,
+        "presentationRedaction": (
+            dict(_PRESENTATION_REDACTION) if presentation_redaction else None
+        ),
         "createdAt": utc_now(),
         "note": (
             "Inter-rater agreement measures annotation reliability, not model accuracy. "
@@ -732,6 +807,10 @@ def export_answer_adjudication_template(
 
     if agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA:
         raise CustomerServiceAnswerReviewError("answer-review agreement schema is invalid")
+    if contains_unredacted_sensitive(agreement):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review agreement contains unredacted sensitive data"
+        )
     _ensure_new((output_path,))
     rows = []
     for item in agreement.get("disagreements") or []:
@@ -752,6 +831,10 @@ def export_answer_adjudication_template(
                 "reason": "",
             }
         )
+    if contains_unredacted_sensitive(rows):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review adjudication template contains unredacted sensitive data"
+        )
     atomic_write_jsonl(output_path, rows, overwrite=False)
     return {
         "schemaVersion": ANSWER_REVIEW_ADJUDICATION_SCHEMA,
@@ -768,6 +851,13 @@ def _load_adjudications(
     *,
     agreement: Mapping[str, Any],
 ) -> dict[str, dict[str, Any]]:
+    presentation_redaction = agreement.get("presentationRedaction") is not None
+    if presentation_redaction and _canonical(
+        agreement.get("presentationRedaction")
+    ) != _canonical(_PRESENTATION_REDACTION):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review agreement presentation redaction is invalid"
+        )
     disagreement_by_id = {
         str(item["caseId"]): item for item in agreement.get("disagreements") or []
     }
@@ -782,6 +872,10 @@ def _load_adjudications(
         if not isinstance(row, Mapping) or set(row) != set(_ADJUDICATION_FIELDS):
             raise CustomerServiceAnswerReviewError(
                 f"{label}: unknown or missing adjudication fields"
+            )
+        if presentation_redaction and contains_unredacted_sensitive(row):
+            raise CustomerServiceAnswerReviewError(
+                f"{label}: contains unredacted sensitive data"
             )
         if row.get("schemaVersion") != ANSWER_REVIEW_ADJUDICATION_SCHEMA:
             raise CustomerServiceAnswerReviewError(f"{label}: schema is invalid")
@@ -847,13 +941,16 @@ def merge_answer_reviews(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return adjudicated answer metrics plus the pre-adjudication agreement."""
 
-    report, report_sha, sources = _report_context(report_path)
     agreement = compare_answer_reviews(report_path, review_a_path, review_b_path)
-    _, review_a = _load_answer_review_sheet(
+    manifest_a, review_a = _load_answer_review_sheet(
         report_path, review_a_path, require_complete=True, check_sheet_hash=True
     )
-    _, review_b = _load_answer_review_sheet(
+    manifest_b, review_b = _load_answer_review_sheet(
         report_path, review_b_path, require_complete=True, check_sheet_hash=True
+    )
+    presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    report, report_sha, sources = _report_context(
+        report_path, presentation_redaction=presentation_redaction
     )
     disagreement_ids = {
         str(item["caseId"]) for item in agreement.get("disagreements") or []
@@ -929,6 +1026,11 @@ def merge_answer_reviews(
                 sha256_file(adjudication_path) if adjudication_path else None
             ),
             "guidelinesVersion": ANSWER_REVIEW_GUIDELINES_VERSION,
+            "presentationRedaction": (
+                dict(_PRESENTATION_REDACTION)
+                if presentation_redaction
+                else None
+            ),
         },
         "caseCount": len(sources),
         "agreement": {
@@ -1144,14 +1246,6 @@ def write_pending_answer_review_evidence(
             "pending evidence requires a non-empty PENDING_ADJUDICATION agreement"
         )
 
-    report, report_sha, _ = _report_context(report_path)
-    if (
-        agreement.get("sourceRunId") != report.get("runId")
-        or agreement.get("sourceReportSha256") != report_sha
-    ):
-        raise CustomerServiceAnswerReviewError(
-            "pending agreement does not bind the supplied HTTP report"
-        )
     manifest_a, _ = _load_answer_review_sheet(
         report_path, review_a_path, require_complete=True, check_sheet_hash=True
     )
@@ -1161,6 +1255,37 @@ def write_pending_answer_review_evidence(
     if manifest_a.get("lifecycle") != "SEALED" or manifest_b.get("lifecycle") != "SEALED":
         raise CustomerServiceAnswerReviewError(
             "pending evidence accepts only SEALED answer-review sheets"
+        )
+    presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    expected_presentation = (
+        dict(_PRESENTATION_REDACTION) if presentation_redaction else None
+    )
+    if _canonical(agreement.get("presentationRedaction")) != _canonical(
+        expected_presentation
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending agreement presentation redaction differs from sealed sheets"
+        )
+    report, report_sha, _ = _report_context(
+        report_path, presentation_redaction=presentation_redaction
+    )
+    if (
+        agreement.get("sourceRunId") != report.get("runId")
+        or agreement.get("sourceReportSha256") != report_sha
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending agreement does not bind the supplied HTTP report"
+        )
+    pending_inputs = [
+        agreement,
+        load_jsonl(review_a_path),
+        load_jsonl(review_b_path),
+        load_json(_sidecar_path(review_a_path)),
+        load_json(_sidecar_path(review_b_path)),
+    ]
+    if contains_unredacted_sensitive(pending_inputs):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review evidence contains unredacted sensitive data"
         )
     if (
         manifest_a.get("sheetSha256") != (agreement.get("reviewA") or {}).get("sha256")
@@ -1234,6 +1359,7 @@ def write_pending_answer_review_evidence(
             "disagreementCaseCount": frozen_agreement.get("disagreementCaseCount"),
             "adjudicationTemplatePath": "adjudication.template.jsonl",
             "adjudicationTemplateSha256AtExport": template["sha256AtExport"],
+            "presentationRedaction": expected_presentation,
             "createdAt": utc_now(),
             "note": (
                 "This is inter-rater reliability evidence only. Final answer-quality "
@@ -1275,6 +1401,7 @@ def write_pending_answer_review_evidence(
                 "sha256AtExport": template["sha256AtExport"],
                 "caseCount": template["caseCount"],
             },
+            "presentationRedaction": expected_presentation,
             "createdAt": utc_now(),
             "files": _inventory(staging),
         }
@@ -1324,6 +1451,37 @@ def write_answer_review_evidence(
         raise CustomerServiceAnswerReviewError("final answer-review report schema is invalid")
     if agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA:
         raise CustomerServiceAnswerReviewError("answer-review agreement schema is invalid")
+    manifest_a = load_json(_sidecar_path(review_a_path))
+    manifest_b = load_json(_sidecar_path(review_b_path))
+    presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    expected_presentation = (
+        dict(_PRESENTATION_REDACTION) if presentation_redaction else None
+    )
+    if (
+        _canonical(agreement.get("presentationRedaction"))
+        != _canonical(expected_presentation)
+        or _canonical(
+            (final_report.get("reviewEvidence") or {}).get("presentationRedaction")
+        )
+        != _canonical(expected_presentation)
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review presentation redaction differs from sealed evidence"
+        )
+    final_inputs: list[Any] = [
+        final_report,
+        agreement,
+        load_jsonl(review_a_path),
+        load_jsonl(review_b_path),
+        manifest_a,
+        manifest_b,
+    ]
+    if adjudication_path is not None:
+        final_inputs.append(load_jsonl(adjudication_path))
+    if contains_unredacted_sensitive(final_inputs):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review evidence contains unredacted sensitive data"
+        )
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}-", dir=output_dir.parent))
     try:
@@ -1372,6 +1530,7 @@ def write_answer_review_evidence(
             "adjudicationSha256": (
                 sha256_file(adjudication_path) if adjudication_path else None
             ),
+            "presentationRedaction": expected_presentation,
             "createdAt": utc_now(),
             "files": _inventory(staging),
         }
@@ -1490,6 +1649,8 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
             "pending answer-review reviewer inventory is invalid"
         )
     reviewer_ids: list[str] = []
+    sheet_manifests: list[dict[str, Any]] = []
+    sheet_rows: list[list[dict[str, Any]]] = []
     for label, filename, agreement_key in (
         ("reviewerA", "reviewer-a.sealed.jsonl", "reviewA"),
         ("reviewerB", "reviewer-b.sealed.jsonl", "reviewB"),
@@ -1502,6 +1663,12 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
         sheet_path = root / "reviews" / filename
         sheet_manifest = load_json(_sidecar_path(sheet_path))
         rows = load_jsonl(sheet_path)
+        if not isinstance(sheet_manifest, Mapping):
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review {label} manifest is invalid"
+            )
+        sheet_manifests.append(dict(sheet_manifest))
+        sheet_rows.append([dict(row) for row in rows if isinstance(row, Mapping)])
         reviewer_id = str(descriptor.get("reviewerId") or "")
         reviewer_ids.append(reviewer_id)
         if (
@@ -1555,6 +1722,23 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
         raise CustomerServiceAnswerReviewError(
             "pending answer-review reviewers are not independent"
         )
+    presentation_redaction = _shared_presentation_redaction(
+        sheet_manifests[0], sheet_manifests[1]
+    )
+    expected_presentation = (
+        dict(_PRESENTATION_REDACTION) if presentation_redaction else None
+    )
+    if (
+        _canonical(agreement.get("presentationRedaction"))
+        != _canonical(expected_presentation)
+        or _canonical(manifest.get("presentationRedaction"))
+        != _canonical(expected_presentation)
+        or _canonical(lifecycle.get("presentationRedaction"))
+        != _canonical(expected_presentation)
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review presentation redaction is invalid"
+        )
 
     template_path = root / "adjudication.template.jsonl"
     template_rows = load_jsonl(template_path)
@@ -1581,6 +1765,12 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
             raise CustomerServiceAnswerReviewError(
                 f"pending answer-review adjudication template row {index} is invalid"
             )
+    if presentation_redaction and contains_unredacted_sensitive(
+        [agreement, manifest, lifecycle, sheet_rows, template_rows]
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review evidence contains unredacted sensitive data"
+        )
     template_sha = sha256_file(template_path)
     template_descriptor = manifest.get("adjudicationTemplate") or {}
     if (
@@ -1760,10 +1950,20 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     review_rows: dict[str, dict[str, dict[str, Any]]] = {}
     reviewer_ids: dict[str, str] = {}
     sources: dict[str, dict[str, Any]] = {}
+    sheet_manifests: dict[str, dict[str, Any]] = {}
+    sheet_rows_for_redaction: dict[str, list[dict[str, Any]]] = {}
     for key, path in review_paths.items():
         sidecar = _sidecar_path(path)
         sheet_manifest = load_json(sidecar)
         rows = load_jsonl(path)
+        if not isinstance(sheet_manifest, Mapping):
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review {key} sealed manifest is invalid"
+            )
+        sheet_manifests[key] = dict(sheet_manifest)
+        sheet_rows_for_redaction[key] = [
+            dict(row) for row in rows if isinstance(row, Mapping)
+        ]
         sheet_hash = sha256_file(path)
         reviewer_id = str(sheet_manifest.get("reviewerId") or "")
         if (
@@ -1836,6 +2036,25 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     if reviewer_ids.get("reviewA") == reviewer_ids.get("reviewB"):
         raise CustomerServiceAnswerReviewError(
             "answer-review reviewers are not independent"
+        )
+    presentation_redaction = _shared_presentation_redaction(
+        sheet_manifests["reviewA"], sheet_manifests["reviewB"]
+    )
+    expected_presentation = (
+        dict(_PRESENTATION_REDACTION) if presentation_redaction else None
+    )
+    if (
+        _canonical(agreement.get("presentationRedaction"))
+        != _canonical(expected_presentation)
+        or _canonical(manifest.get("presentationRedaction"))
+        != _canonical(expected_presentation)
+        or _canonical(
+            (final_report.get("reviewEvidence") or {}).get("presentationRedaction")
+        )
+        != _canonical(expected_presentation)
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review presentation redaction is invalid"
         )
     if set(review_rows["reviewA"]) != set(review_rows["reviewB"]):
         raise CustomerServiceAnswerReviewError(
@@ -1921,6 +2140,19 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
         raise CustomerServiceAnswerReviewError(
             "answer-review has an unexpected adjudication hash"
         )
+    if presentation_redaction:
+        redaction_inputs: list[Any] = [
+            manifest,
+            final_report,
+            agreement,
+            sheet_rows_for_redaction,
+        ]
+        if expected_disagreements:
+            redaction_inputs.append(load_jsonl(adjudication_path))
+        if contains_unredacted_sensitive(redaction_inputs):
+            raise CustomerServiceAnswerReviewError(
+                "answer-review evidence contains unredacted sensitive data"
+            )
 
     final_cases = final_report.get("cases")
     if not isinstance(final_cases, list) or len(final_cases) != case_count:
@@ -2026,6 +2258,8 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
         != _canonical(agreement.get("reviewB"))
         or review_evidence.get("adjudicationSha256") != manifest.get("adjudicationSha256")
         or review_evidence.get("guidelinesVersion") != ANSWER_REVIEW_GUIDELINES_VERSION
+        or _canonical(review_evidence.get("presentationRedaction"))
+        != _canonical(expected_presentation)
     ):
         raise CustomerServiceAnswerReviewError(
             "answer-review final review evidence is invalid"

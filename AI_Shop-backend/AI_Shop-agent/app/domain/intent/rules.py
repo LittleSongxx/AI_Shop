@@ -30,6 +30,18 @@ _SWITCH_HINTS = ("转", "切换", "换品类", "换个", "不要这款", "不要
 _SEARCH_VERBS = (
     "搜索", "找", "推荐", "买", "购买", "采购", "想要", "需要", "看看", "有没有",
 )
+_COMPARISON_HINTS = ("哪个好", "哪款好", "相比", "对比", "比较", "怎么选", "如何选")
+_CURRENT_PRODUCT_REFERENCES = (
+    "这款", "这副", "这个", "这台", "该款", "此款", "另一款", "另一副",
+    "另一个", "这两个", "这两款",
+)
+# Attribute/compatibility vocabulary is deliberately narrower than the generic
+# product vocabulary: "推荐降噪耳机" must remain a discovery query.
+_PRODUCT_ATTRIBUTE_QUERY_HINTS = (
+    "支持", "是否", "能否", "可以吗", "有没有", "有无", "适配", "兼容",
+    "续航", "版本", "参数", "配置", "内存", "硬盘", "接口", "尺寸",
+    "主动降噪", "防水", "保修", "怎么用",
+)
 _CONSULT_FOLLOWUP_HINTS = (
     "这款",
     "这个",
@@ -208,6 +220,25 @@ def looks_like_new_product_search(user_text: str) -> bool:
         )
     ):
         return False
+    # Do not widen a concrete attribute question into an arbitrary shelf
+    # search. The current-product form covers "这款耳机支持蓝牙 5.4 吗";
+    # the second form covers short colloquial wording such as
+    # "耳机有主动降噪嘛" without matching "有没有耳机" discovery queries.
+    attribute_query = any(marker in t for marker in _PRODUCT_ATTRIBUTE_QUERY_HINTS)
+    if attribute_query:
+        has_current_reference = any(marker in t for marker in _CURRENT_PRODUCT_REFERENCES)
+        has_product_then_attribute = bool(
+            re.search(
+                r"(?:耳机|手机壳|手机|平板|电脑|笔记本|相机|音箱|键盘|鼠标|手表|家电)"
+                r"\s*(?:支持|是否|能否|有没有|有无|适配|兼容|续航|版本|参数|配置|内存|硬盘|接口|尺寸|防水|保修|怎么用|有)"
+                r"|(?:耳机|手机壳|手机|平板|电脑|笔记本|相机|音箱|键盘|鼠标|手表|家电)"
+                r"[^。！？!?]{0,12}(?:吗|嘛|么|？|\?)$",
+                t,
+                flags=re.IGNORECASE,
+            )
+        )
+        if has_current_reference or has_product_then_attribute:
+            return False
     if looks_like_direct_product_keyword(t):
         return True
     if any(v in t for v in _SEARCH_VERBS) and (
@@ -234,6 +265,39 @@ def looks_like_new_product_search(user_text: str) -> bool:
     ):
         return True
     return False
+
+
+def looks_like_same_product_comparison(user_text: str | None) -> bool:
+    """Keep a referenced-product comparison out of a fresh shelf search."""
+
+    text = (user_text or "").strip()
+    if not text or len(text) > 60:
+        return False
+    if not any(marker in text for marker in _COMPARISON_HINTS):
+        return False
+    if not any(marker in text for marker in _CURRENT_PRODUCT_REFERENCES):
+        return False
+    if not _mentions_any(text, _ALL_PRODUCT_HINTS):
+        return False
+    if any(verb in text for verb in ("搜索", "搜一下", "找一款", "推荐一款", "买一款")):
+        return False
+    if re.search(
+        r"(?:和|与|跟)\s*(?:苹果|华为|小米|荣耀|三星|OPPO|vivo|索尼|联想|戴尔|惠普)",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return False
+
+    # Cross-category comparisons remain on the broader search/comparison path;
+    # a single category plus a referenced object is a consult clarification.
+    category_hits = sum(
+        1
+        for family in (_PHONE_HINTS, _COMPUTER_HINTS, _SNACK_HINTS, _TOY_HINTS, _MUSIC_HINTS)
+        if _mentions_any(text, family)
+    )
+    return category_hits <= 1 or any(
+        marker in text for marker in ("另一款", "另一副", "这两个", "这两款")
+    )
 
 def looks_like_consult_followup(user_text: str) -> bool:
 

@@ -152,6 +152,7 @@ def test_extract_review_helpers():
     assert content and "物流很快" in content
     assert extract_review_star("五星，音质很好") == 5
     assert extract_review_content("五星，音质很好", "order-1") == "音质很好"
+    assert extract_review_content("我想追评订单 order-1", "order-1") is None
 
 def test_extract_real_act_token():
     token = "act_" + "a" * 32

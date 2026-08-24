@@ -673,6 +673,23 @@ def format_search_tool_message(
         else ""
     )
 
+    # Keep hard negative constraints visible in the user-facing explanation.
+    # This is a disclosure of the requested filter, not a claim that the
+    # entire catalogue contains no excluded items.
+    exclusion_terms: list[str] = []
+    for raw in (
+        *((profile or {}).get("excludedBrands") or []),
+        *((profile or {}).get("excludedTerms") or []),
+        *(((mission or {}).get("exclusions") or {}).get("brands") or []),
+        *(((mission or {}).get("exclusions") or {}).get("terms") or []),
+    ):
+        value = str(raw or "").strip()
+        if value and value.casefold() not in {item.casefold() for item in exclusion_terms}:
+            exclusion_terms.append(value)
+    exclusion_disclosure = (
+        f"排除：{'、'.join(exclusion_terms[:5])}" if exclusion_terms else ""
+    )
+
     if source == "clarify":
         clarification = next_clarification(mission)
         question = (clarification or {}).get("question") or "你最看重哪一项条件？"
@@ -681,8 +698,9 @@ def format_search_tool_message(
         summary = mission_summary(mission) or shopping_profile_service.summary(profile)
         detail = f"（{summary}）" if summary else ""
         return (
-            f"【筛选结果】暂未找到同时满足你的条件{detail}的在售商品。\n"
-            "可以放宽预算或品牌范围，也可以告诉我可接受的替代条件。"
+            f"【筛选结果】本次检索暂未返回同时满足你的条件{detail}的商品，"
+            "不能据此断言平台无货。\n"
+            "可以放宽预算或品牌范围，也可以告诉我可接受的替代条件后继续检索。"
         )
     if source == "offer_unavailable":
         return "【报价核验】当前无法核验实时价格、库存或优惠，暂不展示可能无法购买的推荐。请稍后重试。"
@@ -737,11 +755,16 @@ def format_search_tool_message(
 
     if not products:
         if kw:
-            return f"【搜索结果】暂未找到与「{kw_display}」相关的商品。"
-        return "【搜索结果】未找到相关商品。"
+            return (
+                f"【搜索结果】本次检索暂未返回与「{kw_display}」匹配的商品，"
+                "不能据此断言平台无货。"
+            )
+        return "【搜索结果】本次检索暂未返回匹配商品，不能据此断言平台无货。"
     if source == "shopping_decision_v2":
         summary = mission_summary(mission)
         suffix = f"，已按{summary}筛选" if summary else ""
+        if exclusion_disclosure and exclusion_disclosure not in suffix:
+            suffix += f"；{exclusion_disclosure}"
         return (
             f"【可信导购】已核验指定 SKU 的实时价格、库存和可用优惠{suffix}，"
             f"请查看下方对比卡片。{uncertainty_suffix}"

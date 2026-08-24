@@ -40,6 +40,86 @@ async def _probe_http(client: httpx.AsyncClient, name: str, url: str) -> dict[st
         }
 
 
+def _public_runtime_identity(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    source = value.get("source")
+    if not isinstance(source, dict):
+        return None
+    sha = str(source.get("sha256") or "")
+    if len(sha) != 64:
+        return None
+    return {
+        "schemaVersion": str(value.get("schemaVersion") or ""),
+        "processRole": str(value.get("processRole") or ""),
+        "startedAt": str(value.get("startedAt") or ""),
+        "source": {
+            "scope": str(source.get("scope") or ""),
+            "sha256": sha,
+            "fileCount": int(source.get("fileCount") or 0),
+        },
+    }
+
+
+async def _probe_agent_readiness(client: httpx.AsyncClient, url: str) -> dict[str, Any]:
+    """Require attested API/Worker/MCP source agreement, not bare liveness."""
+
+    try:
+        response = await client.get(url, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+        checks = payload.get("checks") if isinstance(payload, dict) else None
+        worker = checks.get("worker") if isinstance(checks, dict) else None
+        api_identity = _public_runtime_identity(
+            payload.get("runtimeIdentity") if isinstance(payload, dict) else None
+        )
+        worker_identity = _public_runtime_identity(
+            worker.get("workerRuntimeIdentity") if isinstance(worker, dict) else None
+        )
+        mcp = checks.get("mcpRuntime") if isinstance(checks, dict) else None
+        mcp_identity = _public_runtime_identity(
+            mcp.get("mcpRuntimeIdentity") if isinstance(mcp, dict) else None
+        )
+        source_match = bool(
+            isinstance(worker, dict)
+            and worker.get("ok") is True
+            and worker.get("sourceFingerprintMatch") is True
+            and isinstance(mcp, dict)
+            and mcp.get("ok") is True
+            and mcp.get("sourceFingerprintMatch") is True
+            and checks.get("mcp") is True
+            and api_identity
+            and worker_identity
+            and mcp_identity
+            and api_identity.get("processRole") == "api"
+            and worker_identity.get("processRole") == "worker"
+            and mcp_identity.get("processRole") == "mcp"
+            and api_identity["source"]["sha256"] == worker_identity["source"]["sha256"]
+            and api_identity["source"]["sha256"] == mcp_identity["source"]["sha256"]
+        )
+        return {
+            "name": "agent-readiness",
+            "ok": source_match,
+            "statusCode": response.status_code,
+            "url": url,
+            "facts": {
+                "sourceFingerprintMatch": source_match,
+                "apiRuntimeIdentity": api_identity,
+                "workerRuntimeIdentity": worker_identity,
+                "mcpRuntimeIdentity": mcp_identity,
+                "workerReason": worker.get("reason") if isinstance(worker, dict) else None,
+                "mcpReason": mcp.get("reason") if isinstance(mcp, dict) else None,
+            },
+        }
+    except Exception as exc:
+        return {
+            "name": "agent-readiness",
+            "ok": False,
+            "error": type(exc).__name__,
+            "url": url,
+        }
+
+
 async def run_preflight(cases: Sequence[EvaluationCase]) -> dict[str, Any]:
     from app.config.settings import get_settings
     from app.db.pool import acquire
@@ -73,9 +153,8 @@ async def run_preflight(cases: Sequence[EvaluationCase]) -> dict[str, Any]:
         checks.append(await _probe_http(client, "elasticsearch", f"{es_host}/_cluster/health"))
         if any(case.domain.value == "agent" for case in cases):
             checks.append(
-                await _probe_http(
+                await _probe_agent_readiness(
                     client,
-                    "agent-readiness",
                     f"{agent_base_url()}/health/ready",
                 )
             )

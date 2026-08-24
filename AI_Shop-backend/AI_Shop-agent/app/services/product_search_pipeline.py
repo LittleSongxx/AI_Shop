@@ -303,7 +303,11 @@ def filter_products_by_runtime_constraints(
 
     required = {value.casefold() for value in constraints.required_brands}
     excluded = {value.casefold() for value in constraints.excluded_brands}
-    excluded_terms = {value.casefold() for value in constraints.excluded_terms}
+    excluded_terms = tuple(
+        value.casefold()
+        for value in constraints.excluded_terms
+        if str(value).strip()
+    )
     brand_profile = {
         "brands": list(constraints.required_brands),
         "excludedBrands": list(constraints.excluded_brands),
@@ -328,20 +332,20 @@ def filter_products_by_runtime_constraints(
             reason = "BRAND_REQUIRED"
         elif brand and brand in excluded:
             reason = "BRAND_EXCLUDED"
-        elif excluded_terms:
-            exclusion = evaluate_excluded_terms(product, tuple(excluded_terms))
-            if exclusion["violates"]:
-                reason = "TERM_EXCLUDED"
-            elif exclusion["eligibleSkuKeys"]:
-                product["constraint_allowed_sku_keys"] = exclusion["eligibleSkuKeys"]
-                product["constraint_evidence_contracts"] = exclusion["evidenceContracts"]
-        elif constraints.category:
+        if constraints.category:
             category_fields = " ".join(
                 str(product.get(key) or "")
                 for key in ("category", "categoryName", "category_name", "product_class")
             ).strip().casefold()
             if category_fields and constraints.category.casefold() not in category_fields:
-                reason = "CATEGORY_REQUIRED"
+                reason = reason or "CATEGORY_REQUIRED"
+        if excluded_terms:
+            exclusion = evaluate_excluded_terms(product, excluded_terms)
+            if exclusion["violates"]:
+                reason = reason or "TERM_EXCLUDED"
+            elif exclusion["eligibleSkuKeys"]:
+                product["constraint_allowed_sku_keys"] = exclusion["eligibleSkuKeys"]
+                product["constraint_evidence_contracts"] = exclusion["evidenceContracts"]
         if reason:
             rejected.append({"productId": product_id, "reason": reason})
         else:

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "aishop-customer-service-human-dataset/v1",
+  "artifact": "REUSABLE_INPUT_GOLD",
+  "lifecycle": "HUMAN_VERIFIED_IMMUTABLE",
+  "datasetPath": "evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "caseCount": 60,
+  "sourceEvidence": {
+    "artifactId": "customer-service-human-v1-20260823",
+    "path": "evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823",
+    "humanDatasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+    "sourceDraftSha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd",
+    "reviewerASha256": "738ad33ac03c9dfdaee4801adca722073bd216678bf867258b81bdc73d630838",
+    "reviewerBSha256": "5cf8f734e91fa85b46ae0febfa0db7c78749eeedfb48fcd9d838cf3766213e5c",
+    "adjudicationSha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e"
+  },
+  "reusePolicy": {
+    "mayBeUsedAsInputGold": true,
+    "mayBeUsedAsProductionAccuracy": false,
+    "mustPreserveCaseIdsAndRows": true,
+    "changesRequireNewReviewPackage": true
+  }
+}

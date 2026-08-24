@@ -39,6 +39,7 @@ from app.rag.ab_test import get_bucket
 from app.rag.prompt_builder import (
     build_grounding_prompt,
     deterministic_grounding_policy_fallback,
+    deterministic_policy_evidence_fallback,
     grounding_repair_reason,
 )
 from app.rag.query_rewriter import rewrite_for_rag
@@ -74,6 +75,17 @@ output_guard = OutputGuardrail()
 # level so the frozenset is constructed once rather than on every call to
 # build_context_node.
 _KEEP_INTENT: frozenset = frozenset({
+    # A product noun in an after-sales/security sentence is not a category
+    # switch.  Preserve these intents before the shopping-memory heuristic
+    # gets a chance to reinterpret the turn as a new product search.
+    IntentKind.DAMAGED_OR_WRONG_ITEM,
+    IntentKind.AFTERSALES_UNKNOWN,
+    IntentKind.INVOICE,
+    IntentKind.ADDRESS_CHANGE,
+    IntentKind.PAYMENT_ISSUE,
+    IntentKind.COMPLAINT,
+    IntentKind.HUMAN_REQUEST,
+    IntentKind.PRODUCT_CONSULT,
     IntentKind.QUERY_ORDER,
     IntentKind.QUERY_LOGISTICS,
     IntentKind.QUERY_FULFILLMENT,
@@ -82,6 +94,7 @@ _KEEP_INTENT: frozenset = frozenset({
     IntentKind.PRODUCT_REVIEW,
     IntentKind.RECOMMENT,
     IntentKind.REFUND,
+    IntentKind.REFUND_STATUS,
     IntentKind.CONFIRM_RECEIPT,
     IntentKind.CANCEL_ORDER,
 })
@@ -1063,6 +1076,7 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
             tool_args=tool_args,
             intent=intent,
             call_id=f"workflow:{state['message_id']}",
+            prior_source_refs=list(state.get("tool_source_refs") or []),
         )
 
     update = await forced_tool_for_intent(
@@ -1218,6 +1232,7 @@ async def tools_node(state: AgentGraphState) -> dict:
     messages = list(state.get("llm_messages") or [])
     called: list[str] = []
     tool_biz = dict(state.get("tool_biz") or {})
+    tool_source_refs = list(state.get("tool_source_refs") or [])
     biz_type = state.get("biz_type")
     biz_data = state.get("biz_data")
     assistant_cards = state.get("assistant_cards")
@@ -1344,6 +1359,12 @@ async def tools_node(state: AgentGraphState) -> dict:
             verified_image_context=verified_image_context,
             source_message_id=source_message_id,
         )
+        # Legacy integrations and test doubles may not expose the optional
+        # structured evidence fields.  Missing fields mean no evidence, not a
+        # failed agent turn; production ToolInvokeResult objects expose them.
+        result_source_refs = list(getattr(result, "source_refs", None) or [])
+        result_retrieval_trace = getattr(result, "retrieval_trace", None)
+        result_grounding = getattr(result, "grounding", None)
         called.append(tc["name"])
         # Observation 层：工具结果进上下文前统一脱敏/裁剪/污染扫描，
         # 治理痕迹进 trace（A2：命中注入话术时 contaminated 标记）。
@@ -1365,9 +1386,9 @@ async def tools_node(state: AgentGraphState) -> dict:
                 rag_queries.append(query_key)
                 # 检疫不是"没检索"：污染痕迹（quarantineCount/contamination 规则名）
                 # 同样要进 trace——否则 agentic 路径整包被隔离时无法定位被投毒文档。
-                if result.retrieval_trace:
+                if result_retrieval_trace:
                     safe_trace = _quarantined_rag_trace(
-                        result.retrieval_trace,
+                        result_retrieval_trace,
                         obs.matched_rules,
                     )
                     rag_trace = _merge_rag_trace(
@@ -1395,16 +1416,16 @@ async def tools_node(state: AgentGraphState) -> dict:
             rag_retrieval_count += 1
             rag_queries.append(query_key)
             rag_source_refs = _merge_rag_sources(
-                rag_source_refs, result.source_refs
+                rag_source_refs, result_source_refs
             )
             rag_trace = _merge_rag_trace(
                 rag_trace,
-                result.retrieval_trace,
+                result_retrieval_trace,
                 rag_mode=rag_mode,
                 retrieval_no=rag_retrieval_count,
                 source_count=len(rag_source_refs),
             )
-            grounding = result.grounding or {}
+            grounding = result_grounding or {}
             incoming_state = str(grounding.get("evidenceState") or "INSUFFICIENT")
             if incoming_state == "SUPPORTED":
                 rag_evidence_state = "SUPPORTED"
@@ -1452,11 +1473,16 @@ async def tools_node(state: AgentGraphState) -> dict:
                 node_name="tools",
                 input_data={"queryHash": query_key},
                 output_data={
-                    "trace": result.retrieval_trace,
-                    "sourceRefs": result.source_refs,
-                    "hasEvidence": bool(result.source_refs),
+                    "trace": result_retrieval_trace,
+                    "sourceRefs": result_source_refs,
+                    "hasEvidence": bool(result_source_refs),
                 },
             )
+        elif result_source_refs:
+            # Business evidence is carried separately from RAG evidence. This
+            # prevents an order/offer snapshot from being mistaken for policy
+            # grounding while still making the final HTTP envelope auditable.
+            tool_source_refs = _merge_rag_sources(tool_source_refs, result_source_refs)
 
         biz_dict = result.to_biz_dict()
         if biz_dict:
@@ -1484,6 +1510,7 @@ async def tools_node(state: AgentGraphState) -> dict:
         "rag_queries": rag_queries,
         "rag_retrieval_count": rag_retrieval_count,
         "rag_source_refs": rag_source_refs,
+        "tool_source_refs": tool_source_refs,
         "rag_trace": rag_trace,
         "rag_evidence_state": rag_evidence_state,
         "rag_evidence_items": rag_evidence_items,
@@ -1618,6 +1645,47 @@ async def finalize_node(state: AgentGraphState) -> dict:
             chunks = list(chunks) + [_HANDOFF_SUGGEST_TEXT]
             full_text = "".join(chunks)
 
+        verifier_fallback = state.get("verifier_fallback")
+        # A verified order snapshot or a server-built action card already owns
+        # the answer. Preparing a generic RAG fallback here is misleading when
+        # it will never be applied, and makes trace readers think policy RAG
+        # participated in a dynamic-business response.
+        has_dynamic_business_authority = bool(state.get("tool_source_refs")) and (
+            str(state.get("order_resolution") or "").upper()
+            in {"RESOLVED", "NO_ELIGIBLE"}
+            or bool(state.get("assistant_cards"))
+            or str(state.get("biz_type") or "") == "action_confirm"
+        )
+        if (
+            not verifier_fallback
+            and not has_dynamic_business_authority
+            and state.get("rag_evidence_required")
+            and str(state.get("rag_evidence_state") or "").upper() == "SUPPORTED"
+        ):
+            fallback = deterministic_policy_evidence_fallback(
+                str(state.get("user_text") or ""),
+                intent=str(state.get("intent") or ""),
+                evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
+                source_refs=list(state.get("rag_source_refs") or []),
+            )
+            if fallback:
+                verifier_fallback = str(fallback["answer"])
+                episode_service.record_step(
+                    "RAG_POLICY_FALLBACK_PREPARED",
+                    node_name="finalize",
+                    status="OK",
+                    input_data={
+                        "intent": str(state.get("intent") or ""),
+                        "evidenceState": str(state.get("rag_evidence_state") or ""),
+                        "sourceId": fallback.get("sourceId"),
+                    },
+                    output_data={
+                        "event": fallback.get("event"),
+                        "citation": fallback.get("citation"),
+                        "factId": fallback.get("factId"),
+                    },
+                )
+
         await rt.finalize_agent_response(
             agent_msg,
             chunks,
@@ -1628,21 +1696,26 @@ async def finalize_node(state: AgentGraphState) -> dict:
             tools_called=tools_called,
             tool_biz=state.get("tool_biz"),
             search_tool_hint=state.get("search_tool_hint"),
-            source_refs=(
-                {
-                    "trace": state.get("rag_trace"),
-                    "sources": state.get("rag_source_refs") or [],
-                }
-                if state.get("rag_trace")
-                else state.get("rag_source_refs")
-            ),
+            # Keep one backwards-compatible envelope for persistence/UI, while
+            # making the evidence domain explicit.  The verifier consumes only
+            # ragSources for policy citations; business snapshots remain
+            # auditable but cannot launder an unsupported policy claim.
+            source_refs={
+                "trace": state.get("rag_trace"),
+                "ragSources": list(state.get("rag_source_refs") or []),
+                "businessSources": list(state.get("tool_source_refs") or []),
+                "sources": [
+                    *(state.get("rag_source_refs") or []),
+                    *(state.get("tool_source_refs") or []),
+                ],
+            },
             user_text=state.get("user_text"),
             consult_card=state.get("card"),
             message_card=state.get("message_card"),
             order_resolution=state.get("order_resolution"),
             rag_evidence_required=bool(state.get("rag_evidence_required")),
             rag_evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
-            verifier_fallback=state.get("verifier_fallback"),
+            verifier_fallback=verifier_fallback,
         )
     except Exception as e:
         logger.exception("graph_finalize_failed", error=str(e))

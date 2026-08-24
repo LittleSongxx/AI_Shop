@@ -259,7 +259,7 @@ development/regression 数据锁、文件 SHA、case 数、域分布、集合互
 客服 intent/风险/slot/handoff 的 60 条双人盲标+第三人仲裁证据见
 [客服金标评测](docs/evaluation/customer-service/客服金标评测.md)；本轮核心排错、阶段指标、外部调研和后续优先级已合并到
 [主线与开发记录](docs/project/AI_Shop主线与开发记录.md)；新版面试题入口为
-[AI应用开发_Java后端_真实面试题与备考报告_20260821.md](AI应用开发_Java后端_真实面试题与备考报告_20260821.md)。
+[AI应用开发_Java后端_真实面试题与备考报告_20260824.md](AI应用开发_Java后端_真实面试题与备考报告_20260824.md)。
 
 当前评测协议为 `aishop-evaluation/v3`，Python 命令必须使用 Conda `shop` 环境：
 `/home/song/miniconda3/envs/shop/bin/python`。development 锁定 `43` 条（Search/RAG/Agent = `18/18/7`），
@@ -277,19 +277,25 @@ RAG answerable retrieval Recall@5 为 `29/29=1.000`，lexical grounded faithfuln
 Search/RAG/Agent 本地完整链路 P50/P95/P99 分别为 `269.6/797.3/940.6 ms`、`1825.4/4246.7/4525.3 ms`、
 `1362.5/17077.8/20943.0 ms`。样本小且只作本地诊断，RAG lexical/semantic shadow 也不等于人工语义准确率。
 
-客服规则预路由的当前点估计为 Intent Macro-F1 `0.955299`（3 个 intent badcase，分层 95% CI `[0.929286,0.987409]`）、高风险 intent Recall `1.000`（10/10）、
+客服规则预路由的历史人工金标基线为 Intent Macro-F1 `0.955299`（3 个 intent badcase，分层 95% CI `[0.929286,0.987409]`）；同一 60 条 HUMAN_VERIFIED gold 的当前规则回放为 Intent Macro-F1 `1.000000`（无 intent badcase，CI `[1.000000,1.000000]`）。后者是同集修复回放，不是新 holdout 泛化结果。高风险 intent Recall `1.000`（10/10）、
 完整人工 schema 的 slot micro F1 `0.996364=822/825`（3 个 strict-format badcase，95% CI `[0.995061,0.997636]`）、slot EM `0.911765`（31/34）、
 handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
 同一 60 条人工 gold 的 paired replay 为 Span F1 `0.907652 -> 0.996364`、EM `0.558824 -> 0.911765`，修复 12 case、回归 0；只剩 `009/020/058` 的金额原始格式差异。该结果是同集优化证据，不是新 holdout。
 这些是离线规则预路由质量，不是线上客服成功率；`releaseGateEligible=false` 保持 fail-closed。
 
-同一 60 条 gold 已经正式 HTTP Agent/Java/RAG/LLM 路径执行 `60/60`，HTTP 转人工混淆矩阵为 `TP=14,TN=46,FP=0,FN=0`，引用结构违规 `0`。
+历史 HTTP v1 的同一 60 条 gold 已经正式 Agent/Java/RAG/LLM 路径执行 `60/60`，转人工混淆矩阵为 `TP=14,TN=46,FP=0,FN=0`，引用结构违规 `0`。
 Episode 槽位经脱敏，因此 HTTP Slot F1/EM 不可测。答案质量已完成双人盲审与 `8` 条独立第三人仲裁：冻结 60 条回放的答案正确率为
 `51/60=85.0%`（Wilson 95% CI `73.9%–91.9%`），但可计分引用的语义支持率仅 `6/30=20.0%`（`9.5%–37.3%`），联合质量通过率
 `32/60=53.3%`。转人工适当率为 `60/60`，unsafe-answer 为 `0/60`；后两项的小样本区间不能写成“绝对安全”。双人 `52/60` 完全一致和
 `8` 条仲裁是标注可靠性，不能当模型准确率。该 HTTP 观察包 `releaseGateEligible=false`，不是 CSAT/FCR、线上成功率或历史 final 的追溯门禁；
 引用支持缺口是当前客服主线的最高优先级质量问题。
-另有 60 条 v2 draft 及双人盲标表已生成，仲裁前不与当前 60 条 HUMAN_VERIFIED 分母合并。
+另有 60 条 v2 draft 及双人盲标表已生成，仲裁前不与当前 60 条 HUMAN_VERIFIED 分母合并。动态业务工具的 Java 权威 `sourceRefs` 已补齐并在最终消息/HTTP 评测 trace 中保留；这只是代码和契约修复，旧 HTTP `6/30=20.0%` 标签仍绑定旧 run，不能迁移到新输出。
+
+修复后已完成一轮新的真实 HTTP observation：`customer-service-http-v13-20260824`。它在同一冻结 60 条上完整终态 `60/60`、HTTP error `0`、行为契约 `10/10`，Provider usage 为 `18` 次调用、输入/输出 token `78,470/5,486`、`costCny=null` / `UNPRICED`；本地 P50/P95/P99 为 `1015.049/11372.651/22858.230 ms`，仅作本机诊断。`60/60`、Intent/slot 指标和行为契约都不是人工最终答案质量。API、Worker、MCP 已增加相同源码 fingerprint 的 readiness/preflight 检查，避免独立 MCP 进程仍加载旧代码。
+
+原始 Provider observation 已作为只读 [pre-evaluator-fix 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824/) 保存；其中四条“不能据此断言平台无货”被旧纯正则错误判为“平台无货”断言。正式 [v13 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/) 仅对同一 observation 做免责声明感知的确定性离线重算，未重跑 Provider。该评测器修复使行为契约从误报恢复，不能表述为模型质量提升。v13 的答案质量状态为 `PENDING_HUMAN_REVIEW`，两份独立盲审表已绑定该报告 SHA；必须完成新的双盲和第三人仲裁后，才能报告新的答案正确率、引用语义支持率、转人工适当率、unsafe rate 或与 v1 的对照。
+
+另保留一对只读运行版本诊断：v11 在旧 MCP 进程仍加载旧源码时，于同一 10 条定向集出现 `6/10` 行为契约违例；完整重启后的 v12 为 `0/10`。二者由 manifest 成对校验相同数据哈希、状态、违例数和 `SHA256SUMS`，仅证明版本一致性修复有效，不构成答案质量分数。已被 v13 覆盖的 v5/v10 60 条中间运行与未完成 v3 盲审草稿已清理。
 
 Search 已对 10 条已知难例做真实成对回放：Recall/MRR/NDCG 与 v9 baseline 的 delta 均为 `0`，硬约束违规 `0`；仍保留 3 个多商品/集合意图/比较对象难例。
 该 replay 只证明当前无回归，不替代新 final，也不声称指标提升。

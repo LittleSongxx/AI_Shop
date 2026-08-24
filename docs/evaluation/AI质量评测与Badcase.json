@@ -1736,11 +1736,12 @@
     "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
     "metrics": {
       "intentMacroF1": {
-        "value": 0.955299,
-        "numerator": 19.105978,
+        "value": 1.0,
+        "numerator": 20.0,
         "denominator": 20,
-        "confidenceInterval95": {"lower": 0.929286, "upper": 0.987409, "method": "stratified-case-bootstrap-macro-F1"},
-        "badcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"]
+        "confidenceInterval95": {"lower": 1.0, "upper": 1.0, "method": "stratified-case-bootstrap-macro-F1"},
+        "badcaseIds": [],
+        "comparison": {"historicalBaseline": 0.955299, "historicalBadcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"], "sameDatasetReplay": true, "newHoldout": false}
       },
       "highRiskIntentRecall": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseIds": []},
       "slotEntitySpanF1": {"value": 0.996364, "numerator": 822, "denominator": 825, "componentCounts": {"truePositive": 411, "falsePositive": 0, "falseNegative": 3}, "confidenceInterval95": {"lower": 0.995061, "upper": 0.997636, "method": "stratified-case-bootstrap-micro-F1"}, "badcaseCount": 3, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]},
@@ -1750,15 +1751,18 @@
       "canonicalSlotEntitySpanF1": {"value": 0.995683, "numerator": 692, "denominator": 695, "componentCounts": {"truePositive": 346, "falsePositive": 0, "falseNegative": 3}, "confidenceInterval95": {"lower": 0.994135, "upper": 0.997191, "method": "stratified-case-bootstrap-micro-F1"}, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]},
       "canonicalSlotExactMatch": {"value": 0.911765, "numerator": 31, "denominator": 34, "confidenceInterval95": {"lower": 0.770395, "upper": 0.969534, "method": "wilson"}, "badcaseIds": ["cs-gold-v1-009", "cs-gold-v1-020", "cs-gold-v1-058"]}
     },
-    "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "adjudicatedCases": 25},
+    "historicalBaseline": {"intentMacroF1": 0.955299, "badcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"], "datasetCaseCount": 60, "newHoldout": false},
+    "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "slotAgreement": "45/60", "slotCohenKappa": 0.662035, "adjudicatedCases": 25},
     "httpFullPath": {
       "status": "EXECUTED_HUMAN_REVIEWED_ADJUDICATED",
       "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823",
       "sha256SumsSha256": "197bfa7edce9eb897dd6c60e869b1c11d601d42f141810362c7ea8d6b6df159b",
       "execution": "60/60",
       "intentMacroF1": 0.955299,
+      "intentMacroF1Scope": "HISTORICAL_HTTP_RUN_RULE_PRE_ROUTER; not the current same-dataset replay",
       "handoffConfusion": {"truePositive": 14, "falsePositive": 0, "falseNegative": 0, "trueNegative": 46},
       "citationContractInvalidCases": 0,
+      "evidencePropagationFix": {"status": "IMPLEMENTED_AFTER_THIS_RUN", "scope": "new_runs_only", "requiresNewBlindReview": true, "doesNotRewriteHistoricalLabels": true},
       "httpSlotMetrics": "UNAVAILABLE_REDACTED_EPISODE_VALUES",
       "answerQuality": {
         "status": "HUMAN_REVIEWED_ADJUDICATED",
@@ -1792,6 +1796,46 @@
       "localLatencyMs": {"p50": 1014.106, "p95": 15212.514, "p99": 60141.617},
       "usage": {"inputTokens": 114720, "outputTokens": 6649, "providerCalls": 32, "unpricedCalls": 31, "missingUsageCalls": 1, "costCny": null, "costStatus": "MISSING_USAGE"}
     },
+    "httpFullPathV13": {
+      "status": "PENDING_HUMAN_REVIEW",
+      "releaseGateEligible": false,
+      "sourceRunId": "customer-service-http-v13-20260824",
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824",
+      "sha256SumsSha256": "bc786e8c9d98510d4f3c4cd391ea4538cc7304166ae4cb25b390c0eeebd6533a",
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "rawObservation": {
+        "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824",
+        "sha256SumsSha256": "34fd92ac62facaa58f129ff591c8e2a545182fffc79b893f808101bd05f3ae8c",
+        "reportSha256": "46916afcf1bb77a7b10e6adb2e4183cd37302becdc187439451180ce5beae805"
+      },
+      "provenance": {
+        "mode": "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS",
+        "providerCallsReexecuted": false,
+        "evaluatorFix": "DISCLAIMER_AWARE_CATALOG_ABSENCE_ASSERTION_DETECTION",
+        "evaluatorFalsePositiveCaseIds": ["cs-gold-v1-001", "cs-gold-v1-002", "cs-gold-v1-034", "cs-gold-v1-042"],
+        "qualityGainClaimAllowed": false
+      },
+      "executionDiagnostics": {
+        "terminalExecution": "60/60",
+        "httpErrorCount": 0,
+        "behaviorContract": "10/10",
+        "hardConstraintViolationCount": 0,
+        "intentMacroF1": 1.0,
+        "handoffRecall": "14/14",
+        "highRiskIntentRecall": "10/10",
+        "slotMetrics": "UNAVAILABLE_REDACTED_EPISODE_VALUES",
+        "latencyMs": {"boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO", "p50": 1015.049, "p95": 11372.651, "p99": 22858.23},
+        "usage": {"inputTokens": 78470, "outputTokens": 5486, "providerCalls": 18, "costCny": null, "costStatus": "UNPRICED"}
+      },
+      "blindReview": {
+        "status": "OPEN",
+        "caseCount": 60,
+        "reviewerASha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
+        "reviewerBSha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
+        "historicalV1LabelsReusable": false
+      },
+      "answerQualityMetrics": null
+    },
     "candidateV2": {
       "status": "DRAFT_NEEDS_DUAL_HUMAN_REVIEW",
       "additionalCaseCount": 60,
@@ -1814,8 +1858,9 @@
     },
     "limitations": [
       "slot F1/EM is measured on resolve_intent(..., allow_llm=false); HTTP Episode slot values are redacted and are not scored",
-      "HTTP answer quality is a fixed 60-case replay with 8 third-person adjudications; it is not CSAT/FCR, online success, or a retroactive release gate",
-      "citation grounding support is 6/30 eligible cases, so the current generated answer path is not a reliable grounded-answer capability",
+      "Historical v1 HTTP answer quality is a fixed 60-case replay with 8 third-person adjudications; it is not CSAT/FCR, online success, or a retroactive release gate",
+      "Historical v1 citation grounding support is 6/30 eligible cases, so that observed generated-answer path was not a reliable grounded-answer capability",
+      "The repaired v13 HTTP observation remains PENDING_HUMAN_REVIEW; no historical human labels or quality metric may be migrated to it.",
       "offline understanding evidence does not establish online success rate, CSAT, FCR, or release quality gate"
     ]
   },
@@ -2024,6 +2069,15 @@
         "before": {"status": "PROVISIONAL_DRAFT", "headlineMetrics": "all 1.0"},
         "after": {"status": "HUMAN_VERIFIED", "intentMacroF1": 0.955299, "slotEntitySpanF1": 0.907652, "slotExactMatch": 0.558824},
         "qualityGainClaimAllowed": false
+      },
+      {
+        "id": "customer-intent-routing-paired-replay-v2",
+        "kind": "PAIRED_SAME_HUMAN_GOLD",
+        "caseCount": 60,
+        "before": {"intentMacroF1": 0.955299, "riskFieldMismatchCount": 7, "badcaseIds": ["cs-gold-v1-011", "cs-gold-v1-044", "cs-gold-v1-057"]},
+        "after": {"intentMacroF1": 1.0, "riskFieldMismatchCount": 0, "badcaseIds": [], "newHoldout": false},
+        "fixedCaseCount": 3,
+        "qualityGainClaimAllowed": "same-dataset replay only"
       },
       {
         "id": "slot-statistic-correction",

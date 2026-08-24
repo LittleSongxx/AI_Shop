@@ -1,6 +1,10 @@
 # Runtime-only catalog leaves. The historical query-normalization taxonomy is
 # hash-locked by Search v1, so additive runtime categories live separately.
 topics:
+  - canonical: 手机壳
+    aliases: [手机壳, 手机套, 保护壳, 保护套]
+    runtimeCategory: 手机壳
+    surfaceTerms: [手机壳, 手机套, 保护壳, 保护套]
   - canonical: 笔记本电脑
     aliases: [笔记本, 轻薄本, 游戏本]
     runtimeCategory: 笔记本电脑

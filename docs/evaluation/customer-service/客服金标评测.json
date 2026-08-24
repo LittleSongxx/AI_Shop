@@ -27,38 +27,11 @@
         "intent": "REFUND",
         "nextAction": "TOOL",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule"
       },
       "rootCause": "SLOT_NORMALIZATION_GAP",
-      "sliceTags": []
-    },
-    {
-      "caseId": "cs-gold-v1-011",
-      "difficulty": null,
-      "expected": {
-        "intent": "REFUND",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {}
-      },
-      "message": "退款政策一般多久到账",
-      "metrics": [
-        "intentMacroF1"
-      ],
-      "predicted": {
-        "confidence": 0.96,
-        "entities": {},
-        "handoffReason": null,
-        "intent": "REFUND_STATUS",
-        "nextAction": "TOOL",
-        "requestMode": "INFORMATIONAL",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule_priority"
-      },
-      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
       "sliceTags": []
     },
     {
@@ -96,72 +69,6 @@
       "sliceTags": []
     },
     {
-      "caseId": "cs-gold-v1-044",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "PRODUCT_CONSULT",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {
-          "productName": "耳机"
-        }
-      },
-      "message": "这款耳机和另一款相比哪个好",
-      "metrics": [
-        "intentMacroF1"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {
-          "productName": "耳机"
-        },
-        "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
-        "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
-      "sliceTags": [
-        "product-search",
-        "comparison",
-        "consult-search-boundary"
-      ]
-    },
-    {
-      "caseId": "cs-gold-v1-057",
-      "difficulty": "hard",
-      "expected": {
-        "intent": "REFUND",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "slots": {}
-      },
-      "message": "退款多久到账呀",
-      "metrics": [
-        "intentMacroF1"
-      ],
-      "predicted": {
-        "confidence": 0.9,
-        "entities": {},
-        "handoffReason": null,
-        "intent": "CHAT",
-        "nextAction": "ANSWER",
-        "requestMode": "INFORMATIONAL",
-        "riskLevel": "LOW",
-        "shouldHandoff": false,
-        "source": "rule"
-      },
-      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
-      "sliceTags": [
-        "refund",
-        "timing-question",
-        "policy-status-boundary"
-      ]
-    },
-    {
       "caseId": "cs-gold-v1-058",
       "difficulty": "medium",
       "expected": {
@@ -190,7 +97,7 @@
         "shouldHandoff": false,
         "source": "rule_priority"
       },
-      "rootCause": "SLOT_EXTRACTION_GAP",
+      "rootCause": "SLOT_NORMALIZATION_GAP",
       "sliceTags": [
         "invoice",
         "currency-slot"
@@ -577,7 +484,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": false
       },
       "message": "我要退款订单 SM202608050002，金额199元",
@@ -591,7 +498,7 @@
         "intent": "REFUND",
         "nextAction": "TOOL",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule"
       },
@@ -611,7 +518,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "我的退款订单 SM202608050002 什么时候到账",
@@ -624,7 +531,7 @@
         "intent": "REFUND_STATUS",
         "nextAction": "TOOL",
         "requestMode": "READ_QUERY",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule_priority"
       },
@@ -641,21 +548,21 @@
       "id": "cs-gold-v1-011",
       "matches": {
         "handoff": true,
-        "intent": false,
+        "intent": true,
         "riskLevel": true,
         "slotExactMatch": false
       },
       "message": "退款政策一般多久到账",
       "predicted": {
-        "confidence": 0.96,
+        "confidence": 0.9,
         "entities": {},
         "handoffReason": null,
-        "intent": "REFUND_STATUS",
-        "nextAction": "TOOL",
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
         "requestMode": "INFORMATIONAL",
         "riskLevel": "LOW",
         "shouldHandoff": false,
-        "source": "rule_priority"
+        "source": "rule"
       },
       "sliceTags": []
     },
@@ -673,7 +580,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "我要取消订单 SM202608050002",
@@ -686,7 +593,7 @@
         "intent": "CANCEL_ORDER",
         "nextAction": "TOOL",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule"
       },
@@ -735,7 +642,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "订单 SM202608050002 我已经收到货了，帮我确认收货",
@@ -748,7 +655,7 @@
         "intent": "CONFIRM_RECEIPT",
         "nextAction": "TOOL",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule"
       },
@@ -964,7 +871,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "订单 SM202608050002 收货地址填错了，帮我改地址",
@@ -977,7 +884,7 @@
         "intent": "ADDRESS_CHANGE",
         "nextAction": "ANSWER",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule_priority"
       },
@@ -1146,7 +1053,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "我想申请售后，订单 SM202608050002",
@@ -1159,7 +1066,7 @@
         "intent": "AFTERSALES_UNKNOWN",
         "nextAction": "ASK_CLARIFICATION",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule"
       },
@@ -1247,7 +1154,7 @@
       "matches": {
         "handoff": true,
         "intent": true,
-        "riskLevel": false,
+        "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "我要退款，金额 88 元",
@@ -1260,7 +1167,7 @@
         "intent": "REFUND",
         "nextAction": "TOOL",
         "requestMode": "ACTION_PROPOSAL",
-        "riskLevel": "LOW",
+        "riskLevel": "MEDIUM",
         "shouldHandoff": false,
         "source": "rule"
       },
@@ -1453,7 +1360,7 @@
         "entities": {},
         "handoffReason": null,
         "intent": "REFUND",
-        "nextAction": "TOOL",
+        "nextAction": "ANSWER",
         "requestMode": "INFORMATIONAL",
         "riskLevel": "LOW",
         "shouldHandoff": false,
@@ -1723,23 +1630,23 @@
       "id": "cs-gold-v1-044",
       "matches": {
         "handoff": true,
-        "intent": false,
+        "intent": true,
         "riskLevel": true,
         "slotExactMatch": true
       },
       "message": "这款耳机和另一款相比哪个好",
       "predicted": {
-        "confidence": 0.9,
+        "confidence": 0.99,
         "entities": {
           "productName": "耳机"
         },
         "handoffReason": null,
-        "intent": "PRODUCT_SEARCH",
-        "nextAction": "TOOL",
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
         "requestMode": "READ_QUERY",
         "riskLevel": "LOW",
         "shouldHandoff": false,
-        "source": "rule"
+        "source": "structural"
       },
       "sliceTags": [
         "product-search",
@@ -2169,7 +2076,7 @@
       "id": "cs-gold-v1-057",
       "matches": {
         "handoff": true,
-        "intent": false,
+        "intent": true,
         "riskLevel": true,
         "slotExactMatch": false
       },
@@ -2178,7 +2085,7 @@
         "confidence": 0.9,
         "entities": {},
         "handoffReason": null,
-        "intent": "CHAT",
+        "intent": "REFUND",
         "nextAction": "ANSWER",
         "requestMode": "INFORMATIONAL",
         "riskLevel": "LOW",
@@ -2532,9 +2439,9 @@
       "HUMAN_REQUEST": 0,
       "INVOICE": 0,
       "PAYMENT_ISSUE": 0,
-      "PRODUCT_CONSULT": 5,
+      "PRODUCT_CONSULT": 6,
       "PRODUCT_REVIEW": 0,
-      "PRODUCT_SEARCH": 1,
+      "PRODUCT_SEARCH": 0,
       "QUERY_COUPON": 0,
       "QUERY_FULFILLMENT": 0,
       "QUERY_LOGISTICS": 0,
@@ -2701,7 +2608,7 @@
       "ADDRESS_CHANGE": 0,
       "AFTERSALES_UNKNOWN": 0,
       "CANCEL_ORDER": 0,
-      "CHAT": 1,
+      "CHAT": 0,
       "COMPLAINT": 0,
       "CONFIRM_RECEIPT": 0,
       "DAMAGED_OR_WRONG_ITEM": 0,
@@ -2716,8 +2623,8 @@
       "QUERY_LOGISTICS": 0,
       "QUERY_ORDER": 0,
       "RECOMMENT": 0,
-      "REFUND": 3,
-      "REFUND_STATUS": 1
+      "REFUND": 5,
+      "REFUND_STATUS": 0
     },
     "REFUND_STATUS": {
       "ADDRESS_CHANGE": 0,
@@ -2861,10 +2768,67 @@
     "requiredAnnotators": 2,
     "status": "COMPLETE"
   },
+  "httpAnswerReviewV13": {
+    "status": "PENDING_HUMAN_REVIEW",
+    "releaseGateEligible": false,
+    "sourceRunId": "customer-service-http-v13-20260824",
+    "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
+    "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+    "sourceObservation": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824",
+      "sha256SumsSha256": "34fd92ac62facaa58f129ff591c8e2a545182fffc79b893f808101bd05f3ae8c",
+      "reportSha256": "46916afcf1bb77a7b10e6adb2e4183cd37302becdc187439451180ce5beae805"
+    },
+    "observationProvenance": {
+      "mode": "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS",
+      "providerCallsReexecuted": false,
+      "semanticAnswerQualityMeasured": false,
+      "evaluatorCorrection": "DISCLAIMER_AWARE_CATALOG_ABSENCE_ASSERTION_DETECTION"
+    },
+    "execution": {
+      "caseCount": 60,
+      "terminalExecution": "60/60",
+      "httpErrorCount": 0,
+      "hardConstraintViolationCount": 0,
+      "behaviorContract": "10/10",
+      "fixtureProvisionedCount": 19,
+      "fixtureCleanupFailureCount": 0
+    },
+    "runtimeDiagnostics": {
+      "intentMacroF1": 1.0,
+      "handoffRecall": "14/14",
+      "highRiskIntentRecall": "10/10",
+      "httpSlotMetrics": "UNAVAILABLE_REDACTED_EPISODE_VALUES",
+      "latencyMs": {
+        "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+        "p50": 1015.049,
+        "p95": 11372.651,
+        "p99": 22858.23
+      },
+      "usage": {
+        "providerCalls": 18,
+        "inputTokens": 78470,
+        "outputTokens": 5486,
+        "costCny": null,
+        "costStatus": "UNPRICED"
+      }
+    },
+    "blindReview": {
+      "reviewerAPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl",
+      "reviewerASha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
+      "reviewerBPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl",
+      "reviewerBSha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
+      "caseCount": 60,
+      "labelsCompleted": 0,
+      "historicalLabelsReusable": false
+    },
+    "answerQualityMetrics": null
+  },
   "limitations": [
     "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
     "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
-    "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion."
+    "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion.",
+    "The v13 HTTP observation has no completed blind human answer review; its execution, behavior-contract, route, local-latency, and usage fields must not be presented as answer quality."
   ],
   "metrics": {
     "criticalHandoffMissRate": {
@@ -2931,18 +2895,14 @@
       "value": 1.0
     },
     "intentMacroF1": {
-      "badcaseCount": 3,
-      "badcaseIds": [
-        "cs-gold-v1-011",
-        "cs-gold-v1-044",
-        "cs-gold-v1-057"
-      ],
+      "badcaseCount": 0,
+      "badcaseIds": [],
       "confidenceInterval95": {
         "confidenceLevel": 0.95,
-        "lower": 0.929286,
+        "lower": 1.0,
         "method": "stratified-case-bootstrap-macro-F1",
         "stratumCount": 25,
-        "upper": 0.987409
+        "upper": 1.0
       },
       "definition": "Gold intent labels are macro-averaged across the observed label set; prediction outside the set is counted as a miss/false positive.",
       "denominator": 20,
@@ -2950,11 +2910,63 @@
       "notes": [
         "HUMAN_VERIFIED"
       ],
-      "numerator": 19.105978,
+      "numerator": 20.0,
       "releaseGateEligible": false,
       "role": "PRIMARY_QUALITY",
       "status": "MEASURED",
-      "value": 0.955299
+      "value": 1.0
+    },
+    "normalizedSlotEntitySpanF1": {
+      "badcaseCount": 0,
+      "badcaseIds": [],
+      "componentCounts": {
+        "falseNegative": 0,
+        "falsePositive": 0,
+        "truePositive": 453
+      },
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 1.0,
+        "method": "stratified-case-bootstrap-micro-F1",
+        "stratumCount": 27,
+        "upper": 1.0
+      },
+      "definition": "Diagnostic micro character-span F1 after numeric/currency normalization of money-labelled slots; raw span F1 remains primary.",
+      "denominator": 906,
+      "name": "normalizedSlotEntitySpanF1",
+      "notes": [
+        "componentCounts: TP=453, FP=0, FN=0",
+        "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 906,
+      "releaseGateEligible": false,
+      "role": "DIAGNOSTIC_NORMALIZATION",
+      "status": "MEASURED",
+      "value": 1.0
+    },
+    "normalizedSlotExactMatch": {
+      "badcaseCount": 0,
+      "badcaseIds": [],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.898485,
+        "method": "wilson",
+        "upper": 1.0
+      },
+      "definition": "Diagnostic request-level slot equality after numeric/currency normalization of money-labelled slots; raw slot EM remains primary.",
+      "denominator": 34,
+      "name": "normalizedSlotExactMatch",
+      "notes": [
+        "Values such as 199, 199元 and ¥199.00 compare as CNY:199; incompatible currencies do not compare equal.",
+        "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 34,
+      "releaseGateEligible": false,
+      "role": "DIAGNOSTIC_NORMALIZATION",
+      "status": "MEASURED",
+      "value": 1.0
     },
     "slotEntitySpanF1": {
       "badcaseCount": 3,
@@ -3041,9 +3053,9 @@
     },
     "CHAT": {
       "badcaseIds": [],
-      "f1": 0.857143,
-      "precision": 0.75,
-      "predicted": 4,
+      "f1": 1.0,
+      "precision": 1.0,
+      "predicted": 3,
       "recall": 1.0,
       "support": 3
     },
@@ -3096,13 +3108,11 @@
       "support": 7
     },
     "PRODUCT_CONSULT": {
-      "badcaseIds": [
-        "cs-gold-v1-044"
-      ],
-      "f1": 0.909091,
+      "badcaseIds": [],
+      "f1": 1.0,
       "precision": 1.0,
-      "predicted": 5,
-      "recall": 0.833333,
+      "predicted": 6,
+      "recall": 1.0,
       "support": 6
     },
     "PRODUCT_REVIEW": {
@@ -3115,9 +3125,9 @@
     },
     "PRODUCT_SEARCH": {
       "badcaseIds": [],
-      "f1": 0.923077,
-      "precision": 0.857143,
-      "predicted": 7,
+      "f1": 1.0,
+      "precision": 1.0,
+      "predicted": 6,
       "recall": 1.0,
       "support": 6
     },
@@ -3162,21 +3172,18 @@
       "support": 1
     },
     "REFUND": {
-      "badcaseIds": [
-        "cs-gold-v1-011",
-        "cs-gold-v1-057"
-      ],
-      "f1": 0.75,
+      "badcaseIds": [],
+      "f1": 1.0,
       "precision": 1.0,
-      "predicted": 3,
-      "recall": 0.6,
+      "predicted": 5,
+      "recall": 1.0,
       "support": 5
     },
     "REFUND_STATUS": {
       "badcaseIds": [],
-      "f1": 0.666667,
-      "precision": 0.5,
-      "predicted": 2,
+      "f1": 1.0,
+      "precision": 1.0,
+      "predicted": 1,
       "recall": 1.0,
       "support": 1
     }
@@ -3188,7 +3195,7 @@
     "mode": "rule",
     "productionResolver": "app.domain.intent.classifier.resolve_intent",
     "providerFingerprint": "DETERMINISTIC_RULE_BASELINE",
-    "resolverSourceSha256": "1a854779c1d0901f1d96cc3f41c2a650b230f457bf2b1a7a4bbb951b7a98924b"
+    "resolverSourceSha256": "79bc113de30f173ae49ddc5c6a1f5d1886775624ab6c7753f3fe92a4cc4d166d"
   },
   "provisionalTargets": {
     "criticalHandoffMissRate": {

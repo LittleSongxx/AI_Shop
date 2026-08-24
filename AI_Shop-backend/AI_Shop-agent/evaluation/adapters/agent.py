@@ -259,8 +259,13 @@ def _deterministic_workflow_provider_snapshot(
     """
 
     decisions: list[dict[str, Any]] = []
+    order_reference_terminals: list[dict[str, Any]] = []
+    direct_handoff_decisions: list[dict[str, Any]] = []
+    direct_handoff_steps: list[dict[str, Any]] = []
     workflow_nodes = 0
     fallbacks = 0
+    llm_calls = 0
+    llm_failures = 0
     for episode in episodes:
         experiment = episode.get("experiment")
         if isinstance(experiment, Mapping):
@@ -268,19 +273,92 @@ def _deterministic_workflow_provider_snapshot(
             if isinstance(orchestration, Mapping):
                 if str(orchestration.get("mode") or "") == "workflow":
                     decisions.append(dict(orchestration))
+            order_reference = experiment.get("orderReference")
+            if isinstance(order_reference, Mapping) and (
+                str(order_reference.get("route") or "") == "finalize"
+                and str(order_reference.get("outcome") or "")
+                in {"RESOLVED", "NO_ELIGIBLE", "NO_MATCH", "AMBIGUOUS"}
+                and not bool(order_reference.get("dependencyError"))
+            ):
+                order_reference_terminals.append(dict(order_reference))
         for step in episode.get("steps") or []:
             if not isinstance(step, Mapping):
                 continue
+            event_type = str(step.get("eventType") or "")
+            status = str(step.get("status") or "")
+            output = step.get("output")
+            if event_type == "LLM_CALL":
+                llm_calls += 1
+                if status in {"ERROR", "FAILED"}:
+                    llm_failures += 1
+            if (
+                event_type == "INTENT_DECISION"
+                and status == "OK"
+                and isinstance(output, Mapping)
+                and str(output.get("nextAction") or output.get("next_action") or "")
+                == "HANDOFF"
+            ):
+                direct_handoff_decisions.append(dict(output))
+            if event_type == "HANDOFF" and status == "OK":
+                direct_handoff_steps.append(
+                    dict(output) if isinstance(output, Mapping) else {}
+                )
             if (
                 str(step.get("nodeName") or "") == "deterministic_workflow"
-                and str(step.get("status") or "") == "OK"
+                and status == "OK"
             ):
                 workflow_nodes += 1
-            if str(step.get("eventType") or "") == "ORCHESTRATION_FALLBACK":
+            if event_type == "ORCHESTRATION_FALLBACK":
                 fallbacks += 1
 
+    # A direct forced handoff is intentionally resolved before graph/LLM
+    # orchestration. It is valid evidence for an LLM N/A result only when both
+    # the intent decision and the terminal handoff event are present, and no
+    # LLM or orchestration fallback was observed. Zero LLM calls by itself is
+    # never sufficient evidence.
+    if (
+        direct_handoff_decisions
+        and direct_handoff_steps
+        and llm_calls == 0
+        and llm_failures == 0
+        and fallbacks == 0
+    ):
+        reasons = sorted(
+            {
+                str(item.get("handoff_reason") or item.get("intent") or "DIRECT_HANDOFF")
+                for item in direct_handoff_decisions
+            }
+        )
+        return {
+            "notApplicable": True,
+            "notApplicableReason": "deterministic_handoff:" + ",".join(reasons),
+            "workflowEvidence": {
+                "handoffDecisionCount": len(direct_handoff_decisions),
+                "handoffCount": len(direct_handoff_steps),
+                "handoffReasons": reasons,
+                "fallbackCount": fallbacks,
+                "llmCallCount": llm_calls,
+                "llmFailureCount": llm_failures,
+            },
+        }
+
     if not decisions or workflow_nodes == 0 or fallbacks:
-        return {}
+        if not order_reference_terminals:
+            return {}
+        outcomes = sorted(
+            {str(item.get("outcome")) for item in order_reference_terminals}
+        )
+        return {
+            "notApplicable": True,
+            "notApplicableReason": "deterministic_order_reference:" + ",".join(outcomes),
+            "workflowEvidence": {
+                "orderReferenceCount": len(order_reference_terminals),
+                "outcomes": outcomes,
+                "terminalRoutes": [
+                    str(item.get("route")) for item in order_reference_terminals
+                ],
+            },
+        }
     reasons = sorted(
         {
             str(item.get("reason") or "")
@@ -613,11 +691,22 @@ async def run_agent_case(
         or (case.repeat_policy or {}).get("stateMode")
         or "READ_ONLY"
     )
-    provision_declaration = (
-        case.state_fixture.get("provision")
-        if isinstance(case.state_fixture, Mapping)
-        else None
-    )
+    provision_declaration = None
+    if isinstance(case.state_fixture, Mapping):
+        # Repository Agent datasets use ``stateFixture.provision``.  The
+        # customer-service HTTP fixture map is intentionally flatter so its
+        # hash-bound declaration can be inspected without an extra wrapper.
+        # Accept the latter only when the kind is an explicitly supported
+        # local fixture; arbitrary state snapshots must never be treated as
+        # SQL provisioning instructions.
+        nested = case.state_fixture.get("provision")
+        if isinstance(nested, Mapping):
+            provision_declaration = dict(nested)
+        elif str(case.state_fixture.get("kind") or "") in {
+            "CANCELABLE_ORDER_V1",
+            "CUSTOMER_SERVICE_ORDER_V1",
+        }:
+            provision_declaration = dict(case.state_fixture)
     fixture = await provision_agent_fixture(
         provision_declaration,
         user_id=user_id,
@@ -922,7 +1011,17 @@ async def run_agent_case(
         matching_steps = [step for step in all_steps if step.get("toolName") == tool_name]
         matched = any(_contains_subset(step.get("input"), subset) for step in matching_steps)
         argument_rows.append({"tool": tool_name, "subset": subset, "matched": matched})
-    if fixture.active and fixture.order_id:
+    # A provisioned order is shared evidence for many read-only customer
+    # service cases (lookup, logistics, invoice, after-sales).  It must not
+    # implicitly turn every fixture into a cancel-order tool contract: doing
+    # so marks otherwise successful episodes as adapter failures.  The
+    # cancel-specific assertion is only meaningful when the case explicitly
+    # declares that tool as required (the write-evaluation datasets do this).
+    if (
+        fixture.active
+        and fixture.order_id
+        and "PROPOSE_CANCEL_ORDER" in required_tools
+    ):
         matching_steps = [
             step for step in all_steps if step.get("toolName") == "PROPOSE_CANCEL_ORDER"
         ]

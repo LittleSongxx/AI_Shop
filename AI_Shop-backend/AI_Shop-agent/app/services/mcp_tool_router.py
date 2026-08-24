@@ -78,6 +78,8 @@ class McpToolRouter:
                             "bizType": result.biz_type,
                             "hasCards": bool(result.assistant_cards),
                             "sourceCount": len(result.source_refs),
+                            "sourceRefs": list(result.source_refs or [])[:30],
+                            "contractData": result.contract_data,
                             "productIds": result.product_ids[:20],
                             "retrievalTrace": result.retrieval_trace,
                         }

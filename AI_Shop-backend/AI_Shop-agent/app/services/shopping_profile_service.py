@@ -73,6 +73,10 @@ _BRAND_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 _CATEGORY_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    # Keep accessory leaves before their parent category.  A compatibility
+    # question such as ``手机壳适配 iPhone 15`` must never become a phone shelf
+    # search and return handset offers.
+    ("手机壳", ("手机壳", "手机套", "保护壳", "保护套")),
     ("手机", ("手机", "智能机")),
     ("笔记本电脑", ("笔记本", "笔记本电脑", " laptop ", "laptop")),
     ("电脑", ("电脑", "台式机", "主机")),
@@ -89,6 +93,7 @@ _CATEGORY_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("服饰", ("服装", "衣服", "服饰")),
     ("鞋子", ("鞋子", "运动鞋", "跑鞋")),
     ("美妆", ("美妆", "护肤", "化妆品")),
+    ("外套", ("外套", "夹克")),
 )
 
 _SCENARIO_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -138,6 +143,20 @@ _EXACT_MODEL_HINT_RE = re.compile(
 )
 
 _NEGATIVE_BRAND_WORDS = ("不要", "不想要", "排除", "不考虑", "不选", "别买", "避开")
+_NEGATIVE_TERM_WORDS = (
+    "不要",
+    "不想要",
+    "排除",
+    "剔除",
+    "不选",
+    "别要",
+    "不含",
+    "不考虑",
+)
+_EXCLUDED_TERM_RE = re.compile(
+    r"(?:不要|不想要|排除|剔除|不选|别要|不含|不考虑)\s*"
+    r"(?:品牌\s*)?([^，,。！？!?；;]+)"
+)
 # Product names often mention a compatibility target (for example
 # ``车充……适用苹果17``). That is not evidence that the product brand is Apple.
 _COMPATIBILITY_BRAND_PREFIX = re.compile(
@@ -166,18 +185,26 @@ _PROFILE_FIELDS = (
     "budgetMax",
     "brands",
     "excludedBrands",
+    "excludedTerms",
     "scenarios",
     "features",
     "acceptSubstitute",
 )
 _PERSISTENT_EXPLICIT_FIELDS = frozenset(
-    {"brands", "excludedBrands", "scenarios", "features", "acceptSubstitute"}
+    {
+        "brands",
+        "excludedBrands",
+        "excludedTerms",
+        "scenarios",
+        "features",
+        "acceptSubstitute",
+    }
 )
 _SHORT_LIVED_FIELDS = frozenset(
     {"category", "budgetMin", "budgetMax", "acceptSubstitute"}
 )
 _LIST_FIELDS = frozenset(
-    {"brands", "excludedBrands", "scenarios", "features"}
+    {"brands", "excludedBrands", "excludedTerms", "scenarios", "features"}
 )
 _CHAT_TTL_DAYS = {field: (30 if field in _SHORT_LIVED_FIELDS else 90) for field in _PROFILE_FIELDS}
 _MANUAL_TTL_DAYS = 180
@@ -218,6 +245,7 @@ def empty_profile() -> dict[str, Any]:
         "budgetMax": None,
         "brands": [],
         "excludedBrands": [],
+        "excludedTerms": [],
         "scenarios": [],
         "features": [],
         "acceptSubstitute": None,
@@ -375,6 +403,96 @@ def _brand_in_text(text: str, aliases: tuple[str, ...]) -> bool:
     return any(re.search(re.escape(alias), text, flags=re.IGNORECASE) for alias in aliases)
 
 
+def _alias_in_positive_context(text: str, alias: str) -> bool:
+    """Match an alias only when it is not part of a nearby negative clause."""
+
+    value = str(text or "")
+    lowered = value.casefold()
+    needle = str(alias or "").casefold()
+    if not needle:
+        return False
+    offset = 0
+    while True:
+        start = lowered.find(needle, offset)
+        if start < 0:
+            return False
+        clause_start = max(
+            lowered.rfind(marker, 0, start)
+            for marker in ("，", ",", "。", "；", ";", "并", "但", "却")
+        )
+        prefix = lowered[clause_start + 1 : start]
+        negative_positions = [prefix.rfind(marker) for marker in _NEGATIVE_TERM_WORDS]
+        negative_start = max(negative_positions, default=-1)
+        if negative_start < 0:
+            return True
+        # A construction such as ``不要户外款的男士外套`` contains a negative
+        # noun phrase followed by the requested category.  The possessive
+        # boundary (``的``) closes the excluded phrase; an alias after it is
+        # positive context.  Without this boundary ``外套`` was incorrectly
+        # discarded together with ``户外款``.
+        negative_suffix = prefix[negative_start + 1 :]
+        if "的" in negative_suffix and start > clause_start + 1 + negative_start:
+            last_possessive = negative_suffix.rfind("的")
+            if start >= clause_start + 1 + negative_start + 1 + last_possessive + 1:
+                return True
+        offset = start + len(needle)
+
+
+def _brand_in_positive_context(text: str, aliases: tuple[str, ...]) -> bool:
+    """Do not treat a compatibility target as the requested brand."""
+
+    value = str(text or "")
+    for alias in aliases:
+        for match in re.finditer(re.escape(alias), value, flags=re.IGNORECASE):
+            prefix = value[max(0, match.start() - 12) : match.start()]
+            if _COMPATIBILITY_BRAND_PREFIX.search(prefix):
+                continue
+            if _alias_in_positive_context(value, alias):
+                return True
+    return False
+
+
+def _normalize_excluded_term(value: str) -> str:
+    """Reduce style suffixes to the searchable surface (``户外款`` -> ``户外``)."""
+
+    normalized = re.sub(r"\s+", "", str(value or "").strip())
+    normalized = re.sub(r"(?:风格|类型|系列|款式|款|版|风)$", "", normalized)
+    return normalized[:40]
+
+
+def _extract_excluded_terms(text: str) -> list[str]:
+    """Extract explicit non-brand exclusions for the hard-filter pipeline.
+
+    Only a bounded noun/style span is retained.  We intentionally do not turn
+    the remainder of a clause (for example ``不要户外款的男士外套``) into one
+    giant exclusion, which would silently remove the requested category.
+    """
+
+    value = str(text or "")
+    result: list[str] = []
+    known_brand_aliases = tuple(alias for _, aliases in _BRAND_ALIASES for alias in aliases)
+    for match in _EXCLUDED_TERM_RE.finditer(value):
+        candidate = match.group(1).strip()
+        bounded = re.search(
+            r"([\u4e00-\u9fffA-Za-z0-9][\u4e00-\u9fffA-Za-z0-9 _-]{0,20}?"
+            r"(?:风格|类型|系列|款式|款|版|风|类))",
+            candidate,
+            flags=re.IGNORECASE,
+        )
+        if bounded:
+            candidate = bounded.group(1)
+        else:
+            candidate = re.split(r"(?:的|，|,|并|但|却)", candidate, maxsplit=1)[0]
+        normalized = _normalize_excluded_term(candidate)
+        if not normalized or len(normalized) < 2:
+            continue
+        if any(alias.casefold() == normalized.casefold() for alias in known_brand_aliases):
+            continue
+        if normalized.casefold() not in {item.casefold() for item in result}:
+            result.append(normalized)
+    return result[:8]
+
+
 def _brand_in_product_name(text: str, aliases: tuple[str, ...]) -> bool:
     """Match a brand in the name, excluding compatibility clauses."""
 
@@ -420,11 +538,15 @@ def extract_profile(text: str | None) -> dict[str, Any]:
             continue
         if _brand_is_excluded(value, aliases):
             profile["excludedBrands"].append(canonical)
-        else:
+        elif _brand_in_positive_context(value, aliases):
             profile["brands"].append(canonical)
 
     for canonical, aliases in _CATEGORY_HINTS:
-        if any(_category_alias_in_text(value, alias) for alias in aliases):
+        if any(
+            _category_alias_in_text(value, alias)
+            and _alias_in_positive_context(value, alias)
+            for alias in aliases
+        ):
             profile["category"] = canonical
             break
 
@@ -435,14 +557,15 @@ def extract_profile(text: str | None) -> dict[str, Any]:
         else [
             canonical
             for canonical, aliases in _SCENARIO_HINTS
-            if any(alias.casefold() in value.casefold() for alias in aliases)
+            if any(_alias_in_positive_context(value, alias) for alias in aliases)
         ]
     )
     profile["features"] = [
         canonical
         for canonical, aliases in _FEATURE_HINTS
-        if any(alias.casefold() in value.casefold() for alias in aliases)
+        if any(_alias_in_positive_context(value, alias) for alias in aliases)
     ]
+    profile["excludedTerms"] = _extract_excluded_terms(value)
     for pattern in _EXPLICIT_SPEC_PATTERNS:
         for match in pattern.finditer(value):
             spec = re.sub(r"\s+", " ", match.group(1)).strip()
@@ -462,6 +585,7 @@ def _has_signal(profile: dict[str, Any]) -> bool:
         or profile.get("budgetMax") is not None
         or profile.get("brands")
         or profile.get("excludedBrands")
+        or profile.get("excludedTerms")
         or profile.get("scenarios")
         or profile.get("features")
         or profile.get("acceptSubstitute") is not None
@@ -480,6 +604,7 @@ def _has_narrowing_signal(profile: dict[str, Any]) -> bool:
         or profile.get("budgetMax") is not None
         or profile.get("brands")
         or profile.get("excludedBrands")
+        or profile.get("excludedTerms")
         or profile.get("scenarios")
         or profile.get("features")
     )
@@ -505,6 +630,9 @@ def merge_profiles(current: dict[str, Any] | None, incoming: dict[str, Any]) -> 
     result["fieldMeta"] = dict(result.get("fieldMeta") or {})
     for key in ("scenarios", "features"):
         result[key] = _merge_unique(result.get(key) or [], incoming.get(key) or [])
+    result["excludedTerms"] = _merge_unique(
+        result.get("excludedTerms") or [], incoming.get("excludedTerms") or []
+    )
     result["brands"] = list(result.get("brands") or [])
     result["excludedBrands"] = list(result.get("excludedBrands") or [])
     for brand in incoming.get("brands") or []:
@@ -575,6 +703,7 @@ class ShoppingProfileService:
                     "budgetMax": hard.get("budgetMax"),
                     "brands": list(soft.get("brands") or []),
                     "excludedBrands": list(exclusions.get("brands") or []),
+                    "excludedTerms": list(exclusions.get("terms") or []),
                     "scenarios": list(mission.get("useCases") or []),
                     "features": list(soft.get("features") or []),
                     "acceptSubstitute": soft.get("acceptSubstitute"),
@@ -692,12 +821,13 @@ class ShoppingProfileService:
             "  budgetMax     — 最高预算（纯数字，单位元，无则 null）\n"
             "  brands        — 偏好品牌列表，如 [\"苹果\",\"华为\"]\n"
             "  excludedBrands— 排除品牌列表\n"
+            "  excludedTerms — 排除的商品风格/类型词列表\n"
             "  scenarios     — 使用场景列表，如 [\"办公\",\"游戏\",\"送礼\"]\n"
             "  features      — 功能偏好列表，如 [\"便携\",\"续航\",\"性价比\"]\n"
             "  acceptSubstitute — 是否接受替代品牌：true/false/null\n\n"
             "示例输出：\n"
             '{"category":"手机","budgetMin":null,"budgetMax":3000,"brands":["苹果"],'
-            '"excludedBrands":[],"scenarios":["学生"],"features":["性价比"],'
+            '"excludedBrands":[],"excludedTerms":[],"scenarios":["学生"],"features":["性价比"],'
             '"acceptSubstitute":true}'
         )
         try:
@@ -725,7 +855,13 @@ class ShoppingProfileService:
                     result[key] = float(val) if val is not None else None
                 except (TypeError, ValueError):
                     result[key] = None
-            for key in ("brands", "excludedBrands", "scenarios", "features"):
+            for key in (
+                "brands",
+                "excludedBrands",
+                "excludedTerms",
+                "scenarios",
+                "features",
+            ):
                 raw_list = parsed.get(key) or []
                 result[key] = [str(x).strip() for x in raw_list if x][:10]
             sub = parsed.get("acceptSubstitute")
@@ -1160,6 +1296,7 @@ class ShoppingProfileService:
             or profile.get("budgetMax") is not None
             or profile.get("brands")
             or profile.get("excludedBrands")
+            or profile.get("excludedTerms")
         )
 
     @staticmethod
@@ -1266,6 +1403,12 @@ class ShoppingProfileService:
             )
             if _brand_in_text(product_text, aliases):
                 return False
+        if any(
+            str(term).strip().casefold() in product_text
+            for term in profile.get("excludedTerms") or []
+            if str(term).strip()
+        ):
+            return False
         preferred = profile.get("brands") or []
         if profile.get("acceptSubstitute") is True:
             preferred = []
@@ -1350,6 +1493,8 @@ class ShoppingProfileService:
             parts.append("偏好" + "、".join(profile["brands"][:3]))
         if profile.get("excludedBrands"):
             parts.append("排除" + "、".join(profile["excludedBrands"][:3]))
+        if profile.get("excludedTerms"):
+            parts.append("不含" + "、".join(profile["excludedTerms"][:3]))
         if profile.get("category"):
             parts.append(f"类别{profile['category']}")
         if profile.get("scenarios"):

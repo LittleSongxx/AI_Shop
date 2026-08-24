@@ -63,6 +63,10 @@ class AgentGraphState(TypedDict, total=False):
     intent_data: str | None
     intent_decision: dict | None
     request_mode: str | None
+    # Authoritative refs returned by business tools (orders, offers, coupons,
+    # logistics, etc.). Keep this separate from RAG refs so business facts do
+    # not accidentally satisfy a policy-citation requirement.
+    tool_source_refs: list[dict] | None
     rag_source_refs: list[dict] | None
     rag_trace: dict | None
     rag_evidence_state: str
@@ -77,6 +81,9 @@ class AgentGraphState(TypedDict, total=False):
     rag_evidence_required: bool
     input_security_flags: list[str]
     order_resolution: str | None
+    # Redacted evidence for the order-reference stage. This stays separate
+    # from policy RAG refs and from the user-visible answer.
+    order_reference_evidence: dict | None
     pending_order_reference: dict | None
     selected_order_reference: dict | None
 
@@ -137,6 +144,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "intent_data": None,
         "intent_decision": None,
         "request_mode": None,
+        "tool_source_refs": [],
         "rag_source_refs": [],
         "rag_trace": None,
         "rag_evidence_state": "INSUFFICIENT",
@@ -151,6 +159,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "rag_evidence_required": False,
         "input_security_flags": list(agent_msg.get("inputSecurityFlags") or []),
         "order_resolution": None,
+        "order_reference_evidence": None,
         "pending_order_reference": None,
         "selected_order_reference": agent_msg.get("selectedOrderReference"),
         "verified_order_context": None,

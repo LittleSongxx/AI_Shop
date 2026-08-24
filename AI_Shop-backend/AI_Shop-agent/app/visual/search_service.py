@@ -796,6 +796,13 @@ class VisualProductSearchService:
             filters["brands"] = brands
         if excluded_brands:
             filters["excludedBrands"] = excluded_brands
+        excluded_terms = [
+            str(term).strip()
+            for term in profile.get("excludedTerms") or []
+            if str(term).strip()
+        ]
+        if excluded_terms:
+            filters["excludedTerms"] = excluded_terms
         if profile.get("acceptSubstitute") is not None:
             filters["acceptSubstitute"] = bool(profile["acceptSubstitute"])
         if (

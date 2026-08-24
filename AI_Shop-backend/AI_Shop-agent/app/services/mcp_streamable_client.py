@@ -244,6 +244,24 @@ class McpStreamableClient:
         result = await self.call_tool("MCP_CONTRACT", {})
         return result.content == "ok"
 
+    async def runtime_identity(self) -> dict[str, Any]:
+        """Read the MCP process's safe startup identity through its contract.
+
+        This is deliberately a dedicated system tool instead of an HTTP health
+        endpoint so the same internal-token authentication and MCP session are
+        exercised as real tool traffic.  A legacy MCP server cannot silently
+        satisfy this check because it does not expose this tool.
+        """
+
+        result = await self.call_tool("MCP_RUNTIME_IDENTITY", {})
+        try:
+            value = json.loads(result.content)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise RuntimeError("MCP runtime identity is not valid JSON") from exc
+        if not isinstance(value, dict):
+            raise RuntimeError("MCP runtime identity must be an object")
+        return value
+
     async def close(self) -> None:
         await self._holder.close()
 

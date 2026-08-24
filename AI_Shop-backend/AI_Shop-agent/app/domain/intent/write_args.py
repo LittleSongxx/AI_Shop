@@ -35,6 +35,9 @@ _CN_STAR_VALUES = {
 _POSITIVE_STAR_HINTS = ("好评", "很好", "不错", "可以", "满意", "推荐", "赞", "棒", "给力", "喜欢")
 _NEGATIVE_STAR_HINTS = ("差评", "很差", "太差", "失望", "糟糕", "垃圾", "坑")
 _NEUTRAL_STAR_HINTS = ("一般", "还行", "凑合", "普通")
+_REVIEW_ACTION_FILLER_RE = re.compile(
+    r"^(?:请帮我|帮我|我想要|我想|我要|想要|希望|麻烦|给我|请|想|要)\s*"
+)
 
 # 这些意图必须有工具结果才能回答：订单、物流、评价、券的事实只有 Java 侧知道，
 # 模型自己编一段话出来就是幻觉。
@@ -103,6 +106,17 @@ def extract_review_content(text: str, order_id: str | None) -> str | None:
         cleaned,
     )
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" ，。、：:;；~～")
+    # A turn such as “我想追评订单 X” contains only an operation request,
+    # not review content. Strip leading action fillers before deciding whether
+    # a proposal is safe; otherwise the write card would contain “我想”.
+    previous = None
+    while cleaned and cleaned != previous:
+        previous = cleaned
+        cleaned = _REVIEW_ACTION_FILLER_RE.sub("", cleaned, count=1).strip(
+            " ，。、：:;；~～"
+        )
+    if cleaned in {"", "一下", "一下吧", "吧", "呢"}:
+        cleaned = ""
     if len(cleaned) >= 1:
         return cleaned[:200]
     if sentiment:

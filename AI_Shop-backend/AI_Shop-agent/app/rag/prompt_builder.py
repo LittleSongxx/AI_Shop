@@ -226,6 +226,103 @@ def deterministic_grounding_policy_fallback(
     return None
 
 
+def deterministic_policy_evidence_fallback(
+    query: str,
+    *,
+    intent: str | None,
+    evidence_state: str | EvidenceState,
+    source_refs: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """Build a conservative, numbered answer from an authoritative policy ref.
+
+    This is only a last-mile verifier fallback.  It is intentionally limited to
+    common order/after-sales boundaries where the retrieved snippet itself is a
+    complete operational instruction.  It never infers the user's live order
+    state and never proposes a write operation.
+    """
+
+    if EvidenceState(str(evidence_state)) is not EvidenceState.SUPPORTED:
+        return None
+    refs = [item for item in source_refs or [] if isinstance(item, dict)]
+    if not refs:
+        return None
+    normalized_query = str(query or "").casefold()
+    normalized_intent = str(intent or "").upper()
+
+    def matching_ref(kind: str) -> tuple[int, dict[str, Any]] | None:
+        for index, item in enumerate(refs, start=1):
+            fact_ids = " ".join(str(value) for value in _fact_ids_from_item(item))
+            snippet = str(
+                item.get("snippet") or item.get("text") or item.get("heading") or ""
+            )
+            haystack = f"{fact_ids} {snippet}".casefold()
+            if kind == "cancel" and (
+                "取消订单" in haystack or "order.cancel" in haystack
+            ):
+                return index, item
+            if kind == "after_sales" and (
+                "发起售后申请" in haystack
+                or "售后申请" in haystack
+                or "aftersales.request" in haystack
+            ):
+                return index, item
+            if kind == "refund" and (
+                "退货与退款" in haystack
+                or "退款申请" in haystack
+                or "refund." in haystack
+            ):
+                return index, item
+        return None
+
+    kind: str | None = None
+    if normalized_intent == "CANCEL_ORDER" or "取消" in normalized_query:
+        kind = "cancel"
+    elif normalized_intent in {"AFTERSALES_UNKNOWN", "DAMAGED_OR_WRONG_ITEM"} or any(
+        marker in normalized_query for marker in ("售后", "换货", "漏发", "错发", "破损")
+    ):
+        kind = "after_sales"
+    elif normalized_intent in {"REFUND", "REFUND_STATUS"} or "退款" in normalized_query:
+        kind = "refund"
+    if kind is None:
+        return None
+
+    selected = matching_ref(kind)
+    if selected is None:
+        return None
+    citation, selected_ref = selected
+    if kind == "cancel":
+        answer = (
+            f"取消订单取决于当前履约状态。[{citation}] "
+            f"待付款订单可以直接取消。[{citation}] "
+            f"进入发货流程后要根据当前履约状态判断，已发货通常需要按售后流程处理。[{citation}] "
+            f"当前没有可核实的该订单实时履约状态，因此我不会直接执行取消。[{citation}] "
+            f"请先在订单详情查看状态，或转人工核实。[{citation}]"
+        )
+        fact_id = "order.cancel.by_fulfillment_state"
+    elif kind == "after_sales":
+        answer = (
+            "售后申请应从本人订单详情选择对应订单项发起，并提交退款数量、原因和页面要求的必要凭证。"
+            f"[{citation}] 当前没有可核实的订单项和售后资格信息，因此本次不创建写操作。[{citation}] "
+            f"请从订单详情补充信息，或转人工核实。[{citation}]"
+        )
+        fact_id = "aftersales.request_and_refund_boundary"
+    else:
+        answer = (
+            "退款申请应根据订单详情中的订单状态和商品情况提交，退款通常按原支付渠道返回，具体时间取决于支付渠道。"
+            f"[{citation}] 当前没有可核实的订单项和退款状态，因此本次不执行退款操作。[{citation}] "
+            f"请从订单详情查询或转人工核实。[{citation}]"
+        )
+        fact_id = "refund.saga_progress"
+    return {
+        "answer": answer,
+        "citation": citation,
+        "factId": fact_id,
+        "sourceId": selected_ref.get("id"),
+        "event": "RAG_POLICY_EVIDENCE_DETERMINISTIC_FALLBACK",
+        "reason": "supported_policy_answer_failed_verifier",
+    }
+
+
 @dataclass(frozen=True)
 class GroundingPrompt:
     evidence_state: EvidenceState

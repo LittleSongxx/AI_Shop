@@ -45,6 +45,9 @@ class ToolInvokeResult:
             or self.product_names
             or self.order_ids
             or self.contract_data
+            or self.source_refs
+            or self.retrieval_trace
+            or self.grounding
         ):
             return None
         payload = {

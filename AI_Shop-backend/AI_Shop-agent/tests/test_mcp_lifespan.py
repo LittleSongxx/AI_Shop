@@ -5,13 +5,19 @@ from app.mcp_server import server as server_module
 
 async def test_mcp_lifespan_starts_and_closes_episode_writer(monkeypatch):
     events: list[str] = []
+    frozen_roles: list[str] = []
 
     async def record(name: str) -> None:
         events.append(name)
 
+    def freeze_identity(role: str) -> dict:
+        frozen_roles.append(role)
+        return {"source": {"sha256": "test-source"}}
+
     monkeypatch.setattr(
         server_module, "get_settings", lambda: SimpleNamespace(agent_auto_migrate=False)
     )
+    monkeypatch.setattr(server_module, "freeze_runtime_identity", freeze_identity)
     monkeypatch.setattr(
         server_module.redis_service,
         "ensure_connected",
@@ -47,3 +53,4 @@ async def test_mcp_lifespan_starts_and_closes_episode_writer(monkeypatch):
         "db.close",
         "redis.close",
     ]
+    assert frozen_roles == ["mcp"]

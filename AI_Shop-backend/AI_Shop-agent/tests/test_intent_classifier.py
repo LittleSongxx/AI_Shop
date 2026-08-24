@@ -221,6 +221,31 @@ async def test_text_only_product_spec_question_uses_consult_route():
 
 
 @pytest.mark.asyncio
+async def test_same_category_comparison_without_card_uses_consult_clarification():
+    decision = await resolve_intent(
+        "u1", "这款耳机和另一款相比哪个好", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.PRODUCT_CONSULT
+    assert decision.entities["productName"] == "耳机"
+
+
+@pytest.mark.asyncio
+async def test_cross_brand_comparison_remains_product_search():
+    decision = await resolve_intent(
+        "u1", "这款手机和华为哪个好", allow_llm=False, record_metrics=False
+    )
+    assert decision.intent == IntentKind.PRODUCT_SEARCH
+
+
+@pytest.mark.asyncio
+async def test_state_changing_refund_proposal_is_medium_risk():
+    decision = await resolve_intent(
+        "u1", "我要退款订单 SM202608050002，金额199元", allow_llm=False, record_metrics=False
+    )
+    assert decision.risk_level == RiskLevel.MEDIUM
+
+
+@pytest.mark.asyncio
 async def test_privacy_request_is_high_risk_immediate_handoff():
     decision = await resolve_intent(
         "u1", "你们能读取我的邮箱历史吗", allow_llm=False, record_metrics=False
@@ -235,7 +260,7 @@ async def test_generic_refund_policy_keeps_refund_taxonomy():
     decision = await resolve_intent(
         "u1", "退款政策一般多久到账", allow_llm=False, record_metrics=False
     )
-    assert decision.intent == IntentKind.REFUND_STATUS
+    assert decision.intent == IntentKind.REFUND
     assert decision.request_mode == RequestMode.INFORMATIONAL
 
 
@@ -269,7 +294,7 @@ async def test_unresolved_support_statement_is_complaint_and_handoff():
         ("删除我的个人资料", IntentKind.HUMAN_REQUEST, RiskLevel.HIGH, NextAction.HANDOFF),
         ("我已经问了三次还没解决", IntentKind.COMPLAINT, RiskLevel.MEDIUM, NextAction.HANDOFF),
         ("收到的是错的颜色", IntentKind.DAMAGED_OR_WRONG_ITEM, RiskLevel.MEDIUM, NextAction.ANSWER),
-        ("退款多久到账呀", IntentKind.CHAT, RiskLevel.LOW, NextAction.ANSWER),
+        ("退款多久到账呀", IntentKind.REFUND, RiskLevel.LOW, NextAction.ANSWER),
         ("谢谢你", IntentKind.CHAT, RiskLevel.LOW, NextAction.ANSWER),
         ("账号被盗了怎么办", IntentKind.HUMAN_REQUEST, RiskLevel.HIGH, NextAction.HANDOFF),
         ("我想投诉但先别转人工", IntentKind.COMPLAINT, RiskLevel.MEDIUM, NextAction.ANSWER),

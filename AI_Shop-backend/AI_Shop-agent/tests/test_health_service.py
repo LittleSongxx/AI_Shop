@@ -17,6 +17,11 @@ async def test_readiness_requires_all_core_dependencies(monkeypatch):
     monkeypatch.setattr(service, "_check_mcp", AsyncMock(return_value=True))
     monkeypatch.setattr(
         service,
+        "_check_mcp_runtime",
+        AsyncMock(return_value={"ok": True, "sourceFingerprintMatch": True}),
+    )
+    monkeypatch.setattr(
+        service,
         "_check_es_mapping",
         AsyncMock(return_value={"ok": True, "field": "embedding", "expectedDimensions": 1024}),
     )

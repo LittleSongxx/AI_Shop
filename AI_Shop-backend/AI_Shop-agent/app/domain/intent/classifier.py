@@ -760,15 +760,12 @@ def classify_intent_by_rules(
         ) or bool(extract_order_id(text) or extract_order_item_id(text)) or any(
             k in text for k in ("退款还没到账", "退款未到账")
         )
-        generic_policy = any(k in text for k in ("一般", "通常", "大概", "规则", "正常"))
-        if personal_refund or (
-            not generic_policy
-            and not re.search(r"^(退款|退货).*(?:多久|几天|何时|什么时候)", text)
-        ):
+        if personal_refund:
             return IntentKind.REFUND_STATUS
-        if "政策" in text or "规则" in text:
-            return IntentKind.REFUND_STATUS
-        return IntentKind.CHAT
+        # Without an order/started-refund context this is a policy/timing
+        # question.  Keep it on the REFUND knowledge path; REFUND_STATUS is
+        # reserved for user-specific progress lookup.
+        return IntentKind.REFUND
     if _is_informational_fund_question(text):
         return IntentKind.CHAT
     if any(k in text for k in PAYMENT_ISSUE_HINTS):
@@ -1720,6 +1717,22 @@ def _build_decision(
         IntentKind.DAMAGED_OR_WRONG_ITEM,
     }:
         risk = RiskLevel.MEDIUM
+    if risk == RiskLevel.LOW and intent in {
+        IntentKind.REFUND,
+        IntentKind.CANCEL_ORDER,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.ADDRESS_CHANGE,
+        IntentKind.AFTERSALES_UNKNOWN,
+    } and classify_request_mode(user_text, intent) == RequestMode.ACTION_PROPOSAL:
+        # State-changing proposals need stronger guardrails than read-only
+        # policy answers, even before a confirmation token is issued.
+        risk = RiskLevel.MEDIUM
+    if risk == RiskLevel.LOW and intent == IntentKind.REFUND_STATUS and (
+        extract_order_id(user_text)
+        or extract_order_item_id(user_text)
+        or any(marker in user_text for marker in ("我的退款", "这笔退款", "退款单", "我退的"))
+    ):
+        risk = RiskLevel.MEDIUM
     urgency = UrgencyKind.NORMAL
     if sentiment == SentimentKind.VERY_NEGATIVE or risk == RiskLevel.HIGH:
         urgency = UrgencyKind.CRITICAL
@@ -1735,6 +1748,14 @@ def _build_decision(
         if not after_sales_workflow:
             tool_intents = tool_intents - _AFTER_SALES_WORKFLOW_INTENTS
         next_action = NextAction.TOOL if intent in tool_intents else NextAction.ANSWER
+        if (
+            intent == IntentKind.REFUND
+            and classify_request_mode(user_text, intent) == RequestMode.INFORMATIONAL
+            and not (extract_order_id(user_text) or extract_order_item_id(user_text))
+        ):
+            # Generic refund policy/timing is a knowledge answer. A concrete
+            # order remains on the eligibility/tool path.
+            next_action = NextAction.ANSWER
         if intent == IntentKind.AFTERSALES_UNKNOWN:
             next_action = NextAction.ASK_CLARIFICATION
 

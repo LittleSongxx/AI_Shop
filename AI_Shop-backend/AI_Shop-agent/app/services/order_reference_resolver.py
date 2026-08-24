@@ -26,6 +26,7 @@ from app.harness.metrics.runtime_sensors import (
     ORDER_REFERENCE_LATENCY,
     ORDER_REFERENCE_TOTAL,
 )
+from app.services.evidence_refs import negative_lookup_ref, order_refs
 from app.services.java_internal_client import java_internal_client
 from app.services.product_search_query import topic_terms_for_text
 from app.utils.order_ids import extract_order_id, extract_order_item_id
@@ -58,6 +59,21 @@ ORDER_REFERENCE_INTENTS = frozenset(
         IntentKind.INVOICE.value,
         IntentKind.DAMAGED_OR_WRONG_ITEM.value,
         IntentKind.AFTERSALES_UNKNOWN.value,
+    }
+)
+
+# State-changing intents require an authoritative eligibility check even when
+# the first turn is phrased as an informational question.  This prevents a
+# later orchestration hop from turning an ineligible order into a write
+# proposal. Pure status/look-up intents intentionally stay out of this set.
+ORDER_ELIGIBILITY_REQUIRED_INTENTS = frozenset(
+    {
+        IntentKind.REFUND.value,
+        IntentKind.CANCEL_ORDER.value,
+        IntentKind.CONFIRM_RECEIPT.value,
+        IntentKind.PRODUCT_REVIEW.value,
+        IntentKind.RECOMMENT.value,
+        IntentKind.DAMAGED_OR_WRONG_ITEM.value,
     }
 )
 
@@ -126,6 +142,9 @@ class OrderReferenceResolution:
     matched_candidates: list[dict[str, Any]] = field(default_factory=list)
     reason: str = ""
     clues: dict[str, Any] = field(default_factory=dict)
+    # Java-owned order snapshot/negative lookup evidence. It is carried
+    # separately from user-visible text for claim-level auditability.
+    source_refs: list[dict[str, Any]] = field(default_factory=list)
 
 
 class OrderReferenceResolver:
@@ -219,6 +238,16 @@ class OrderReferenceResolver:
                 intent=intent,
                 reason="没有在你的订单中找到该订单号，请核对后重试。",
                 clues=clues,
+                source_refs=[
+                    negative_lookup_ref(
+                        "order",
+                        query={
+                            "orderId": explicit_order_id,
+                            "scope": "AUTHENTICATED_USER",
+                        },
+                        source="JAVA_ORDER_SERVICE",
+                    )
+                ],
             )
 
         eligible = [
@@ -366,6 +395,7 @@ class OrderReferenceResolver:
                 target=working[0],
                 matched_candidates=working,
                 clues=clues,
+                source_refs=order_refs(working),
             )
         if len(working) > 1:
             return OrderReferenceResolution(
@@ -375,6 +405,7 @@ class OrderReferenceResolver:
                 matched_candidates=working,
                 reason=self._selection_prompt(intent, exact=True),
                 clues=clues,
+                source_refs=order_refs(working[: self.CARD_LIMIT]),
             )
         if all_candidates and not eligible:
             return self._no_eligible(intent, all_candidates, clues)
@@ -503,17 +534,40 @@ class OrderReferenceResolver:
             detail = "与商品品类匹配的"
         elif clues.get("statuses"):
             detail = "与订单状态匹配的"
-        reason = f"我没有在你的订单中找到{detail}目标。"
+        if intent in {
+            IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+            IntentKind.AFTERSALES_UNKNOWN.value,
+            IntentKind.ADDRESS_CHANGE.value,
+            IntentKind.INVOICE.value,
+        }:
+            reason = "为了核验售后资格，我还没有定位到对应订单。"
+        else:
+            reason = f"我没有在你的订单中找到{detail}目标。"
         if suggestions:
             reason += "以下是最近可办理的订单，请选择一项继续。"
         else:
-            reason += "请补充商品名、购买时间或订单号。"
+            reason += "请补充订单号或商品信息后继续；不要把本次未定位当作平台没有该订单。"
         return OrderReferenceResolution(
             outcome=OrderReferenceOutcome.NO_MATCH,
             intent=intent,
             candidates=suggestions,
             reason=reason,
             clues=clues,
+            source_refs=(
+                order_refs(suggestions)
+                if suggestions
+                else [
+                    negative_lookup_ref(
+                        "order",
+                        query={
+                            "scope": "AUTHENTICATED_USER",
+                            "intent": intent,
+                            "candidateCount": 0,
+                        },
+                        source="JAVA_ORDER_SERVICE",
+                    )
+                ]
+            ),
         )
 
     def _no_eligible(
@@ -532,6 +586,10 @@ class OrderReferenceResolver:
             IntentKind.PRODUCT_REVIEW.value: "首次评价",
             IntentKind.RECOMMENT.value: "追评",
             IntentKind.QUERY_COMMENT.value: "查看评价",
+            IntentKind.DAMAGED_OR_WRONG_ITEM.value: "发起破损/错发售后",
+            IntentKind.ADDRESS_CHANGE.value: "修改收货地址",
+            IntentKind.INVOICE.value: "申请发票",
+            IntentKind.AFTERSALES_UNKNOWN.value: "办理售后",
         }.get(intent, "办理该操作")
         return OrderReferenceResolution(
             outcome=OrderReferenceOutcome.NO_ELIGIBLE,
@@ -540,6 +598,7 @@ class OrderReferenceResolver:
             matched_candidates=rows,
             reason=f"找到了相关订单，但订单状态为“{status}”，当前不能{action}。",
             clues=clues,
+            source_refs=order_refs(rows[: self.CARD_LIMIT]),
         )
 
     def _deduplicate(

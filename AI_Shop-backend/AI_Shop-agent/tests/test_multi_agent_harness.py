@@ -201,6 +201,21 @@ def test_specialist_tool_scope_is_task_specific_and_bounded():
         },
         "order_fulfillment_specialist",
     ) == ["QUERY_ORDERS"]
+    assert _task_tools_for_specialist(
+        {
+            "intent": "PRODUCT_CONSULT",
+            "user_text": "这款耳机支持蓝牙 5.4 吗",
+        },
+        "shopping_advisor",
+    ) == []
+    assert _task_tools_for_specialist(
+        {
+            "intent": "PRODUCT_CONSULT",
+            "user_text": "这款耳机支持蓝牙 5.4 吗",
+            "card": {"productId": "p1", "productName": "耳机"},
+        },
+        "shopping_advisor",
+    ) == ["GET_PRODUCT_DETAIL"]
 
 
 def test_visual_specialist_tool_args_are_bound_to_supervisor_context():
@@ -1307,7 +1322,8 @@ async def test_product_search_artifact_reaches_root_with_cards_and_tool_context(
         "productNames": ["测试手机"],
     }
     assert result["search_tool_hint"] == hint
-    assert result["rag_source_refs"] == [{"type": "product", "productId": "p1"}]
+    assert result["rag_source_refs"] == []
+    assert result["tool_source_refs"] == [{"type": "product", "productId": "p1"}]
 
 
 @pytest.mark.asyncio
@@ -1576,10 +1592,8 @@ async def test_supervisor_synthesis_orders_artifacts_by_plan_not_completion(monk
     )
 
     assert artifact_orders == [planned]
-    assert [item["type"] for item in result["rag_source_refs"]] == [
-        "order",
-        "knowledge",
-    ]
+    assert [item["type"] for item in result["rag_source_refs"]] == ["knowledge"]
+    assert [item["type"] for item in result["tool_source_refs"]] == ["order"]
 
 
 @pytest.mark.asyncio
@@ -1950,6 +1964,7 @@ class _ProductionHarnessState(TypedDict, total=False):
     chunks: Annotated[list[str], operator.add]
     tools_called: Annotated[list[str], operator.add]
     rag_source_refs: list[dict]
+    tool_source_refs: list[dict]
     route: str
     assistant_cards: str
     action_proposal: dict

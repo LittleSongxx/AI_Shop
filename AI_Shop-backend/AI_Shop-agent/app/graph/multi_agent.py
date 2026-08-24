@@ -209,6 +209,9 @@ _TOOL_EVIDENCE_TYPES = {
     "QUERY_SUPPORT_CASES": frozenset({"support_case"}),
     "SEARCH_KNOWLEDGE": frozenset({"knowledge", "knowledge_chunk", "faq", "rag", "policy"}),
 }
+_RAG_EVIDENCE_TYPES = frozenset(
+    {"knowledge", "knowledge_chunk", "faq", "rag"}
+)
 _SUPPORT_CASE_CARD_TERMS = (
     "工单",
     "售后申请",
@@ -250,6 +253,35 @@ def _is_trusted_evidence_ref(item: dict[str, Any]) -> bool:
 def _evidence_type_matches_tool(item: dict[str, Any], tool_name: str) -> bool:
     evidence_type = str(item.get("type") or "").strip().lower()
     return evidence_type in _TOOL_EVIDENCE_TYPES.get(tool_name, frozenset())
+
+
+def _is_rag_source_ref(item: dict[str, Any]) -> bool:
+    """Return whether a ref is policy/document evidence, not a business snapshot.
+
+    ``policy`` is intentionally excluded here: the eligibility rule tool also
+    emits a policy-shaped decision ref, but that is an authoritative business
+    decision rather than a retrievable policy document.  The latter must not
+    satisfy the RAG citation gate by itself.
+    """
+
+    return (
+        _is_trusted_evidence_ref(item)
+        and str(item.get("type") or "").strip().lower() in _RAG_EVIDENCE_TYPES
+    )
+
+
+def _partition_source_refs(
+    refs: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split validated refs into RAG and authoritative business channels."""
+
+    rag: list[dict[str, Any]] = []
+    business: list[dict[str, Any]] = []
+    for item in refs or []:
+        if not isinstance(item, dict) or not _is_trusted_evidence_ref(item):
+            continue
+        (rag if _is_rag_source_ref(item) else business).append(item)
+    return rag, business
 
 
 def _has_verified_evidence(evidence: list[dict[str, Any]]) -> bool:
@@ -696,6 +728,11 @@ def _task_tools_for_specialist(
             "productId"
         ):
             return ["GET_PRODUCT_DETAIL"]
+        if intent == IntentKind.PRODUCT_CONSULT.value:
+            # Without an authoritative product/card there is nothing safe to
+            # search or describe. Ask for a model/card instead of widening an
+            # attribute question into arbitrary results.
+            return []
         return ["SEARCH_PRODUCTS", "GET_PRODUCT_DETAIL"]
     if agent_id == "after_sales_policy_specialist":
         user_text = str(state.get("user_text") or "")
@@ -1107,6 +1144,11 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                             if required_usable
                             else 0
                         ),
+                        "sourceRefs": (
+                            list(required_result.source_refs or [])[:30]
+                            if required_usable
+                            else []
+                        ),
                         "quarantined": required_observation.contaminated,
                     },
                     agent_id=task.agent_id,
@@ -1256,6 +1298,11 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                             "success": result_usable,
                             "sourceCount": (
                                 len(result.source_refs or []) if result_usable else 0
+                            ),
+                            "sourceRefs": (
+                                list(result.source_refs or [])[:30]
+                                if result_usable
+                                else []
                             ),
                             "quarantined": observation.contaminated,
                         },
@@ -1887,8 +1934,9 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                 merged_tool_biz[key] = list(
                     dict.fromkeys([*(merged_tool_biz.get(key) or []), *values])
                 )[:50]
-    source_candidates = [
+    raw_source_candidates = [
         *(state.get("rag_source_refs") or []),
+        *(state.get("tool_source_refs") or []),
         *[
             evidence
             for artifact in artifacts
@@ -1896,25 +1944,32 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             if evidence.get("type") != "tool_result"
         ],
     ]
-    source_refs: list[dict[str, Any]] = []
-    source_keys: set[tuple[str, str]] = set()
-    for evidence in source_candidates:
-        if not isinstance(evidence, dict):
-            continue
-        identity = str(
-            evidence.get("chunkId")
-            or evidence.get("documentId")
-            or evidence.get("questionId")
-            or evidence.get("productId")
-            or evidence.get("orderId")
-            or evidence.get("id")
-            or ""
-        )
-        key = (str(evidence.get("type") or ""), identity)
-        if not identity or key in source_keys:
-            continue
-        source_keys.add(key)
-        source_refs.append(evidence)
+    rag_candidates, business_candidates = _partition_source_refs(raw_source_candidates)
+
+    def _dedupe_refs(source_candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        source_refs: list[dict[str, Any]] = []
+        source_keys: set[tuple[str, str]] = set()
+        for evidence in source_candidates:
+            if not isinstance(evidence, dict):
+                continue
+            identity = str(
+                evidence.get("chunkId")
+                or evidence.get("documentId")
+                or evidence.get("questionId")
+                or evidence.get("productId")
+                or evidence.get("orderId")
+                or evidence.get("id")
+                or ""
+            )
+            key = (str(evidence.get("type") or ""), identity)
+            if not identity or key in source_keys:
+                continue
+            source_keys.add(key)
+            source_refs.append(evidence)
+        return source_refs[:30]
+
+    rag_source_refs = _dedupe_refs(rag_candidates)
+    tool_source_refs = _dedupe_refs(business_candidates)
     artifact_with_cards = next(
         (artifact for artifact in artifacts if artifact.assistant_cards), None
     )
@@ -1937,7 +1992,8 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             (artifact.search_tool_hint for artifact in artifacts if artifact.search_tool_hint),
             None,
         ),
-        "rag_source_refs": source_refs[:30],
+        "rag_source_refs": rag_source_refs,
+        "tool_source_refs": tool_source_refs,
         "rag_trace": (
             {"ragMode": state.get("rag_mode"), "retrievals": rag_traces}
             if rag_traces

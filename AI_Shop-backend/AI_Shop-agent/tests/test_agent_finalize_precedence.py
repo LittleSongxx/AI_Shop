@@ -158,6 +158,65 @@ async def test_product_comparison_card_is_the_terminal_payload():
 
 
 @pytest.mark.asyncio
+async def test_consult_turn_drops_unrelated_product_cards_and_asks_for_identity():
+    unrelated = json.dumps(
+        [{"productId": "other", "productName": "另一款手机", "minPrice": 8999}],
+        ensure_ascii=False,
+    )
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+    ):
+        await finalize_agent_response(
+            {
+                "userId": "u1",
+                "messageId": 35,
+                "userMessage": "这款手机续航怎么样",
+                "intentDecision": {"intent": "PRODUCT_CONSULT"},
+            },
+            ["模型误返回商品列表"],
+            [],
+            assistant_cards=unrelated,
+            tools_called=["SEARCH_PRODUCTS"],
+            consult_card={"productId": "selected", "productName": "当前手机"},
+            user_text="这款手机续航怎么样",
+        )
+
+    assert "请提供具体商品名称、型号或商品卡片" in complete.await_args.args[1]
+    assert complete.await_args.args[2] == "agent"
+    assert complete.await_args.args[3] is None
+
+
+@pytest.mark.asyncio
+async def test_consult_without_card_asks_attribute_specific_identity_question():
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+    ):
+        await finalize_agent_response(
+            {
+                "userId": "u1",
+                "messageId": 36,
+                "userMessage": "这款耳机支持蓝牙 5.4 吗",
+                "intentDecision": {"intent": "PRODUCT_CONSULT"},
+            },
+            ["根据当前知识库，我无法确认该信息。请联系人工客服核实。"],
+            [],
+            tools_called=[],
+            user_text="这款耳机支持蓝牙 5.4 吗",
+        )
+
+    assert "蓝牙或版本" in complete.await_args.args[1]
+    assert complete.await_args.args[2] == "agent"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("card_type", "biz_type"),
     [

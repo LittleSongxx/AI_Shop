@@ -33,6 +33,11 @@ _TOKEN_RE = re.compile(r"(?i)\b(?:sk|ak)-[A-Za-z0-9_-]{12,}")
 _ACTION_TOKEN_RE = re.compile(r"(?i)\bact_[a-f0-9]{32}\b")
 _PHONE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
+_ACTION_TOKEN_ANY_RE = re.compile(r"(?i)\bact_[A-Za-z0-9][A-Za-z0-9_-]{2,}\b")
+_PLACEHOLDER_RE = re.compile(r"^\[REDACTED_[A-Za-z0-9_:-]+\]$")
+_SHA256_RE = re.compile(r"(?i)^[a-f0-9]{64}$")
+
+REDACTION_PROFILE = "evaluation.core.redaction/v1"
 
 
 def _identity_digest(value: Any) -> str:
@@ -41,9 +46,16 @@ def _identity_digest(value: Any) -> str:
 
 
 def redact_text(value: str) -> str:
+    if _PLACEHOLDER_RE.fullmatch(value.strip()):
+        return value
+    # Evidence uses SHA-256 content bindings extensively.  A contiguous digit
+    # run inside a hexadecimal digest is not a phone number and must remain
+    # byte-stable for hash verification.
+    if _SHA256_RE.fullmatch(value):
+        return value
     text = _BEARER_RE.sub("[REDACTED_BEARER]", value)
     text = _TOKEN_RE.sub("[REDACTED_TOKEN]", text)
-    text = _ACTION_TOKEN_RE.sub("[REDACTED_ACTION_TOKEN]", text)
+    text = _ACTION_TOKEN_ANY_RE.sub("[REDACTED_ACTION_TOKEN]", text)
     text = _PHONE_RE.sub("[REDACTED_PHONE]", text)
     return _EMAIL_RE.sub("[REDACTED_EMAIL]", text)
 
@@ -64,6 +76,8 @@ def redact(value: Any, *, key: str | None = None) -> Any:
     if key and _is_secret_field(key):
         return "[REDACTED_SECRET]"
     if key and _IDENTITY_KEY_RE.search(key) and value not in (None, ""):
+        if isinstance(value, str) and _PLACEHOLDER_RE.fullmatch(value.strip()):
+            return value
         return _identity_digest(value)
     if isinstance(value, str):
         return redact_text(value)
@@ -72,3 +86,49 @@ def redact(value: Any, *, key: str | None = None) -> Any:
     if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
         return [redact(item) for item in value]
     return value
+
+
+def _contains_unredacted_sensitive(value: Any, *, key: str | None = None) -> bool:
+    """Return whether an evidence value still contains a secret or identity.
+
+    This deliberately checks both field names and free text.  It is used at
+    immutable-evidence boundaries, so a false positive fails closed instead
+    of allowing a credential or action token to be published.
+    """
+
+    if key and (_is_secret_field(key) or _IDENTITY_KEY_RE.search(key)):
+        if value in (None, ""):
+            return False
+        if isinstance(value, str) and _PLACEHOLDER_RE.fullmatch(value.strip()):
+            return False
+        return True
+    if isinstance(value, str):
+        text = value
+        if _PLACEHOLDER_RE.fullmatch(text.strip()):
+            return False
+        if _SHA256_RE.fullmatch(text):
+            return False
+        return any(
+            pattern.search(text)
+            for pattern in (
+                _BEARER_RE,
+                _TOKEN_RE,
+                _ACTION_TOKEN_ANY_RE,
+                _PHONE_RE,
+                _EMAIL_RE,
+            )
+        )
+    if isinstance(value, Mapping):
+        return any(
+            _contains_unredacted_sensitive(item, key=str(item_key))
+            for item_key, item in value.items()
+        )
+    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
+        return any(_contains_unredacted_sensitive(item) for item in value)
+    return False
+
+
+def contains_unredacted_sensitive(value: Any) -> bool:
+    """Fail-closed check for secrets/PII that must not enter evidence."""
+
+    return _contains_unredacted_sensitive(value)

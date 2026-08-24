@@ -41,6 +41,10 @@ _CURRENT_RAG_ABSTENTION_RE = re.compile(
     r"^(?:根据当前知识库|当前(?:没有|未检索到|缺少)|本轮(?:没有|未检索到)).{0,30}"
     r"(?:无法确认|不能确认|没有足够|缺少依据|联系人工)"
 )
+_GENERIC_POLICY_STATUS_RE = re.compile(
+    r"(?:待付款订单|已发货通常|进入发货流程|取决于当前履约状态|"
+    r"售后申请应从本人订单详情|退款申请应根据订单详情)"
+)
 _FALLBACKS = {
     "WRITE_WITHOUT_PENDING_ACTION": (
         "未能生成可执行的确认卡片。请核对订单信息后重试，或回复“转人工”。"
@@ -83,12 +87,19 @@ class VerificationResult:
     action: str
     assistant: str
     issues: tuple[VerificationIssue, ...]
+    # ``passed`` describes the original model draft.  A separately verified
+    # fallback is intentionally exposed as a different signal so dashboards
+    # cannot turn a repaired answer into a misleading model-pass rate.
+    fallback_verified: bool = False
+    terminal_quality: str = "UNVERIFIED"
 
     def quality(self) -> dict[str, Any]:
         return {
             "verifierPassed": self.passed,
             "verifierAction": self.action,
             "verifierIssues": [issue.public() for issue in self.issues],
+            "fallbackVerified": self.fallback_verified,
+            "terminalQuality": self.terminal_quality,
         }
 
 
@@ -108,12 +119,21 @@ class ResponseVerifier:
         policy_evidence_required: bool = False,
         rag_citation_required: bool = False,
         rag_evidence_state: str | None = None,
+        rag_source_refs: list[dict] | None = None,
         safe_fallback: str | None = None,
     ) -> VerificationResult:
         text = str(assistant or "").strip()
         called = frozenset(str(tool) for tool in tools_called or [])
         issues: list[VerificationIssue] = []
-        source_count = _source_count(source_refs)
+        # New callers pass an explicit RAG channel.  The legacy ``source_refs``
+        # argument remains supported for old replay fixtures, but a business
+        # snapshot in ``businessSources`` must never satisfy a policy gate.
+        effective_rag_refs = (
+            rag_source_refs
+            if rag_source_refs is not None
+            else _legacy_rag_sources(source_refs)
+        )
+        source_count = _source_count(effective_rag_refs)
         verified_action_card = (
             str(biz_type or "") == "action_confirm" and has_pending_action
         )
@@ -174,8 +194,16 @@ class ResponseVerifier:
             )
 
         required = _DYNAMIC_BIZ_TOOLS.get(str(biz_type or ""))
-        resolved_order = str(order_resolution or "").upper() == "RESOLVED"
-        if required and not called.intersection(required) and not resolved_order:
+        order_outcome = str(order_resolution or "").upper()
+        business_refs = _business_sources(source_refs)
+        # NO_ELIGIBLE is a verified read result, not an executable target. It
+        # may support a status-based refusal, but never authorizes a write.
+        verified_order_context = order_outcome == "RESOLVED" or (
+            order_outcome == "NO_ELIGIBLE"
+            and bool(business_refs)
+            and any(ref.get("matched", True) is not False for ref in business_refs)
+        )
+        if required and not called.intersection(required) and not verified_order_context:
             issues.append(
                 VerificationIssue(
                     "DYNAMIC_FACT_WITHOUT_TOOL",
@@ -185,7 +213,17 @@ class ResponseVerifier:
         elif (
             _DYNAMIC_FACT_RE.search(text)
             and not called.intersection(set().union(*_DYNAMIC_BIZ_TOOLS.values()))
-            and not resolved_order
+            and not verified_order_context
+            and not (
+                # A cited, generic policy sentence may mention lifecycle
+                # states (for example "待付款/已发货") without claiming the
+                # user's actual order is in that state.  Keep the runtime
+                # tool requirement for order-specific text and identifiers.
+                rag_citation_required
+                and source_count > 0
+                and _GENERIC_POLICY_STATUS_RE.search(text)
+                and not re.search(r"\b(?:SM|SO|ORD|ORDER)[-_A-Z0-9]{4,}\b", text, re.I)
+            )
         ):
             issues.append(
                 VerificationIssue(
@@ -196,7 +234,7 @@ class ResponseVerifier:
 
         unsupported_policy_claim = _has_unsupported_policy_claim(text)
         policy_abstained = bool(_POLICY_ABSTENTION_RE.search(text))
-        if not _has_sources(source_refs) and (
+        if not _has_sources(effective_rag_refs) and (
             unsupported_policy_claim or (policy_evidence_required and not policy_abstained)
         ):
             issues.append(
@@ -227,13 +265,21 @@ class ResponseVerifier:
             )
 
         if not issues:
-            return VerificationResult(True, "PASS", text, ())
+            return VerificationResult(
+                True,
+                "PASS",
+                text,
+                (),
+                fallback_verified=False,
+                terminal_quality="PASS",
+            )
         primary = max(issues, key=_issue_priority)
         action = "HANDOFF" if primary.severity == "CRITICAL" else "DEGRADE"
         if primary.code == "RECOMMENDATION_CONSTRAINT_VIOLATION":
             action = "CLARIFY"
         fallback_assistant = _FALLBACKS[primary.code]
         candidate = str(safe_fallback or "").strip()
+        fallback_verified = False
         if candidate:
             fallback_check = self.verify(
                 assistant=candidate,
@@ -248,14 +294,25 @@ class ResponseVerifier:
                 policy_evidence_required=policy_evidence_required,
                 rag_citation_required=rag_citation_required,
                 rag_evidence_state=rag_evidence_state,
+                rag_source_refs=rag_source_refs,
             )
             if fallback_check.passed:
                 fallback_assistant = fallback_check.assistant
+                fallback_verified = True
+        terminal_quality = (
+            "SAFE_DEGRADED"
+            if fallback_verified
+            else "HANDOFF_REQUIRED"
+            if action == "HANDOFF"
+            else "DEGRADED_UNVERIFIED"
+        )
         return VerificationResult(
             False,
             action,
             fallback_assistant,
             tuple(issues),
+            fallback_verified=fallback_verified,
+            terminal_quality=terminal_quality,
         )
 
 
@@ -268,6 +325,32 @@ def _has_sources(source_refs: list[dict] | dict | None) -> bool:
             isinstance(item, dict) and item for item in sources
         )
     return False
+
+
+def _legacy_rag_sources(source_refs: list[dict] | dict | None) -> list[dict]:
+    """Read the pre-v3 shape without silently reclassifying new channels."""
+
+    if isinstance(source_refs, list):
+        return [item for item in source_refs if isinstance(item, dict)]
+    if isinstance(source_refs, dict):
+        if isinstance(source_refs.get("ragSources"), list):
+            return [item for item in source_refs["ragSources"] if isinstance(item, dict)]
+        sources = source_refs.get("sources")
+        if isinstance(sources, list):
+            return [item for item in sources if isinstance(item, dict)]
+    return []
+
+
+def _business_sources(source_refs: list[dict] | dict | None) -> list[dict]:
+    """Read only the explicit Java/MCP evidence channel."""
+
+    if isinstance(source_refs, dict):
+        return [
+            item
+            for item in source_refs.get("businessSources") or []
+            if isinstance(item, dict)
+        ]
+    return []
 
 
 def _source_count(source_refs: list[dict] | dict | None) -> int:

@@ -89,6 +89,33 @@
 - 相关单测、manifest checker、compileall 和 readiness 已通过；v5 比 v4 样本更大但仍是共享本机/外部 Provider 描述性诊断，不能声称严格因果或生产容量提升。
 - 客服 HTTP 最终答案的 60 条双盲已由独立第三人完成 `8` 条仲裁，发布 `HUMAN_REVIEWED_ADJUDICATED` 只读包。双人四标签案件级一致 `52/60=0.866667` 是标注可靠性；最终质量为答案正确 `51/60=85.0%`（95% CI `73.9%–91.9%`）、引用语义支持 `6/30=20.0%`（`9.5%–37.3%`）、转人工适当 `60/60`、unsafe `0/60`、联合质量 `32/60=53.3%`。该结果揭示动态事实来源未绑定的主缺口，`releaseGateEligible=false`，不追溯修改 v9 final。
 
+### 2026-08-24：客服边界修复、人工标签审计口径校正
+
+- 复用并 fail-closed 加载已封存人工数据：`gold-v1-human-adjudicated.jsonl`（60 条，SHA-256 `112dfd...ddc527`）和固定 HTTP 答案 labels；标签不能套用到新答案，源 run/answer hash 任一变化即拒绝。
+- 重新核查标注合理性：案件级全字段一致 `35/60`，但 intent 字段 `57/60`、Cohen κ `0.945913`，risk `56/60`、κ `0.889908`，handoff `60/60`；低案件一致主要是 slots `45/60` 的 schema/金额格式差异，不应写成“意图只有 58.3% 正确”。
+- 规则预路由在同一 60 条 HUMAN_VERIFIED gold 上重跑：Intent Macro-F1 `0.955299 -> 1.000000`（`011/044/057` 修复）、风险字段不一致 `7 -> 0`；高风险 Recall `10/10`、handoff Recall `14/14`、critical miss `0/6` 保持。该结果是同集优化回放，不是新 holdout 泛化证据。
+- 具体修复：无订单的退款时效改走 `REFUND` 政策回答，已有订单/退款上下文才走 `REFUND_STATUS`；同类“这款商品和另一款哪个好”保留咨询对象并澄清，跨品牌/跨品类比较仍走搜索；无商品卡的属性咨询专家不再获得 `SEARCH_PRODUCTS`，避免泛搜索；状态变更型退款/取消/确认收货/改地址/售后提案标为 MEDIUM 风险。
+- 搜索约束回归：显式排除词、手机壳/兼容机型类别和 category+exclusion 同时过滤已通过 `79` 个定向测试；未重刷 Search final 或 qrel。
+- 审计报告现在同时记录 `UNVERIFIABLE_RUNTIME_FACT=24` 与其中人工判“回答正确”的 `19` 条，并保留所有 case ID；前者是证据不足，不是模型错误率。旧 HTTP 回放仍为答案正确 `51/60`、引用支持 `6/30`，新 HTTP 输出必须重新双盲审查。
+
+### 2026-08-24：人工标签合理性复核与证据传播修复
+
+- 新增 `客服标注审计`：60 条中 59 个槽位为 `DIRECT_SPAN`，1 个为有“一个”原文依据的 `DERIVED_ALLOWED_RULE`（`cs-gold-v1-055`），0 个槽位无法由输入解释；未发现可由原文直接证伪的明确误标。
+- 将标注风险拆成可复核边界：退款政策/状态（011/057）、商品比较（044）、支付方式 taxonomy（049）、售后换货（056）、履约/物流风险（007/008）和确认收货策略（014）。这些是规范选择或 taxonomy 缺口，不把仲裁标签包装成专家真值。
+- 修复动态业务工具 `sourceRefs` 从 Java/MCP 结果到最终 HTTP envelope 的传播，并保留只有负查询证据时的引用；增加回归测试。旧 HTTP 引用支持 `6/30=20.0%` 仍是不可变历史观察，修复后必须新 run、新双盲审，不能直接推算提升。
+- `shop` 环境定向回归 `53 passed`，标注审计/人工数据专项 `10 passed`；全量 pytest 在最终验证阶段重新执行，真实 MySQL migration 未连接时仅条件跳过。
+- 联网调研 BEIR、Elastic RRF、Microsoft RAG Evaluators、Ragas、Self-RAG、AgentBench/ToolBench、NIST AI RMF；结论写入质量报告：AI_Shop 重点展示硬约束电商搜索、动态权威快照、客服路由/转人工、确认写入和幂等，不复制 InsightVault 的文档 RAG 主线。
+
+### 2026-08-24：v13 HTTP 回放、评测器假阳性与新盲审准备
+
+- 发现 API/Worker 重启并不会自动更新独立 MCP 进程；曾出现“源码已修复、MCP 仍运行旧 `product_service.py`”的定向回放现象。新增 API、Worker、MCP 共同 source fingerprint，`/health/ready` 和 evaluation preflight 不一致即 fail-closed。
+- 动态订单、商品、库存、报价、优惠券、物流、退款、评价、工单及负查询结果现在由 Java/MCP 权威 `sourceRefs` 传到 graph state、Episode/step、response verifier 和 HTTP envelope；`matched=false` 仅代表本次定义范围内未命中，禁止解释为平台范围不存在。
+- `customer-service-http-v13-20260824` 对冻结 60 条执行一次真实 Provider HTTP observation：完整终态 `60/60`、HTTP error `0`、行为契约 `10/10`、hard-constraint violation `0`；Provider calls `18`、input/output tokens `78,470/5,486`、`costCny=null` / `UNPRICED`，本地 P50/P95/P99 `1015.049/11372.651/22858.230 ms`。这些是执行、路由、契约和本地诊断，不是人工最终答案质量。
+- 原始 observation（report SHA `46916af...e805`）保存为只读 `customer-service-http-v13-pre-evaluator-fix-20260824`。`001/002/034/042` 的“不能据此断言平台无货”被旧纯正则错误当成“平台无货”断言；新增免责声明感知检测和正反两条回归测试。正式 v13 包（report SHA `2b1b97...94357`）只从同一原始 observation 做确定性离线重算，`providerCallsReexecuted=false`，因此四条行为契约误报的消失不是模型质量提升。
+- v13 `answerQuality.status=PENDING_HUMAN_REVIEW`，所有人工质量分数保持 `null`。已生成两份独立随机顺序、无 expected/预测标签的 60 条盲审表（SHA `3e4fdb...85fa6` / `e6476c...884aa`）；必须完成双人填写、封存和第三人仲裁后，才能报告 v13 答案正确率、引用语义支持率、转人工适当率、unsafe-answer rate、联合质量及新 badcase。历史 v1 `51/60`、`6/30`、`32/60` 继续只绑定旧 run。
+- 定向回归 `33 passed`、Ruff、`compileall`、`git diff --check` 通过；v13 原始 observation 与正式 rebuilt 包均采用只读 `0444` 和 `SHA256SUMS`。本轮又将 manifest 验证扩展为同时校验原始 observation、正式 rebuild、开放盲审表、report hash 与只读属性。
+- 额外保留 v11/v12 成对运行版本排错证据：同一 10 条定向集在旧 MCP 仍加载旧代码时出现 `6/10` 行为契约违例，完整重启后的恢复对照为 `0/10`。manifest 现在校验二者的只读文件集、SHA-256、相同 HUMAN_VERIFIED 数据哈希、预期状态和违例数；它们不进入质量分母。v5/v10 两个被 v13 覆盖的 60 条中间运行，以及绑定 v10 且未填写的 v3 盲审草稿已物理删除，避免把过期输出误当成当前主线。清理后 manifest、文档一致性、Ruff、`compileall` 与全量 Python 回归均通过：`1392 passed, 7 skipped`；跳过项只依赖真实 MySQL 8 migration 环境。
+
 ## 关键踩坑、排错与效果
 
 下表只把同一数据、同一 observation 或同一候选规模的结果称为“前后对比”。不同 final 使用不同 dataset/source hash，只能作为排错生命周期，不能包装成严格 A/B。
@@ -100,10 +127,14 @@
 | HTTP 槽位跨脱敏边界评分 | Episode 已将订单号等值脱敏，无法与原始 gold 做 span 比较 | HTTP Slot F1/EM 从错误可评分假设改为 `UNAVAILABLE`；规则预路由 slot 指标单独保留 | `UNAVAILABLE` 比伪造 0/1 更可信 |
 | HTTP 引用结构出现 6 条告警 | 最终 envelope 未复制 `sourceRefs`，但 `RAG_RETRIEVAL` trace 保存了实际来源；从原 observation 离线重建 | citation contract invalid `6 -> 0`，Provider 未重跑 | 只修复引用链路提取，不等于答案语义正确 |
 | HTTP 引用结构为 0 仍可能不可信 | 双盲+第三人仲裁把“结构上有来源”与“来源足以支持具体回答”分开度量 | 引用语义支持仅 `6/30=20.0%`，联合质量 `32/60=53.3%`；24 条 citation badcase 被保留 | 不能以 60/60 执行、citation contract 0 或双人一致率包装为 grounded-answer 质量 |
+| 独立 MCP 进程可加载旧源码 | Worker/API 重启不等于 MCP reload；对 API、Worker、MCP 增加共同 source fingerprint，并在 readiness/preflight 做一致性校验 | 版本不一致从可静默发生改为 fail-closed | 是部署一致性修复，不能以此改写任何历史 HTTP 标签 |
+| 免责声明被评测器误杀 | 旧正则把“不能据此断言平台无货”视作“平台无货”断言；改为提取未被否定覆盖的独立 claim，并保存命中文本 | 同一 v13 observation 的 4 条 `NO_UNSUPPORTED_CATALOG_ABSENCE_CLAIM` 假阳性消失；Provider 未重跑 | 是评测器正确性修复，不是模型由失败提升为通过 |
+| v13 证据传播修复后不能继承旧人审分数 | 新 output 的 sourceRefs、答案和运行 hash 均不同；生成双人 blind sheet 并绑定 report/source-observation hash | v13 人工质量保持 `PENDING_HUMAN_REVIEW`，而非把旧 `85%/20%/53.3%` 迁移过去 | 必须完成新双盲和仲裁后，才能宣称任何 v13 答案质量指标 |
 | Search 难例可能被“修指标”掩盖 | 固定 v9 qrels/ranking，真实 Provider 对 10 条难例做 paired replay | Recall/MRR/NDCG delta 全为 `0`，约束违规 `0`；`23/34/47` 仍失败 | 结论是无回归，不是质量提升 |
 | 候选快照存在 N+1 风险 | 同一隔离 MySQL、同一 `100` 候选比较 batch/N+1，并校验结果等价与 rollback | offer P50 `89.805 -> 23.864 ms`，降低 `73.4%`；decision P50 `70.501 -> 2.405 ms`，降低 `96.6%`；round trip `100 -> 1` | 本地受控 benchmark，不是生产 SLO |
 | Provider usage/费用容易被记成零 | usage 缺失记 `MISSING_USAGE`，无可信价格记 `UNPRICED`，费用保持 `null` | 消除“未知成本=0”的错误结论 | 尚不能给出单请求成本门禁 |
 | 完整人工 slot schema 覆盖不足 | 在生产预路由补充已冻结 schema 的确定性实体抽取，并用同 gold paired replay | Span F1 `0.907652 -> 0.996364`；EM `0.558824 -> 0.911765`；12 fixed、0 regressed | 同集优化证据，不是新 holdout；3 个金额 raw-format badcase 保留 |
+| 客服属性/比较误路由与风险级别偏低 | 增加同类比较识别、无卡咨询工具隔离、退款政策/状态上下文分流，并将状态变更提案提升为 MEDIUM | 同 60 条 gold Intent Macro-F1 `0.955299 -> 1.000000`；风险不一致 `7 -> 0`；定向路由/约束回归 `257` 相关测试通过 | 同集规则回放；HTTP 最终答案和引用指标必须用新运行重新盲审，不能继承旧 labels |
 | Agent 长尾缺少容量分层 | 新增只读完整链路并发 benchmark、warm-up 和 hard deadline，分开 deterministic 与 LLM path、stage 和 usage | v5 warm-up `4/4`、正式 `80/80`；c8 QPS `1.353`、LLM P95 `12.013s`；社交 path 5 次均零 Provider | 共享本机、外部 Provider，仍不是 steady-state、stress/soak 或生产 SLO |
 | “零 token”与“usage 缺失”混淆 | 从 Episode 的 LLM_CALL/AGENT_POLICY 事实判定是否实际调用 Provider | 纯社交由 `MISSING_USAGE (0 missing) -> NOT_APPLICABLE/no_llm_call` | 只有可审计确认未调用时才能使用 NOT_APPLICABLE |
 

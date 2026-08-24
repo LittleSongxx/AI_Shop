@@ -8,7 +8,7 @@
     },
     "scorecard": {
       "path": "docs/evaluation/AI质量评测与Badcase.json",
-      "sha256": "e8e34934c74736ca436d321fcc64f659081be43e1821c2e71c09c1bfa9ac535d",
+      "sha256": "bdb5bc57960aa1aa811735baac4979e166e1774985455e8e9c9ed02480d2c7dd",
       "schemaVersion": "aishop-quality-scorecard/v1",
       "derivedFrom": "evaluation.currentEvidence"
     },
@@ -28,7 +28,7 @@
       "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
       "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
       "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
-      "reportSha256": "15841ff8f6f59557e6d7d36cec12816d0f225d6fa8bfbbfc44548205c35a7524",
+      "reportSha256": "85fdc361c794538200c2dec5de20c537c4bb1622636f8a8dec744923343d6b1c",
       "caseCount": 60,
       "status": "HUMAN_VERIFIED",
       "releaseGateEligible": false,
@@ -44,6 +44,22 @@
         "adjudicationSha256": "bd17272f74dfff76feae28a56d040973792bba74f7e44aa19207543c95d2e37e",
         "releaseGateEligible": false
       }
+    },
+    "customerServiceAnnotationAudit": {
+      "status": "PROCESS_AUDIT_NOT_NEW_GOLD",
+      "reportPath": "docs/evaluation/customer-service/客服标注审计.json",
+      "reportSha256": "c6bfa589ad32d8a3a8c0f06418d7bdc1604b4606ff8be257fb7eb2a51ba3e7da",
+      "markdownPath": "docs/evaluation/customer-service/客服标注审计.md",
+      "markdownSha256": "5c189da3f1d19ebee983be829fd6bf44eb4ae0ad84a856fedc59c02433afd35a",
+      "caseCount": 60,
+      "confirmedMislabelCaseCount": 0,
+      "slotProvenance": {
+        "directSpan": 59,
+        "derivedAllowed": 1,
+        "notFoundInInput": 0
+      },
+      "taxonomyReviewCaseCount": 8,
+      "releaseGateEligible": false
     },
     "customerServiceCandidateV2": {
       "status": "DRAFT_NEEDS_DUAL_HUMAN_REVIEW",
@@ -109,6 +125,35 @@
           "jointQualityPassRate": {"value": 0.533333, "numerator": 32, "denominator": 60, "badcaseCount": 28}
         }
       }
+    },
+    "customerServiceAnswerReviewV13": {
+      "status": "PENDING_HUMAN_REVIEW",
+      "releaseGateEligible": false,
+      "sourceRunId": "customer-service-http-v13-20260824",
+      "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "caseCount": 60,
+      "preEvaluatorFixEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824",
+        "sha256SumsSha256": "34fd92ac62facaa58f129ff591c8e2a545182fffc79b893f808101bd05f3ae8c",
+        "sourceObservationReportSha256": "46916afcf1bb77a7b10e6adb2e4183cd37302becdc187439451180ce5beae805"
+      },
+      "reviewSheets": [
+        {
+          "reviewerId": "reviewer-a",
+          "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl",
+          "sha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
+          "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl.manifest.json",
+          "manifestSha256": "d272cfda2cca600cdc828ecf3128248c4378785c8b707294ddd6e039bd682ecd"
+        },
+        {
+          "reviewerId": "reviewer-b",
+          "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl",
+          "sha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
+          "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl.manifest.json",
+          "manifestSha256": "f02ee16320a11ab6e31967c7520e0b00ef0234f1e9a1159da454980a78a60912"
+        }
+      ]
     },
     "pricingEstimate": {
       "path": "docs/evaluation/model-pricing-estimate-20260824.json",
@@ -332,6 +377,39 @@
         "sha256SumsSha256": "197bfa7edce9eb897dd6c60e869b1c11d601d42f141810362c7ea8d6b6df159b"
       },
       {
+        "kind": "customer-service-http",
+        "packageId": "customer-service-http-v13-20260824",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824",
+        "runId": "customer-service-http-v13-20260824",
+        "sha256SumsSha256": "bc786e8c9d98510d4f3c4cd391ea4538cc7304166ae4cb25b390c0eeebd6533a"
+      },
+      {
+        "kind": "customer-service-http",
+        "packageId": "customer-service-http-v11-targeted-20260824",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v11-targeted-stale-worker-20260824",
+        "runId": "customer-service-http-v11-targeted-20260824",
+        "resultRole": "RUNTIME_VERSION_STALE_BASELINE",
+        "pairId": "customer-service-runtime-identity-v1-20260824",
+        "expectedStatus": "STALE_WORKER_RUNTIME_DIAGNOSTIC",
+        "expectedBehaviorContractViolationCount": 6,
+        "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+        "caseCount": 10,
+        "sha256SumsSha256": "7c00090d220f11d37d7f567eadfc840611f1a13e223f23c20a1c07bdff72bf22"
+      },
+      {
+        "kind": "customer-service-http",
+        "packageId": "customer-service-http-v12-targeted-after-worker-restart-20260824",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v12-targeted-after-worker-restart-20260824",
+        "runId": "customer-service-http-v12-targeted-after-worker-restart-20260824",
+        "resultRole": "RUNTIME_VERSION_POST_RESTART_RECOVERY",
+        "pairId": "customer-service-runtime-identity-v1-20260824",
+        "expectedStatus": "POST_WORKER_RESTART_TARGETED_DIAGNOSTIC",
+        "expectedBehaviorContractViolationCount": 0,
+        "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+        "caseCount": 10,
+        "sha256SumsSha256": "105246a70ee87bd126548d0d35c0daac85b2a1a93adb0e85017d09a1afdab453"
+      },
+      {
         "kind": "search-paired-replay",
         "packageId": "search-hard-negative-paired-v1-20260823",
         "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823",
@@ -422,7 +500,7 @@
       }
     ]
   },
-  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package and a 60/60 production HTTP observation run; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. Two independent HTTP-answer reviews have 52/60 four-label exact agreement, and an independent third reviewer adjudicated all 8 disagreements. The resulting fixed-replay answer correctness is 51/60=85.0%, citation grounding support is 6/30=20.0%, handoff appropriateness is 60/60, unsafe-answer rate is 0/60, and joint quality is 32/60=53.3%. Agreement is annotation reliability, not model accuracy; this package is non-gating and does not establish CSAT/FCR, online success, or grounded-answer readiness. Redacted HTTP slots remain UNAVAILABLE. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
+  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. Historical HTTP v1 has two independent answer reviews with 52/60 four-label exact agreement and 8 third-person adjudications: answer correctness 51/60=85.0%, citation grounding support 6/30=20.0%, handoff appropriateness 60/60, unsafe-answer rate 0/60, and joint quality 32/60=53.3%. Agreement is annotation reliability, not model accuracy; historical v1 is non-gating and does not establish CSAT/FCR, online success, or grounded-answer readiness. Redacted HTTP slots remain UNAVAILABLE. The repaired customer-service-http-v13-20260824 is a separate 60/60 real Provider observation with Java/MCP dynamic sourceRefs, API/Worker/MCP source-fingerprint preflight, and 10/10 safety/behavior contracts. Its raw observation and disclaimer-aware offline rebuild are both immutable; the four prior catalog-absence contract failures were evaluator false positives, not a model-quality gain. v13 answerQuality is PENDING_HUMAN_REVIEW: its two open blind sheets are bound to the v13 report hash, and no v1 human labels or answer-quality metric may migrate to it. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
   "visibleRuns": {
     "development": {
       "runId": "development-20260822-ai-quality-v9",
@@ -451,8 +529,10 @@
     "docs/evaluation/AI质量评测与Badcase.json",
     "docs/evaluation/customer-service/客服金标评测.md",
     "docs/evaluation/customer-service/客服金标评测.json",
+    "docs/evaluation/customer-service/客服标注审计.md",
+    "docs/evaluation/customer-service/客服标注审计.json",
     "docs/evaluation/model-pricing-estimate-20260824.json",
-    "AI应用开发_Java后端_真实面试题与备考报告_20260821.md"
+    "AI应用开发_Java后端_真实面试题与备考报告_20260824.md"
   ],
   "documentationConsistency": [
     {
@@ -460,7 +540,9 @@
       "requiredTokens": [
         "docs/project/AI_Shop主线与开发记录.md",
         "docs/evaluation/AI质量评测与Badcase.md",
-        "docs/evaluation/customer-service/客服金标评测.md"
+        "docs/evaluation/customer-service/客服金标评测.md",
+        "customer-service-http-v13-20260824",
+        "PENDING_HUMAN_REVIEW"
       ],
       "forbiddenTokens": [
         "docs/AI应用求职项目证据总览.md",
@@ -473,7 +555,9 @@
       "requiredTokens": [
         "project/AI_Shop主线与开发记录.md",
         "evaluation/AI质量评测与Badcase.md",
-        "customer-service/客服金标评测.md"
+        "customer-service/客服金标评测.md",
+        "customer-service-http-v13-20260824",
+        "PENDING_HUMAN_REVIEW"
       ],
       "forbiddenTokens": [
         "_20260820.md",
@@ -490,6 +574,8 @@
         "HUMAN_VERIFIED",
         "HUMAN_REVIEWED_ADJUDICATED",
         "6/30=20.0%",
+        "customer-service-http-v13-20260824",
+        "PENDING_HUMAN_REVIEW",
         "关键踩坑、排错与效果"
       ],
       "forbiddenTokens": [
@@ -507,7 +593,9 @@
         "当前达标与可用性",
         "只读容量曲线",
         "0.996364",
-        "6/30=20.0%"
+        "6/30=20.0%",
+        "customer-service-http-v13-20260824",
+        "PENDING_HUMAN_REVIEW"
       ],
       "forbiddenTokens": [
         "AI质量指标与Badcase索引_20260822.md",
@@ -523,14 +611,16 @@
         "customer-service-slot-replay-v1-20260823",
         "releaseGateEligible=false",
         "HUMAN_REVIEWED_ADJUDICATED",
-        "6/30 eligible"
+        "6/30 eligible",
+        "customer-service-http-v13-20260824",
+        "PENDING_HUMAN_REVIEW"
       ],
       "forbiddenTokens": [
         "HUMAN_VERIFIED_RESULT"
       ]
     },
     {
-      "path": "AI应用开发_Java后端_真实面试题与备考报告_20260821.md",
+      "path": "AI应用开发_Java后端_真实面试题与备考报告_20260824.md",
       "requiredTokens": [
         "docs/evaluation/AI质量评测与Badcase.md",
         "docs/project/AI_Shop主线与开发记录.md"
@@ -538,6 +628,20 @@
       "forbiddenTokens": [
         "docs/AI质量指标与Badcase索引_20260822.md",
         "docs/AI应用求职项目证据总览.md"
+      ]
+    },
+    {
+      "path": "docs/evaluation/customer-service/客服标注审计.md",
+      "requiredTokens": [
+        "REVIEWED_WITH_BOUNDARY_FLAGS",
+        "DIRECT_SPAN",
+        "DERIVED_ALLOWED_RULE",
+        "明确误标候选",
+        "UNVERIFIABLE_RUNTIME_FACT"
+      ],
+      "forbiddenTokens": [
+        "专家金标",
+        "线上准确率"
       ]
     }
   ]

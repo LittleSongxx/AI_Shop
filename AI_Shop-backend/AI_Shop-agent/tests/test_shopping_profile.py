@@ -191,6 +191,32 @@ def test_extract_profile_supports_units_and_upper_budget():
     assert profile["features"] == ["便携"]
 
 
+def test_extract_profile_keeps_negative_style_out_of_positive_scenario():
+    profile = extract_profile("帮我找 500 元以内、不要户外款的男士外套")
+
+    assert profile["category"] == "外套"
+    assert profile["scenarios"] == []
+    assert profile["excludedTerms"] == ["户外"]
+
+
+def test_extract_profile_separates_phone_case_and_ignores_compatibility_brand():
+    profile = extract_profile("手机壳有没有适配 iPhone 15")
+
+    assert profile["category"] == "手机壳"
+    assert profile["brands"] == []
+
+
+def test_profile_hard_filter_applies_excluded_terms():
+    service = ShoppingProfileService()
+    profile = extract_profile("500元以内的男士外套，不要户外款")
+    products = [
+        {"product_id": "a", "product_name": "男士休闲外套", "min_price": 300},
+        {"product_id": "b", "product_name": "男士户外外套", "min_price": 300},
+    ]
+
+    assert [item["product_id"] for item in service.filter_products(products, profile)] == ["a"]
+
+
 def test_merge_profile_keeps_previous_constraints():
     current = extract_profile("预算3000以内的华为手机")
     incoming = extract_profile("办公、续航，排除苹果")

@@ -59,7 +59,11 @@ from app.utils.biz_payload import (
     support_case_card_type,
     trim_assistant,
 )
-from app.utils.product_consult import is_product_consult_turn, parse_consult_card
+from app.utils.product_consult import (
+    is_product_consult_turn,
+    parse_consult_card,
+    product_consult_clarification,
+)
 
 logger = structlog.get_logger()
 tracer = get_tracer()
@@ -349,6 +353,65 @@ _WRITE_PROPOSE_TOOLS = frozenset({
     "PROPOSE_RECOMMENT",
 })
 
+
+def _source_channels(
+    source_refs: list[dict] | dict | None,
+) -> tuple[list[dict], list[dict]]:
+    """Return explicit RAG and business evidence channels.
+
+    The v3 envelope carries both channels.  ``sources`` and a bare list are
+    retained as a legacy shape and treated as RAG-compatible only for callers
+    that have not migrated yet; production graph paths always pass the
+    explicit fields below.
+    """
+
+    if isinstance(source_refs, dict):
+        has_explicit = "ragSources" in source_refs or "businessSources" in source_refs
+        if has_explicit:
+            rag = [
+                item
+                for item in source_refs.get("ragSources") or []
+                if isinstance(item, dict)
+            ]
+            business = [
+                item
+                for item in source_refs.get("businessSources") or []
+                if isinstance(item, dict)
+            ]
+            return rag, business
+        legacy = [
+            item for item in source_refs.get("sources") or [] if isinstance(item, dict)
+        ]
+        return legacy, []
+    if isinstance(source_refs, list):
+        return [item for item in source_refs if isinstance(item, dict)], []
+    return [], []
+
+
+def _consult_cards_match(
+    cards_json: str | None,
+    consult_card: dict | None,
+) -> bool:
+    """Allow product cards in a consult turn only for the selected product."""
+
+    selected_id = str((consult_card or {}).get("productId") or "").strip()
+    if not selected_id or not cards_json or not is_product_cards_json(cards_json):
+        return False
+    try:
+        payload = json.loads(cards_json)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    if isinstance(payload, dict):
+        payload = payload.get("products")
+    if not isinstance(payload, list):
+        return False
+    ids = {
+        str(item.get("productId") or item.get("product_id") or "").strip()
+        for item in payload
+        if isinstance(item, dict)
+    }
+    return selected_id in ids
+
 def _recover_order_cards(
     assistant_cards: str | None,
     tools_called: list[str] | None,
@@ -384,12 +447,17 @@ async def finalize_agent_response(
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
     full_text = "".join(chunks)
+    route_intent = str(
+        (agent_msg.get("intentDecision") or {}).get("intent")
+        or agent_msg.get("intent")
+        or ""
+    ).upper()
     is_consult_turn = is_product_consult_turn(
         user_text,
         message_card,
         consult_card,
         from_product=bool(agent_msg.get("fromProduct")),
-    )
+    ) or route_intent == "PRODUCT_CONSULT"
     called = list(tools_called or [])
 
     resolved = await resolve_action_confirm(full_text, messages, user_id)
@@ -398,6 +466,7 @@ async def finalize_agent_response(
         # echoing the credential.  Re-validate the server card before using it.
         resolved = await resolve_server_action_card(assistant_cards, user_id)
     pending_for_verifier: dict | None = None
+    clarification_applied = False
     if resolved:
         assistant, biz_data, biz_type, pending_for_verifier = resolved
     elif is_order_selection_json(assistant_cards):
@@ -477,6 +546,29 @@ async def finalize_agent_response(
                 cards_json, forced_biz = await _resolve_product_cards_json(
                     assistant_cards, tool_biz, tools_called, search_tool_hint
                 )
+                if cards_json and is_consult_turn and not _consult_cards_match(
+                    cards_json, consult_card or message_card
+                ):
+                    # A model/tool may widen a property question into a fresh
+                    # shelf search.  Showing those cards is worse than asking
+                    # for the missing product identity: it creates a concrete
+                    # but unrelated recommendation and makes dynamic facts
+                    # impossible to audit.  Keep the selected-product path
+                    # available when the returned card contains its ID.
+                    logger.warning(
+                        "consult_product_card_mismatch_blocked",
+                        user_id=user_id,
+                        selected_product_id=str(
+                            (consult_card or message_card or {}).get("productId") or ""
+                        ),
+                    )
+                    cards_json = None
+                    forced_biz = None
+                    search_tool_hint = None
+                    assistant_cards = None
+                    full_text = (
+                        "请提供具体商品名称、型号或商品卡片，我才能核对该商品的规格与兼容性。"
+                    )
                 if not cards_json and should_force_product_cards(
                     full_text,
                     None,
@@ -534,6 +626,27 @@ async def finalize_agent_response(
                         assistant = "操作确认卡片无效，请重新发起。"
                     biz_type = biz_type or "agent"
 
+    # A PRODUCT_CONSULT request without an authoritative product/card cannot
+    # be answered by broad retrieval.  Replace a refusal or accidental generic
+    # text with a field-specific identity question; this keeps the next turn
+    # actionable and avoids unrelated recommendations.
+    if (
+        is_consult_turn
+        and not (consult_card or message_card)
+        and not any(tool in called for tool in ("GET_PRODUCT_DETAIL", "COMPARE_PRODUCTS"))
+    ):
+        assistant = product_consult_clarification(user_text)
+        clarification_applied = True
+        assistant_cards = None
+        biz_type = "agent"
+        episode_service.record_step(
+            "PRODUCT_CONSULT_CLARIFICATION",
+            node_name="finalize",
+            status="OK",
+            input_data={"intent": route_intent},
+            output_data={"reason": "missing_authoritative_product_identity"},
+        )
+
     assistant = _strip_emojis_from_assistant(assistant)
 
     recommendation_constraints: dict | None = None
@@ -576,11 +689,36 @@ async def finalize_agent_response(
         except (TypeError, json.JSONDecodeError):
             support_case_for_verifier = {}
 
-    if isinstance(source_refs, dict):
-        rag_sources = source_refs.get("sources") or []
-    else:
-        rag_sources = source_refs or []
+    rag_sources, business_sources = _source_channels(source_refs)
     rag_supported = str(rag_evidence_state).upper() == "SUPPORTED" and bool(rag_sources)
+    dynamic_authority = (
+        str(order_resolution or "").upper() in {"RESOLVED", "NO_ELIGIBLE"}
+        and bool(business_sources)
+        and (
+            biz_type
+            in {
+                "query_order",
+                "query_logistics",
+                "query_comment",
+                "query_coupon",
+                "support_case_list",
+                "support_case_detail",
+                "action_confirm",
+            }
+            # NO_ELIGIBLE is emitted as a plain explanatory answer by the
+            # resolver. Its business snapshot is still authoritative even
+            # though no specialist biz card is rendered.
+            or str(order_resolution or "").upper() == "NO_ELIGIBLE"
+        )
+    )
+    # A Java order snapshot is sufficient for a dynamic status/capability
+    # response.  It must not be forced through the public-policy citation gate;
+    # unsupported policy claims are still rejected independently by the
+    # verifier's claim regex below.
+    policy_gate_required = (
+        rag_evidence_required and not clarification_applied and not dynamic_authority
+    )
+    rag_gate_required = policy_gate_required and rag_supported
     verification = response_verifier.verify(
         assistant=assistant,
         biz_type=biz_type,
@@ -591,15 +729,17 @@ async def finalize_agent_response(
         recommendation_constraints=recommendation_constraints,
         recommendation_candidates=recommendation_candidates,
         support_case=support_case_for_verifier,
-        policy_evidence_required=rag_evidence_required,
-        rag_citation_required=rag_evidence_required and rag_supported,
+        # A missing product identity is handled by a deterministic
+        # clarification, not a policy answer.  Do not let the generic RAG
+        # evidence gate replace that safe next-step question with a refusal.
+        policy_evidence_required=policy_gate_required,
+        rag_citation_required=rag_gate_required,
         rag_evidence_state=rag_evidence_state,
+        rag_source_refs=rag_sources,
         safe_fallback=verifier_fallback,
     )
     verifier_fallback_applied = bool(
-        not verification.passed
-        and verifier_fallback
-        and verification.assistant == verifier_fallback.strip()
+        not verification.passed and verification.fallback_verified
     )
     RESPONSE_VERIFIER_TOTAL.labels(
         result="pass" if verification.passed else verification.action.lower(),
@@ -623,11 +763,14 @@ async def finalize_agent_response(
             "bizType": biz_type,
             "toolsCalled": called,
             "hasPendingAction": resolved is not None,
-            "hasSources": bool(source_refs),
+            "hasSources": bool(rag_sources or business_sources),
+            "ragSourceCount": len(rag_sources),
+            "businessSourceCount": len(business_sources),
         },
         output_data={
             **verification.quality(),
             "safeFallbackApplied": verifier_fallback_applied,
+            "clarificationApplied": clarification_applied,
         },
     )
     if not verification.passed:

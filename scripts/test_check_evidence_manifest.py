@@ -213,6 +213,34 @@ def test_adjudicated_http_answer_review_requires_its_frozen_parent_and_metrics()
     assert any("metric is invalid: citationGroundingSupport" in error for error in errors)
 
 
+def test_pending_v13_answer_review_binds_raw_observation_and_open_sheets() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReviewV13"])
+
+    errors: list[str] = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV13",
+        require_pre_evaluator_observation=True,
+    )
+    assert errors == []
+
+    descriptor["preEvaluatorFixEvidence"]["sourceObservationReportSha256"] = "0" * 64
+    errors = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV13",
+        require_pre_evaluator_observation=True,
+    )
+
+    assert any("source observation is invalid" in error for error in errors)
+
+
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:
     package = tmp_path / "evaluation/.runs/final-failed"
     package.mkdir(parents=True)
@@ -564,6 +592,31 @@ def test_http_diagnostic_requires_unavailable_redacted_slots(tmp_path: Path) -> 
     errors = []
     _validate_diagnostic_evidence(tmp_path, [invalid], errors)
     assert any("HTTP slot metric must remain unavailable" in error for error in errors)
+
+
+def test_runtime_version_diagnostic_pair_preserves_stale_baseline_and_recovery() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptors = [
+        deepcopy(descriptor)
+        for descriptor in manifest["evaluation"]["diagnosticEvidence"]
+        if str(descriptor.get("resultRole") or "").startswith("RUNTIME_VERSION_")
+    ]
+
+    assert len(descriptors) == 2
+    errors: list[str] = []
+    _validate_diagnostic_evidence(root, descriptors, errors)
+    assert errors == []
+
+    stale = next(
+        descriptor
+        for descriptor in descriptors
+        if descriptor["resultRole"] == "RUNTIME_VERSION_STALE_BASELINE"
+    )
+    stale["expectedBehaviorContractViolationCount"] = 0
+    errors = []
+    _validate_diagnostic_evidence(root, descriptors, errors)
+    assert any("expected behavior-contract count is invalid" in error for error in errors)
 
 
 def test_search_paired_replay_binds_baseline_and_preserves_qrels(tmp_path: Path) -> None:

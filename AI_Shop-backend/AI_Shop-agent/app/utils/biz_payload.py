@@ -280,7 +280,14 @@ def intro_from_search_tool_hint(hint: str | None) -> str:
         return intro[:MAX_PRODUCT_SEARCH_INTRO_LEN]
 
     # Search miss + alternative recommend (hot-sale / browse backfill).
-    miss = next((ln for ln in bracket_lines if "暂未找到" in ln or "未找到" in ln), "")
+    miss = next(
+        (
+            ln
+            for ln in bracket_lines
+            if any(marker in ln for marker in ("暂未找到", "暂未返回", "未找到"))
+        ),
+        "",
+    )
     alt = next(
         (ln for ln in bracket_lines if "【另荐热销】" in ln or "【浏览推荐】" in ln or "【热销推荐】" in ln),
         "",
@@ -436,7 +443,14 @@ def compact_product_search_intro(llm_text: str | None, tool_hint: str | None = N
     hint_intro = intro_from_search_tool_hint(tool_hint)
     miss_or_alt = any(
         m in hint
-        for m in ("暂未找到", "【另荐热销】", "【浏览推荐】", "【热销推荐】")
+        for m in (
+            "暂未找到",
+            "暂未返回",
+            "不能据此断言平台无货",
+            "【另荐热销】",
+            "【浏览推荐】",
+            "【热销推荐】",
+        )
     )
     if miss_or_alt and hint_intro:
         return hint_intro[:MAX_PRODUCT_SEARCH_INTRO_LEN]

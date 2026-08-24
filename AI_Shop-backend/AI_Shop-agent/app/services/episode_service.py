@@ -128,6 +128,18 @@ _STRUCTURED_IDENTIFIER_KEYS = frozenset(
         "tool_scope",
         "type",
         "warnings",
+        # Quality/terminal fields are finite server-owned enums or bounded
+        # issue records. Keep them readable in evaluation evidence; treating
+        # a value such as ``DEGRADED_UNVERIFIED`` as a long ID would destroy
+        # the state transition the evaluator is auditing.
+        "clarification_applied",
+        "fallback_verified",
+        "safe_fallback_applied",
+        "terminal_quality",
+        "verifier_action",
+        "verifier_issues",
+        "verifier_passed",
+        "issue_codes",
     }
 )
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import secrets
 import sys
 from collections import defaultdict
@@ -91,10 +92,20 @@ from evaluation.customer_service_gold import (
     load_gold_dataset,
     run_customer_service_gold,
 )
+from evaluation.customer_service_annotation_audit import (
+    DEFAULT_JSON as DEFAULT_CUSTOMER_SERVICE_AUDIT_JSON,
+    DEFAULT_MD as DEFAULT_CUSTOMER_SERVICE_AUDIT_MD,
+    write_audit,
+)
 from evaluation.customer_service_http import (
+    DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
     build_http_agent_case,
+    load_http_fixture_map,
+    prepare_http_runtime_row,
     rebuild_customer_service_http_report,
     run_customer_service_http,
+    sanitize_customer_service_http_report,
+    seal_customer_service_http_diagnostic,
     write_customer_service_http_evidence,
 )
 from evaluation.customer_service_answer_review import (
@@ -274,6 +285,20 @@ def build_parser() -> argparse.ArgumentParser:
     customer_service.add_argument(
         "--json-output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_JSON_REPORT
     )
+    customer_service_audit = commands.add_parser(
+        "customer-service-audit",
+        help="audit frozen customer-service human labels and evidence sufficiency",
+    )
+    customer_service_audit.add_argument(
+        "--output",
+        type=Path,
+        help="Markdown audit path (defaults to the canonical docs path)",
+    )
+    customer_service_audit.add_argument(
+        "--json-output",
+        type=Path,
+        help="JSON audit path (defaults to the canonical docs path)",
+    )
     slot_replay = commands.add_parser(
         "customer-service-slot-replay",
         help="compare the current deterministic slot extractor with immutable human evidence",
@@ -299,6 +324,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--case-id", action="append", default=[], help="optional case ID filter; repeatable"
     )
     customer_http_run.add_argument("--timeout-seconds", type=float, default=240.0)
+    customer_http_run.add_argument(
+        "--fixture-file",
+        type=Path,
+        help="optional SHA-bound local per-case order fixture map",
+    )
+    customer_http_run.add_argument(
+        "--enable-local-fixtures",
+        action="store_true",
+        help="explicitly allow LOCAL_EVALUATION_ONLY SQL fixtures",
+    )
+    customer_http_run.add_argument(
+        "--behavior-contract-file",
+        type=Path,
+        default=DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
+        help="hash-bound case-level HTTP safety contracts",
+    )
     customer_http_run.add_argument("--review-a-output", type=Path)
     customer_http_run.add_argument("--review-b-output", type=Path)
     customer_http_rebuild = customer_http_commands.add_parser(
@@ -308,8 +349,32 @@ def build_parser() -> argparse.ArgumentParser:
     customer_http_rebuild.add_argument("--source-report", type=Path, required=True)
     customer_http_rebuild.add_argument("--dataset", type=Path, required=True)
     customer_http_rebuild.add_argument("--output-dir", type=Path, required=True)
+    customer_http_rebuild.add_argument(
+        "--behavior-contract-file",
+        type=Path,
+        default=DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
+    )
     customer_http_rebuild.add_argument("--review-a-output", type=Path)
     customer_http_rebuild.add_argument("--review-b-output", type=Path)
+    customer_http_diagnostic = customer_http_commands.add_parser(
+        "seal-diagnostic",
+        help="seal a partial targeted HTTP badcase replay outside quality gates",
+    )
+    customer_http_diagnostic.add_argument("--source-report", type=Path, required=True)
+    customer_http_diagnostic.add_argument("--dataset", type=Path, required=True)
+    customer_http_diagnostic.add_argument("--output-dir", type=Path, required=True)
+    customer_http_diagnostic.add_argument("--diagnostic-status", required=True)
+    customer_http_diagnostic.add_argument(
+        "--behavior-contract-file",
+        type=Path,
+        default=DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
+    )
+    customer_http_diagnostic.add_argument(
+        "--note",
+        action="append",
+        default=[],
+        help="diagnostic provenance note; repeatable",
+    )
     customer_http_export = customer_http_commands.add_parser(
         "review-export", help="export a blind final-answer review sheet"
     )
@@ -1104,6 +1169,24 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "customer-service-audit":
+        markdown_path = args.output or DEFAULT_CUSTOMER_SERVICE_AUDIT_MD
+        json_path = args.json_output or DEFAULT_CUSTOMER_SERVICE_AUDIT_JSON
+        report = write_audit(
+            markdown_path=markdown_path,
+            json_path=json_path,
+        )
+        _print(
+            {
+                "schemaVersion": report.get("schemaVersion"),
+                "status": report.get("annotationAuditStatus"),
+                "intentSlotAudit": report.get("intentSlotAudit"),
+                "answerReviewAudit": report.get("answerReviewAudit"),
+                "markdown": str(markdown_path),
+                "json": str(json_path),
+            }
+        )
+        return 0
     if args.command == "customer-service-slot-replay":
         report, paired_cases = await build_slot_replay(
             args.dataset,
@@ -1132,7 +1215,27 @@ async def _main(args: argparse.Namespace) -> int:
             selected = {str(value) for value in args.case_id}
             if selected:
                 rows = [row for row in rows if str(row["id"]) in selected]
-            cases = [build_http_agent_case(row) for row in rows]
+            fixture_map = (
+                load_http_fixture_map(args.fixture_file, args.dataset)
+                if args.fixture_file
+                else None
+            )
+            if fixture_map:
+                if not args.enable_local_fixtures and os.getenv(
+                    "AI_EVAL_ENABLE_WRITE_FIXTURES", ""
+                ).strip().casefold() not in {"1", "true", "yes", "on"}:
+                    raise EvaluationError(
+                        "--fixture-file requires --enable-local-fixtures or "
+                        "AI_EVAL_ENABLE_WRITE_FIXTURES=true"
+                    )
+                os.environ["AI_EVAL_ENABLE_WRITE_FIXTURES"] = "true"
+            fixture_rows = dict((fixture_map or {}).get("fixtures") or {})
+            cases = [
+                build_http_agent_case(
+                    prepare_http_runtime_row(row, fixture_rows.get(str(row["id"])))
+                )
+                for row in rows
+            ]
             await init_pool()
             try:
                 preflight = await run_preflight(cases)
@@ -1142,10 +1245,15 @@ async def _main(args: argparse.Namespace) -> int:
                     preflight=preflight,
                     timeout_seconds=args.timeout_seconds,
                     case_ids=args.case_id,
+                    fixture_map=fixture_map,
+                    behavior_contract_file=args.behavior_contract_file,
                 )
             finally:
                 await close_pool()
-            atomic_write_json(args.output, report, overwrite=False)
+            # The report is the source of the reviewer sheets, so raw runtime
+            # observations must never be persisted outside the process.
+            review_safe_report = sanitize_customer_service_http_report(report)
+            atomic_write_json(args.output, review_safe_report, overwrite=False)
             reviews: dict[str, Any] = {}
             if args.review_a_output:
                 reviews["reviewA"] = export_answer_review_sheet(
@@ -1161,13 +1269,15 @@ async def _main(args: argparse.Namespace) -> int:
                 )
             _print(
                 {
-                    "schemaVersion": report.get("schemaVersion"),
-                    "runId": report.get("runId"),
-                    "status": report.get("status"),
-                    "dataset": report.get("dataset"),
-                    "httpExecution": report.get("httpExecution"),
-                    "handoffDecision": report.get("handoffDecision"),
-                    "answerQuality": report.get("answerQuality"),
+                    "schemaVersion": review_safe_report.get("schemaVersion"),
+                    "runId": review_safe_report.get("runId"),
+                    "status": review_safe_report.get("status"),
+                    "dataset": review_safe_report.get("dataset"),
+                    "httpExecution": review_safe_report.get("httpExecution"),
+                    "handoffDecision": review_safe_report.get("handoffDecision"),
+                    "answerQuality": review_safe_report.get("answerQuality"),
+                    "qualityDiagnostics": review_safe_report.get("qualityDiagnostics"),
+                    "runtimeFixture": review_safe_report.get("runtimeFixture"),
                     "output": str(args.output),
                     "reviews": reviews,
                 }
@@ -1177,6 +1287,7 @@ async def _main(args: argparse.Namespace) -> int:
             report = rebuild_customer_service_http_report(
                 args.source_report,
                 args.dataset,
+                behavior_contract_file=args.behavior_contract_file,
             )
             verification = write_customer_service_http_evidence(
                 report, args.output_dir
@@ -1208,6 +1319,17 @@ async def _main(args: argparse.Namespace) -> int:
                     "reviews": reviews,
                 }
             )
+            return 0
+        if args.customer_http_command == "seal-diagnostic":
+            verification = seal_customer_service_http_diagnostic(
+                args.source_report,
+                args.dataset,
+                args.output_dir,
+                diagnostic_status=args.diagnostic_status,
+                behavior_contract_file=args.behavior_contract_file,
+                notes=args.note,
+            )
+            _print(verification)
             return 0
         if args.customer_http_command == "review-export":
             manifest = export_answer_review_sheet(

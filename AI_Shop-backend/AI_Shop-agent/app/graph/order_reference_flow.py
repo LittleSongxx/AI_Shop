@@ -13,7 +13,9 @@ from app.domain.intent.types import IntentKind, RequestMode
 from app.domain.intent.write_args import extract_review_content, extract_review_star
 from app.graph.state import AgentGraphState
 from app.memory.session_memory_service import session_memory_service
+from app.services.episode_service import episode_service
 from app.services.order_reference_resolver import (
+    ORDER_ELIGIBILITY_REQUIRED_INTENTS,
     ORDER_REFERENCE_INTENTS,
     OrderReferenceOutcome,
     order_reference_resolver,
@@ -33,14 +35,20 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
             request_mode = classify_request_mode(user_text, IntentKind(intent)).value
         except ValueError:
             request_mode = RequestMode.READ_QUERY.value
-    if request_mode in {
-        RequestMode.INFORMATIONAL.value,
-        RequestMode.HUMAN_SUPPORT.value,
-    }:
+    if request_mode == RequestMode.HUMAN_SUPPORT.value:
         return {"route": "orchestration_router"}
     if intent not in ORDER_REFERENCE_INTENTS:
         return {"route": "orchestration_router"}
-    if intent == IntentKind.QUERY_ORDER.value and not _has_specific_order_clue(user_text):
+    # An order-specific informational question (for example, “订单 X 怎么还
+    # 没发货”) still needs the Java snapshot. Only generic policy questions
+    # should bypass order resolution and use RAG directly.
+    order_specific_query_intents = {
+        IntentKind.QUERY_ORDER.value,
+        IntentKind.QUERY_LOGISTICS.value,
+        IntentKind.QUERY_FULFILLMENT.value,
+        IntentKind.REFUND_STATUS.value,
+    }
+    if intent in order_specific_query_intents and not _has_specific_order_clue(user_text):
         return {"route": "orchestration_router"}
 
     decision = state.get("intent_decision") or {}
@@ -51,63 +59,147 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         entities=decision.get("entities") or {},
         consult_card=state.get("card"),
         pending_reference=state.get("pending_order_reference"),
-        enforce_action_eligibility=request_mode == RequestMode.ACTION_PROPOSAL.value,
+        enforce_action_eligibility=(
+            request_mode == RequestMode.ACTION_PROPOSAL.value
+            or intent in ORDER_ELIGIBILITY_REQUIRED_INTENTS
+        ),
     )
-    base = {"order_resolution": resolution.outcome.value}
+    base = {
+        "order_resolution": resolution.outcome.value,
+        "tool_source_refs": list(resolution.source_refs or []),
+    }
+
+    def with_evidence(
+        update: dict,
+        *,
+        route: str,
+        resolved_tool: str | None = None,
+        has_context: bool = False,
+    ) -> dict:
+        """Attach a redacted resolver proof and persist it in the Episode."""
+
+        audit = {
+            "outcome": resolution.outcome.value,
+            "route": route,
+            "resolvedTool": resolved_tool,
+            "businessSourceRefCount": len(resolution.source_refs or []),
+            "hasVerifiedOrderContext": bool(has_context),
+            "matchedCandidateCount": len(
+                resolution.matched_candidates or resolution.candidates or []
+            ),
+            "dependencyError": resolution.outcome == OrderReferenceOutcome.DEPENDENCY_ERROR,
+        }
+        episode_service.record_step(
+            "ORDER_REFERENCE_RESOLUTION",
+            node_name="order_reference",
+            status="ERROR" if audit["dependencyError"] else "OK",
+            output_data=audit,
+        )
+        # Keep this under its own key; later RAG/orchestration updates must not
+        # erase the proof that a deterministic path was deliberately selected.
+        episode_service.update_run(experiment={"orderReference": audit})
+        return {**update, "order_reference_evidence": audit}
 
     if resolution.outcome == OrderReferenceOutcome.DEPENDENCY_ERROR:
-        return {**base, "chunks": [resolution.reason], "biz_type": "agent", "route": "finalize"}
+        return with_evidence(
+            {**base, "chunks": [resolution.reason], "biz_type": "agent", "route": "finalize"},
+            route="finalize",
+        )
     if resolution.outcome == OrderReferenceOutcome.NO_ELIGIBLE:
-        await _remember_reference(state, intent, resolution.candidates[0] if resolution.candidates else None)
-        return {**base, "chunks": [resolution.reason], "biz_type": "agent", "route": "finalize"}
+        candidate = resolution.candidates[0] if resolution.candidates else None
+        await _remember_reference(state, intent, candidate)
+        # A non-eligible order is still a verified read snapshot. It must not
+        # create a write proposal, but its status may safely explain the refusal.
+        return with_evidence(
+            {
+                **base,
+                "verified_order_context": dict(candidate) if candidate else None,
+                "chunks": [resolution.reason],
+                "biz_type": "agent",
+                "route": "finalize",
+            },
+            route="finalize",
+            has_context=bool(candidate and resolution.source_refs),
+        )
     if resolution.outcome in {OrderReferenceOutcome.AMBIGUOUS, OrderReferenceOutcome.NO_MATCH}:
         if resolution.candidates:
             card = await _selection_card(state, intent, resolution.reason, resolution.candidates)
-            return {
-                **base,
-                "assistant_cards": json.dumps(card, ensure_ascii=False),
-                "biz_type": "order_selection",
-                "chunks": [],
-                "route": "finalize",
-            }
-        return {**base, "chunks": [resolution.reason], "biz_type": "agent", "route": "finalize"}
+            return with_evidence(
+                {
+                    **base,
+                    "assistant_cards": json.dumps(card, ensure_ascii=False),
+                    "biz_type": "order_selection",
+                    "chunks": [],
+                    "route": "finalize",
+                },
+                route="finalize",
+            )
+        return with_evidence(
+            {**base, "chunks": [resolution.reason], "biz_type": "agent", "route": "finalize"},
+            route="finalize",
+        )
     if resolution.outcome != OrderReferenceOutcome.RESOLVED or not resolution.target:
-        return {
-            **base,
-            "chunks": ["订单候选已失效，请重新描述商品、购买时间或订单号。"],
-            "biz_type": "agent",
-            "route": "finalize",
-        }
+        return with_evidence(
+            {
+                **base,
+                "chunks": ["订单候选已失效，请重新描述商品、购买时间或订单号。"],
+                "biz_type": "agent",
+                "route": "finalize",
+            },
+            route="finalize",
+        )
 
     target = resolution.target
     tool = _tool_for_target(intent, user_text, target, state)
     if tool is None:
         await _remember_reference(state, intent, target)
-        return {
-            **base,
-            "chunks": [_missing_args_prompt(intent, target)],
-            "biz_type": "agent",
-            "route": "finalize",
-        }
+        # Missing write arguments are a deterministic, snapshot-backed
+        # clarification path. Preserve the same evidence as the other
+        # finalize branches so evaluation can distinguish it from a skipped
+        # or failed LLM call.
+        return with_evidence(
+            {
+                **base,
+                "verified_order_context": dict(target),
+                "chunks": [_missing_args_prompt(intent, target)],
+                "biz_type": "agent",
+                "route": "finalize",
+            },
+            route="finalize",
+            has_context=True,
+        )
 
     tool_name, args = tool
     direct = await _direct_response(state, intent, target)
     if direct is not None:
-        return {**base, **direct}
+        return with_evidence(
+            {**base, **direct, "verified_order_context": dict(target)},
+            route="finalize",
+            has_context=True,
+        )
     await _clear_reference(state)
     if tool_name.startswith("PROPOSE_") and request_mode != RequestMode.ACTION_PROPOSAL.value:
-        return {
+        return with_evidence(
+            {
+                **base,
+                "verified_order_context": dict(target),
+                "resolved_order_tool": None,
+                "route": "orchestration_router",
+            },
+            route="orchestration_router",
+            has_context=True,
+        )
+    return with_evidence(
+        {
             **base,
             "verified_order_context": dict(target),
-            "resolved_order_tool": None,
+            "resolved_order_tool": {"name": tool_name, "args": args},
             "route": "orchestration_router",
-        }
-    return {
-        **base,
-        "verified_order_context": dict(target),
-        "resolved_order_tool": {"name": tool_name, "args": args},
-        "route": "orchestration_router",
-    }
+        },
+        route="orchestration_router",
+        resolved_tool=tool_name,
+        has_context=True,
+    )
 
 
 async def _selection_card(

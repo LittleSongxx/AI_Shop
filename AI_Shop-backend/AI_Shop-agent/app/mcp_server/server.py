@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import secrets
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from typing import Any
 
+import structlog
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import Settings as FastMCPSettings
 from starlette.responses import JSONResponse
@@ -24,6 +26,10 @@ from app.services.evaluation_fault_service import (
 )
 from app.services.java_internal_client import delegated_user_scope
 from app.services.redis_service import redis_service
+from app.services.runtime_identity import (
+    current_runtime_identity,
+    freeze_runtime_identity,
+)
 from app.services.shopping_mission_service import initialize_category_need_schemas
 from app.services.tool_invoke_result import ToolInvokeResult
 from evaluation.core.fault_injection import FailureInjectionScope, fault_point
@@ -31,6 +37,7 @@ from evaluation.core.fault_injection import FailureInjectionScope, fault_point
 _MCP_HOST = os.getenv("FASTMCP_HOST", "127.0.0.1")
 _MCP_PORT = int(os.getenv("FASTMCP_PORT", "7060"))
 configure_structured_logging()
+logger = structlog.get_logger()
 
 # mcp 1.28.1 defines Settings before FastMCP and leaves its lifespan forward
 # reference unresolved under pydantic-settings 2.15.
@@ -68,12 +75,17 @@ class EvaluationAwareFastMCP(FastMCP):
 @asynccontextmanager
 async def _mcp_lifespan(_server: FastMCP) -> AsyncIterator[dict]:
     settings = get_settings()
+    runtime_identity = freeze_runtime_identity("mcp")
     await redis_service.ensure_connected()
     await init_pool()
     if settings.agent_auto_migrate:
         await asyncio.to_thread(run_migrations)
     await initialize_category_need_schemas()
     await episode_service.start()
+    logger.info(
+        "mcp_service_started",
+        source_sha256=(runtime_identity.get("source") or {}).get("sha256"),
+    )
     try:
         yield {}
     finally:
@@ -120,6 +132,17 @@ async def _run_as_delegated_user(
 @mcp.tool(name="MCP_CONTRACT", description="[SYSTEM] report the AI_Shop tool contract version")
 async def mcp_contract() -> str:
     return _text(ToolInvokeResult(content="ok"))
+
+
+@mcp.tool(
+    name="MCP_RUNTIME_IDENTITY",
+    description="[SYSTEM] report the safe MCP serving runtime identity",
+)
+async def mcp_runtime_identity() -> str:
+    """Expose only a frozen, credential-free source fingerprint internally."""
+
+    identity = current_runtime_identity() or freeze_runtime_identity("mcp")
+    return _text(ToolInvokeResult(content=json.dumps(identity, sort_keys=True)))
 
 
 @mcp.tool(name="SEARCH_PRODUCTS", description="[READ] 搜索/推荐商品")
@@ -365,6 +388,7 @@ def main() -> None:
 
     settings = get_settings()
     settings.validate_runtime()
+    freeze_runtime_identity("mcp")
     app = InternalTokenMiddleware(mcp.streamable_http_app(), settings.internal_token)
     uvicorn.run(app, host=_MCP_HOST, port=_MCP_PORT)
 

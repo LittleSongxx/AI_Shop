@@ -98,3 +98,16 @@ def test_hot_sale_fallback_message_not_found():
     assert "零食" in msg
     assert "另荐热销" in msg
     assert "找到 2 个商品" not in msg
+
+
+def test_hard_exclusion_is_visible_without_claiming_catalog_absence():
+    msg = format_search_tool_message(
+        "预算500元以内的男士外套",
+        None,
+        [{"product_name": "基础款男士外套", "product_id": "P1"}],
+        "shopping_decision_v2",
+        profile={"excludedTerms": ["户外款"]},
+        mission={"category": "外套"},
+    )
+    assert "排除：户外款" in msg
+    assert "全目录" not in msg

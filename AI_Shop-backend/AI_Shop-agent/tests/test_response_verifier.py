@@ -1,6 +1,7 @@
 from app.rag.prompt_builder import (
     build_grounding_prompt,
     deterministic_grounding_policy_fallback,
+    deterministic_policy_evidence_fallback,
     grounding_repair_reason,
 )
 from app.services.response_verifier import response_verifier
@@ -25,6 +26,66 @@ def test_dynamic_order_fact_requires_a_tool_or_resolved_order_reference():
     assert blocked.passed is False
     assert blocked.issues[0].code == "DYNAMIC_FACT_WITHOUT_TOOL"
     assert grounded.passed is True
+
+
+def test_resolved_dynamic_snapshot_does_not_require_policy_citation():
+    result = response_verifier.verify(
+        assistant=(
+            "当前订单状态为“已付款,待发货”，商家尚未发货；"
+            "客服侧暂无催发货写工具。"
+        ),
+        biz_type="query_order",
+        tools_called=[],
+        source_refs={
+            "ragSources": [],
+            "businessSources": [
+                {"type": "order", "orderId": "O1", "matched": True}
+            ],
+        },
+        rag_source_refs=[],
+        order_resolution="RESOLVED",
+        has_pending_action=False,
+        policy_evidence_required=False,
+    )
+    assert result.passed is True
+
+
+def test_no_eligible_verified_snapshot_supports_status_but_not_write():
+    result = response_verifier.verify(
+        assistant="订单当前状态为‘已付款,待发货’，当前不能取消。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs={
+            "ragSources": [],
+            "businessSources": [
+                {
+                    "type": "order",
+                    "orderId": "O1",
+                    "matched": True,
+                    "orderStatusName": "已付款,待发货",
+                }
+            ],
+        },
+        rag_source_refs=[],
+        order_resolution="NO_ELIGIBLE",
+        has_pending_action=False,
+    )
+    assert result.passed is True
+
+    blocked = response_verifier.verify(
+        assistant="请确认取消订单。",
+        biz_type="action_confirm",
+        tools_called=["PROPOSE_CANCEL_ORDER"],
+        source_refs={
+            "ragSources": [],
+            "businessSources": [{"type": "order", "orderId": "O1", "matched": True}],
+        },
+        rag_source_refs=[],
+        order_resolution="NO_ELIGIBLE",
+        has_pending_action=False,
+    )
+    assert blocked.passed is False
+    assert blocked.issues[0].code == "WRITE_WITHOUT_PENDING_ACTION"
 
 
 def test_write_tool_requires_a_server_verified_pending_action():
@@ -59,6 +120,70 @@ def test_policy_claim_requires_published_source_reference():
 
     assert blocked.issues[0].code == "POLICY_WITHOUT_CITATION"
     assert grounded.passed is True
+
+
+def test_business_snapshot_cannot_satisfy_rag_policy_citation_gate():
+    result = response_verifier.verify(
+        assistant="平台规定七天内支持无理由退货。",
+        biz_type="agent",
+        tools_called=["QUERY_ORDERS"],
+        source_refs={
+            "ragSources": [],
+            "businessSources": [
+                {"type": "order", "orderId": "O1", "orderStatusName": "已发货"}
+            ],
+            "sources": [
+                {"type": "order", "orderId": "O1", "orderStatusName": "已发货"}
+            ],
+        },
+        rag_source_refs=[],
+        has_pending_action=False,
+        policy_evidence_required=True,
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "POLICY_WITHOUT_CITATION"
+
+
+def test_policy_evidence_fallback_is_conservative_and_cited():
+    refs = [
+        {
+            "id": "cancel-policy",
+            "factIds": ["order.cancel.by_fulfillment_state"],
+            "snippet": "待付款订单可以直接取消；已发货通常需要按售后流程处理。",
+        }
+    ]
+    fallback = deterministic_policy_evidence_fallback(
+        "我要取消订单 SM1",
+        intent="CANCEL_ORDER",
+        evidence_state="SUPPORTED",
+        source_refs=refs,
+    )
+
+    assert fallback is not None
+    assert fallback["citation"] == 1
+    assert fallback["answer"].count("[1]") >= 5
+    checked = response_verifier.verify(
+        assistant=fallback["answer"],
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+    assert checked.passed is True
+
+
+def test_policy_evidence_fallback_does_not_invent_without_matching_source():
+    assert deterministic_policy_evidence_fallback(
+        "我要取消订单 SM1",
+        intent="CANCEL_ORDER",
+        evidence_state="SUPPORTED",
+        source_refs=[{"id": "unrelated", "snippet": "优惠券规则"}],
+    ) is None
 
 
 def test_policy_evidence_gate_rejects_uncited_answer_without_keyword_match():
@@ -163,6 +288,38 @@ def test_policy_violation_rejects_an_unsafe_custom_fallback():
 
     assert result.passed is False
     assert result.assistant.startswith("当前没有检索到足够的已发布规则依据")
+
+
+def test_safe_fallback_is_reported_separately_from_original_model_failure():
+    fallback = "当前没有足够的规则依据，请补充订单信息或转人工。"
+    result = response_verifier.verify(
+        assistant="平台规定七天内支持无理由退货。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        policy_evidence_required=True,
+        safe_fallback=fallback,
+    )
+
+    assert result.passed is False
+    assert result.fallback_verified is True
+    assert result.terminal_quality == "SAFE_DEGRADED"
+    assert result.quality()["verifierPassed"] is False
+    assert result.quality()["fallbackVerified"] is True
+
+
+def test_product_identity_clarification_is_not_a_policy_answer():
+    result = response_verifier.verify(
+        assistant="要判断续航表现，请提供具体手机品牌/型号，或发送商品卡片。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs=[],
+        has_pending_action=False,
+        policy_evidence_required=False,
+    )
+    assert result.passed is True
+    assert result.terminal_quality == "PASS"
 
 
 def test_supported_rag_abstention_is_rejected():

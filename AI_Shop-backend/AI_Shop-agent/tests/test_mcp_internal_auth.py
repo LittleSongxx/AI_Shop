@@ -1,5 +1,7 @@
 import ast
+import json
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -7,6 +9,7 @@ from app.config.settings import Settings
 from app.mcp_server.server import InternalTokenMiddleware, _run_as_delegated_user
 from app.services.java_internal_client import JavaInternalClient
 from app.services.mcp_streamable_client import McpStreamableClient
+from app.services.tool_invoke_result import ToolInvokeResult
 
 
 @pytest.mark.asyncio
@@ -43,6 +46,27 @@ def test_mcp_client_always_sends_internal_token(monkeypatch):
     client = McpStreamableClient()
     assert client._headers == {"X-Internal-Token": "secret"}
     get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_mcp_runtime_identity_requires_an_object_contract(monkeypatch):
+    client = McpStreamableClient()
+    expected = {
+        "schemaVersion": "aishop-runtime-identity/v1",
+        "processRole": "mcp",
+        "source": {"sha256": "a" * 64},
+    }
+    monkeypatch.setattr(
+        client,
+        "call_tool",
+        AsyncMock(return_value=ToolInvokeResult(content=json.dumps(expected))),
+    )
+
+    assert await client.runtime_identity() == expected
+
+    client.call_tool = AsyncMock(return_value=ToolInvokeResult(content="[]"))
+    with pytest.raises(RuntimeError, match="must be an object"):
+        await client.runtime_identity()
 
 
 @pytest.mark.asyncio

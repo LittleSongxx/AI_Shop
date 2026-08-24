@@ -20,6 +20,7 @@ from app.config.settings import get_settings
 
 _ENABLED_VALUES = frozenset({"1", "true", "yes", "on"})
 _CANCELABLE_ORDER = "CANCELABLE_ORDER_V1"
+_CUSTOMER_SERVICE_ORDER = "CUSTOMER_SERVICE_ORDER_V1"
 _LOCAL_SCOPE = "LOCAL_EVALUATION_ONLY"
 _JAVA_TOKEN_USER_CLASS = "com.aishop.entity.dto.TokenUserInfoDTO"
 _INITIAL_STOCK = 7
@@ -94,14 +95,33 @@ def _stable_fixture_ids(user_id: str, nonce: str) -> dict[str, str]:
     }
 
 
+def _stable_customer_service_order_ids(user_id: str, nonce: str) -> dict[str, str]:
+    """Generate isolated identifiers for a read-only客服 order snapshot."""
+
+    digest = hashlib.sha256(f"customer-service\0{user_id}\0{nonce}".encode()).hexdigest().upper()
+    fixture_epoch = datetime(2020, 1, 1) + timedelta(
+        milliseconds=int(digest[:16], 16) % (10 * 365 * 24 * 60 * 60 * 1000)
+    )
+    timestamp = fixture_epoch.strftime("%Y%m%d%H%M%S%f")[:17]
+    order_id = timestamp + digest[16:31]
+    product_id = "EV" + digest[24:37]
+    sku_hash = digest[32:64]
+    return {
+        "orderId": order_id,
+        "orderItemId": f"{order_id}_1",
+        "productId": product_id,
+        "skuHash": sku_hash,
+    }
+
+
 def build_java_web_session_payload(
     declaration: dict[str, Any], *, user_id: str, token: str
 ) -> dict[str, Any]:
     """Build a RedisSerializer.json-compatible principal for local write evals."""
 
     _fixture_guard(declaration)
-    if declaration.get("kind") != _CANCELABLE_ORDER:
-        raise RuntimeError("Java-compatible session requires a cancelable-order fixture")
+    if declaration.get("kind") not in {_CANCELABLE_ORDER, _CUSTOMER_SERVICE_ORDER}:
+        raise RuntimeError("Java-compatible session requires a supported local order fixture")
     if not user_id.strip() or not token.strip():
         raise RuntimeError("Java-compatible session requires non-empty userId and token")
     return {
@@ -127,6 +147,7 @@ class ProvisionedAgentFixture:
     capture_fixture: dict[str, Any] = field(default_factory=dict)
     template_values: dict[str, str] = field(default_factory=dict)
     evidence: dict[str, Any] = field(default_factory=dict)
+    cleanup_mode: str = "ORDER_AND_STOCK"
 
     @property
     def active(self) -> bool:
@@ -254,18 +275,100 @@ class ProvisionedAgentFixture:
         java_residue: dict[str, int] = {"orderRows": 1}
         java_error: Exception | None = None
         try:
-            identifiers = (
-                self.order_item_id,
-                self.product_id,
-                self.sku_hash,
-                self.restore_business_key,
-                self.compensation_key,
-            )
-            if not all(identifiers):
-                raise RuntimeError("evaluation fixture cleanup identifiers are incomplete")
+            if not self.order_item_id:
+                raise RuntimeError("evaluation fixture cleanup order identifiers are incomplete")
             connection = await _connect_order_db(autocommit=False)
             try:
                 async with connection.cursor() as cursor:
+                    if self.cleanup_mode == "ORDER_ONLY":
+                        await cursor.execute(
+                            "DELETE FROM refund_request WHERE order_id=%s AND user_id=%s",
+                            (self.order_id, self.user_id),
+                        )
+                        java_cleanup["refundRequests"] = int(cursor.rowcount or 0)
+                        await cursor.execute(
+                            "DELETE FROM order_logistics_info_record WHERE order_id=%s",
+                            (self.order_id,),
+                        )
+                        java_cleanup["logisticsRecords"] = int(cursor.rowcount or 0)
+                        await cursor.execute(
+                            "DELETE FROM order_logistics_info WHERE order_id=%s AND user_id=%s",
+                            (self.order_id, self.user_id),
+                        )
+                        java_cleanup["logistics"] = int(cursor.rowcount or 0)
+                        await cursor.execute(
+                            "DELETE FROM order_item WHERE order_item_id=%s AND order_id=%s",
+                            (self.order_item_id, self.order_id),
+                        )
+                        java_cleanup["orderItems"] = int(cursor.rowcount or 0)
+                        await cursor.execute(
+                            "DELETE FROM order_info WHERE order_id=%s AND user_id=%s",
+                            (self.order_id, self.user_id),
+                        )
+                        java_cleanup["orders"] = int(cursor.rowcount or 0)
+                        residue_queries = (
+                            (
+                                "orderRows",
+                                "SELECT COUNT(*) FROM order_info WHERE order_id=%s",
+                                (self.order_id,),
+                            ),
+                            (
+                                "orderItemRows",
+                                "SELECT COUNT(*) FROM order_item WHERE order_item_id=%s",
+                                (self.order_item_id,),
+                            ),
+                            (
+                                "logisticsRows",
+                                "SELECT COUNT(*) FROM order_logistics_info WHERE order_id=%s",
+                                (self.order_id,),
+                            ),
+                            (
+                                "logisticsRecordRows",
+                                "SELECT COUNT(*) FROM order_logistics_info_record WHERE order_id=%s",
+                                (self.order_id,),
+                            ),
+                            (
+                                "refundRows",
+                                "SELECT COUNT(*) FROM refund_request WHERE order_id=%s",
+                                (self.order_id,),
+                            ),
+                        )
+                        for name, sql, params in residue_queries:
+                            await cursor.execute(sql, params)
+                            row = await cursor.fetchone()
+                            java_residue[name] = int(row[0]) if row else 1
+                        await connection.commit()
+                        # The order-only fixture has no inventory or durable
+                        # command ledger.  Skip the write-fixture cleanup below.
+                        self.evidence["cleanup"] = {
+                            "completed": (
+                                not any(java_residue.values())
+                                and agent_error is None
+                                and java_error is None
+                            ),
+                            "agentRowsDeleted": agent_cleanup,
+                            "residualAgentRows": agent_residue,
+                            "javaRowsDeleted": java_cleanup,
+                            "residualJavaRows": java_residue,
+                        }
+                        if any(java_residue.values()):
+                            raise RuntimeError(
+                                f"evaluation order fixture cleanup residue: {java_residue}"
+                            )
+                        if agent_error is not None:
+                            raise RuntimeError(
+                                "Agent fixture cleanup failed after Java cleanup"
+                            ) from agent_error
+                        return
+                    identifiers = (
+                        self.order_item_id,
+                        self.product_id,
+                        self.sku_hash,
+                        self.restore_business_key,
+                        self.compensation_key,
+                    )
+                    if not all(identifiers):
+                        raise RuntimeError("evaluation fixture cleanup identifiers are incomplete")
                     await cursor.execute(
                         "DELETE FROM order_item WHERE order_item_id=%s AND order_id=%s",
                         (self.order_item_id, self.order_id),
@@ -382,6 +485,12 @@ async def provision_agent_fixture(
     kind = str(declared.get("kind") or "").strip()
     if not kind:
         return ProvisionedAgentFixture(declared=declared, user_id=user_id)
+    if kind == _CUSTOMER_SERVICE_ORDER:
+        return await _provision_customer_service_order_fixture(
+            declared,
+            user_id=user_id,
+            isolation_nonce=isolation_nonce,
+        )
     if kind != _CANCELABLE_ORDER:
         raise RuntimeError(f"unsupported Agent state fixture kind: {kind}")
     _fixture_guard(declared)
@@ -500,6 +609,145 @@ async def provision_agent_fixture(
         capture_fixture=capture_fixture,
         template_values={"orderId": order_id},
         evidence=evidence,
+    )
+
+
+async def _provision_customer_service_order_fixture(
+    declared: dict[str, Any],
+    *,
+    user_id: str,
+    isolation_nonce: str | None = None,
+) -> ProvisionedAgentFixture:
+    """Create one isolated Java order snapshot for客服 read-path evaluation.
+
+    This fixture deliberately provisions only the order-owned rows required by
+    the internal Agent query APIs.  It is not a production data seeder and is
+    guarded by the same local-only opt-in as write fixtures.
+    """
+
+    _fixture_guard(declared)
+    nonce = isolation_nonce or secrets.token_hex(16)
+    ids = _stable_customer_service_order_ids(user_id, nonce)
+    order_status = int(declared.get("orderStatus", 1))
+    if order_status not in {0, 1, 2, 3, 4, 5, 6, 7}:
+        raise RuntimeError("customer-service order fixture orderStatus is invalid")
+    item_status = int(declared.get("orderItemStatus", 1))
+    amount = float(declared.get("amount", 199.0))
+    subject = str(declared.get("subject") or "客服评测商品")[:200]
+    product_name = str(declared.get("productName") or "客服评测商品")[:200]
+    connection = await _connect_order_db(autocommit=False)
+    try:
+        async with connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                INSERT INTO order_info
+                    (order_id, amount, goods_amount, discount_amount, coupon_discount,
+                     user_id, order_time, order_status, pay_channel, pay_scene,
+                     pay_order_id, channel_order_Id, comment_status, subject)
+                VALUES (%s, %s, %s, 0.00, 0.00, %s, NOW(3), %s,
+                        %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    ids["orderId"],
+                    amount,
+                    amount,
+                    user_id,
+                    order_status,
+                    "alipay" if order_status != 0 else None,
+                    "alipay_pc" if order_status != 0 else None,
+                    f"EVPAY{ids['orderId'][-20:]}",
+                    f"EVCHANNEL{ids['orderId'][-20:]}",
+                    int(declared.get("commentStatus", 0)),
+                    subject,
+                ),
+            )
+            if int(cursor.rowcount or 0) != 1:
+                raise RuntimeError("failed to provision exactly one客服 order")
+            await cursor.execute(
+                """
+                INSERT INTO order_item
+                    (order_item_id, order_id, product_id, product_name,
+                     property_value_id_hash, property_info, item_amount,
+                     buy_count, order_item_status, remark)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    ids["orderItemId"],
+                    ids["orderId"],
+                    ids["productId"],
+                    product_name,
+                    ids["skuHash"],
+                    str(declared.get("propertyInfo") or "评测规格")[:150],
+                    amount,
+                    int(declared.get("buyCount", 1)),
+                    item_status,
+                    "LOCAL_EVALUATION_ONLY",
+                ),
+            )
+            if int(cursor.rowcount or 0) != 1:
+                raise RuntimeError("failed to provision exactly one客服 order item")
+            if bool(declared.get("withLogistics")):
+                await cursor.execute(
+                    """
+                    INSERT INTO order_logistics_info
+                        (order_id, user_id, logistics_no, logistics_company,
+                         sender_name, sender_phone, sender_address,
+                         receiver_name, receiver_phone, receiver_address,
+                         logistics_status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        ids["orderId"],
+                        user_id,
+                        f"EVLOG{ids['orderId'][-20:]}",
+                        "LOCAL_EVALUATION_CARRIER",
+                        "AI Shop evaluation",
+                        None,
+                        None,
+                        "evaluation-user",
+                        None,
+                        None,
+                        int(declared.get("logisticsStatus", 1)),
+                    ),
+                )
+        await connection.commit()
+    except BaseException:
+        await connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+    capture_fixture = {
+        **declared,
+        "kind": _CUSTOMER_SERVICE_ORDER,
+        "scope": _LOCAL_SCOPE,
+        "orderIds": [ids["orderId"]],
+        "orderDatabaseAudit": {"enabled": False, "reason": "ORDER_ONLY_READ_FIXTURE"},
+    }
+    evidence = {
+        "kind": _CUSTOMER_SERVICE_ORDER,
+        "scope": _LOCAL_SCOPE,
+        "sourceOrderId": declared.get("sourceOrderId"),
+        "orderId": ids["orderId"],
+        "orderItemId": ids["orderItemId"],
+        "productId": ids["productId"],
+        "orderStatus": order_status,
+        "withLogistics": bool(declared.get("withLogistics")),
+        "provisioningBoundary": "DIRECT_SQL_FIXTURE_ONLY",
+        "mutationBoundary": "READ_ONLY_CUSTOMER_SERVICE_HTTP_EVALUATION",
+        "cleanup": {"completed": False},
+    }
+    return ProvisionedAgentFixture(
+        declared=declared,
+        user_id=user_id,
+        order_id=ids["orderId"],
+        order_item_id=ids["orderItemId"],
+        product_id=ids["productId"],
+        sku_hash=ids["skuHash"],
+        capture_fixture=capture_fixture,
+        template_values={"orderId": ids["orderId"]},
+        evidence=evidence,
+        cleanup_mode="ORDER_ONLY",
     )
 
 

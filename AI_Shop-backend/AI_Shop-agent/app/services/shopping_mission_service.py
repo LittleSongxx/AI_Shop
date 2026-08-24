@@ -325,7 +325,10 @@ def empty_shopping_mission(profile: dict[str, Any] | None = None) -> dict[str, A
             "features": _unique(profile.get("features")),
             "acceptSubstitute": profile.get("acceptSubstitute"),
         },
-        "exclusions": {"brands": _unique(profile.get("excludedBrands")), "terms": []},
+        "exclusions": {
+            "brands": _unique(profile.get("excludedBrands")),
+            "terms": _unique(profile.get("excludedTerms")),
+        },
         "personalization": {
             "enabled": bool(profile.get("personalizationEnabled", True)),
             "implicitSignals": [
@@ -495,6 +498,11 @@ def apply_explicit_turn(
         exclusions["brands"] = _unique(incoming["excludedBrands"])
         soft["brands"] = [brand for brand in soft.get("brands") or [] if brand not in exclusions["brands"]]
         _set_source(mission, "excludedBrands", message_id)
+    if incoming.get("excludedTerms"):
+        exclusions["terms"] = _unique(
+            [*(exclusions.get("terms") or []), *incoming["excludedTerms"]]
+        )
+        _set_source(mission, "excludedTerms", message_id)
 
     # A brand named in the current turn is a hard constraint by default. It is
     # downgraded only when the same turn explicitly accepts substitutes; a

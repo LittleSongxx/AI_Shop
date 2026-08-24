@@ -1188,6 +1188,17 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
             "report.md",
         },
     }
+    runtime_version_roles = {
+        "RUNTIME_VERSION_STALE_BASELINE": {
+            "status": "STALE_WORKER_RUNTIME_DIAGNOSTIC",
+            "behaviorContractViolationCount": 6,
+        },
+        "RUNTIME_VERSION_POST_RESTART_RECOVERY": {
+            "status": "POST_WORKER_RESTART_TARGETED_DIAGNOSTIC",
+            "behaviorContractViolationCount": 0,
+        },
+    }
+    runtime_version_pairs: dict[str, dict[str, tuple[str, str]]] = {}
     seen: set[str] = set()
     for index, descriptor in enumerate(descriptors, 1):
         label = f"evaluation.diagnosticEvidence[{index}]"
@@ -1255,41 +1266,146 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
         if package.get("files") != inventory:
             errors.append(f"{label} file inventory is stale")
         if kind == "customer-service-http":
-            if report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1":
-                errors.append(f"{label} HTTP report schema is invalid")
-            if (
-                package.get("releaseGateEligible") is not False
-                or report.get("releaseGateEligible") is not False
-                or report.get("normalQualityDenominatorExcluded") is not True
-            ):
-                errors.append(f"{label} HTTP evidence must not be a release gate")
-            if package.get("providerCallsReexecuted") is not False:
-                errors.append(f"{label} offline rebuild provenance is invalid")
-            if not HEX64.fullmatch(
-                str(package.get("sourceObservationReportSha256") or "")
-            ):
-                errors.append(f"{label} source observation digest is invalid")
-            route_metrics = ((report.get("httpRoute") or {}).get("metrics") or {})
-            for metric_name in ("slotEntitySpanF1", "slotExactMatch"):
-                if (route_metrics.get(metric_name) or {}).get("status") != "UNAVAILABLE":
-                    errors.append(f"{label} HTTP slot metric must remain unavailable")
-            observation = report.get("observationProvenance") or {}
-            if (
-                observation.get("mode") != "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS"
-                or observation.get("providerCallsReexecuted") is not False
-                or observation.get("sourceReportSha256")
-                != package.get("sourceObservationReportSha256")
-            ):
-                errors.append(f"{label} HTTP observation provenance is invalid")
-            answer_quality = report.get("answerQuality") or {}
-            if (
-                answer_quality.get("status") != "PENDING_HUMAN_REVIEW"
-                or answer_quality.get("selfJudged") is not False
-                or answer_quality.get("answerCorrectness") is not None
-                or answer_quality.get("citationGroundingSupport") is not None
-                or answer_quality.get("unsafeAnswerRate") is not None
-            ):
-                errors.append(f"{label} HTTP answer quality must remain pending human review")
+            runtime_role = str(descriptor.get("resultRole") or "")
+            if runtime_role in runtime_version_roles:
+                expected = runtime_version_roles[runtime_role]
+                pair_id = str(descriptor.get("pairId") or "")
+                if not pair_id:
+                    errors.append(f"{label} runtime-version diagnostic pairId is required")
+                elif runtime_role in runtime_version_pairs.setdefault(pair_id, {}):
+                    errors.append(
+                        f"{label} duplicates runtime-version diagnostic role in pair: {pair_id}"
+                    )
+                else:
+                    dataset_sha = str((report.get("dataset") or {}).get("sha256") or "")
+                    runtime_version_pairs[pair_id][runtime_role] = (label, dataset_sha)
+                if descriptor.get("expectedStatus") != expected["status"]:
+                    errors.append(f"{label} runtime-version expected status is invalid")
+                if (
+                    descriptor.get("expectedBehaviorContractViolationCount")
+                    != expected["behaviorContractViolationCount"]
+                ):
+                    errors.append(
+                        f"{label} runtime-version expected behavior-contract count is invalid"
+                    )
+                if report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1":
+                    errors.append(f"{label} HTTP report schema is invalid")
+                if (
+                    package.get("releaseGateEligible") is not False
+                    or report.get("releaseGateEligible") is not False
+                    or report.get("normalQualityDenominatorExcluded") is not True
+                    or package.get("status") != expected["status"]
+                    or report.get("status") != expected["status"]
+                ):
+                    errors.append(
+                        f"{label} runtime-version diagnostic lifecycle boundary is invalid"
+                    )
+                if package.get("providerCallsReexecuted") is not False:
+                    errors.append(f"{label} offline rebuild provenance is invalid")
+                source_observation_sha = str(
+                    package.get("sourceObservationReportSha256") or ""
+                )
+                if not HEX64.fullmatch(source_observation_sha):
+                    errors.append(f"{label} source observation digest is invalid")
+                observation = report.get("observationProvenance") or {}
+                if (
+                    observation.get("mode")
+                    != "OFFLINE_DERIVATION_FROM_PRESERVED_TARGETED_OBSERVATIONS"
+                    or observation.get("providerCallsReexecuted") is not False
+                    or observation.get("sourceReportSha256") != source_observation_sha
+                ):
+                    errors.append(
+                        f"{label} runtime-version observation provenance is invalid"
+                    )
+                route_metrics = ((report.get("httpRoute") or {}).get("metrics") or {})
+                for metric_name in ("slotEntitySpanF1", "slotExactMatch"):
+                    if (route_metrics.get(metric_name) or {}).get("status") != "UNAVAILABLE":
+                        errors.append(
+                            f"{label} HTTP slot metric must remain unavailable"
+                        )
+                answer_quality = report.get("answerQuality") or {}
+                if (
+                    answer_quality.get("status") != "PENDING_HUMAN_REVIEW"
+                    or answer_quality.get("selfJudged") is not False
+                    or answer_quality.get("answerCorrectness") is not None
+                    or answer_quality.get("citationGroundingSupport") is not None
+                    or answer_quality.get("unsafeAnswerRate") is not None
+                ):
+                    errors.append(
+                        f"{label} HTTP answer quality must remain pending human review"
+                    )
+                dataset = report.get("dataset") or {}
+                expected_case_count = descriptor.get("caseCount")
+                if (
+                    dataset.get("annotationStatus") != "HUMAN_VERIFIED"
+                    or dataset.get("sha256") != descriptor.get("datasetSha256")
+                    or not HEX64.fullmatch(str(dataset.get("sha256") or ""))
+                    or dataset.get("caseCount") != expected_case_count
+                ):
+                    errors.append(f"{label} runtime-version dataset binding is invalid")
+                execution_rate = ((report.get("httpExecution") or {}).get("executionRate") or {})
+                if (
+                    execution_rate.get("numerator") != expected_case_count
+                    or execution_rate.get("denominator") != expected_case_count
+                    or (report.get("httpExecution") or {}).get("errorCaseIds") != []
+                ):
+                    errors.append(
+                        f"{label} runtime-version HTTP execution denominator is invalid"
+                    )
+                behavior_contracts = report.get("behaviorContracts") or {}
+                results = behavior_contracts.get("results") or []
+                violation_count = sum(
+                    isinstance(result, dict) and result.get("status") != "PASSED"
+                    for result in results
+                )
+                if (
+                    behavior_contracts.get("contractCount") != expected_case_count
+                    or behavior_contracts.get("executedContractCount") != expected_case_count
+                    or len(results) != expected_case_count
+                    or violation_count
+                    != expected["behaviorContractViolationCount"]
+                ):
+                    errors.append(
+                        f"{label} runtime-version behavior-contract evidence is invalid"
+                    )
+            elif runtime_role:
+                errors.append(f"{label} customer-service HTTP result role is invalid")
+            else:
+                if report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1":
+                    errors.append(f"{label} HTTP report schema is invalid")
+                if (
+                    package.get("releaseGateEligible") is not False
+                    or report.get("releaseGateEligible") is not False
+                    or report.get("normalQualityDenominatorExcluded") is not True
+                ):
+                    errors.append(f"{label} HTTP evidence must not be a release gate")
+                if package.get("providerCallsReexecuted") is not False:
+                    errors.append(f"{label} offline rebuild provenance is invalid")
+                if not HEX64.fullmatch(
+                    str(package.get("sourceObservationReportSha256") or "")
+                ):
+                    errors.append(f"{label} source observation digest is invalid")
+                route_metrics = ((report.get("httpRoute") or {}).get("metrics") or {})
+                for metric_name in ("slotEntitySpanF1", "slotExactMatch"):
+                    if (route_metrics.get(metric_name) or {}).get("status") != "UNAVAILABLE":
+                        errors.append(f"{label} HTTP slot metric must remain unavailable")
+                observation = report.get("observationProvenance") or {}
+                if (
+                    observation.get("mode") != "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS"
+                    or observation.get("providerCallsReexecuted") is not False
+                    or observation.get("sourceReportSha256")
+                    != package.get("sourceObservationReportSha256")
+                ):
+                    errors.append(f"{label} HTTP observation provenance is invalid")
+                answer_quality = report.get("answerQuality") or {}
+                if (
+                    answer_quality.get("status") != "PENDING_HUMAN_REVIEW"
+                    or answer_quality.get("selfJudged") is not False
+                    or answer_quality.get("answerCorrectness") is not None
+                    or answer_quality.get("citationGroundingSupport") is not None
+                    or answer_quality.get("unsafeAnswerRate") is not None
+                ):
+                    errors.append(f"{label} HTTP answer quality must remain pending human review")
         if kind == "search-paired-replay":
             if report.get("schemaVersion") != "aishop-search-paired-replay/v1":
                 errors.append(f"{label} paired replay report schema is invalid")
@@ -1424,6 +1540,23 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
         ]
         if writable:
             errors.append(f"{label} contains writable files: {writable}")
+    expected_runtime_roles = set(runtime_version_roles)
+    for pair_id, members in runtime_version_pairs.items():
+        if set(members) != expected_runtime_roles:
+            errors.append(
+                "runtime-version diagnostic pair must contain exactly stale baseline and "
+                f"post-restart recovery: {pair_id}"
+            )
+            continue
+        stale_label, stale_dataset_sha = members["RUNTIME_VERSION_STALE_BASELINE"]
+        recovery_label, recovery_dataset_sha = members[
+            "RUNTIME_VERSION_POST_RESTART_RECOVERY"
+        ]
+        if stale_dataset_sha != recovery_dataset_sha:
+            errors.append(
+                "runtime-version diagnostic pair datasets differ: "
+                f"{stale_label} vs {recovery_label}"
+            )
 
 
 def _resolve_hashed_file(
@@ -1448,6 +1581,107 @@ def _resolve_hashed_file(
     if not HEX64.fullmatch(expected) or _sha256(path) != expected:
         errors.append(f"{label} hash mismatch: {relative}")
     return path
+
+
+def _validate_customer_service_pre_evaluator_observation(
+    root: Path,
+    descriptor: dict[str, Any],
+    errors: list[str],
+    *,
+    label: str,
+) -> None:
+    """Keep the original Provider observation behind an offline rebuild auditable."""
+
+    observation = descriptor.get("preEvaluatorFixEvidence")
+    if not isinstance(observation, dict):
+        errors.append(f"{label}.preEvaluatorFixEvidence must be an object")
+        return
+    relative = str(observation.get("path") or "")
+    try:
+        package_root = _resolve(root, relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not package_root.is_dir():
+        errors.append(f"{label}.preEvaluatorFixEvidence directory is missing: {relative}")
+        return
+
+    sums = _parse_sums(package_root, errors)
+    sums_path = package_root / "SHA256SUMS"
+    if (
+        not sums_path.is_file()
+        or observation.get("sha256SumsSha256") != _sha256(sums_path)
+    ):
+        errors.append(
+            f"{label}.preEvaluatorFixEvidence SHA256SUMS digest differs from project manifest"
+        )
+    expected_files = {
+        "badcases.jsonl",
+        "evidence-manifest.json",
+        "report.json",
+        "report.md",
+    }
+    if set(sums) != expected_files:
+        errors.append(
+            f"{label}.preEvaluatorFixEvidence file set is invalid: {sorted(sums)}"
+        )
+        return
+
+    report_path = package_root / "report.json"
+    try:
+        package = _json(package_root / "evidence-manifest.json")
+        report = _json(report_path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label}.preEvaluatorFixEvidence JSON is invalid: {exc}")
+        return
+
+    source_run_id = str(descriptor.get("sourceRunId") or "")
+    report_sha256 = _sha256(report_path)
+    inventory = {
+        name: {
+            "sha256": _sha256(package_root / name),
+            "bytes": (package_root / name).stat().st_size,
+        }
+        for name in sums
+        if name != "evidence-manifest.json"
+    }
+    if (
+        package.get("schemaVersion") != "aishop-customer-service-http-evidence/v1"
+        or package.get("kind") != "customer-service-http"
+        or package.get("runId") != source_run_id
+        or package.get("releaseGateEligible") is not False
+        or package.get("providerCallsReexecuted") is not None
+        or package.get("sourceObservationReportSha256") is not None
+        or package.get("files") != inventory
+    ):
+        errors.append(f"{label}.preEvaluatorFixEvidence package binding is invalid")
+    if (
+        observation.get("sourceObservationReportSha256") != report_sha256
+        or report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1"
+        or report.get("runId") != source_run_id
+        or report.get("observationProvenance") is not None
+    ):
+        errors.append(f"{label}.preEvaluatorFixEvidence source observation is invalid")
+    answer_quality = report.get("answerQuality") or {}
+    if (
+        answer_quality.get("status") != "PENDING_HUMAN_REVIEW"
+        or answer_quality.get("selfJudged") is not False
+        or answer_quality.get("answerCorrectness") is not None
+        or answer_quality.get("citationGroundingSupport") is not None
+        or answer_quality.get("unsafeAnswerRate") is not None
+    ):
+        errors.append(
+            f"{label}.preEvaluatorFixEvidence answer quality must remain pending human review"
+        )
+    writable = [
+        str(path.relative_to(package_root))
+        for path in package_root.rglob("*")
+        if path.is_file() and path.stat().st_mode & 0o222
+    ]
+    if writable:
+        errors.append(
+            f"{label}.preEvaluatorFixEvidence contains writable files: {writable}"
+        )
 
 
 def _validate_customer_service_candidate(
@@ -2231,10 +2465,12 @@ def _validate_customer_service_answer_review(
     root: Path,
     descriptor: Any,
     errors: list[str],
+    *,
+    label: str = "evaluation.customerServiceAnswerReview",
+    require_pre_evaluator_observation: bool = False,
 ) -> None:
     """Validate the v2 answer-review lifecycle and immutable HTTP binding."""
 
-    label = "evaluation.customerServiceAnswerReview"
     if not isinstance(descriptor, dict):
         errors.append(f"{label} must be an object")
         return
@@ -2273,6 +2509,14 @@ def _validate_customer_service_answer_review(
         or "" in report_ids
     ):
         errors.append(f"{label} source report binding is invalid")
+
+    if require_pre_evaluator_observation:
+        _validate_customer_service_pre_evaluator_observation(
+            root,
+            descriptor,
+            errors,
+            label=label,
+        )
 
     if status == "PENDING_ADJUDICATION":
         _validate_pending_customer_service_answer_review(
@@ -2577,6 +2821,17 @@ def validate_repository(
         evaluation.get("customerServiceAnswerReview"),
         errors,
     )
+    v13_answer_review = evaluation.get("customerServiceAnswerReviewV13")
+    if v13_answer_review is None:
+        errors.append("evaluation.customerServiceAnswerReviewV13 is required")
+    else:
+        _validate_customer_service_answer_review(
+            root,
+            v13_answer_review,
+            errors,
+            label="evaluation.customerServiceAnswerReviewV13",
+            require_pre_evaluator_observation=True,
+        )
     _validate_pricing_estimate(
         root,
         evaluation.get("pricingEstimate"),

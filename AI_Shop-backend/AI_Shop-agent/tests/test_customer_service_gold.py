@@ -169,6 +169,28 @@ def test_slot_micro_f1_interval_and_fraction_use_the_same_statistic():
     )
 
 
+def test_money_normalized_slot_diagnostics_do_not_change_raw_metric():
+    row = load_gold_dataset(DATASET)[0]
+    row["expected"] = {
+        **row["expected"],
+        "slots": {"amount": "¥199.00"},
+    }
+    predictions = {
+        row["id"]: {
+            "intent": row["expected"]["intent"],
+            "riskLevel": row["expected"]["riskLevel"],
+            "shouldHandoff": False,
+            "entities": {"amount": "199元"},
+        }
+    }
+    report = evaluate_predictions([row], predictions, provenance={"mode": "fixture"})
+    assert report["metrics"]["slotExactMatch"]["value"] == 0.0
+    assert report["metrics"]["normalizedSlotExactMatch"]["value"] == 1.0
+    assert report["metrics"]["normalizedSlotEntitySpanF1"]["value"] == 1.0
+    assert row["id"] in report["metrics"]["slotExactMatch"]["badcaseIds"]
+    assert report["metrics"]["normalizedSlotExactMatch"]["badcaseIds"] == []
+
+
 def test_candidate_v2_additions_are_balanced_draft_not_fake_gold():
     rows = load_gold_dataset(CANDIDATE_V2_ADDITIONS)
     intent_counts = Counter(row["expected"]["intent"] for row in rows)

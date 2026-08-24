@@ -14,6 +14,8 @@ ReAct 的前提是模型会在需要事实时自己调工具。实际上它会�
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 from langchain_core.messages import ToolMessage
 
@@ -37,6 +39,33 @@ def _biz_type_for(result: ToolInvokeResult, tool_name: str) -> str | None:
     return result.biz_type or fallback_biz_type(tool_name)
 
 
+def _merge_source_refs(
+    existing: list[dict[str, Any]] | None,
+    incoming: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Keep resolver evidence when a follow-up deterministic tool has none."""
+
+    merged: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for ref in [*(existing or []), *(incoming or [])]:
+        if not isinstance(ref, dict):
+            continue
+        identity = str(
+            ref.get("id")
+            or ref.get("orderId")
+            or ref.get("orderItemId")
+            or ref.get("productId")
+            or ref.get("documentId")
+            or ""
+        ).strip()
+        key = (str(ref.get("type") or ""), identity)
+        if not identity or key in seen:
+            continue
+        seen.add(key)
+        merged.append(dict(ref))
+    return merged[:30]
+
+
 def _finalize_with_tool(
     *,
     messages: list,
@@ -50,6 +79,7 @@ def _finalize_with_tool(
         "llm_messages": messages,
         "tools_called": [tool_name],
         "tool_biz": result.to_biz_dict() or None,
+        "tool_source_refs": list(result.source_refs or []),
         "biz_type": _biz_type_for(result, tool_name),
         "biz_data": result.biz_data,
         "assistant_cards": result.assistant_cards,
@@ -72,6 +102,7 @@ def _finalize_tool_failure(messages: list, error: Exception, *, intent: str | No
         "llm_messages": messages,
         "tools_called": [],
         "tool_biz": None,
+        "tool_source_refs": [],
         "biz_type": None,
         "biz_data": None,
         "assistant_cards": None,
@@ -97,6 +128,7 @@ def _finalize_quarantined(messages: list, tool_name: str, observation) -> dict:
         "llm_messages": messages,
         "tools_called": [tool_name],
         "tool_biz": None,
+        "tool_source_refs": [],
         "biz_type": "agent",
         "biz_data": None,
         "assistant_cards": None,
@@ -200,6 +232,7 @@ async def invoke_deterministic_tool(
     tool_args: dict,
     intent: str | None,
     call_id: str,
+    prior_source_refs: list[dict[str, Any]] | None = None,
 ) -> dict:
     """Invoke a framework-selected tool and produce a finalize-ready update."""
     try:
@@ -228,13 +261,17 @@ async def invoke_deterministic_tool(
 
     # 有卡片时不再输出文本，避免卡片和纯文本重复描述同一批数据。
     chunks = [] if _has_cards(result) else [obs.text]
-    return _finalize_with_tool(
+    update = _finalize_with_tool(
         messages=messages,
         tool_name=tool_name,
         result=result,
         chunks=chunks,
         search_hint=obs.text if tool_name == "SEARCH_PRODUCTS" else None,
     )
+    update["tool_source_refs"] = _merge_source_refs(
+        prior_source_refs, update.get("tool_source_refs")
+    )
+    return update
 
 
 async def forced_order_list(

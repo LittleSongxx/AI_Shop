@@ -46,6 +46,7 @@ from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.message_service import agent_message_service, next_unresolved_count
 from app.services.pending_action_service import pending_action_service
 from app.services.redis_service import redis_service
+from app.services.runtime_identity import freeze_runtime_identity
 from app.services.shopping_mission_service import initialize_category_need_schemas
 from app.services.stream_service import stream_service
 from app.services.task_service import agent_task_service
@@ -93,10 +94,12 @@ class AgentWorker:
         self._consumers: list[tuple[aio_pika.abc.AbstractQueue, str]] = []
         self._background_tasks: list[asyncio.Task] = []
         self._worker_id = f"worker-{uuid.uuid4().hex}"
+        self._runtime_identity: dict[str, object] | None = None
 
     async def run(self) -> None:
         settings = get_settings()
         settings.validate_runtime()
+        self._runtime_identity = freeze_runtime_identity("worker")
         heartbeat_task: asyncio.Task[None] | None = None
         # P0-3: Worker 独立进程，此前从不初始化 telemetry，任务/LLM/MQ/工具链路
         # 在 trace 里断链；同时任务指标在 Worker 内更新，Prometheus 需要有独立
@@ -190,6 +193,7 @@ class AgentWorker:
             await redis_service.set_worker_heartbeat(
                 self._worker_id,
                 settings.agent_worker_heartbeat_ttl_seconds,
+                metadata=self._runtime_identity,
             )
             heartbeat_task = asyncio.create_task(
                 self._heartbeat_loop(settings.agent_worker_heartbeat_ttl_seconds),
@@ -198,6 +202,7 @@ class AgentWorker:
             logger.info(
                 "agent_worker_started",
                 worker_id=self._worker_id,
+                source_sha256=(self._runtime_identity.get("source") or {}).get("sha256"),
                 high=settings.agent_worker_high_concurrency,
                 fast=settings.agent_worker_fast_concurrency,
                 low=settings.agent_worker_low_concurrency,
@@ -269,6 +274,10 @@ class AgentWorker:
                     await redis_service.set_worker_heartbeat(
                         self._worker_id,
                         ttl_seconds,
+                        metadata=(
+                            self._runtime_identity
+                            or freeze_runtime_identity("worker")
+                        ),
                     )
                 except Exception as exc:
                     # A transient Redis failure should not silently kill the heartbeat

@@ -36,6 +36,7 @@ from app.services.judge_service import judge_service
 from app.services.mcp_streamable_client import mcp_streamable_client
 from app.services.privacy_job_service import privacy_job_service
 from app.services.redis_service import redis_service
+from app.services.runtime_identity import freeze_runtime_identity
 from app.services.shopping_mission_service import initialize_category_need_schemas
 
 configure_structured_logging()
@@ -79,6 +80,7 @@ async def lifespan(app: FastAPI):
     global _knowledge_listener_task, _warmup_task
 
     get_settings().validate_runtime()
+    freeze_runtime_identity("api")
     await redis_service.connect()
     await init_pool()
     if get_settings().agent_auto_migrate:

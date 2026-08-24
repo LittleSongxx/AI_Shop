@@ -190,6 +190,51 @@ def test_answer_review_is_source_bound_and_requires_complete_labels(tmp_path: Pa
         validate_answer_review_sheet(report, open_sheet)
 
 
+def test_answer_review_projects_sensitive_runtime_fields_and_rejects_reviewer_leaks(
+    tmp_path: Path,
+):
+    report = _http_report(tmp_path / "http-report.json")
+    action_token = "act_1234567890abcdef1234567890abcdef"
+    raw = load_json(report)
+    raw["cases"][0]["http"]["answer"] = (
+        f'{{"type":"ACTION_CONFIRM","actionToken":"{action_token}"}}'
+    )
+    raw["cases"][0]["http"]["sourceRefs"][0]["userId"] = "real-user-42"
+    atomic_write_json(report, raw, overwrite=True)
+
+    open_sheet = tmp_path / "review.open.jsonl"
+    manifest = export_answer_review_sheet(report, open_sheet, reviewer_id="reviewer-a")
+    rows = load_jsonl(open_sheet)
+    rendered = json.dumps(rows, ensure_ascii=False)
+
+    assert manifest["presentationRedaction"]["projection"] == "REDACTED_REVIEW_SAFE_FIELDS"
+    assert action_token not in rendered
+    assert "[REDACTED_ACTION_TOKEN]" in rendered
+    assert "real-user-42" not in rendered
+    assert rows[0]["sourceReportSha256"] == hashlib.sha256(report.read_bytes()).hexdigest()
+
+    _fill_sheet(open_sheet, {f"case-{index}": _labels() for index in range(1, 4)})
+    rows = load_jsonl(open_sheet)
+    rows[0]["comment"] = f"copied token: {action_token}"
+    atomic_write_jsonl(open_sheet, rows)
+    with pytest.raises(CustomerServiceAnswerReviewError, match="unredacted sensitive"):
+        seal_answer_review_sheet(report, open_sheet, tmp_path / "review.sealed.jsonl")
+
+
+def test_answer_review_legacy_v2_sheet_without_new_marker_remains_readable(
+    tmp_path: Path,
+):
+    report = _http_report(tmp_path / "http-report.json")
+    open_sheet = tmp_path / "review.open.jsonl"
+    export_answer_review_sheet(report, open_sheet, reviewer_id="reviewer-a")
+    manifest_path = open_sheet.with_suffix(open_sheet.suffix + ".manifest.json")
+    manifest = load_json(manifest_path)
+    manifest.pop("presentationRedaction")
+    atomic_write_json(manifest_path, manifest, overwrite=True)
+
+    assert validate_answer_review_sheet(report, open_sheet)["lifecycle"] == "OPEN"
+
+
 def test_answer_review_agreement_and_adjudicated_quality_metrics(tmp_path: Path):
     left = {f"case-{index}": _labels() for index in range(1, 4)}
     right = {f"case-{index}": _labels() for index in range(1, 4)}
@@ -286,6 +331,29 @@ def test_answer_review_merge_fails_closed_without_independent_adjudication(
     rows[0]["finalLabels"] = _labels()
     atomic_write_jsonl(adjudication, rows)
     with pytest.raises(CustomerServiceAnswerReviewError, match="independent"):
+        merge_answer_reviews(
+            report,
+            sealed_a,
+            sealed_b,
+            adjudication_path=adjudication,
+        )
+
+
+def test_answer_review_adjudication_rejects_sensitive_reason(tmp_path: Path):
+    left = {f"case-{index}": _labels() for index in range(1, 4)}
+    right = {f"case-{index}": _labels() for index in range(1, 4)}
+    right["case-2"] = _labels(answer=False, citation="UNSUPPORTED")
+    report, sealed_a, sealed_b = _sealed_pair(tmp_path, left=left, right=right)
+    agreement = compare_answer_reviews(report, sealed_a, sealed_b)
+    adjudication = tmp_path / "adjudication.open.jsonl"
+    export_answer_adjudication_template(agreement, adjudication)
+    rows = load_jsonl(adjudication)
+    rows[0]["adjudicator"] = "reviewer-c"
+    rows[0]["reason"] = "copied act_1234567890abcdef1234567890abcdef"
+    rows[0]["finalLabels"] = _labels(answer=False, citation="UNSUPPORTED")
+    atomic_write_jsonl(adjudication, rows)
+
+    with pytest.raises(CustomerServiceAnswerReviewError, match="unredacted sensitive"):
         merge_answer_reviews(
             report,
             sealed_a,

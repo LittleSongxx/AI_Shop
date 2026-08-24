@@ -1,9 +1,11 @@
 """商品咨询上下文解析测试。"""
 
+from app.domain.intent.rules import looks_like_new_product_search
 from app.utils.product_consult import (
     is_product_consult_turn,
     normalize_consult_card,
     parse_consult_card,
+    product_consult_clarification,
 )
 
 
@@ -67,3 +69,31 @@ def test_is_product_consult_turn_product_channel_keeps_followup():
     assert is_product_consult_turn("这款内存多大", None, consult, from_product=True)
     assert not is_product_consult_turn("预算500想买手机", None, consult, from_product=True)
     assert not is_product_consult_turn("吉他", None, consult, from_product=True)
+
+
+def test_attribute_questions_do_not_become_fresh_product_searches():
+    for text in (
+        "这款耳机支持蓝牙 5.4 吗",
+        "这副耳机有没有主动降噪",
+        "耳机有主动降噪嘛",
+        "这款手机续航怎么样",
+        "手机壳有没有适配 iPhone 15",
+    ):
+        assert not looks_like_new_product_search(text)
+
+
+def test_product_discovery_queries_still_use_search_path():
+    for text in (
+        "推荐主动降噪耳机",
+        "预算 2000 买手机",
+        "有没有适合学生的平板",
+        "搜索蓝牙耳机",
+    ):
+        assert looks_like_new_product_search(text)
+
+
+def test_product_consult_clarification_is_specific_to_requested_attribute():
+    assert "蓝牙或版本" in product_consult_clarification("这款耳机支持蓝牙 5.4 吗")
+    assert "主动降噪" in product_consult_clarification("耳机有主动降噪嘛")
+    assert "续航" in product_consult_clarification("这款手机续航怎么样")
+    assert "兼容性" in product_consult_clarification("手机壳适配 iPhone 15 吗")

@@ -372,7 +372,9 @@ def test_demo_order_ids_are_part_of_the_deterministic_contract():
         ("我收到的耳机坏了", IntentKind.DAMAGED_OR_WRONG_ITEM),
         ("催一下没发货的耳机", IntentKind.QUERY_FULFILLMENT),
         ("没发货的耳机物流到哪了", IntentKind.QUERY_LOGISTICS),
-        ("退款一般多久到账", IntentKind.CHAT),
+        # Generic refund timing is a refund-policy information request.  It
+        # must not be confused with a user-specific refund-status lookup.
+        ("退款一般多久到账", IntentKind.REFUND),
         ("我的退款到哪了", IntentKind.REFUND_STATUS),
     ],
 )

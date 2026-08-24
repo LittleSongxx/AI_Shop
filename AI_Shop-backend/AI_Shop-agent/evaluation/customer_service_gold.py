@@ -13,9 +13,11 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+import re
 import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +52,29 @@ DEFAULT_JSON_REPORT = DEFAULT_REPORT.with_suffix(".json")
 # coverage rather than a replacement denominator.
 PRODUCTION_CANONICAL_SLOT_FIELDS = frozenset(
     {"orderId", "orderItemId", "productId", "productName", "amount"}
+)
+
+# Human reviewers naturally write money with a currency symbol/suffix while
+# the production extractor commonly emits a bare numeric value. Keep raw span
+# metrics primary and expose normalization only as a diagnostic.
+MONEY_SLOT_FIELDS = frozenset(
+    {"amount", "budget", "price", "minPrice", "maxPrice", "estimatedPayable"}
+)
+_MONEY_MARKERS = (
+    ("人民币", "CNY"),
+    ("RMB", "CNY"),
+    ("CNY", "CNY"),
+    ("¥", "CNY"),
+    ("￥", "CNY"),
+    ("元", "CNY"),
+    ("块钱", "CNY"),
+    ("块", "CNY"),
+    ("美元", "USD"),
+    ("USD", "USD"),
+    ("$", "USD"),
+    ("欧元", "EUR"),
+    ("EUR", "EUR"),
+    ("€", "EUR"),
 )
 
 # This is the sealed diagnostic snapshot captured before the first resolver
@@ -387,6 +412,8 @@ def _metric(
     definition: str,
     notes: Sequence[str] = (),
     evidence_status: str = PROVISIONAL_STATUS,
+    role: str = "PRIMARY_QUALITY",
+    release_gate_eligible: bool = False,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -398,8 +425,8 @@ def _metric(
         "badcaseCount": len(list(dict.fromkeys(badcase_ids))),
         "badcaseIds": list(dict.fromkeys(str(case_id) for case_id in badcase_ids)),
         "definition": definition,
-        "role": "PRIMARY_QUALITY",
-        "releaseGateEligible": False,
+        "role": role,
+        "releaseGateEligible": release_gate_eligible,
         "notes": [*notes, evidence_status],
     }
 
@@ -410,16 +437,56 @@ def _span_tokens(value: Any) -> list[str]:
     return [char for char in _norm(value) if not char.isspace()]
 
 
+def _normalize_money(value: Any) -> str | None:
+    """Return a currency-qualified numeric value for diagnostic comparisons."""
+
+    text = unicodedata.normalize("NFKC", str(value or ""))
+    text = text.replace(",", "").replace(" ", "").replace("\u3000", "")
+    currency: str | None = None
+    for marker, code in sorted(_MONEY_MARKERS, key=lambda item: len(item[0]), reverse=True):
+        if marker.casefold() in text.casefold():
+            currency = code
+            text = re.sub(re.escape(marker), "", text, flags=re.IGNORECASE)
+    # Do not guess through ranges, qualifiers or prose. Those remain raw
+    # strings and still appear in the primary span metric.
+    if not re.fullmatch(r"[-+]?\d+(?:\.\d+)?", text):
+        return None
+    try:
+        number = Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None
+    if not number.is_finite():
+        return None
+    normalized = format(number.normalize(), "f")
+    if "." in normalized:
+        normalized = normalized.rstrip("0").rstrip(".")
+    # Bare numeric values are treated as CNY only inside a money-labelled
+    # slot; this mirrors the Chinese customer-service dataset convention.
+    return f"{currency or 'CNY'}:{normalized or '0'}"
+
+
+def _normalize_slot_value(key: Any, value: Any) -> str:
+    field = str(key)
+    if field in MONEY_SLOT_FIELDS:
+        normalized_money = _normalize_money(value)
+        if normalized_money is not None:
+            return normalized_money
+    return _norm(value)
+
+
 def _slot_case_counts_for_maps(
     expected_slots: Mapping[str, Any],
     predicted_slots: Mapping[str, Any],
+    *,
+    value_normalizer=None,
 ) -> tuple[int, int, int, float]:
     if not isinstance(expected_slots, Mapping) or not isinstance(predicted_slots, Mapping):
         return 0, 0, 0, 0.0
     tp = fp = fn = 0
+    normalizer = value_normalizer or (lambda _key, value: _norm(value))
     for key in set(str(item) for item in expected_slots) | set(str(item) for item in predicted_slots):
-        gold = _span_tokens(expected_slots.get(key, ""))
-        pred = _span_tokens(predicted_slots.get(key, ""))
+        gold = _span_tokens(normalizer(key, expected_slots.get(key, "")))
+        pred = _span_tokens(normalizer(key, predicted_slots.get(key, "")))
         overlap = Counter(gold) & Counter(pred)
         matched = sum(overlap.values())
         tp += matched
@@ -434,6 +501,16 @@ def _slot_case_counts(expected: Mapping[str, Any], predicted: Mapping[str, Any])
     return _slot_case_counts_for_maps(
         expected.get("slots") or {},
         predicted.get("entities") or {},
+    )
+
+
+def _normalized_slot_case_counts(
+    expected: Mapping[str, Any], predicted: Mapping[str, Any]
+) -> tuple[int, int, int, float]:
+    return _slot_case_counts_for_maps(
+        expected.get("slots") or {},
+        predicted.get("entities") or {},
+        value_normalizer=_normalize_slot_value,
     )
 
 
@@ -452,6 +529,18 @@ def _slot_maps_equal(expected_slots: Mapping[str, Any], predicted_slots: Mapping
         {str(key): _norm(value) for key, value in expected_slots.items()}
         == {str(key): _norm(value) for key, value in predicted_slots.items()}
     )
+
+
+def _normalized_slot_maps_equal(
+    expected_slots: Mapping[str, Any], predicted_slots: Mapping[str, Any]
+) -> bool:
+    return {
+        str(key): _normalize_slot_value(key, value)
+        for key, value in expected_slots.items()
+    } == {
+        str(key): _normalize_slot_value(key, value)
+        for key, value in predicted_slots.items()
+    }
 
 
 def _slot_badcase_root_cause(
@@ -483,6 +572,8 @@ def _slot_badcase_root_cause(
         expected_values = {_norm(value) for value in expected_canonical.values()}
         predicted_values = {_norm(value) for value in predicted_canonical.values()}
         if expected_values & predicted_values:
+            return "SLOT_NORMALIZATION_GAP"
+        if _normalized_slot_maps_equal(expected_canonical, predicted_canonical):
             return "SLOT_NORMALIZATION_GAP"
     return "SLOT_EXTRACTION_GAP"
 
@@ -533,6 +624,12 @@ def evaluate_predictions(
     slot_case_strata: list[str] = []
     slot_tp = slot_fp = slot_fn = 0
     slot_em_numerator = slot_em_denominator = 0
+    normalized_slot_f1_badcases: list[str] = []
+    normalized_slot_em_badcases: list[str] = []
+    normalized_slot_case_counts: list[tuple[int, int, int]] = []
+    normalized_slot_case_strata: list[str] = []
+    normalized_slot_tp = normalized_slot_fp = normalized_slot_fn = 0
+    normalized_slot_em_numerator = normalized_slot_em_denominator = 0
     canonical_slot_f1_badcases: list[str] = []
     canonical_slot_em_badcases: list[str] = []
     canonical_slot_case_counts: list[tuple[int, int, int]] = []
@@ -607,6 +704,31 @@ def evaluate_predictions(
                 slot_em_numerator += 1
             else:
                 slot_em_badcases.append(case_id)
+
+        normalized_tp, normalized_fp, normalized_fn, _normalized_case_f1 = (
+            _normalized_slot_case_counts(expected, predicted)
+        )
+        normalized_slot_tp += normalized_tp
+        normalized_slot_fp += normalized_fp
+        normalized_slot_fn += normalized_fn
+        normalized_slot_case_counts.append(
+            (normalized_tp, normalized_fp, normalized_fn)
+        )
+        normalized_slot_case_strata.append(
+            f"{expected_intent}|{expected_risk}|"
+            f"{'HANDOFF' if expected_handoff else 'NO_HANDOFF'}|"
+            f"{'HAS_SLOT' if expected_slots else 'NO_SLOT'}"
+        )
+        if normalized_fp or normalized_fn:
+            normalized_slot_f1_badcases.append(case_id)
+        if expected_slots:
+            normalized_slot_em_denominator += 1
+            if isinstance(predicted_slots, Mapping) and _normalized_slot_maps_equal(
+                expected_slots, predicted_slots
+            ):
+                normalized_slot_em_numerator += 1
+            else:
+                normalized_slot_em_badcases.append(case_id)
         expected_canonical_slots = _project_canonical_slots(expected_slots)
         predicted_canonical_slots = _project_canonical_slots(predicted_slots)
         extension_keys = set(expected_slots) - PRODUCTION_CANONICAL_SLOT_FIELDS
@@ -706,6 +828,22 @@ def evaluate_predictions(
         seed=_BOOTSTRAP_SEED ^ 0x51,
         strata=slot_case_strata,
     )
+    normalized_slot_precision = (
+        normalized_slot_tp / (normalized_slot_tp + normalized_slot_fp)
+        if normalized_slot_tp + normalized_slot_fp
+        else 0.0
+    )
+    normalized_slot_recall = (
+        normalized_slot_tp / (normalized_slot_tp + normalized_slot_fn)
+        if normalized_slot_tp + normalized_slot_fn
+        else 0.0
+    )
+    normalized_slot_f1 = _f1(normalized_slot_precision, normalized_slot_recall)
+    normalized_slot_interval = _bootstrap_micro_f1_interval(
+        normalized_slot_case_counts,
+        seed=_BOOTSTRAP_SEED ^ 0x5D,
+        strata=normalized_slot_case_strata,
+    )
     canonical_slot_precision = (
         canonical_slot_tp / (canonical_slot_tp + canonical_slot_fp)
         if canonical_slot_tp + canonical_slot_fp
@@ -764,6 +902,44 @@ def evaluate_predictions(
             definition="Request-level exact equality of all expected slots; cases with no expected slots are excluded from the denominator.",
             evidence_status=evidence_status,
         ),
+        "normalizedSlotEntitySpanF1": _metric(
+            "normalizedSlotEntitySpanF1",
+            normalized_slot_f1
+            if normalized_slot_tp + normalized_slot_fp + normalized_slot_fn
+            else None,
+            numerator=2 * normalized_slot_tp,
+            denominator=2 * normalized_slot_tp
+            + normalized_slot_fp
+            + normalized_slot_fn,
+            interval=normalized_slot_interval,
+            badcase_ids=normalized_slot_f1_badcases,
+            definition="Diagnostic micro character-span F1 after numeric/currency normalization of money-labelled slots; raw span F1 remains primary.",
+            notes=(
+                f"componentCounts: TP={normalized_slot_tp}, FP={normalized_slot_fp}, FN={normalized_slot_fn}",
+                "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+            ),
+            evidence_status=evidence_status,
+            role="DIAGNOSTIC_NORMALIZATION",
+        ),
+        "normalizedSlotExactMatch": _metric(
+            "normalizedSlotExactMatch",
+            normalized_slot_em_numerator / normalized_slot_em_denominator
+            if normalized_slot_em_denominator
+            else None,
+            numerator=normalized_slot_em_numerator,
+            denominator=normalized_slot_em_denominator,
+            interval=_wilson(
+                normalized_slot_em_numerator, normalized_slot_em_denominator
+            ),
+            badcase_ids=normalized_slot_em_badcases,
+            definition="Diagnostic request-level slot equality after numeric/currency normalization of money-labelled slots; raw slot EM remains primary.",
+            notes=(
+                "Values such as 199, 199元 and ¥199.00 compare as CNY:199; incompatible currencies do not compare equal.",
+                "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+            ),
+            evidence_status=evidence_status,
+            role="DIAGNOSTIC_NORMALIZATION",
+        ),
         "handoffRecall": _metric(
             "handoffRecall",
             handoff_hits / handoff_total if handoff_total else None,
@@ -789,6 +965,11 @@ def evaluate_predictions(
         "truePositive": slot_tp,
         "falsePositive": slot_fp,
         "falseNegative": slot_fn,
+    }
+    metrics["normalizedSlotEntitySpanF1"]["componentCounts"] = {
+        "truePositive": normalized_slot_tp,
+        "falsePositive": normalized_slot_fp,
+        "falseNegative": normalized_slot_fn,
     }
     canonical_slot_metrics = {
         "canonicalSlotEntitySpanF1": {
@@ -836,6 +1017,8 @@ def evaluate_predictions(
         | set(risk_badcases)
         | set(slot_f1_badcases)
         | set(slot_em_badcases)
+        | set(normalized_slot_f1_badcases)
+        | set(normalized_slot_em_badcases)
         | set(handoff_badcases)
         | set(critical_handoff_badcases)
     )
@@ -850,6 +1033,8 @@ def evaluate_predictions(
                 ("highRiskIntentRecall", risk_badcases),
                 ("slotEntitySpanF1", slot_f1_badcases),
                 ("slotExactMatch", slot_em_badcases),
+                ("normalizedSlotEntitySpanF1", normalized_slot_f1_badcases),
+                ("normalizedSlotExactMatch", normalized_slot_em_badcases),
                 ("handoffRecall", handoff_badcases),
                 ("criticalHandoffMissRate", critical_handoff_badcases),
             )
@@ -1039,6 +1224,16 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"{metric.get('numerator')}/{metric.get('denominator')} | {ci} | "
             f"{metric.get('badcaseCount', 0)} |"
         )
+    lines.extend(
+        [
+            "",
+            "## 证据版本边界",
+            "",
+            "- 当前 60 条规则预路由结果是同一 HUMAN_VERIFIED 数据集上的 paired replay；槽位修复证据包 `customer-service-slot-replay-v1-20260823` 只证明无回归/修复，不是新 holdout 泛化结果。",
+            "- HTTP 最终答案另有独立 `HUMAN_REVIEWED_ADJUDICATED` 证据包；固定旧回放的引用语义支持为 `6/30 eligible`（20.0%），不能从本报告的意图/槽位结果推导生成答案质量。",
+            "- HTTP 新输出必须重新双人盲审；旧答案 labels 绑定 source run 和答案 SHA-256，不能迁移到新代码结果。",
+        ]
+    )
     baseline = report.get("historicalBaseline") or {}
     lines.extend(
         [

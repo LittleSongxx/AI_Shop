@@ -110,6 +110,92 @@ def test_deterministic_workflow_provider_snapshot_rejects_fallback_or_missing_tr
     assert _deterministic_workflow_provider_snapshot([missing_route_episode]) == {}
 
 
+def test_order_reference_terminal_trace_proves_llm_not_applicable() -> None:
+    snapshot = _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "experiment": {
+                    "orderReference": {
+                        "outcome": "NO_ELIGIBLE",
+                        "route": "finalize",
+                        "dependencyError": False,
+                    }
+                },
+                "steps": [
+                    {
+                        "eventType": "ORDER_REFERENCE_RESOLUTION",
+                        "nodeName": "order_reference",
+                        "status": "OK",
+                    }
+                ],
+            }
+        ]
+    )
+    assert snapshot["notApplicable"] is True
+    assert snapshot["notApplicableReason"] == "deterministic_order_reference:NO_ELIGIBLE"
+
+
+def test_direct_handoff_trace_proves_llm_not_applicable() -> None:
+    snapshot = _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "steps": [
+                    {
+                        "eventType": "INTENT_DECISION",
+                        "nodeName": "api",
+                        "status": "OK",
+                        "output": {
+                            "intent": "COMPLAINT",
+                            "next_action": "HANDOFF",
+                            "handoff_reason": "FUND_DISPUTE",
+                        },
+                    },
+                    {
+                        "eventType": "HANDOFF",
+                        "nodeName": "support",
+                        "status": "OK",
+                        "output": {"reason": "FUND_DISPUTE"},
+                    },
+                ]
+            }
+        ]
+    )
+
+    complete, facts = provider_complete(
+        ["llm"], {"llm": {"requests": 0, "failures": 0, **snapshot}}
+    )
+
+    assert snapshot["notApplicableReason"] == "deterministic_handoff:FUND_DISPUTE"
+    assert snapshot["workflowEvidence"]["handoffDecisionCount"] == 1
+    assert complete == 1
+    assert facts["llm"]["notApplicableValid"] is True
+
+
+def test_direct_handoff_does_not_hide_llm_call_or_orchestration_fallback() -> None:
+    base_steps = [
+        {
+            "eventType": "INTENT_DECISION",
+            "status": "OK",
+            "output": {"intent": "COMPLAINT", "nextAction": "HANDOFF"},
+        },
+        {"eventType": "HANDOFF", "status": "OK", "output": {}},
+    ]
+
+    assert _deterministic_workflow_provider_snapshot(
+        [{"steps": [*base_steps, {"eventType": "LLM_CALL", "status": "ERROR"}]}]
+    ) == {}
+    assert _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "steps": [
+                    *base_steps,
+                    {"eventType": "ORCHESTRATION_FALLBACK", "status": "FALLBACK"},
+                ]
+            }
+        ]
+    ) == {}
+
+
 def test_action_token_extraction_is_scoped_and_shape_validated() -> None:
     token = "act_" + "a" * 32
     assert _find_action_token({"authorization": token}) is None

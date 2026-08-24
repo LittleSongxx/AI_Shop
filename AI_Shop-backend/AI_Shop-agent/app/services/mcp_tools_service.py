@@ -14,13 +14,81 @@ from app.constants import (
     REVIEWABLE_ORDER_STATUSES,
 )
 from app.exceptions import PendingActionConflict
+from app.services.evidence_refs import (
+    negative_lookup_ref,
+    order_refs,
+    product_no_result_ref,
+    product_refs,
+)
 from app.services.java_internal_client import java_internal_client
 from app.services.order_service import order_service
 from app.services.pending_action_service import pending_action_service
+from app.services.shopping_profile_service import shopping_profile_service
 from app.services.tool_invoke_result import ToolInvokeResult
 from app.utils.biz_payload import build_action_confirm_payload
 
 logger = structlog.get_logger()
+
+
+def _search_constraint_evidence(
+    products: list[dict], profile: dict | None
+) -> dict:
+    """Expose a conservative audit of returned candidates and hard exclusions.
+
+    The catalog filter remains authoritative in the search pipeline.  This
+    projection deliberately says what was checked on returned cards; it does
+    not claim that an excluded item is absent from the full catalogue.
+    """
+
+    profile = profile or {}
+    excluded_brands = [
+        str(value).strip()
+        for value in profile.get("excludedBrands") or []
+        if str(value).strip()
+    ]
+    excluded_terms = [
+        str(value).strip()
+        for value in profile.get("excludedTerms") or []
+        if str(value).strip()
+    ]
+    violating_ids: list[str] = []
+    for product in products:
+        product_id = str(
+            product.get("product_id")
+            or product.get("productId")
+            or product.get("id")
+            or ""
+        )
+        text = " ".join(
+            str(product.get(key) or "")
+            for key in (
+                "product_name",
+                "productName",
+                "product_desc",
+                "productDesc",
+                "category",
+                "categoryName",
+                "brand",
+            )
+        ).casefold()
+        brand = shopping_profile_service.resolve_known_brand(product, profile)
+        brand_hit = any(
+            str(value).casefold() in str(brand or "").casefold()
+            or str(value).casefold() in text
+            for value in excluded_brands
+        )
+        term_hit = any(str(value).casefold() in text for value in excluded_terms)
+        if brand_hit or term_hit:
+            violating_ids.append(product_id)
+    return {
+        "type": "HARD_CONSTRAINT_AUDIT",
+        "excludedBrands": excluded_brands,
+        "excludedTerms": excluded_terms,
+        "returnedCandidateCount": len(products),
+        "violatingReturnedProductIds": violating_ids,
+        "returnedCandidatesSatisfyExclusions": not violating_ids,
+        "catalogAbsenceClaim": False,
+    }
 
 def _status_name(status: int | None) -> str:
 
@@ -85,15 +153,30 @@ def _parse_dt(value) -> datetime | None:
             continue
     return None
 
-async def query_logistics(user_id: str, order_id: str) -> str:
+async def query_logistics(user_id: str, order_id: str) -> ToolInvokeResult:
 
     if not order_id:
-        return "【查询物流失败】请输入要查询物流的订单号"
+        return ToolInvokeResult(
+            content="【查询物流失败】请输入要查询物流的订单号",
+            success=False,
+            error_code="BAD_ARGS",
+        )
     try:
         logistics = await java_internal_client.get_logistics(user_id, order_id)
         if not logistics:
-            return "【查询物流失败】订单物流信息不存在"
+            return ToolInvokeResult(
+                content="【查询物流失败】订单物流信息不存在",
+                biz_type="query_logistics",
+                source_refs=[
+                    negative_lookup_ref(
+                        "logistics",
+                        query={"orderId": order_id},
+                        source="JAVA_LOGISTICS_SERVICE",
+                    )
+                ],
+            )
         records = logistics.get("record_list") or logistics.get("recordList") or []
+        latest_addr = ""
         company = logistics.get("logistics_company") or logistics.get("logisticsCompany") or "快递"
         logistics_no = logistics.get("logistics_no") or logistics.get("logisticsNo") or "-"
         status = logistics.get("logistics_status")
@@ -121,37 +204,94 @@ async def query_logistics(user_id: str, order_id: str) -> str:
         header = "【订单%s查询物流成功】" % order_id
         header += chr(10) + "承运商：%s，运单号：%s，状态：%s" % (company, logistics_no, status_name)
         if not rows:
-            return header + chr(10) + "暂无物流轨迹明细。"
+            content = header + chr(10) + "暂无物流轨迹明细。"
+        else:
+            table = "<table>" + chr(10)
+            table += "<tr><th>时间</th><th>地点</th></tr>" + chr(10)
+            table += chr(10).join(rows) + chr(10) + "</table>"
+            latest = records[0] if records and isinstance(records[0], dict) else {}
+            latest_addr = latest.get("record_address") or latest.get("recordAddress") or ""
+            footer = (chr(10) + "当前包裹最新位置：" + str(latest_addr)) if latest_addr else ""
+            content = header + chr(10) + table + footer
 
-        table = "<table>" + chr(10)
-        table += "<tr><th>时间</th><th>地点</th></tr>" + chr(10)
-        table += chr(10).join(rows) + chr(10) + "</table>"
-        latest = records[0] if records and isinstance(records[0], dict) else {}
-        latest_addr = latest.get("record_address") or latest.get("recordAddress") or ""
-        footer = (chr(10) + "当前包裹最新位置：" + str(latest_addr)) if latest_addr else ""
-        return header + chr(10) + table + footer
+        return ToolInvokeResult(
+            content=content,
+            biz_type="query_logistics",
+            source_refs=[
+                {
+                    "type": "logistics",
+                    "id": str(order_id),
+                    "orderId": str(order_id),
+                    "matched": True,
+                    "carrier": company,
+                    "trackingNo": logistics_no,
+                    "status": status_name,
+                    "latestLocation": latest_addr or None,
+                    "recordCount": len(records),
+                    "source": "JAVA_LOGISTICS_SERVICE",
+                }
+            ],
+        )
     except Exception:
         logger.exception("mcp_query_logistics_failed", user_id=user_id, order_id=order_id)
-        return "【查询物流失败】系统处理异常，请稍后重试或联系客服"
+        return ToolInvokeResult(
+            content="【查询物流失败】系统处理异常，请稍后重试或联系客服",
+            success=False,
+            error_code="TOOL_ERROR",
+            biz_type="query_logistics",
+        )
 
 
 
-async def query_comment(user_id: str, order_id: str) -> str:
+async def query_comment(user_id: str, order_id: str) -> ToolInvokeResult:
 
     if not order_id:
-        return "【查询评价失败】请输入要查询评价的订单号"
+        return ToolInvokeResult(
+            content="【查询评价失败】请输入要查询评价的订单号",
+            success=False,
+            error_code="BAD_ARGS",
+        )
     try:
         row = await java_internal_client.get_comment(user_id, order_id)
         if not row:
-            return "【查询评价失败】订单评价不存在"
-        return json.dumps(
+            return ToolInvokeResult(
+                content="【查询评价失败】订单评价不存在",
+                biz_type="query_comment",
+                source_refs=[
+                    negative_lookup_ref(
+                        "comment",
+                        query={"orderId": order_id},
+                        source="JAVA_COMMENT_SERVICE",
+                    )
+                ],
+            )
+        content = json.dumps(
             {k: (_fmt_dt(v) if isinstance(v, datetime) else v) for k, v in row.items()},
             ensure_ascii=False,
             default=str,
         )
+        return ToolInvokeResult(
+            content=content,
+            biz_type="query_comment",
+            source_refs=[
+                {
+                    "type": "comment",
+                    "id": str(order_id),
+                    "orderId": str(order_id),
+                    "matched": True,
+                    "commentStatus": row.get("status") or row.get("comment_status"),
+                    "source": "JAVA_COMMENT_SERVICE",
+                }
+            ],
+        )
     except Exception:
         logger.exception("mcp_query_comment_failed", user_id=user_id, order_id=order_id)
-        return "【查询评价失败】系统处理异常，请稍后重试或联系客服"
+        return ToolInvokeResult(
+            content="【查询评价失败】系统处理异常，请稍后重试或联系客服",
+            success=False,
+            error_code="TOOL_ERROR",
+            biz_type="query_comment",
+        )
 
 
 async def query_refund_status(
@@ -174,7 +314,20 @@ async def query_refund_status(
             order_item_id=order_item_id,
         )
         if not rows:
-            return ToolInvokeResult(content="该订单暂未查到退款申请记录。", biz_type="query_refund_status")
+            return ToolInvokeResult(
+                content="该订单暂未查到退款申请记录。",
+                biz_type="query_refund_status",
+                source_refs=[
+                    negative_lookup_ref(
+                        "refund",
+                        query={
+                            "orderId": order_id,
+                            "orderItemId": order_item_id,
+                        },
+                        source="JAVA_REFUND_SERVICE",
+                    )
+                ],
+            )
         return ToolInvokeResult(
             content=json.dumps(rows, ensure_ascii=False, default=str),
             biz_type="query_refund_status",
@@ -182,6 +335,20 @@ async def query_refund_status(
                 str(row.get("order_id") or "")
                 for row in rows
                 if row.get("order_id")
+            ],
+            source_refs=[
+                {
+                    "type": "refund",
+                    "id": str(row.get("refund_id") or row.get("refundId") or row.get("order_id") or order_id or order_item_id),
+                    "orderId": row.get("order_id") or row.get("orderId") or order_id,
+                    "orderItemId": row.get("order_item_id") or row.get("orderItemId") or order_item_id,
+                    "refundStatus": row.get("refund_status") or row.get("refundStatus") or row.get("status"),
+                    "refundAmount": row.get("refund_amount") or row.get("refundAmount"),
+                    "matched": True,
+                    "source": "JAVA_REFUND_SERVICE",
+                }
+                for row in rows
+                if isinstance(row, dict)
             ],
         )
     except Exception:
@@ -197,10 +364,14 @@ async def query_refund_status(
             error_code="TOOL_ERROR",
         )
 
-async def query_user_coupons(user_id: str, status: int | None = None) -> str:
+async def query_user_coupons(user_id: str, status: int | None = None) -> ToolInvokeResult:
 
     if not user_id:
-        return "【查询优惠券失败】用户ID不能为空"
+        return ToolInvokeResult(
+            content="【查询优惠券失败】用户ID不能为空",
+            success=False,
+            error_code="BAD_ARGS",
+        )
     try:
         query_status = 0 if status is None else status
         rows = await java_internal_client.list_user_coupons(user_id)
@@ -236,10 +407,44 @@ async def query_user_coupons(user_id: str, status: int | None = None) -> str:
                 break
 
         if not result:
-            return "【查询优惠券成功】当前没有符合条件的优惠券"
-        return f"【查询优惠券成功】共 {len(result)} 张：{json.dumps(result, ensure_ascii=False)}"
+            return ToolInvokeResult(
+                content="【查询优惠券成功】当前没有符合条件的优惠券",
+                biz_type="query_user_coupons",
+                source_refs=[
+                    negative_lookup_ref(
+                        "coupon",
+                        query={"status": query_status, "scope": "AUTHENTICATED_USER"},
+                        source="JAVA_COUPON_SERVICE",
+                    )
+                ],
+            )
+        return ToolInvokeResult(
+            content=f"【查询优惠券成功】共 {len(result)} 张：{json.dumps(result, ensure_ascii=False)}",
+            biz_type="query_user_coupons",
+            source_refs=[
+                {
+                    "type": "coupon",
+                    "id": str(item.get("userCouponId") or item.get("couponId") or ""),
+                    "couponId": item.get("couponId"),
+                    "couponName": item.get("couponName"),
+                    "status": item.get("status"),
+                    "validEndTime": item.get("validEndTime"),
+                    "matched": True,
+                    "scope": "AUTHENTICATED_USER",
+                    "source": "JAVA_COUPON_SERVICE",
+                }
+                for item in result
+                if item.get("userCouponId") or item.get("couponId")
+            ],
+        )
     except Exception:
-        return "【查询优惠券失败】系统处理异常，请稍后重试"
+        logger.exception("mcp_query_user_coupons_failed", user_id=user_id)
+        return ToolInvokeResult(
+            content="【查询优惠券失败】系统处理异常，请稍后重试",
+            success=False,
+            error_code="TOOL_ERROR",
+            biz_type="query_user_coupons",
+        )
 
 async def _order_items_params(order_id: str, order: dict | None = None) -> list[dict]:
 
@@ -573,6 +778,13 @@ async def query_support_cases(
                 success=False,
                 error_code="NOT_FOUND",
                 biz_type="support_case_detail",
+                source_refs=[
+                    negative_lookup_ref(
+                        "support_case",
+                        query={"caseId": case_id, "scope": "AUTHENTICATED_USER"},
+                        source="JAVA_SUPPORT_CASE_SERVICE",
+                    )
+                ],
             )
         if case_id:
             card = {"type": "SUPPORT_CASE_DETAIL", "case": rows[0]}
@@ -580,6 +792,17 @@ async def query_support_cases(
                 content=f"【工单查询成功】工单 {rows[0]['caseNo']} 状态为 {rows[0]['status']}",
                 biz_type="support_case_detail",
                 assistant_cards=json.dumps(card, ensure_ascii=False),
+                source_refs=[
+                    {
+                        "type": "support_case",
+                        "id": str(rows[0].get("caseId") or rows[0].get("id") or rows[0].get("caseNo")),
+                        "caseId": rows[0].get("caseId") or rows[0].get("id"),
+                        "caseNo": rows[0].get("caseNo"),
+                        "status": rows[0].get("status"),
+                        "matched": True,
+                        "source": "JAVA_SUPPORT_CASE_SERVICE",
+                    }
+                ],
             )
         card = {"type": "SUPPORT_CASE_LIST", "cases": rows}
         return ToolInvokeResult(
@@ -590,6 +813,28 @@ async def query_support_cases(
             ),
             biz_type="support_case_list",
             assistant_cards=json.dumps(card, ensure_ascii=False),
+            source_refs=(
+                [
+                    {
+                        "type": "support_case",
+                        "id": str(row.get("caseId") or row.get("id") or row.get("caseNo")),
+                        "caseId": row.get("caseId") or row.get("id"),
+                        "caseNo": row.get("caseNo"),
+                        "status": row.get("status"),
+                        "matched": True,
+                        "source": "JAVA_SUPPORT_CASE_SERVICE",
+                    }
+                    for row in rows
+                    if isinstance(row, dict)
+                ]
+                or [
+                    negative_lookup_ref(
+                        "support_case",
+                        query={"scope": "AUTHENTICATED_USER"},
+                        source="JAVA_SUPPORT_CASE_SERVICE",
+                    )
+                ]
+            ),
         )
     except Exception:
         logger.exception("mcp_query_support_cases_failed", user_id=user_id)
@@ -632,14 +877,16 @@ async def tool_search_products(
     from app.services.shopping_profile_service import shopping_profile_service
 
     mission = await shopping_mission_service.load(user_id)
+    effective_profile = await shopping_profile_service.get_effective_profile(user_id)
     content = format_search_tool_message(
         keyword,
         consult,
         products,
         source,
-        profile=await shopping_profile_service.get_effective_profile(user_id),
+        profile=effective_profile,
         mission=mission,
     )
+    constraint_evidence = _search_constraint_evidence(products, effective_profile)
     request_id = str(
         request_id
         or
@@ -657,6 +904,22 @@ async def tool_search_products(
         run_id
         or (current_episode().run_id if current_episode() else request_id.removeprefix("req_"))
     )
+    source_refs = product_refs(
+        products,
+        request_id=request_id,
+        source="JAVA_GATEWAY",
+    )
+    if not products:
+        source_refs = [
+            product_no_result_ref(
+                keyword or "",
+                result_source=source or "constraint_miss",
+                request_id=request_id,
+                # ``none`` can also mean a provider returned no usable data;
+                # keep that case visible but do not call it authoritative.
+                authoritative=source not in {"", "none"},
+            )
+        ]
     contract = build_response(
         RecommendationRequest(
             requestId=request_id,
@@ -674,7 +937,7 @@ async def tool_search_products(
             else "NO_RESULT"
         ),
         fallback_used=source in {"rrf_fallback", "category", "browse", "hot_sale_explicit"},
-        trace={"source": source},
+        trace={"source": source, "constraintEvidence": constraint_evidence},
         message=content if not products else None,
     ).model_dump(mode="json", by_alias=True)
     if not products:
@@ -683,6 +946,7 @@ async def tool_search_products(
             biz_type=biz_type,
             assistant_cards=assistant if assistant and assistant != "[]" else None,
             contract_data=contract,
+            source_refs=source_refs,
         )
 
     names = [str(p.get("product_name") or p.get("productName") or "") for p in products]
@@ -695,6 +959,7 @@ async def tool_search_products(
         product_ids=ids,
         product_names=[n for n in names if n],
         contract_data=contract,
+        source_refs=source_refs,
     )
 
 async def tool_query_orders(user_id: str, order_id: str | None = None) -> "ToolInvokeResult":
@@ -705,7 +970,17 @@ async def tool_query_orders(user_id: str, order_id: str | None = None) -> "ToolI
 
     assistant, biz_data, biz_type = await order_service.query_orders(user_id, order_id or None)
     if assistant == "[]":
-        return ToolInvokeResult(content="【订单查询】未找到相关订单。")
+        return ToolInvokeResult(
+            content="【订单查询】未找到相关订单。",
+            biz_type=biz_type,
+            source_refs=[
+                negative_lookup_ref(
+                    "order",
+                    query={"orderId": order_id, "scope": "AUTHENTICATED_USER"},
+                    source="JAVA_ORDER_SERVICE",
+                )
+            ],
+        )
     try:
         cards = json.loads(assistant)
         order_ids = [str(c.get("orderId") or c.get("order_id") or "") for c in cards if isinstance(c, dict)]
@@ -717,16 +992,50 @@ async def tool_query_orders(user_id: str, order_id: str | None = None) -> "ToolI
             biz_data=biz_data,
             assistant_cards=assistant,
             order_ids=order_ids,
+            source_refs=order_refs(cards, source="JAVA_ORDER_SERVICE"),
         )
     except json.JSONDecodeError:
-        return ToolInvokeResult(content=f"【订单查询】{assistant[:300]}", biz_type=biz_type, biz_data=biz_data)
+        return ToolInvokeResult(
+            content=f"【订单查询】{assistant[:300]}",
+            biz_type=biz_type,
+            biz_data=biz_data,
+        )
 
-async def tool_get_product_detail(user_id: str, product_id: str) -> str:
+async def tool_get_product_detail(user_id: str, product_id: str) -> ToolInvokeResult:
 
-    from app.services.product_service import product_service
+    from app.constants import PRODUCT_STATUS_ON_SALE
+    from app.services.java_internal_client import java_internal_client
 
     _ = user_id
-    return await product_service.get_product_detail_text(product_id)
+    row = await java_internal_client.get_product_detail(product_id)
+    if not row:
+        return ToolInvokeResult(
+            content=f"【商品不存在】productId={product_id}",
+            success=False,
+            error_code="NOT_FOUND",
+            biz_type="product_detail",
+            source_refs=[
+                negative_lookup_ref(
+                    "product_detail",
+                    query={"productId": product_id},
+                    source="JAVA_PRODUCT_SERVICE",
+                )
+            ],
+        )
+    if row.get("status") != PRODUCT_STATUS_ON_SALE:
+        content = f"【商品已下架】{row.get('product_name') or product_id}"
+    else:
+        desc = (row.get("product_desc") or "")[:200]
+        content = (
+            f"商品：{row.get('product_name')} | ID：{row.get('product_id')} | "
+            f"价格：{row.get('min_price')}~{row.get('max_price')}元 | "
+            f"销量：{row.get('total_sale') or 0} | 简介：{desc}"
+        )
+    return ToolInvokeResult(
+        content=content,
+        biz_type="product_detail",
+        source_refs=product_refs([row], source="JAVA_PRODUCT_SERVICE"),
+    )
 
 
 async def tool_compare_products(

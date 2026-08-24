@@ -125,3 +125,18 @@ def test_out_of_stock_message_does_not_fall_back_to_hot_sale_claim():
 
     assert "均已售罄" in message
     assert "热销" not in message
+
+
+@pytest.mark.parametrize("source", ["constraint_miss", "no_match", "none"])
+def test_non_authoritative_empty_search_discloses_retrieval_limit(source: str):
+    message = format_search_tool_message("索尼耳机", None, [], source)
+
+    assert "本次检索" in message
+    assert "不能据此断言平台无货" in message
+
+
+def test_plain_empty_search_discloses_retrieval_limit():
+    message = format_search_tool_message("索尼耳机", None, [], "unknown")
+
+    assert "本次检索" in message
+    assert "不能据此断言平台无货" in message
