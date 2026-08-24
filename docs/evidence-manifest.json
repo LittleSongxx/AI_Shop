@@ -28,7 +28,7 @@
       "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
       "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
       "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
-      "reportSha256": "85fdc361c794538200c2dec5de20c537c4bb1622636f8a8dec744923343d6b1c",
+      "reportSha256": "076fce83ef355a2d894fa652715e9e9aaa34881a5c391ea0f1e53efe570712fa",
       "caseCount": 60,
       "status": "HUMAN_VERIFIED",
       "releaseGateEligible": false,
@@ -127,7 +127,7 @@
       }
     },
     "customerServiceAnswerReviewV13": {
-      "status": "PENDING_HUMAN_REVIEW",
+      "status": "PENDING_ADJUDICATION",
       "releaseGateEligible": false,
       "sourceRunId": "customer-service-http-v13-20260824",
       "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
@@ -153,7 +153,16 @@
           "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl.manifest.json",
           "manifestSha256": "f02ee16320a11ab6e31967c7520e0b00ef0234f1e9a1159da454980a78a60912"
         }
-      ]
+      ],
+      "pendingEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
+        "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+        "sha256SumsSha256": "147d770692f503227699b96e26c73a36ba95320c3effd6f6c6c9fa9f28d06258",
+        "exactAgreementCaseCount": 49,
+        "disagreementCaseCount": 11,
+        "caseAgreementRate": 0.816667,
+        "releaseGateEligible": false
+      }
     },
     "pricingEstimate": {
       "path": "docs/evaluation/model-pricing-estimate-20260824.json",
@@ -500,7 +509,7 @@
       }
     ]
   },
-  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. Historical HTTP v1 has two independent answer reviews with 52/60 four-label exact agreement and 8 third-person adjudications: answer correctness 51/60=85.0%, citation grounding support 6/30=20.0%, handoff appropriateness 60/60, unsafe-answer rate 0/60, and joint quality 32/60=53.3%. Agreement is annotation reliability, not model accuracy; historical v1 is non-gating and does not establish CSAT/FCR, online success, or grounded-answer readiness. Redacted HTTP slots remain UNAVAILABLE. The repaired customer-service-http-v13-20260824 is a separate 60/60 real Provider observation with Java/MCP dynamic sourceRefs, API/Worker/MCP source-fingerprint preflight, and 10/10 safety/behavior contracts. Its raw observation and disclaimer-aware offline rebuild are both immutable; the four prior catalog-absence contract failures were evaluator false positives, not a model-quality gain. v13 answerQuality is PENDING_HUMAN_REVIEW: its two open blind sheets are bound to the v13 report hash, and no v1 human labels or answer-quality metric may migrate to it. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
+  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. Historical HTTP v1 has two independent answer reviews with 52/60 four-label exact agreement and 8 third-person adjudications: answer correctness 51/60=85.0%, citation grounding support 6/30=20.0%, handoff appropriateness 60/60, unsafe-answer rate 0/60, and joint quality 32/60=53.3%. Agreement is annotation reliability, not model accuracy; historical v1 is non-gating and does not establish CSAT/FCR, online success, or grounded-answer readiness. Redacted HTTP slots remain UNAVAILABLE. The repaired customer-service-http-v13-20260824 is a separate 60/60 real Provider observation with Java/MCP dynamic sourceRefs, API/Worker/MCP source-fingerprint preflight, and 10/10 safety/behavior contracts. Its raw observation and disclaimer-aware offline rebuild are both immutable; the four prior catalog-absence contract failures were evaluator false positives, not a model-quality gain. v13 source report remains PENDING_HUMAN_REVIEW, while its dual review is now PENDING_ADJUDICATION: 49/60 exact case agreement, 11 third-person decisions pending, and no v1 human labels or answer-quality metric may migrate to it. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
   "visibleRuns": {
     "development": {
       "runId": "development-20260822-ai-quality-v9",
@@ -542,7 +551,7 @@
         "docs/evaluation/AI质量评测与Badcase.md",
         "docs/evaluation/customer-service/客服金标评测.md",
         "customer-service-http-v13-20260824",
-        "PENDING_HUMAN_REVIEW"
+        "PENDING_ADJUDICATION"
       ],
       "forbiddenTokens": [
         "docs/AI应用求职项目证据总览.md",
@@ -557,7 +566,7 @@
         "evaluation/AI质量评测与Badcase.md",
         "customer-service/客服金标评测.md",
         "customer-service-http-v13-20260824",
-        "PENDING_HUMAN_REVIEW"
+        "PENDING_ADJUDICATION"
       ],
       "forbiddenTokens": [
         "_20260820.md",

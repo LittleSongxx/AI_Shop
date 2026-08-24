@@ -116,6 +116,14 @@
 - 定向回归 `33 passed`、Ruff、`compileall`、`git diff --check` 通过；v13 原始 observation 与正式 rebuilt 包均采用只读 `0444` 和 `SHA256SUMS`。本轮又将 manifest 验证扩展为同时校验原始 observation、正式 rebuild、开放盲审表、report hash 与只读属性。
 - 额外保留 v11/v12 成对运行版本排错证据：同一 10 条定向集在旧 MCP 仍加载旧代码时出现 `6/10` 行为契约违例，完整重启后的恢复对照为 `0/10`。manifest 现在校验二者的只读文件集、SHA-256、相同 HUMAN_VERIFIED 数据哈希、预期状态和违例数；它们不进入质量分母。v5/v10 两个被 v13 覆盖的 60 条中间运行，以及绑定 v10 且未填写的 v3 盲审草稿已物理删除，避免把过期输出误当成当前主线。清理后 manifest、文档一致性、Ruff、`compileall` 与全量 Python 回归均通过：`1392 passed, 7 skipped`；跳过项只依赖真实 MySQL 8 migration 环境。
 
+### 2026-08-24：v13 双盲封存、分歧诊断与仲裁准备
+
+- 用户提供根目录两份 v13 标注表；逐条校验 60/60 case、四项标签、sourceRefs、答案哈希和 report SHA-256，未重跑 Provider，也未修改 v13 observation。
+- 两份 sealed 表的案件级完全一致为 `49/60=81.67%`；字段级一致：answerCorrect `59/60`、citationSupport `50/60`（Cohen κ `0.735450`）、handoff `59/60`、unsafe `60/60`。这是一致性/标注可靠性，不是模型质量率。
+- 11 条仲裁 badcase 为 `004/005/006/007/008/009/014/016/017/035/012`。前 10 条都围绕动态订单快照未直接支持回答中的商品名或流程风险/资格断言；`012` 还涉及取消订单能否确定拒绝及是否应转人工。完整双人备注和冻结 sourceRefs 位于待仲裁 evidence package。
+- 生成只读包 `customer-service-http-v13-answer-review-pending-adjudication-20260824`，包含两份 sealed 原件、agreement、`SHA256SUMS` 和 11 条模板；项目根目录保留第三人填写文件 `adjudication.answer-review-v13.open.jsonl`。历史 v1 `51/60`、`6/30`、`32/60` 不迁移到 v13，v13 最终答案质量仍不可用。
+- 修复评测工具文档硬编码旧 v2 仲裁文件名的问题：说明现在引用实际导出的 adjudication 路径，并增加回归断言。仓库内 v13 open 表恢复为空白模板，已标注输入逐字节保存在 sealed package，不重复进入当前主线。
+
 ## 关键踩坑、排错与效果
 
 下表只把同一数据、同一 observation 或同一候选规模的结果称为“前后对比”。不同 final 使用不同 dataset/source hash，只能作为排错生命周期，不能包装成严格 A/B。

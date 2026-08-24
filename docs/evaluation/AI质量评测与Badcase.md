@@ -20,7 +20,7 @@
 | RAG citation support | 1.000000 | 50/50 | [1.000000, 1.000000] percentile bootstrap | 无；semantic judge 只作 shadow |
 | AI 客服 intent/slot/handoff | 见下节 | 独立 60 条双人盲标+仲裁 gold | bootstrap/Wilson | 3 intent、3 strict-format slot badcase |
 | AI 客服 HTTP 最终答案（历史 v1） | 正确率 `0.850000`；引用支持 `0.200000` | 60 条双盲+8 条第三人仲裁；引用分母 30 | Wilson | 9 answer、24 citation、28 joint badcase |
-| AI 客服 HTTP 最终答案（修复后 v13） | `PENDING_HUMAN_REVIEW` | 60 条真实 HTTP observation；两份空白盲审表 | 不适用 | 尚未产生人工质量 badcase |
+| AI 客服 HTTP 最终答案（修复后 v13） | `PENDING_ADJUDICATION` | 60 条真实 HTTP observation；双人已封存，49/60 案件完全一致，11 条待第三人仲裁 | 不适用 | `004/005/006/007/008/009/014/016/017/035` 引用分歧；`012` 答案/转人工分歧 |
 
 Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap 区间；由于运行 summary 与 scorecard 是两次独立重采样，NDCG 和 P95 的区间端点可能有小幅差异，点估计、分母和 badcase 必须一致。这里的表格明确标注为 scorecard 区间，不能把两套端点混写成一个“线上置信区间”。
 
@@ -29,7 +29,7 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 | 证据 | 当前可用程度 | 可以怎么说 | 不能怎么说 |
 |---|---|---|---|
 | Search 50 条离线 qrel | **可用于简历/面试** | `n=50`、44 条有 qrel 的 Recall/MRR/NDCG、95% CI、切片和漏召回/错排 case | 线上 CTR、个性化推荐收益或生产 SLO |
-| 客服 60 条 HUMAN_VERIFIED + HTTP 答案审查 | **可用于简历/面试，但须完整披露版本边界** | 双人盲标、25 条 lead 仲裁后的 intent/slot/handoff；历史 v1 HTTP 答案的双盲+8 条第三人仲裁；v13 重新盲审已预注册 | 线上客服准确率、CSAT/FCR；不能隐去历史 v1 HTTP 引用支持仅 `6/30=20.0%`、联合质量 `32/60=53.3%`，也不能把 v13 `60/60` 当作答案质量 |
+| 客服 60 条 HUMAN_VERIFIED + HTTP 答案审查 | **可用于简历/面试，但须完整披露版本边界** | 双人盲标、25 条 lead 仲裁后的 intent/slot/handoff；历史 v1 HTTP 答案的双盲+8 条第三人仲裁；v13 双盲已封存、案件一致率 `49/60=81.67%`，正在第三人仲裁 | 线上客服准确率、CSAT/FCR；不能隐去历史 v1 HTTP 引用支持仅 `6/30=20.0%`、联合质量 `32/60=53.3%`，也不能把 v13 执行 `60/60` 或任一单评结果当作最终答案质量 |
 | RAG 50 条、Agent 25 条 | **工程诊断可用** | RAG 检索/引用/拒答下界，Agent 幂等、终态和状态 diff 契约 | 人工语义准确率、开放世界 Agent 成功率 |
 | 本地延迟、容量、token、DB、故障矩阵 | **复盘/设计证据可用** | 环境、样本、并发/QPS、P50/P95/P99、usage unknown、batch/N+1 和恢复契约 | 持续生产容量、费用为 0、线上 SLO |
 
@@ -44,12 +44,12 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 | Search 相关性与约束 | **达标** | Recall@10 `0.9621`、MRR `0.9375`、NDCG `0.9205`，硬约束违规 `0` | 足以支撑当前 47 商品、小流量场景的可用搜索/导购；多对象和比较型难例仍需 fallback/澄清 |
 | RAG 受控问答 | **有条件达标** | answerable Recall@5 `29/29`，lexical grounded/citation/no-answer 门禁通过 | 足以支撑封闭知识库 FAQ；没有独立人工语义真值，不能证明开放域答案准确率 |
 | 客服理解与转人工 | **当前离线点估计达标** | 同一 60 条 HUMAN_VERIFIED gold 重跑后 Intent Macro-F1 `1.0000`、高风险和 handoff Recall `1.0`；raw full-slot F1 `0.9964`、normalized F1/EM `1.0` | 可用于带澄清和人工兜底的客服路由；这是同集规则回放，不是开放世界泛化，写操作仍须 Java 校验和确认 |
-| 客服 HTTP 最终答案与引用 | **历史 v1 未达；修复后 v13 待人工复核** | v1 人工仲裁后答案正确 `51/60=85.0%`，引用语义支持 `6/30=20.0%`，联合质量 `32/60=53.3%`；v13 已补动态 sourceRefs、但新答案尚无人工标签 | 可保留路由、确认和人工兜底；在 v13 双盲+仲裁完成前，不能将新生成回答包装为可独立交付的 grounded 客服 |
+| 客服 HTTP 最终答案与引用 | **历史 v1 未达；修复后 v13 待仲裁** | v1 人工仲裁后答案正确 `51/60=85.0%`，引用语义支持 `6/30=20.0%`，联合质量 `32/60=53.3%`；v13 双人已完成且 11 条分歧已导出，最终质量率仍待第三人仲裁 | 可保留路由、确认和人工兜底；在 v13 仲裁完成前，不能将新生成回答包装为可独立交付的 grounded 客服 |
 | Agent 交易可靠性 | **冻结场景达标** | 25 case、200 trials，`pass^8=1.0`，state diff/终态全匹配，重复副作用 `0`；故障 contract `11/11 HARD + 1/1 SHADOW` | 支撑受控交易提案、确认和幂等执行；不等于开放世界 Agent 成功率 |
 | 单请求交互延迟 | **Search 可用，生成链路长尾偏高** | 本地 Search P95 `0.80s`、RAG `4.25s`、Agent `17.08s`、客服 HTTP `15.21s`，客服 P99 `60.14s` | 搜索体验可用；Agent/客服需要流式反馈、超时降级和长尾优化，不能承诺生产 SLO |
 | 容量与成本 | **已有扩大后的本地诊断，生产结论未建立** | 只读 4 case、warm-up `4`、正式 `80` 请求（并发 `1/2/4/8`、每档 20）；c8 `1.353 QPS`；生成路径 P95 `10.211–12.013s`；usage 有 token 但未定价 | 可定位并发瓶颈和回归，不能据此承诺持续吞吐、生产 SLO 或单位经济性 |
 
-综合结论：当前证据足以支撑小商品集、低并发、人工最终兜底下的检索、路由和受控交易演示，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。历史 HTTP v1 答案仲裁暴露出引用支持 `20.0%` 和联合质量 `53.3%` 的关键缺口。v13 已针对证据传播、路由与验证器误报完成真实回放，但新答案仍 `PENDING_HUMAN_REVIEW`，所以生成式客服回答仍不能独立上线。其余限制是 Agent/客服生成链路长尾、共享本机负载仍非生产容量、真实账单价格未知，以及客服金标仍只有 60 条。
+综合结论：当前证据足以支撑小商品集、低并发、人工最终兜底下的检索、路由和受控交易演示，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。历史 HTTP v1 答案仲裁暴露出引用支持 `20.0%` 和联合质量 `53.3%` 的关键缺口。v13 已针对证据传播、路由与验证器误报完成真实回放，双人审查的案件级一致率为 `81.67%`，但 11 条分歧尚未由第三人裁定，因此生成式客服回答仍不能独立上线。其余限制是 Agent/客服生成链路长尾、共享本机负载仍非生产容量、真实账单价格未知，以及客服金标仍只有 60 条。
 
 ### Search slice（不加权掩盖失败）
 
@@ -153,7 +153,7 @@ Intent CI 已按 `intent×risk×handoff` 对完整 case 分层并每次重算 Ma
 
 完整只读包见 [customer-service-answer-review-v2-adjudicated-20260824](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824/)。它包含 sealed 原件、第三人仲裁、最终 labels、逐 case badcase、`SHA256SUMS`，并由项目 manifest 复核；`releaseGateEligible=false`，不对历史 v9 final 追溯设门禁。
 
-### 客服 HTTP/LLM 全链路：修复后 v13，待人工质量复核
+### 客服 HTTP/LLM 全链路：修复后 v13，双盲已封存、待第三人仲裁
 
 动态订单/商品/库存/优惠券/物流/退款等 Java 权威 `sourceRefs` 已由 MCP 工具结果传入 graph state、Episode/step trace、response verifier 和最终 HTTP envelope；政策知识与动态事实仍分开校验。为避免“代码已改但独立 MCP 进程仍在跑旧源码”，API、Worker、MCP 在 readiness 与评测 preflight 中必须报告同一 source fingerprint，否则评测 fail-closed。
 
@@ -165,7 +165,7 @@ usage 为 Provider calls `18`、input/output tokens `78,470/5,486`、`costCny=nu
 
 排错过程中，`cs-gold-v1-001/002/034/042` 的安全免责声明“不能据此断言平台无货”被旧正则只按“平台无货”命中，造成四个 `NO_UNSUPPORTED_CATALOG_ABSENCE_CLAIM` 假阳性。评测器现仅把独立的平台范围缺货断言判错，并保存实际命中的 claim；新增正反两条回归测试。正式 v13 的行为契约违规为 `0`，表示修正了评测器误杀，**不表示业务模型由失败提升为通过**。
 
-v13 `answerQuality.status=PENDING_HUMAN_REVIEW`，所有人工质量分数为 `null`。两份按不同随机顺序的 60 条开放盲审表已生成并校验：`reviewer-a` SHA-256 `3e4fdb...85fa6`、`reviewer-b` SHA-256 `e6476c...884aa`；它们不含 expected、预测标签或另一位审阅者标签。必须先完成双人独立标注、封存、分歧仲裁，才能计算 v13 的答案正确率、引用语义支持率、转人工适当率、unsafe-answer rate、联合质量和新的 badcase；历史 v1 的 `85.0%/20.0%/53.3%` 不得迁移或对比成提升。
+v13 原始 report 的 `answerQuality.status` 仍不可变地是 `PENDING_HUMAN_REVIEW`；当前生命周期已推进到双人封存后的 `PENDING_ADJUDICATION`。两份审查表已通过来源绑定校验并封存，案件级完全一致 `49/60=0.816667`，字段级一致为：answerCorrect `59/60`、citationSupport `50/60`（Cohen κ `0.735450`）、handoff `59/60`、unsafe `60/60`。11 条待仲裁为 `004/005/006/007/008/009/014/016/017/035/012`；其中前 10 条仅引用支持分歧，`012` 同时有答案正确和转人工分歧。待仲裁只读包见 [customer-service-http-v13-answer-review-pending-adjudication-20260824](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/)，第三人填写文件为项目根目录 `adjudication.answer-review-v13.open.jsonl`。必须完成第三人裁定后，才能计算 v13 的答案正确率、引用语义支持率、转人工适当率、unsafe-answer rate、联合质量和新的 badcase；历史 v1 的 `85.0%/20.0%/53.3%` 不得迁移或对比成提升。
 
 另已新增 60 条 v2 draft（20 个 intent 各 3 条，hard 35，应转人工 16），目标将金标扩到 120 条。在双人盲标、封存和仲裁完成前，它仍是
 `DRAFT_NEEDS_DUAL_HUMAN_REVIEW`，不与当前 60 条 HUMAN_VERIFIED 分母合并。

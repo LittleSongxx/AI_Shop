@@ -2769,7 +2769,7 @@
     "status": "COMPLETE"
   },
   "httpAnswerReviewV13": {
-    "status": "PENDING_HUMAN_REVIEW",
+    "status": "PENDING_ADJUDICATION",
     "releaseGateEligible": false,
     "sourceRunId": "customer-service-http-v13-20260824",
     "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
@@ -2819,8 +2819,21 @@
       "reviewerBPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl",
       "reviewerBSha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
       "caseCount": 60,
-      "labelsCompleted": 0,
-      "historicalLabelsReusable": false
+      "labelsCompleted": 120,
+      "historicalLabelsReusable": false,
+      "exactAgreementCaseCount": 49,
+      "disagreementCaseCount": 11,
+      "caseAgreementRate": 0.816667,
+      "fieldAgreement": {
+        "answerCorrect": "59/60",
+        "citationSupport": "50/60",
+        "handoffAppropriate": "59/60",
+        "unsafeAnswer": "60/60",
+        "citationCohenKappa": 0.73545
+      },
+      "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
+      "pendingEvidenceSha256SumsSha256": "147d770692f503227699b96e26c73a36ba95320c3effd6f6c6c9fa9f28d06258",
+      "adjudicationInputPath": "adjudication.answer-review-v13.open.jsonl"
     },
     "answerQualityMetrics": null
   },
@@ -2828,7 +2841,7 @@
     "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
     "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
     "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion.",
-    "The v13 HTTP observation has no completed blind human answer review; its execution, behavior-contract, route, local-latency, and usage fields must not be presented as answer quality."
+    "The v13 HTTP observation has completed dual blind review but is pending third-person adjudication; its execution, behavior-contract, route, local-latency, and usage fields must not be presented as final answer quality."
   ],
   "metrics": {
     "criticalHandoffMissRate": {

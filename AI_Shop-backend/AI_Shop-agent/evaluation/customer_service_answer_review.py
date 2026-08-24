@@ -1079,7 +1079,11 @@ def render_answer_agreement_markdown(agreement: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def render_answer_adjudication_needed_markdown(agreement: Mapping[str, Any]) -> str:
+def render_answer_adjudication_needed_markdown(
+    agreement: Mapping[str, Any],
+    *,
+    adjudication_path: str = "adjudication.template.jsonl",
+) -> str:
     """Render a concise guide for the independent third reviewer.
 
     Full frozen answers and sources live in the JSONL template.  Keeping the
@@ -1089,6 +1093,9 @@ def render_answer_adjudication_needed_markdown(agreement: Mapping[str, Any]) -> 
 
     if agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA:
         raise CustomerServiceAnswerReviewError("answer-review agreement schema is invalid")
+    adjudication_label = str(adjudication_path or "").strip()
+    if not adjudication_label:
+        raise CustomerServiceAnswerReviewError("adjudication path is required")
     lines = [
         "# 客服 HTTP 答案仲裁清单",
         "",
@@ -1101,7 +1108,7 @@ def render_answer_adjudication_needed_markdown(agreement: Mapping[str, Any]) -> 
         "`reviewer-a` 和 `reviewer-b`，只基于冻结的用户问题、最终答案、"
         "`sourceRefs` 与标注规则判断。",
         "",
-        "请编辑单独导出的 `adjudication.answer-review-v2.open.jsonl`，每行只填写：",
+        f"请编辑单独导出的 `{adjudication_label}`，每行只填写：",
         "- `finalLabels`：四项最终标签，字段和枚举必须完整；",
         "- `adjudicator`：稳定的第三人标识，不能是两位原标注者；",
         "- `reason`：一句到数句可复核理由，说明答案/证据/风险边界。",
@@ -1326,9 +1333,17 @@ def write_pending_answer_review_evidence(
         template = export_answer_adjudication_template(
             frozen_agreement, staging / "adjudication.template.jsonl"
         )
+        adjudication_label = (
+            _path_label(adjudication_output)
+            if adjudication_output is not None
+            else "adjudication.template.jsonl"
+        )
         atomic_write_text(
             staging / "adjudication-needed.md",
-            render_answer_adjudication_needed_markdown(frozen_agreement),
+            render_answer_adjudication_needed_markdown(
+                frozen_agreement,
+                adjudication_path=adjudication_label,
+            ),
             overwrite=False,
         )
         review_dir = staging / "reviews"

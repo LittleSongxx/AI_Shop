@@ -391,7 +391,9 @@ def test_pending_answer_review_evidence_freezes_dual_reviews_and_exports_input(
     )
     assert verify_pending_answer_review_evidence(package)["caseCount"] == 3
     assert len(load_jsonl(editable)) == 1
-    assert not (package / "adjudication-needed.md").read_bytes().endswith(b"\n\n")
+    adjudication_needed = (package / "adjudication-needed.md").read_text()
+    assert "adjudication.answer-review-v2.open.jsonl" in adjudication_needed
+    assert not adjudication_needed.endswith("\n\n")
     frozen_agreement = load_json(package / "agreement.json")
     assert frozen_agreement["reviewA"]["path"] == "reviews/reviewer-a.sealed.jsonl"
     assert frozen_agreement["reviewB"]["path"] == "reviews/reviewer-b.sealed.jsonl"
