@@ -1,6 +1,8 @@
-# 客服 HTTP v13 第三人仲裁说明
+# 客服 HTTP v13 第三人仲裁说明（已完成归档）
 
-本说明配合同级的 `adjudication.answer-review-v13.open.jsonl` 使用。该 JSONL 包含 11 条双人审查分歧，来源固定为一次真实 HTTP 运行：
+> 状态：`HUMAN_REVIEWED_ADJUDICATED`。本文件保留当时的详细仲裁规则，不能再用来修改已封存结果。
+
+本说明曾配合同级的 `adjudication.answer-review-v13.open.jsonl` 使用。11 条双人审查分歧现已由独立第三人填写 `adjudication.answer-review-v13.final.jsonl` 并通过 fail-closed 合并；冻结副本、双评原件、最终指标和 `SHA256SUMS` 位于 `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/`。根目录 JSONL 仅是本地交接副本，最终证据以该只读 package 为准。
 
 ```text
 customer-service-http-v13-20260824
@@ -8,7 +10,7 @@ source report SHA-256:
 2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357
 ```
 
-你的任务是对这 11 条冻结输出作独立最终裁定。它不是让你为模型打高分，也不是在两位审阅者之间投票；每个结论必须能从该行的用户问题、最终答案和可见 `sourceRefs` 复核。
+当时的任务是对这 11 条冻结输出作独立最终裁定。它不是让审阅者为模型打高分，也不是在两位审阅者之间投票；每个结论都必须能从该行的用户问题、最终答案和可见 `sourceRefs` 复核。
 
 ## 审查边界
 
@@ -131,4 +133,4 @@ cd /home/song/code/Java/AI_Shop
 conda run -n shop python -c "import json; from pathlib import Path; p = Path('adjudication.answer-review-v13.open.jsonl'); [json.loads(line) for line in p.read_text(encoding='utf-8').splitlines() if line.strip()]; print('valid JSONL')"
 ```
 
-语法检查不会验证证据绑定、独立性、标签枚举或仲裁覆盖；完成后直接交回该文件。维护者会执行 fail-closed 校验、合并 sealed 双评与仲裁结果，并生成新的只读最终质量证据包。
+语法检查不会验证证据绑定、独立性、标签枚举或仲裁覆盖。该批已完成 fail-closed 校验、sealed 双评与仲裁合并；最终结果为答案正确 `59/60`、引用支持 `20/34`、转人工适当 `59/60`、unsafe `0/60`、联合质量 `46/60`。任何后续评审必须创建新的 sheet、运行和 evidence package，不能改写此批。

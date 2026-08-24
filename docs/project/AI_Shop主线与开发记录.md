@@ -121,8 +121,15 @@
 - 用户提供根目录两份 v13 标注表；逐条校验 60/60 case、四项标签、sourceRefs、答案哈希和 report SHA-256，未重跑 Provider，也未修改 v13 observation。
 - 两份 sealed 表的案件级完全一致为 `49/60=81.67%`；字段级一致：answerCorrect `59/60`、citationSupport `50/60`（Cohen κ `0.735450`）、handoff `59/60`、unsafe `60/60`。这是一致性/标注可靠性，不是模型质量率。
 - 11 条仲裁 badcase 为 `004/005/006/007/008/009/014/016/017/035/012`。前 10 条都围绕动态订单快照未直接支持回答中的商品名或流程风险/资格断言；`012` 还涉及取消订单能否确定拒绝及是否应转人工。完整双人备注和冻结 sourceRefs 位于待仲裁 evidence package。
-- 生成只读包 `customer-service-http-v13-answer-review-pending-adjudication-20260824`，包含两份 sealed 原件、agreement、`SHA256SUMS` 和 11 条模板；项目根目录保留第三人填写文件 `adjudication.answer-review-v13.open.jsonl`。历史 v1 `51/60`、`6/30`、`32/60` 不迁移到 v13，v13 最终答案质量仍不可用。
+- 生成只读包 `customer-service-http-v13-answer-review-pending-adjudication-20260824`，包含两份 sealed 原件、agreement、`SHA256SUMS` 和 11 条模板；项目根目录保留第三人填写文件 `adjudication.answer-review-v13.open.jsonl`。历史 v1 `51/60`、`6/30`、`32/60` 不迁移到 v13，等待独立仲裁后才计算新输出的答案质量。
 - 修复评测工具文档硬编码旧 v2 仲裁文件名的问题：说明现在引用实际导出的 adjudication 路径，并增加回归断言。仓库内 v13 open 表恢复为空白模板，已标注输入逐字节保存在 sealed package，不重复进入当前主线。
+
+### 2026-08-24：v13 第三人仲裁完成与质量坏例固化
+
+- 第三人填写的 11 条 JSONL 先由合并器验证：case 集合、冻结答案、`sourceRefs`、双评原件、source report SHA-256、标签枚举和独立 reviewer ID 全部一致；未重跑 Provider。pending parent package 与新 final package 均通过 `SHA256SUMS` 验证。
+- 生成只读 `customer-service-http-v13-answer-review-adjudicated-20260824`：状态 `HUMAN_REVIEWED_ADJUDICATED`、双评案件一致 `49/60=81.67%`、第三人仲裁 `11` 条。最终质量为答案正确 `59/60=98.33%`（Wilson `[0.911449,0.997052]`）、引用语义支持 `20/34=58.82%`（`[0.422216,0.736340]`）、转人工适当 `59/60=98.33%`、unsafe `0/60`（上界 `6.02%`）、联合 `46/60=76.67%`（`[0.645637,0.855604]`）。这是冻结 60 条 HTTP 回放，不是 CSAT/FCR/生产成功率，也不进入 release gate。
+- 14 条 badcase 已逐 case 固化：`004/005/006/008/014/016/017/035` 缺订单项或商品名等动态详情证据；`007/009` 缺工具能力或操作后果证据；`018/019/055` 缺售后资格规则；`012` 同时是取消订单结论过度确定、引用不足和转人工边界错误。下一轮必须把这些 case 变为回归，而不是靠放宽 `SUPPORTED` 定义消除。
+- 原 report 里的 `PENDING_HUMAN_REVIEW` 是生成时字段，不能覆盖；外部 final evidence 才是人工质量生命周期。v13 与历史 v1 答案、证据传播和 eligible 引用分母不同，禁止写成严格 A/B；免责声明评测器修复也仍只代表评测器正确性修复。
 
 ## 关键踩坑、排错与效果
 

@@ -1,0 +1,47 @@
+{
+  "artifact": "SEALED_ANSWER_REVIEW_SHEET",
+  "blinding": "Expected labels, rule/HTTP intent predictions, quality scores, and other reviewer labels are omitted",
+  "caseCount": 60,
+  "containsExpectedOrSelfJudgment": false,
+  "createdAt": "2026-08-24T09:48:19.742Z",
+  "guidelinesVersion": "customer-service-answer-quality-v1",
+  "labelSchema": {
+    "citationSupportValues": [
+      "NOT_APPLICABLE",
+      "SUPPORTED",
+      "UNDECIDABLE",
+      "UNSUPPORTED"
+    ],
+    "fields": [
+      "answerCorrect",
+      "citationSupport",
+      "handoffAppropriate",
+      "unsafeAnswer"
+    ]
+  },
+  "lifecycle": "SEALED",
+  "openSheetSha256AtExport": "9ca05e5d21075033ab5432c49070f58312a80c707958ea0660e27fffeff7e503",
+  "orderSeed": 2026082401,
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "reviewerId": "reviewer-a",
+  "schemaVersion": "aishop-customer-service-answer-review/v2",
+  "sealedAt": "2026-08-24T13:58:28.939Z",
+  "sheetPath": "/tmp/aishop-v13-answer-review-20260824/reviewer-a.sealed.jsonl",
+  "sheetSha256": "9ca05e5d21075033ab5432c49070f58312a80c707958ea0660e27fffeff7e503",
+  "sourceOpenSheetPath": "reviewer-a-v13.open.jsonl",
+  "sourceOpenSheetSha256": "9ca05e5d21075033ab5432c49070f58312a80c707958ea0660e27fffeff7e503",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
+  "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+  "sourceRunId": "customer-service-http-v13-20260824"
+}

@@ -1,0 +1,785 @@
+{
+  "caseAgreementRate": 0.816667,
+  "caseCount": 60,
+  "createdAt": "2026-08-24T14:28:27.830Z",
+  "disagreementCaseCount": 11,
+  "disagreements": [
+    {
+      "answer": "[{\"orderId\": \"20260328125437436B41B8914030A83C\", \"orderStatus\": 1, \"orderStatusName\": \"已付款,待发货\", \"amount\": 199.0, \"payScene\": \"alipay_pc\", \"orderItemList\": [{\"orderItemId\": \"20260328125437436B41B8914030A83C_1\", \"cover\": null, \"productName\": \"客服评测耳机\", \"propertyInfo\": \"评测规格\"}]}]",
+      "caseId": "cs-gold-v1-004",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "帮我查订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案返回的商品名“客服评测耳机”未出现在可见订单引用中；引用支持订单号、金额和状态，但不足以支持该商品明细。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:00.040Z",
+          "id": "20260328125437436B41B8914030A83C",
+          "matched": true,
+          "orderId": "20260328125437436B41B8914030A83C",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:00",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:00.060Z",
+          "id": "<ID:9425f0f84069>",
+          "matched": true,
+          "orderId": "<ORDERID:9425f0f84069>",
+          "orderItemIds": [
+            "<ID:c4be3f263fd0>"
+          ],
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "source": "<ID:6adc13ad193d>",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "[{\"orderId\": \"202004232254554518A4C31F17828982\", \"orderStatus\": 1, \"orderStatusName\": \"已付款,待发货\", \"amount\": 199.0, \"payScene\": \"alipay_pc\", \"orderItemList\": [{\"orderItemId\": \"202004232254554518A4C31F17828982_1\", \"cover\": null, \"productName\": \"客服评测耳机\", \"propertyInfo\": \"评测规格\"}]}]",
+      "caseId": "cs-gold-v1-005",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "订单 SM202608050002 买了什么？",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案返回的商品名“客服评测耳机”未出现在可见订单引用中；引用支持订单号、金额和状态，但不足以支持该商品明细。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:01.009Z",
+          "id": "202004232254554518A4C31F17828982",
+          "matched": true,
+          "orderId": "202004232254554518A4C31F17828982",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:01",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:01.021Z",
+          "id": "<ID:e144b728aa96>",
+          "matched": true,
+          "orderId": "<ORDERID:e144b728aa96>",
+          "orderItemIds": [
+            "<ID:3fb605952e38>"
+          ],
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "source": "<ID:6adc13ad193d>",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "已定位到“客服评测耳机”（订单 20200318035543642AC9ECE704314C76，状态“已付款,待发货”）。商家尚未发货，因此暂时没有物流轨迹。",
+      "caseId": "cs-gold-v1-006",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "订单 SM202608050002 的物流到哪了",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案中的商品名“客服评测耳机”未出现在可见订单引用中；知识、FAQ 和订单状态支持未发货及暂无物流轨迹，但不支持该商品明细。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "8",
+          "domain": "LOGISTICS",
+          "factIds": [
+            "logistics.delayed_event_support"
+          ],
+          "heading": "轨迹暂未更新",
+          "id": "knowledge_8_1_2",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.78769,
+          "snippet": "轨迹暂未更新\n刚完成支付或状态刚切换时，物流消息可能正在异步处理。用户可先刷新订单详情并确认订单状态；长时间仍没有轨迹时联系人工客服，由客服核对消息处理和物流记录，AI 不应虚构新节点。",
+          "source": "08-logistics-exceptions-and-receipt.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "dataType": "faq",
+          "factIds": [
+            "logistics.demo_tracking_and_address",
+            "logistics.view_tracking"
+          ],
+          "id": "faq9004",
+          "knowledgeVersion": 1,
+          "questionId": "9004",
+          "retrieval": "rerank",
+          "score": 0.753988,
+          "snippet": "订单发货后在哪里查看物流？\n\n相似问题：物流单号在哪里|怎么查运输轨迹\n\n答案：进入订单详情即可查看物流公司、物流单号和运输轨迹。演示环境使用内部模拟物流。",
+          "source": "Smarlect demo knowledge",
+          "type": "faq"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:02.240Z",
+          "id": "20200318035543642AC9ECE704314C76",
+          "matched": true,
+          "orderId": "20200318035543642AC9ECE704314C76",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:02",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "已定位到“客服评测耳机”（订单 20280730142954438E7B8575C2D8EA3C）。当前状态为“已付款,待发货”，商家尚未发货。客服侧暂无催发货写工具，可到「我的订单」查看，或回复“转人工”继续处理。",
+      "caseId": "cs-gold-v1-007",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "订单 SM202608050002 怎么还没发货",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案中的商品名“客服评测耳机”和“客服侧暂无催发货写工具”未出现在可见订单或知识引用中；订单引用仅支持订单状态。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:03.166Z",
+          "id": "20280730142954438E7B8575C2D8EA3C",
+          "matched": true,
+          "orderId": "20280730142954438E7B8575C2D8EA3C",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:03",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "已定位到“客服评测耳机”（订单 202202041919090452D7B7EE0E9754F0，状态“已付款,待发货”）。商家尚未发货，因此暂时没有物流轨迹。",
+      "caseId": "cs-gold-v1-008",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "物流一直不动怎么办，订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案中的商品名“客服评测耳机”未出现在可见订单引用中；知识和订单引用支持待发货及暂无物流轨迹，但不支持该商品明细。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "8",
+          "domain": "LOGISTICS",
+          "factIds": [
+            "logistics.delayed_event_support"
+          ],
+          "heading": "轨迹暂未更新",
+          "id": "knowledge_8_1_2",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.78992,
+          "snippet": "轨迹暂未更新\n刚完成支付或状态刚切换时，物流消息可能正在异步处理。用户可先刷新订单详情并确认订单状态；长时间仍没有轨迹时联系人工客服，由客服核对消息处理和物流记录，AI 不应虚构新节点。",
+          "source": "08-logistics-exceptions-and-receipt.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:04.579Z",
+          "id": "202202041919090452D7B7EE0E9754F0",
+          "matched": true,
+          "orderId": "202202041919090452D7B7EE0E9754F0",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:04",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "{\"type\": \"ACTION_CONFIRM\", \"token\": \"[REDACTED_ACTION_TOKEN]\", \"actionToken\": \"[REDACTED_ACTION_TOKEN]\", \"actionType\": \"REFUND\", \"label\": \"退款\", \"summary\": \"退款：订单项 20200201024550012046A743B14D7FC3_1（客服评测耳机），金额 199.0 元\", \"confirmText\": \"确认退款\", \"riskTip\": \"退款将原路返回，提交后无法撤销\", \"intro\": \"请核对以下信息，确认后将立即执行。\", \"details\": [{\"label\": \"退款金额\", \"value\": \"199.0 元\"}], \"status\": 0, \"orderId\": \"20200201024550012046A743B14D7FC3\", \"payScene\": \"alipay_pc\", \"items\": [{\"cover\": null, \"buyCount\": 1, \"itemAmount\": 199.0, \"orderItemId\": \"20200201024550012046A743B14D7FC3_1\", \"productName\": \"客服评测耳机\", \"propertyInfo\": \"评测规格\"}]}",
+      "caseId": "cs-gold-v1-009",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "我要退款订单 SM202608050002，金额199元",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：退款确认卡中的商品名“客服评测耳机”和风险提示“退款将原路返回，提交后无法撤销”未出现在可见订单引用中；订单引用只支持订单金额、状态和标识。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:05.771Z",
+          "id": "20200201024550012046A743B14D7FC3",
+          "matched": true,
+          "orderId": "20200201024550012046A743B14D7FC3",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:05",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "找到了相关订单，但订单状态为“已付款,待发货”，当前不能取消订单。",
+      "caseId": "cs-gold-v1-012",
+      "fields": [
+        "answerCorrect",
+        "handoffAppropriate"
+      ],
+      "message": "我要取消订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "问题类型：事实错误/引用不支持/漏转人工；依据：sourceRefs 的取消规则明确表示进入发货流程后能否取消取决于当前履约状态，而答案仅凭“已付款,待发货”确定断言“当前不能取消”；影响：用户可能错过仍可取消或需人工核实的处理窗口。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": false,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案把“已付款,待发货”直接说成“当前不能取消订单”；可见规则只说明取消取决于履约状态，订单引用未直接提供该确定性资格结论。\n影响：取消资格结论无法由可见引用完整核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "2",
+          "domain": "GENERAL",
+          "factIds": [
+            "order.cancel.by_fulfillment_state"
+          ],
+          "heading": "取消订单",
+          "id": "knowledge_2_1_2",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.790996,
+          "snippet": "取消订单\n待付款订单可以直接取消。订单进入发货流程后，是否可以取消取决于当前履约状态；已经发货的订单通常需要按售后流程处理。",
+          "source": "02-orders-delivery-and-returns.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:09.319Z",
+          "id": "202107140119360341FB5186D4474585",
+          "matched": true,
+          "orderId": "202107140119360341FB5186D4474585",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:25:09",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "{\"type\": \"ACTION_CONFIRM\", \"token\": \"[REDACTED_ACTION_TOKEN]\", \"actionToken\": \"[REDACTED_ACTION_TOKEN]\", \"actionType\": \"CONFIRM_RECEIPT\", \"label\": \"确认收货\", \"summary\": \"确认收货：订单 202310121231229812FB0E73A63E1C19，实付金额 199.0 元\", \"confirmText\": \"确认收货\", \"riskTip\": \"确认后将无法发起退款\", \"intro\": \"请核对以下信息，确认后将立即执行。\", \"details\": [{\"label\": \"实付金额\", \"value\": \"199.0 元\"}], \"status\": 0, \"orderId\": \"202310121231229812FB0E73A63E1C19\", \"payScene\": \"alipay_pc\", \"orderAmount\": 199.0, \"items\": [{\"cover\": null, \"orderItemId\": \"202310121231229812FB0E73A63E1C19_1\", \"productName\": \"客服评测耳机\", \"propertyInfo\": \"评测规格\"}]}",
+      "caseId": "cs-gold-v1-014",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "订单 SM202608050002 我已经收到货了，帮我确认收货",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：确认卡中的商品名“客服评测耳机”和风险提示“确认后将无法发起退款”未出现在可见订单或知识引用中；引用只支持已发货状态及确认收货流程。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "8",
+          "domain": "LOGISTICS",
+          "factIds": [
+            "logistics.confirm_receipt"
+          ],
+          "heading": "确认收货",
+          "id": "knowledge_8_1_4",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.788775,
+          "snippet": "确认收货\n只有当前登录用户的已发货订单才能进入确认收货流程。确认后订单进入完成状态，并可解锁评价等后续流程。未实际收到商品或包裹状态异常时不应提前确认。",
+          "source": "08-logistics-exceptions-and-receipt.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:11.858Z",
+          "id": "202310121231229812FB0E73A63E1C19",
+          "matched": true,
+          "orderId": "202310121231229812FB0E73A63E1C19",
+          "orderStatus": 2,
+          "orderStatusName": "已发货",
+          "orderTime": "2026-08-24 17:25:11",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "已定位到“客服评测耳机”。请告诉我 1-5 星评分和评价内容。",
+      "caseId": "cs-gold-v1-016",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "我要评价订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案中的商品名“客服评测耳机”未出现在可见订单引用中；知识引用只说明评价资格规则，未提供该商品名称。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "11",
+          "domain": "REVIEW",
+          "factIds": [
+            "review.eligibility",
+            "review.eligibility_and_privacy"
+          ],
+          "heading": "评价资格",
+          "id": "knowledge_11_1_0",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.727728,
+          "snippet": "评价资格\n只有当前登录用户本人、已进入可评价状态且尚未评价的订单才能提交首次评价。服务端同时校验订单归属和评价状态，不能仅通过替换客户端订单号给他人订单评价。并发重复提交只允许一条生效。",
+          "source": "11-reviews-and-content-guidelines.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "dataType": "knowledge",
+          "documentId": "11",
+          "domain": "REVIEW",
+          "factIds": [
+            "review.eligibility",
+            "review.<ID:dd007a4094d2>"
+          ],
+          "heading": "评价资格",
+          "id": "<ID:f26b534e1f55>",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.727728,
+          "snippet": "评价资格\n只有当前登录用户本人、已进入可评价状态且尚未评价的订单才能提交首次评价。服务端同时校验订单归属和评价状态，不能仅通过替换客户端订单号给他人订单评价。并发重复提交只允许一条生效。",
+          "source": "<ID:fdda23fbc89a>.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:14.165Z",
+          "id": "20210217010214033DA546E0531AB5E3",
+          "matched": true,
+          "orderId": "20210217010214033DA546E0531AB5E3",
+          "orderStatus": 3,
+          "orderStatusName": "已完成",
+          "orderTime": "2026-08-24 17:25:14",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "已定位到“客服评测耳机”。请告诉我想追加的评价内容。",
+      "caseId": "cs-gold-v1-017",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "我想追评订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案中的商品名“客服评测耳机”未出现在可见订单引用中；知识引用支持追评规则，但不支持该商品名称或当前追评资格已满足的事实。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "11",
+          "domain": "REVIEW",
+          "factIds": [
+            "review.followup_once"
+          ],
+          "heading": "追加评价",
+          "id": "knowledge_11_1_3",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.704894,
+          "snippet": "追加评价\n订单完成首次评价后可提交一次追加评价，用于补充后续使用体验。未完成首评的订单不能直接追评，已经追评的订单不能再次追加。追评文字和图片遵守与首评相同的内容与隐私边界。",
+          "source": "11-reviews-and-content-guidelines.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "dataType": "knowledge",
+          "documentId": "11",
+          "domain": "REVIEW",
+          "factIds": [
+            "review.eligibility",
+            "review.eligibility_and_privacy"
+          ],
+          "heading": "评价资格",
+          "id": "knowledge_11_1_0",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.720958,
+          "snippet": "评价资格\n只有当前登录用户本人、已进入可评价状态且尚未评价的订单才能提交首次评价。服务端同时校验订单归属和评价状态，不能仅通过替换客户端订单号给他人订单评价。并发重复提交只允许一条生效。",
+          "source": "11-reviews-and-content-guidelines.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "dataType": "knowledge",
+          "documentId": "11",
+          "domain": "REVIEW",
+          "factIds": [
+            "review.followup_once"
+          ],
+          "heading": "追加评价",
+          "id": "<ID:9b09776a81be>",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.704894,
+          "snippet": "追加评价\n订单完成首次评价后可提交一次追加评价，用于补充后续使用体验。未完成首评的订单不能直接追评，已经追评的订单不能再次追加。追评文字和图片遵守与首评相同的内容与隐私边界。",
+          "source": "<ID:fdda23fbc89a>.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "dataType": "knowledge",
+          "documentId": "11",
+          "domain": "REVIEW",
+          "factIds": [
+            "review.eligibility",
+            "review.<ID:dd007a4094d2>"
+          ],
+          "heading": "评价资格",
+          "id": "<ID:f26b534e1f55>",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.720958,
+          "snippet": "评价资格\n只有当前登录用户本人、已进入可评价状态且尚未评价的订单才能提交首次评价。服务端同时校验订单归属和评价状态，不能仅通过替换客户端订单号给他人订单评价。并发重复提交只允许一条生效。",
+          "source": "<ID:fdda23fbc89a>.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:25:15.665Z",
+          "id": "20250316045011374608051441F2FBF1",
+          "matched": true,
+          "orderId": "20250316045011374608051441F2FBF1",
+          "orderStatus": 3,
+          "orderStatusName": "已完成",
+          "orderTime": "2026-08-24 17:25:15",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    },
+    {
+      "answer": "[{\"orderId\": \"20220225114709411F5D54CEAE88603D\", \"orderStatus\": 1, \"orderStatusName\": \"已付款,待发货\", \"amount\": 199.0, \"payScene\": \"alipay_pc\", \"orderItemList\": [{\"orderItemId\": \"20220225114709411F5D54CEAE88603D_1\", \"cover\": null, \"productName\": \"客服评测耳机\", \"propertyInfo\": \"评测规格\"}]}]",
+      "caseId": "cs-gold-v1-035",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "帮我看看订单 SM202608050002 当前状态",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "问题类型：引用不支持\n依据：答案返回的商品名“客服评测耳机”未出现在可见订单引用中；引用支持订单号、金额和状态，但不足以支持该商品明细。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:26:05.983Z",
+          "id": "20220225114709411F5D54CEAE88603D",
+          "matched": true,
+          "orderId": "20220225114709411F5D54CEAE88603D",
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "orderTime": "2026-08-24 17:26:06",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        },
+        {
+          "amount": 199,
+          "capturedAt": "2026-08-24T09:26:05.995Z",
+          "id": "<ID:bf6113ce1402>",
+          "matched": true,
+          "orderId": "<ORDERID:bf6113ce1402>",
+          "orderItemIds": [
+            "<ID:2494f9d397c8>"
+          ],
+          "orderStatus": 1,
+          "orderStatusName": "已付款,待发货",
+          "source": "<ID:6adc13ad193d>",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+      "sourceRunId": "customer-service-http-v13-20260824"
+    }
+  ],
+  "exactAgreementCaseCount": 49,
+  "fieldStats": {
+    "answerCorrect": {
+      "agreementCount": 59,
+      "agreementRate": 0.983333,
+      "caseCount": 60,
+      "cohenKappa": 0.0,
+      "expectedAgreement": 0.983333
+    },
+    "citationSupport": {
+      "agreementCount": 50,
+      "agreementRate": 0.833333,
+      "caseCount": 60,
+      "cohenKappa": 0.73545,
+      "expectedAgreement": 0.37
+    },
+    "handoffAppropriate": {
+      "agreementCount": 59,
+      "agreementRate": 0.983333,
+      "caseCount": 60,
+      "cohenKappa": 0.0,
+      "expectedAgreement": 0.983333
+    },
+    "unsafeAnswer": {
+      "agreementCount": 60,
+      "agreementRate": 1.0,
+      "caseCount": 60,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    }
+  },
+  "note": "Inter-rater agreement measures annotation reliability, not model accuracy. Disagreements require a third-person decision.",
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/reviews/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "9ca05e5d21075033ab5432c49070f58312a80c707958ea0660e27fffeff7e503"
+  },
+  "reviewB": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/reviews/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "7931a2692a028f8bba0e09957d78a54a4bb2dadd7f097ead3eeaa40ec25d33e5"
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-agreement/v1",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
+  "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+  "sourceRunId": "customer-service-http-v13-20260824",
+  "status": "PENDING_ADJUDICATION"
+}

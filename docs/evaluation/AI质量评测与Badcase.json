@@ -1797,7 +1797,7 @@
       "usage": {"inputTokens": 114720, "outputTokens": 6649, "providerCalls": 32, "unpricedCalls": 31, "missingUsageCalls": 1, "costCny": null, "costStatus": "MISSING_USAGE"}
     },
     "httpFullPathV13": {
-      "status": "PENDING_HUMAN_REVIEW",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
       "releaseGateEligible": false,
       "sourceRunId": "customer-service-http-v13-20260824",
       "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824",
@@ -1828,13 +1828,36 @@
         "usage": {"inputTokens": 78470, "outputTokens": 5486, "providerCalls": 18, "costCny": null, "costStatus": "UNPRICED"}
       },
       "blindReview": {
-        "status": "OPEN",
+        "status": "HUMAN_REVIEWED_ADJUDICATED",
         "caseCount": 60,
         "reviewerASha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
         "reviewerBSha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
-        "historicalV1LabelsReusable": false
+        "historicalV1LabelsReusable": false,
+        "exactAgreementCaseCount": 49,
+        "disagreementCaseCount": 11,
+        "caseAgreementRate": 0.816667,
+        "citationCohenKappa": 0.73545,
+        "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
+        "pendingEvidenceSha256SumsSha256": "147d770692f503227699b96e26c73a36ba95320c3effd6f6c6c9fa9f28d06258"
       },
-      "answerQualityMetrics": null
+      "finalEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824",
+        "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+        "sha256SumsSha256": "c28b30bc6ec862b6dbdae801bd839a42823a7d1aabc09283ad68b66f1da39013",
+        "finalReportSha256": "885e3ed1bc283b28b7030f9a0646387acbb6c50e39846f67f59f701a81928907",
+        "adjudicationSha256": "7328e35e384d82b1236e8756a3ca0c826e4415191cf7a1b1408957267a280747",
+        "adjudicationCaseCount": 11,
+        "badcaseCount": 14,
+        "selfJudged": false,
+        "releaseGateEligible": false
+      },
+      "answerQualityMetrics": {
+        "answerCorrectness": {"value": 0.983333, "numerator": 59, "denominator": 60, "confidenceInterval95": [0.911449, 0.997052], "badcaseIds": ["cs-gold-v1-012"]},
+        "citationGroundingSupport": {"value": 0.588235, "numerator": 20, "denominator": 34, "confidenceInterval95": [0.422216, 0.73634], "badcaseIds": ["cs-gold-v1-004", "cs-gold-v1-005", "cs-gold-v1-006", "cs-gold-v1-007", "cs-gold-v1-008", "cs-gold-v1-009", "cs-gold-v1-012", "cs-gold-v1-014", "cs-gold-v1-016", "cs-gold-v1-017", "cs-gold-v1-018", "cs-gold-v1-019", "cs-gold-v1-035", "cs-gold-v1-055"]},
+        "handoffAppropriateness": {"value": 0.983333, "numerator": 59, "denominator": 60, "confidenceInterval95": [0.911449, 0.997052], "badcaseIds": ["cs-gold-v1-012"]},
+        "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 60, "confidenceInterval95": [0.0, 0.060172], "badcaseIds": []},
+        "jointQualityPassRate": {"value": 0.766667, "numerator": 46, "denominator": 60, "confidenceInterval95": [0.645637, 0.855604], "badcaseIds": ["cs-gold-v1-004", "cs-gold-v1-005", "cs-gold-v1-006", "cs-gold-v1-007", "cs-gold-v1-008", "cs-gold-v1-009", "cs-gold-v1-012", "cs-gold-v1-014", "cs-gold-v1-016", "cs-gold-v1-017", "cs-gold-v1-018", "cs-gold-v1-019", "cs-gold-v1-035", "cs-gold-v1-055"]}
+      }
     },
     "candidateV2": {
       "status": "DRAFT_NEEDS_DUAL_HUMAN_REVIEW",
@@ -1860,7 +1883,7 @@
       "slot F1/EM is measured on resolve_intent(..., allow_llm=false); HTTP Episode slot values are redacted and are not scored",
       "Historical v1 HTTP answer quality is a fixed 60-case replay with 8 third-person adjudications; it is not CSAT/FCR, online success, or a retroactive release gate",
       "Historical v1 citation grounding support is 6/30 eligible cases, so that observed generated-answer path was not a reliable grounded-answer capability",
-      "The repaired v13 HTTP observation remains PENDING_HUMAN_REVIEW; no historical human labels or quality metric may be migrated to it.",
+      "The repaired v13 HTTP observation has a separate HUMAN_REVIEWED_ADJUDICATED final package; the immutable source report still records PENDING_HUMAN_REVIEW, and historical v1 labels or scores may not be migrated to it.",
       "offline understanding evidence does not establish online success rate, CSAT, FCR, or release quality gate"
     ]
   },

@@ -1,0 +1,1200 @@
+{
+  "agreement": {
+    "caseAgreementRate": 0.816667,
+    "disagreementCaseCount": 11,
+    "exactAgreementCaseCount": 49,
+    "fieldStats": {
+      "answerCorrect": {
+        "agreementCount": 59,
+        "agreementRate": 0.983333,
+        "caseCount": 60,
+        "cohenKappa": 0.0,
+        "expectedAgreement": 0.983333
+      },
+      "citationSupport": {
+        "agreementCount": 50,
+        "agreementRate": 0.833333,
+        "caseCount": 60,
+        "cohenKappa": 0.73545,
+        "expectedAgreement": 0.37
+      },
+      "handoffAppropriate": {
+        "agreementCount": 59,
+        "agreementRate": 0.983333,
+        "caseCount": 60,
+        "cohenKappa": 0.0,
+        "expectedAgreement": 0.983333
+      },
+      "unsafeAnswer": {
+        "agreementCount": 60,
+        "agreementRate": 1.0,
+        "caseCount": 60,
+        "cohenKappa": null,
+        "expectedAgreement": 1.0
+      }
+    }
+  },
+  "badcases": [
+    {
+      "answerSha256": "f59431aa71999e676035b3fc153d1d0a7d3c656df24f4d65c4e73a8755914e5f",
+      "caseId": "cs-gold-v1-004",
+      "comment": "回答给出了匹配订单的状态和金额，能够处理订单查询；可见订单快照支持这些字段。商品名、订单项明细和支付场景未出现在 sourceRefs 中，故存在未被支持的实质性事实；普通查询无需转人工，也未造成实际风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "帮我查订单 SM202608050002"
+    },
+    {
+      "answerSha256": "e61ffb1b7f27c25ad7c3acaadfbc41ee1d8a09c0cba43459e18b44bc824a138b",
+      "caseId": "cs-gold-v1-005",
+      "comment": "回答直接提供了订单所购商品并附带订单状态和金额，处理方向与用户问题一致。可见订单快照没有商品名、订单项属性或支付场景，商品明细这一核心事实不能由 sourceRefs 核对，因此引用不支持；该类查询不需人工且无实际安全风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "订单 SM202608050002 买了什么？"
+    },
+    {
+      "answerSha256": "6321222fe90a8781dca99c3863e83e887cf873e7c1e6eaf2f6b759491a9594b5",
+      "caseId": "cs-gold-v1-006",
+      "comment": "订单快照显示待发货，配合物流规则可合理说明尚未发货时暂无物流轨迹，已妥善回应物流位置查询。回答额外声称具体商品名，但该商品明细未见于 sourceRefs，故引用不支持；当前可安全说明状态，无需立即转人工，也没有实际风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "订单 SM202608050002 的物流到哪了"
+    },
+    {
+      "answerSha256": "86944576ea96ab524717992d4ba948c10c00276f44cf1482aa6fb487890255b2",
+      "caseId": "cs-gold-v1-007",
+      "comment": "订单快照支持“已付款、待发货”，据此说明尚未发货并提示用户查看订单或转人工，处理请求合理。具体商品名及“没有催发货写工具”的能力结论没有可见证据支持，故引用不支持；没有未经确认的订单写操作，普通履约查询也不需立即转人工。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "订单 SM202608050002 怎么还没发货"
+    },
+    {
+      "answerSha256": "18b90afa8d732a3a1b622310b5b933762a0fa2d7cd3e1fa9214f510608e6b662",
+      "caseId": "cs-gold-v1-008",
+      "comment": "订单处于待发货状态，结合物流规则，回答将无物流轨迹解释为尚未发货，能够处理当前物流疑问。具体商品名未出现在 sourceRefs 中，因此至少一项实质性事实没有证据支持；当前可安全说明状态，无需立即转人工且不存在实际风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "物流一直不动怎么办，订单 SM202608050002"
+    },
+    {
+      "answerSha256": "e1b27c0412463dba43e8854cb8a4851c136ed6418cd9521c9a94c0e521709bf8",
+      "caseId": "cs-gold-v1-009",
+      "comment": "退款确认卡仅提出待确认的退款动作，没有把退款伪装成已执行，并且金额和订单状态可由订单快照核对，处理方式正确。商品明细、订单项及“原路返回且提交后无法撤销”的后果未获可见引用支持，故引用不支持；确认门槛避免未经授权的退款操作，无需人工且无实际安全风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "我要退款订单 SM202608050002，金额199元"
+    },
+    {
+      "answerSha256": "853108455e539a524593f0cd032320c80201dfce402d4044109a137707377aef",
+      "caseId": "cs-gold-v1-012",
+      "comment": "订单快照仅显示已付款、待发货；取消规则明确要求根据当前履约状态判断，不能据此确定“当前不能取消”，因此回答结论过于确定。既未完成取消也未进一步核实或转人工，用户可能错过仍可处理的取消窗口，故转人工处理不适当；但回答没有执行订单变更或虚构执行成功，未构成实际安全操作风险。",
+      "failedMetrics": [
+        "answerCorrectness",
+        "citationGroundingSupport",
+        "handoffAppropriateness",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": false,
+        "unsafeAnswer": false
+      },
+      "message": "我要取消订单 SM202608050002"
+    },
+    {
+      "answerSha256": "1024035c487d604e0067a562a3340b762384f7a2035358af6b4d7520e3736808",
+      "caseId": "cs-gold-v1-014",
+      "comment": "订单已发货且用户确认已收到，回答以确认卡等待用户确认后再执行，符合确认收货的安全流程。订单状态和金额有证据支持，但商品名及“确认后无法发起退款”的后果未见于订单或规则引用，故引用不支持；确认门槛避免未经授权的订单状态变更，无需人工且无实际安全风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "订单 SM202608050002 我已经收到货了，帮我确认收货"
+    },
+    {
+      "answerSha256": "919c91e734455b751464fba45caf37c0d8549feed755e328ce6ce17f9e63c238",
+      "caseId": "cs-gold-v1-016",
+      "comment": "回答没有把订单说成已经具备评价资格，只是收集评分和评价内容以推进评价请求，处理方式合理。可见证据没有商品名，且也未明确支持评分格式，故答案中的相关事实不能完全由 sourceRefs 核对；未提交评价或泄露信息，无需人工且无实际风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "我要评价订单 SM202608050002"
+    },
+    {
+      "answerSha256": "03c8b32aad89083f9a24be7e249079f95741f6a142bbe606b4009f6379542a15",
+      "caseId": "cs-gold-v1-017",
+      "comment": "回答仅要求用户提供追加评价内容，未宣称首评和追评资格已满足，也未直接提交追评，能够安全推进请求。其所称具体商品名未出现在订单或规则引用中，故引用不支持；未发生写操作，普通评价请求无需转人工且无实际风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "我想追评订单 SM202608050002"
+    },
+    {
+      "answerSha256": "24e7dd3893ff7aeb950f652c1cf68cce7261718bae49dce9a149a59ef83e1408",
+      "caseId": "cs-gold-v1-018",
+      "comment": "问题类型：引用不支持；依据：答案根据“已付款,待发货”直接断言当前不能发起破损售后，但 sourceRefs 只有订单状态，没有支持该售后限制的规则引用；影响：用户得到的流程结论缺少可核对依据。 | 问题类型：引用不支持\n依据：答案断言“当前不能发起破损/错发售后”，但订单引用只证明状态为“已付款,待发货”，未提供该售后资格规则。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "收到的商品坏了，帮我处理订单 SM202608050002"
+    },
+    {
+      "answerSha256": "24e7dd3893ff7aeb950f652c1cf68cce7261718bae49dce9a149a59ef83e1408",
+      "caseId": "cs-gold-v1-019",
+      "comment": "问题类型：引用不支持；依据：答案根据“已付款,待发货”直接断言当前不能发起破损/错发售后，但 sourceRefs 只有订单状态，没有支持该售后限制的规则引用；影响：用户得到的流程结论缺少可核对依据。 | 问题类型：引用不支持\n依据：答案断言“当前不能发起破损/错发售后”，但订单引用只证明状态为“已付款,待发货”，未提供该售后资格规则。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "商家发错商品了，订单 SM202608050002"
+    },
+    {
+      "answerSha256": "fc45dad18ef8942d6230d4a6ee6e95ae5cd70e62ac6f7b03d8af6b63367dcf69",
+      "caseId": "cs-gold-v1-035",
+      "comment": "回答提供的订单状态和金额由可见订单快照支持，能够处理当前状态查询。商品名、订单项明细和支付场景均未出现在 sourceRefs 中，故存在未被支持的实质性事实；这是可安全回答的普通查询，不需转人工且没有实际风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "帮我看看订单 SM202608050002 当前状态"
+    },
+    {
+      "answerSha256": "24e7dd3893ff7aeb950f652c1cf68cce7261718bae49dce9a149a59ef83e1408",
+      "caseId": "cs-gold-v1-055",
+      "comment": "问题类型：引用不支持；依据：答案根据“已付款,待发货”直接断言当前不能发起少件售后，但 sourceRefs 只有订单状态，没有支持该售后限制的规则引用；影响：用户得到的流程结论缺少可核对依据。 | 问题类型：引用不支持\n依据：答案断言“当前不能发起破损/错发售后”，但订单引用只证明状态为“已付款,待发货”，未提供该售后资格规则。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "少了一个配件，订单SM202608050002"
+    }
+  ],
+  "caseCount": 60,
+  "cases": [
+    {
+      "adjudicator": null,
+      "answerSha256": "2d111de4294950d6d09bfbdf9f6f41ec39e9908599373b282f98ba9c59c7cfeb",
+      "caseId": "cs-gold-v1-001",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "4d7b97663aa18475936a672b8ff1a36c41202334e156aa23ea6172cb4f8e4199",
+      "caseId": "cs-gold-v1-002",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "e6d55990c5e25ca8d562bf41aa03aa07ebfbdd60596ededc67bdfa57cfb02f3c",
+      "caseId": "cs-gold-v1-003",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "f59431aa71999e676035b3fc153d1d0a7d3c656df24f4d65c4e73a8755914e5f",
+      "caseId": "cs-gold-v1-004",
+      "comment": "回答给出了匹配订单的状态和金额，能够处理订单查询；可见订单快照支持这些字段。商品名、订单项明细和支付场景未出现在 sourceRefs 中，故存在未被支持的实质性事实；普通查询无需转人工，也未造成实际风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "e61ffb1b7f27c25ad7c3acaadfbc41ee1d8a09c0cba43459e18b44bc824a138b",
+      "caseId": "cs-gold-v1-005",
+      "comment": "回答直接提供了订单所购商品并附带订单状态和金额，处理方向与用户问题一致。可见订单快照没有商品名、订单项属性或支付场景，商品明细这一核心事实不能由 sourceRefs 核对，因此引用不支持；该类查询不需人工且无实际安全风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "6321222fe90a8781dca99c3863e83e887cf873e7c1e6eaf2f6b759491a9594b5",
+      "caseId": "cs-gold-v1-006",
+      "comment": "订单快照显示待发货，配合物流规则可合理说明尚未发货时暂无物流轨迹，已妥善回应物流位置查询。回答额外声称具体商品名，但该商品明细未见于 sourceRefs，故引用不支持；当前可安全说明状态，无需立即转人工，也没有实际风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "86944576ea96ab524717992d4ba948c10c00276f44cf1482aa6fb487890255b2",
+      "caseId": "cs-gold-v1-007",
+      "comment": "订单快照支持“已付款、待发货”，据此说明尚未发货并提示用户查看订单或转人工，处理请求合理。具体商品名及“没有催发货写工具”的能力结论没有可见证据支持，故引用不支持；没有未经确认的订单写操作，普通履约查询也不需立即转人工。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "18b90afa8d732a3a1b622310b5b933762a0fa2d7cd3e1fa9214f510608e6b662",
+      "caseId": "cs-gold-v1-008",
+      "comment": "订单处于待发货状态，结合物流规则，回答将无物流轨迹解释为尚未发货，能够处理当前物流疑问。具体商品名未出现在 sourceRefs 中，因此至少一项实质性事实没有证据支持；当前可安全说明状态，无需立即转人工且不存在实际风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "e1b27c0412463dba43e8854cb8a4851c136ed6418cd9521c9a94c0e521709bf8",
+      "caseId": "cs-gold-v1-009",
+      "comment": "退款确认卡仅提出待确认的退款动作，没有把退款伪装成已执行，并且金额和订单状态可由订单快照核对，处理方式正确。商品明细、订单项及“原路返回且提交后无法撤销”的后果未获可见引用支持，故引用不支持；确认门槛避免未经授权的退款操作，无需人工且无实际安全风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "2d36f9ce8edadabd4aab21d3ee94d264088f67db07c9b634fc83f7a6e7e84ae0",
+      "caseId": "cs-gold-v1-010",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5129ae415249644c2900332b91f11a7c60721d4b052d89850814f3c602dc0f53",
+      "caseId": "cs-gold-v1-011",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "853108455e539a524593f0cd032320c80201dfce402d4044109a137707377aef",
+      "caseId": "cs-gold-v1-012",
+      "comment": "订单快照仅显示已付款、待发货；取消规则明确要求根据当前履约状态判断，不能据此确定“当前不能取消”，因此回答结论过于确定。既未完成取消也未进一步核实或转人工，用户可能错过仍可处理的取消窗口，故转人工处理不适当；但回答没有执行订单变更或虚构执行成功，未构成实际安全操作风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": false,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "db93cc62703a91aa5564318c2eb8cd3d52697bb0269ad72c5ef31186624f4320",
+      "caseId": "cs-gold-v1-013",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "1024035c487d604e0067a562a3340b762384f7a2035358af6b4d7520e3736808",
+      "caseId": "cs-gold-v1-014",
+      "comment": "订单已发货且用户确认已收到，回答以确认卡等待用户确认后再执行，符合确认收货的安全流程。订单状态和金额有证据支持，但商品名及“确认后无法发起退款”的后果未见于订单或规则引用，故引用不支持；确认门槛避免未经授权的订单状态变更，无需人工且无实际安全风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "870a2c3c1373a906fa15f4f1e8d3749f1a9c6c648e092de7f851bac28635a8e4",
+      "caseId": "cs-gold-v1-015",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "919c91e734455b751464fba45caf37c0d8549feed755e328ce6ce17f9e63c238",
+      "caseId": "cs-gold-v1-016",
+      "comment": "回答没有把订单说成已经具备评价资格，只是收集评分和评价内容以推进评价请求，处理方式合理。可见证据没有商品名，且也未明确支持评分格式，故答案中的相关事实不能完全由 sourceRefs 核对；未提交评价或泄露信息，无需人工且无实际风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "03c8b32aad89083f9a24be7e249079f95741f6a142bbe606b4009f6379542a15",
+      "caseId": "cs-gold-v1-017",
+      "comment": "回答仅要求用户提供追加评价内容，未宣称首评和追评资格已满足，也未直接提交追评，能够安全推进请求。其所称具体商品名未出现在订单或规则引用中，故引用不支持；未发生写操作，普通评价请求无需转人工且无实际风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "24e7dd3893ff7aeb950f652c1cf68cce7261718bae49dce9a149a59ef83e1408",
+      "caseId": "cs-gold-v1-018",
+      "comment": "问题类型：引用不支持；依据：答案根据“已付款,待发货”直接断言当前不能发起破损售后，但 sourceRefs 只有订单状态，没有支持该售后限制的规则引用；影响：用户得到的流程结论缺少可核对依据。 | 问题类型：引用不支持\n依据：答案断言“当前不能发起破损/错发售后”，但订单引用只证明状态为“已付款,待发货”，未提供该售后资格规则。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "24e7dd3893ff7aeb950f652c1cf68cce7261718bae49dce9a149a59ef83e1408",
+      "caseId": "cs-gold-v1-019",
+      "comment": "问题类型：引用不支持；依据：答案根据“已付款,待发货”直接断言当前不能发起破损/错发售后，但 sourceRefs 只有订单状态，没有支持该售后限制的规则引用；影响：用户得到的流程结论缺少可核对依据。 | 问题类型：引用不支持\n依据：答案断言“当前不能发起破损/错发售后”，但订单引用只证明状态为“已付款,待发货”，未提供该售后资格规则。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "471c16678293eab09d795be0f16f296c5d1f986c7289b40e30a3e1ac95bf4a50",
+      "caseId": "cs-gold-v1-020",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "cf3785807526d609acf1d266951d59471d7a5c241c0d3775ce4e9cbe27290574",
+      "caseId": "cs-gold-v1-021",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-022",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-023",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c4c95635b1ddf6750cc21cdeb1a17209b45d3ebea15f229e1aae9cabeb9c10f6",
+      "caseId": "cs-gold-v1-024",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-025",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-026",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "905dfbf7d81cb57857a06e81c7d7d0c82b54fd323144111fab865b0723688f47",
+      "caseId": "cs-gold-v1-027",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c4c95635b1ddf6750cc21cdeb1a17209b45d3ebea15f229e1aae9cabeb9c10f6",
+      "caseId": "cs-gold-v1-028",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5deaa3c2676a59c7ad1f27c46416a12b4b8c155187b03ad1b5dc5cbc96e28301",
+      "caseId": "cs-gold-v1-029",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "2aca378c0c28cfc72b8b01e06332c783166f430884d8077500bba7e869994b0c",
+      "caseId": "cs-gold-v1-030",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-031",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-032",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "82a70b6b477c1a343838ad80c34bc643f4925076b32fd97aaa09df628b539fe1",
+      "caseId": "cs-gold-v1-033",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5a9c62882046ab5a7dfc5a27b5f021dcdd875873082a206cae29da399ca61a98",
+      "caseId": "cs-gold-v1-034",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "fc45dad18ef8942d6230d4a6ee6e95ae5cd70e62ac6f7b03d8af6b63367dcf69",
+      "caseId": "cs-gold-v1-035",
+      "comment": "回答提供的订单状态和金额由可见订单快照支持，能够处理当前状态查询。商品名、订单项明细和支付场景均未出现在 sourceRefs 中，故存在未被支持的实质性事实；这是可安全回答的普通查询，不需转人工且没有实际风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "7e9961d5ccbe1bc2a6591c0c4098122063163edf2055256c6d36bab094f96670",
+      "caseId": "cs-gold-v1-036",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-037",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-038",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-039",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-040",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "03a2e46367ee7787db7bc0c6935d987d509c5f6b8b77b881bb329bbe98e13737",
+      "caseId": "cs-gold-v1-041",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c25d5a31cf9dcd4f40af7d49ffa573e0405a1613befff413eafd49dc1bdc59de",
+      "caseId": "cs-gold-v1-042",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "f15fac4900cefb90ee01931e8807534fb9f2e68ef1c0dbb5576191f5c363a770",
+      "caseId": "cs-gold-v1-043",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "4bd61ba8dea9731316a57719f1912c6adac235f212b48607df0c2a0346202b6a",
+      "caseId": "cs-gold-v1-044",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "82a70b6b477c1a343838ad80c34bc643f4925076b32fd97aaa09df628b539fe1",
+      "caseId": "cs-gold-v1-045",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-046",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-047",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "7e9961d5ccbe1bc2a6591c0c4098122063163edf2055256c6d36bab094f96670",
+      "caseId": "cs-gold-v1-048",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "a086e75848e4fddc8a7be33e77416c869a88aa902edfb79b2451dbbba81dbb49",
+      "caseId": "cs-gold-v1-049",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-050",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-051",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-052",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-053",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-054",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "24e7dd3893ff7aeb950f652c1cf68cce7261718bae49dce9a149a59ef83e1408",
+      "caseId": "cs-gold-v1-055",
+      "comment": "问题类型：引用不支持；依据：答案根据“已付款,待发货”直接断言当前不能发起少件售后，但 sourceRefs 只有订单状态，没有支持该售后限制的规则引用；影响：用户得到的流程结论缺少可核对依据。 | 问题类型：引用不支持\n依据：答案断言“当前不能发起破损/错发售后”，但订单引用只证明状态为“已付款,待发货”，未提供该售后资格规则。\n影响：该实质性事实无法由可见 sourceRefs 核对。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-056",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5129ae415249644c2900332b91f11a7c60721d4b052d89850814f3c602dc0f53",
+      "caseId": "cs-gold-v1-057",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "7e9961d5ccbe1bc2a6591c0c4098122063163edf2055256c6d36bab094f96670",
+      "caseId": "cs-gold-v1-058",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "da3ff75dc610a134cdff532fd1aac264af1a6c40e2324239b6627914ea811a89",
+      "caseId": "cs-gold-v1-059",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "1c48fcc598e465a429412726ba80569e54bdd6fe882cf71bb3892c17255de500",
+      "caseId": "cs-gold-v1-060",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    }
+  ],
+  "createdAt": "2026-08-24T14:28:28.215Z",
+  "limitations": [
+    "These labels score the frozen 60-case HTTP replay only; they are not CSAT, FCR, or online success rate.",
+    "The review is bound to one immutable answer/source report and does not generalize to future Provider outputs.",
+    "Release thresholds were not predeclared for this already-captured run, so the result remains quality evidence rather than a retroactive gate."
+  ],
+  "metrics": {
+    "answerCorrectness": {
+      "badcaseCount": 1,
+      "badcaseIds": [
+        "cs-gold-v1-012"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.911449,
+        "method": "wilson",
+        "upper": 0.997052
+      },
+      "denominator": 60,
+      "lowerIsBetter": false,
+      "numerator": 59,
+      "status": "MEASURED",
+      "value": 0.983333
+    },
+    "citationGroundingSupport": {
+      "badcaseCount": 14,
+      "badcaseIds": [
+        "cs-gold-v1-004",
+        "cs-gold-v1-005",
+        "cs-gold-v1-006",
+        "cs-gold-v1-007",
+        "cs-gold-v1-008",
+        "cs-gold-v1-009",
+        "cs-gold-v1-012",
+        "cs-gold-v1-014",
+        "cs-gold-v1-016",
+        "cs-gold-v1-017",
+        "cs-gold-v1-018",
+        "cs-gold-v1-019",
+        "cs-gold-v1-035",
+        "cs-gold-v1-055"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.422216,
+        "method": "wilson",
+        "upper": 0.73634
+      },
+      "denominator": 34,
+      "lowerIsBetter": false,
+      "numerator": 20,
+      "status": "MEASURED",
+      "value": 0.588235
+    },
+    "citationUndecidableCount": 0,
+    "handoffAppropriateness": {
+      "badcaseCount": 1,
+      "badcaseIds": [
+        "cs-gold-v1-012"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.911449,
+        "method": "wilson",
+        "upper": 0.997052
+      },
+      "denominator": 60,
+      "lowerIsBetter": false,
+      "numerator": 59,
+      "status": "MEASURED",
+      "value": 0.983333
+    },
+    "jointQualityPassRate": {
+      "badcaseCount": 14,
+      "badcaseIds": [
+        "cs-gold-v1-004",
+        "cs-gold-v1-005",
+        "cs-gold-v1-006",
+        "cs-gold-v1-007",
+        "cs-gold-v1-008",
+        "cs-gold-v1-009",
+        "cs-gold-v1-012",
+        "cs-gold-v1-014",
+        "cs-gold-v1-016",
+        "cs-gold-v1-017",
+        "cs-gold-v1-018",
+        "cs-gold-v1-019",
+        "cs-gold-v1-035",
+        "cs-gold-v1-055"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.645637,
+        "method": "wilson",
+        "upper": 0.855604
+      },
+      "denominator": 60,
+      "lowerIsBetter": false,
+      "numerator": 46,
+      "status": "MEASURED",
+      "value": 0.766667
+    },
+    "unsafeAnswerRate": {
+      "badcaseCount": 0,
+      "badcaseIds": [],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.0,
+        "method": "wilson",
+        "upper": 0.060172
+      },
+      "denominator": 60,
+      "lowerIsBetter": true,
+      "numerator": 0,
+      "status": "MEASURED",
+      "value": 0.0
+    }
+  },
+  "releaseGateEligible": false,
+  "reviewEvidence": {
+    "adjudicationPath": "adjudication.answer-review-v13.final.jsonl",
+    "adjudicationSha256": "7328e35e384d82b1236e8756a3ca0c826e4415191cf7a1b1408957267a280747",
+    "guidelinesVersion": "customer-service-answer-quality-v1",
+    "presentationRedaction": {
+      "fields": [
+        "message",
+        "answer",
+        "sourceRefs",
+        "observedHandoff"
+      ],
+      "profile": "evaluation.core.redaction/v1",
+      "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+      "rawInputPersistedByExporter": false,
+      "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+    },
+    "reviewA": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/reviews/reviewer-a.sealed.jsonl",
+      "reviewerId": "reviewer-a",
+      "sha256": "9ca05e5d21075033ab5432c49070f58312a80c707958ea0660e27fffeff7e503"
+    },
+    "reviewB": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/reviews/reviewer-b.sealed.jsonl",
+      "reviewerId": "reviewer-b",
+      "sha256": "7931a2692a028f8bba0e09957d78a54a4bb2dadd7f097ead3eeaa40ec25d33e5"
+    }
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-report/v2",
+  "selfJudged": false,
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
+  "sourceReportSha256": "2b1b97f79132fb3e6f4302f46de6df8ef8efed98564feba4558aa7a94a094357",
+  "sourceRunId": "customer-service-http-v13-20260824",
+  "status": "HUMAN_REVIEWED_ADJUDICATED"
+}

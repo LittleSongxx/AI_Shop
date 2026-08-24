@@ -2769,7 +2769,7 @@
     "status": "COMPLETE"
   },
   "httpAnswerReviewV13": {
-    "status": "PENDING_ADJUDICATION",
+    "status": "HUMAN_REVIEWED_ADJUDICATED",
     "releaseGateEligible": false,
     "sourceRunId": "customer-service-http-v13-20260824",
     "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/report.json",
@@ -2782,7 +2782,7 @@
     "observationProvenance": {
       "mode": "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS",
       "providerCallsReexecuted": false,
-      "semanticAnswerQualityMeasured": false,
+      "semanticAnswerQualityMeasured": true,
       "evaluatorCorrection": "DISCLAIMER_AWARE_CATALOG_ABSENCE_ASSERTION_DETECTION"
     },
     "execution": {
@@ -2814,6 +2814,7 @@
       }
     },
     "blindReview": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
       "reviewerAPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl",
       "reviewerASha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
       "reviewerBPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl",
@@ -2833,15 +2834,32 @@
       },
       "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
       "pendingEvidenceSha256SumsSha256": "147d770692f503227699b96e26c73a36ba95320c3effd6f6c6c9fa9f28d06258",
-      "adjudicationInputPath": "adjudication.answer-review-v13.open.jsonl"
+      "adjudicationInputPath": "adjudication.answer-review-v13.final.jsonl"
     },
-    "answerQualityMetrics": null
+    "finalEvidence": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824",
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "c28b30bc6ec862b6dbdae801bd839a42823a7d1aabc09283ad68b66f1da39013",
+      "finalReportSha256": "885e3ed1bc283b28b7030f9a0646387acbb6c50e39846f67f59f701a81928907",
+      "adjudicationSha256": "7328e35e384d82b1236e8756a3ca0c826e4415191cf7a1b1408957267a280747",
+      "adjudicationCaseCount": 11,
+      "badcaseCount": 14,
+      "selfJudged": false,
+      "releaseGateEligible": false
+    },
+    "answerQualityMetrics": {
+      "answerCorrectness": {"value": 0.983333, "numerator": 59, "denominator": 60, "confidenceInterval95": [0.911449, 0.997052], "badcaseIds": ["cs-gold-v1-012"]},
+      "citationGroundingSupport": {"value": 0.588235, "numerator": 20, "denominator": 34, "confidenceInterval95": [0.422216, 0.73634], "badcaseIds": ["cs-gold-v1-004", "cs-gold-v1-005", "cs-gold-v1-006", "cs-gold-v1-007", "cs-gold-v1-008", "cs-gold-v1-009", "cs-gold-v1-012", "cs-gold-v1-014", "cs-gold-v1-016", "cs-gold-v1-017", "cs-gold-v1-018", "cs-gold-v1-019", "cs-gold-v1-035", "cs-gold-v1-055"]},
+      "handoffAppropriateness": {"value": 0.983333, "numerator": 59, "denominator": 60, "confidenceInterval95": [0.911449, 0.997052], "badcaseIds": ["cs-gold-v1-012"]},
+      "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 60, "confidenceInterval95": [0.0, 0.060172], "badcaseIds": []},
+      "jointQualityPassRate": {"value": 0.766667, "numerator": 46, "denominator": 60, "confidenceInterval95": [0.645637, 0.855604], "badcaseIds": ["cs-gold-v1-004", "cs-gold-v1-005", "cs-gold-v1-006", "cs-gold-v1-007", "cs-gold-v1-008", "cs-gold-v1-009", "cs-gold-v1-012", "cs-gold-v1-014", "cs-gold-v1-016", "cs-gold-v1-017", "cs-gold-v1-018", "cs-gold-v1-019", "cs-gold-v1-035", "cs-gold-v1-055"]}
+    }
   },
   "limitations": [
     "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
     "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
     "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion.",
-    "The v13 HTTP observation has completed dual blind review but is pending third-person adjudication; its execution, behavior-contract, route, local-latency, and usage fields must not be presented as final answer quality."
+    "The v13 HTTP observation now has a separate HUMAN_REVIEWED_ADJUDICATED answer-review package; the source report retains its original PENDING_HUMAN_REVIEW field, and execution, behavior-contract, route, local-latency, and usage fields remain distinct from human answer-quality metrics."
   ],
   "metrics": {
     "criticalHandoffMissRate": {
