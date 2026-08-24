@@ -563,6 +563,8 @@
     "docs/evaluation/customer-service/客服标注审计.md",
     "docs/evaluation/customer-service/客服标注审计.json",
     "docs/evaluation/model-pricing-estimate-20260824.json",
+    "AI_Shop-backend/AI_Shop-agent/evaluation/README.md",
+    "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/README.md",
     "AI应用开发_Java后端_真实面试题与备考报告_20260824.md"
   ],
   "documentationConsistency": [
@@ -661,6 +663,33 @@
       "forbiddenTokens": [
         "docs/AI质量指标与Badcase索引_20260822.md",
         "docs/AI应用求职项目证据总览.md"
+      ]
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/README.md",
+      "requiredTokens": [
+        "可复现的评测输入",
+        "人工标注的唯一正式位置",
+        "customer-service-http-v13-answer-review-adjudicated-20260824",
+        ".holdouts",
+        ".runs"
+      ],
+      "forbiddenTokens": [
+        "生产准确率",
+        "线上 CSAT"
+      ]
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/README.md",
+      "requiredTokens": [
+        "不可变评测结果与人工证据",
+        "SHA256SUMS",
+        "customer-service-http-v13-answer-review-adjudicated-20260824",
+        "capacity-readonly-v5-20260824",
+        "不替代 final"
+      ],
+      "forbiddenTokens": [
+        "线上 CSAT"
       ]
     },
     {

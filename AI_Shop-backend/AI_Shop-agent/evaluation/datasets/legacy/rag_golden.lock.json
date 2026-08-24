@@ -1,5 +1,13 @@
 {
   "schemaVersion": 1,
+  "lifecycle": "SUPERSEDED_LEGACY_DATASET",
+  "currentMainline": false,
+  "migration": {
+    "migratedAt": "2026-08-24",
+    "previousDatasetPath": "scripts/rag_golden.jsonl",
+    "previousLockPath": "scripts/rag_golden.lock.json",
+    "reason": "Catalogued with evaluation inputs; retained only for historical RAG regression diagnosis."
+  },
   "datasetSha256": "4cd581038cea0503f78a7d092d0e630fd5b874f496beba9c316d5d54d0c36a88",
   "minimumKnowledgeRelease": 5,
   "requiredFaqQuestionIds": [
@@ -12,22 +20,22 @@
   ],
   "knowledgeFiles": [
     {
-      "path": "../data/demo_knowledge/01-shopping-guide.md",
+      "path": "../../../../data/demo_knowledge/01-shopping-guide.md",
       "rawSha256": "3b33c204a901d0d22efac57ee41a88841e090ab7fd72b5c1931ab4d4968158c4",
       "normalizedSha256": "9c10a9b9d3c4f259e3a74be535766d5239cb2ac7d401904acbdea6896a8fca0c"
     },
     {
-      "path": "../data/demo_knowledge/02-orders-delivery-and-returns.md",
+      "path": "../../../../data/demo_knowledge/02-orders-delivery-and-returns.md",
       "rawSha256": "22537c01425793b763be174321ab06e808b4f56705be94077056053218d4b855",
       "normalizedSha256": "cb2e4c26ad14a22c71528acde9c2fd202edcc6d3ee3f38a890ed37e715937ed1"
     },
     {
-      "path": "../data/demo_knowledge/03-membership-and-coupons.md",
+      "path": "../../../../data/demo_knowledge/03-membership-and-coupons.md",
       "rawSha256": "36ad7168c5e08fdd4b6616d9751cf37662cec5b2545d10b92c1719007bce25fc",
       "normalizedSha256": "00dfa82593e40463c161ec6b0c37f573c99e28a0074526601c0699bf8c639ddf"
     },
     {
-      "path": "../data/demo_knowledge/04-ai-assistant-and-support.md",
+      "path": "../../../../data/demo_knowledge/04-ai-assistant-and-support.md",
       "rawSha256": "4794dcf842287f6cf3953a2dfbdbb024762169f56b6e36cca08343ec724affb4",
       "normalizedSha256": "72939fee6c4dad367ec0888f278d16c947101bac1a6c0b29b1712b5baa92b029"
     }

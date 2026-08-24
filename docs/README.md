@@ -9,6 +9,8 @@
 | [evaluation/AI质量评测与Badcase.json](evaluation/AI质量评测与Badcase.json) | Search/RAG/Agent 指标、延迟诊断、usage 状态及逐指标 badcase 的机器可读结果 | immutable scorecard 投影 |
 | [evaluation/customer-service/客服金标评测](evaluation/customer-service/客服金标评测.md) | 60 条双人盲标+第三人仲裁的 intent、风险、slot、handoff 质量证据 | `HUMAN_VERIFIED` 离线证据，仍不进入 release gate |
 | [evaluation/customer-service/客服金标评测.json](evaluation/customer-service/客服金标评测.json) | 客服评测逐 case、canonical slot 诊断和 badcase | 可复核机器证据 |
+| [评测输入资产索引](../AI_Shop-backend/AI_Shop-agent/evaluation/README.md) | 可见数据集、私有 holdout、人工标注输入、fixtures、lock 与运行生命周期分类 | 可复现输入入口 |
+| [不可变结果资产索引](../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/README.md) | current/archive、人工审查、客服 HTTP、Search/Agent/DB/fault/capacity 结果分类 | `SHA256SUMS` 证据入口 |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824/` | 历史 v1 60 条 HTTP 最终答案的双盲+第三人仲裁、CI 与 badcase | `HUMAN_REVIEWED_ADJUDICATED`；非 release gate |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/` | 修复 sourceRefs 后的 60 条真实 HTTP observation、行为契约与 usage | 原始 report 保持 `PENDING_HUMAN_REVIEW`；执行/契约不等于答案质量 |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/` | v13 sealed 双评、11 条第三人仲裁、最终指标、CI、badcase 与哈希 | `HUMAN_REVIEWED_ADJUDICATED`；冻结回放证据，非 release gate |
