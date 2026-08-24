@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -77,6 +79,70 @@ def _fill_sheet(path: Path, labels_by_id: dict[str, dict]) -> None:
         row["labels"] = labels_by_id[str(row["caseId"])]
         row["comment"] = f"reviewed {row['caseId']}"
     atomic_write_jsonl(path, rows)
+
+
+def _rehash_answer_review_evidence(package: Path) -> None:
+    """Model a coherent on-disk rewrite so semantic verification is exercised."""
+
+    for path in package.rglob("*"):
+        if path.is_file():
+            path.chmod(0o644)
+    manifest_path = package / "evidence-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    inventory = {}
+    for path in sorted(package.rglob("*")):
+        if path.is_file() and path.name not in {"SHA256SUMS", "evidence-manifest.json"}:
+            inventory[path.relative_to(package).as_posix()] = {
+                "bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+    manifest["files"] = inventory
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    rows = []
+    for path in sorted(package.rglob("*")):
+        if path.is_file() and path.name != "SHA256SUMS":
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            rows.append(f"{digest}  {path.relative_to(package).as_posix()}\n")
+    (package / "SHA256SUMS").write_text("".join(rows), encoding="utf-8")
+    for path in package.rglob("*"):
+        if path.is_file():
+            path.chmod(0o444)
+
+
+def _write_adjudicated_evidence(tmp_path: Path) -> Path:
+    left = {f"case-{index}": _labels() for index in range(1, 4)}
+    right = {f"case-{index}": _labels() for index in range(1, 4)}
+    right["case-2"] = _labels(answer=False, citation="UNSUPPORTED")
+    report, sealed_a, sealed_b = _sealed_pair(
+        tmp_path, left=left, right=right
+    )
+    agreement = compare_answer_reviews(report, sealed_a, sealed_b)
+    adjudication = tmp_path / "adjudication.jsonl"
+    export_answer_adjudication_template(agreement, adjudication)
+    rows = load_jsonl(adjudication)
+    rows[0]["adjudicator"] = "reviewer-c"
+    rows[0]["reason"] = "independent review"
+    rows[0]["finalLabels"] = _labels(answer=False, citation="UNSUPPORTED")
+    atomic_write_jsonl(adjudication, rows)
+    final_report, final_agreement = merge_answer_reviews(
+        report,
+        sealed_a,
+        sealed_b,
+        adjudication_path=adjudication,
+    )
+    evidence = tmp_path / "answer-review-evidence"
+    write_answer_review_evidence(
+        final_report,
+        final_agreement,
+        review_a_path=sealed_a,
+        review_b_path=sealed_b,
+        adjudication_path=adjudication,
+        output_dir=evidence,
+    )
+    return evidence
 
 
 def _sealed_pair(
@@ -282,3 +348,37 @@ def test_answer_review_agreement_needs_no_adjudication_file(tmp_path: Path):
     assert agreement["status"] == "AGREED_NO_ADJUDICATION"
     assert final_report["agreement"]["disagreementCaseCount"] == 0
     assert final_report["metrics"]["jointQualityPassRate"]["value"] == 1.0
+
+
+def test_answer_review_evidence_rejects_rehashed_metric_tampering(tmp_path: Path):
+    evidence = _write_adjudicated_evidence(tmp_path)
+    report_path = evidence / "final-report.json"
+    report = load_json(report_path)
+    report["metrics"]["answerCorrectness"]["value"] = 1.0
+    report_path.chmod(0o644)
+    atomic_write_json(report_path, report, overwrite=True)
+    _rehash_answer_review_evidence(evidence)
+
+    with pytest.raises(
+        CustomerServiceAnswerReviewError,
+        match="final metrics or badcases",
+    ):
+        verify_answer_review_evidence(evidence)
+
+
+def test_answer_review_evidence_rejects_rehashed_adjudication_tampering(
+    tmp_path: Path,
+):
+    evidence = _write_adjudicated_evidence(tmp_path)
+    adjudication_path = evidence / "reviews" / "adjudication.final.jsonl"
+    rows = load_jsonl(adjudication_path)
+    rows[0]["sourceRefs"] = [{"citation": "tampered"}]
+    adjudication_path.chmod(0o644)
+    atomic_write_jsonl(adjudication_path, rows, overwrite=True)
+    _rehash_answer_review_evidence(evidence)
+
+    with pytest.raises(
+        CustomerServiceAnswerReviewError,
+        match="adjudication source field sourceRefs was modified",
+    ):
+        verify_answer_review_evidence(evidence)

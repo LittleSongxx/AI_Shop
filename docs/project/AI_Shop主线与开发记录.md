@@ -87,7 +87,7 @@
 - 清理客服 HTTP 旧 v1 单人评分实现和旧空表；v2 双人盲审、封存、第三人仲裁成为唯一答案语义主线。双人封存后仍必须完成独立第三人仲裁，才可发布答案正确率、引用支持率、转人工适当率和 unsafe-answer rate。
 - 新增带 URL、抓取时间、区域、模型 fingerprint 和页面 SHA-256 的目录价估算证据：`qwen3.7-plus` 北京 ≤256K 原价输入/输出 `2/8 CNY per 1M tokens`。状态固定为 `ESTIMATED_LIST_PRICE`，不改运行时 `UNPRICED`，不启用费用门禁；真实合同/账单仍未知。
 - 相关单测、manifest checker、compileall 和 readiness 已通过；v5 比 v4 样本更大但仍是共享本机/外部 Provider 描述性诊断，不能声称严格因果或生产容量提升。
-- 客服 HTTP 最终答案的两份 60 条盲审已完整封存：四标签案件级完全一致 `52/60=0.866667`，`8` 条分歧已冻结为只读待仲裁包；answer correctness 与 citation support 的一致性分别为 `54/60`（κ `0.446154`）和 `58/60`（κ `0.942857`），handoff/unsafe 均为 `60/60`。这些是标注可靠性而非模型质量率，最终指标仍为 `PENDING_ADJUDICATION`。
+- 客服 HTTP 最终答案的 60 条双盲已由独立第三人完成 `8` 条仲裁，发布 `HUMAN_REVIEWED_ADJUDICATED` 只读包。双人四标签案件级一致 `52/60=0.866667` 是标注可靠性；最终质量为答案正确 `51/60=85.0%`（95% CI `73.9%–91.9%`）、引用语义支持 `6/30=20.0%`（`9.5%–37.3%`）、转人工适当 `60/60`、unsafe `0/60`、联合质量 `32/60=53.3%`。该结果揭示动态事实来源未绑定的主缺口，`releaseGateEligible=false`，不追溯修改 v9 final。
 
 ## 关键踩坑、排错与效果
 
@@ -99,6 +99,7 @@
 | Slot F1/CI 统计量不一致 | F1 统一为 `2TP/(2TP+FP+FN)`；bootstrap 每次按 `intent×risk×handoff` 抽完整 case 并重算统计量 | 点估计仍为 `0.907652`；展示由 `344/414` 改为 `688/758`，CI 由 `[0.884563,0.961881]` 修正为 `[0.888889,0.926454]` | 同一预测重算，不能称质量提升 |
 | HTTP 槽位跨脱敏边界评分 | Episode 已将订单号等值脱敏，无法与原始 gold 做 span 比较 | HTTP Slot F1/EM 从错误可评分假设改为 `UNAVAILABLE`；规则预路由 slot 指标单独保留 | `UNAVAILABLE` 比伪造 0/1 更可信 |
 | HTTP 引用结构出现 6 条告警 | 最终 envelope 未复制 `sourceRefs`，但 `RAG_RETRIEVAL` trace 保存了实际来源；从原 observation 离线重建 | citation contract invalid `6 -> 0`，Provider 未重跑 | 只修复引用链路提取，不等于答案语义正确 |
+| HTTP 引用结构为 0 仍可能不可信 | 双盲+第三人仲裁把“结构上有来源”与“来源足以支持具体回答”分开度量 | 引用语义支持仅 `6/30=20.0%`，联合质量 `32/60=53.3%`；24 条 citation badcase 被保留 | 不能以 60/60 执行、citation contract 0 或双人一致率包装为 grounded-answer 质量 |
 | Search 难例可能被“修指标”掩盖 | 固定 v9 qrels/ranking，真实 Provider 对 10 条难例做 paired replay | Recall/MRR/NDCG delta 全为 `0`，约束违规 `0`；`23/34/47` 仍失败 | 结论是无回归，不是质量提升 |
 | 候选快照存在 N+1 风险 | 同一隔离 MySQL、同一 `100` 候选比较 batch/N+1，并校验结果等价与 rollback | offer P50 `89.805 -> 23.864 ms`，降低 `73.4%`；decision P50 `70.501 -> 2.405 ms`，降低 `96.6%`；round trip `100 -> 1` | 本地受控 benchmark，不是生产 SLO |
 | Provider usage/费用容易被记成零 | usage 缺失记 `MISSING_USAGE`，无可信价格记 `UNPRICED`，费用保持 `null` | 消除“未知成本=0”的错误结论 | 尚不能给出单请求成本门禁 |
@@ -116,7 +117,7 @@
 | 生成式导购 | 适合作为受控解释/澄清层 | 候选和交易事实不交给 LLM 生成；没有行为序列、ranker、A/B，不能称工业个性化推荐 |
 | 可信 RAG | 工程路径成熟 | 版本/注入隔离、最小证据、引用、拒答；当前 lexical 指标不是人工语义真值 |
 | 业务 Agent | 可靠执行边界清晰 | 确认后 Java 写入、幂等、未知结果和终态校验；客服理解已有 60 条 HUMAN_VERIFIED 离线金标 |
-| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标、容量诊断和 fail-closed；仍缺真实行为、最终仲裁后的 HTTP 答案金标和生产压测 |
+| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标、HTTP 答案第三人仲裁、容量诊断和 fail-closed；仍缺真实行为、引用修复后的新 holdout 与生产压测 |
 
 与传统搜索和前沿生成式搜推的取舍：型号、数字、品牌、否定词必须保留倒排/结构化硬约束；向量用于同义泛化；LLM 只在候选集内做
 澄清、比较和 grounded explanation。直接让 LLM 生成商品 ID 会把幻觉、库存和报价时变性带入交易边界，不适合当前项目。
@@ -129,10 +130,10 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 ## 当前边界与下一步
 
 - 客服 gold 当前主线为 `HUMAN_VERIFIED`；release gate 仍显式关闭，避免把离线人工金标误写成线上成功率。
-- 由独立第三人完成客服 HTTP 答案的 `8` 条分歧仲裁，再报答案正确率、引用支持率、转人工适当性和 unsafe-answer rate。
+- 优先修复客服 HTTP 的动态事实来源绑定与政策-动作引用边界；使用新预注册 holdout 再做双盲+仲裁，不能改写当前 60 条或只报告同集优化。
 - 完成 v2 新增 60 条的双人盲标/仲裁后，生成 120 条 HUMAN_VERIFIED v2 并重算分层 CI；当前 draft 不可报分。
 - 每次修改都要保留指标级 badcase、输入/gold/prediction、根因和新旧数据集哈希；Search hard negative 继续只做 paired replay，不改标签刷分。
 - Search 成对回放基线已固定；后续只针对 `23/34/47` 做 query decomposition/对象保留的可见集 A/B，不能改标签或重刷 final 制造提升。
 - 当前容量曲线只证明本地短时只读诊断可运行；固定独占环境的 warm-up、steady-state、stress/soak 和 Provider 分层完成前，不新增生产 SLO 结论。
 - 当前真实账单价格和 endpoint 合同仍未核验；目录价估算仅用于面试中的成本量级说明，不能写成实际单请求成本。
-- 真实曝光/点击/购买、最终 HTTP 答案仲裁和授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论。
+- 真实曝光/点击/购买、授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论；HTTP 答案已有人审基线，但当前引用支持不足以支撑“可信生成客服”主张。

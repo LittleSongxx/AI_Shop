@@ -1629,6 +1629,15 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
 
 
 def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
+    """Verify an adjudicated package from its sealed inputs, not just its hashes.
+
+    ``SHA256SUMS`` protects a published package from accidental edits.  The
+    checks below additionally make a coherently re-hashed package fail closed:
+    the final labels must be derived from the two sealed sheets plus any
+    independent adjudication, and the reported metrics/badcases must be a
+    deterministic score of those final labels.
+    """
+
     root = root.resolve()
     manifest_path = root / "evidence-manifest.json"
     sums_path = root / "SHA256SUMS"
@@ -1649,11 +1658,27 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
                 "answer-review inventory escapes package"
             ) from exc
         expected[name] = digest
+    base_required = {
+        "agreement.json",
+        "agreement.md",
+        "badcases.jsonl",
+        "evidence-manifest.json",
+        "final-report.json",
+        "final-report.md",
+        "reviews/reviewer-a.sealed.jsonl",
+        "reviews/reviewer-a.sealed.jsonl.manifest.json",
+        "reviews/reviewer-b.sealed.jsonl",
+        "reviews/reviewer-b.sealed.jsonl.manifest.json",
+    }
     actual = {
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
         if path.is_file() and path.name != "SHA256SUMS"
     }
+    if not base_required.issubset(actual):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review evidence is missing required files"
+        )
     if set(expected) != actual:
         raise CustomerServiceAnswerReviewError(
             "answer-review evidence file set differs from SHA256SUMS"
@@ -1673,7 +1698,36 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     if agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA:
         raise CustomerServiceAnswerReviewError("answer-review agreement schema is invalid")
     if (
+        manifest.get("kind") != "customer-service-answer-human-review"
+        or manifest.get("status") != "HUMAN_REVIEWED_ADJUDICATED"
+        or manifest.get("selfJudged") is not False
+        or manifest.get("releaseGateEligible") is not False
+        or final_report.get("status") != "HUMAN_REVIEWED_ADJUDICATED"
+        or final_report.get("selfJudged") is not False
+        or final_report.get("releaseGateEligible") is not False
+        or agreement.get("releaseGateEligible") is not False
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review evidence lifecycle is invalid"
+        )
+    disagreement_count = int(agreement.get("disagreementCaseCount") or 0)
+    expected_agreement_status = (
+        "PENDING_ADJUDICATION" if disagreement_count else "AGREED_NO_ADJUDICATION"
+    )
+    if agreement.get("status") != expected_agreement_status:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review agreement lifecycle is invalid"
+        )
+    required = set(base_required)
+    if disagreement_count:
+        required.add("reviews/adjudication.final.jsonl")
+    if actual != required:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review evidence file set does not match adjudication lifecycle"
+        )
+    if (
         manifest.get("sourceRunId") != final_report.get("sourceRunId")
+        or manifest.get("sourceReportPath") != final_report.get("sourceReportPath")
         or manifest.get("sourceReportSha256")
         != final_report.get("sourceReportSha256")
         or manifest.get("caseCount") != final_report.get("caseCount")
@@ -1684,6 +1738,297 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     if manifest.get("files") != _inventory(root):
         raise CustomerServiceAnswerReviewError(
             "answer-review evidence manifest inventory is stale"
+        )
+
+    source_run_id = str(final_report.get("sourceRunId") or "")
+    source_report_sha = str(final_report.get("sourceReportSha256") or "")
+    case_count = int(final_report.get("caseCount") or -1)
+    if not source_run_id or not source_report_sha or case_count <= 0:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review final report source binding is invalid"
+        )
+    for field in ("sourceRunId", "sourceReportPath", "sourceReportSha256", "caseCount"):
+        if agreement.get(field) != final_report.get(field):
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review agreement differs from final report: {field}"
+            )
+
+    review_paths = {
+        "reviewA": root / "reviews" / "reviewer-a.sealed.jsonl",
+        "reviewB": root / "reviews" / "reviewer-b.sealed.jsonl",
+    }
+    review_rows: dict[str, dict[str, dict[str, Any]]] = {}
+    reviewer_ids: dict[str, str] = {}
+    sources: dict[str, dict[str, Any]] = {}
+    for key, path in review_paths.items():
+        sidecar = _sidecar_path(path)
+        sheet_manifest = load_json(sidecar)
+        rows = load_jsonl(path)
+        sheet_hash = sha256_file(path)
+        reviewer_id = str(sheet_manifest.get("reviewerId") or "")
+        if (
+            sheet_manifest.get("schemaVersion") != ANSWER_REVIEW_SCHEMA
+            or sheet_manifest.get("artifact") != "SEALED_ANSWER_REVIEW_SHEET"
+            or sheet_manifest.get("lifecycle") != "SEALED"
+            or not reviewer_id
+            or sheet_manifest.get("sheetSha256") != sheet_hash
+            or sheet_manifest.get("sourceRunId") != source_run_id
+            or sheet_manifest.get("sourceReportSha256") != source_report_sha
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review {key} sealed sheet binding is invalid"
+            )
+        agreement_review = agreement.get(key) or {}
+        if (
+            not isinstance(agreement_review, Mapping)
+            or agreement_review.get("reviewerId") != reviewer_id
+            or agreement_review.get("sha256") != sheet_hash
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review {key} agreement binding is invalid"
+            )
+        expected_manifest_hash = manifest.get(
+            "reviewASha256" if key == "reviewA" else "reviewBSha256"
+        )
+        if expected_manifest_hash != sheet_hash:
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review {key} evidence manifest hash is invalid"
+            )
+        by_id: dict[str, dict[str, Any]] = {}
+        for index, row in enumerate(rows, 1):
+            label = f"answer-review {key} row {index}"
+            if not isinstance(row, Mapping) or set(row) != _ROW_FIELDS:
+                raise CustomerServiceAnswerReviewError(f"{label} schema is invalid")
+            case_id = str(row.get("caseId") or "")
+            if not case_id or case_id in by_id:
+                raise CustomerServiceAnswerReviewError(f"{label} caseId is invalid")
+            if (
+                row.get("schemaVersion") != ANSWER_REVIEW_SCHEMA
+                or row.get("reviewerId") != reviewer_id
+                or row.get("guidelinesVersion") != ANSWER_REVIEW_GUIDELINES_VERSION
+                or row.get("sourceRunId") != source_run_id
+                or row.get("sourceReportSha256") != source_report_sha
+                or not isinstance(row.get("comment"), str)
+            ):
+                raise CustomerServiceAnswerReviewError(f"{label} source binding is invalid")
+            labels = _validate_labels(
+                row.get("labels"), label=f"{label}.labels", require_complete=True
+            )
+            normalized = dict(row)
+            normalized["labels"] = labels
+            by_id[case_id] = normalized
+            if key == "reviewA":
+                sources[case_id] = {
+                    "caseId": case_id,
+                    "sourceRunId": source_run_id,
+                    "sourceReportSha256": source_report_sha,
+                    "message": row.get("message"),
+                    "answer": row.get("answer") or "",
+                    "sourceRefs": copy.deepcopy(row.get("sourceRefs") or []),
+                    "observedHandoff": bool(row.get("observedHandoff")),
+                }
+        if len(by_id) != case_count:
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review {key} case count is invalid"
+            )
+        review_rows[key] = by_id
+        reviewer_ids[key] = reviewer_id
+    if reviewer_ids.get("reviewA") == reviewer_ids.get("reviewB"):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review reviewers are not independent"
+        )
+    if set(review_rows["reviewA"]) != set(review_rows["reviewB"]):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review sealed sheets cover different cases"
+        )
+    for case_id, source in sources.items():
+        row = review_rows["reviewB"][case_id]
+        for field in ("message", "answer", "sourceRefs", "observedHandoff"):
+            if _canonical(row.get(field)) != _canonical(source.get(field)):
+                raise CustomerServiceAnswerReviewError(
+                    f"answer-review sealed source differs for {case_id}: {field}"
+                )
+
+    expected_disagreements: dict[str, dict[str, Any]] = {}
+    field_values: dict[str, tuple[list[Any], list[Any]]] = {
+        field: ([], []) for field in _LABEL_FIELDS
+    }
+    for case_id, source in sources.items():
+        left = review_rows["reviewA"][case_id]
+        right = review_rows["reviewB"][case_id]
+        fields: list[str] = []
+        for field in _LABEL_FIELDS:
+            field_values[field][0].append(left["labels"][field])
+            field_values[field][1].append(right["labels"][field])
+            if _canonical(left["labels"][field]) != _canonical(right["labels"][field]):
+                fields.append(field)
+        if fields:
+            expected_disagreements[case_id] = {
+                **copy.deepcopy(source),
+                "fields": fields,
+                "reviewerA": {
+                    "reviewerId": reviewer_ids["reviewA"],
+                    "labels": copy.deepcopy(left["labels"]),
+                    "comment": left["comment"],
+                },
+                "reviewerB": {
+                    "reviewerId": reviewer_ids["reviewB"],
+                    "labels": copy.deepcopy(right["labels"]),
+                    "comment": right["comment"],
+                },
+            }
+    agreement_disagreements = {
+        str(item.get("caseId") or ""): item
+        for item in agreement.get("disagreements") or []
+        if isinstance(item, Mapping)
+    }
+    if (
+        len(agreement_disagreements) != disagreement_count
+        or set(agreement_disagreements) != set(expected_disagreements)
+        or any(
+            _canonical(agreement_disagreements[case_id])
+            != _canonical(expected_disagreements[case_id])
+            for case_id in expected_disagreements
+        )
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review agreement disagreements are invalid"
+        )
+    expected_field_stats = {
+        field: _categorical_agreement(*field_values[field]) for field in _LABEL_FIELDS
+    }
+    exact_count = case_count - len(expected_disagreements)
+    if (
+        agreement.get("caseCount") != case_count
+        or agreement.get("exactAgreementCaseCount") != exact_count
+        or agreement.get("disagreementCaseCount") != len(expected_disagreements)
+        or agreement.get("caseAgreementRate") != round(exact_count / case_count, 6)
+        or _canonical(agreement.get("fieldStats")) != _canonical(expected_field_stats)
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review agreement metrics are invalid"
+        )
+
+    adjudications: dict[str, dict[str, Any]] = {}
+    adjudication_path = root / "reviews" / "adjudication.final.jsonl"
+    if expected_disagreements:
+        adjudications = _load_adjudications(adjudication_path, agreement=agreement)
+        if manifest.get("adjudicationSha256") != sha256_file(adjudication_path):
+            raise CustomerServiceAnswerReviewError(
+                "answer-review adjudication hash is invalid"
+            )
+    elif manifest.get("adjudicationSha256") is not None:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review has an unexpected adjudication hash"
+        )
+
+    final_cases = final_report.get("cases")
+    if not isinstance(final_cases, list) or len(final_cases) != case_count:
+        raise CustomerServiceAnswerReviewError("answer-review final cases are invalid")
+    final_by_id: dict[str, Mapping[str, Any]] = {}
+    labels_by_id: dict[str, dict[str, Any]] = {}
+    comments_by_id: dict[str, str] = {}
+    expected_case_fields = {
+        "caseId",
+        "labels",
+        "labelSource",
+        "adjudicator",
+        "comment",
+        "answerSha256",
+    }
+    for index, final_case in enumerate(final_cases, 1):
+        if not isinstance(final_case, Mapping) or set(final_case) != expected_case_fields:
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review final case {index} schema is invalid"
+            )
+        case_id = str(final_case.get("caseId") or "")
+        if case_id not in sources or case_id in final_by_id:
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review final case {index} caseId is invalid"
+            )
+        labels = _validate_labels(
+            final_case.get("labels"),
+            label=f"answer-review final case {index}.labels",
+            require_complete=True,
+        )
+        source = sources[case_id]
+        if final_case.get("answerSha256") != sha256_bytes(
+            str(source.get("answer") or "").encode("utf-8")
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review final case {case_id} answer hash is invalid"
+            )
+        if case_id in adjudications:
+            expected_labels = adjudications[case_id]["labels"]
+            expected_source = "ADJUDICATED"
+            expected_adjudicator = adjudications[case_id]["adjudicator"]
+            expected_comment = adjudications[case_id]["reason"]
+        else:
+            left = review_rows["reviewA"][case_id]
+            right = review_rows["reviewB"][case_id]
+            if _canonical(left["labels"]) != _canonical(right["labels"]):
+                raise CustomerServiceAnswerReviewError(
+                    f"answer-review final case {case_id} lacks adjudication"
+                )
+            expected_labels = left["labels"]
+            expected_source = "REVIEWER_AGREEMENT"
+            expected_adjudicator = None
+            expected_comment = " | ".join(
+                value for value in (left["comment"], right["comment"]) if value
+            )
+        if (
+            _canonical(labels) != _canonical(expected_labels)
+            or final_case.get("labelSource") != expected_source
+            or final_case.get("adjudicator") != expected_adjudicator
+            or final_case.get("comment") != expected_comment
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"answer-review final case {case_id} decision is invalid"
+            )
+        final_by_id[case_id] = final_case
+        labels_by_id[case_id] = labels
+        comments_by_id[case_id] = expected_comment
+    if set(final_by_id) != set(sources):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review final case coverage is invalid"
+        )
+    # The two blind sheets have independent randomized orders.  The final
+    # report retains the source-report order, which is also the stable order
+    # for badcase IDs, so score against that declared order rather than a
+    # reviewer-specific ordering.
+    ordered_sources = {
+        str(final_case["caseId"]): sources[str(final_case["caseId"])]
+        for final_case in final_cases
+    }
+    expected_metrics, expected_badcases = _score_final_labels(
+        ordered_sources, labels_by_id, comments_by_id
+    )
+    expected_final_agreement = {
+        "exactAgreementCaseCount": exact_count,
+        "disagreementCaseCount": len(expected_disagreements),
+        "caseAgreementRate": round(exact_count / case_count, 6),
+        "fieldStats": expected_field_stats,
+    }
+    if (
+        _canonical(final_report.get("agreement")) != _canonical(expected_final_agreement)
+        or _canonical(final_report.get("metrics")) != _canonical(expected_metrics)
+        or _canonical(final_report.get("badcases")) != _canonical(expected_badcases)
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review final metrics or badcases are inconsistent with labels"
+        )
+    review_evidence = final_report.get("reviewEvidence")
+    if (
+        not isinstance(review_evidence, Mapping)
+        or _canonical(review_evidence.get("reviewA"))
+        != _canonical(agreement.get("reviewA"))
+        or _canonical(review_evidence.get("reviewB"))
+        != _canonical(agreement.get("reviewB"))
+        or review_evidence.get("adjudicationSha256") != manifest.get("adjudicationSha256")
+        or review_evidence.get("guidelinesVersion") != ANSWER_REVIEW_GUIDELINES_VERSION
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review final review evidence is invalid"
         )
     writable = [
         path.relative_to(root).as_posix()

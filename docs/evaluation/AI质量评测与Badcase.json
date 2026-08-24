@@ -1752,7 +1752,7 @@
     },
     "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "adjudicatedCases": 25},
     "httpFullPath": {
-      "status": "EXECUTED_PENDING_ADJUDICATION",
+      "status": "EXECUTED_HUMAN_REVIEWED_ADJUDICATED",
       "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823",
       "sha256SumsSha256": "197bfa7edce9eb897dd6c60e869b1c11d601d42f141810362c7ea8d6b6df159b",
       "execution": "60/60",
@@ -1760,9 +1760,21 @@
       "handoffConfusion": {"truePositive": 14, "falsePositive": 0, "falseNegative": 0, "trueNegative": 46},
       "citationContractInvalidCases": 0,
       "httpSlotMetrics": "UNAVAILABLE_REDACTED_EPISODE_VALUES",
-      "answerQuality": "PENDING_ADJUDICATION",
+      "answerQuality": {
+        "status": "HUMAN_REVIEWED_ADJUDICATED",
+        "releaseGateEligible": false,
+        "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824",
+        "sha256SumsSha256": "9180969093bfbf79cafc7e3c779cf0b840e985f635f3e1480c608d19df548816",
+        "metrics": {
+          "answerCorrectness": {"value": 0.85, "numerator": 51, "denominator": 60, "confidenceInterval95": {"lower": 0.738854, "upper": 0.919026, "method": "wilson"}, "badcaseIds": ["cs-gold-v1-003", "cs-gold-v1-012", "cs-gold-v1-027", "cs-gold-v1-029", "cs-gold-v1-033", "cs-gold-v1-041", "cs-gold-v1-044", "cs-gold-v1-045", "cs-gold-v1-059"]},
+          "citationGroundingSupport": {"value": 0.2, "numerator": 6, "denominator": 30, "confidenceInterval95": {"lower": 0.095051, "upper": 0.373057, "method": "wilson"}, "badcaseCount": 24},
+          "handoffAppropriateness": {"value": 1.0, "numerator": 60, "denominator": 60, "confidenceInterval95": {"lower": 0.939828, "upper": 1.0, "method": "wilson"}},
+          "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 60, "confidenceInterval95": {"lower": 0.0, "upper": 0.060172, "method": "wilson"}},
+          "jointQualityPassRate": {"value": 0.533333, "numerator": 32, "denominator": 60, "confidenceInterval95": {"lower": 0.408934, "upper": 0.653721, "method": "wilson"}, "badcaseCount": 28}
+        }
+      },
       "answerReviewAgreement": {
-        "status": "PENDING_ADJUDICATION",
+        "status": "HUMAN_REVIEWED_ADJUDICATED",
         "caseCount": 60,
         "exactAgreementCaseCount": 52,
         "disagreementCaseCount": 8,
@@ -1773,8 +1785,9 @@
           "handoffAppropriate": {"agreementCount": 60, "cohenKappa": null},
           "unsafeAnswer": {"agreementCount": 60, "cohenKappa": null}
         },
-        "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824",
-        "finalMetricsAvailable": false
+        "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824",
+        "finalEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824",
+        "finalMetricsAvailable": true
       },
       "localLatencyMs": {"p50": 1014.106, "p95": 15212.514, "p99": 60141.617},
       "usage": {"inputTokens": 114720, "outputTokens": 6649, "providerCalls": 32, "unpricedCalls": 31, "missingUsageCalls": 1, "costCny": null, "costStatus": "MISSING_USAGE"}
@@ -1801,7 +1814,8 @@
     },
     "limitations": [
       "slot F1/EM is measured on resolve_intent(..., allow_llm=false); HTTP Episode slot values are redacted and are not scored",
-      "two blinded HTTP answer reviews are sealed; 8 disagreements require third-person adjudication before final quality metrics are available",
+      "HTTP answer quality is a fixed 60-case replay with 8 third-person adjudications; it is not CSAT/FCR, online success, or a retroactive release gate",
+      "citation grounding support is 6/30 eligible cases, so the current generated answer path is not a reliable grounded-answer capability",
       "offline understanding evidence does not establish online success rate, CSAT, FCR, or release quality gate"
     ]
   },

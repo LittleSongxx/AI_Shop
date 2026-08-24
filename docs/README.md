@@ -9,6 +9,7 @@
 | [evaluation/AI质量评测与Badcase.json](evaluation/AI质量评测与Badcase.json) | Search/RAG/Agent 指标、延迟诊断、usage 状态及逐指标 badcase 的机器可读结果 | immutable scorecard 投影 |
 | [evaluation/customer-service/客服金标评测](evaluation/customer-service/客服金标评测.md) | 60 条双人盲标+第三人仲裁的 intent、风险、slot、handoff 质量证据 | `HUMAN_VERIFIED` 离线证据，仍不进入 release gate |
 | [evaluation/customer-service/客服金标评测.json](evaluation/customer-service/客服金标评测.json) | 客服评测逐 case、canonical slot 诊断和 badcase | 可复核机器证据 |
+| `evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824/` | 60 条 HTTP 最终答案的双盲+第三人仲裁、CI 与 badcase | `HUMAN_REVIEWED_ADJUDICATED`；非 release gate |
 | [evidence-manifest.json](evidence-manifest.json) | current、archive、visible run、哈希和生命周期机器索引 | 机器校验入口 |
 
 项目根目录的 [Java 后端面试报告](../AI应用开发_Java后端_真实面试题与备考报告_20260821.md) 是独立的求职研究材料，不与项目开发日志重复合并。
@@ -46,7 +47,10 @@ python -m evaluation.cli customer-service-http rebuild --source-report <raw-repo
 `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/`；
 不得把规则基线、模型自评或 `pass^k` 当成线上成功率；当前 scorecard 同步引用 60 条 HUMAN_VERIFIED 客服 gold，但 `releaseGateEligible=false`，后续标签修订必须生成新版本。
 
-同一 60 条的正式 HTTP Agent 路径证据位于 `customer-service-http-v1-20260823/`；答案双人盲审已封存为 `PENDING_ADJUDICATION`，案件级完全一致 `52/60`、待第三人仲裁 `8`。这只是标注一致性，最终答案语义质量指标仍不可发布。
+同一 60 条的正式 HTTP Agent 路径证据位于 `customer-service-http-v1-20260823/`；最终答案已由双人盲审和 `8` 条独立第三人仲裁封存为
+`HUMAN_REVIEWED_ADJUDICATED`。案件级双人完全一致 `52/60` 是标注可靠性；最终质量为答案正确率 `51/60=85.0%`、引用语义支持
+`6/30=20.0%`、转人工适当率 `60/60`、unsafe-answer `0/60`、联合通过 `32/60=53.3%`。该包是固定 HTTP 回放的人工证据，
+`releaseGateEligible=false`，不能外推为 CSAT/FCR 或线上客服成功率；引用支持缺口必须在新预注册 holdout 上修复和复验。
 新增 60 条 v2 数据及两份盲标表位于 `evaluation/datasets/customer_service/`，状态为 draft；仲裁前不与 v1 合并。Search 10 条难例回放位于
 `evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823/`，只用于已知难例回归和优化对照，不替代 v9 final。
 

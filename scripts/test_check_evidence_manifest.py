@@ -181,7 +181,7 @@ def test_current_customer_service_report_is_human_verified_but_release_fail_clos
     assert "historicalDraft" not in descriptor
 
 
-def test_pending_http_answer_review_requires_the_frozen_agreement_summary() -> None:
+def test_adjudicated_http_answer_review_requires_its_frozen_parent_and_metrics() -> None:
     root = Path(__file__).parents[1]
     manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
     descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReview"])
@@ -195,6 +195,22 @@ def test_pending_http_answer_review_requires_the_frozen_agreement_summary() -> N
     _validate_customer_service_answer_review(root, descriptor, errors)
 
     assert any("agreement summary differs" in error for error in errors)
+
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReview"])
+    descriptor["finalEvidence"]["adjudicationCaseCount"] = 7
+    errors = []
+    _validate_customer_service_answer_review(root, descriptor, errors)
+
+    assert any("adjudication coverage/hash is invalid" in error for error in errors)
+
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReview"])
+    descriptor["finalEvidence"]["metrics"]["citationGroundingSupport"][
+        "numerator"
+    ] = 7
+    errors = []
+    _validate_customer_service_answer_review(root, descriptor, errors)
+
+    assert any("metric is invalid: citationGroundingSupport" in error for error in errors)
 
 
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:
