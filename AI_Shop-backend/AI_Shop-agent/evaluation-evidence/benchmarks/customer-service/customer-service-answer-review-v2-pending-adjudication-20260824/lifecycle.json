@@ -1,0 +1,23 @@
+{
+  "adjudicationTemplatePath": "adjudication.template.jsonl",
+  "adjudicationTemplateSha256AtExport": "86967b0d8375dd87ec6a001a57c92114d08fd52ffac36cbb4e7427ea4de7c16c",
+  "artifact": "CUSTOMER_SERVICE_ANSWER_REVIEW",
+  "caseCount": 60,
+  "createdAt": "2026-08-24T01:48:14.135Z",
+  "disagreementCaseCount": 8,
+  "exactAgreementCaseCount": 52,
+  "lifecycle": "PENDING_ADJUDICATION",
+  "note": "This is inter-rater reliability evidence only. Final answer-quality metrics remain unavailable until an independent third reviewer adjudicates every disagreement.",
+  "releaseGateEligible": false,
+  "reviewerASha256": "36e813a69703e59eef9b5f81453d2e1d7aadc42a86a8faf07ec8c9dd79976e1a",
+  "reviewerBSha256": "088b0e80b27bc536b53d6b54de9b38bc4bfd4b969ca7a184d6bd25748bbd0e3c",
+  "reviewers": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "schemaVersion": "aishop-customer-service-answer-review-pending-lifecycle/v1",
+  "selfJudged": false,
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/report.json",
+  "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+  "sourceRunId": "customer-service-http-v1-20260823"
+}

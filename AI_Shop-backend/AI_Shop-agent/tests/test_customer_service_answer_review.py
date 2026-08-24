@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from evaluation.core.io import atomic_write_json, atomic_write_jsonl, load_jsonl
+from evaluation.core.io import atomic_write_json, atomic_write_jsonl, load_json, load_jsonl
 from evaluation.customer_service_answer_review import (
     ANSWER_REVIEW_ADJUDICATION_SCHEMA,
     ANSWER_REVIEW_REPORT_SCHEMA,
@@ -16,7 +16,9 @@ from evaluation.customer_service_answer_review import (
     seal_answer_review_sheet,
     validate_answer_review_sheet,
     verify_answer_review_evidence,
+    verify_pending_answer_review_evidence,
     write_answer_review_evidence,
+    write_pending_answer_review_evidence,
 )
 from evaluation.customer_service_http import HTTP_REPORT_SCHEMA
 
@@ -223,6 +225,54 @@ def test_answer_review_merge_fails_closed_without_independent_adjudication(
             sealed_a,
             sealed_b,
             adjudication_path=adjudication,
+        )
+
+
+def test_pending_answer_review_evidence_freezes_dual_reviews_and_exports_input(
+    tmp_path: Path,
+):
+    left = {f"case-{index}": _labels() for index in range(1, 4)}
+    right = {f"case-{index}": _labels() for index in range(1, 4)}
+    right["case-2"] = _labels(answer=False, citation="UNSUPPORTED")
+    report, sealed_a, sealed_b = _sealed_pair(
+        tmp_path, left=left, right=right
+    )
+    agreement = compare_answer_reviews(report, sealed_a, sealed_b)
+    package = tmp_path / "pending-answer-review"
+    editable = tmp_path / "adjudication.answer-review-v2.open.jsonl"
+
+    verification = write_pending_answer_review_evidence(
+        report,
+        agreement,
+        review_a_path=sealed_a,
+        review_b_path=sealed_b,
+        output_dir=package,
+        adjudication_output=editable,
+    )
+
+    assert verification["verified"] is True
+    assert verification["disagreementCaseCount"] == 1
+    assert verification["editableAdjudication"]["path"].endswith(
+        "adjudication.answer-review-v2.open.jsonl"
+    )
+    assert verify_pending_answer_review_evidence(package)["caseCount"] == 3
+    assert len(load_jsonl(editable)) == 1
+    assert not (package / "adjudication-needed.md").read_bytes().endswith(b"\n\n")
+    frozen_agreement = load_json(package / "agreement.json")
+    assert frozen_agreement["reviewA"]["path"] == "reviews/reviewer-a.sealed.jsonl"
+    assert frozen_agreement["reviewB"]["path"] == "reviews/reviewer-b.sealed.jsonl"
+    assert all(
+        not path.stat().st_mode & 0o222
+        for path in package.rglob("*")
+        if path.is_file()
+    )
+    with pytest.raises(FileExistsError):
+        write_pending_answer_review_evidence(
+            report,
+            agreement,
+            review_a_path=sealed_a,
+            review_b_path=sealed_b,
+            output_dir=package,
         )
 
 

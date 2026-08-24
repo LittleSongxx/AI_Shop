@@ -24,7 +24,7 @@
   "reviewerId": "reviewer-b",
   "schemaVersion": "aishop-customer-service-answer-review/v2",
   "sheetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v2/reviewer-b.open.jsonl",
-  "sheetSha256": "7e4a8826bec10b06054c30b12e546b75504bbf98f88b81d56587052b64c3f09d",
+  "sheetSha256": "088b0e80b27bc536b53d6b54de9b38bc4bfd4b969ca7a184d6bd25748bbd0e3c",
   "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/report.json",
   "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
   "sourceRunId": "customer-service-http-v1-20260823"

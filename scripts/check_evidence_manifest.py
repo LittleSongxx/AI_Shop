@@ -1584,22 +1584,290 @@ def _validate_customer_service_candidate(
         errors.append(f"{label}.reviewSheets must bind reviewer-a and reviewer-b")
 
 
+def _validate_pending_customer_service_answer_review(
+    root: Path,
+    descriptor: dict[str, Any],
+    report: dict[str, Any],
+    report_ids: set[str],
+    errors: list[str],
+) -> None:
+    """Validate frozen dual review evidence before third-person adjudication."""
+
+    label = "evaluation.customerServiceAnswerReview.pendingEvidence"
+    pending = descriptor.get("pendingEvidence")
+    if not isinstance(pending, dict):
+        errors.append(f"{label} must be an object")
+        return
+    relative = str(pending.get("path") or "")
+    try:
+        package_root = _resolve(root, relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not package_root.is_dir():
+        errors.append(f"{label} directory is missing: {relative}")
+        return
+    sums = _parse_sums(package_root, errors)
+    sums_path = package_root / "SHA256SUMS"
+    expected_sums = str(pending.get("sha256SumsSha256") or "")
+    if (
+        not HEX64.fullmatch(expected_sums)
+        or not sums_path.is_file()
+        or _sha256(sums_path) != expected_sums
+    ):
+        errors.append(f"{label} SHA256SUMS digest differs from project manifest")
+    required = {
+        "adjudication-needed.md",
+        "adjudication.template.jsonl",
+        "agreement.json",
+        "agreement.md",
+        "evidence-manifest.json",
+        "lifecycle.json",
+        "reviews/reviewer-a.sealed.jsonl",
+        "reviews/reviewer-a.sealed.jsonl.manifest.json",
+        "reviews/reviewer-b.sealed.jsonl",
+        "reviews/reviewer-b.sealed.jsonl.manifest.json",
+    }
+    if set(sums) != required:
+        errors.append(f"{label} file inventory is invalid")
+        return
+    try:
+        package = _json(package_root / "evidence-manifest.json")
+        lifecycle = _json(package_root / "lifecycle.json")
+        agreement = _json(package_root / "agreement.json")
+        template_rows = _jsonl(package_root / "adjudication.template.jsonl")
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        errors.append(f"{label} payload is invalid: {exc}")
+        return
+    if (
+        package.get("schemaVersion")
+        != "aishop-customer-service-answer-review-pending-evidence/v1"
+        or package.get("status") != "PENDING_ADJUDICATION"
+        or package.get("releaseGateEligible") is not False
+        or package.get("selfJudged") is not False
+    ):
+        errors.append(f"{label} package lifecycle is invalid")
+    if (
+        lifecycle.get("schemaVersion")
+        != "aishop-customer-service-answer-review-pending-lifecycle/v1"
+        or lifecycle.get("lifecycle") != "PENDING_ADJUDICATION"
+        or lifecycle.get("releaseGateEligible") is not False
+        or lifecycle.get("selfJudged") is not False
+    ):
+        errors.append(f"{label} lifecycle record is invalid")
+    if (
+        agreement.get("schemaVersion")
+        != "aishop-customer-service-answer-review-agreement/v1"
+        or agreement.get("status") != "PENDING_ADJUDICATION"
+        or agreement.get("releaseGateEligible") is not False
+    ):
+        errors.append(f"{label} agreement lifecycle is invalid")
+    for field in ("sourceRunId", "sourceReportPath", "sourceReportSha256", "caseCount"):
+        if (
+            package.get(field) != descriptor.get(field)
+            or lifecycle.get(field) != descriptor.get(field)
+            or agreement.get(field) != descriptor.get(field)
+        ):
+            errors.append(f"{label} source field differs: {field}")
+    if (
+        pending.get("exactAgreementCaseCount")
+        != agreement.get("exactAgreementCaseCount")
+        or pending.get("disagreementCaseCount")
+        != agreement.get("disagreementCaseCount")
+        or pending.get("caseAgreementRate") != agreement.get("caseAgreementRate")
+    ):
+        errors.append(f"{label} agreement summary differs from project manifest")
+    inventory = {
+        name: {
+            "bytes": (package_root / name).stat().st_size,
+            "sha256": _sha256(package_root / name),
+        }
+        for name in sums
+        if name != "evidence-manifest.json"
+    }
+    if package.get("files") != inventory:
+        errors.append(f"{label} package file inventory is stale")
+
+    source_by_id: dict[str, dict[str, Any]] = {}
+    for source_case in report.get("cases") or []:
+        if not isinstance(source_case, dict):
+            continue
+        case_id = str(source_case.get("caseId") or "")
+        http = source_case.get("http") if isinstance(source_case.get("http"), dict) else {}
+        source_by_id[case_id] = {
+            "message": source_case.get("message"),
+            "answer": http.get("answer") or "",
+            "sourceRefs": http.get("sourceRefs") or [],
+            "observedHandoff": bool(http.get("handoffObserved")),
+        }
+    expected_label_keys = {
+        "answerCorrect",
+        "citationSupport",
+        "handoffAppropriate",
+        "unsafeAnswer",
+    }
+    expected_row_fields = {
+        "schemaVersion",
+        "caseId",
+        "reviewerId",
+        "guidelinesVersion",
+        "sourceRunId",
+        "sourceReportSha256",
+        "message",
+        "answer",
+        "sourceRefs",
+        "observedHandoff",
+        "labels",
+        "comment",
+    }
+    reviewer_ids: list[str] = []
+    for key, filename, agreement_key in (
+        ("reviewerA", "reviewer-a.sealed.jsonl", "reviewA"),
+        ("reviewerB", "reviewer-b.sealed.jsonl", "reviewB"),
+    ):
+        sheet_path = package_root / "reviews" / filename
+        sheet_manifest_path = sheet_path.with_suffix(sheet_path.suffix + ".manifest.json")
+        try:
+            rows = _jsonl(sheet_path)
+            sheet_manifest = _json(sheet_manifest_path)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            errors.append(f"{label} {key} sheet is invalid: {exc}")
+            continue
+        reviewer = str((package.get("reviewers") or {}).get(key, {}).get("reviewerId") or "")
+        reviewer_ids.append(reviewer)
+        expected_sha = _sha256(sheet_path)
+        if (
+            (package.get("reviewers") or {}).get(key, {}).get("sealedPath")
+            != f"reviews/{filename}"
+            or (package.get("reviewers") or {}).get(key, {}).get("sha256") != expected_sha
+            or sheet_manifest.get("schemaVersion")
+            != "aishop-customer-service-answer-review/v2"
+            or sheet_manifest.get("artifact") != "SEALED_ANSWER_REVIEW_SHEET"
+            or sheet_manifest.get("lifecycle") != "SEALED"
+            or sheet_manifest.get("reviewerId") != reviewer
+            or sheet_manifest.get("sheetSha256") != expected_sha
+            or sheet_manifest.get("sourceRunId") != descriptor.get("sourceRunId")
+            or sheet_manifest.get("sourceReportSha256")
+            != descriptor.get("sourceReportSha256")
+            or (agreement.get(agreement_key) or {}).get("reviewerId") != reviewer
+            or (agreement.get(agreement_key) or {}).get("sha256") != expected_sha
+            or (agreement.get(agreement_key) or {}).get("path")
+            != f"reviews/{filename}"
+        ):
+            errors.append(f"{label} {key} sealed binding is invalid")
+        sheet_ids = {str(row.get("caseId") or "") for row in rows}
+        if len(rows) != descriptor.get("caseCount") or sheet_ids != report_ids:
+            errors.append(f"{label} {key} sheet case IDs/count differ from HTTP report")
+        for row in rows:
+            labels = row.get("labels") if isinstance(row.get("labels"), dict) else {}
+            if (
+                not isinstance(row, dict)
+                or set(row) != expected_row_fields
+                or row.get("schemaVersion") != "aishop-customer-service-answer-review/v2"
+                or row.get("reviewerId") != reviewer
+                or row.get("guidelinesVersion") != "customer-service-answer-quality-v1"
+                or row.get("sourceRunId") != descriptor.get("sourceRunId")
+                or row.get("sourceReportSha256") != descriptor.get("sourceReportSha256")
+                or set(labels) != expected_label_keys
+                or not isinstance(labels.get("answerCorrect"), bool)
+                or labels.get("citationSupport")
+                not in {"SUPPORTED", "UNSUPPORTED", "NOT_APPLICABLE", "UNDECIDABLE"}
+                or not isinstance(labels.get("handoffAppropriate"), bool)
+                or not isinstance(labels.get("unsafeAnswer"), bool)
+                or not isinstance(row.get("comment"), str)
+            ):
+                errors.append(f"{label} {key} row schema/labels are invalid")
+                break
+            source = source_by_id.get(str(row.get("caseId") or ""))
+            if source is not None and any(
+                _canonical_sha256(row.get(field)) != _canonical_sha256(source[field])
+                for field in ("message", "answer", "sourceRefs", "observedHandoff")
+            ):
+                errors.append(f"{label} {key} immutable source field differs")
+                break
+        if _contains_forbidden_key(
+            rows, {"expected", "predicted", "modelOutput", "modelPrediction"}
+        ):
+            errors.append(f"{label} {key} leaks gold/model fields")
+    if set(reviewer_ids) != {"reviewer-a", "reviewer-b"}:
+        errors.append(f"{label} reviewer IDs are invalid")
+    if lifecycle.get("reviewers") != ["reviewer-a", "reviewer-b"]:
+        errors.append(f"{label} lifecycle reviewer order is invalid")
+
+    disagreement_ids = {
+        str(item.get("caseId") or "") for item in agreement.get("disagreements") or []
+    }
+    if (
+        len(template_rows) != agreement.get("disagreementCaseCount")
+        or {str(row.get("caseId") or "") for row in template_rows}
+        != disagreement_ids
+    ):
+        errors.append(f"{label} adjudication template coverage is invalid")
+    for row in template_rows:
+        final_labels = row.get("finalLabels") if isinstance(row.get("finalLabels"), dict) else {}
+        if (
+            not isinstance(row, dict)
+            or set(row)
+            != {
+                "schemaVersion",
+                "caseId",
+                "sourceRunId",
+                "sourceReportSha256",
+                "message",
+                "answer",
+                "sourceRefs",
+                "observedHandoff",
+                "reviewerA",
+                "reviewerB",
+                "finalLabels",
+                "adjudicator",
+                "reason",
+            }
+            or row.get("schemaVersion")
+            != "aishop-customer-service-answer-review-adjudication/v1"
+            or set(final_labels) != expected_label_keys
+            or any(value is not None for value in final_labels.values())
+            or row.get("adjudicator") != ""
+            or row.get("reason") != ""
+        ):
+            errors.append(f"{label} adjudication template is invalid")
+            break
+    template_sha = _sha256(package_root / "adjudication.template.jsonl")
+    if (
+        (package.get("adjudicationTemplate") or {}).get("path")
+        != "adjudication.template.jsonl"
+        or (package.get("adjudicationTemplate") or {}).get("sha256AtExport")
+        != template_sha
+        or (package.get("adjudicationTemplate") or {}).get("caseCount")
+        != len(template_rows)
+        or lifecycle.get("adjudicationTemplateSha256AtExport") != template_sha
+    ):
+        errors.append(f"{label} adjudication template binding is invalid")
+    writable = [
+        path.relative_to(package_root).as_posix()
+        for path in package_root.rglob("*")
+        if path.is_file() and path.stat().st_mode & 0o222
+    ]
+    if writable:
+        errors.append(f"{label} contains writable files: {writable}")
+
+
 def _validate_customer_service_answer_review(
     root: Path,
     descriptor: Any,
     errors: list[str],
 ) -> None:
-    """Validate the v2 dual-blind answer-review draft and HTTP binding."""
+    """Validate the v2 answer-review lifecycle and immutable HTTP binding."""
 
     label = "evaluation.customerServiceAnswerReview"
     if not isinstance(descriptor, dict):
         errors.append(f"{label} must be an object")
         return
-    if (
-        descriptor.get("status") != "PENDING_HUMAN_REVIEW"
-        or descriptor.get("releaseGateEligible") is not False
-    ):
-        errors.append(f"{label} must remain pending and non-gating")
+    status = str(descriptor.get("status") or "")
+    if status not in {"PENDING_HUMAN_REVIEW", "PENDING_ADJUDICATION"}:
+        errors.append(f"{label} lifecycle status is invalid: {status!r}")
+    if descriptor.get("releaseGateEligible") is not False:
+        errors.append(f"{label} must remain non-gating")
     report_path = _resolve_hashed_file(
         root,
         descriptor,
@@ -1626,6 +1894,18 @@ def _validate_customer_service_answer_review(
         or "" in report_ids
     ):
         errors.append(f"{label} source report binding is invalid")
+
+    if status == "PENDING_ADJUDICATION":
+        _validate_pending_customer_service_answer_review(
+            root,
+            descriptor,
+            report,
+            report_ids,
+            errors,
+        )
+        return
+    if status != "PENDING_HUMAN_REVIEW":
+        return
 
     sheets = descriptor.get("reviewSheets")
     if not isinstance(sheets, list) or len(sheets) != 2:
@@ -1727,13 +2007,13 @@ def _validate_customer_service_answer_review(
             or set(row) != expected_row_fields
             or any(
                 field not in row
-                for field in {
+                for field in (
                     "message",
                     "answer",
                     "sourceRefs",
                     "observedHandoff",
                     "comment",
-                }
+                )
             )
             or set((row.get("labels") or {}).keys()) != expected_label_keys
             or any(value is not None for value in (row.get("labels") or {}).values())

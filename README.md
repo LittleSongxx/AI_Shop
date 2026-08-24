@@ -284,7 +284,7 @@ handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
 这些是离线规则预路由质量，不是线上客服成功率；`releaseGateEligible=false` 保持 fail-closed。
 
 同一 60 条 gold 已经正式 HTTP Agent/Java/RAG/LLM 路径执行 `60/60`，HTTP 转人工混淆矩阵为 `TP=14,TN=46,FP=0,FN=0`，引用结构违规 `0`。
-Episode 槽位经脱敏，因此 HTTP Slot F1/EM 不可测；答案正确性、引用语义支持、转人工适当性与 unsafe-answer rate 仍待独立人工盲审。
+Episode 槽位经脱敏，因此 HTTP Slot F1/EM 不可测；答案质量双人盲审已封存为 `PENDING_ADJUDICATION`：`52/60` 案件四项标签完全一致，`8` 条待独立第三人仲裁。该一致性不是最终答案正确率；仲裁完成前不发布答案正确性、引用语义支持、转人工适当性或 unsafe-answer rate。
 另有 60 条 v2 draft 及双人盲标表已生成，仲裁前不与当前 60 条 HUMAN_VERIFIED 分母合并。
 
 Search 已对 10 条已知难例做真实成对回放：Recall/MRR/NDCG 与 v9 baseline 的 delta 均为 `0`，硬约束违规 `0`；仍保留 3 个多商品/集合意图/比较对象难例。

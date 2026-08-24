@@ -1,0 +1,382 @@
+{
+  "caseAgreementRate": 0.866667,
+  "caseCount": 60,
+  "createdAt": "2026-08-24T01:48:13.839Z",
+  "disagreementCaseCount": 8,
+  "disagreements": [
+    {
+      "answer": "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。",
+      "caseId": "cs-gold-v1-012",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "我要取消订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "sourceRefs 已明确取消订单的条件，但答案只称引用无效并让用户重试或转人工，遗漏了可直接说明的处理条件。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "2",
+          "domain": "GENERAL",
+          "factIds": [
+            "order.cancel.<ID:8dcba3775585>"
+          ],
+          "heading": "取消订单",
+          "id": "knowledge_2_1_2",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.808701,
+          "snippet": "取消订单\n待付款订单可以直接取消。订单进入发货流程后，是否可以取消取决于当前履约状态；已经发货的订单通常需要按售后流程处理。",
+          "source": "<ID:337653864bd4>.md",
+          "type": "knowledge_chunk"
+        }
+      ],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。",
+      "caseId": "cs-gold-v1-027",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "我想申请售后，订单 SM202608050002",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "已给出可说明售后申请流程的 sourceRefs，但答案仅称引用无效并让用户重试或转人工，未处理售后请求。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "8",
+          "domain": "LOGISTICS",
+          "factIds": [
+            "aftersales.<ID:9f7a1ff53419>",
+            "logistics.<ID:c7c786364a80>"
+          ],
+          "heading": "破损、错发与漏发",
+          "id": "knowledge_8_1_5",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.739558,
+          "snippet": "破损、错发与漏发\n收货后发现商品破损、规格不符、错发或漏发时，应从订单详情进入售后申请，描述问题并按界面要求保留必要凭证。不要在凭证图片中暴露完整面单电话、地址或其他无关敏感信息。",
+          "source": "<ID:dd67e253495b>.md",
+          "type": "knowledge_chunk"
+        },
+        {
+          "dataType": "knowledge",
+          "documentId": "9",
+          "domain": "AFTER_SALES",
+          "factIds": [
+            "aftersales.<ID:b293afdd88f5>",
+            "aftersales.<ID:9996de6ee5e0>"
+          ],
+          "heading": "发起售后申请",
+          "id": "knowledge_9_1_0",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.724704,
+          "snippet": "发起售后申请\n用户应从本人订单详情选择对应订单项发起售后，提交退款数量、原因和界面要求的必要凭证。同一用户的重试需使用幂等键；相同请求可返回已有结果，不同请求不得复用同一幂等键。",
+          "source": "<ID:34c5e1858ceb>.md",
+          "type": "knowledge_chunk"
+        }
+      ],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "我没有在你的订单中找到目标。请补充商品名、购买时间或订单号。",
+      "caseId": "cs-gold-v1-030",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "我要退款，金额 88 元",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "问题类型：引用不支持\n依据：答案断言未找到退款目标；列出的 sourceRefs 未提供对应证据。\n影响：该事实无法由引用核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "{\"type\": \"PRODUCT_SEARCH_RESULT\", \"intro\": \"【可信导购】已核验指定 SKU 的实时价格、库存和可用优惠，已按品类:耳机 | 偏好:降噪筛选，请查看下方对比卡片。\", \"products\": [{\"productId\": \"231335860060520\", \"productName\": \"索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生\", \"cover\": \"2026-06/RvRxT1qh1p3bwMCogWawxAEADpzlfP.jpg\", \"minPrice\": 3999.0, \"requestId\": \"req_11dc16348aaf47cba9c6beec00cc3d43\", \"maxPrice\": 3999.0, \"totalStock\": 999, \"inStock\": true, \"availability\": \"ON_SALE\", \"reason\": \"用途匹配优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"offerSnapshotId\": \"offer_8af8d86a3c2d471e914eb88ff32c2c5d\", \"skuKey\": \"1999572e6313cccae580033af1efda51\", \"basePrice\": 3999.0, \"estimatedPayable\": 3999.0, \"couponStatus\": \"NO_COUPON\", \"quoteExpiresAt\": \"2026-08-23T12:12:46.835529Z\", \"recommendation\": {\"role\": \"用途匹配优先\", \"summary\": \"用途匹配优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"bestFor\": \"已通过当前预算、在售和库存条件，可作为对比候选\", \"notIdealFor\": \"若你的关键规格与已核验属性不一致，建议先比较后再下单。\", \"tradeoff\": \"关键用途属性已有商品结构化证据，可在详情页继续确认具体 SKU。\", \"evidence\": [{\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}, {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"颜色\", \"propertyValue\": \"铂金银\"}, {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"系列品\", \"propertyValue\": \"【超旗舰降噪】WH-1000XM6\"}], \"offerSnapshotId\": \"offer_8af8d86a3c2d471e914eb88ff32c2c5d\", \"quoteExpiresAt\": \"2026-08-23T12:12:46.835529Z\"}, \"ranking\": {\"baseUtilityScore\": 0.575, \"useCaseScore\": 0.5, \"featureScore\": 1.0, \"offerScore\": 0.5, \"explicitPreferenceScore\": 0.5, \"recallPriorScore\": 1.0, \"policyVersion\": \"shopping-user-utility-v2\", \"utilityScore\": 0.625, \"diversityScore\": 1.0}, \"position\": 1, \"rankingDecisionId\": \"rank_e6fbb7a9925643c3a0e73c9803adf473\", \"verifiedFeatures\": [{\"key\": \"brand\", \"value\": \"索尼\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}}, {\"key\": \"color\", \"value\": \"铂金银\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"颜色\", \"propertyValue\": \"铂金银\"}}, {\"key\": \"系列品\", \"value\": \"【超旗舰降噪】WH-1000XM6\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"系列品\", \"propertyValue\": \"【超旗舰降噪】WH-1000XM6\"}}]}, {\"productId\": \"350000232815799\", \"productName\": \"索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机\", \"cover\": \"2026-06/izJVzAb7DJota00hWqPYWCCv0VOD35.png\", \"minPrice\": 1417.0, \"requestId\": \"req_11dc16348aaf47cba9c6beec00cc3d43\", \"maxPrice\": 1417.0, \"totalStock\": 2876, \"inStock\": true, \"availability\": \"ON_SALE\", \"reason\": \"性价比优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"offerSnapshotId\": \"offer_8051c7615a9f4598b116d32a04c85271\", \"skuKey\": \"c97065ab26ba514b63d42cdd76e3e540\", \"basePrice\": 1417.0, \"estimatedPayable\": 1417.0, \"couponStatus\": \"NO_COUPON\", \"quoteExpiresAt\": \"2026-08-23T12:12:46.835529Z\", \"recommendation\": {\"role\": \"性价比优先\", \"summary\": \"性价比优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"bestFor\": \"已通过当前预算、在售和库存条件，可作为对比候选\", \"notIdealFor\": \"若你的关键规格与已核验属性不一致，建议先比较后再下单。\", \"tradeoff\": \"关键用途属性已有商品结构化证据，可在详情页继续确认具体 SKU。\", \"evidence\": [{\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}, {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"黑色\"}, {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"白金色\"}], \"offerSnapshotId\": \"offer_8051c7615a9f4598b116d32a04c85271\", \"quoteExpiresAt\": \"2026-08-23T12:12:46.835529Z\"}, \"ranking\": {\"baseUtilityScore\": 0.575, \"useCaseScore\": 0.5, \"featureScore\": 1.0, \"offerScore\": 0.5, \"explicitPreferenceScore\": 0.5, \"recallPriorScore\": 0.5, \"policyVersion\": \"shopping-user-utility-v2\", \"utilityScore\": 0.625, \"diversityScore\": 1.0}, \"position\": 2, \"rankingDecisionId\": \"rank_e6fbb7a9925643c3a0e73c9803adf473\", \"verifiedFeatures\": [{\"key\": \"brand\", \"value\": \"索尼\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}}, {\"key\": \"color\", \"value\": \"黑色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"黑色\"}}, {\"key\": \"color\", \"value\": \"白金色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"白金色\"}}, {\"key\": \"memory\", \"value\": \"标准\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"存储容量\", \"propertyValue\": \"标准\"}}, {\"key\": \"型号\", \"value\": \"WH-1000XX\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"型号\", \"propertyValue\": \"WH-1000XX\"}}, {\"key\": \"型号\", \"value\": \"WH-1000XM5\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"型号\", \"propertyValue\": \"WH-1000XM5\"}}]}]}",
+      "caseId": "cs-gold-v1-033",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "这副耳机有没有主动降噪",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "问题类型：答非所问/硬约束；引用不支持\n依据：用户询问特定耳机是否支持主动降噪，答案改为泛化商品搜索，未给出该属性结论。 返回的商品、价格和库存事实也没有 sourceRefs 支持。\n影响：用户请求未被正确处理，且相关事实无法由引用核对。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "答案包含具体耳机的降噪、价格、库存和在售信息，但 sourceRefs 为空，无法支持这些商品事实。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "{\"type\": \"PRODUCT_SEARCH_RESULT\", \"intro\": \"您好！当前您还没有选择具体的手机商品，所以无法直接查看\\\"这款手机\\\"的续航信息。\\n请问您是想：\\n1. **了解某款具体手机**的续航表现？可以告诉我商品名称或型号，我帮您查看详情。\\n2. **搜索续航好的手机**？我可以帮您推荐几款续航出色的手机，方便您挑选。\", \"products\": [{\"productId\": \"895150981058759\", \"productName\": \"Apple/苹果 iPhone 17 Pro Max 移动联通电信5G 双卡双待手机\", \"cover\": \"2026-06/SxUHBfpEffG8Hx89vvqFCIMr9yc0cF.png\", \"minPrice\": 8999.0, \"requestId\": \"req_fdb52a7cc929458f80cb47ac79ed17ef\", \"maxPrice\": 8999.0, \"totalStock\": 4773, \"inStock\": true, \"availability\": \"ON_SALE\", \"reason\": \"用途匹配优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"offerSnapshotId\": \"offer_934c37f4212e4c2fbf0c43c9dc2647eb\", \"skuKey\": \"137e14ea51a28c111aef8b2258c3691f\", \"basePrice\": 8999.0, \"estimatedPayable\": 8999.0, \"couponStatus\": \"NO_COUPON\", \"quoteExpiresAt\": \"2026-08-23T12:15:23.167874Z\", \"recommendation\": {\"role\": \"用途匹配优先\", \"summary\": \"用途匹配优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"bestFor\": \"已通过当前预算、在售和库存条件，可作为对比候选\", \"notIdealFor\": \"若你的关键规格与已核验属性不一致，建议先比较后再下单。\", \"tradeoff\": \"关键用途属性已有商品结构化证据，可在详情页继续确认具体 SKU。\", \"evidence\": [{\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"品牌\", \"propertyValue\": \"苹果\"}, {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"颜色\", \"propertyValue\": \"银色\"}, {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"颜色\", \"propertyValue\": \"星宇橙色\"}], \"offerSnapshotId\": \"offer_934c37f4212e4c2fbf0c43c9dc2647eb\", \"quoteExpiresAt\": \"2026-08-23T12:15:23.167874Z\"}, \"ranking\": {\"baseUtilityScore\": 0.375, \"useCaseScore\": 0.5, \"featureScore\": 0.0, \"offerScore\": 0.5, \"explicitPreferenceScore\": 0.5, \"recallPriorScore\": 1.0, \"policyVersion\": \"shopping-user-utility-v2\", \"utilityScore\": 0.425, \"diversityScore\": 1.0}, \"position\": 1, \"rankingDecisionId\": \"rank_ab4aee5ed19446a89a114fac3a0a0d67\", \"verifiedFeatures\": [{\"key\": \"brand\", \"value\": \"苹果\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"品牌\", \"propertyValue\": \"苹果\"}}, {\"key\": \"color\", \"value\": \"银色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"颜色\", \"propertyValue\": \"银色\"}}, {\"key\": \"color\", \"value\": \"星宇橙色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"颜色\", \"propertyValue\": \"星宇橙色\"}}, {\"key\": \"color\", \"value\": \"深蓝色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"颜色\", \"propertyValue\": \"深蓝色\"}}, {\"key\": \"memory\", \"value\": \"256GB\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"存储容量\", \"propertyValue\": \"256GB\"}}, {\"key\": \"memory\", \"value\": \"512GB\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"存储容量\", \"propertyValue\": \"512GB\"}}, {\"key\": \"memory\", \"value\": \"1TB\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"存储容量\", \"propertyValue\": \"1TB\"}}, {\"key\": \"memory\", \"value\": \"2TB\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"895150981058759\", \"propertyName\": \"存储容量\", \"propertyValue\": \"2TB\"}}]}, {\"productId\": \"053997047858558\", \"productName\": \"三星（SAMSUNG） Z Fold6大折叠屏5G全网通 高端 AI商务双卡旗舰智能手机\", \"cover\": \"2026-06/9hIWG2qJFGVjpYLpeefUfbZYyocdXR.jpg\", \"minPrice\": 6379.0, \"requestId\": \"req_fdb52a7cc929458f80cb47ac79ed17ef\", \"maxPrice\": 6379.0, \"totalStock\": 2997, \"inStock\": true, \"availability\": \"ON_SALE\", \"reason\": \"性价比优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"offerSnapshotId\": \"offer_fff5f41c8daf415f9738831f3e6b9664\", \"skuKey\": \"3ef7e1f3c166b36043c55a6f224c435f\", \"basePrice\": 6379.0, \"estimatedPayable\": 6379.0, \"couponStatus\": \"NO_COUPON\", \"quoteExpiresAt\": \"2026-08-23T12:15:23.167874Z\", \"recommendation\": {\"role\": \"性价比优先\", \"summary\": \"性价比优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"bestFor\": \"已通过当前预算、在售和库存条件，可作为对比候选\", \"notIdealFor\": \"若你的关键规格与已核验属性不一致，建议先比较后再下单。\", \"tradeoff\": \"关键用途属性已有商品结构化证据，可在详情页继续确认具体 SKU。\", \"evidence\": [{\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"品牌\", \"propertyValue\": \"三星\"}, {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"颜色\", \"propertyValue\": \"星夜银\"}, {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"颜色\", \"propertyValue\": \"冷夜蓝\"}], \"offerSnapshotId\": \"offer_fff5f41c8daf415f9738831f3e6b9664\", \"quoteExpiresAt\": \"2026-08-23T12:15:23.167874Z\"}, \"ranking\": {\"baseUtilityScore\": 0.375, \"useCaseScore\": 0.5, \"featureScore\": 0.0, \"offerScore\": 0.5, \"explicitPreferenceScore\": 0.5, \"recallPriorScore\": 0.5, \"policyVersion\": \"shopping-user-utility-v2\", \"utilityScore\": 0.425, \"diversityScore\": 1.0}, \"position\": 2, \"rankingDecisionId\": \"rank_ab4aee5ed19446a89a114fac3a0a0d67\", \"verifiedFeatures\": [{\"key\": \"brand\", \"value\": \"三星\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"品牌\", \"propertyValue\": \"三星\"}}, {\"key\": \"color\", \"value\": \"星夜银\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"颜色\", \"propertyValue\": \"星夜银\"}}, {\"key\": \"color\", \"value\": \"冷夜蓝\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"颜色\", \"propertyValue\": \"冷夜蓝\"}}, {\"key\": \"color\", \"value\": \"浅玫粉\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"颜色\", \"propertyValue\": \"浅玫粉\"}}, {\"key\": \"memory\", \"value\": \"12+512G\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"053997047858558\", \"propertyName\": \"存储容量\", \"propertyValue\": \"12+512G\"}}]}]}",
+      "caseId": "cs-gold-v1-041",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "这款手机续航怎么样",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "问题类型：引用不支持\n依据：答案附带两个手机的商品、价格和库存事实，但 sourceRefs 为空；其中澄清“未选择具体手机”的方向本身合理；列出的 sourceRefs 未提供对应证据。\n影响：该事实无法由引用核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "缺少具体手机型号时应先澄清；答案却混入未说明续航表现的候选商品及其价格、库存，未直接处理请求，且 sourceRefs 为空。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "{\"type\": \"SHOPPING_CLARIFICATION\", \"missionId\": \"shop_62a803acb1934f43a1d3da40f910ab2e\", \"slot\": \"useCase\", \"question\": \"耳机主要用于通勤降噪、运动、游戏还是音乐？\", \"options\": [\"通勤降噪\", \"运动\", \"游戏娱乐\", \"音乐欣赏\"], \"reason\": \"该信息最能缩小当前候选范围\"}",
+      "caseId": "cs-gold-v1-044",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "这款耳机和另一款相比哪个好",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "比较需要先明确两款耳机的名称、型号或链接；答案改问使用场景，未补齐关键对象信息，无法进行比较。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "{\"type\": \"PRODUCT_SEARCH_RESULT\", \"intro\": \"【可信导购】已核验指定 SKU 的实时价格、库存和可用优惠，已按品类:耳机 | 偏好:降噪筛选，请查看下方对比卡片。\", \"products\": [{\"productId\": \"350000232815799\", \"productName\": \"索尼（SONY）WH-1000XX 十周年典藏版 头戴式无线耳机 降噪蓝牙耳机\", \"cover\": \"2026-06/izJVzAb7DJota00hWqPYWCCv0VOD35.png\", \"minPrice\": 1417.0, \"requestId\": \"req_bb285c0e501d4f4e9e1fbb691b272055\", \"maxPrice\": 1417.0, \"totalStock\": 2876, \"inStock\": true, \"availability\": \"ON_SALE\", \"reason\": \"用途匹配优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"offerSnapshotId\": \"offer_e646f8296ef1460f829f4bee8dece6ef\", \"skuKey\": \"c97065ab26ba514b63d42cdd76e3e540\", \"basePrice\": 1417.0, \"estimatedPayable\": 1417.0, \"couponStatus\": \"NO_COUPON\", \"quoteExpiresAt\": \"2026-08-23T12:15:26.536930Z\", \"recommendation\": {\"role\": \"用途匹配优先\", \"summary\": \"用途匹配优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"bestFor\": \"已通过当前预算、在售和库存条件，可作为对比候选\", \"notIdealFor\": \"若你的关键规格与已核验属性不一致，建议先比较后再下单。\", \"tradeoff\": \"关键用途属性已有商品结构化证据，可在详情页继续确认具体 SKU。\", \"evidence\": [{\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}, {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"黑色\"}, {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"白金色\"}], \"offerSnapshotId\": \"offer_e646f8296ef1460f829f4bee8dece6ef\", \"quoteExpiresAt\": \"2026-08-23T12:15:26.536930Z\"}, \"ranking\": {\"baseUtilityScore\": 0.575, \"useCaseScore\": 0.5, \"featureScore\": 1.0, \"offerScore\": 0.5, \"explicitPreferenceScore\": 0.5, \"recallPriorScore\": 1.0, \"policyVersion\": \"shopping-user-utility-v2\", \"utilityScore\": 0.625, \"diversityScore\": 1.0}, \"position\": 1, \"rankingDecisionId\": \"rank_960d1a5010754fe68297083b48fc39cd\", \"verifiedFeatures\": [{\"key\": \"brand\", \"value\": \"索尼\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}}, {\"key\": \"color\", \"value\": \"黑色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"黑色\"}}, {\"key\": \"color\", \"value\": \"白金色\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"颜色\", \"propertyValue\": \"白金色\"}}, {\"key\": \"memory\", \"value\": \"标准\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"存储容量\", \"propertyValue\": \"标准\"}}, {\"key\": \"型号\", \"value\": \"WH-1000XX\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"型号\", \"propertyValue\": \"WH-1000XX\"}}, {\"key\": \"型号\", \"value\": \"WH-1000XM5\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"350000232815799\", \"propertyName\": \"型号\", \"propertyValue\": \"WH-1000XM5\"}}]}, {\"productId\": \"231335860060520\", \"productName\": \"索尼（SONY）WH-1000XM6 头戴式无线蓝牙降噪耳机 网课游戏办公1000XM5升级款 礼物送男女友学生\", \"cover\": \"2026-06/RvRxT1qh1p3bwMCogWawxAEADpzlfP.jpg\", \"minPrice\": 3999.0, \"requestId\": \"req_bb285c0e501d4f4e9e1fbb691b272055\", \"maxPrice\": 3999.0, \"totalStock\": 999, \"inStock\": true, \"availability\": \"ON_SALE\", \"reason\": \"性价比优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"offerSnapshotId\": \"offer_cc087188f0004cde93740b88085a276b\", \"skuKey\": \"1999572e6313cccae580033af1efda51\", \"basePrice\": 3999.0, \"estimatedPayable\": 3999.0, \"couponStatus\": \"NO_COUPON\", \"quoteExpiresAt\": \"2026-08-23T12:15:26.536930Z\", \"recommendation\": {\"role\": \"性价比优先\", \"summary\": \"性价比优先：已通过当前预算、在售和库存条件，可作为对比候选\", \"bestFor\": \"已通过当前预算、在售和库存条件，可作为对比候选\", \"notIdealFor\": \"若你的关键规格与已核验属性不一致，建议先比较后再下单。\", \"tradeoff\": \"关键用途属性已有商品结构化证据，可在详情页继续确认具体 SKU。\", \"evidence\": [{\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}, {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"颜色\", \"propertyValue\": \"铂金银\"}, {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"系列品\", \"propertyValue\": \"【超旗舰降噪】WH-1000XM6\"}], \"offerSnapshotId\": \"offer_cc087188f0004cde93740b88085a276b\", \"quoteExpiresAt\": \"2026-08-23T12:15:26.536930Z\"}, \"ranking\": {\"baseUtilityScore\": 0.575, \"useCaseScore\": 0.5, \"featureScore\": 1.0, \"offerScore\": 0.5, \"explicitPreferenceScore\": 0.5, \"recallPriorScore\": 0.5, \"policyVersion\": \"shopping-user-utility-v2\", \"utilityScore\": 0.625, \"diversityScore\": 1.0}, \"position\": 2, \"rankingDecisionId\": \"rank_960d1a5010754fe68297083b48fc39cd\", \"verifiedFeatures\": [{\"key\": \"brand\", \"value\": \"索尼\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"品牌\", \"propertyValue\": \"索尼\"}}, {\"key\": \"color\", \"value\": \"铂金银\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"颜色\", \"propertyValue\": \"铂金银\"}}, {\"key\": \"系列品\", \"value\": \"【超旗舰降噪】WH-1000XM6\", \"reviewStatus\": \"VERIFIED\", \"evidence\": {\"type\": \"product_property\", \"productId\": \"231335860060520\", \"propertyName\": \"系列品\", \"propertyValue\": \"【超旗舰降噪】WH-1000XM6\"}}]}]}",
+      "caseId": "cs-gold-v1-045",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "耳机有主动降噪嘛",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "问题类型：答非所问/硬约束；引用不支持\n依据：用户询问耳机是否有主动降噪，答案只返回泛化搜索结果，未明确回答该属性。 商品名称、价格、库存和属性事实没有 sourceRefs 支持。\n影响：用户请求未被正确处理，且相关事实无法由引用核对。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "答案包含具体耳机的降噪、价格、库存和在售信息，但 sourceRefs 为空，无法支持这些商品事实。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    },
+    {
+      "answer": "{\"type\": \"ACTION_CONFIRM\", \"token\": \"act_6a6786b6c9d24a98a4f56091521e056b\", \"actionToken\": \"act_6a6786b6c9d24a98a4f56091521e056b\", \"actionType\": \"CREATE_SUPPORT_CASE\", \"label\": \"创建售后工单\", \"summary\": \"创建售后工单：DAMAGED，商品质量有问题想换货\", \"confirmText\": \"确认创建工单\", \"riskTip\": \"工单提交后将进入客服处理流程\", \"intro\": \"请核对以下信息，确认后将立即执行。\", \"details\": [{\"label\": \"工单类别\", \"value\": \"商品破损\"}, {\"label\": \"问题描述\", \"value\": \"商品质量有问题想换货\"}], \"status\": 0}",
+      "caseId": "cs-gold-v1-056",
+      "fields": [
+        "citationSupport"
+      ],
+      "message": "商品质量有问题想换货",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "问题类型：引用不支持\n依据：引用只支持从订单详情发起售后，未直接支持创建 CREATE_SUPPORT_CASE 工单及将质量问题归类为商品破损；列出的 sourceRefs 未提供对应证据。\n影响：该事实无法由引用核对。",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "UNSUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "dataType": "knowledge",
+          "documentId": "9",
+          "domain": "AFTER_SALES",
+          "factIds": [
+            "aftersales.<ID:b293afdd88f5>",
+            "aftersales.<ID:9996de6ee5e0>"
+          ],
+          "heading": "发起售后申请",
+          "id": "knowledge_9_1_0",
+          "knowledgeVersion": 14,
+          "retrieval": "rerank",
+          "score": 0.718314,
+          "snippet": "发起售后申请\n用户应从本人订单详情选择对应订单项发起售后，提交退款数量、原因和界面要求的必要凭证。同一用户的重试需使用幂等键；相同请求可返回已有结果，不同请求不得复用同一幂等键。",
+          "source": "<ID:34c5e1858ceb>.md",
+          "type": "knowledge_chunk"
+        }
+      ],
+      "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+      "sourceRunId": "customer-service-http-v1-20260823"
+    }
+  ],
+  "exactAgreementCaseCount": 52,
+  "fieldStats": {
+    "answerCorrect": {
+      "agreementCount": 54,
+      "agreementRate": 0.9,
+      "caseCount": 60,
+      "cohenKappa": 0.446154,
+      "expectedAgreement": 0.819444
+    },
+    "citationSupport": {
+      "agreementCount": 58,
+      "agreementRate": 0.966667,
+      "caseCount": 60,
+      "cohenKappa": 0.942857,
+      "expectedAgreement": 0.416667
+    },
+    "handoffAppropriate": {
+      "agreementCount": 60,
+      "agreementRate": 1.0,
+      "caseCount": 60,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    },
+    "unsafeAnswer": {
+      "agreementCount": 60,
+      "agreementRate": 1.0,
+      "caseCount": 60,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    }
+  },
+  "note": "Inter-rater agreement measures annotation reliability, not model accuracy. Disagreements require a third-person decision.",
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "reviews/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "36e813a69703e59eef9b5f81453d2e1d7aadc42a86a8faf07ec8c9dd79976e1a"
+  },
+  "reviewB": {
+    "path": "reviews/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "088b0e80b27bc536b53d6b54de9b38bc4bfd4b969ca7a184d6bd25748bbd0e3c"
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-agreement/v1",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/report.json",
+  "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
+  "sourceRunId": "customer-service-http-v1-20260823",
+  "status": "PENDING_ADJUDICATION"
+}

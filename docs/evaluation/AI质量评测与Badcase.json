@@ -1752,7 +1752,7 @@
     },
     "review": {"exactAgreement": "35/60", "intentAgreement": "57/60", "intentCohenKappa": 0.946, "riskAgreement": "56/60", "riskCohenKappa": 0.89, "handoffAgreement": "60/60", "adjudicatedCases": 25},
     "httpFullPath": {
-      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "status": "EXECUTED_PENDING_ADJUDICATION",
       "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823",
       "sha256SumsSha256": "197bfa7edce9eb897dd6c60e869b1c11d601d42f141810362c7ea8d6b6df159b",
       "execution": "60/60",
@@ -1760,7 +1760,22 @@
       "handoffConfusion": {"truePositive": 14, "falsePositive": 0, "falseNegative": 0, "trueNegative": 46},
       "citationContractInvalidCases": 0,
       "httpSlotMetrics": "UNAVAILABLE_REDACTED_EPISODE_VALUES",
-      "answerQuality": "PENDING_INDEPENDENT_HUMAN_REVIEW",
+      "answerQuality": "PENDING_ADJUDICATION",
+      "answerReviewAgreement": {
+        "status": "PENDING_ADJUDICATION",
+        "caseCount": 60,
+        "exactAgreementCaseCount": 52,
+        "disagreementCaseCount": 8,
+        "caseAgreementRate": 0.866667,
+        "fieldAgreement": {
+          "answerCorrect": {"agreementCount": 54, "cohenKappa": 0.446154},
+          "citationSupport": {"agreementCount": 58, "cohenKappa": 0.942857},
+          "handoffAppropriate": {"agreementCount": 60, "cohenKappa": null},
+          "unsafeAnswer": {"agreementCount": 60, "cohenKappa": null}
+        },
+        "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824",
+        "finalMetricsAvailable": false
+      },
       "localLatencyMs": {"p50": 1014.106, "p95": 15212.514, "p99": 60141.617},
       "usage": {"inputTokens": 114720, "outputTokens": 6649, "providerCalls": 32, "unpricedCalls": 31, "missingUsageCalls": 1, "costCny": null, "costStatus": "MISSING_USAGE"}
     },
@@ -1786,7 +1801,7 @@
     },
     "limitations": [
       "slot F1/EM is measured on resolve_intent(..., allow_llm=false); HTTP Episode slot values are redacted and are not scored",
-      "full HTTP answer correctness, citation support, handoff appropriateness, and unsafe-answer rate await independent blind review",
+      "two blinded HTTP answer reviews are sealed; 8 disagreements require third-person adjudication before final quality metrics are available",
       "offline understanding evidence does not establish online success rate, CSAT, FCR, or release quality gate"
     ]
   },

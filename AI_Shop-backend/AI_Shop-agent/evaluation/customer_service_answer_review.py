@@ -45,6 +45,12 @@ ANSWER_REVIEW_ADJUDICATION_SCHEMA = (
     "aishop-customer-service-answer-review-adjudication/v1"
 )
 ANSWER_REVIEW_EVIDENCE_SCHEMA = "aishop-customer-service-answer-review-evidence/v1"
+ANSWER_REVIEW_PENDING_EVIDENCE_SCHEMA = (
+    "aishop-customer-service-answer-review-pending-evidence/v1"
+)
+ANSWER_REVIEW_PENDING_LIFECYCLE_SCHEMA = (
+    "aishop-customer-service-answer-review-pending-lifecycle/v1"
+)
 ANSWER_REVIEW_GUIDELINES_VERSION = "customer-service-answer-quality-v1"
 
 _LABEL_FIELDS = (
@@ -968,7 +974,68 @@ def render_answer_agreement_markdown(agreement: Mapping[str, Any]) -> str:
         lines.append(
             f"| `{item.get('caseId')}` | `{', '.join(item.get('fields') or [])}` | {message} |"
         )
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def render_answer_adjudication_needed_markdown(agreement: Mapping[str, Any]) -> str:
+    """Render a concise guide for the independent third reviewer.
+
+    Full frozen answers and sources live in the JSONL template.  Keeping the
+    Markdown concise makes the actual points of disagreement easy to scan
+    without creating a second editable source of truth.
+    """
+
+    if agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA:
+        raise CustomerServiceAnswerReviewError("answer-review agreement schema is invalid")
+    lines = [
+        "# 客服 HTTP 答案仲裁清单",
+        "",
+        f"- 总案件：`{agreement.get('caseCount')}`",
+        f"- 完全一致：`{agreement.get('exactAgreementCaseCount')}`",
+        f"- 待仲裁：`{agreement.get('disagreementCaseCount')}`",
+        f"- 案件级一致率：`{agreement.get('caseAgreementRate')}`",
+        "",
+        "这份文件只描述双人分歧，不是模型准确率。仲裁者须独立于 "
+        "`reviewer-a` 和 `reviewer-b`，只基于冻结的用户问题、最终答案、"
+        "`sourceRefs` 与标注规则判断。",
+        "",
+        "请编辑单独导出的 `adjudication.answer-review-v2.open.jsonl`，每行只填写：",
+        "- `finalLabels`：四项最终标签，字段和枚举必须完整；",
+        "- `adjudicator`：稳定的第三人标识，不能是两位原标注者；",
+        "- `reason`：一句到数句可复核理由，说明答案/证据/风险边界。",
+        "",
+        "不要改写 `caseId`、问题、答案、引用、两位标注结果、源报告哈希或其他字段。"
+        "完成后交回该 JSONL；维护者会 fail-closed 校验并生成最终只读证据包。",
+        "",
+    ]
+    for item in agreement.get("disagreements") or []:
+        message = str(item.get("message") or "").replace("\n", " ")
+        fields = ", ".join(str(field) for field in item.get("fields") or [])
+        reviewer_a = item.get("reviewerA") or {}
+        reviewer_b = item.get("reviewerB") or {}
+        lines.extend(
+            [
+                f"## {item.get('caseId')}",
+                "",
+                f"用户问题：{message}",
+                "",
+                f"分歧字段：`{fields}`",
+                "",
+                "Reviewer A：",
+                "```json",
+                _canonical(reviewer_a.get("labels") or {}).decode("utf-8"),
+                "```",
+                f"备注：{reviewer_a.get('comment') or '无'}",
+                "",
+                "Reviewer B：",
+                "```json",
+                _canonical(reviewer_b.get("labels") or {}).decode("utf-8"),
+                "```",
+                f"备注：{reviewer_b.get('comment') or '无'}",
+                "",
+            ]
+        )
+    return "\n".join(lines).rstrip("\n") + "\n"
 
 
 def render_answer_review_markdown(report: Mapping[str, Any]) -> str:
@@ -1043,6 +1110,200 @@ def _assert_evidence_boundary(path: Path) -> None:
         raise CustomerServiceAnswerReviewError(
             f"answer-review benchmark cannot write inside protected {protected}"
         )
+
+
+def write_pending_answer_review_evidence(
+    report_path: Path,
+    agreement: Mapping[str, Any],
+    *,
+    review_a_path: Path,
+    review_b_path: Path,
+    output_dir: Path,
+    adjudication_output: Path | None = None,
+) -> dict[str, Any]:
+    """Freeze completed dual review before the third-person adjudication.
+
+    The package is immutable.  When ``adjudication_output`` is supplied, a
+    separate editable copy of the blank template is exported after the package
+    is sealed, so the third reviewer cannot mutate the evidence package.
+    """
+
+    _assert_evidence_boundary(output_dir)
+    if output_dir.exists():
+        raise FileExistsError(
+            f"refusing to overwrite pending answer-review evidence: {output_dir}"
+        )
+    if adjudication_output is not None:
+        _ensure_new((adjudication_output,))
+    if (
+        agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA
+        or agreement.get("status") != "PENDING_ADJUDICATION"
+        or int(agreement.get("disagreementCaseCount") or 0) <= 0
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending evidence requires a non-empty PENDING_ADJUDICATION agreement"
+        )
+
+    report, report_sha, _ = _report_context(report_path)
+    if (
+        agreement.get("sourceRunId") != report.get("runId")
+        or agreement.get("sourceReportSha256") != report_sha
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending agreement does not bind the supplied HTTP report"
+        )
+    manifest_a, _ = _load_answer_review_sheet(
+        report_path, review_a_path, require_complete=True, check_sheet_hash=True
+    )
+    manifest_b, _ = _load_answer_review_sheet(
+        report_path, review_b_path, require_complete=True, check_sheet_hash=True
+    )
+    if manifest_a.get("lifecycle") != "SEALED" or manifest_b.get("lifecycle") != "SEALED":
+        raise CustomerServiceAnswerReviewError(
+            "pending evidence accepts only SEALED answer-review sheets"
+        )
+    if (
+        manifest_a.get("sheetSha256") != (agreement.get("reviewA") or {}).get("sha256")
+        or manifest_b.get("sheetSha256") != (agreement.get("reviewB") or {}).get("sha256")
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending agreement reviewer hashes differ from sealed sheets"
+        )
+    if manifest_a.get("reviewerId") == manifest_b.get("reviewerId"):
+        raise CustomerServiceAnswerReviewError(
+            "pending evidence requires two independent reviewer IDs"
+        )
+    frozen_agreement = copy.deepcopy(dict(agreement))
+    for key, path in (
+        ("reviewA", "reviews/reviewer-a.sealed.jsonl"),
+        ("reviewB", "reviews/reviewer-b.sealed.jsonl"),
+    ):
+        review = frozen_agreement.get(key)
+        if not isinstance(review, dict):
+            raise CustomerServiceAnswerReviewError(
+                f"pending agreement {key} descriptor is invalid"
+            )
+        # The package contains the sealed sheet, so retain a self-contained
+        # provenance reference rather than a caller-owned staging path.
+        review["path"] = path
+
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}-", dir=output_dir.parent))
+    try:
+        atomic_write_json(
+            staging / "agreement.json", frozen_agreement, overwrite=False
+        )
+        atomic_write_text(
+            staging / "agreement.md",
+            render_answer_agreement_markdown(frozen_agreement),
+            overwrite=False,
+        )
+        template = export_answer_adjudication_template(
+            frozen_agreement, staging / "adjudication.template.jsonl"
+        )
+        atomic_write_text(
+            staging / "adjudication-needed.md",
+            render_answer_adjudication_needed_markdown(frozen_agreement),
+            overwrite=False,
+        )
+        review_dir = staging / "reviews"
+        review_dir.mkdir()
+        for name, source in (
+            ("reviewer-a.sealed.jsonl", review_a_path),
+            ("reviewer-b.sealed.jsonl", review_b_path),
+        ):
+            shutil.copy2(source, review_dir / name)
+            shutil.copy2(
+                _sidecar_path(source),
+                review_dir / f"{name}.manifest.json",
+            )
+        lifecycle = {
+            "schemaVersion": ANSWER_REVIEW_PENDING_LIFECYCLE_SCHEMA,
+            "artifact": "CUSTOMER_SERVICE_ANSWER_REVIEW",
+            "lifecycle": "PENDING_ADJUDICATION",
+            "releaseGateEligible": False,
+            "selfJudged": False,
+            "sourceRunId": report.get("runId"),
+            "sourceReportPath": _path_label(report_path),
+            "sourceReportSha256": report_sha,
+            "caseCount": frozen_agreement.get("caseCount"),
+            "reviewers": [manifest_a["reviewerId"], manifest_b["reviewerId"]],
+            "reviewerASha256": manifest_a["sheetSha256"],
+            "reviewerBSha256": manifest_b["sheetSha256"],
+            "exactAgreementCaseCount": frozen_agreement.get("exactAgreementCaseCount"),
+            "disagreementCaseCount": frozen_agreement.get("disagreementCaseCount"),
+            "adjudicationTemplatePath": "adjudication.template.jsonl",
+            "adjudicationTemplateSha256AtExport": template["sha256AtExport"],
+            "createdAt": utc_now(),
+            "note": (
+                "This is inter-rater reliability evidence only. Final answer-quality "
+                "metrics remain unavailable until an independent third reviewer "
+                "adjudicates every disagreement."
+            ),
+        }
+        atomic_write_json(staging / "lifecycle.json", lifecycle, overwrite=False)
+        manifest = {
+            "schemaVersion": ANSWER_REVIEW_PENDING_EVIDENCE_SCHEMA,
+            "kind": "customer-service-answer-human-review",
+            "status": "PENDING_ADJUDICATION",
+            "releaseGateEligible": False,
+            "selfJudged": False,
+            "sourceRunId": report.get("runId"),
+            "sourceReportPath": _path_label(report_path),
+            "sourceReportSha256": report_sha,
+            "caseCount": frozen_agreement.get("caseCount"),
+            "reviewers": {
+                "reviewerA": {
+                    "reviewerId": manifest_a["reviewerId"],
+                    "sealedPath": "reviews/reviewer-a.sealed.jsonl",
+                    "sha256": manifest_a["sheetSha256"],
+                },
+                "reviewerB": {
+                    "reviewerId": manifest_b["reviewerId"],
+                    "sealedPath": "reviews/reviewer-b.sealed.jsonl",
+                    "sha256": manifest_b["sheetSha256"],
+                },
+            },
+            "agreement": {
+                "path": "agreement.json",
+                "exactAgreementCaseCount": frozen_agreement.get("exactAgreementCaseCount"),
+                "disagreementCaseCount": frozen_agreement.get("disagreementCaseCount"),
+                "caseAgreementRate": frozen_agreement.get("caseAgreementRate"),
+            },
+            "adjudicationTemplate": {
+                "path": "adjudication.template.jsonl",
+                "sha256AtExport": template["sha256AtExport"],
+                "caseCount": template["caseCount"],
+            },
+            "createdAt": utc_now(),
+            "files": _inventory(staging),
+        }
+        atomic_write_json(staging / "evidence-manifest.json", manifest, overwrite=False)
+        atomic_write_text(staging / "SHA256SUMS", _sums(staging), overwrite=False)
+        for path in staging.rglob("*"):
+            if path.is_file():
+                os.chmod(path, 0o444)
+        verify_pending_answer_review_evidence(staging)
+        staging.replace(output_dir)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+    editable = None
+    if adjudication_output is not None:
+        atomic_write_text(
+            adjudication_output,
+            (output_dir / "adjudication.template.jsonl").read_text(encoding="utf-8"),
+            overwrite=False,
+        )
+        editable = {
+            "path": _path_label(adjudication_output),
+            "sha256AtExport": sha256_file(adjudication_output),
+        }
+    return {
+        **verify_pending_answer_review_evidence(output_dir),
+        "editableAdjudication": editable,
+    }
 
 
 def write_answer_review_evidence(
@@ -1125,6 +1386,246 @@ def write_answer_review_evidence(
         shutil.rmtree(staging, ignore_errors=True)
         raise
     return verify_answer_review_evidence(output_dir)
+
+
+def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
+    """Verify the immutable pre-adjudication package and its source bindings."""
+
+    root = root.resolve()
+    manifest_path = root / "evidence-manifest.json"
+    sums_path = root / "SHA256SUMS"
+    if not manifest_path.is_file() or not sums_path.is_file():
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review evidence is incomplete"
+        )
+    expected: dict[str, str] = {}
+    for line in sums_path.read_text(encoding="utf-8").splitlines():
+        digest, separator, name = line.partition("  ")
+        if not separator or len(digest) != 64 or not name or name in expected:
+            raise CustomerServiceAnswerReviewError(
+                f"invalid pending answer-review SHA256SUMS line: {line!r}"
+            )
+        target = (root / name).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise CustomerServiceAnswerReviewError(
+                "pending answer-review inventory escapes package"
+            ) from exc
+        expected[name] = digest
+    required = {
+        "adjudication-needed.md",
+        "adjudication.template.jsonl",
+        "agreement.json",
+        "agreement.md",
+        "evidence-manifest.json",
+        "lifecycle.json",
+        "reviews/reviewer-a.sealed.jsonl",
+        "reviews/reviewer-a.sealed.jsonl.manifest.json",
+        "reviews/reviewer-b.sealed.jsonl",
+        "reviews/reviewer-b.sealed.jsonl.manifest.json",
+    }
+    actual = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.name != "SHA256SUMS"
+    }
+    if actual != required or set(expected) != required:
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review evidence file set differs from required inventory"
+        )
+    for name, digest in expected.items():
+        if sha256_file(root / name) != digest:
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review evidence hash mismatch: {name}"
+            )
+    manifest = load_json(manifest_path)
+    lifecycle = load_json(root / "lifecycle.json")
+    agreement = load_json(root / "agreement.json")
+    if (
+        manifest.get("schemaVersion") != ANSWER_REVIEW_PENDING_EVIDENCE_SCHEMA
+        or manifest.get("status") != "PENDING_ADJUDICATION"
+        or manifest.get("releaseGateEligible") is not False
+        or manifest.get("selfJudged") is not False
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review evidence manifest is invalid"
+        )
+    if (
+        lifecycle.get("schemaVersion") != ANSWER_REVIEW_PENDING_LIFECYCLE_SCHEMA
+        or lifecycle.get("lifecycle") != "PENDING_ADJUDICATION"
+        or lifecycle.get("releaseGateEligible") is not False
+        or lifecycle.get("selfJudged") is not False
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review lifecycle is invalid"
+        )
+    if (
+        agreement.get("schemaVersion") != ANSWER_REVIEW_AGREEMENT_SCHEMA
+        or agreement.get("status") != "PENDING_ADJUDICATION"
+        or agreement.get("releaseGateEligible") is not False
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review agreement is invalid"
+        )
+    for field in ("sourceRunId", "sourceReportPath", "sourceReportSha256", "caseCount"):
+        if (
+            manifest.get(field) != agreement.get(field)
+            or lifecycle.get(field) != agreement.get(field)
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review source field differs: {field}"
+            )
+    if manifest.get("files") != _inventory(root):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review evidence manifest inventory is stale"
+        )
+
+    reviewers = manifest.get("reviewers")
+    if not isinstance(reviewers, Mapping) or set(reviewers) != {
+        "reviewerA",
+        "reviewerB",
+    }:
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review reviewer inventory is invalid"
+        )
+    reviewer_ids: list[str] = []
+    for label, filename, agreement_key in (
+        ("reviewerA", "reviewer-a.sealed.jsonl", "reviewA"),
+        ("reviewerB", "reviewer-b.sealed.jsonl", "reviewB"),
+    ):
+        descriptor = reviewers[label]
+        if not isinstance(descriptor, Mapping):
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review {label} descriptor is invalid"
+            )
+        sheet_path = root / "reviews" / filename
+        sheet_manifest = load_json(_sidecar_path(sheet_path))
+        rows = load_jsonl(sheet_path)
+        reviewer_id = str(descriptor.get("reviewerId") or "")
+        reviewer_ids.append(reviewer_id)
+        if (
+            descriptor.get("sealedPath") != f"reviews/{filename}"
+            or descriptor.get("sha256") != sha256_file(sheet_path)
+            or sheet_manifest.get("schemaVersion") != ANSWER_REVIEW_SCHEMA
+            or sheet_manifest.get("artifact") != "SEALED_ANSWER_REVIEW_SHEET"
+            or sheet_manifest.get("lifecycle") != "SEALED"
+            or sheet_manifest.get("reviewerId") != reviewer_id
+            or sheet_manifest.get("sheetSha256") != sha256_file(sheet_path)
+            or sheet_manifest.get("sourceRunId") != agreement.get("sourceRunId")
+            or sheet_manifest.get("sourceReportSha256")
+            != agreement.get("sourceReportSha256")
+            or (agreement.get(agreement_key) or {}).get("reviewerId") != reviewer_id
+            or (agreement.get(agreement_key) or {}).get("sha256")
+            != sha256_file(sheet_path)
+            or (agreement.get(agreement_key) or {}).get("path")
+            != f"reviews/{filename}"
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review {label} sealed binding is invalid"
+            )
+        if len(rows) != agreement.get("caseCount"):
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review {label} case count is invalid"
+            )
+        ids: set[str] = set()
+        for index, row in enumerate(rows, 1):
+            if (
+                not isinstance(row, Mapping)
+                or set(row) != _ROW_FIELDS
+                or row.get("reviewerId") != reviewer_id
+                or row.get("schemaVersion") != ANSWER_REVIEW_SCHEMA
+                or row.get("guidelinesVersion") != ANSWER_REVIEW_GUIDELINES_VERSION
+            ):
+                raise CustomerServiceAnswerReviewError(
+                    f"pending answer-review {label} row {index} is invalid"
+                )
+            case_id = str(row.get("caseId") or "")
+            if not case_id or case_id in ids:
+                raise CustomerServiceAnswerReviewError(
+                    f"pending answer-review {label} case IDs are invalid"
+                )
+            ids.add(case_id)
+            _validate_labels(
+                row.get("labels"),
+                label=f"pending answer-review {label} row {index}.labels",
+                require_complete=True,
+            )
+    if len(set(reviewer_ids)) != 2 or lifecycle.get("reviewers") != reviewer_ids:
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review reviewers are not independent"
+        )
+
+    template_path = root / "adjudication.template.jsonl"
+    template_rows = load_jsonl(template_path)
+    disagreement_ids = [
+        str(item.get("caseId") or "") for item in agreement.get("disagreements") or []
+    ]
+    if (
+        len(template_rows) != agreement.get("disagreementCaseCount")
+        or {str(row.get("caseId") or "") for row in template_rows}
+        != set(disagreement_ids)
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review adjudication template coverage is invalid"
+        )
+    for index, row in enumerate(template_rows, 1):
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != _ADJUDICATION_FIELDS
+            or row.get("schemaVersion") != ANSWER_REVIEW_ADJUDICATION_SCHEMA
+            or row.get("finalLabels") != _blank_labels()
+            or row.get("adjudicator") != ""
+            or row.get("reason") != ""
+        ):
+            raise CustomerServiceAnswerReviewError(
+                f"pending answer-review adjudication template row {index} is invalid"
+            )
+    template_sha = sha256_file(template_path)
+    template_descriptor = manifest.get("adjudicationTemplate") or {}
+    if (
+        template_descriptor.get("path") != "adjudication.template.jsonl"
+        or template_descriptor.get("sha256AtExport") != template_sha
+        or template_descriptor.get("caseCount") != len(template_rows)
+        or lifecycle.get("adjudicationTemplatePath")
+        != "adjudication.template.jsonl"
+        or lifecycle.get("adjudicationTemplateSha256AtExport") != template_sha
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review adjudication template binding is invalid"
+        )
+    if (
+        manifest.get("agreement", {}).get("exactAgreementCaseCount")
+        != agreement.get("exactAgreementCaseCount")
+        or manifest.get("agreement", {}).get("disagreementCaseCount")
+        != agreement.get("disagreementCaseCount")
+        or manifest.get("agreement", {}).get("caseAgreementRate")
+        != agreement.get("caseAgreementRate")
+        or lifecycle.get("exactAgreementCaseCount")
+        != agreement.get("exactAgreementCaseCount")
+        or lifecycle.get("disagreementCaseCount")
+        != agreement.get("disagreementCaseCount")
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review agreement summary is invalid"
+        )
+    writable = [
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.stat().st_mode & 0o222
+    ]
+    if writable:
+        raise CustomerServiceAnswerReviewError(
+            f"pending answer-review evidence is writable: {writable}"
+        )
+    return {
+        "verified": True,
+        "root": str(root),
+        "sourceRunId": manifest.get("sourceRunId"),
+        "caseCount": manifest.get("caseCount"),
+        "disagreementCaseCount": agreement.get("disagreementCaseCount"),
+        "sha256SumsSha256": sha256_file(sums_path),
+    }
 
 
 def verify_answer_review_evidence(root: Path) -> dict[str, Any]:

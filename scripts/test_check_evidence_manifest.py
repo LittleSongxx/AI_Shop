@@ -1,5 +1,6 @@
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 
 from check_evidence_manifest import (
@@ -8,6 +9,7 @@ from check_evidence_manifest import (
     _parse_sums,
     _validate_auxiliary_evidence,
     _validate_benchmarks,
+    _validate_customer_service_answer_review,
     _validate_diagnostic_evidence,
     _validate_failed_final_attempts,
     _validate_lock,
@@ -177,6 +179,22 @@ def test_current_customer_service_report_is_human_verified_but_release_fail_clos
     assert report["humanReviewPlan"]["adjudicationComplete"] is True
     assert "customerServiceGoldDraft" not in manifest["evaluation"]
     assert "historicalDraft" not in descriptor
+
+
+def test_pending_http_answer_review_requires_the_frozen_agreement_summary() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReview"])
+
+    errors: list[str] = []
+    _validate_customer_service_answer_review(root, descriptor, errors)
+    assert errors == []
+
+    descriptor["pendingEvidence"]["disagreementCaseCount"] = 7
+    errors = []
+    _validate_customer_service_answer_review(root, descriptor, errors)
+
+    assert any("agreement summary differs" in error for error in errors)
 
 
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:

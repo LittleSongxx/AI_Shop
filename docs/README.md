@@ -46,7 +46,7 @@ python -m evaluation.cli customer-service-http rebuild --source-report <raw-repo
 `AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/`；
 不得把规则基线、模型自评或 `pass^k` 当成线上成功率；当前 scorecard 同步引用 60 条 HUMAN_VERIFIED 客服 gold，但 `releaseGateEligible=false`，后续标签修订必须生成新版本。
 
-同一 60 条的正式 HTTP Agent 路径证据位于 `customer-service-http-v1-20260823/`；当前完成执行/路由/转人工口径，答案语义质量待独立人工盲审。
+同一 60 条的正式 HTTP Agent 路径证据位于 `customer-service-http-v1-20260823/`；答案双人盲审已封存为 `PENDING_ADJUDICATION`，案件级完全一致 `52/60`、待第三人仲裁 `8`。这只是标注一致性，最终答案语义质量指标仍不可发布。
 新增 60 条 v2 数据及两份盲标表位于 `evaluation/datasets/customer_service/`，状态为 draft；仲裁前不与 v1 合并。Search 10 条难例回放位于
 `evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823/`，只用于已知难例回归和优化对照，不替代 v9 final。
 

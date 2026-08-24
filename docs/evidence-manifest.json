@@ -8,7 +8,7 @@
     },
     "scorecard": {
       "path": "docs/evaluation/AI质量评测与Badcase.json",
-      "sha256": "8924da224be58fde280280a743cef1d946f0641c30a588de2af1e69e6f4cb9d3",
+      "sha256": "8e9a6f9b084fc7260a8d01a6db99c35b8adc252a880276d252d3ac46cd10f3b3",
       "schemaVersion": "aishop-quality-scorecard/v1",
       "derivedFrom": "evaluation.currentEvidence"
     },
@@ -72,28 +72,21 @@
       ]
     },
     "customerServiceAnswerReview": {
-      "status": "PENDING_HUMAN_REVIEW",
+      "status": "PENDING_ADJUDICATION",
       "releaseGateEligible": false,
       "sourceRunId": "customer-service-http-v1-20260823",
       "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/report.json",
       "sourceReportSha256": "c55702515dea1e9af4a6db8690103248cf1df5ae95cdad5092dcd919f9770c1f",
       "caseCount": 60,
-      "reviewSheets": [
-        {
-          "reviewerId": "reviewer-a",
-          "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v2/reviewer-a.open.jsonl",
-          "sha256": "303116f23eed385a0e5e177396a724c42631105d0441cf821f7680c882c846d4",
-          "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v2/reviewer-a.open.jsonl.manifest.json",
-          "manifestSha256": "b4427eb351690f37db34aa62dbfcb78f6c255f2070b6c9332423b31bffbb4dec"
-        },
-        {
-          "reviewerId": "reviewer-b",
-          "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v2/reviewer-b.open.jsonl",
-          "sha256": "7e4a8826bec10b06054c30b12e546b75504bbf98f88b81d56587052b64c3f09d",
-          "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v2/reviewer-b.open.jsonl.manifest.json",
-          "manifestSha256": "7bd04f8960e0c30fc01b8328ae11d7a4a4a3cf29c8d354e0f7ef18e026dc8712"
-        }
-      ]
+      "pendingEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824",
+        "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+        "sha256SumsSha256": "a0e169adccf00260ae4249593018222a09c0ef836ee7681058d586430924c149",
+        "exactAgreementCaseCount": 52,
+        "disagreementCaseCount": 8,
+        "caseAgreementRate": 0.866667,
+        "releaseGateEligible": false
+      }
     },
     "pricingEstimate": {
       "path": "docs/evaluation/model-pricing-estimate-20260824.json",
@@ -407,7 +400,7 @@
       }
     ]
   },
-  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package and a 60/60 production HTTP observation run; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. HTTP answer correctness, citation support, handoff appropriateness, and unsafe-answer rate remain pending two-person human review, while redacted HTTP slots remain UNAVAILABLE. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
+  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package and a 60/60 production HTTP observation run; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. Two independent HTTP-answer reviews are sealed: 52/60 cases have four-label exact agreement and 8 cases await independent third-person adjudication, so final answer correctness, citation support, handoff appropriateness, and unsafe-answer rate remain unavailable; redacted HTTP slots remain UNAVAILABLE. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
   "visibleRuns": {
     "development": {
       "runId": "development-20260822-ai-quality-v9",

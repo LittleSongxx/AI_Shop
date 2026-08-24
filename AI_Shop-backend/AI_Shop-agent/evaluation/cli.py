@@ -107,7 +107,9 @@ from evaluation.customer_service_answer_review import (
     seal_answer_review_sheet,
     validate_answer_review_sheet,
     verify_answer_review_evidence,
+    verify_pending_answer_review_evidence,
     write_answer_review_evidence,
+    write_pending_answer_review_evidence,
 )
 from evaluation.customer_service_review import (
     compare_human_reviews,
@@ -342,6 +344,19 @@ def build_parser() -> argparse.ArgumentParser:
     customer_http_compare.add_argument("--output", type=Path, required=True)
     customer_http_compare.add_argument("--markdown-output", type=Path)
     customer_http_compare.add_argument("--adjudication-output", type=Path)
+    customer_http_package = customer_http_commands.add_parser(
+        "review-package",
+        help="freeze completed dual reviews and export a separate adjudication input",
+    )
+    customer_http_package.add_argument("--report", type=Path, required=True)
+    customer_http_package.add_argument("--review-a", type=Path, required=True)
+    customer_http_package.add_argument("--review-b", type=Path, required=True)
+    customer_http_package.add_argument("--output-dir", type=Path, required=True)
+    customer_http_package.add_argument(
+        "--adjudication-output",
+        type=Path,
+        help="optional writable third-reviewer JSONL output outside the evidence package",
+    )
     customer_http_merge = customer_http_commands.add_parser(
         "review-merge", help="merge two sealed reviews and optional third-person adjudication"
     )
@@ -354,6 +369,11 @@ def build_parser() -> argparse.ArgumentParser:
         "review-verify", help="verify an immutable answer-review evidence package"
     )
     customer_http_verify.add_argument("--evidence-dir", type=Path, required=True)
+    customer_http_pending_verify = customer_http_commands.add_parser(
+        "review-pending-verify",
+        help="verify an immutable pending-adjudication answer-review package",
+    )
+    customer_http_pending_verify.add_argument("--evidence-dir", type=Path, required=True)
     customer_review = commands.add_parser(
         "customer-service-review",
         help="export, validate, or merge two blinded customer-service review sheets",
@@ -1263,6 +1283,32 @@ async def _main(args: argparse.Namespace) -> int:
                 }
             )
             return 0
+        if args.customer_http_command == "review-package":
+            agreement = compare_answer_reviews(
+                args.report,
+                args.review_a,
+                args.review_b,
+            )
+            verification = write_pending_answer_review_evidence(
+                args.report,
+                agreement,
+                review_a_path=args.review_a,
+                review_b_path=args.review_b,
+                output_dir=args.output_dir,
+                adjudication_output=args.adjudication_output,
+            )
+            _print(
+                {
+                    "status": agreement["status"],
+                    "caseCount": agreement["caseCount"],
+                    "exactAgreementCaseCount": agreement["exactAgreementCaseCount"],
+                    "disagreementCaseCount": agreement["disagreementCaseCount"],
+                    "caseAgreementRate": agreement["caseAgreementRate"],
+                    "fieldStats": agreement["fieldStats"],
+                    "verification": verification,
+                }
+            )
+            return 0
         if args.customer_http_command == "review-merge":
             final_report, agreement = merge_answer_reviews(
                 args.report,
@@ -1291,6 +1337,9 @@ async def _main(args: argparse.Namespace) -> int:
             return 0
         if args.customer_http_command == "review-verify":
             _print(verify_answer_review_evidence(args.evidence_dir))
+            return 0
+        if args.customer_http_command == "review-pending-verify":
+            _print(verify_pending_answer_review_evidence(args.evidence_dir))
             return 0
         raise AssertionError(
             f"unhandled customer-service HTTP command: {args.customer_http_command}"

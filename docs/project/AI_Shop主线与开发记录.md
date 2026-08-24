@@ -64,7 +64,7 @@
 
 - 新增客服 HTTP 评测器，60 条 HUMAN_VERIFIED gold 全部走正式 Agent/Java/RAG/LLM 路径；执行 `60/60`，HTTP Intent Macro-F1 `0.955299`，handoff `TP=14/TN=46/FP=0/FN=0`。
 - 修正两个证据口径：HTTP Episode 脱敏槽位不再计分；Slot F1 改为标准 `2TP/(2TP+FP+FN)=688/758`，每次分层 bootstrap 重算 micro F1，95% CI 为 `[0.888889, 0.926454]`。
-- 原 6 条 citation contract 告警的证据实际在 `RAG_RETRIEVAL` trace；扩展来源提取并用原 observation 离线重建后违规为 `0`，没有重跑 Provider。答案语义质量仍待两份独立人工盲审。
+- 原 6 条 citation contract 告警的证据实际在 `RAG_RETRIEVAL` trace；扩展来源提取并用原 observation 离线重建后违规为 `0`，没有重跑 Provider。该时点起答案语义质量进入独立双人盲审，后续封存与仲裁状态见 2026-08-24 记录。
 - 生成客服 v2 新增 60 条 draft：20 个 intent 各 3 条，hard 35，高风险 9，应转人工 16。双人盲标 sheet 已就绪，仲裁前不与 v1 合并或报分。
 - 执行 10 条 Search hard-negative 真实成对回放：Recall/MRR/NDCG 前后 delta 均为 `0`，硬约束违规 `0`；仍保留 `23/34/47` 三个多商品/集合意图/比较对象难例，未改 qrels 或 v9 final。
 - 客服 HTTP 本地 P50/P95/P99 为 `1014.1/15212.5/60141.6 ms`；token `114720/6649`，32 次 Provider call 中 31 次未定价、1 次缺 usage，因此 `costCny=null`。这些是本地诊断，不是生产 SLO。
@@ -84,9 +84,10 @@
 - 重启后 readiness 复核通过：MySQL、Redis、RabbitMQ、Worker、Java Gateway、MCP 和 Elasticsearch 1024 维向量 mapping 全部正常；Python 固定使用 Conda `shop`。
 - 新增 Agent 单次生成 hard deadline `AGENT_LLM_CALL_DEADLINE_SECONDS=45`，与 graph/Worker `120s` 总 deadline 分层。超时保留 `LLM_TIMEOUT`、trace 和 `MISSING_USAGE`，不伪造成功。
 - 容量 benchmark v5 加入 warm-up `4`（不进分母），正式 4 case × 并发 `1/2/4/8` × 每档 `20`，共 `80/80` 安全执行；QPS `0.396/0.641/0.965/1.353`，混合 P50/P95/P99（c8）`1051.5/10505.0/12032.6ms`，LLM 路径 P95 `10.211/9.852/10.574/12.013s`，badcase `0`。证据包 `capacity-readonly-v5-20260824`，仍明确 `notProductionSlo=true`。
-- 清理客服 HTTP 旧 v1 单人评分实现和旧空表；v2 双人盲审、封存、第三人仲裁成为唯一答案语义主线。未完成人工审查前，答案正确率、引用支持率、转人工适当率和 unsafe-answer rate 保持 pending。
+- 清理客服 HTTP 旧 v1 单人评分实现和旧空表；v2 双人盲审、封存、第三人仲裁成为唯一答案语义主线。双人封存后仍必须完成独立第三人仲裁，才可发布答案正确率、引用支持率、转人工适当率和 unsafe-answer rate。
 - 新增带 URL、抓取时间、区域、模型 fingerprint 和页面 SHA-256 的目录价估算证据：`qwen3.7-plus` 北京 ≤256K 原价输入/输出 `2/8 CNY per 1M tokens`。状态固定为 `ESTIMATED_LIST_PRICE`，不改运行时 `UNPRICED`，不启用费用门禁；真实合同/账单仍未知。
 - 相关单测、manifest checker、compileall 和 readiness 已通过；v5 比 v4 样本更大但仍是共享本机/外部 Provider 描述性诊断，不能声称严格因果或生产容量提升。
+- 客服 HTTP 最终答案的两份 60 条盲审已完整封存：四标签案件级完全一致 `52/60=0.866667`，`8` 条分歧已冻结为只读待仲裁包；answer correctness 与 citation support 的一致性分别为 `54/60`（κ `0.446154`）和 `58/60`（κ `0.942857`），handoff/unsafe 均为 `60/60`。这些是标注可靠性而非模型质量率，最终指标仍为 `PENDING_ADJUDICATION`。
 
 ## 关键踩坑、排错与效果
 
@@ -115,7 +116,7 @@
 | 生成式导购 | 适合作为受控解释/澄清层 | 候选和交易事实不交给 LLM 生成；没有行为序列、ranker、A/B，不能称工业个性化推荐 |
 | 可信 RAG | 工程路径成熟 | 版本/注入隔离、最小证据、引用、拒答；当前 lexical 指标不是人工语义真值 |
 | 业务 Agent | 可靠执行边界清晰 | 确认后 Java 写入、幂等、未知结果和终态校验；客服理解已有 60 条 HUMAN_VERIFIED 离线金标 |
-| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标、容量诊断和 fail-closed；仍缺真实行为、独立答案盲评和生产压测 |
+| 评测发布 | 证据纪律较完整 | current/archive、SHA-256、数据互斥、客服人工金标、容量诊断和 fail-closed；仍缺真实行为、最终仲裁后的 HTTP 答案金标和生产压测 |
 
 与传统搜索和前沿生成式搜推的取舍：型号、数字、品牌、否定词必须保留倒排/结构化硬约束；向量用于同义泛化；LLM 只在候选集内做
 澄清、比较和 grounded explanation。直接让 LLM 生成商品 ID 会把幻觉、库存和报价时变性带入交易边界，不适合当前项目。
@@ -128,10 +129,10 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 ## 当前边界与下一步
 
 - 客服 gold 当前主线为 `HUMAN_VERIFIED`；release gate 仍显式关闭，避免把离线人工金标误写成线上成功率。
-- 先完成客服 HTTP 答案的两份人工盲审，再报答案正确率、引用支持率、转人工适当性和 unsafe-answer rate。
+- 由独立第三人完成客服 HTTP 答案的 `8` 条分歧仲裁，再报答案正确率、引用支持率、转人工适当性和 unsafe-answer rate。
 - 完成 v2 新增 60 条的双人盲标/仲裁后，生成 120 条 HUMAN_VERIFIED v2 并重算分层 CI；当前 draft 不可报分。
 - 每次修改都要保留指标级 badcase、输入/gold/prediction、根因和新旧数据集哈希；Search hard negative 继续只做 paired replay，不改标签刷分。
 - Search 成对回放基线已固定；后续只针对 `23/34/47` 做 query decomposition/对象保留的可见集 A/B，不能改标签或重刷 final 制造提升。
 - 当前容量曲线只证明本地短时只读诊断可运行；固定独占环境的 warm-up、steady-state、stress/soak 和 Provider 分层完成前，不新增生产 SLO 结论。
 - 当前真实账单价格和 endpoint 合同仍未核验；目录价估算仅用于面试中的成本量级说明，不能写成实际单请求成本。
-- 真实曝光/点击/购买、人工盲评和授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论。
+- 真实曝光/点击/购买、最终 HTTP 答案仲裁和授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论。

@@ -6,6 +6,8 @@
 
 已完成的 `intent/risk/slot/shouldHandoff` 人工金标在另一个 evidence 包中；本次只判断答案是否答对、引用是否支持、转人工是否合适，以及是否存在不安全回答。
 
+当前这批表已由两位标注者完成并封存，状态为 `PENDING_ADJUDICATION`：`52/60` 案件四项标签完全一致，剩余 `8` 条由独立第三人仲裁。这里保留的 `*.open.jsonl` 是已封存输入的可追溯副本，不应再编辑；权威 sealed 包位于 `evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824/`。第三人应编辑项目根目录的 `adjudication.answer-review-v2.open.jsonl`，不要改写本目录中的两份表或 sealed 原件。
+
 ## 2. 文件与双盲要求
 
 - `reviewer-a.open.jsonl`：分配给标注者 A。
@@ -135,7 +137,14 @@ conda run -n shop python -m evaluation.cli customer-service-http review-compare 
 
 第三位仲裁者只需填写 `adjudication.template.jsonl` 中的分歧项。仲裁完成后，不要覆盖原始 open/sealed 文件；由维护者生成新的不可变 evidence 包，并更新报告中的指标、置信区间和逐指标 badcase。
 
+当前批次的只读模板已在待仲裁 evidence 包中，维护者另导出可编辑副本：
+
+```text
+/home/song/code/Java/AI_Shop/adjudication.answer-review-v2.open.jsonl
+```
+
+它只有 8 行。第三人只能填写 `finalLabels`、`adjudicator` 和 `reason`，并且 `adjudicator` 不能为 `reviewer-a` 或 `reviewer-b`。完成后将该文件交回维护者；维护者执行 `review-merge` 并生成最终 read-only 质量证据包。
+
 ## 8. 证据边界
 
 这项审查只代表冻结的 60 条 HTTP observation，不代表线上客服准确率、CSAT、FCR 或未来 Provider 输出的稳定质量。最终报告必须同时保留双人一致率、仲裁数量、各指标数值和 badcase；不能只展示联合通过率。
-
