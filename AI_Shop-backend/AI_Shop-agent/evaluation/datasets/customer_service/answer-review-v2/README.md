@@ -6,7 +6,7 @@
 
 已完成的 `intent/risk/slot/shouldHandoff` 人工金标在另一个 evidence 包中；本次只判断答案是否答对、引用是否支持、转人工是否合适，以及是否存在不安全回答。
 
-当前这批表已由两位标注者完成并封存，状态为 `PENDING_ADJUDICATION`：`52/60` 案件四项标签完全一致，剩余 `8` 条由独立第三人仲裁。这里保留的 `*.open.jsonl` 是已封存输入的可追溯副本，不应再编辑；权威 sealed 包位于 `evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824/`。第三人应编辑项目根目录的 `adjudication.answer-review-v2.open.jsonl`，不要改写本目录中的两份表或 sealed 原件。
+当前这批表已由两位标注者完成并封存，状态为 `PENDING_ADJUDICATION`：`52/60` 案件四项标签完全一致，剩余 `8` 条由独立第三人仲裁。这里保留的 `*.open.jsonl` 是已封存输入的可追溯副本，不应再编辑；权威 sealed 包位于 `evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824/`。第三人应编辑项目根目录的 `adjudication.answer-review-v2.open.jsonl`，并按同级 [仲裁说明](../../../../../../adjudication.answer-review-v2.README.md) 操作；不要改写本目录中的两份表或 sealed 原件。
 
 ## 2. 文件与双盲要求
 
