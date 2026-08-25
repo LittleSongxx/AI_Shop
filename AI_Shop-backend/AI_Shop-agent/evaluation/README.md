@@ -12,7 +12,7 @@ project manifest 绑定的文件不得为了“整理目录”而移动。
 | Final 输入与消费记录 | `datasets/final-inputs/`、`datasets/locks/consumed-final.json` | final 输入不入 Git；消费过的哈希和生命周期保留，禁止复用 |
 | 私有 holdout | `.holdouts/` | v3-v9 的一次性 final 输入，仅本机保留并被 `.gitignore` 排除；哈希见 lifecycle/manifest |
 | 人工客服理解金标 | `datasets/customer_service/gold-v1.jsonl`、`datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl` | 60 条意图、风险、槽位、转人工标签；正式副本和 sealed 原件见客服 HUMAN_VERIFIED package |
-| 人工客服答案审查 | `datasets/customer_service/adjudicated/answer-review-v2-adjudicated.*`、`datasets/customer_service/answer-review-v2/`、`datasets/customer_service/answer-review-v13/` | v1/v13 最终答案标签严格绑定各自 HTTP report 与 answer SHA-256；v20 的填写原件和 final evidence 直接封存在 immutable package；目录内 open sheet 只是历史导出模板，不是最终标签 |
+| 人工客服答案审查 | `datasets/customer_service/adjudicated/answer-review-v2-adjudicated.*` | 本地仅保留运行器读取的 v1 canonical 投影；v1/v13/v20 的 sealed 双评、仲裁和最终标签只保留在对应 immutable evidence package |
 | 客服候选扩展集 | `datasets/customer_service/candidate-v2-additions.*`、`annotation-v2/` | 60 条 draft 与空白双盲模板；`DRAFT_NEEDS_DUAL_HUMAN_REVIEW`，不得进入任何当前质量分母 |
 | 客服契约与 fixtures | `datasets/customer_service/adjudicated/http-*.json` | HTTP 行为契约、隔离 fixture；仅做受控契约/回归 |
 | Search catalog fixture | `fixtures/product-catalog.v1.json`、`fixtures/product-catalog.v2.json` | 离线检索/重放输入，不是生产商品主数据 |
@@ -28,7 +28,7 @@ project manifest 绑定的文件不得为了“整理目录”而移动。
 - 历史 HTTP v1 最终答案：`../evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824/`。
 - 当前 HTTP v13 最终答案：`../evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/`。
 - 当前 HTTP v20 最终答案：`../evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/`；其 pending parent 保留在同名 `-pending-adjudication-20260825/` package。
-- 两个 answer-review package 的 pending 目录是 sealed 双评和空白仲裁模板的不可变 parent，不是待继续编辑的工作区。
+- 各 answer-review package 的 pending 目录是 sealed 双评和空白仲裁模板的不可变 parent，不是待继续编辑的工作区。
 
 `customer_service/adjudicated/` 仅保留运行器读取所需的 canonical 复用投影；它不能替代对应 evidence package 的
 sealed review、adjudication、最终报告和 `SHA256SUMS`。

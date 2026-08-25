@@ -2815,10 +2815,10 @@
     },
     "blindReview": {
       "status": "HUMAN_REVIEWED_ADJUDICATED",
-      "reviewerAPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl",
-      "reviewerASha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
-      "reviewerBPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl",
-      "reviewerBSha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
+      "reviewerAPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/reviews/reviewer-a.sealed.jsonl",
+      "reviewerASha256": "9ca05e5d21075033ab5432c49070f58312a80c707958ea0660e27fffeff7e503",
+      "reviewerBPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/reviews/reviewer-b.sealed.jsonl",
+      "reviewerBSha256": "7931a2692a028f8bba0e09957d78a54a4bb2dadd7f097ead3eeaa40ec25d33e5",
       "caseCount": 60,
       "labelsCompleted": 120,
       "historicalLabelsReusable": false,
@@ -2834,7 +2834,7 @@
       },
       "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
       "pendingEvidenceSha256SumsSha256": "147d770692f503227699b96e26c73a36ba95320c3effd6f6c6c9fa9f28d06258",
-      "adjudicationInputPath": "adjudication.answer-review-v13.final.jsonl"
+      "adjudicationInputPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/reviews/adjudication.final.jsonl"
     },
     "finalEvidence": {
       "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824",

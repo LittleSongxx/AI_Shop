@@ -356,7 +356,8 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=REPO_ROOT / "docs/project/closure-evidence/order-facts-contract-v1-20260825",
+        required=True,
+        help="New output directory for the immutable closure evidence package",
     )
     args = parser.parse_args()
     write_report(args.output_dir.resolve())

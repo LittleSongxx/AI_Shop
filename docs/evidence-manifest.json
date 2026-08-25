@@ -28,7 +28,7 @@
       "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
       "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
       "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
-      "reportSha256": "acc1c253424ab82d7adc42085f32d32cc044557a544f891febcb578444d9b4e7",
+      "reportSha256": "001b99696d40fc81fae53d3124ef69c5ba8e6a65541dd1120d635401f8f5eae8",
       "caseCount": 60,
       "status": "HUMAN_VERIFIED",
       "releaseGateEligible": false,
@@ -138,22 +138,6 @@
         "sha256SumsSha256": "34fd92ac62facaa58f129ff591c8e2a545182fffc79b893f808101bd05f3ae8c",
         "sourceObservationReportSha256": "46916afcf1bb77a7b10e6adb2e4183cd37302becdc187439451180ce5beae805"
       },
-      "reviewSheets": [
-        {
-          "reviewerId": "reviewer-a",
-          "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl",
-          "sha256": "3e4fdbc639aeee9650bdcaca24f3e33fb9fe725e1c2f3529cda8d7eb2c985fa6",
-          "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-a.open.jsonl.manifest.json",
-          "manifestSha256": "d272cfda2cca600cdc828ecf3128248c4378785c8b707294ddd6e039bd682ecd"
-        },
-        {
-          "reviewerId": "reviewer-b",
-          "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl",
-          "sha256": "e6476c4389ca8b5a41656129b890a202b50a0e04c1f577bfd2bdec63de3884aa",
-          "manifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/answer-review-v13/reviewer-b.open.jsonl.manifest.json",
-          "manifestSha256": "f02ee16320a11ab6e31967c7520e0b00ef0234f1e9a1159da454980a78a60912"
-        }
-      ],
       "pendingEvidence": {
         "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
         "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
@@ -465,27 +449,6 @@
         "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
         "caseCount": 60,
         "sha256SumsSha256": "d366f934097f3c825ad5d2db7cd5d97741ba6121ea399f36301a02347a0240ae"
-      },
-      {
-        "kind": "customer-service-http",
-        "packageId": "customer-service-http-v16-20260825",
-        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v16-20260825",
-        "runId": "customer-service-http-v16-20260825",
-        "sha256SumsSha256": "0ccf5289a5fcd234940b3e24b3e9fa818dc27c3afe96858872a6df08700e6695"
-      },
-      {
-        "kind": "customer-service-http",
-        "packageId": "customer-service-http-v17-20260825",
-        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v17-20260825",
-        "runId": "customer-service-http-v17-20260825",
-        "sha256SumsSha256": "53f8391820b7453f6f8caf2cc769b72dde8abad4632ba081ce3c0c65ab501304"
-      },
-      {
-        "kind": "customer-service-http",
-        "packageId": "customer-service-http-v18-20260825",
-        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v18-20260825",
-        "runId": "customer-service-http-v18-20260825",
-        "sha256SumsSha256": "98ea0078a446450cc3e862c37e7c8452f64acafbba73b4d9de0cb565ded2e895"
       },
       {
         "kind": "customer-service-http",

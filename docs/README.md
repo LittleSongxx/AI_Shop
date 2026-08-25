@@ -20,7 +20,6 @@
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/` | v20 sealed 双评、4 条第三人仲裁、最终指标、CI、11 条 badcase 与哈希 | `HUMAN_REVIEWED_ADJUDICATED`；当前冻结答案质量证据，非 release gate |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-pending-adjudication-20260825/` | v20 双人 sealed 原件、案件/字段一致性和 4 条仲裁模板 | 已完成的只读 parent package，`PENDING_ADJUDICATION`；非 release gate |
 | `customer-service-http-v11-targeted-stale-worker-20260824/` + `v12-targeted-after-worker-restart-20260824/` | 独立 MCP 仍加载旧源码的定向复现，以及重启后恢复对照 | 成对、只读 runtime-version 诊断；不进入质量分母 |
-| `evaluation/datasets/customer_service/answer-review-v13/` | v13 两份原始空白模板与 manifest（填写版已封存在 evidence package） | 历史导出模板；最终标签只认 adjudicated package |
 | [evidence-manifest.json](evidence-manifest.json) | current、archive、visible run、哈希和生命周期机器索引 | 机器校验入口 |
 
 项目根目录的 [Java 后端面试报告](../AI应用开发_Java后端_真实面试题与备考报告_20260824.md) 是独立的求职研究材料，不与项目开发日志重复合并。
