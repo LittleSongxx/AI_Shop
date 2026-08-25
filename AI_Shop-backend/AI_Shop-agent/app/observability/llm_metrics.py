@@ -38,6 +38,8 @@ def reset_run_cost() -> None:
     _RUN_COST.set(
         {
             "calls": 0,
+            "attempts": 0,
+            "failed_calls": 0,
             "input_tokens": 0,
             "output_tokens": 0,
             "cost_cny": 0.0,
@@ -56,6 +58,8 @@ def _run_cost_state() -> dict:
     if state is None:
         state = {
             "calls": 0,
+            "attempts": 0,
+            "failed_calls": 0,
             "input_tokens": 0,
             "output_tokens": 0,
             "cost_cny": 0.0,
@@ -176,6 +180,7 @@ def record_llm_usage(
     )
     state = _run_cost_state()
     state["calls"] += 1
+    state["attempts"] += 1
     if token_counts["input"] is not None:
         state["input_tokens"] += token_counts["input"]
     if token_counts["output"] is not None:
@@ -219,8 +224,9 @@ def snapshot_cost_summary(*, tools_called: list[str] | None = None) -> dict:
     固定成本计入 llmCalls。
     """
     state = _RUN_COST.get() or {}
-    calls = int(state.get("calls") or 0)
-    path = "heavy" if tools_called else ("light" if calls else "none")
+    successful_calls = int(state.get("calls") or 0)
+    attempts = int(state.get("attempts") or successful_calls)
+    path = "heavy" if tools_called else ("light" if attempts else "none")
     missing_usage_calls = int(state.get("missing_usage_calls") or 0)
     unpriced_calls = int(state.get("unpriced_calls") or 0)
     priced_calls = int(state.get("priced_calls") or 0)
@@ -238,31 +244,47 @@ def snapshot_cost_summary(*, tools_called: list[str] | None = None) -> dict:
         cost = None
     return {
         "path": path,
-        "llmCalls": calls,
+        "llmCalls": attempts,
+        "successfulLlmCalls": successful_calls,
+        "failedLlmCalls": int(state.get("failed_calls") or 0),
         "inputTokens": int(state.get("input_tokens") or 0),
         "outputTokens": int(state.get("output_tokens") or 0),
-        "providerCalls": calls,
+        "providerCalls": attempts,
+        "providerAttempts": attempts,
         "pricedCalls": priced_calls,
         "unpricedCalls": unpriced_calls,
         "missingUsageCalls": missing_usage_calls,
         "costCny": cost,
         "costStatus": cost_status,
         "usageSources": sorted(state.get("usage_sources") or [])
-        if calls
+        if attempts
         else ["not_applicable"],
         "missingReasons": dict(sorted((state.get("missing_reasons") or {}).items())),
-        "notApplicableReason": "no_llm_call" if not calls else None,
+        "notApplicableReason": "no_llm_call" if not attempts else None,
         "models": sorted(state.get("models") or []),
     }
 
 
-def record_llm_failure(model: str, *, fallback: bool = False) -> None:
+def record_llm_failure(
+    model: str,
+    *,
+    fallback: bool = False,
+    missing_reason: str = "provider_error_before_usage",
+) -> None:
     """Record one provider call that raised or was deliberately cancelled."""
     LLM_CALL_TOTAL.labels(
         model=str(model or "unknown"),
         fallback="true" if fallback else "false",
         result="error",
     ).inc()
+    state = _run_cost_state()
+    state["attempts"] += 1
+    state["failed_calls"] += 1
+    state["missing_usage_calls"] += 1
+    reasons = state.setdefault("missing_reasons", {})
+    reasons[missing_reason] = int(reasons.get(missing_reason, 0)) + 1
+    state.setdefault("usage_sources", set()).add("none")
+    state.setdefault("models", set()).add(str(model or "unknown"))
 
 
 async def invoke_llm_with_metrics(
@@ -292,7 +314,11 @@ async def invoke_llm_with_metrics(
             async with asyncio.timeout(effective_timeout):
                 response = await llm.ainvoke(messages)
         except asyncio.CancelledError:
-            record_llm_failure(resolved_model, fallback=fallback)
+            record_llm_failure(
+                resolved_model,
+                fallback=fallback,
+                missing_reason="cancelled_before_usage",
+            )
             episode_service.record_step(
                 "LLM_CALL",
                 node_name="llm",
@@ -314,7 +340,15 @@ async def invoke_llm_with_metrics(
             raise
         except Exception as exc:
             error = exc
-            record_llm_failure(resolved_model, fallback=fallback)
+            record_llm_failure(
+                resolved_model,
+                fallback=fallback,
+                missing_reason=(
+                    "call_deadline_exceeded_before_usage"
+                    if isinstance(exc, TimeoutError)
+                    else "provider_error_before_usage"
+                ),
+            )
             span.record_exception(exc)
             raise
         else:

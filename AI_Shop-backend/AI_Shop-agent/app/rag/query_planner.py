@@ -157,8 +157,23 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
     if "演示" in text and any(term in text for term in ("资金", "扣款", "扣除")):
         add("payment.demo_no_real_funds")
     if (
-        any(term in text for term in ("退货申请", "售后申请", "退货退款", "退款"))
-        and any(term in text for term in ("订单详情", "入口", "发起", "申请", "到账", "支付渠道"))
+        any(term in text for term in ("退货申请", "售后申请", "退货退款", "退款", "退货"))
+        and any(
+            term in text
+            for term in (
+                "订单详情",
+                "入口",
+                "发起",
+                "申请",
+                "到账",
+                "支付渠道",
+                "条件",
+                "资格",
+                "规则",
+                "政策",
+                "要求",
+            )
+        )
     ):
         add("aftersales.request_and_refund_boundary")
     if "幂等键" in text and any(

@@ -11,10 +11,14 @@
 | [evaluation/customer-service/客服金标评测.json](evaluation/customer-service/客服金标评测.json) | 客服评测逐 case、canonical slot 诊断和 badcase | 可复核机器证据 |
 | [评测输入资产索引](../AI_Shop-backend/AI_Shop-agent/evaluation/README.md) | 可见数据集、私有 holdout、人工标注输入、fixtures、lock 与运行生命周期分类 | 可复现输入入口 |
 | [不可变结果资产索引](../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/README.md) | current/archive、人工审查、客服 HTTP、Search/Agent/DB/fault/capacity 结果分类 | `SHA256SUMS` 证据入口 |
+| [结果与数据集索引](evaluation/结果与数据集索引.md) | 当前结果、HTTP observation、人工审查生命周期、数据集状态和本地原始 observation 边界 | 稳定整理入口；不替代 immutable package |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824/` | 历史 v1 60 条 HTTP 最终答案的双盲+第三人仲裁、CI 与 badcase | `HUMAN_REVIEWED_ADJUDICATED`；非 release gate |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/` | 修复 sourceRefs 后的 60 条真实 HTTP observation、行为契约与 usage | 原始 report 保持 `PENDING_HUMAN_REVIEW`；执行/契约不等于答案质量 |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/` | v13 sealed 双评、11 条第三人仲裁、最终指标、CI、badcase 与哈希 | `HUMAN_REVIEWED_ADJUDICATED`；冻结回放证据，非 release gate |
 | `evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/` | v13 双人 sealed 原件、案件/字段一致性、11 条空白仲裁模板和哈希 | 已完成的只读 parent package，`PENDING_ADJUDICATION`；非 release gate |
+| `evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/` | 当前源码指纹下的 60 条真实 HTTP replay、行为契约、usage 和本地延迟 | 源 report 保持生成时 `PENDING_HUMAN_REVIEW`；执行指标不等于答案质量 |
+| `evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/` | v20 sealed 双评、4 条第三人仲裁、最终指标、CI、11 条 badcase 与哈希 | `HUMAN_REVIEWED_ADJUDICATED`；当前冻结答案质量证据，非 release gate |
+| `evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-pending-adjudication-20260825/` | v20 双人 sealed 原件、案件/字段一致性和 4 条仲裁模板 | 已完成的只读 parent package，`PENDING_ADJUDICATION`；非 release gate |
 | `customer-service-http-v11-targeted-stale-worker-20260824/` + `v12-targeted-after-worker-restart-20260824/` | 独立 MCP 仍加载旧源码的定向复现，以及重启后恢复对照 | 成对、只读 runtime-version 诊断；不进入质量分母 |
 | `evaluation/datasets/customer_service/answer-review-v13/` | v13 两份原始空白模板与 manifest（填写版已封存在 evidence package） | 历史导出模板；最终标签只认 adjudicated package |
 | [evidence-manifest.json](evidence-manifest.json) | current、archive、visible run、哈希和生命周期机器索引 | 机器校验入口 |
@@ -59,6 +63,7 @@ python -m evaluation.cli customer-service-http rebuild --source-report <raw-repo
 `6/30=20.0%`、转人工适当率 `60/60`、unsafe-answer `0/60`、联合通过 `32/60=53.3%`。该包是固定 HTTP 回放的人工证据，
 `releaseGateEligible=false`，不能外推为 CSAT/FCR 或线上客服成功率；引用支持缺口必须在新预注册 holdout 上修复和复验。
 修复后的 `customer-service-http-v13-20260824` 已真实执行 `60/60`，并完成动态业务 `sourceRefs` 传播、API/Worker/MCP source fingerprint 预检和免责声明误报评测器修复。其正式包只从原始 Provider observation 做确定性离线重算，`providerCallsReexecuted=false`；源 report 的答案质量字段保持 `PENDING_HUMAN_REVIEW`，但外部双评和 11 条独立第三人仲裁已封存为 `HUMAN_REVIEWED_ADJUDICATED`。最终结果为答案正确 `59/60=98.33%`、可计分引用支持 `20/34=58.82%`、转人工适当 `59/60`、unsafe `0/60`、联合质量 `46/60=76.67%`；14 条 badcase 仍主要是动态订单详情、资格规则、工具能力或后果没有同一行可见证据。不得把 v13 的 `60/60`、行为契约 `10/10`、Intent 指标或本地延迟当作人工答案质量，也不能把与历史 v1 的不同冻结输出包装为严格质量提升；历史 v1 的人工标签不得迁移。
+当前 `customer-service-http-v20-20260825` 同样真实执行 `60/60`，并以新随机顺序 A/B 表完成双人盲审；案件级一致 `56/60`，4 条分歧由独立第三人仲裁。最终质量为答案正确 `57/60=95.00%`、引用支持 `25/36=69.44%`、转人工适当 `60/60`、unsafe `1/60`、联合质量 `49/60=81.67%`。11 条 badcase 与 `014` 的售后权益风险必须与指标一起披露；v20 与 v13 是不同冻结输出，不得只挑上升指标表述为严格提升。
 为保留排错证据而不污染主线，v11/v12 的同一 10 条定向对照被单独登记：旧 MCP 运行时包有 `6/10` 行为契约违例，完整重启后恢复包为 `0/10`。它们只证明版本一致性问题曾被复现和消除，不衡量最终答案质量；已被 v13 覆盖的 v5/v10 完整中间运行及其未完成 v3 盲审草稿已删除。
 新增 60 条 v2 数据及两份盲标表位于 `evaluation/datasets/customer_service/`，状态为 draft；仲裁前不与 v1 合并。Search 10 条难例回放位于
 `evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823/`，只用于已知难例回归和优化对照，不替代 v9 final。

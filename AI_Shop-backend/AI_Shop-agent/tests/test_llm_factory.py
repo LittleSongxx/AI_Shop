@@ -129,6 +129,20 @@ def test_chat_llm_can_switch_to_distinct_fallback_model(monkeypatch):
         get_settings.cache_clear()
 
 
+def test_chat_llm_retry_policy_uses_configured_default_and_explicit_zero(
+    monkeypatch,
+):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_MAX_RETRIES", "1")
+    get_settings.cache_clear()
+    try:
+        assert chat_llm_config().max_retries == 1
+        assert chat_llm_config(max_retries=0).max_retries == 0
+        assert chat_llm_config(max_retries=-1).max_retries == 0
+    finally:
+        get_settings.cache_clear()
+
+
 def test_same_model_does_not_enable_fallback(monkeypatch):
     monkeypatch.setenv("LLM_MODEL", "same-model")
     monkeypatch.setenv("LLM_FALLBACK_MODEL", "same-model")

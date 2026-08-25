@@ -15,6 +15,7 @@ from app.services.product_constraint_evidence import evaluate_excluded_terms
 from app.services.product_search_query import (
     comparison_target_terms,
     exact_model_tokens,
+    extract_query_hard_constraints,
     filter_products_by_query_relevance,
     infer_product_category,
     is_comparison_query,
@@ -38,6 +39,10 @@ class ProductRuntimeConstraints:
     excluded_terms: tuple[str, ...] = ()
     use_cases: tuple[str, ...] = ()
     preferred_features: tuple[str, ...] = ()
+    must_terms: tuple[str, ...] = ()
+    must_not_terms: tuple[str, ...] = ()
+    comparison_targets: tuple[str, ...] = ()
+    comparison_required: bool = False
 
     def public(self) -> dict[str, Any]:
         return {
@@ -49,6 +54,10 @@ class ProductRuntimeConstraints:
             "excludedTerms": list(self.excluded_terms),
             "useCases": list(self.use_cases),
             "preferredFeatures": list(self.preferred_features),
+            "mustTerms": list(self.must_terms),
+            "mustNotTerms": list(self.must_not_terms),
+            "comparisonTargets": list(self.comparison_targets),
+            "comparisonRequired": self.comparison_required,
         }
 
 
@@ -88,6 +97,9 @@ class ProductSearchTrace:
     partial_failure: bool = False
     deadline_exceeded: bool = False
     result_source: str = "none"
+    comparison_coverage: dict[str, int] = field(default_factory=dict)
+    comparison_complete: bool | None = None
+    incomplete_reason: str | None = None
 
     def public(self) -> dict[str, Any]:
         return {
@@ -109,6 +121,9 @@ class ProductSearchTrace:
             "partialFailure": self.partial_failure,
             "deadlineExceeded": self.deadline_exceeded,
             "resultSource": self.result_source,
+            "comparisonCoverage": dict(self.comparison_coverage),
+            "comparisonComplete": self.comparison_complete,
+            "incompleteReason": self.incomplete_reason,
         }
 
 
@@ -153,6 +168,38 @@ def _unique_text(values: Sequence[Any]) -> tuple[str, ...]:
         value = " ".join(str(raw or "").strip().split())
         if value and value.casefold() not in {item.casefold() for item in result}:
             result.append(value)
+    return tuple(result)
+
+
+def _text_values(value: Any) -> tuple[Any, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Sequence):
+        return tuple(value)
+    return (value,)
+
+
+def _boolean(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def _merge_exclusion_terms(*groups: Any) -> tuple[str, ...]:
+    """Merge exclusions while removing longer terms covered by a shorter one."""
+
+    merged = _unique_text(
+        tuple(item for group in groups for item in _text_values(group))
+    )
+    result: list[str] = []
+    for value in sorted(merged, key=lambda item: (len(item), item.casefold())):
+        folded = value.casefold()
+        if any(existing.casefold() in folded for existing in result):
+            continue
+        result = [item for item in result if folded not in item.casefold()]
+        result.append(value)
     return tuple(result)
 
 
@@ -221,15 +268,42 @@ def build_product_query_plan(
     if comparison_target_only:
         rules.append("comparison_target_excluded_from_requested_category")
 
+    raw_hard = extract_query_hard_constraints(raw)
+    mission_budget_min = _number(hard.get("budgetMin", hard.get("budget_min")))
+    mission_budget_max = _number(hard.get("budgetMax", hard.get("budget_max")))
+    raw_budget_min = _number(raw_hard.get("budget_min"))
+    raw_budget_max = _number(raw_hard.get("budget_max"))
+    budget_mins = [value for value in (mission_budget_min, raw_budget_min) if value is not None]
+    budget_maxes = [value for value in (mission_budget_max, raw_budget_max) if value is not None]
+    mission_must_terms = hard.get("mustTerms", hard.get("must_terms")) or hard.get("requiredTerms", ())
+    mission_must_not_terms = exclusions.get("terms") or ()
+    mission_targets = hard.get("comparisonTargets", hard.get("comparison_targets")) or ()
+    must_terms = _unique_text(
+        (*_text_values(mission_must_terms), *_text_values(raw_hard.get("must_terms")))
+    )
+    must_not_terms = _merge_exclusion_terms(
+        mission_must_not_terms, raw_hard.get("must_not_terms")
+    )
+    comparison_targets = _unique_text(
+        (*_text_values(mission_targets), *_text_values(raw_hard.get("comparison_targets")))
+    )
+    comparison_required = bool(
+        _boolean(hard.get("comparisonRequired", hard.get("comparison_required", False)))
+        or raw_hard.get("comparison_required")
+    )
     constraints = ProductRuntimeConstraints(
         category=category,
-        budget_min=_number(hard.get("budgetMin")),
-        budget_max=_number(hard.get("budgetMax")),
-        required_brands=_unique_text(hard.get("requiredBrands") or ()),
-        excluded_brands=_unique_text(exclusions.get("brands") or ()),
-        excluded_terms=_unique_text(exclusions.get("terms") or ()),
-        use_cases=_unique_text(mission.get("useCases") or ()),
-        preferred_features=_unique_text(soft.get("features") or ()),
+        budget_min=max(budget_mins) if budget_mins else None,
+        budget_max=min(budget_maxes) if budget_maxes else None,
+        required_brands=_unique_text(_text_values(hard.get("requiredBrands"))),
+        excluded_brands=_unique_text(_text_values(exclusions.get("brands"))),
+        excluded_terms=must_not_terms,
+        use_cases=_unique_text(_text_values(mission.get("useCases"))),
+        preferred_features=_unique_text(_text_values(soft.get("features"))),
+        must_terms=must_terms,
+        must_not_terms=must_not_terms,
+        comparison_targets=comparison_targets,
+        comparison_required=comparison_required,
     )
     return ProductQueryPlan(
         raw_query=raw,
@@ -267,7 +341,21 @@ def _product_text(product: Mapping[str, Any]) -> str:
         product.get("category_name"),
         product.get("product_class"),
     )
-    return " ".join(str(value or "") for value in values).casefold()
+    property_values = product.get("property_values") or product.get("propertyValues") or ()
+    property_text = " ".join(
+        " ".join(
+            str(item.get(key) or "")
+            for key in ("property_name", "propertyName", "property_value", "propertyValue")
+        )
+        for item in property_values
+        if isinstance(item, Mapping)
+    )
+    sku_text = " ".join(
+        " ".join(str(item.get(key) or "") for key in ("property_value_ids", "propertyValueIds", "sku_name", "skuName"))
+        for item in (product.get("skus") or ())
+        if isinstance(item, Mapping)
+    )
+    return " ".join((*(str(value or "") for value in values), property_text, sku_text)).casefold()
 
 
 def _product_surface_text(product: Mapping[str, Any]) -> str:
@@ -293,6 +381,54 @@ def _product_price(product: Mapping[str, Any]) -> float | None:
         if value is not None:
             return value
     return None
+
+
+def _compact_text(value: Any) -> str:
+    return "".join(
+        character
+        for character in str(value or "").casefold()
+        if character.isalnum() or "\u4e00" <= character <= "\u9fff"
+    )
+
+
+def _product_matches_term(product: Mapping[str, Any], term: str) -> bool:
+    """Match an explicit hard term against snapshot-backed product text."""
+
+    raw_term = " ".join(str(term or "").strip().split()).casefold()
+    if not raw_term:
+        return True
+    text = _product_text(product)
+    if raw_term in text:
+        return True
+    compact_term = _compact_text(raw_term)
+    compact_product = _compact_text(text)
+    if compact_term and compact_term in compact_product:
+        return True
+    return bool(
+        len(compact_term) >= 3
+        and compact_term[-1:] in {"版", "款"}
+        and compact_term[:-1] in compact_product
+    )
+
+
+def comparison_target_coverage(
+    products: Sequence[Mapping[str, Any]],
+    plan: ProductQueryPlan,
+) -> tuple[dict[str, int], bool | None, str | None]:
+    """Return per-target evidence coverage for an explicit comparison."""
+
+    if not plan.constraints.comparison_required:
+        return {}, None, None
+    targets = plan.constraints.comparison_targets or plan.constraints.must_terms
+    coverage = {str(target): 0 for target in targets if str(target).strip()}
+    if not coverage:
+        return {}, False, "COMPARISON_TARGETS_UNRESOLVED"
+    for product in products:
+        for target in tuple(coverage):
+            if _product_matches_term(product, target):
+                coverage[target] += 1
+    missing = [target for target, count in coverage.items() if count <= 0]
+    return coverage, not missing, "MISSING_COMPARISON_TARGETS" if missing else None
 
 
 def filter_products_by_runtime_constraints(
@@ -324,9 +460,11 @@ def filter_products_by_runtime_constraints(
             product["brand"] = brand
         price = _product_price(product)
         reason: str | None = None
-        if constraints.budget_max is not None and price is not None and price > constraints.budget_max:
+        if (constraints.budget_max is not None or constraints.budget_min is not None) and price is None:
+            reason = "BUDGET_UNVERIFIED"
+        elif constraints.budget_max is not None and price > constraints.budget_max:
             reason = "OVER_BUDGET"
-        elif constraints.budget_min is not None and price is not None and price < constraints.budget_min:
+        elif constraints.budget_min is not None and price < constraints.budget_min:
             reason = "BELOW_BUDGET_RANGE"
         elif required and brand not in required:
             reason = "BRAND_REQUIRED"
@@ -369,7 +507,14 @@ def filter_products_for_query_plan(
 
     candidates = [dict(product) for product in products]
     surface_rejected: list[dict[str, str]] = []
-    model_tokens = exact_model_tokens(plan.raw_query)
+    excluded_model_tokens = {
+        _compact_text(term) for term in plan.constraints.must_not_terms
+    }
+    model_tokens = tuple(
+        token
+        for token in exact_model_tokens(plan.raw_query)
+        if _compact_text(token) not in excluded_model_tokens
+    )
     if model_tokens:
         model_match = any if is_comparison_query(plan.raw_query) else all
         retained_terms = comparison_target_terms(plan.raw_query)
@@ -428,7 +573,14 @@ def filter_products_for_query_plan(
                 )
                 for contract in type_contracts
             ]
-            if any(contract_matches):
+            comparison_target_match = bool(
+                plan.constraints.comparison_required
+                and any(
+                    _product_matches_term(product, target)
+                    for target in plan.constraints.comparison_targets
+                )
+            )
+            if any(contract_matches) or comparison_target_match:
                 matched.append(product)
             else:
                 surface_rejected.append(
@@ -479,6 +631,39 @@ def filter_products_for_query_plan(
                         "reason": "UNKNOWN_CATEGORY_SURFACE_MISMATCH",
                     }
                 )
+        candidates = matched
+    hard_terms = tuple(
+        term for term in plan.constraints.must_terms if str(term or "").strip()
+    )
+    if hard_terms and candidates:
+        if plan.constraints.comparison_required:
+            target_terms = tuple(
+                term
+                for term in (plan.constraints.comparison_targets or hard_terms)
+                if str(term or "").strip()
+            )
+            matched = [
+                product
+                for product in candidates
+                if any(_product_matches_term(product, term) for term in target_terms)
+            ]
+            mismatch_reason = "COMPARISON_TARGET_MISSING"
+        else:
+            matched = [
+                product
+                for product in candidates
+                if all(_product_matches_term(product, term) for term in hard_terms)
+            ]
+            mismatch_reason = "MUST_TERM_MISSING"
+        matched_ids = {id(product) for product in matched}
+        surface_rejected.extend(
+            {
+                "productId": _product_id(product),
+                "reason": mismatch_reason,
+            }
+            for product in candidates
+            if id(product) not in matched_ids
+        )
         candidates = matched
     managed_category = infer_product_category(plan.raw_query)
     if managed_category and candidates and not type_contracts:
@@ -749,12 +934,50 @@ class ProductSearchPipeline:
 
         if eligible:
             trace.provider_calls["rerank"] = 1
+            authoritative_ids = {
+                _product_id(product) for product in eligible if _product_id(product)
+            }
+            rerank_size = min(
+                max(1, candidate_size),
+                max(result_size, len(plan.constraints.comparison_targets)),
+            )
             reranked, rerank_status, rerank_latency = await bounded_stage(
-                "rerank", lambda: rerank(plan.raw_query, eligible, result_size)
+                "rerank", lambda: rerank(plan.raw_query, eligible, rerank_size)
             )
             trace.stage_latency_ms["rerank"] = round(rerank_latency, 4)
             if rerank_status == "OK":
-                eligible = list(reranked or [])
+                reranked_rows = list(reranked or [])
+                unknown_rerank_rows = [
+                    product
+                    for product in reranked_rows
+                    if authoritative_ids and _product_id(product) not in authoritative_ids
+                ]
+                if unknown_rerank_rows:
+                    trace.rejection_counts["RERANK_UNKNOWN_PRODUCT"] = (
+                        trace.rejection_counts.get("RERANK_UNKNOWN_PRODUCT", 0)
+                        + len(unknown_rerank_rows)
+                    )
+                    trace.rejection_reasons.extend(
+                        {
+                            "productId": _product_id(product),
+                            "reason": "RERANK_UNKNOWN_PRODUCT",
+                        }
+                        for product in unknown_rerank_rows
+                    )
+                    reranked_rows = [
+                        product
+                        for product in reranked_rows
+                        if not authoritative_ids
+                        or _product_id(product) in authoritative_ids
+                    ]
+                reranked_eligible, rerank_rejected = filter_products_for_query_plan(
+                    reranked_rows, plan
+                )
+                eligible = reranked_eligible
+                for row in rerank_rejected:
+                    reason = row["reason"]
+                    trace.rejection_counts[reason] = trace.rejection_counts.get(reason, 0) + 1
+                trace.rejection_reasons.extend(rerank_rejected)
                 trace.fallback = any(
                     str(product.get("_search_rerank_source") or "rerank") != "rerank"
                     for product in eligible
@@ -772,6 +995,13 @@ class ProductSearchPipeline:
             trace.provider_calls["rerank"] = 0
             if ranked_ids:
                 trace.result_source = "constraint_miss"
+        coverage, complete, incomplete_reason = comparison_target_coverage(eligible, plan)
+        trace.comparison_coverage = coverage
+        trace.comparison_complete = complete
+        trace.incomplete_reason = incomplete_reason
+        if complete is False:
+            trace.result_source = "comparison_incomplete"
+            eligible = []
         trace.result_count = len(eligible)
         trace.stage_latency_ms["total"] = round((time.perf_counter() - started) * 1000, 4)
         capture = _PRODUCT_SEARCH_EVALUATION_CAPTURE.get()

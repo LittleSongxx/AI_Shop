@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "aishop-project-closure-contract/v1",
+  "claim": "CURRENT_SOURCE_CONTRACT_OBSERVATION",
+  "notProductionSlo": true,
+  "livePairedEvaluation": "NOT_RUN_DEPENDENCIES_NOT_READY",
+  "sourceFingerprint": {
+    "gitCommit": "1f42d38eeabe9cfc54dbc7f732373afdd6fccc1f",
+    "worktreeStatus": "M AI_Shop-backend/AI_Shop-agent/.env.example\n M AI_Shop-backend/AI_Shop-agent/app/config/settings.py\n M AI_Shop-backend/AI_Shop-agent/app/graph/forced_tools.py\n M AI_Shop-backend/AI_Shop-agent/app/graph/nodes.py\n M AI_Shop-backend/AI_Shop-agent/app/graph/orchestration_policy.py\n M AI_Shop-backend/AI_Shop-agent/app/graph/order_reference_flow.py\n M AI_Shop-backend/AI_Shop-agent/app/graph/runner.py\n M AI_Shop-backend/AI_Shop-agent/app/graph/state.py\n M AI_Shop-backend/AI_Shop-agent/app/observability/llm_metrics.py\n M AI_Shop-backend/AI_Shop-agent/app/services/agent_runtime.py\n M AI_Shop-backend/AI_Shop-agent/app/services/evidence_refs.py\n M AI_Shop-backend/AI_Shop-agent/app/services/java_internal_client.py\n M AI_Shop-backend/AI_Shop-agent/app/services/llm_factory.py\n M AI_Shop-backend/AI_Shop-agent/app/services/mcp_tools_service.py\n M AI_Shop-backend/AI_Shop-agent/app/services/order_reference_resolver.py\n M AI_Shop-backend/AI_Shop-agent/app/services/product_search_pipeline.py\n M AI_Shop-backend/AI_Shop-agent/app/services/product_search_query.py\n M AI_Shop-backend/AI_Shop-agent/app/services/product_service.py\n M AI_Shop-backend/AI_Shop-agent/app/services/response_verifier.py\n M AI_Shop-backend/AI_Shop-agent/evaluation/capacity_benchmark.py\n M AI_Shop-backend/AI_Shop-agent/evaluation/cli.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_agent_graph.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_capacity_benchmark.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_feature_settings.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_llm_factory.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_orchestration_policy.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_order_reference_flow.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_order_reference_resolver.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_product_payload.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_product_search_pipeline.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_response_verifier.py\n M AI_Shop-backend/AI_Shop-agent/tests/test_run_cost_summary.py\n M AI_Shop-backend/AI_Shop-order/app/src/main/java/com/aishop/controller/internal/OrderAgentInternalController.java\n M AI_Shop-backend/AI_Shop-order/app/src/test/java/com/aishop/controller/internal/OrderAgentInternalControllerTest.java\n D adjudication.answer-review-v13.README.md\n?? AI_Shop-backend/AI_Shop-agent/scripts/project_closure_check.py\n?? \"docs/project/AI_Shop\\351\\241\\271\\347\\233\\256\\346\\224\\266\\345\\217\\243\\344\\272\\244\\344\\273\\230.md\"\n?? docs/project/closure-evidence/",
+    "trackedDiffSha256": "2378215319ecf33e05dcd70f8d2fcb78fbea8d7d70c1cc36a7d8f608ff03fa3b"
+  },
+  "environment": {
+    "pythonCommand": "conda run -n shop python",
+    "evaluationMode": "SERVICE_INDEPENDENT_UNIT_CONTRACT",
+    "capturedAt": "2026-08-25T00:25:05.745201+00:00"
+  },
+  "summary": {
+    "caseCount": 9,
+    "passed": 9,
+    "failed": 0
+  },
+  "cases": [
+    {
+      "caseId": "order-status-claim",
+      "description": "订单状态必须由 Java status claim 支持",
+      "expectedPass": true,
+      "observed": {
+        "passed": true,
+        "action": "PASS",
+        "terminalQuality": "PASS",
+        "issueCodes": [],
+        "issueDetails": []
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "order-status-without-field-claim",
+      "description": "只有订单号 claim 不能证明发货状态",
+      "expectedPass": false,
+      "observed": {
+        "passed": false,
+        "action": "DEGRADE",
+        "terminalQuality": "DEGRADED_UNVERIFIED",
+        "issueCodes": [
+          "DYNAMIC_FACT_WITHOUT_CLAIM"
+        ],
+        "issueDetails": [
+          "回答中的订单状态没有对应的 Java 动态字段 claim"
+        ]
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "order-product-claim",
+      "description": "商品名必须匹配订单项 productName claim",
+      "expectedPass": true,
+      "observed": {
+        "passed": true,
+        "action": "PASS",
+        "terminalQuality": "PASS",
+        "issueCodes": [],
+        "issueDetails": []
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "order-product-mismatch",
+      "description": "模型不能把其他商品名挂到该订单上",
+      "expectedPass": false,
+      "observed": {
+        "passed": false,
+        "action": "DEGRADE",
+        "terminalQuality": "DEGRADED_UNVERIFIED",
+        "issueCodes": [
+          "DYNAMIC_FACT_WITHOUT_CLAIM"
+        ],
+        "issueDetails": [
+          "回答中的商品名与订单项动态字段 claim 不一致"
+        ]
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "capability-allowed",
+      "description": "允许操作必须有匹配的 Java action capability",
+      "expectedPass": true,
+      "observed": {
+        "passed": true,
+        "action": "PASS",
+        "terminalQuality": "PASS",
+        "issueCodes": [],
+        "issueDetails": []
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "capability-polarity-mismatch",
+      "description": "已拒绝的资格不能生成可操作结论",
+      "expectedPass": false,
+      "observed": {
+        "passed": false,
+        "action": "DEGRADE",
+        "terminalQuality": "DEGRADED_UNVERIFIED",
+        "issueCodes": [
+          "ACTION_CAPABILITY_WITHOUT_DECISION"
+        ],
+        "issueDetails": [
+          "回答中的“CANCEL_ORDER/ALLOWED”与已核验的订单、订单项或资格决定不匹配"
+        ]
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "refund-versioned-policy",
+      "description": "退款资格必须绑定策略 ID、版本和评估时间",
+      "expectedPass": true,
+      "observed": {
+        "passed": true,
+        "action": "PASS",
+        "terminalQuality": "PASS",
+        "issueCodes": [],
+        "issueDetails": []
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "refund-unversioned-policy",
+      "description": "缺少版本化策略元数据时不得宣称退款资格",
+      "expectedPass": false,
+      "observed": {
+        "passed": false,
+        "action": "DEGRADE",
+        "terminalQuality": "DEGRADED_UNVERIFIED",
+        "issueCodes": [
+          "POLICY_WITHOUT_CITATION",
+          "ACTION_CAPABILITY_WITHOUT_DECISION"
+        ],
+        "issueDetails": [
+          "确定性政策结论缺少已发布知识引用",
+          "回答声称该订单具备售后资格，但缺少策略引擎返回的匹配资格决定"
+        ]
+      },
+      "contractPassed": true
+    },
+    {
+      "caseId": "selection-item-ownership",
+      "description": "错订单项选择不得降级为订单卡",
+      "expectedPass": true,
+      "observed": {
+        "passed": true,
+        "card": {}
+      },
+      "contractPassed": true
+    }
+  ],
+  "limitations": [
+    "本报告只验证当前源码中的订单事实、资格和响应校验 contract，不代表线上答案正确率。",
+    "完整客服 HTTP paired replay 需要 Java、MCP、Worker、MySQL、Redis、ES 和 Provider readiness。",
+    "未在本报告中把历史 baseline 或旧人工评分迁移到当前候选版本。"
+  ],
+  "nextLiveCommand": "cd AI_Shop-backend/AI_Shop-agent && conda run -n shop python -m evaluation.cli preflight --split regression"
+}

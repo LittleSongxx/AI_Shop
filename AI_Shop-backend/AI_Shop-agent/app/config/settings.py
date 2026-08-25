@@ -110,8 +110,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
     llm_fallback_model: str = "deepseek-chat"
-    llm_timeout: int = 60
-    llm_max_retries: int = 3
+    llm_timeout: int = 20
+    llm_max_retries: int = 1
     # 每百万 token 人民币单价。模型未配置时只累计 token 和 unpriced，
     # 不使用可能过时的内置价格猜测。
     llm_pricing_cny_per_million_json: dict[str, dict[str, float]] = Field(
@@ -408,12 +408,12 @@ class Settings(BaseSettings):
     circuit_llm_failure_threshold: int = 5
     circuit_llm_recovery_timeout: int = 60
 
-    graph_max_react_rounds: int = 5
+    graph_max_react_rounds: int = 3
     # Hard wall-clock bound for one Agent generation call, including retries
     # performed inside the Provider SDK. This stays below both the graph and
     # durable Worker deadlines so a slow Provider cannot consume the entire
     # request budget before the application can return a controlled failure.
-    agent_llm_call_deadline_seconds: float = 45.0
+    agent_llm_call_deadline_seconds: float = 25.0
     # Controlled latency ablation.  It is off by default and only affects the
     # first turn of low-risk, read-only, non-grounded support requests; write,
     # handoff, security, and RAG paths retain the normal reasoning budget.
@@ -434,10 +434,10 @@ class Settings(BaseSettings):
     # Per-run guard. Session/day quotas protect aggregate spend; this guard bounds
     # one graph execution and therefore also catches runaway tool loops.
     agent_budget_enabled: bool = True
-    agent_budget_max_tokens: int = 40_000
+    agent_budget_max_tokens: int = 16_000
     agent_budget_max_cost_cny: float = 1.0
-    agent_budget_max_steps: int = 24
-    agent_budget_deadline_seconds: float = 120.0
+    agent_budget_max_steps: int = 16
+    agent_budget_deadline_seconds: float = 60.0
     agent_budget_warn_threshold: float = 0.8
     orchestration_mode: Literal[
         "adaptive", "workflow", "single_agent", "multi_agent"
@@ -485,7 +485,7 @@ class Settings(BaseSettings):
     # Intent classification is a bounded auxiliary call. It must not inherit
     # the full conversational LLM retry budget and consume the Worker deadline.
     intent_llm_timeout_seconds: int = Field(
-        default=15,
+        default=8,
         validation_alias=AliasChoices(
             "INTENT_LLM_TIMEOUT_SECONDS",
             "intent_llm_timeout_seconds",

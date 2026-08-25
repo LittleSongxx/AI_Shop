@@ -117,15 +117,24 @@ FUND_AT_RISK = (
     "支付成功没订单",
     "付款成功但订单没生成",
     "支付成功但订单没生成",
+    "付款成功后订单没生成",
+    "支付成功后订单没生成",
     "资金",
     "盗刷",
     "未授权支付",
     "不是我操作",
+    "非本人支付",
+    "不是我支付",
+    "不是本人支付",
 )
 PAYMENT_BLOCKED = (
     "支付失败",
     "付款失败",
     "支付异常",
+    "支付不成功",
+    "付款不成功",
+    "付不了",
+    "无法付款",
 )
 PAYMENT_ISSUE_HINTS = FUND_AT_RISK + PAYMENT_BLOCKED
 _PAYMENT_INFORMATION_HINTS = (
@@ -176,12 +185,18 @@ _FUND_INCIDENT_HINTS = (
     "退款还没到账",
     "退款未到账",
     "支付成功没订单",
+    "盗刷",
     "盗刷了",
     "被盗刷",
     "未授权支付",
     "不是我操作",
+    "非本人支付",
+    "不是我支付",
+    "不是本人支付",
     "付款成功但订单没生成",
     "支付成功但订单没生成",
+    "付款成功后订单没生成",
+    "支付成功后订单没生成",
 )
 _UNRESOLVED_HINTS = (
     "还是没解决",
@@ -380,6 +395,40 @@ def _funds_at_risk(text: str) -> bool:
     ):
         return False
     return any(term in text for term in FUND_AT_RISK) and not _is_informational_fund_question(text)
+
+
+def is_ambiguous_payment_failure(text: str | None) -> bool:
+    """Whether a failed-payment utterance lacks a confirmed funds state.
+
+    This deliberately composes the existing payment vocabulary and risk
+    derivation instead of creating another independent list of loss signals.
+    It is used by the graph only after the classifier has kept the turn out of
+    the HIGH-risk/handoff path.
+    """
+
+    value = str(text or "").strip()
+    if not value or not any(marker in value for marker in PAYMENT_BLOCKED):
+        return False
+    if _funds_at_risk(value):
+        return False
+    return not any(marker in value for marker in _FUND_NEGATED_HINTS)
+
+
+def is_confirmed_no_deduction_payment_failure(text: str | None) -> bool:
+    """Whether a blocked payment explicitly confirms that no funds moved.
+
+    The graph uses this only after the normal risk and handoff boundaries have
+    been evaluated.  A simultaneous confirmed incident always wins over the
+    negated-deduction phrase, so the helper cannot downgrade a funds dispute.
+    """
+
+    value = str(text or "").strip()
+    if not value or not any(marker in value for marker in PAYMENT_BLOCKED):
+        return False
+    if not any(marker in value for marker in _FUND_NEGATED_HINTS):
+        return False
+    return not _funds_at_risk(value)
+
 
 _TOOL_INTENTS = frozenset(
     {

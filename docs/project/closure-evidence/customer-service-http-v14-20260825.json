@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "aishop-customer-service-http-closure/v1",
+  "status": "EXECUTED_PENDING_INDEPENDENT_HUMAN_REVIEW",
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v14-20260825",
+  "observation": {
+    "sourcePath": "run/evaluation-observations/customer-service-http-v14-20260825.json",
+    "sourceReportSha256": "53989861835a498018b8ca16c2719446e053638591162ed53abafbcb8d45d349",
+    "immutablePackage": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v14-20260825",
+    "packageReportSha256": "53989861835a498018b8ca16c2719446e053638591162ed53abafbcb8d45d349",
+    "packageSha256SumsSha256": "d366f934097f3c825ad5d2db7cd5d97741ba6121ea399f36301a02347a0240ae",
+    "providerCallsReexecuted": true,
+    "caseCount": 60,
+    "execution": {
+      "numerator": 60,
+      "denominator": 60,
+      "value": 1.0,
+      "status": "MEASURED"
+    }
+  },
+  "preflight": {
+    "path": "docs/project/closure-evidence/preflight-regression-20260825-r2.json",
+    "sha256": "7e99bb01b7d3ccaeeecb5402537fa86564e3734a2fa39aa4cfb758fe4ec297bc",
+    "passed": true,
+    "sourceFingerprint": "89b00a9384938c12d53d7eedc3705debe51c23cf43a4bec7c744555e2f88dc91",
+    "sourceFileCount": 183,
+    "fixtureScope": "LOCAL_EVALUATION_ONLY",
+    "fixtureTablesVerified": [
+      "aishop_order.order_info",
+      "aishop_order.order_item",
+      "aishop_order.order_request_idempotency",
+      "aishop_order.mq_compensation_log",
+      "aishop_stock.sku_stock",
+      "aishop_stock.stock_change_record"
+    ]
+  },
+  "dataset": {
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+    "fixtureSha256": "fadf095fa921d901fc00315074e52234ae6ac15f011d9e3afe3be90fe6069f6f",
+    "behaviorContractsSha256": "ffb2048cdefc5b5a4b30da1f97f40bc23b48bcd33ca5c45ca2a4dd8249e81706"
+  },
+  "metrics": {
+    "intentMacroF1": 1.0,
+    "highRiskIntentRecall": 1.0,
+    "handoffRecall": 1.0,
+    "criticalHandoffMissRate": 0.0,
+    "httpLatencyMs": {
+      "p50": 1021.515,
+      "p95": 12175.641,
+      "p99": 15439.877,
+      "sampleCount": 60,
+      "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO"
+    },
+    "usage": {
+      "inputTokens": 87243,
+      "outputTokens": 4739,
+      "providerCalls": 21,
+      "missingUsageCalls": 1,
+      "costCny": null,
+      "costStatus": "MISSING_USAGE"
+    },
+    "runtimeDiagnostics": {
+      "verifierObservedCount": 45,
+      "verifierPassCount": 39,
+      "safeDegradedCount": 6,
+      "clarificationCount": 5,
+      "fixtureProvisionedCount": 19,
+      "fixtureCleanupFailureCount": 0
+    }
+  },
+  "behaviorContracts": {
+    "status": "VIOLATIONS_DETECTED",
+    "violationCaseIds": [
+      "cs-gold-v1-019",
+      "cs-gold-v1-055"
+    ],
+    "note": "Both cases resolved an authenticated order and made no action proposal, but the current contract requires NO_ELIGIBLE at the order-reference event. This is retained as a safety-contract badcase; it is not converted into an answer-quality label."
+  },
+  "answerReview": {
+    "status": "BLOCKED_EXTERNAL_HUMAN_INPUT",
+    "reviewCoverage": {
+      "numerator": 0,
+      "denominator": 60
+    },
+    "reviewerA": {
+      "path": "run/evaluation-observations/customer-service-http-v14-20260825.reviewer-a.open.jsonl",
+      "sha256": "db08fed5ede6b0fa019460d0842e7fe536d8ce8a336f91ae932f0a45461e9f74",
+      "lifecycle": "OPEN_INCOMPLETE"
+    },
+    "reviewerB": {
+      "path": "run/evaluation-observations/customer-service-http-v14-20260825.reviewer-b.open.jsonl",
+      "sha256": "51d31ffd5c3030496524a10eff7dcbeac6e2eb4d358f85e3755d960c90bc985f",
+      "lifecycle": "OPEN_INCOMPLETE"
+    },
+    "adjudication": {
+      "status": "NOT_STARTED",
+      "reason": "The review-package command correctly rejected both sheets because labels are incomplete. No independent reviewer labels or third-person decisions were available in this environment."
+    },
+    "answerCorrectness": null,
+    "citationGroundingSupport": null,
+    "unsafeAnswerRate": null
+  },
+  "integrity": {
+    "sourceAndPackageReportMatch": true,
+    "sha256SumsPresent": true,
+    "historicalPackagesModified": false,
+    "fixtureResidueForCurrentRun": {
+      "order": 0,
+      "stock": 0,
+      "agentMutableRows": 0
+    }
+  }
+}

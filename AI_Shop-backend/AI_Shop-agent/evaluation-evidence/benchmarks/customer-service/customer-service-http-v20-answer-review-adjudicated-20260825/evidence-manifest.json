@@ -1,0 +1,70 @@
+{
+  "adjudicationSha256": "9256c9126495941b65985190254a6b7d420e5286f70eb4a886bcadf821332e00",
+  "caseCount": 60,
+  "createdAt": "2026-08-25T07:36:59.576Z",
+  "files": {
+    "agreement.json": {
+      "bytes": 37909,
+      "sha256": "de3fc5900ccfe4d3d15a25bab0084ed13957ab1ba210b0a4e9e79376fdc9ca25"
+    },
+    "agreement.md": {
+      "bytes": 888,
+      "sha256": "cab0892c4c2aa8b653c148efebf705a86301dd65551af7519e79f683e4317ec2"
+    },
+    "badcases.jsonl": {
+      "bytes": 7413,
+      "sha256": "363a74d1059e9b12afa1bf21c16f0e981875c767c5901982913fd5569d630d7e"
+    },
+    "final-report.json": {
+      "bytes": 41621,
+      "sha256": "71a3a8ccadaa5310c10fee0d439d6a7e88e996d0e2209d62048b6e89449d34bf"
+    },
+    "final-report.md": {
+      "bytes": 1084,
+      "sha256": "d677c94d4391053a8d67659dfb4dfdd5842a8d11c8fbd4a4bb5e881949941c97"
+    },
+    "reviews/adjudication.final.jsonl": {
+      "bytes": 28542,
+      "sha256": "9256c9126495941b65985190254a6b7d420e5286f70eb4a886bcadf821332e00"
+    },
+    "reviews/reviewer-a.sealed.jsonl": {
+      "bytes": 170262,
+      "sha256": "eebe089c9dbeefb13db87b07a9e7f6d14f0b1783a7447e6a2b5444b2c4a008da"
+    },
+    "reviews/reviewer-a.sealed.jsonl.manifest.json": {
+      "bytes": 1987,
+      "sha256": "ced236db0a951a31728bb4aa8aa907298ea3457f611b3ba38a70390ad6278276"
+    },
+    "reviews/reviewer-b.sealed.jsonl": {
+      "bytes": 170052,
+      "sha256": "7bf246c923cfd8be4036a04c14b5861f9e47879d30f73aa2b88210902376c8c6"
+    },
+    "reviews/reviewer-b.sealed.jsonl.manifest.json": {
+      "bytes": 1986,
+      "sha256": "80d51bec6341244a75ad9f211be2ae7d6401869e6847ba2eda234561db743ed7"
+    }
+  },
+  "kind": "customer-service-answer-human-review",
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "releaseGateEligible": false,
+  "reviewASha256": "eebe089c9dbeefb13db87b07a9e7f6d14f0b1783a7447e6a2b5444b2c4a008da",
+  "reviewBSha256": "7bf246c923cfd8be4036a04c14b5861f9e47879d30f73aa2b88210902376c8c6",
+  "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+  "selfJudged": false,
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/report.json",
+  "sourceReportSha256": "10d171bc33930f20b13321f17aac08449e61186c5a92716f271cba20ace8596d",
+  "sourceRunId": "customer-service-http-v20-20260825",
+  "status": "HUMAN_REVIEWED_ADJUDICATED"
+}

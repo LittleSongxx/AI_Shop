@@ -86,6 +86,8 @@ async def test_workflow_searches_plain_product_search_without_llm(monkeypatch):
     )
     assert update["tools_called"] == ["SEARCH_PRODUCTS"]
     assert update["route"] == "finalize"
+    assert update["llm_skipped"] is True
+    assert update["structured_result_finalized"] is True
 
 
 def test_adaptive_router_uses_workflow_for_verified_write_proposal():
@@ -244,6 +246,9 @@ async def test_workflow_executes_only_the_preverified_tool(monkeypatch):
     )
     assert update["tools_called"] == ["PROPOSE_REFUND"]
     assert update["route"] == "finalize"
+    assert update["llm_skipped"] is True
+    assert update["llm_skip_reason"] == "verified_order_workflow"
+    assert update["structured_result_finalized"] is True
 
 
 @pytest.mark.asyncio
@@ -265,6 +270,9 @@ async def test_workflow_returns_auditable_social_reply_without_provider_or_tool(
     assert update["chunks"] == ["不客气，有需要可以继续告诉我。"]
     assert update["tools_called"] == []
     assert update["route"] == "finalize"
+    assert update["llm_skipped"] is True
+    assert update["llm_skip_reason"] == "deterministic_social_reply"
+    assert update["structured_result_finalized"] is True
     record.assert_called_once_with(
         "AGENT_POLICY",
         node_name="deterministic_workflow",

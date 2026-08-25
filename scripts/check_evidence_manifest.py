@@ -1198,6 +1198,13 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
             "behaviorContractViolationCount": 0,
         },
     }
+    live_execution_roles = {
+        "LIVE_EXECUTED_OBSERVATION": {
+            "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+            "behaviorContractCount": 10,
+            "behaviorContractViolationCount": 2,
+        },
+    }
     runtime_version_pairs: dict[str, dict[str, tuple[str, str]]] = {}
     seen: set[str] = set()
     for index, descriptor in enumerate(descriptors, 1):
@@ -1368,6 +1375,70 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
                     errors.append(
                         f"{label} runtime-version behavior-contract evidence is invalid"
                     )
+            elif runtime_role in live_execution_roles:
+                expected = live_execution_roles[runtime_role]
+                if descriptor.get("expectedStatus") != expected["status"]:
+                    errors.append(f"{label} live execution expected status is invalid")
+                if report.get("schemaVersion") != "aishop-customer-service-http-evaluation/v1":
+                    errors.append(f"{label} live HTTP report schema is invalid")
+                if (
+                    package.get("releaseGateEligible") is not False
+                    or report.get("releaseGateEligible") is not False
+                    or report.get("normalQualityDenominatorExcluded") is not True
+                    or package.get("status") != expected["status"]
+                    or report.get("status") != expected["status"]
+                ):
+                    errors.append(f"{label} live HTTP lifecycle boundary is invalid")
+                if package.get("providerCallsReexecuted") is not None:
+                    errors.append(f"{label} live execution provenance must remain null")
+                if package.get("sourceObservationReportSha256") is not None:
+                    errors.append(f"{label} live execution source observation must remain null")
+                dataset = report.get("dataset") or {}
+                if (
+                    dataset.get("annotationStatus") != "HUMAN_VERIFIED"
+                    or dataset.get("sha256") != descriptor.get("datasetSha256")
+                    or dataset.get("caseCount") != descriptor.get("caseCount")
+                ):
+                    errors.append(f"{label} live execution dataset binding is invalid")
+                execution_rate = (
+                    (report.get("httpExecution") or {}).get("executionRate") or {}
+                )
+                if (
+                    execution_rate.get("numerator") != descriptor.get("caseCount")
+                    or execution_rate.get("denominator") != descriptor.get("caseCount")
+                    or (report.get("httpExecution") or {}).get("errorCaseIds") != []
+                ):
+                    errors.append(f"{label} live HTTP execution denominator is invalid")
+                behavior_contracts = report.get("behaviorContracts") or {}
+                results = behavior_contracts.get("results") or []
+                violation_count = sum(
+                    isinstance(result, dict) and result.get("status") != "PASSED"
+                    for result in results
+                )
+                if (
+                    behavior_contracts.get("contractCount")
+                    != expected["behaviorContractCount"]
+                    or behavior_contracts.get("executedContractCount")
+                    != expected["behaviorContractCount"]
+                    or len(results) != expected["behaviorContractCount"]
+                    or violation_count != expected["behaviorContractViolationCount"]
+                    or descriptor.get("behaviorContractViolationCount")
+                    != expected["behaviorContractViolationCount"]
+                ):
+                    errors.append(f"{label} live behavior-contract evidence is invalid")
+                route_metrics = ((report.get("httpRoute") or {}).get("metrics") or {})
+                for metric_name in ("slotEntitySpanF1", "slotExactMatch"):
+                    if (route_metrics.get(metric_name) or {}).get("status") != "UNAVAILABLE":
+                        errors.append(f"{label} live HTTP slot metric must remain unavailable")
+                answer_quality = report.get("answerQuality") or {}
+                if (
+                    answer_quality.get("status") != "PENDING_HUMAN_REVIEW"
+                    or answer_quality.get("selfJudged") is not False
+                    or answer_quality.get("answerCorrectness") is not None
+                    or answer_quality.get("citationGroundingSupport") is not None
+                    or answer_quality.get("unsafeAnswerRate") is not None
+                ):
+                    errors.append(f"{label} live HTTP answer quality must remain pending human review")
             elif runtime_role:
                 errors.append(f"{label} customer-service HTTP result role is invalid")
             else:
@@ -1818,6 +1889,50 @@ def _validate_customer_service_candidate(
         errors.append(f"{label}.reviewSheets must bind reviewer-a and reviewer-b")
 
 
+def _expected_answer_reviewers(
+    descriptor: dict[str, Any],
+    errors: list[str],
+    *,
+    label: str,
+) -> list[str]:
+    """Return the two independent reviewer identities bound by an evidence run."""
+
+    configured = descriptor.get("reviewerIds")
+    if configured is None:
+        return ["reviewer-a", "reviewer-b"]
+    if (
+        not isinstance(configured, list)
+        or len(configured) != 2
+        or any(not isinstance(value, str) or not value.strip() for value in configured)
+        or len(set(configured)) != 2
+    ):
+        errors.append(f"{label}.reviewerIds must contain two distinct reviewer IDs")
+        return ["reviewer-a", "reviewer-b"]
+    return list(configured)
+
+
+def _answer_review_message(source_case: dict[str, Any], message_projection: str) -> str:
+    """Reproduce the declared source/runtime question projection for sealed sheets."""
+
+    message = str(source_case.get("message") or "")
+    if message_projection != "RUNTIME_FIXTURE_AWARE_V1":
+        return message
+    http = source_case.get("http") if isinstance(source_case.get("http"), dict) else {}
+    rendered_fields = {
+        str(field)
+        for field in (http.get("renderedFixtureTemplateFields") or [])
+        if isinstance(field, str)
+    }
+    if "orderId" not in rendered_fields:
+        return message
+    fixture = http.get("fixtureEvidence") if isinstance(http.get("fixtureEvidence"), dict) else {}
+    source_order_id = str(fixture.get("sourceOrderId") or "").strip()
+    runtime_order_id = str(fixture.get("orderId") or "").strip()
+    if source_order_id and runtime_order_id and source_order_id in message:
+        return message.replace(source_order_id, runtime_order_id)
+    return message
+
+
 def _validate_pending_customer_service_answer_review(
     root: Path,
     descriptor: dict[str, Any],
@@ -1922,6 +2037,7 @@ def _validate_pending_customer_service_answer_review(
     if package.get("files") != inventory:
         errors.append(f"{label} package file inventory is stale")
 
+    message_projection = str(package.get("messageProjection") or "SOURCE_DATASET_MESSAGE_V1")
     source_by_id: dict[str, dict[str, Any]] = {}
     for source_case in report.get("cases") or []:
         if not isinstance(source_case, dict):
@@ -1929,7 +2045,7 @@ def _validate_pending_customer_service_answer_review(
         case_id = str(source_case.get("caseId") or "")
         http = source_case.get("http") if isinstance(source_case.get("http"), dict) else {}
         source_by_id[case_id] = {
-            "message": source_case.get("message"),
+            "message": _answer_review_message(source_case, message_projection),
             "answer": http.get("answer") or "",
             "sourceRefs": http.get("sourceRefs") or [],
             "observedHandoff": bool(http.get("handoffObserved")),
@@ -1954,6 +2070,7 @@ def _validate_pending_customer_service_answer_review(
         "labels",
         "comment",
     }
+    expected_reviewer_ids = _expected_answer_reviewers(descriptor, errors, label=label)
     reviewer_ids: list[str] = []
     for key, filename, agreement_key in (
         ("reviewerA", "reviewer-a.sealed.jsonl", "reviewA"),
@@ -2023,9 +2140,9 @@ def _validate_pending_customer_service_answer_review(
             rows, {"expected", "predicted", "modelOutput", "modelPrediction"}
         ):
             errors.append(f"{label} {key} leaks gold/model fields")
-    if set(reviewer_ids) != {"reviewer-a", "reviewer-b"}:
+    if set(reviewer_ids) != set(expected_reviewer_ids):
         errors.append(f"{label} reviewer IDs are invalid")
-    if lifecycle.get("reviewers") != ["reviewer-a", "reviewer-b"]:
+    if lifecycle.get("reviewers") != expected_reviewer_ids:
         errors.append(f"{label} lifecycle reviewer order is invalid")
 
     disagreement_ids = {
@@ -2224,6 +2341,7 @@ def _validate_adjudicated_customer_service_answer_review(
         ("reviewerA", "reviewer-a.sealed.jsonl", "reviewASha256"),
         ("reviewerB", "reviewer-b.sealed.jsonl", "reviewBSha256"),
     )
+    expected_reviewer_ids = _expected_answer_reviewers(descriptor, errors, label=label)
     reviewer_ids: set[str] = set()
     expected_row_fields = {
         "schemaVersion",
@@ -2298,7 +2416,7 @@ def _validate_adjudicated_customer_service_answer_review(
             for row in rows
         ):
             errors.append(f"{label} {key} row schema/labels are invalid")
-    if reviewer_ids != {"reviewer-a", "reviewer-b"}:
+    if reviewer_ids != set(expected_reviewer_ids):
         errors.append(f"{label} reviewers are not independent")
 
     disagreement_by_id = {
@@ -2369,7 +2487,7 @@ def _validate_adjudicated_customer_service_answer_review(
             or not isinstance(labels.get("unsafeAnswer"), bool)
             or not str(row.get("adjudicator") or "").strip()
             or str(row.get("adjudicator") or "").strip()
-            in {"reviewer-a", "reviewer-b"}
+            in set(expected_reviewer_ids)
             or not str(row.get("reason") or "").strip()
         ):
             errors.append(f"{label} adjudication row is invalid: {case_id or '?'}")
@@ -2831,6 +2949,16 @@ def validate_repository(
             errors,
             label="evaluation.customerServiceAnswerReviewV13",
             require_pre_evaluator_observation=True,
+        )
+    v20_answer_review = evaluation.get("customerServiceAnswerReviewV20")
+    if v20_answer_review is None:
+        errors.append("evaluation.customerServiceAnswerReviewV20 is required")
+    else:
+        _validate_customer_service_answer_review(
+            root,
+            v20_answer_review,
+            errors,
+            label="evaluation.customerServiceAnswerReviewV20",
         )
     _validate_pricing_estimate(
         root,

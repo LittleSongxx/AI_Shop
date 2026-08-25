@@ -1,5 +1,6 @@
 package com.aishop.controller.internal;
 
+import com.aishop.api.enums.OrderCommentStatusEnum;
 import com.aishop.biz.OrderInfoService;
 import com.aishop.biz.OrderItemService;
 import com.aishop.biz.RefundSagaTransactionService;
@@ -204,5 +205,176 @@ class OrderAgentInternalControllerTest {
         BusinessException exc = assertThrows(BusinessException.class,
                 () -> controller.listOrders(Map.of("userId", "u9")));
         assertEquals(403, exc.getCode());
+    }
+
+    @Test
+    void actionCapabilityAllowsCancelableOwnedOrder() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        order.setOrderStatus(0);
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        ResponseVO<Map<String, Object>> response = controller.actionCapability(Map.of(
+                "action", "CANCEL_ORDER",
+                "orderId", "SM202608050001"
+        ));
+
+        assertEquals("ALLOWED", response.getData().get("decision"));
+        assertEquals("CANCEL_ORDER", response.getData().get("action"));
+        assertEquals("order-action-capability/v1",
+                response.getData().get("capabilityVersion"));
+    }
+
+    @Test
+    void actionCapabilityDeniesByCurrentBusinessState() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        order.setOrderStatus(1);
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        ResponseVO<Map<String, Object>> response = controller.actionCapability(Map.of(
+                "action", "CANCEL_ORDER",
+                "orderId", "SM202608050001"
+        ));
+
+        assertEquals("DENIED", response.getData().get("decision"));
+        assertEquals("ORDER_STATUS_NOT_CANCELLABLE",
+                response.getData().get("reasonCode"));
+    }
+
+    @Test
+    void actionCapabilityAllowsFirstReviewOnlyBeforeEvaluation() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        order.setCommentStatus(OrderCommentStatusEnum.NOT_EVALUATED.getStatus());
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        ResponseVO<Map<String, Object>> allowed = controller.actionCapability(Map.of(
+                "action", "PRODUCT_REVIEW",
+                "orderId", "SM202608050001"
+        ));
+        order.setCommentStatus(OrderCommentStatusEnum.EVALUATED.getStatus());
+        ResponseVO<Map<String, Object>> denied = controller.actionCapability(Map.of(
+                "action", "PRODUCT_REVIEW",
+                "orderId", "SM202608050001"
+        ));
+
+        assertEquals("ALLOWED", allowed.getData().get("decision"));
+        assertEquals("DENIED", denied.getData().get("decision"));
+        assertEquals("COMMENT_ALREADY_EVALUATED",
+                denied.getData().get("reasonCode"));
+    }
+
+    @Test
+    void actionCapabilityAllowsRecommentOnlyAfterFirstEvaluation() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        order.setCommentStatus(OrderCommentStatusEnum.NOT_EVALUATED.getStatus());
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        ResponseVO<Map<String, Object>> denied = controller.actionCapability(Map.of(
+                "action", "RECOMMENT",
+                "orderId", "SM202608050001"
+        ));
+        order.setCommentStatus(OrderCommentStatusEnum.EVALUATED.getStatus());
+        ResponseVO<Map<String, Object>> allowed = controller.actionCapability(Map.of(
+                "action", "RECOMMENT",
+                "orderId", "SM202608050001"
+        ));
+
+        assertEquals("DENIED", denied.getData().get("decision"));
+        assertEquals("COMMENT_NOT_RECOMMENTABLE",
+                denied.getData().get("reasonCode"));
+        assertEquals("ALLOWED", allowed.getData().get("decision"));
+    }
+
+    @Test
+    void actionCapabilityIgnoresModelVisibleUserIdAndUsesDelegation() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        order.setOrderStatus(2);
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        ResponseVO<Map<String, Object>> response = controller.actionCapability(Map.of(
+                "action", "CONFIRM_RECEIPT",
+                "orderId", "SM202608050001",
+                "userId", "attacker-controlled"
+        ));
+
+        assertEquals("ALLOWED", response.getData().get("decision"));
+    }
+
+    @Test
+    void actionCapabilityRejectsAnotherUsersOrder() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("other-user");
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        BusinessException exc = assertThrows(BusinessException.class,
+                () -> controller.actionCapability(Map.of(
+                        "action", "CANCEL_ORDER",
+                        "orderId", "SM202608050001"
+                )));
+        assertEquals(403, exc.getCode());
+    }
+
+    @Test
+    void actionCapabilityRejectsItemFromAnotherOrder() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+        OrderItem item = new OrderItem();
+        item.setOrderItemId("SMITEM202608050009");
+        item.setOrderId("SM202608050009");
+        when(orderItemService.getOrderItemByOrderItemId("SMITEM202608050009"))
+                .thenReturn(item);
+
+        ResponseVO<Map<String, Object>> response = controller.actionCapability(Map.of(
+                "action", "CANCEL_ORDER",
+                "orderId", "SM202608050001",
+                "orderItemId", "SMITEM202608050009"
+        ));
+
+        assertEquals("DENIED", response.getData().get("decision"));
+        assertEquals("ORDER_ITEM_MISMATCH", response.getData().get("reasonCode"));
+    }
+
+    @Test
+    void actionCapabilityReturnsUnavailableForUnknownAction() {
+        delegateAs("u1");
+        OrderInfo order = new OrderInfo();
+        order.setOrderId("SM202608050001");
+        order.setUserId("u1");
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050001"))
+                .thenReturn(order);
+
+        ResponseVO<Map<String, Object>> response = controller.actionCapability(Map.of(
+                "action", "DROP_DATABASE",
+                "orderId", "SM202608050001"
+        ));
+
+        assertEquals("UNAVAILABLE", response.getData().get("decision"));
+        assertEquals("UNSUPPORTED_ACTION", response.getData().get("reasonCode"));
     }
 }

@@ -6,14 +6,24 @@ import structlog
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from app.config.settings import get_settings
-from app.domain.intent.classifier import resolve_intent
+from app.domain.intent.classifier import (
+    is_ambiguous_payment_failure,
+    is_confirmed_no_deduction_payment_failure,
+    resolve_intent,
+)
 from app.domain.intent.rules import (
     deterministic_social_reply,
     looks_like_category_switch,
     looks_like_new_product_search,
     wants_order_list_cards,
 )
-from app.domain.intent.types import IntentDecision, IntentKind, NextAction
+from app.domain.intent.types import (
+    IntentDecision,
+    IntentKind,
+    NextAction,
+    RequestMode,
+    RiskLevel,
+)
 from app.domain.intent.write_args import TOOL_REQUIRED_INTENTS
 from app.graph.forced_tools import (
     forced_order_list,
@@ -53,6 +63,10 @@ from app.services.message_service import agent_message_service
 from app.services.product_service import is_similar_or_recommend_request
 from app.services.product_snapshot_service import product_snapshot_service
 from app.services.redis_service import redis_service
+from app.services.response_verifier import (
+    has_dynamic_order_authority,
+    has_trusted_capability_decision,
+)
 from app.utils.biz_payload import (
     is_order_cards_json,
     is_product_cards_json,
@@ -60,7 +74,11 @@ from app.utils.biz_payload import (
     support_case_card_type,
 )
 from app.utils.order_ids import extract_order_id
-from app.utils.product_consult import is_product_consult_turn
+from app.utils.product_consult import (
+    is_product_consult_turn,
+    normalize_consult_card,
+    product_consult_clarification,
+)
 from app.utils.prompt_boundary import isolate_knowledge_text
 
 logger = structlog.get_logger()
@@ -68,7 +86,45 @@ logger = structlog.get_logger()
 # A3：HANDOFF_SUGGESTED（REPEATED_INTENT / 低置信）时追加在回答末尾的
 # 建议转人工文案。只是建议，不强制；用户可继续提问或直接说"转人工"。
 _HANDOFF_SUGGEST_TEXT = "\n\n如仍未解决，可以回复“转人工”，由人工客服继续协助。"
+_PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE = (
+    "根据你的描述，本次支付失败且没有扣款。请先检查支付方式和页面提示，再自行重新发起支付；"
+    "若之后出现扣款、重复扣款或非本人支付，请回复“转人工”以进入人工核查。"
+)
 output_guard = OutputGuardrail()
+_WRITE_PROPOSAL_TOOLS = frozenset(
+    {
+        "PROPOSE_REFUND",
+        "PROPOSE_CANCEL_ORDER",
+        "PROPOSE_CONFIRM_RECEIPT",
+        "PROPOSE_CREATE_SUPPORT_CASE",
+        "PROPOSE_PRODUCT_REVIEW",
+        "PROPOSE_RECOMMENT",
+    }
+)
+
+
+def _allow_llm_fallback_retry(
+    state: AgentGraphState,
+    *,
+    non_stream_turn: bool,
+    turn_chunks: list[str],
+) -> bool:
+    """Fallback is limited to idempotent reads with no visible partial output."""
+
+    if not non_stream_turn or turn_chunks or state.get("input_security_flags"):
+        return False
+    if str(state.get("request_mode") or "") not in {
+        RequestMode.READ_QUERY.value,
+        RequestMode.INFORMATIONAL.value,
+    }:
+        return False
+    called = {str(tool) for tool in state.get("tools_called") or []}
+    pending = {
+        str(call.get("name") or "")
+        for call in state.get("pending_tool_calls") or []
+        if isinstance(call, dict)
+    }
+    return not bool((called | pending) & _WRITE_PROPOSAL_TOOLS)
 
 # Intent kinds for which the original intent is preserved even when a
 # category-switch or new-product-search is detected.  Defined at module
@@ -664,8 +720,139 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         await redis_service.clear_bound_message_id(user_id)
         return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
 
+    intent_name = str(state.get("intent") or "")
+    user_text = str(state.get("user_text") or "")
+    intent_decision = state.get("intent_decision") or {}
+    decision_risk = str(
+        intent_decision.get("risk_level")
+        or intent_decision.get("riskLevel")
+        or ""
+    ).upper()
+    decision_action = str(
+        intent_decision.get("next_action")
+        or intent_decision.get("nextAction")
+        or ""
+    ).upper()
+    has_consult_identity = bool(
+        normalize_consult_card(state.get("card"))
+        or normalize_consult_card(state.get("message_card"))
+    )
+    has_product_evidence = any(
+        tool in {"GET_PRODUCT_DETAIL", "COMPARE_PRODUCTS"}
+        for tool in state.get("tools_called") or []
+    )
+    if (
+        intent_name == IntentKind.PRODUCT_CONSULT.value
+        and not has_consult_identity
+        and not has_product_evidence
+        and not state.get("comparison_product_ids")
+    ):
+        clarification = product_consult_clarification(user_text)
+        episode_service.record_step(
+            "PRODUCT_CONSULT_CLARIFICATION",
+            node_name="agent_loop",
+            status="OK",
+            input_data={"intent": intent_name},
+            output_data={"reason": "missing_authoritative_product_identity"},
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "PRODUCT_CONSULT_IDENTITY_CLARIFICATION",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "missing_authoritative_product_identity",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [clarification],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "missing_authoritative_product_identity",
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+
+    payment_guidance_allowed = (
+        intent_name == IntentKind.PAYMENT_ISSUE.value
+        and str(state.get("request_mode") or "")
+        != RequestMode.HUMAN_SUPPORT.value
+        and decision_risk != RiskLevel.HIGH.value
+        and decision_action != NextAction.HANDOFF.value
+    )
+    if payment_guidance_allowed and is_confirmed_no_deduction_payment_failure(
+        user_text
+    ):
+        episode_service.record_step(
+            "PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE",
+            node_name="agent_loop",
+            status="OK",
+            input_data={"intent": intent_name},
+            output_data={"reason": "funds_not_deducted"},
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "funds_not_deducted",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [_PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "funds_not_deducted",
+            "deterministic_clarification": True,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+
+    if payment_guidance_allowed and is_ambiguous_payment_failure(user_text):
+        clarification = (
+            "请先确认支付账户是否已有扣款记录。若已扣款、重复扣款或非本人支付，"
+            "请回复“转人工”以进入人工核查；若未扣款，请补充支付页面提示或支付方式。"
+        )
+        episode_service.record_step(
+            "PAYMENT_FAILURE_STATE_CLARIFICATION",
+            node_name="agent_loop",
+            status="OK",
+            input_data={"intent": intent_name},
+            output_data={"reason": "funds_state_not_confirmed"},
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "PAYMENT_FAILURE_STATE_CLARIFICATION",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "funds_state_not_confirmed",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [clarification],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "funds_state_not_confirmed",
+            "deterministic_clarification": True,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+
     consult = state.get("card")
-    user_text = state.get("user_text") or ""
     from_product = state.get("from_product", False)
     tools_called = state.get("tools_called") or []
     similar_first_turn = (
@@ -737,6 +924,16 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         ),
         "disable_thinking": bounded_grounded_turn or fast_support_turn,
     }
+    # A proposal path must never hide a provider failure behind an SDK retry.
+    # The deterministic capability and pending-action guards can be retried by
+    # the user with a fresh business snapshot instead.  Keep the option absent
+    # on normal turns so the LLM factory's configured retry policy still owns
+    # those calls.
+    if (
+        str(state.get("request_mode") or "")
+        == RequestMode.ACTION_PROPOSAL.value
+    ):
+        llm_options["max_retries"] = 0
     llm = rt.bind_agent_llm(**llm_options)
     try:
         if non_stream_turn:
@@ -755,12 +952,23 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             )
     except Exception as primary_error:
         response = None
-        can_retry = not turn_chunks and has_fallback_chat_llm()
+        retry_is_safe = _allow_llm_fallback_retry(
+            state, non_stream_turn=non_stream_turn, turn_chunks=turn_chunks
+        )
+        can_retry = retry_is_safe and has_fallback_chat_llm()
         # A4：失败的调用也计入 LLM_CALL_TOTAL（成功/失败都要可观测，
         # 只看成功数算不出失败率）。已部分流式输出的不算 fallback 机会，
         # 但那次调用本身已经失败，照记。
         if not non_stream_turn:
-            rt.record_llm_failure(settings.llm_model, fallback=False)
+            rt.record_llm_failure(
+                settings.llm_model,
+                fallback=False,
+                missing_reason=(
+                    "call_deadline_exceeded_before_usage"
+                    if isinstance(primary_error, TimeoutError)
+                    else "provider_error_before_usage"
+                ),
+            )
         logger.warning(
             "llm_turn_failed",
             error=str(primary_error),
@@ -769,7 +977,9 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         )
         if can_retry:
             try:
-                fallback_llm = rt.bind_agent_llm(fallback=True, **llm_options)
+                fallback_llm = rt.bind_agent_llm(
+                    fallback=True, **{**llm_options, "max_retries": 0}
+                )
                 if non_stream_turn:
                     response = await invoke_llm_with_metrics(
                         fallback_llm,
@@ -795,13 +1005,39 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             except Exception as fallback_error:
                 if not non_stream_turn:
                     rt.record_llm_failure(
-                        settings.llm_fallback_model, fallback=True
+                        settings.llm_fallback_model,
+                        fallback=True,
+                        missing_reason=(
+                            "call_deadline_exceeded_before_usage"
+                            if isinstance(fallback_error, TimeoutError)
+                            else "provider_error_before_usage"
+                        ),
                     )
                 logger.warning(
                     "llm_fallback_failed",
                     error=str(fallback_error),
                     error_type=type(fallback_error).__name__,
                 )
+        elif has_fallback_chat_llm():
+            episode_service.record_step(
+                "LLM_FALLBACK_SUPPRESSED",
+                node_name="agent_loop",
+                status="SKIPPED",
+                output_data={
+                    "reason": (
+                        "non_idempotent_or_write_path"
+                        if str(state.get("request_mode") or "")
+                        not in {
+                            RequestMode.READ_QUERY.value,
+                            RequestMode.INFORMATIONAL.value,
+                        }
+                        else "streaming_partial_or_security_boundary"
+                    ),
+                    "requestMode": state.get("request_mode"),
+                    "nonStreamTurn": non_stream_turn,
+                    "visiblePartial": bool(turn_chunks),
+                },
+            )
         if response is None:
             partial = "".join((state.get("chunks") or []) + turn_chunks)
             await rt.push_chat_error(agent_msg, "agent", partial)
@@ -1066,10 +1302,26 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
             "biz_type": "agent",
             "chunks": [social_reply],
             "pending_tool_calls": [],
+            "llm_skipped": True,
+            "llm_skip_reason": "deterministic_social_reply",
+            "structured_result_finalized": True,
             "route": "finalize",
         }
     if tool_name and isinstance(tool_args, dict):
-        return await invoke_deterministic_tool(
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="deterministic_workflow",
+            output_data={
+                "policy": "VERIFIED_ORDER_WORKFLOW",
+                "route": "workflow",
+                "mode": "workflow",
+                "llmSkipped": True,
+                "llmSkipReason": "verified_order_workflow",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": tool_name.startswith("PROPOSE_"),
+            },
+        )
+        update = await invoke_deterministic_tool(
             messages=messages,
             user_id=user_id,
             tool_name=tool_name,
@@ -1078,6 +1330,12 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
             call_id=f"workflow:{state['message_id']}",
             prior_source_refs=list(state.get("tool_source_refs") or []),
         )
+        return {
+            **update,
+            "llm_skipped": True,
+            "llm_skip_reason": "verified_order_workflow",
+            "structured_result_finalized": True,
+        }
 
     update = await forced_tool_for_intent(
         messages=messages,
@@ -1087,7 +1345,25 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
         user_text=str(state.get("user_text") or ""),
     )
     if update is not None:
-        return update
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="deterministic_workflow",
+            output_data={
+                "policy": "DETERMINISTIC_BUSINESS_TOOL",
+                "route": "workflow",
+                "mode": "workflow",
+                "llmSkipped": True,
+                "llmSkipReason": "deterministic_business_tool",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            **update,
+            "llm_skipped": True,
+            "llm_skip_reason": "deterministic_business_tool",
+            "structured_result_finalized": True,
+        }
 
     # A deterministic path must never guess missing business parameters. Hand
     # the request to one agent for clarification and preserve that fallback in
@@ -1650,15 +1926,19 @@ async def finalize_node(state: AgentGraphState) -> dict:
         # the answer. Preparing a generic RAG fallback here is misleading when
         # it will never be applied, and makes trace readers think policy RAG
         # participated in a dynamic-business response.
-        has_dynamic_business_authority = bool(state.get("tool_source_refs")) and (
+        business_refs = list(state.get("tool_source_refs") or [])
+        has_dynamic_business_authority = (
             str(state.get("order_resolution") or "").upper()
             in {"RESOLVED", "NO_ELIGIBLE"}
-            or bool(state.get("assistant_cards"))
-            or str(state.get("biz_type") or "") == "action_confirm"
-        )
+            and has_dynamic_order_authority(business_refs)
+        ) or has_trusted_capability_decision(business_refs)
+        # A card's mere presence is not authority.  Order selection fields and
+        # action cards are accepted only through their field-level snapshot or
+        # durable pending-action verification in ``finalize_agent_response``.
         if (
             not verifier_fallback
             and not has_dynamic_business_authority
+            and not state.get("deterministic_clarification")
             and state.get("rag_evidence_required")
             and str(state.get("rag_evidence_state") or "").upper() == "SUPPORTED"
         ):
@@ -1715,6 +1995,9 @@ async def finalize_node(state: AgentGraphState) -> dict:
             order_resolution=state.get("order_resolution"),
             rag_evidence_required=bool(state.get("rag_evidence_required")),
             rag_evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
+            deterministic_clarification=bool(
+                state.get("deterministic_clarification")
+            ),
             verifier_fallback=verifier_fallback,
         )
     except Exception as e:

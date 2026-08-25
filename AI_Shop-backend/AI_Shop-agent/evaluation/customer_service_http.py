@@ -234,6 +234,7 @@ def load_http_behavior_contracts(path: Path, dataset_path: Path) -> dict[str, An
         seen_contract_ids.add(contract_id)
         for key in (
             "requiredOrderOutcomes",
+            "requiredActionProposals",
             "prohibitedObservedIntents",
             "prohibitedTools",
             "requiredAnswerRegexes",
@@ -1024,6 +1025,13 @@ def _behavior_contract_result(
 
     if expected.get("requireNoActionProposal"):
         add("NO_ACTION_PROPOSAL", not action_types, actual=sorted(action_types))
+    required_actions = set(expected.get("requiredActionProposals") or [])
+    if required_actions:
+        add(
+            "REQUIRED_ACTION_PROPOSALS",
+            required_actions.issubset(action_types),
+            actual=sorted(action_types),
+        )
     if expected.get("requireEmptyStateDiff"):
         add(
             "EMPTY_READ_ONLY_STATE_DIFF",

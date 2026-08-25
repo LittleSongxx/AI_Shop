@@ -285,3 +285,81 @@ async def test_failed_rag_repair_draft_is_replaced_by_verifier_fallback():
     persisted = complete.await_args.args[1]
     assert persisted != unsafe_draft
     assert persisted == "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。"
+
+
+@pytest.mark.asyncio
+async def test_deterministic_payment_clarification_bypasses_policy_evidence_gate():
+    guidance = (
+        "根据你的描述，本次支付失败且没有扣款。请先检查支付方式和页面提示，再自行重新发起支付；"
+        "若之后出现扣款、重复扣款或非本人支付，请回复“转人工”以进入人工核查。"
+    )
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+        patch("app.services.agent_runtime.badcase_service.add_candidate", AsyncMock()) as badcase,
+        patch("app.services.agent_runtime.judge_service.enqueue"),
+        patch("app.services.agent_runtime.episode_service.record_step"),
+        patch("app.services.agent_runtime.episode_service.update_run"),
+    ):
+        await finalize_agent_response(
+            {
+                "userId": "u1",
+                "messageId": 37,
+                "userMessage": "支付失败但没有扣款，怎么办",
+                "intentDecision": {"intent": "PAYMENT_ISSUE"},
+            },
+            [guidance],
+            [],
+            tools_called=[],
+            user_text="支付失败但没有扣款，怎么办",
+            source_refs={"ragSources": [], "businessSources": [], "sources": []},
+            rag_evidence_required=True,
+            rag_evidence_state="INSUFFICIENT",
+            deterministic_clarification=True,
+        )
+
+    assert complete.await_args.args[1] == guidance
+    assert complete.await_args.args[2] == "agent"
+    badcase.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_deterministic_invoice_target_clarification_bypasses_policy_evidence_gate():
+    guidance = (
+        "我需要先定位具体订单才能继续处理开票请求。仅凭金额无法唯一匹配订单，"
+        "请补充订单号或商品信息；如需人工帮助可回复“转人工”。"
+    )
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+        patch("app.services.agent_runtime.badcase_service.add_candidate", AsyncMock()) as badcase,
+        patch("app.services.agent_runtime.judge_service.enqueue"),
+        patch("app.services.agent_runtime.episode_service.record_step"),
+        patch("app.services.agent_runtime.episode_service.update_run"),
+    ):
+        await finalize_agent_response(
+            {
+                "userId": "u1",
+                "messageId": 38,
+                "userMessage": "¥199.00的订单我要开发票",
+                "intentDecision": {"intent": "INVOICE"},
+            },
+            [guidance],
+            [],
+            tools_called=[],
+            user_text="¥199.00的订单我要开发票",
+            source_refs={"ragSources": [], "businessSources": [], "sources": []},
+            rag_evidence_required=True,
+            rag_evidence_state="INSUFFICIENT",
+            deterministic_clarification=True,
+        )
+
+    assert complete.await_args.args[1] == guidance
+    assert complete.await_args.args[2] == "agent"
+    badcase.assert_not_awaited()

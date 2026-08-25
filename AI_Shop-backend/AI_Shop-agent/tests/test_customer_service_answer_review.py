@@ -9,6 +9,8 @@ import pytest
 from evaluation.core.io import atomic_write_json, atomic_write_jsonl, load_json, load_jsonl
 from evaluation.customer_service_answer_review import (
     ANSWER_REVIEW_ADJUDICATION_SCHEMA,
+    ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+    ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
     ANSWER_REVIEW_REPORT_SCHEMA,
     CustomerServiceAnswerReviewError,
     compare_answer_reviews,
@@ -56,6 +58,21 @@ def _http_report(path: Path) -> Path:
         overwrite=False,
     )
     return path
+
+
+def _fixture_http_report(path: Path) -> Path:
+    report = _http_report(path)
+    raw = load_json(report)
+    raw["cases"][0]["message"] = "订单 SM202608050002 的物流到哪了"
+    raw["cases"][0]["http"]["fixtureEvidence"] = {
+        "sourceOrderId": "SM202608050002",
+        "orderId": "20220205175455334F51D3ADFEBAC358",
+        "scope": "LOCAL_EVALUATION_ONLY",
+        "provisioningBoundary": "DIRECT_SQL_FIXTURE_ONLY",
+    }
+    raw["cases"][0]["http"]["renderedFixtureTemplateFields"] = ["orderId"]
+    atomic_write_json(report, raw, overwrite=True)
+    return report
 
 
 def _labels(
@@ -150,16 +167,24 @@ def _sealed_pair(
     *,
     left: dict[str, dict] | None = None,
     right: dict[str, dict] | None = None,
+    report_path: Path | None = None,
+    message_projection: str = ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
 ) -> tuple[Path, Path, Path]:
-    report = _http_report(tmp_path / "http-report.json")
+    report = report_path or _http_report(tmp_path / "http-report.json")
     default = {f"case-{index}": _labels() for index in range(1, 4)}
     open_a = tmp_path / "reviewer-a.open.jsonl"
     open_b = tmp_path / "reviewer-b.open.jsonl"
     manifest_a = export_answer_review_sheet(
-        report, open_a, reviewer_id="reviewer-a"
+        report,
+        open_a,
+        reviewer_id="reviewer-a",
+        message_projection=message_projection,
     )
     manifest_b = export_answer_review_sheet(
-        report, open_b, reviewer_id="reviewer-b"
+        report,
+        open_b,
+        reviewer_id="reviewer-b",
+        message_projection=message_projection,
     )
     assert manifest_a["orderSeed"] != manifest_b["orderSeed"]
     assert "expected" not in load_jsonl(open_a)[0]
@@ -224,15 +249,140 @@ def test_answer_review_projects_sensitive_runtime_fields_and_rejects_reviewer_le
 def test_answer_review_legacy_v2_sheet_without_new_marker_remains_readable(
     tmp_path: Path,
 ):
-    report = _http_report(tmp_path / "http-report.json")
+    report = _fixture_http_report(tmp_path / "http-report.json")
     open_sheet = tmp_path / "review.open.jsonl"
-    export_answer_review_sheet(report, open_sheet, reviewer_id="reviewer-a")
+    manifest = export_answer_review_sheet(report, open_sheet, reviewer_id="reviewer-a")
+    assert manifest["messageProjection"] == ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE
+    assert next(
+        row for row in load_jsonl(open_sheet) if row["caseId"] == "case-1"
+    )["message"] == "订单 SM202608050002 的物流到哪了"
     manifest_path = open_sheet.with_suffix(open_sheet.suffix + ".manifest.json")
     manifest = load_json(manifest_path)
     manifest.pop("presentationRedaction")
+    manifest.pop("messageProjection")
     atomic_write_json(manifest_path, manifest, overwrite=True)
 
     assert validate_answer_review_sheet(report, open_sheet)["lifecycle"] == "OPEN"
+
+
+def test_answer_review_fixture_projection_uses_runtime_question_and_fails_closed(
+    tmp_path: Path,
+):
+    report = _fixture_http_report(tmp_path / "http-report.json")
+    open_sheet = tmp_path / "fixture-aware.open.jsonl"
+    manifest = export_answer_review_sheet(
+        report,
+        open_sheet,
+        reviewer_id="reviewer-a",
+        message_projection=ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+    )
+
+    assert manifest["messageProjection"] == ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+    assert next(
+        row for row in load_jsonl(open_sheet) if row["caseId"] == "case-1"
+    )["message"] == "订单 20220205175455334F51D3ADFEBAC358 的物流到哪了"
+    assert validate_answer_review_sheet(report, open_sheet)["lifecycle"] == "OPEN"
+
+    invalid_report = _fixture_http_report(tmp_path / "invalid-fixture-report.json")
+    invalid = load_json(invalid_report)
+    invalid["cases"][0]["http"].pop("fixtureEvidence")
+    atomic_write_json(invalid_report, invalid, overwrite=True)
+    with pytest.raises(CustomerServiceAnswerReviewError, match="requires fixture evidence"):
+        export_answer_review_sheet(
+            invalid_report,
+            tmp_path / "invalid-fixture.open.jsonl",
+            reviewer_id="reviewer-a",
+            message_projection=ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+        )
+
+
+def test_fixture_aware_answer_reviews_are_consistent_across_evidence_lifecycle(
+    tmp_path: Path,
+):
+    report = _fixture_http_report(tmp_path / "http-report.json")
+    left = {f"case-{index}": _labels() for index in range(1, 4)}
+    right = {f"case-{index}": _labels() for index in range(1, 4)}
+    right["case-1"] = _labels(answer=False, citation="UNSUPPORTED")
+    _report, sealed_a, sealed_b = _sealed_pair(
+        tmp_path,
+        report_path=report,
+        left=left,
+        right=right,
+        message_projection=ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+    )
+    agreement = compare_answer_reviews(report, sealed_a, sealed_b)
+    assert agreement["messageProjection"] == ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+
+    pending = tmp_path / "fixture-aware-pending"
+    assert write_pending_answer_review_evidence(
+        report,
+        agreement,
+        review_a_path=sealed_a,
+        review_b_path=sealed_b,
+        output_dir=pending,
+    )["verified"] is True
+    assert verify_pending_answer_review_evidence(pending)["caseCount"] == 3
+    assert load_json(pending / "evidence-manifest.json")["messageProjection"] == (
+        ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+    )
+    assert load_json(pending / "lifecycle.json")["messageProjection"] == (
+        ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+    )
+
+    adjudication = tmp_path / "fixture-aware-adjudication.jsonl"
+    export_answer_adjudication_template(agreement, adjudication)
+    rows = load_jsonl(adjudication)
+    rows[0]["adjudicator"] = "reviewer-c"
+    rows[0]["reason"] = "independent review"
+    rows[0]["finalLabels"] = _labels(answer=False, citation="UNSUPPORTED")
+    atomic_write_jsonl(adjudication, rows)
+    final_report, final_agreement = merge_answer_reviews(
+        report,
+        sealed_a,
+        sealed_b,
+        adjudication_path=adjudication,
+    )
+    assert final_report["reviewEvidence"]["messageProjection"] == (
+        ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+    )
+    evidence = tmp_path / "fixture-aware-evidence"
+    assert write_answer_review_evidence(
+        final_report,
+        final_agreement,
+        review_a_path=sealed_a,
+        review_b_path=sealed_b,
+        adjudication_path=adjudication,
+        output_dir=evidence,
+    )["verified"] is True
+    assert verify_answer_review_evidence(evidence)["caseCount"] == 3
+    assert load_json(evidence / "evidence-manifest.json")["messageProjection"] == (
+        ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+    )
+
+
+def test_answer_review_rejects_mixed_message_projections(tmp_path: Path):
+    report = _fixture_http_report(tmp_path / "http-report.json")
+    labels = {f"case-{index}": _labels() for index in range(1, 4)}
+    _report, sealed_fixture, _sealed_fixture_b = _sealed_pair(
+        tmp_path,
+        report_path=report,
+        left=labels,
+        right=labels,
+        message_projection=ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+    )
+    open_source = tmp_path / "source.open.jsonl"
+    export_answer_review_sheet(
+        report,
+        open_source,
+        reviewer_id="reviewer-source",
+        message_projection=ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
+    )
+    _fill_sheet(open_source, labels)
+    sealed_source = tmp_path / "source.sealed.jsonl"
+    seal_answer_review_sheet(report, open_source, sealed_source)
+
+    with pytest.raises(CustomerServiceAnswerReviewError, match="different message projections"):
+        compare_answer_reviews(report, sealed_fixture, sealed_source)
 
 
 def test_answer_review_agreement_and_adjudicated_quality_metrics(tmp_path: Path):

@@ -241,6 +241,66 @@ def test_pending_v13_answer_review_binds_raw_observation_and_open_sheets() -> No
     assert any("source observation is invalid" in error for error in errors)
 
 
+def test_v20_answer_review_binds_fixture_projection_metrics_and_reviewers() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReviewV20"])
+
+    errors: list[str] = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV20",
+    )
+
+    assert errors == []
+    assert not any("immutable source field differs" in error for error in errors)
+
+    descriptor["reviewerIds"] = ["reviewer-a", "reviewer-b"]
+    errors = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV20",
+    )
+    assert any("reviewer IDs are invalid" in error for error in errors)
+
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReviewV20"])
+    descriptor["finalEvidence"]["metrics"]["answerCorrectness"]["numerator"] = 58
+    errors = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV20",
+    )
+    assert any("metric is invalid: answerCorrectness" in error for error in errors)
+
+
+def test_live_v14_http_diagnostic_preserves_its_execution_boundary() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = deepcopy(
+        next(
+            item
+            for item in manifest["evaluation"]["diagnosticEvidence"]
+            if item.get("packageId") == "customer-service-http-v14-20260825"
+        )
+    )
+
+    errors: list[str] = []
+    _validate_diagnostic_evidence(root, [descriptor], errors)
+
+    assert errors == []
+
+    descriptor["behaviorContractViolationCount"] = 0
+    errors = []
+    _validate_diagnostic_evidence(root, [descriptor], errors)
+    assert any("live behavior-contract evidence is invalid" in error for error in errors)
+
+
 def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:
     package = tmp_path / "evaluation/.runs/final-failed"
     package.mkdir(parents=True)

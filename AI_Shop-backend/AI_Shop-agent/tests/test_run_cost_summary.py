@@ -13,6 +13,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from app.observability.llm_metrics import (
+    record_llm_failure,
     record_llm_usage,
     reset_run_cost,
     snapshot_cost_summary,
@@ -58,6 +59,25 @@ def test_snapshot_after_two_calls_aggregates_cost_and_tokens():
     # (1000*2 + 500*8 + 500*2 + 250*8) / 1e6 = (2000+4000+1000+2000)/1e6
     assert summary["costCny"] == pytest.approx(0.009)
     assert summary["models"] == ["priced-model"]
+
+
+def test_failed_attempts_are_separate_from_successful_calls():
+    record_llm_failure(
+        "primary-model", missing_reason="call_deadline_exceeded_before_usage"
+    )
+    record_llm_usage(_priced_response(input_tokens=100, output_tokens=25))
+
+    summary = snapshot_cost_summary()
+    assert summary["llmCalls"] == 2
+    assert summary["providerAttempts"] == 2
+    assert summary["successfulLlmCalls"] == 1
+    assert summary["failedLlmCalls"] == 1
+    assert summary["missingUsageCalls"] == 1
+    assert summary["missingReasons"] == {
+        "call_deadline_exceeded_before_usage": 1
+    }
+    assert summary["costStatus"] == "MISSING_USAGE"
+    assert summary["models"] == ["priced-model", "primary-model"]
 
 
 def test_heavy_path_when_tools_called_even_with_single_call():

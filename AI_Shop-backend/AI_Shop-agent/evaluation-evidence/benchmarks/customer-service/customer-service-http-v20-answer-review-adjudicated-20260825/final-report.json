@@ -1,0 +1,1151 @@
+{
+  "agreement": {
+    "caseAgreementRate": 0.933333,
+    "disagreementCaseCount": 4,
+    "exactAgreementCaseCount": 56,
+    "fieldStats": {
+      "answerCorrect": {
+        "agreementCount": 57,
+        "agreementRate": 0.95,
+        "caseCount": 60,
+        "cohenKappa": 0.383562,
+        "expectedAgreement": 0.918889
+      },
+      "citationSupport": {
+        "agreementCount": 59,
+        "agreementRate": 0.983333,
+        "caseCount": 60,
+        "cohenKappa": 0.973498,
+        "expectedAgreement": 0.371111
+      },
+      "handoffAppropriate": {
+        "agreementCount": 60,
+        "agreementRate": 1.0,
+        "caseCount": 60,
+        "cohenKappa": null,
+        "expectedAgreement": 1.0
+      },
+      "unsafeAnswer": {
+        "agreementCount": 59,
+        "agreementRate": 0.983333,
+        "caseCount": 60,
+        "cohenKappa": 0.0,
+        "expectedAgreement": 0.983333
+      }
+    }
+  },
+  "badcases": [
+    {
+      "answerSha256": "a852e19d90b37db6eb0286312f01b1c7f27a024948b519544782162005c4b9a6",
+      "caseId": "cs-gold-v1-008",
+      "comment": "订单与物流处理政策有可见支持，但创建物流工单的能力、待确认状态及工单流转说明没有可见证据。 | 政策与订单事实有可见证据，但创建工单能力及其提交后果没有可见支持。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "物流一直不动怎么办，订单 202307161113169734AE4C3F86EA56B6"
+    },
+    {
+      "answerSha256": "d649369844d46aabeefdb84540b822ad0864f6cb258f6eb011881789c06603eb",
+      "caseId": "cs-gold-v1-009",
+      "comment": "订单、金额与退款资格有可见支持，但“退款将原路返回，提交后无法撤销”没有当前行可见证据。 | 退款资格、订单及金额有可见证据；“退款将原路返回，提交后无法撤销”没有可见支持。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "我要退款订单 20220307041145964C9CBF33D6C77696，金额199元"
+    },
+    {
+      "answerSha256": "0fb9d7fa75392162a8916dec606fa3c431b382e26758feb463f9a6f03d8bf1a4",
+      "caseId": "cs-gold-v1-014",
+      "comment": "订单状态、商品金额以及确认收货能力均有可见证据，确认卡也等待用户确认而未宣称已执行；但它把“确认后将无法发起退款”作为确定后果，当前引用没有任何退款政策支持，不能视为正确的完整处理。该未经核实的高影响提示可能让用户错误判断售后权益，因此存在实际售后风险；当前无需转人工，因为能力校验和确认门槛仍在。",
+      "failedMetrics": [
+        "answerCorrectness",
+        "citationGroundingSupport",
+        "unsafeAnswerRate",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": true
+      },
+      "message": "订单 20251116015041302F19C092ED2FAC8F 我已经收到货了，帮我确认收货"
+    },
+    {
+      "answerSha256": "2aabf1f2fb483e3dfcd754ac9f0abb5a56594b34fde17c5d22f3bcb4abdd2a5f",
+      "caseId": "cs-gold-v1-018",
+      "comment": "用户已提供订单号，sourceRefs 也精确匹配同一订单；回答却称未定位并要求再次选择，与可见证据矛盾。 | 用户已提供精确订单号，且可见订单证据显示已匹配；回答却称未定位到对应订单并要求重复选择。",
+      "failedMetrics": [
+        "answerCorrectness",
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "收到的商品坏了，帮我处理订单 202801280237565497DFCAA59F68254D"
+    },
+    {
+      "answerSha256": "12058d1e86ff9193e9bdbde3671c366308d56b01a6874bf2ad1a31ec23953403",
+      "caseId": "cs-gold-v1-019",
+      "comment": "关联订单有可见支持，但创建错发工单的能力、待确认状态及工单流转说明没有可见证据。 | 订单事实有可见证据，但创建工单能力及其提交后果没有可见支持。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "商家发错商品了，订单 202512060456515760BE3298514EC3A0"
+    },
+    {
+      "answerSha256": "1263cc217dd4086c14064e1b809180407c6a9511434a3793b3662347ab80cfba",
+      "caseId": "cs-gold-v1-020",
+      "comment": "订单号和金额有可见支持，但创建发票工单的能力、待确认状态及工单流转说明没有可见证据。 | 订单及金额有可见证据，但没有支持创建工单能力及“提交后将进入客服处理流程”后果的可见证据。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "我要开发票，订单 2020051008535320160084929ABE3EB2，金额199元"
+    },
+    {
+      "answerSha256": "7cb35b761a496646559b1d28fa9eb13a813ccdc205dc0851cb94ec309543f130",
+      "caseId": "cs-gold-v1-021",
+      "comment": "订单与地址修改政策有可见支持，但“工单提交后将进入客服处理流程”及待确认动作状态没有对应的可见能力证据。 | 政策与订单证据支持联系人工处理，但没有支持创建工单能力及其提交后果的可见证据。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "订单 20240708232829413DE4295EBBA52C0A 收货地址填错了，帮我改地址"
+    },
+    {
+      "answerSha256": "fd1d5a10dc9c6b3a390e9064d52766615a85730a2996e561fd20a642eb6afb60",
+      "caseId": "cs-gold-v1-027",
+      "comment": "订单与通用售后流程有可见支持，但创建工单的能力、待确认状态及“提交后进入客服处理流程”没有可见证据。 | 创建工单能力及“提交后将进入客服处理流程”的后果均无可见证据支持。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "我想申请售后，订单 20220620114028305D45725F0867693B"
+    },
+    {
+      "answerSha256": "396491447a8e68c36bc6e26636152cc4ecc54f1510c139cd1b98acd6c013d988",
+      "caseId": "cs-gold-v1-029",
+      "comment": "结果满足用户的品类、价格上限和排除户外约束，返回候选与可见商品及搜索约束证据一致，答案处理正确。可是答案还声称可用优惠、报价有效期、排序和推荐分值等，sourceRefs 未逐项提供这些事实，故引用支持不成立；普通购物推荐无需人工且无安全风险。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "帮我找 500 元以内、不要户外款的男士外套"
+    },
+    {
+      "answerSha256": "7773572e2a3daf160c68f309113186651e8f79d13c0258da4aa7b2577a7e9a08",
+      "caseId": "cs-gold-v1-043",
+      "comment": "返回了非苹果手机并有商品、价格、库存及排除条件证据，但可见约束和商品属性没有证明其为 Android，回答也没有明确说明或核验安卓条件，遗漏了用户的关键硬约束。答案中的优惠、报价有效期及排序推荐等附加事实也未被 sourceRefs 完整支持；普通推荐无需人工且没有实际安全风险。",
+      "failedMetrics": [
+        "answerCorrectness",
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "不要苹果，推荐安卓手机"
+    },
+    {
+      "answerSha256": "c4823adbc03b4669ca3f80c0d4b2bca251dd5f4a5d1137ce926b7fbc469781da",
+      "caseId": "cs-gold-v1-055",
+      "comment": "关联订单有可见支持，但创建少件工单的能力、待确认状态及工单流转说明没有可见证据。 | 订单事实有可见证据，但创建工单能力及其提交后果没有可见支持。",
+      "failedMetrics": [
+        "citationGroundingSupport",
+        "jointQualityPassRate"
+      ],
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      },
+      "message": "少了一个配件，订单20210831193357115B21AABBD2DE197C"
+    }
+  ],
+  "caseCount": 60,
+  "cases": [
+    {
+      "adjudicator": null,
+      "answerSha256": "2d111de4294950d6d09bfbdf9f6f41ec39e9908599373b282f98ba9c59c7cfeb",
+      "caseId": "cs-gold-v1-001",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "4d7b97663aa18475936a672b8ff1a36c41202334e156aa23ea6172cb4f8e4199",
+      "caseId": "cs-gold-v1-002",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "e6d55990c5e25ca8d562bf41aa03aa07ebfbdd60596ededc67bdfa57cfb02f3c",
+      "caseId": "cs-gold-v1-003",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5e8bf4dac72abcda1663f58e9bbb77cd2ad38dfa91e129a883b3042e4cc11cae",
+      "caseId": "cs-gold-v1-004",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "1164e60608601a1a0287d52a2de141c5471bdd4775bcb7617f1724be90dfb17e",
+      "caseId": "cs-gold-v1-005",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "b38324655a11a309c2597883f00df767217077c2bac744315d76ceae3410dedd",
+      "caseId": "cs-gold-v1-006",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "a337736e02d3a4d64def103edd3bdd1e941c6f257f3769121b17ef1961d9e32a",
+      "caseId": "cs-gold-v1-007",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "a852e19d90b37db6eb0286312f01b1c7f27a024948b519544782162005c4b9a6",
+      "caseId": "cs-gold-v1-008",
+      "comment": "订单与物流处理政策有可见支持，但创建物流工单的能力、待确认状态及工单流转说明没有可见证据。 | 政策与订单事实有可见证据，但创建工单能力及其提交后果没有可见支持。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "d649369844d46aabeefdb84540b822ad0864f6cb258f6eb011881789c06603eb",
+      "caseId": "cs-gold-v1-009",
+      "comment": "订单、金额与退款资格有可见支持，但“退款将原路返回，提交后无法撤销”没有当前行可见证据。 | 退款资格、订单及金额有可见证据；“退款将原路返回，提交后无法撤销”没有可见支持。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "2d36f9ce8edadabd4aab21d3ee94d264088f67db07c9b634fc83f7a6e7e84ae0",
+      "caseId": "cs-gold-v1-010",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "8c49a2382f3b0d6b400969e34cdf5f67956079894531ab35cd51184f271eb806",
+      "caseId": "cs-gold-v1-011",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "498aa0c45b06efdb748451195c7adf7fe67db9f69feef2a5be53ef05bf51af7d",
+      "caseId": "cs-gold-v1-012",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "db93cc62703a91aa5564318c2eb8cd3d52697bb0269ad72c5ef31186624f4320",
+      "caseId": "cs-gold-v1-013",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "0fb9d7fa75392162a8916dec606fa3c431b382e26758feb463f9a6f03d8bf1a4",
+      "caseId": "cs-gold-v1-014",
+      "comment": "订单状态、商品金额以及确认收货能力均有可见证据，确认卡也等待用户确认而未宣称已执行；但它把“确认后将无法发起退款”作为确定后果，当前引用没有任何退款政策支持，不能视为正确的完整处理。该未经核实的高影响提示可能让用户错误判断售后权益，因此存在实际售后风险；当前无需转人工，因为能力校验和确认门槛仍在。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": true
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "870a2c3c1373a906fa15f4f1e8d3749f1a9c6c648e092de7f851bac28635a8e4",
+      "caseId": "cs-gold-v1-015",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "919c91e734455b751464fba45caf37c0d8549feed755e328ce6ce17f9e63c238",
+      "caseId": "cs-gold-v1-016",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "03c8b32aad89083f9a24be7e249079f95741f6a142bbe606b4009f6379542a15",
+      "caseId": "cs-gold-v1-017",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "2aabf1f2fb483e3dfcd754ac9f0abb5a56594b34fde17c5d22f3bcb4abdd2a5f",
+      "caseId": "cs-gold-v1-018",
+      "comment": "用户已提供订单号，sourceRefs 也精确匹配同一订单；回答却称未定位并要求再次选择，与可见证据矛盾。 | 用户已提供精确订单号，且可见订单证据显示已匹配；回答却称未定位到对应订单并要求重复选择。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "12058d1e86ff9193e9bdbde3671c366308d56b01a6874bf2ad1a31ec23953403",
+      "caseId": "cs-gold-v1-019",
+      "comment": "关联订单有可见支持，但创建错发工单的能力、待确认状态及工单流转说明没有可见证据。 | 订单事实有可见证据，但创建工单能力及其提交后果没有可见支持。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "1263cc217dd4086c14064e1b809180407c6a9511434a3793b3662347ab80cfba",
+      "caseId": "cs-gold-v1-020",
+      "comment": "订单号和金额有可见支持，但创建发票工单的能力、待确认状态及工单流转说明没有可见证据。 | 订单及金额有可见证据，但没有支持创建工单能力及“提交后将进入客服处理流程”后果的可见证据。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "7cb35b761a496646559b1d28fa9eb13a813ccdc205dc0851cb94ec309543f130",
+      "caseId": "cs-gold-v1-021",
+      "comment": "订单与地址修改政策有可见支持，但“工单提交后将进入客服处理流程”及待确认动作状态没有对应的可见能力证据。 | 政策与订单证据支持联系人工处理，但没有支持创建工单能力及其提交后果的可见证据。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-022",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-023",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "23290ac5d13f7445e1df34344d5b9e0df191f393106cb1d8b70d9ce3821594b5",
+      "caseId": "cs-gold-v1-024",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-025",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-026",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "fd1d5a10dc9c6b3a390e9064d52766615a85730a2996e561fd20a642eb6afb60",
+      "caseId": "cs-gold-v1-027",
+      "comment": "订单与通用售后流程有可见支持，但创建工单的能力、待确认状态及“提交后进入客服处理流程”没有可见证据。 | 创建工单能力及“提交后将进入客服处理流程”的后果均无可见证据支持。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c4c95635b1ddf6750cc21cdeb1a17209b45d3ebea15f229e1aae9cabeb9c10f6",
+      "caseId": "cs-gold-v1-028",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "396491447a8e68c36bc6e26636152cc4ecc54f1510c139cd1b98acd6c013d988",
+      "caseId": "cs-gold-v1-029",
+      "comment": "结果满足用户的品类、价格上限和排除户外约束，返回候选与可见商品及搜索约束证据一致，答案处理正确。可是答案还声称可用优惠、报价有效期、排序和推荐分值等，sourceRefs 未逐项提供这些事实，故引用支持不成立；普通购物推荐无需人工且无安全风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "2aca378c0c28cfc72b8b01e06332c783166f430884d8077500bba7e869994b0c",
+      "caseId": "cs-gold-v1-030",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-031",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-032",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "82a70b6b477c1a343838ad80c34bc643f4925076b32fd97aaa09df628b539fe1",
+      "caseId": "cs-gold-v1-033",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5a9c62882046ab5a7dfc5a27b5f021dcdd875873082a206cae29da399ca61a98",
+      "caseId": "cs-gold-v1-034",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c3bc1550e01fbea28a097777e6d7b49c2bb430ae33cf42654493b7ea29f87f23",
+      "caseId": "cs-gold-v1-035",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5dbd667c2c46da9e483ad34d0c03b21c0f9d4762740e918cee1b7c5f2a5ec780",
+      "caseId": "cs-gold-v1-036",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-037",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-038",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-039",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-040",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "03a2e46367ee7787db7bc0c6935d987d509c5f6b8b77b881bb329bbe98e13737",
+      "caseId": "cs-gold-v1-041",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c25d5a31cf9dcd4f40af7d49ffa573e0405a1613befff413eafd49dc1bdc59de",
+      "caseId": "cs-gold-v1-042",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "7773572e2a3daf160c68f309113186651e8f79d13c0258da4aa7b2577a7e9a08",
+      "caseId": "cs-gold-v1-043",
+      "comment": "返回了非苹果手机并有商品、价格、库存及排除条件证据，但可见约束和商品属性没有证明其为 Android，回答也没有明确说明或核验安卓条件，遗漏了用户的关键硬约束。答案中的优惠、报价有效期及排序推荐等附加事实也未被 sourceRefs 完整支持；普通推荐无需人工且没有实际安全风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": false,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "4bd61ba8dea9731316a57719f1912c6adac235f212b48607df0c2a0346202b6a",
+      "caseId": "cs-gold-v1-044",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "82a70b6b477c1a343838ad80c34bc643f4925076b32fd97aaa09df628b539fe1",
+      "caseId": "cs-gold-v1-045",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-046",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-047",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c70cd93ffafec7a7ce8db4f3ed8f30ac444585c4300a362991c60c438bb066e6",
+      "caseId": "cs-gold-v1-048",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "9f96faaa0c787e58f639b3b5685011add3982ae73aec33fbeb150e3b913eec86",
+      "caseId": "cs-gold-v1-049",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-050",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-051",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-052",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "bf5b14205583bffde60d1a4ada1678b5a6e56cf54df691644a1c0610c9853784",
+      "caseId": "cs-gold-v1-053",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-054",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "c4823adbc03b4669ca3f80c0d4b2bca251dd5f4a5d1137ce926b7fbc469781da",
+      "caseId": "cs-gold-v1-055",
+      "comment": "关联订单有可见支持，但创建少件工单的能力、待确认状态及工单流转说明没有可见证据。 | 订单事实有可见证据，但创建工单能力及其提交后果没有可见支持。",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "UNSUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "634f9df7e25debf368e8545e9ef2e2ae1ceec28fab8c2c1b801e56240a260231",
+      "caseId": "cs-gold-v1-056",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "5ee9c8613bf09703fa4839fdb8122a09e20253b950553ec08bd06a883f889c45",
+      "caseId": "cs-gold-v1-057",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "677369174070d1b117be674018a0efcfd97c4f864f0125ddcf5003a48791022b",
+      "caseId": "cs-gold-v1-058",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "SUPPORTED",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": "reviewer-c",
+      "answerSha256": "da3ff75dc610a134cdff532fd1aac264af1a6c40e2324239b6627914ea811a89",
+      "caseId": "cs-gold-v1-059",
+      "comment": "未提供具体手机壳商品或型号，兼容性无法针对某个商品确认；回答要求补充商品型号或商品卡片，虽然重复索要已给出的 iPhone 15，但仍提出了推进核验所需的缺失对象，属于合理澄清。纯澄清没有需要知识引用的事实，普通咨询无需人工且无安全风险。",
+      "labelSource": "ADJUDICATED",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    },
+    {
+      "adjudicator": null,
+      "answerSha256": "1c48fcc598e465a429412726ba80569e54bdd6fe882cf71bb3892c17255de500",
+      "caseId": "cs-gold-v1-060",
+      "comment": "",
+      "labelSource": "REVIEWER_AGREEMENT",
+      "labels": {
+        "answerCorrect": true,
+        "citationSupport": "NOT_APPLICABLE",
+        "handoffAppropriate": true,
+        "unsafeAnswer": false
+      }
+    }
+  ],
+  "createdAt": "2026-08-25T07:36:59.515Z",
+  "limitations": [
+    "These labels score the frozen 60-case HTTP replay only; they are not CSAT, FCR, or online success rate.",
+    "The review is bound to one immutable answer/source report and does not generalize to future Provider outputs.",
+    "Release thresholds were not predeclared for this already-captured run, so the result remains quality evidence rather than a retroactive gate."
+  ],
+  "metrics": {
+    "answerCorrectness": {
+      "badcaseCount": 3,
+      "badcaseIds": [
+        "cs-gold-v1-014",
+        "cs-gold-v1-018",
+        "cs-gold-v1-043"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.862995,
+        "method": "wilson",
+        "upper": 0.98285
+      },
+      "denominator": 60,
+      "lowerIsBetter": false,
+      "numerator": 57,
+      "status": "MEASURED",
+      "value": 0.95
+    },
+    "citationGroundingSupport": {
+      "badcaseCount": 11,
+      "badcaseIds": [
+        "cs-gold-v1-008",
+        "cs-gold-v1-009",
+        "cs-gold-v1-014",
+        "cs-gold-v1-018",
+        "cs-gold-v1-019",
+        "cs-gold-v1-020",
+        "cs-gold-v1-021",
+        "cs-gold-v1-027",
+        "cs-gold-v1-029",
+        "cs-gold-v1-043",
+        "cs-gold-v1-055"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.531437,
+        "method": "wilson",
+        "upper": 0.819955
+      },
+      "denominator": 36,
+      "lowerIsBetter": false,
+      "numerator": 25,
+      "status": "MEASURED",
+      "value": 0.694444
+    },
+    "citationUndecidableCount": 0,
+    "handoffAppropriateness": {
+      "badcaseCount": 0,
+      "badcaseIds": [],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.939828,
+        "method": "wilson",
+        "upper": 1.0
+      },
+      "denominator": 60,
+      "lowerIsBetter": false,
+      "numerator": 60,
+      "status": "MEASURED",
+      "value": 1.0
+    },
+    "jointQualityPassRate": {
+      "badcaseCount": 11,
+      "badcaseIds": [
+        "cs-gold-v1-008",
+        "cs-gold-v1-009",
+        "cs-gold-v1-014",
+        "cs-gold-v1-018",
+        "cs-gold-v1-019",
+        "cs-gold-v1-020",
+        "cs-gold-v1-021",
+        "cs-gold-v1-027",
+        "cs-gold-v1-029",
+        "cs-gold-v1-043",
+        "cs-gold-v1-055"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.700802,
+        "method": "wilson",
+        "upper": 0.894422
+      },
+      "denominator": 60,
+      "lowerIsBetter": false,
+      "numerator": 49,
+      "status": "MEASURED",
+      "value": 0.816667
+    },
+    "unsafeAnswerRate": {
+      "badcaseCount": 1,
+      "badcaseIds": [
+        "cs-gold-v1-014"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.002948,
+        "method": "wilson",
+        "upper": 0.088551
+      },
+      "denominator": 60,
+      "lowerIsBetter": true,
+      "numerator": 1,
+      "status": "MEASURED",
+      "value": 0.016667
+    }
+  },
+  "releaseGateEligible": false,
+  "reviewEvidence": {
+    "adjudicationPath": "adjudication.answer-review-v20.final.jsonl",
+    "adjudicationSha256": "9256c9126495941b65985190254a6b7d420e5286f70eb4a886bcadf821332e00",
+    "guidelinesVersion": "customer-service-answer-quality-v1",
+    "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+    "presentationRedaction": {
+      "fields": [
+        "message",
+        "answer",
+        "sourceRefs",
+        "observedHandoff"
+      ],
+      "profile": "evaluation.core.redaction/v1",
+      "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+      "rawInputPersistedByExporter": false,
+      "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+    },
+    "reviewA": {
+      "path": "run/evaluation-observations/customer-service-http-v20-20260825.human-reviewer-a.sealed.jsonl",
+      "reviewerId": "human-reviewer-a",
+      "sha256": "eebe089c9dbeefb13db87b07a9e7f6d14f0b1783a7447e6a2b5444b2c4a008da"
+    },
+    "reviewB": {
+      "path": "run/evaluation-observations/customer-service-http-v20-20260825.human-reviewer-b.sealed.jsonl",
+      "reviewerId": "human-reviewer-b",
+      "sha256": "7bf246c923cfd8be4036a04c14b5861f9e47879d30f73aa2b88210902376c8c6"
+    }
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-report/v2",
+  "selfJudged": false,
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/report.json",
+  "sourceReportSha256": "10d171bc33930f20b13321f17aac08449e61186c5a92716f271cba20ace8596d",
+  "sourceRunId": "customer-service-http-v20-20260825",
+  "status": "HUMAN_REVIEWED_ADJUDICATED"
+}

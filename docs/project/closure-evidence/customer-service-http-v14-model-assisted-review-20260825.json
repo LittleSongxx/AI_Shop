@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "aishop-customer-service-http-model-assisted-review/v1",
+  "status": "MODEL_ASSISTED_DIAGNOSTIC_NOT_HUMAN_REVIEW",
+  "releaseGateEligible": false,
+  "sourceRunId": "customer-service-http-v14-20260825",
+  "sourceReportSha256": "53989861835a498018b8ca16c2719446e053638591162ed53abafbcb8d45d349",
+  "reviewers": {
+    "reviewerA": {
+      "id": "model-reviewer-a",
+      "sealedPath": "run/evaluation-observations/customer-service-http-v14-20260825.model-reviewer-a.sealed.jsonl",
+      "sha256": "c8cd55beff995a088acacc92dfbbbf060596fde19c203ff21682aad92f28093d"
+    },
+    "reviewerB": {
+      "id": "model-reviewer-b",
+      "sealedPath": "run/evaluation-observations/customer-service-http-v14-20260825.model-reviewer-b.sealed.jsonl",
+      "sha256": "94f021331ab25413c36d54e95370e9234196a695dcd4f259ef067f60e332550b"
+    }
+  },
+  "agreement": {
+    "caseCount": 60,
+    "exactAgreementCaseCount": 54,
+    "disagreementCaseCount": 6,
+    "caseAgreementRate": 0.9,
+    "fieldStats": {
+      "answerCorrect": {"agreementCount": 57, "agreementRate": 0.95, "cohenKappa": 0.545455},
+      "citationSupport": {"agreementCount": 56, "agreementRate": 0.933333, "cohenKappa": 0.881129},
+      "handoffAppropriate": {"agreementCount": 59, "agreementRate": 0.983333, "cohenKappa": 0.791667},
+      "unsafeAnswer": {"agreementCount": 60, "agreementRate": 1.0, "cohenKappa": null}
+    },
+    "path": "run/evaluation-observations/customer-service-http-v14-20260825.model-agreement.json",
+    "sha256": "accbab2403e774b32958fef680f4f267f62688caa7863c5845d24dfea6c9e54a"
+  },
+  "adjudication": {
+    "id": "model-adjudicator-v14",
+    "caseCount": 6,
+    "path": "run/evaluation-observations/customer-service-http-v14-20260825.model-adjudication.final.jsonl",
+    "sha256": "11c82b84a627c32f2a7260f56174d3ede5c09f4272b228384fbde852f1b81cfb"
+  },
+  "diagnosticMetrics": {
+    "answerCorrectness": {"numerator": 56, "denominator": 60, "value": 0.933333, "confidenceInterval95": [0.840746, 0.973771]},
+    "citationGroundingSupport": {"numerator": 28, "denominator": 33, "value": 0.848485, "confidenceInterval95": [0.690801, 0.933495]},
+    "handoffAppropriateness": {"numerator": 57, "denominator": 60, "value": 0.95, "confidenceInterval95": [0.862995, 0.98285]},
+    "unsafeAnswerRate": {"numerator": 0, "denominator": 60, "value": 0.0, "confidenceInterval95": [0.0, 0.060172]},
+    "jointQualityPassRate": {"numerator": 51, "denominator": 60, "value": 0.85, "confidenceInterval95": [0.738854, 0.919026]}
+  },
+  "diagnosticPackage": {
+    "path": "run/evaluation-observations/customer-service-http-v14-model-assisted-review-20260825",
+    "finalReportSha256": "d7656a50dd889132d116a4dd57fac972df08ad9d8e5cceaa3651618f44f781b9",
+    "sha256SumsSha256": "2c96743b1a25a0b72daf56b5e8027e78bc26d05971f6f799605bc1fe4ed93cfd"
+  },
+  "limitations": [
+    "两位 reviewer 和第三位 adjudicator 均为独立模型辅助角色，不是外部真人。",
+    "评测器生成的 HUMAN_REVIEWED_ADJUDICATED 状态仅用于验证流程，不能作为真人质量证据。",
+    "本记录不改变 v14 closure 的 EXECUTED_PENDING_INDEPENDENT_HUMAN_REVIEW 状态，也不进入 release gate。",
+    "诊断指标仅代表冻结的 60 条 HTTP observation，不代表线上 CSAT、FCR 或生产质量。"
+  ]
+}

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -8,9 +9,11 @@ from evaluation.capacity_benchmark import (
     CapacityBenchmarkError,
     _public_observation,
     benchmark_capacity,
+    benchmark_open_arrival_capacity,
     load_capacity_cases,
     parse_concurrency_levels,
     summarize_capacity_level,
+    summarize_open_arrival_capacity,
     verify_capacity_evidence,
     write_capacity_evidence,
 )
@@ -325,3 +328,182 @@ async def test_capacity_warmup_is_excluded_from_measured_observations(
     assert report["warmup"]["excludedFromMeasuredLevels"] is True
     assert report["warmup"]["observationsStored"] is False
     assert report["configuration"]["warmupRequests"] == 2
+
+
+def test_open_arrival_summary_separates_drops_timeouts_429_and_end_to_end_latency():
+    common = {
+        "providerCompleteness": 1,
+        "terminalStateCorrectness": 1,
+        "stateDiffMatched": True,
+        "duplicateSideEffectCount": 0,
+        "severeSafetyViolationCount": 0,
+        "usage": {
+            "providerCalls": 0,
+            "costCny": None,
+            "costStatus": "NOT_APPLICABLE",
+            "notApplicableReason": "no_llm_call",
+        },
+        "generatorDelayMs": 2,
+        "queueDelayMs": 3,
+        "latencyMs": 10,
+        "endToEndLatencyMs": 15,
+        "completedOffsetMs": 20,
+    }
+    observations = [
+        {
+            **common,
+            "status": "PASSED",
+            "arrivalOutcome": "COMPLETED",
+            "actualLaunchOffsetMs": 5,
+            "lateStart": False,
+        },
+        {
+            **common,
+            "status": "ERROR",
+            "arrivalOutcome": "TIMEOUT",
+            "actualLaunchOffsetMs": 10,
+            "lateStart": True,
+        },
+        {
+            **common,
+            "status": "ERROR",
+            "arrivalOutcome": "HTTP_429",
+            "actualLaunchOffsetMs": 15,
+            "lateStart": False,
+        },
+        {
+            "status": "DROPPED",
+            "arrivalOutcome": "DROPPED",
+            "actualLaunchOffsetMs": None,
+            "completedOffsetMs": None,
+            "generatorDelayMs": 4,
+            "queueDelayMs": None,
+            "endToEndLatencyMs": None,
+            "lateStart": False,
+        },
+    ]
+
+    summary = summarize_open_arrival_capacity(
+        observations,
+        arrival_rate_qps=4,
+        duration_seconds=1,
+        wall_seconds=2,
+        max_inflight=2,
+        peak_inflight=2,
+        resource_samples=[],
+    )
+
+    assert summary["plannedArrivalCount"] == 4
+    assert summary["actualLaunchCount"] == 3
+    assert summary["completedCount"] == 3
+    assert summary["successfulCount"] == 1
+    assert summary["timeoutCount"] == 1
+    assert summary["http429Count"] == 1
+    assert summary["lateStartCount"] == 1
+    assert summary["droppedCount"] == 1
+    assert summary["achievedArrivalRateQps"] == 3
+    assert summary["completionThroughputQps"] == 1.5
+    assert summary["endToEndLatencyMs"]["sampleCount"] == 3
+
+
+@pytest.mark.asyncio
+async def test_open_arrival_scheduler_uses_fixed_clock_and_reports_queue_drops(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "evaluation.capacity_benchmark.load_gold_dataset",
+        lambda _path: [_gold_row()],
+    )
+    rows, cases = load_capacity_cases(Path("unused.jsonl"), case_ids=("case-1",))
+    monkeypatch.setattr(
+        "evaluation.capacity_benchmark.load_capacity_cases",
+        lambda _path, case_ids: (rows, cases),
+    )
+
+    async def fake_run(case, *, user_id, timeout_seconds, trial_context):
+        await asyncio.sleep(0.05)
+        return CaseResult(
+            case_id=case.case_id,
+            domain=Domain.AGENT,
+            status=CaseStatus.PASSED,
+            metrics={
+                "providerCompleteness": 1,
+                "terminalStateCorrectness": 1,
+                "severeSafetyViolationCount": 0,
+            },
+            latency_ms=50,
+            output={"answer": "ok", "tools": [], "episodes": []},
+            providers={},
+            assertions=[],
+            usage={
+                "providerCalls": 0,
+                "costCny": None,
+                "costStatus": "NOT_APPLICABLE",
+                "notApplicableReason": "no_llm_call",
+            },
+            state_diff={"matched": True, "duplicateSideEffectCount": 0},
+        )
+
+    async def no_resource_samples(stop, *, interval_seconds):
+        await stop.wait()
+        return []
+
+    monkeypatch.setattr("evaluation.capacity_benchmark.run_agent_case", fake_run)
+    monkeypatch.setattr(
+        "evaluation.capacity_benchmark._sample_resources", no_resource_samples
+    )
+    dataset = tmp_path / "human.jsonl"
+    dataset.write_text("{}\n", encoding="utf-8")
+
+    report, observations = await benchmark_open_arrival_capacity(
+        dataset,
+        run_id="capacity-open-test",
+        arrival_rate_qps=1_000,
+        iterations=8,
+        max_inflight=1,
+        warmup_requests=0,
+        timeout_seconds=1,
+        case_ids=("case-1",),
+        preflight={"passed": True},
+    )
+
+    summary = report["summary"]
+    assert report["claim"] == "LOCAL_OPEN_ARRIVAL_READ_ONLY_OBSERVATION"
+    assert report["notProductionSlo"] is True
+    assert report["configuration"]["iterations"] == 8
+    assert report["configuration"]["maxInflight"] == 1
+    assert summary["plannedArrivalCount"] == 8
+    assert summary["actualLaunchCount"] < 8
+    assert summary["droppedCount"] > 0
+    assert summary["peakInflight"] == 1
+    assert len(observations) == 8
+    assert all("generatorDelayMs" in row for row in observations)
+    assert all("plannedArrivalOffsetMs" in row for row in observations)
+    launched = [row for row in observations if row["actualLaunchOffsetMs"] is not None]
+    assert launched
+    assert all("queueDelayMs" in row for row in launched)
+    assert all("endToEndLatencyMs" in row for row in launched)
+
+
+def test_capacity_cli_accepts_open_arrival_options():
+    from evaluation.cli import build_parser
+
+    args = build_parser().parse_args(
+        [
+            "benchmark-capacity",
+            "--dataset",
+            "human.jsonl",
+            "--run-id",
+            "open-test",
+            "--arrival-rate-qps",
+            "12.5",
+            "--duration-seconds",
+            "20",
+            "--max-inflight",
+            "32",
+        ]
+    )
+
+    assert args.arrival_rate_qps == 12.5
+    assert args.duration_seconds == 20
+    assert args.max_inflight == 32

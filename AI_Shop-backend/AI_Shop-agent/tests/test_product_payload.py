@@ -4,11 +4,18 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.services.java_internal_client import java_internal_client
+from app.services.product_search_pipeline import (
+    ProductSearchResult,
+    ProductSearchTrace,
+    product_search_pipeline,
+)
 from app.services.product_service import (
     ProductService,
     filter_known_available_products,
     format_search_tool_message,
 )
+from app.services.search_recommend_service import search_recommend_service
+from app.services.shopping_profile_service import shopping_profile_service
 from app.utils.biz_payload import build_order_payload, build_product_payload
 
 
@@ -140,3 +147,59 @@ def test_plain_empty_search_discloses_retrieval_limit():
 
     assert "本次检索" in message
     assert "不能据此断言平台无货" in message
+
+
+def test_comparison_incomplete_message_never_presents_a_one_sided_result():
+    message = format_search_tool_message(
+        "WH-1000XM6和十周年版降噪耳机如何比较",
+        None,
+        [],
+        "comparison_incomplete",
+    )
+
+    assert "对比不完整" in message
+    assert "单边对比" in message
+    assert "找到" not in message
+
+
+@pytest.mark.asyncio
+async def test_comparison_incomplete_blocks_browse_and_hot_sale_fallback(monkeypatch):
+    service = ProductService()
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "get_effective_profile",
+        AsyncMock(return_value={}),
+    )
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "should_clarify",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(service, "_mission_for_request", AsyncMock(return_value={}))
+    trace = ProductSearchTrace(
+        query_plan={},
+        result_source="comparison_incomplete",
+        comparison_coverage={"wh1000xm6": 1, "十周年版": 0},
+        comparison_complete=False,
+        incomplete_reason="MISSING_COMPARISON_TARGETS",
+    )
+    monkeypatch.setattr(
+        product_search_pipeline,
+        "search",
+        AsyncMock(return_value=ProductSearchResult([], ["xm6"], trace)),
+    )
+    browse = AsyncMock(return_value=[{"product_id": "unrelated"}])
+    hot_sale = AsyncMock(return_value=[{"product_id": "unrelated"}])
+    monkeypatch.setattr(search_recommend_service, "load_recommend_products", browse)
+    monkeypatch.setattr(search_recommend_service, "load_hot_sale", hot_sale)
+
+    _assistant, _biz, _biz_type, products, source = await service.search_products(
+        "u1",
+        "WH-1000XM6和十周年版降噪耳机如何比较",
+        user_text="给我推荐并比较 WH-1000XM6 和十周年版降噪耳机",
+    )
+
+    assert products == []
+    assert source == "comparison_incomplete"
+    browse.assert_not_awaited()
+    hot_sale.assert_not_awaited()

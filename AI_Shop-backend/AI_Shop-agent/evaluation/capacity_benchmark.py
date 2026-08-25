@@ -217,6 +217,10 @@ def _policy_facts(result: CaseResult) -> list[dict[str, Any]]:
         "policy",
         "deterministicSocialReply",
         "llmSkipped",
+        "llmSkipReason",
+        "route",
+        "mode",
+        "structuredResultFinalized",
         "ragSkipped",
         "sideEffectAllowed",
         "maxTokens",
@@ -290,6 +294,88 @@ def _public_observation(
         ],
         "error": result.error,
     }
+
+
+def _capacity_error_observation(
+    *,
+    case: EvaluationCase,
+    source_row: Mapping[str, Any],
+    trial_id: str,
+    request_id: str,
+    latency_ms: float,
+    exc: Exception,
+) -> dict[str, Any]:
+    expected = (
+        source_row.get("expected")
+        if isinstance(source_row.get("expected"), Mapping)
+        else {}
+    )
+    return {
+        "caseId": case.case_id,
+        "trialId": trial_id,
+        "requestId": request_id,
+        "intent": str(expected.get("intent") or ""),
+        "requiredProviders": list(case.required_providers),
+        "status": "ERROR",
+        "latencyMs": round(latency_ms, 3),
+        "providerCompleteness": 0,
+        "terminalStateCorrectness": 0,
+        "stateDiffMatched": False,
+        "duplicateSideEffectCount": 0,
+        "severeSafetyViolationCount": 0,
+        "usage": {
+            "providerCalls": 0,
+            "costCny": None,
+            "costStatus": "MISSING_USAGE",
+            "usageReported": False,
+            "missingReason": "capacity_request_error_before_usage",
+        },
+        "executionPath": "UNKNOWN",
+        "providerFacts": {},
+        "answer": {"sha256": None, "chars": 0, "rawStored": False},
+        "tools": [],
+        "steps": [],
+        "error": {"type": type(exc).__name__, "message": str(exc)[:300]},
+    }
+
+
+async def _execute_capacity_request(
+    case: EvaluationCase,
+    source_row: Mapping[str, Any],
+    *,
+    context: Any,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    expected = (
+        source_row.get("expected")
+        if isinstance(source_row.get("expected"), Mapping)
+        else {}
+    )
+    request_started = time.perf_counter()
+    try:
+        result = await run_agent_case(
+            case,
+            user_id=context.evaluation_user_id,
+            timeout_seconds=timeout_seconds,
+            trial_context=context,
+        )
+    except Exception as exc:
+        return _capacity_error_observation(
+            case=case,
+            source_row=source_row,
+            trial_id=context.trial_id,
+            request_id=context.request_id,
+            latency_ms=(time.perf_counter() - request_started) * 1000,
+            exc=exc,
+        )
+    return _public_observation(
+        result,
+        case_id=case.case_id,
+        trial_id=context.trial_id,
+        request_id=context.request_id,
+        intent=str(expected.get("intent") or ""),
+        required_providers=case.required_providers,
+    )
 
 
 def summarize_capacity_level(
@@ -462,61 +548,16 @@ async def benchmark_capacity(
         async def execute(index: int, *, phase: str) -> dict[str, Any]:
             case = cases[index % len(cases)]
             source_row = selected_rows[index % len(selected_rows)]
-            expected = (
-                source_row.get("expected")
-                if isinstance(source_row.get("expected"), Mapping)
-                else {}
-            )
             context = trial_context(
                 f"{run_id}-{phase}-c{concurrency}", case.case_id, index + 1
             )
             async with semaphore:
-                request_started = time.perf_counter()
-                try:
-                    result = await run_agent_case(
-                        case,
-                        user_id=context.evaluation_user_id,
-                        timeout_seconds=timeout_seconds,
-                        trial_context=context,
-                    )
-                except Exception as exc:
-                    return {
-                        "caseId": case.case_id,
-                        "trialId": context.trial_id,
-                        "requestId": context.request_id,
-                        "intent": str(expected.get("intent") or ""),
-                        "requiredProviders": list(case.required_providers),
-                        "status": "ERROR",
-                        "latencyMs": round(
-                            (time.perf_counter() - request_started) * 1000, 3
-                        ),
-                        "providerCompleteness": 0,
-                        "terminalStateCorrectness": 0,
-                        "stateDiffMatched": False,
-                        "duplicateSideEffectCount": 0,
-                        "severeSafetyViolationCount": 0,
-                        "usage": {
-                            "providerCalls": 0,
-                            "costCny": None,
-                            "costStatus": "MISSING_USAGE",
-                            "usageReported": False,
-                            "missingReason": "capacity_request_error_before_usage",
-                        },
-                        "executionPath": "UNKNOWN",
-                        "providerFacts": {},
-                        "answer": {"sha256": None, "chars": 0, "rawStored": False},
-                        "tools": [],
-                        "steps": [],
-                        "error": {"type": type(exc).__name__, "message": str(exc)[:300]},
-                    }
-            return _public_observation(
-                result,
-                case_id=case.case_id,
-                trial_id=context.trial_id,
-                request_id=context.request_id,
-                intent=str(expected.get("intent") or ""),
-                required_providers=case.required_providers,
-            )
+                return await _execute_capacity_request(
+                    case,
+                    source_row,
+                    context=context,
+                    timeout_seconds=timeout_seconds,
+                )
 
         if concurrency == levels[0] and warmup_requests:
             warmup_started = time.perf_counter()
@@ -627,8 +668,422 @@ async def benchmark_capacity(
     )
 
 
+def summarize_open_arrival_capacity(
+    observations: Sequence[Mapping[str, Any]],
+    *,
+    arrival_rate_qps: float,
+    duration_seconds: float,
+    wall_seconds: float,
+    max_inflight: int,
+    peak_inflight: int,
+    resource_samples: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    rows = list(observations)
+    launched = [row for row in rows if row.get("actualLaunchOffsetMs") is not None]
+    dropped = [row for row in rows if str(row.get("arrivalOutcome")) == "DROPPED"]
+    completed = [row for row in launched if row.get("completedOffsetMs") is not None]
+    safe_successes = [
+        row
+        for row in completed
+        if str(row.get("status")) == CaseStatus.PASSED.value
+        and int(row.get("providerCompleteness") or 0) == 1
+        and int(row.get("terminalStateCorrectness") or 0) == 1
+        and bool(row.get("stateDiffMatched"))
+        and int(row.get("duplicateSideEffectCount") or 0) == 0
+        and int(row.get("severeSafetyViolationCount") or 0) == 0
+    ]
+    timeout_count = sum(
+        str(row.get("arrivalOutcome")) == "TIMEOUT" for row in completed
+    )
+    http_429_count = sum(
+        str(row.get("arrivalOutcome")) == "HTTP_429" for row in completed
+    )
+    cpu = [
+        float(row["hostCpuUsedPercent"])
+        for row in resource_samples
+        if row.get("hostCpuUsedPercent") is not None
+    ]
+    memory = [
+        float(row["hostMemoryUsedPercent"])
+        for row in resource_samples
+        if row.get("hostMemoryUsedPercent") is not None
+    ]
+    return {
+        "plannedArrivalCount": len(rows),
+        "actualLaunchCount": len(launched),
+        "completedCount": len(completed),
+        "successfulCount": len(safe_successes),
+        "errorCount": len(completed) - len(safe_successes),
+        "timeoutCount": timeout_count,
+        "http429Count": http_429_count,
+        "lateStartCount": sum(bool(row.get("lateStart")) for row in launched),
+        "droppedCount": len(dropped),
+        "launchRate": round(len(launched) / len(rows), 6) if rows else 0.0,
+        "completionRate": round(len(completed) / len(rows), 6) if rows else 0.0,
+        "successRate": round(len(safe_successes) / len(rows), 6) if rows else 0.0,
+        "targetArrivalRateQps": round(arrival_rate_qps, 6),
+        "achievedArrivalRateQps": (
+            round(len(launched) / duration_seconds, 6)
+            if duration_seconds > 0
+            else None
+        ),
+        "completionThroughputQps": (
+            round(len(completed) / wall_seconds, 6) if wall_seconds > 0 else None
+        ),
+        "durationSeconds": round(duration_seconds, 6),
+        "wallSeconds": round(wall_seconds, 6),
+        "maxInflight": max_inflight,
+        "peakInflight": peak_inflight,
+        "generatorDelayMs": _summary(
+            [float(row.get("generatorDelayMs") or 0) for row in rows]
+        ),
+        "queueDelayMs": _summary(
+            [float(row.get("queueDelayMs") or 0) for row in launched]
+        ),
+        "serviceLatencyMs": _summary(
+            [float(row.get("latencyMs") or 0) for row in completed]
+        ),
+        "endToEndLatencyMs": _summary(
+            [float(row.get("endToEndLatencyMs") or 0) for row in completed]
+        ),
+        "usage": merge_usage(
+            row.get("usage") if isinstance(row.get("usage"), Mapping) else {}
+            for row in completed
+        ),
+        "resources": {
+            "scope": "LOCAL_HOST_SHARED_WITH_OTHER_PROCESSES",
+            "sampleCount": len(resource_samples),
+            "hostCpuUsedPercent": _summary(cpu),
+            "hostMemoryUsedPercent": _summary(memory),
+            "rawSamples": list(resource_samples),
+        },
+    }
+
+
+async def benchmark_open_arrival_capacity(
+    dataset_path: Path,
+    *,
+    run_id: str,
+    arrival_rate_qps: float,
+    duration_seconds: float = 30.0,
+    iterations: int | None = None,
+    max_inflight: int = 64,
+    warmup_requests: int = 4,
+    timeout_seconds: float = 180.0,
+    case_ids: Sequence[str] = DEFAULT_CAPACITY_CASE_IDS,
+    preflight: Mapping[str, Any],
+    resource_sample_interval_seconds: float = 0.2,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Run a fixed-rate, read-only open-arrival load observation.
+
+    Arrivals are generated from a monotonic schedule independently of request
+    completion. A bounded queue of ``max_inflight`` waiting arrivals prevents
+    the load generator from hiding overload in unbounded local memory.
+    """
+
+    if not 0 < arrival_rate_qps <= 10_000:
+        raise CapacityBenchmarkError("arrival_rate_qps must be between 0 and 10000")
+    if not 0 < duration_seconds <= 3_600:
+        raise CapacityBenchmarkError("duration_seconds must be between 0 and 3600")
+    if iterations is not None and not 1 <= iterations <= 1_000_000:
+        raise CapacityBenchmarkError("iterations must be between 1 and 1000000")
+    if not 1 <= max_inflight <= 1_024:
+        raise CapacityBenchmarkError("max_inflight must be between 1 and 1024")
+    if not 0 <= warmup_requests <= 1_000:
+        raise CapacityBenchmarkError("warmup_requests must be between 0 and 1000")
+    if timeout_seconds <= 0:
+        raise CapacityBenchmarkError("timeout_seconds must be positive")
+    if preflight.get("passed") is not True:
+        raise CapacityBenchmarkError(
+            "capacity benchmark requires a passing production preflight"
+        )
+
+    selected_rows, cases = load_capacity_cases(dataset_path, case_ids=case_ids)
+    planned_count = (
+        int(iterations)
+        if iterations is not None
+        else max(1, int(arrival_rate_qps * duration_seconds))
+    )
+    measured_duration = (
+        planned_count / arrival_rate_qps if iterations is not None else duration_seconds
+    )
+    interval_seconds = 1.0 / arrival_rate_qps
+    late_start_threshold_ms = max(1.0, interval_seconds * 1000)
+
+    warmup_observations: list[dict[str, Any]] = []
+    warmup_started = time.perf_counter()
+    for index in range(warmup_requests):
+        case = cases[index % len(cases)]
+        source_row = selected_rows[index % len(selected_rows)]
+        context = trial_context(f"{run_id}-warmup-open", case.case_id, index + 1)
+        warmup_observations.append(
+            await _execute_capacity_request(
+                case,
+                source_row,
+                context=context,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+    warmup_wall_seconds = time.perf_counter() - warmup_started
+    warmup_report = {
+        "requestCount": 0,
+        "status": "NOT_RUN",
+        "excludedFromMeasuredLevels": True,
+        "observationsStored": False,
+    }
+    if warmup_observations:
+        warmup_report = {
+            **summarize_capacity_level(
+                warmup_observations,
+                concurrency=1,
+                wall_seconds=warmup_wall_seconds,
+                resource_samples=[],
+            ),
+            "requestCount": len(warmup_observations),
+            "status": "COMPLETED",
+            "excludedFromMeasuredLevels": True,
+            "observationsStored": False,
+        }
+
+    queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue(
+        maxsize=max_inflight
+    )
+    observations: list[dict[str, Any]] = []
+    active_requests = 0
+    peak_inflight = 0
+    measured_started = time.perf_counter()
+
+    async def worker() -> None:
+        nonlocal active_requests, peak_inflight
+        while True:
+            job = await queue.get()
+            if job is None:
+                queue.task_done()
+                return
+            request_started = time.perf_counter()
+            queue_delay_ms = max(0.0, (request_started - job["enqueuedAt"]) * 1000)
+            actual_launch_offset_ms = (request_started - measured_started) * 1000
+            start_delay_ms = float(job["generatorDelayMs"]) + queue_delay_ms
+            active_requests += 1
+            peak_inflight = max(peak_inflight, active_requests)
+            try:
+                observation = await _execute_capacity_request(
+                    job["case"],
+                    job["sourceRow"],
+                    context=job["context"],
+                    timeout_seconds=timeout_seconds,
+                )
+            finally:
+                active_requests -= 1
+            completed_at = time.perf_counter()
+            error_text = json.dumps(
+                observation.get("error") or {}, ensure_ascii=False
+            ).casefold()
+            if "429" in error_text and (
+                "too many" in error_text or "rate" in error_text or "status" in error_text
+            ):
+                outcome = "HTTP_429"
+            elif "timeout" in error_text or "timed out" in error_text:
+                outcome = "TIMEOUT"
+            elif str(observation.get("status")) == CaseStatus.ERROR.value:
+                outcome = "ERROR"
+            else:
+                outcome = "COMPLETED"
+            observation.update(
+                {
+                    "arrivalIndex": job["index"],
+                    "plannedArrivalOffsetMs": round(job["plannedOffsetMs"], 3),
+                    "actualLaunchOffsetMs": round(actual_launch_offset_ms, 3),
+                    "completedOffsetMs": round(
+                        (completed_at - measured_started) * 1000, 3
+                    ),
+                    "generatorDelayMs": round(job["generatorDelayMs"], 3),
+                    "queueDelayMs": round(queue_delay_ms, 3),
+                    "startDelayMs": round(start_delay_ms, 3),
+                    "lateStart": start_delay_ms > late_start_threshold_ms,
+                    "endToEndLatencyMs": round(
+                        (completed_at - job["plannedAt"]) * 1000, 3
+                    ),
+                    "arrivalOutcome": outcome,
+                    "maxInflight": max_inflight,
+                }
+            )
+            observations.append(observation)
+            queue.task_done()
+
+    workers = [
+        asyncio.create_task(worker())
+        for _ in range(min(max_inflight, planned_count))
+    ]
+    stop = asyncio.Event()
+    sampler = asyncio.create_task(
+        _sample_resources(stop, interval_seconds=resource_sample_interval_seconds)
+    )
+    try:
+        for index in range(planned_count):
+            planned_offset_seconds = index * interval_seconds
+            planned_at = measured_started + planned_offset_seconds
+            delay = planned_at - time.perf_counter()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            generated_at = time.perf_counter()
+            generator_delay_ms = max(0.0, (generated_at - planned_at) * 1000)
+            case = cases[index % len(cases)]
+            source_row = selected_rows[index % len(selected_rows)]
+            context = trial_context(
+                f"{run_id}-measured-open", case.case_id, index + 1
+            )
+            job = {
+                "index": index + 1,
+                "case": case,
+                "sourceRow": source_row,
+                "context": context,
+                "plannedAt": planned_at,
+                "plannedOffsetMs": planned_offset_seconds * 1000,
+                "enqueuedAt": generated_at,
+                "generatorDelayMs": generator_delay_ms,
+            }
+            try:
+                queue.put_nowait(job)
+            except asyncio.QueueFull:
+                expected = (
+                    source_row.get("expected")
+                    if isinstance(source_row.get("expected"), Mapping)
+                    else {}
+                )
+                observations.append(
+                    {
+                        "arrivalIndex": index + 1,
+                        "caseId": case.case_id,
+                        "trialId": context.trial_id,
+                        "requestId": context.request_id,
+                        "intent": str(expected.get("intent") or ""),
+                        "status": "DROPPED",
+                        "arrivalOutcome": "DROPPED",
+                        "plannedArrivalOffsetMs": round(
+                            planned_offset_seconds * 1000, 3
+                        ),
+                        "actualLaunchOffsetMs": None,
+                        "completedOffsetMs": None,
+                        "generatorDelayMs": round(generator_delay_ms, 3),
+                        "queueDelayMs": None,
+                        "startDelayMs": None,
+                        "lateStart": False,
+                        "endToEndLatencyMs": None,
+                        "maxInflight": max_inflight,
+                        "executionPath": "NOT_LAUNCHED",
+                        "usage": {},
+                        "error": {
+                            "type": "LOAD_GENERATOR_QUEUE_FULL",
+                            "message": "bounded open-arrival queue was full",
+                        },
+                    }
+                )
+        await queue.join()
+    finally:
+        for _worker in workers:
+            await queue.put(None)
+        await queue.join()
+        await asyncio.gather(*workers)
+        wall_seconds = time.perf_counter() - measured_started
+        stop.set()
+        resource_samples = await sampler
+
+    observations.sort(key=lambda row: int(row.get("arrivalIndex") or 0))
+    summary = summarize_open_arrival_capacity(
+        observations,
+        arrival_rate_qps=arrival_rate_qps,
+        duration_seconds=measured_duration,
+        wall_seconds=wall_seconds,
+        max_inflight=max_inflight,
+        peak_inflight=peak_inflight,
+        resource_samples=resource_samples,
+    )
+    report = {
+        "schemaVersion": CAPACITY_SCHEMA,
+        "runId": run_id,
+        "createdAt": utc_now(),
+        "mode": "OPEN_ARRIVAL",
+        "dataset": {
+            "path": str(dataset_path.resolve()),
+            "sha256": sha256_file(dataset_path),
+            "selectedCaseIds": [str(row["id"]) for row in selected_rows],
+            "caseCount": len(selected_rows),
+            "annotationStatus": HUMAN_STATUS,
+        },
+        "configuration": {
+            "arrivalRateQps": arrival_rate_qps,
+            "durationSeconds": measured_duration,
+            "iterations": planned_count,
+            "maxInflight": max_inflight,
+            "queueCapacity": max_inflight,
+            "arrivalIntervalMs": round(interval_seconds * 1000, 6),
+            "lateStartThresholdMs": round(late_start_threshold_ms, 6),
+            "warmupRequests": warmup_requests,
+            "timeoutSeconds": timeout_seconds,
+            "resourceSampleIntervalSeconds": resource_sample_interval_seconds,
+            "requestIsolation": [
+                "evaluationUserId",
+                "requestId",
+                "idempotencyKey",
+                "traceId",
+            ],
+        },
+        "preflight": dict(preflight),
+        "warmup": warmup_report,
+        "summary": summary,
+        "notProductionSlo": True,
+        "normalQualityDenominatorExcluded": True,
+        "claim": "LOCAL_OPEN_ARRIVAL_READ_ONLY_OBSERVATION",
+        "limitations": [
+            "Local single-host infrastructure and external Provider conditions; not a production SLO or capacity commitment.",
+            "The bounded waiting queue has the same capacity as maxInflight; queue-full arrivals are reported as dropped.",
+            "Generator delay, queue delay, service latency, and end-to-end latency are reported separately.",
+            "The fixed read-only case mix is an engineering probe, not production traffic distribution.",
+            "Answer content is hashed; semantic quality remains outside this benchmark.",
+        ],
+    }
+    return report, observations
+
+
 def _report_markdown(report: Mapping[str, Any]) -> str:
     warmup = report.get("warmup") or {}
+    if report.get("mode") == "OPEN_ARRIVAL":
+        summary = report.get("summary") or {}
+        generator = summary.get("generatorDelayMs") or {}
+        queue_delay = summary.get("queueDelayMs") or {}
+        end_to_end = summary.get("endToEndLatencyMs") or {}
+        return "\n".join(
+            [
+                "# AI Shop 本地只读开放到达率容量基准",
+                "",
+                f"> Run `{report.get('runId')}`；`notProductionSlo=true`；不进入质量门禁。",
+                "",
+                f"> Claim `{report.get('claim')}`。",
+                "",
+                "| 目标 QPS | 实际发起 QPS | 完成吞吐 QPS | 计划/发起/完成 | 丢弃 | 超时 | 429 | 晚启动 |",
+                "|---:|---:|---:|---|---:|---:|---:|---:|",
+                f"| {summary.get('targetArrivalRateQps')} | "
+                f"{summary.get('achievedArrivalRateQps')} | "
+                f"{summary.get('completionThroughputQps')} | "
+                f"{summary.get('plannedArrivalCount')}/{summary.get('actualLaunchCount')}/"
+                f"{summary.get('completedCount')} | {summary.get('droppedCount')} | "
+                f"{summary.get('timeoutCount')} | {summary.get('http429Count')} | "
+                f"{summary.get('lateStartCount')} |",
+                "",
+                "| 指标 | P50 | P95 | P99 | Max |",
+                "|---|---:|---:|---:|---:|",
+                f"| generator delay (ms) | {generator.get('p50')} | {generator.get('p95')} | {generator.get('p99')} | {generator.get('max')} |",
+                f"| queue delay (ms) | {queue_delay.get('p50')} | {queue_delay.get('p95')} | {queue_delay.get('p99')} | {queue_delay.get('max')} |",
+                f"| end-to-end latency (ms) | {end_to_end.get('p50')} | {end_to_end.get('p95')} | {end_to_end.get('p99')} | {end_to_end.get('max')} |",
+                "",
+                "## 边界",
+                "",
+                "这是本机固定节拍、固定只读 case 混合下的开放到达率观察值。"
+                "它不能外推为生产 SLO、峰值容量或真实业务流量分布。",
+                "",
+            ]
+        )
     lines = [
         "# AI Shop 本地只读容量基准",
         "",
@@ -722,6 +1177,7 @@ def write_capacity_evidence(
         "notProductionSlo": True,
         "normalQualityDenominatorExcluded": True,
         "preflightPassed": (report.get("preflight") or {}).get("passed") is True,
+        "claim": report.get("claim"),
         "files": inventory,
     }
     atomic_write_json(root / "evidence-manifest.json", manifest, overwrite=False)
@@ -771,6 +1227,10 @@ def verify_capacity_evidence(root: Path) -> dict[str, Any]:
         raise CapacityBenchmarkError("capacity evidence must declare notProductionSlo=true")
     if report.get("normalQualityDenominatorExcluded") is not True:
         raise CapacityBenchmarkError("capacity evidence must be excluded from quality denominators")
+    if report.get("mode") == "OPEN_ARRIVAL" and report.get("claim") != (
+        "LOCAL_OPEN_ARRIVAL_READ_ONLY_OBSERVATION"
+    ):
+        raise CapacityBenchmarkError("open-arrival capacity claim is invalid")
     if manifest.get("preflightPassed") is not True:
         raise CapacityBenchmarkError("capacity evidence requires a passing preflight")
     if manifest.get("runId") != report.get("runId"):

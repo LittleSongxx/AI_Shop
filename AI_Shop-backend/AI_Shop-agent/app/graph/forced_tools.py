@@ -87,6 +87,7 @@ def _finalize_with_tool(
         "search_fallback_done": True,
         "chunks": chunks,
         "pending_tool_calls": [],
+        "structured_result_finalized": True,
         "route": "finalize",
     }
 

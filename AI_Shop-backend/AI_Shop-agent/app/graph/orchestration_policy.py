@@ -132,9 +132,10 @@ def _workflow_eligible(state: Mapping[str, Any]) -> bool:
         and deterministic_social_reply(str(state.get("user_text") or "")) is not None
     ):
         return True
-    # The order resolver has already verified ownership, state eligibility,
-    # and exact tool arguments. A conditional RAG prefetch must not promote a
-    # single deterministic write proposal into a multi-agent policy workflow.
+    # The order resolver has verified ownership and exact target arguments;
+    # write eligibility is supplied by the separate Java/policy capability
+    # gate before ``resolved_order_tool`` is populated. A conditional RAG
+    # prefetch must not promote that bounded workflow into multi-agent policy.
     if state.get("resolved_order_tool"):
         return True
     if state.get("rag_evidence_required"):

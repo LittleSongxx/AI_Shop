@@ -40,7 +40,12 @@ from app.services.mcp_tool_router import mcp_tool_router
 from app.services.message_service import agent_message_service
 from app.services.pending_action_service import pending_action_service
 from app.services.redis_service import redis_service
-from app.services.response_verifier import response_verifier
+from app.services.response_verifier import (
+    has_dynamic_order_authority,
+    has_trusted_capability_decision,
+    requires_published_policy_evidence,
+    response_verifier,
+)
 from app.services.shopping_profile_service import shopping_profile_service
 from app.services.stream_service import stream_service
 from app.utils.biz_payload import (
@@ -197,7 +202,11 @@ async def stream_llm_turn(
             async for chunk in llm.astream(messages):
                 if await is_cancelled(user_id, message_id):
                     episode_status = "CANCELLED"
-                    record_llm_failure(resolved_model, fallback=fallback)
+                    record_llm_failure(
+                        resolved_model,
+                        fallback=fallback,
+                        missing_reason="cancelled_before_usage",
+                    )
                     return None
                 gathered = chunk if gathered is None else gathered + chunk
                 visible = strip_embedded_product_json(
@@ -220,7 +229,11 @@ async def stream_llm_turn(
                 )
         if await is_cancelled(user_id, message_id):
             episode_status = "CANCELLED"
-            record_llm_failure(resolved_model, fallback=fallback)
+            record_llm_failure(
+                resolved_model,
+                fallback=fallback,
+                missing_reason="cancelled_before_usage",
+            )
             return None
         if gathered is None:
             raise RuntimeError("LLM stream ended without a response")
@@ -442,6 +455,7 @@ async def finalize_agent_response(
     order_resolution: str | None = None,
     rag_evidence_required: bool = False,
     rag_evidence_state: str = "INSUFFICIENT",
+    deterministic_clarification: bool = False,
     verifier_fallback: str | None = None,
 ) -> None:
     user_id = agent_msg["userId"]
@@ -466,7 +480,7 @@ async def finalize_agent_response(
         # echoing the credential.  Re-validate the server card before using it.
         resolved = await resolve_server_action_card(assistant_cards, user_id)
     pending_for_verifier: dict | None = None
-    clarification_applied = False
+    clarification_applied = bool(deterministic_clarification)
     if resolved:
         assistant, biz_data, biz_type, pending_for_verifier = resolved
     elif is_order_selection_json(assistant_cards):
@@ -661,6 +675,7 @@ async def finalize_agent_response(
                 "budgetMin": effective_profile.get("budgetMin"),
                 "budgetMax": effective_profile.get("budgetMax"),
                 "excludedBrands": effective_profile.get("excludedBrands") or [],
+                "excludedTerms": effective_profile.get("excludedTerms") or [],
                 "requiredBrands": (
                     effective_profile.get("brands") or []
                     if effective_profile.get("acceptSubstitute") is False
@@ -693,7 +708,7 @@ async def finalize_agent_response(
     rag_supported = str(rag_evidence_state).upper() == "SUPPORTED" and bool(rag_sources)
     dynamic_authority = (
         str(order_resolution or "").upper() in {"RESOLVED", "NO_ELIGIBLE"}
-        and bool(business_sources)
+        and has_dynamic_order_authority(business_sources)
         and (
             biz_type
             in {
@@ -705,18 +720,21 @@ async def finalize_agent_response(
                 "support_case_detail",
                 "action_confirm",
             }
-            # NO_ELIGIBLE is emitted as a plain explanatory answer by the
-            # resolver. Its business snapshot is still authoritative even
-            # though no specialist biz card is rendered.
             or str(order_resolution or "").upper() == "NO_ELIGIBLE"
         )
     )
-    # A Java order snapshot is sufficient for a dynamic status/capability
-    # response.  It must not be forced through the public-policy citation gate;
-    # unsupported policy claims are still rejected independently by the
-    # verifier's claim regex below.
+    capability_authority = has_trusted_capability_decision(business_sources)
+    # Pure dynamic/capability answers do not need a generic policy fallback.
+    # The moment the prose contains a general rule, keep the published-policy
+    # gate active so an order snapshot cannot launder a missing citation.
+    business_only_answer = dynamic_authority or capability_authority
     policy_gate_required = (
-        rag_evidence_required and not clarification_applied and not dynamic_authority
+        rag_evidence_required
+        and not clarification_applied
+        and (
+            not business_only_answer
+            or requires_published_policy_evidence(assistant, business_sources)
+        )
     )
     rag_gate_required = policy_gate_required and rag_supported
     verification = response_verifier.verify(
@@ -865,6 +883,7 @@ def bind_agent_llm(
     max_tokens: int | None = None,
     disable_thinking: bool = False,
     tools_enabled: bool = True,
+    max_retries: int | None = None,
 ):
     """The tool-bound LLM for one ReAct round.
 
@@ -874,7 +893,9 @@ def bind_agent_llm(
     change still produces a fresh binding.
     """
     config = chat_llm_config(
-        fallback=fallback, disable_thinking=disable_thinking
+        fallback=fallback,
+        disable_thinking=disable_thinking,
+        max_retries=max_retries,
     )
     if tools_enabled:
         scope = None if allowed_tools is None else tuple(sorted(allowed_tools))

@@ -161,6 +161,20 @@ async def test_agent_preflight_requires_readiness_source_match():
     assert result["facts"]["apiRuntimeIdentity"]["source"]["sha256"] == "a" * 64
     assert result["facts"]["mcpRuntimeIdentity"]["processRole"] == "mcp"
 
+    stale_workspace = await _probe_agent_readiness(
+        _Client(payload),
+        "http://agent.test/health/ready",
+        expected_source={
+            "scope": "agent-app-source-and-runtime-dependencies/v1",
+            "sha256": "b" * 64,
+            "fileCount": 12,
+        },
+    )
+
+    assert stale_workspace["ok"] is False
+    assert stale_workspace["facts"]["processSourceAgreement"] is True
+    assert stale_workspace["facts"]["runtimeMatchesExpectedSource"] is False
+
     payload["checks"]["worker"]["workerRuntimeIdentity"] = {
         **_identity("worker", "b" * 64),
         "workerId": "worker-1",

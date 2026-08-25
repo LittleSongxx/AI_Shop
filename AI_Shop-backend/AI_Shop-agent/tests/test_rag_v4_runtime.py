@@ -123,6 +123,16 @@ def test_query_fact_hints_cover_address_snapshot_and_refund_channel_queries():
     )
 
 
+def test_query_fact_hints_cover_generic_refund_conditions_without_status_guessing():
+    assert query_fact_hints("退款需要满足哪些条件") == (
+        "aftersales.request_and_refund_boundary",
+    )
+    assert query_fact_hints("退货政策有哪些要求") == (
+        "aftersales.request_and_refund_boundary",
+    )
+    assert query_fact_hints("我的退款状态是什么") == ()
+
+
 def test_evidence_selector_promotes_preferred_fact_beyond_top_two_candidates():
     docs = [
         {"content": "普通地址说明"},

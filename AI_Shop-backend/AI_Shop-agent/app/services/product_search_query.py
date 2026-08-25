@@ -213,6 +213,26 @@ _MODEL_TOKEN_RE = re.compile(
 _SPEC_TOKEN_RE = re.compile(
     r"(?i)^(?:[345]g|\d+(?:\.\d+)?(?:gb|tb|g|w|mah|ml|cm|mm))$"
 )
+_BUDGET_RANGE_RE = re.compile(
+    r"(?P<min>\d+(?:\.\d+)?)\s*(?:元|块)?\s*(?:到|至|[-~—])\s*"
+    r"(?P<max>\d+(?:\.\d+)?)\s*(?:元|块)?"
+)
+_BUDGET_MAX_RE = re.compile(
+    r"(?P<value>\d+(?:\.\d+)?)\s*(?:元|块)\s*(?:以内|以下|不超过|至多|封顶|内)"
+    r"|(?:预算|价格)\s*(?P<budget>\d+(?:\.\d+)?)\s*(?:元|块)"
+)
+_BUDGET_MIN_RE = re.compile(
+    r"(?P<value>\d+(?:\.\d+)?)\s*(?:元|块)\s*(?:以上|起步|至少)"
+)
+_NEGATIVE_TERM_RE = re.compile(
+    r"(?:不要|不含|排除|剔除|不选|别要|无需|不要买)\s*"
+    r"([^，。；;！？!?并且同时和与保留的]+)"
+)
+_QUERY_FILLER_RE = re.compile(
+    r"(?:预算|价格|以内|以下|不超过|至多|封顶|以上|至少|"
+    r"如何比较|怎么比较|如何选|怎么选|哪个好|哪个更好|"
+    r"推荐|想买|我要|帮我|请|平价|便宜|比较|对比)"
+)
 
 
 def exact_model_tokens(query: str | None) -> tuple[str, ...]:
@@ -229,6 +249,65 @@ def exact_model_tokens(query: str | None) -> tuple[str, ...]:
     return tuple(tokens)
 
 
+def _clean_constraint_term(value: str | None) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"[，。；;！？!?、：:（）()\[\]\\\"']+", " ", text)
+    text = _QUERY_FILLER_RE.sub(" ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def extract_budget_constraints(query: str | None) -> tuple[float | None, float | None]:
+    value = str(query or "")
+    minimum: float | None = None
+    maximum: float | None = None
+    range_match = _BUDGET_RANGE_RE.search(value)
+    if range_match:
+        minimum = float(range_match.group("min"))
+        maximum = float(range_match.group("max"))
+    max_match = _BUDGET_MAX_RE.search(value)
+    if max_match:
+        raw = max_match.group("value") or max_match.group("budget")
+        if raw is not None:
+            parsed = float(raw)
+            maximum = parsed if maximum is None else min(maximum, parsed)
+    min_match = _BUDGET_MIN_RE.search(value)
+    if min_match:
+        minimum = float(min_match.group("value"))
+    return minimum, maximum
+
+
+def extract_query_exclusions(query: str | None) -> tuple[str, ...]:
+    values: list[str] = []
+    for match in _NEGATIVE_TERM_RE.finditer(str(query or "")):
+        term = _clean_constraint_term(match.group(1))
+        if term and term.casefold() not in {item.casefold() for item in values}:
+            values.append(term)
+    return tuple(values)
+
+
+def _comparison_segments(query: str | None) -> list[str]:
+    value = primary_product_request(query)
+    value = re.sub(r"(?:如何|怎么|怎样)(?:比较|对比|选)\s*$", "", value)
+    value = _BUDGET_RANGE_RE.sub(" ", value)
+    value = _BUDGET_MAX_RE.sub(" ", value)
+    value = _BUDGET_MIN_RE.sub(" ", value)
+    value = re.sub(r"(?:不要|不含|排除|剔除|不选|别要)\s*[^，。；;！？!?]+", " ", value)
+    parts = re.split(
+        r"\s*(?:和|与|及|以及|对比|比较|、|VS|vs|VS\.|怎么选|如何选|哪个好|哪个更好)\s*",
+        value,
+    )
+    result: list[str] = []
+    for part in parts:
+        cleaned = _clean_constraint_term(part)
+        compact = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]", "", cleaned)
+        if len(compact) < 2:
+            continue
+        if cleaned.casefold() not in {item.casefold() for item in result}:
+            result.append(cleaned)
+    return result
+
+
 def is_comparison_query(query: str | None) -> bool:
     """Whether model identifiers describe alternative targets, not one SKU."""
 
@@ -242,16 +321,81 @@ def is_comparison_query(query: str | None) -> bool:
 
 
 def comparison_target_terms(query: str | None) -> tuple[str, ...]:
-    """Extract non-model words naming an explicitly retained comparison target."""
+    """Extract bounded, user-named comparison target terms."""
 
-    value = str(query or "").casefold()
-    spans = re.findall(r"(?:保留|对比|比较)\s*([^，。；;！？!?]+)", value)
+    raw = str(query or "")
+    explicit_target_spans = re.findall(
+        r"(?:保留|对比|比较)\s*([^，。；;！？!?]+)", raw.casefold()
+    )
+    segments = (
+        explicit_target_spans
+        if explicit_target_spans
+        else _comparison_segments(raw)
+        if re.search(r"(?:和|与|及|以及|对比|比较|、|VS|vs|怎么选|如何选|哪个好)", raw)
+        else []
+    )
     terms: list[str] = []
-    for span in spans:
-        for token in re.findall(r"[\u4e00-\u9fff]{2,}|[a-z0-9][a-z0-9_-]{1,}", span):
-            if token not in terms:
-                terms.append(token)
+    generic_suffixes = {
+        "零食",
+        "耳机",
+        "降噪耳机",
+        "无线降噪耳机",
+        "手机",
+        "电脑",
+        "办公机",
+    }
+    for segment in segments:
+        for token in re.findall(
+            r"[\u4e00-\u9fff]{2,}|[a-z0-9][a-z0-9_-]{1,}", segment.casefold()
+        ):
+            normalized = re.sub(r"[^0-9a-z\u4e00-\u9fff]", "", token)
+            for suffix in sorted(generic_suffixes, key=len, reverse=True):
+                if normalized == suffix:
+                    normalized = ""
+                    break
+                if normalized.endswith(suffix) and len(normalized) > len(suffix):
+                    normalized = normalized[: -len(suffix)]
+                    break
+            if len(normalized) >= 2 and normalized not in terms:
+                terms.append(normalized)
     return tuple(terms)
+
+
+def extract_query_hard_constraints(query: str | None) -> dict[str, Any]:
+    """Parse only explicit, conservative hard constraints from user text."""
+
+    raw = str(query or "").strip()
+    budget_min, budget_max = extract_budget_constraints(raw)
+    must_not = extract_query_exclusions(raw)
+    model_tokens = exact_model_tokens(raw)
+    targets = comparison_target_terms(raw)
+    comparison_required = bool(
+        is_comparison_query(raw) and len(model_tokens) + len(targets) >= 2
+    )
+    excluded_compact = {
+        re.sub(r"[^0-9a-z\u4e00-\u9fff]", "", term.casefold())
+        for term in must_not
+    }
+    must_terms: list[str] = [
+        term
+        for term in model_tokens
+        if re.sub(r"[^0-9a-z\u4e00-\u9fff]", "", term.casefold())
+        not in excluded_compact
+    ]
+    if comparison_required:
+        must_terms.extend(targets)
+    unique_must: list[str] = []
+    for term in must_terms:
+        if term and term.casefold() not in {item.casefold() for item in unique_must}:
+            unique_must.append(term)
+    return {
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "must_terms": tuple(unique_must),
+        "must_not_terms": must_not,
+        "comparison_targets": targets,
+        "comparison_required": comparison_required,
+    }
 
 
 def infer_product_category(text: str | None) -> str | None:

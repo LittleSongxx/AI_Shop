@@ -72,8 +72,12 @@ def test_runtime_filter_uses_only_verified_available_fields():
         ),
     )
 
-    assert [row["id"] for row in eligible] == ["ok", "unknown"]
-    assert {row["reason"] for row in rejected} == {"OVER_BUDGET", "BRAND_REQUIRED"}
+    assert [row["id"] for row in eligible] == ["ok"]
+    assert {row["reason"] for row in rejected} == {
+        "OVER_BUDGET",
+        "BRAND_REQUIRED",
+        "BUDGET_UNVERIFIED",
+    }
 
 
 def test_runtime_filter_checks_category_even_when_exclusion_passes():
@@ -319,8 +323,84 @@ def test_negative_model_query_keeps_requested_alternative():
         plan,
     )
 
-    assert [row["id"] for row in eligible] == ["xm6", "xm10"]
+    assert [row["id"] for row in eligible] == ["xm10"]
     assert not any(row["reason"] == "EXACT_MODEL_MISMATCH" for row in rejected)
+
+
+def test_raw_query_hard_constraints_merge_with_mission_and_keep_string_fields_atomic():
+    plan = build_product_query_plan(
+        "100元以内旺旺雪饼和可乐零食",
+        {
+            "hardConstraints": {
+                "budgetMin": 20,
+                "budgetMax": 120,
+                "mustTerms": "零食",
+            },
+            "exclusions": {"terms": "临期"},
+        },
+    )
+
+    assert plan.constraints.budget_min == 20
+    assert plan.constraints.budget_max == 100
+    assert plan.constraints.must_terms == ("零食", "旺旺雪饼", "可乐")
+    assert plan.constraints.must_not_terms == ("临期",)
+    assert plan.constraints.comparison_targets == ("旺旺雪饼", "可乐")
+    assert plan.constraints.comparison_required is True
+
+
+def test_named_snack_comparison_requires_both_targets_and_budget_evidence():
+    plan = build_product_query_plan("100元以内旺旺雪饼和可乐零食", {})
+    eligible, rejected = filter_products_for_query_plan(
+        [
+            {"id": "snow", "productName": "旺旺雪饼零食", "price": 25},
+            {"id": "cola", "productName": "可乐零食组合装", "price": 39},
+            {"id": "over", "productName": "可乐零食豪华装", "price": 129},
+            {"id": "unknown", "productName": "旺旺雪饼礼盒"},
+            {"id": "other", "productName": "薯片零食", "price": 10},
+        ],
+        plan,
+    )
+
+    assert [row["id"] for row in eligible] == ["snow", "cola"]
+    assert {row["reason"] for row in rejected} >= {
+        "OVER_BUDGET",
+        "BUDGET_UNVERIFIED",
+    }
+    assert any(row["productId"] == "other" for row in rejected)
+
+
+def test_raw_negative_term_is_enforced_without_mission_parser_support():
+    plan = build_product_query_plan("平价零食不要旺旺雪饼", {})
+    eligible, rejected = filter_products_for_query_plan(
+        [
+            {"id": "excluded", "productName": "旺旺雪饼零食", "price": 10},
+            {"id": "kept", "productName": "芒果味休闲零食", "price": 12},
+        ],
+        plan,
+    )
+
+    assert [row["id"] for row in eligible] == ["kept"]
+    assert rejected == [{"productId": "excluded", "reason": "TERM_EXCLUDED"}]
+
+
+def test_named_headphone_comparison_tracks_each_target_independently():
+    plan = build_product_query_plan(
+        "WH-1000XM6和十周年版降噪耳机如何比较", {}
+    )
+    eligible, _rejected = filter_products_for_query_plan(
+        [
+            {"id": "xm6", "productName": "Sony WH-1000XM6 无线降噪耳机"},
+            {"id": "anniversary", "productName": "Sony 十周年典藏版降噪耳机"},
+        ],
+        plan,
+    )
+
+    from app.services.product_search_pipeline import comparison_target_coverage
+
+    coverage, complete, reason = comparison_target_coverage(eligible, plan)
+    assert coverage == {"wh1000xm6": 1, "十周年版": 1}
+    assert complete is True
+    assert reason is None
 
 
 def test_runtime_surface_contract_keeps_verified_target_product():
@@ -511,6 +591,69 @@ async def test_pipeline_runs_all_retrieval_variants_concurrently():
     assert result.trace.query_plan["rawQuery"] == "预算3000元适合拍照的手机"
     assert result.products[0]["product_id"] == "p1"
     assert result.trace.provider_calls == {"bm25": 2, "embeddingVector": 2, "rerank": 1}
+
+
+@pytest.mark.asyncio
+async def test_pipeline_fails_closed_when_rerank_drops_one_comparison_target():
+    async def recall(_query: str, _limit: int) -> list[str]:
+        return ["snow", "cola"]
+
+    async def load(_ids: list[str]) -> list[dict]:
+        return [
+            {"product_id": "snow", "product_name": "旺旺雪饼零食", "price": 25},
+            {"product_id": "cola", "product_name": "可乐零食组合装", "price": 39},
+        ]
+
+    async def rerank(_query: str, products: list[dict], _limit: int) -> list[dict]:
+        return [{**products[0], "_search_rerank_source": "rerank"}]
+
+    result = await ProductSearchPipeline().search(
+        build_product_query_plan("100元以内旺旺雪饼和可乐零食", {}),
+        candidate_size=4,
+        result_size=2,
+        keyword_search=recall,
+        vector_search=recall,
+        load_products=load,
+        rerank=rerank,
+    )
+
+    assert result.products == []
+    assert result.trace.result_source == "comparison_incomplete"
+    assert result.trace.comparison_coverage == {"旺旺雪饼": 1, "可乐": 0}
+    assert result.trace.comparison_complete is False
+    assert result.trace.incomplete_reason == "MISSING_COMPARISON_TARGETS"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_rejects_product_injected_only_by_reranker():
+    async def recall(_query: str, _limit: int) -> list[str]:
+        return ["p1"]
+
+    result = await ProductSearchPipeline().search(
+        build_product_query_plan("手机", {}),
+        candidate_size=4,
+        result_size=2,
+        keyword_search=recall,
+        vector_search=recall,
+        load_products=AsyncMock(
+            return_value=[
+                {"product_id": "p1", "product_name": "手机", "categoryName": "手机"}
+            ]
+        ),
+        rerank=AsyncMock(
+            return_value=[
+                {
+                    "product_id": "injected",
+                    "product_name": "手机",
+                    "categoryName": "手机",
+                    "_search_rerank_source": "rerank",
+                }
+            ]
+        ),
+    )
+
+    assert result.products == []
+    assert result.trace.rejection_counts["RERANK_UNKNOWN_PRODUCT"] == 1
 
 
 @pytest.mark.asyncio

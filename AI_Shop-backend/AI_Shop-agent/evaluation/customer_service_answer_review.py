@@ -57,6 +57,14 @@ ANSWER_REVIEW_PENDING_LIFECYCLE_SCHEMA = (
     "aishop-customer-service-answer-review-pending-lifecycle/v1"
 )
 ANSWER_REVIEW_GUIDELINES_VERSION = "customer-service-answer-quality-v1"
+ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE = "SOURCE_DATASET_MESSAGE_V1"
+ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE = "RUNTIME_FIXTURE_AWARE_V1"
+_MESSAGE_PROJECTIONS = frozenset(
+    {
+        ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
+        ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+    }
+)
 _PRESENTATION_REDACTION = {
     "profile": REDACTION_PROFILE,
     "projection": "REDACTED_REVIEW_SAFE_FIELDS",
@@ -178,6 +186,29 @@ def _shared_presentation_redaction(
     return left_enabled
 
 
+def _message_projection(manifest: Mapping[str, Any]) -> str:
+    """Read a source-message projection while preserving legacy v2 sheets."""
+
+    projection = str(
+        manifest.get("messageProjection") or ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE
+    )
+    if projection not in _MESSAGE_PROJECTIONS:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review message projection is invalid"
+        )
+    return projection
+
+
+def _shared_message_projection(left: Mapping[str, Any], right: Mapping[str, Any]) -> str:
+    left_projection = _message_projection(left)
+    right_projection = _message_projection(right)
+    if left_projection != right_projection:
+        raise CustomerServiceAnswerReviewError(
+            "answer-review sheets use different message projections"
+        )
+    return left_projection
+
+
 def _validate_labels(
     value: Any,
     *,
@@ -211,9 +242,51 @@ def _validate_labels(
     return labels
 
 
+def _review_message(
+    value: Mapping[str, Any],
+    http: Mapping[str, Any],
+    *,
+    message_projection: str,
+) -> str:
+    message = value.get("message")
+    if not isinstance(message, str) or not message.strip():
+        raise CustomerServiceAnswerReviewError("answer-review source message is invalid")
+    if message_projection == ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE:
+        return message
+
+    rendered_fields = {
+        str(field)
+        for field in (http.get("renderedFixtureTemplateFields") or [])
+        if isinstance(field, str)
+    }
+    if "orderId" not in rendered_fields:
+        return message
+    fixture = http.get("fixtureEvidence")
+    if not isinstance(fixture, Mapping) or not fixture:
+        raise CustomerServiceAnswerReviewError(
+            "fixture-aware answer review requires fixture evidence for a rendered order ID"
+        )
+    source_order_id = str(fixture.get("sourceOrderId") or "").strip()
+    runtime_order_id = str(fixture.get("orderId") or "").strip()
+    if not source_order_id or not runtime_order_id:
+        raise CustomerServiceAnswerReviewError(
+            "fixture-aware answer review requires a source and rendered order ID"
+        )
+    if source_order_id not in message:
+        raise CustomerServiceAnswerReviewError(
+            "fixture-aware answer review cannot locate the source order reference"
+        )
+    return message.replace(source_order_id, runtime_order_id)
+
+
 def _report_context(
-    report_path: Path, *, presentation_redaction: bool = False
+    report_path: Path,
+    *,
+    presentation_redaction: bool = False,
+    message_projection: str = ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
 ) -> tuple[dict[str, Any], str, dict[str, dict[str, Any]]]:
+    if message_projection not in _MESSAGE_PROJECTIONS:
+        raise CustomerServiceAnswerReviewError("answer-review message projection is invalid")
     report = load_json(report_path)
     if report.get("schemaVersion") != HTTP_REPORT_SCHEMA:
         raise CustomerServiceAnswerReviewError(
@@ -236,7 +309,11 @@ def _report_context(
             "caseId": case_id,
             "sourceRunId": report.get("runId"),
             "sourceReportSha256": report_sha,
-            "message": value.get("message"),
+            "message": _review_message(
+                value,
+                http,
+                message_projection=message_projection,
+            ),
             "answer": http.get("answer") or "",
             "sourceRefs": copy.deepcopy(http.get("sourceRefs") or []),
             "observedHandoff": bool(http.get("handoffObserved")),
@@ -279,6 +356,7 @@ def export_answer_review_sheet(
     *,
     reviewer_id: str,
     seed: int | None = None,
+    message_projection: str = ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
 ) -> dict[str, Any]:
     """Export one reviewer-specific, gold-blind answer sheet."""
 
@@ -286,7 +364,9 @@ def export_answer_review_sheet(
     if not reviewer:
         raise CustomerServiceAnswerReviewError("reviewer_id is required")
     report, report_sha, cases = _report_context(
-        report_path, presentation_redaction=True
+        report_path,
+        presentation_redaction=True,
+        message_projection=message_projection,
     )
     if seed is None:
         seed_material = f"{reviewer}\0{report_sha}".encode()
@@ -324,6 +404,7 @@ def export_answer_review_sheet(
         ),
         "containsExpectedOrSelfJudgment": False,
         "presentationRedaction": dict(_PRESENTATION_REDACTION),
+        "messageProjection": message_projection,
         "createdAt": utc_now(),
     }
     atomic_write_json(output_manifest, manifest, overwrite=False)
@@ -345,8 +426,11 @@ def _load_answer_review_sheet(
     manifest = load_json(manifest_path)
     rows = load_jsonl(sheet_path)
     presentation_redaction = _presentation_redaction_enabled(manifest)
+    message_projection = _message_projection(manifest)
     report, report_sha, sources = _report_context(
-        report_path, presentation_redaction=presentation_redaction
+        report_path,
+        presentation_redaction=presentation_redaction,
+        message_projection=message_projection,
     )
     if manifest.get("schemaVersion") != ANSWER_REVIEW_SCHEMA:
         raise CustomerServiceAnswerReviewError("answer-review manifest schema is invalid")
@@ -648,8 +732,11 @@ def score_answer_review(report_path: Path, review_path: Path) -> dict[str, Any]:
         != "OPEN",
     )
     presentation_redaction = _presentation_redaction_enabled(manifest)
+    message_projection = _message_projection(manifest)
     report, report_sha, sources = _report_context(
-        report_path, presentation_redaction=presentation_redaction
+        report_path,
+        presentation_redaction=presentation_redaction,
+        message_projection=message_projection,
     )
     labels = {case_id: item["labels"] for case_id, item in reviewed.items()}
     comments = {case_id: item["comment"] for case_id, item in reviewed.items()}
@@ -665,6 +752,7 @@ def score_answer_review(report_path: Path, review_path: Path) -> dict[str, Any]:
         "reviewSha256": sha256_file(review_path),
         "reviewerIds": [manifest["reviewerId"]],
         "caseCount": len(sources),
+        "messageProjection": message_projection,
         "metrics": metrics,
         "badcases": badcases,
         "limitations": [
@@ -719,8 +807,11 @@ def compare_answer_reviews(
             "agreement comparison accepts only SEALED answer-review sheets"
         )
     presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    message_projection = _shared_message_projection(manifest_a, manifest_b)
     report, report_sha, sources = _report_context(
-        report_path, presentation_redaction=presentation_redaction
+        report_path,
+        presentation_redaction=presentation_redaction,
+        message_projection=message_projection,
     )
     reviewer_a = str(manifest_a["reviewerId"])
     reviewer_b = str(manifest_b["reviewerId"])
@@ -792,6 +883,7 @@ def compare_answer_reviews(
         "presentationRedaction": (
             dict(_PRESENTATION_REDACTION) if presentation_redaction else None
         ),
+        "messageProjection": message_projection,
         "createdAt": utc_now(),
         "note": (
             "Inter-rater agreement measures annotation reliability, not model accuracy. "
@@ -851,6 +943,7 @@ def _load_adjudications(
     *,
     agreement: Mapping[str, Any],
 ) -> dict[str, dict[str, Any]]:
+    _message_projection(agreement)
     presentation_redaction = agreement.get("presentationRedaction") is not None
     if presentation_redaction and _canonical(
         agreement.get("presentationRedaction")
@@ -949,8 +1042,11 @@ def merge_answer_reviews(
         report_path, review_b_path, require_complete=True, check_sheet_hash=True
     )
     presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    message_projection = _shared_message_projection(manifest_a, manifest_b)
     report, report_sha, sources = _report_context(
-        report_path, presentation_redaction=presentation_redaction
+        report_path,
+        presentation_redaction=presentation_redaction,
+        message_projection=message_projection,
     )
     disagreement_ids = {
         str(item["caseId"]) for item in agreement.get("disagreements") or []
@@ -1031,6 +1127,7 @@ def merge_answer_reviews(
                 if presentation_redaction
                 else None
             ),
+            "messageProjection": message_projection,
         },
         "caseCount": len(sources),
         "agreement": {
@@ -1264,6 +1361,7 @@ def write_pending_answer_review_evidence(
             "pending evidence accepts only SEALED answer-review sheets"
         )
     presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    message_projection = _shared_message_projection(manifest_a, manifest_b)
     expected_presentation = (
         dict(_PRESENTATION_REDACTION) if presentation_redaction else None
     )
@@ -1273,8 +1371,14 @@ def write_pending_answer_review_evidence(
         raise CustomerServiceAnswerReviewError(
             "pending agreement presentation redaction differs from sealed sheets"
         )
+    if _message_projection(agreement) != message_projection:
+        raise CustomerServiceAnswerReviewError(
+            "pending agreement message projection differs from sealed sheets"
+        )
     report, report_sha, _ = _report_context(
-        report_path, presentation_redaction=presentation_redaction
+        report_path,
+        presentation_redaction=presentation_redaction,
+        message_projection=message_projection,
     )
     if (
         agreement.get("sourceRunId") != report.get("runId")
@@ -1375,6 +1479,7 @@ def write_pending_answer_review_evidence(
             "adjudicationTemplatePath": "adjudication.template.jsonl",
             "adjudicationTemplateSha256AtExport": template["sha256AtExport"],
             "presentationRedaction": expected_presentation,
+            "messageProjection": message_projection,
             "createdAt": utc_now(),
             "note": (
                 "This is inter-rater reliability evidence only. Final answer-quality "
@@ -1417,6 +1522,7 @@ def write_pending_answer_review_evidence(
                 "caseCount": template["caseCount"],
             },
             "presentationRedaction": expected_presentation,
+            "messageProjection": message_projection,
             "createdAt": utc_now(),
             "files": _inventory(staging),
         }
@@ -1469,6 +1575,7 @@ def write_answer_review_evidence(
     manifest_a = load_json(_sidecar_path(review_a_path))
     manifest_b = load_json(_sidecar_path(review_b_path))
     presentation_redaction = _shared_presentation_redaction(manifest_a, manifest_b)
+    message_projection = _shared_message_projection(manifest_a, manifest_b)
     expected_presentation = (
         dict(_PRESENTATION_REDACTION) if presentation_redaction else None
     )
@@ -1482,6 +1589,14 @@ def write_answer_review_evidence(
     ):
         raise CustomerServiceAnswerReviewError(
             "answer-review presentation redaction differs from sealed evidence"
+        )
+    if (
+        _message_projection(agreement) != message_projection
+        or _message_projection(final_report.get("reviewEvidence") or {})
+        != message_projection
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review message projection differs from sealed evidence"
         )
     final_inputs: list[Any] = [
         final_report,
@@ -1546,6 +1661,7 @@ def write_answer_review_evidence(
                 sha256_file(adjudication_path) if adjudication_path else None
             ),
             "presentationRedaction": expected_presentation,
+            "messageProjection": message_projection,
             "createdAt": utc_now(),
             "files": _inventory(staging),
         }
@@ -1740,6 +1856,9 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
     presentation_redaction = _shared_presentation_redaction(
         sheet_manifests[0], sheet_manifests[1]
     )
+    message_projection = _shared_message_projection(
+        sheet_manifests[0], sheet_manifests[1]
+    )
     expected_presentation = (
         dict(_PRESENTATION_REDACTION) if presentation_redaction else None
     )
@@ -1753,6 +1872,14 @@ def verify_pending_answer_review_evidence(root: Path) -> dict[str, Any]:
     ):
         raise CustomerServiceAnswerReviewError(
             "pending answer-review presentation redaction is invalid"
+        )
+    if (
+        _message_projection(agreement) != message_projection
+        or _message_projection(manifest) != message_projection
+        or _message_projection(lifecycle) != message_projection
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "pending answer-review message projection is invalid"
         )
 
     template_path = root / "adjudication.template.jsonl"
@@ -2055,6 +2182,9 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     presentation_redaction = _shared_presentation_redaction(
         sheet_manifests["reviewA"], sheet_manifests["reviewB"]
     )
+    message_projection = _shared_message_projection(
+        sheet_manifests["reviewA"], sheet_manifests["reviewB"]
+    )
     expected_presentation = (
         dict(_PRESENTATION_REDACTION) if presentation_redaction else None
     )
@@ -2070,6 +2200,15 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     ):
         raise CustomerServiceAnswerReviewError(
             "answer-review presentation redaction is invalid"
+        )
+    if (
+        _message_projection(agreement) != message_projection
+        or _message_projection(manifest) != message_projection
+        or _message_projection(final_report.get("reviewEvidence") or {})
+        != message_projection
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "answer-review message projection is invalid"
         )
     if set(review_rows["reviewA"]) != set(review_rows["reviewB"]):
         raise CustomerServiceAnswerReviewError(
@@ -2275,6 +2414,7 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
         or review_evidence.get("guidelinesVersion") != ANSWER_REVIEW_GUIDELINES_VERSION
         or _canonical(review_evidence.get("presentationRedaction"))
         != _canonical(expected_presentation)
+        or _message_projection(review_evidence) != message_projection
     ):
         raise CustomerServiceAnswerReviewError(
             "answer-review final review evidence is invalid"

@@ -10,8 +10,6 @@ from typing import Any
 import structlog
 
 from app.constants import (
-    CONFIRM_RECEIPT_ORDER_STATUSES,
-    ORDER_ITEM_STATUS_NORMAL,
     ORDER_STATUS_COMPLETED,
     ORDER_STATUS_NAMES,
     ORDER_STATUS_PAID,
@@ -19,7 +17,6 @@ from app.constants import (
     ORDER_STATUS_REFUNDED,
     ORDER_STATUS_SHIPPED,
     ORDER_STATUS_WAIT_PAYMENT,
-    REFUNDABLE_ORDER_STATUSES,
 )
 from app.domain.intent.types import IntentKind
 from app.harness.metrics.runtime_sensors import (
@@ -250,64 +247,34 @@ class OrderReferenceResolver:
                 ],
             )
 
-        eligible = [
-            row
-            for row in all_candidates
-            if not enforce_action_eligibility or self._is_eligible(row, intent)
-        ]
-        working = list(eligible)
-
-        if not eligible and all_candidates:
-            ineligible_matches = list(all_candidates)
-            consult_product_id = str(
-                (consult_card or {}).get("productId")
-                or (consult_card or {}).get("product_id")
-                or ""
-            ).strip()
-            if consult_product_id:
-                ineligible_matches = [
-                    row
-                    for row in ineligible_matches
-                    if row.get("productId") == consult_product_id
-                ]
-            ineligible_terms = topic_terms_for_text(user_text)
-            if ineligible_terms:
-                ineligible_matches = [
-                    row
-                    for row in ineligible_matches
-                    if self._candidate_matches_terms(row, ineligible_terms)
-                ]
-            if ineligible_matches:
-                return self._no_eligible(intent, ineligible_matches, clues)
-            return self._no_match(intent, [], clues, user_text)
+        # ``enforce_action_eligibility`` is retained for API compatibility with
+        # stored/replayed callers, but it must never use a Python status table
+        # to decide a business capability.  This resolver establishes only an
+        # owned order/item reference; action eligibility is evaluated later by
+        # Java (or the versioned after-sales policy engine for refunds).
+        del enforce_action_eligibility
+        candidates = list(all_candidates)
+        working = list(candidates)
 
         if explicit_item_id:
             working = [
                 row for row in working if row.get("orderItemId") == explicit_item_id
             ]
-            all_explicit = [
-                row for row in all_candidates if row.get("orderItemId") == explicit_item_id
-            ]
-            if not working and all_explicit:
-                return self._no_eligible(intent, all_explicit, clues)
+            if not working:
+                return self._no_match(intent, candidates, clues, user_text)
 
         status_filter = self._status_filter(user_text)
         if status_filter:
             clues["statuses"] = sorted(status_filter)
             working = [row for row in working if row.get("orderStatus") in status_filter]
             if not working:
-                status_matches = [
-                    row for row in all_candidates if row.get("orderStatus") in status_filter
-                ]
-                if status_matches:
-                    return self._no_eligible(intent, status_matches, clues)
-                return self._no_match(intent, eligible, clues, user_text)
+                return self._no_match(intent, candidates, clues, user_text)
 
         working, has_time_clue = self._apply_time_filter(working, user_text)
         if has_time_clue:
             clues["time"] = True
         if not working:
-            return self._no_match(intent, eligible, clues, user_text)
+            return self._no_match(intent, candidates, clues, user_text)
 
         topic_terms = topic_terms_for_text(user_text)
         explicit_topic_terms = sorted(
@@ -344,7 +311,7 @@ class OrderReferenceResolver:
                 working = product_matches
                 clues["productId"] = consult_product_id
             elif self._has_product_pronoun(user_text):
-                return self._no_match(intent, eligible, clues, user_text)
+                return self._no_match(intent, candidates, clues, user_text)
 
         if topic_terms:
             product_matches = [
@@ -352,7 +319,7 @@ class OrderReferenceResolver:
             ]
             clues["productTerms"] = topic_terms[:8]
             if not product_matches:
-                return self._no_match(intent, eligible, clues, user_text)
+                return self._no_match(intent, candidates, clues, user_text)
             working = product_matches
             matched_explicit_terms = [
                 term
@@ -379,7 +346,7 @@ class OrderReferenceResolver:
                 if self._candidate_matches_lexical_clues(row, lexical_clues)
             ]
             if not product_matches:
-                return self._no_match(intent, eligible, clues, user_text)
+                return self._no_match(intent, candidates, clues, user_text)
             working = product_matches
 
         if any(hint in user_text for hint in _RECENT_HINTS) and len(working) > 1:
@@ -407,9 +374,7 @@ class OrderReferenceResolver:
                 clues=clues,
                 source_refs=order_refs(working[: self.CARD_LIMIT]),
             )
-        if all_candidates and not eligible:
-            return self._no_eligible(intent, all_candidates, clues)
-        return self._no_match(intent, eligible, clues, user_text)
+        return self._no_match(intent, candidates, clues, user_text)
 
     def _normalize_order(self, order: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(order)
@@ -446,7 +411,12 @@ class OrderReferenceResolver:
         item_id = str(item.get("order_item_id") or item.get("orderItemId") or "")
         target_id = item_id if target_type == "ORDER_ITEM" else order_id
         status = self._int(order.get("order_status"))
-        cover = str(item.get("cover") or "").split(",")[0] or None
+        item_amount = self._number(
+            item.get("item_amount")
+            if item.get("item_amount") is not None
+            else item.get("itemAmount")
+        )
+        order_amount = self._number(order.get("amount"))
         search_text = " ".join(
             f"{row.get('product_name') or row.get('productName') or ''} "
             f"{row.get('property_info') or row.get('propertyInfo') or ''} "
@@ -461,44 +431,28 @@ class OrderReferenceResolver:
             "orderId": order_id,
             "orderItemId": item_id or None,
             "productId": str(item.get("product_id") or item.get("productId") or "") or None,
-            "productName": item.get("product_name") or item.get("productName") or order.get("subject"),
+            "productName": item.get("product_name") or item.get("productName"),
             "propertyInfo": item.get("property_info") or item.get("propertyInfo"),
-            "cover": cover,
-            "amount": self._number(item.get("item_amount", order.get("amount"))),
+            "amount": item_amount if item_amount is not None else order_amount,
+            "_orderAmount": order_amount,
+            "_itemAmount": item_amount,
+            "_amountFactPath": (
+                "order_item.itemAmount" if item_amount is not None else "order.amount"
+            ),
             "orderStatus": status,
-            "orderStatusName": ORDER_STATUS_NAMES.get(status, "订单"),
+            "orderStatusName": (
+                order.get("order_status_name")
+                or order.get("orderStatusName")
+                or ORDER_STATUS_NAMES.get(status, "订单")
+            ),
             "orderTime": str(order.get("order_time") or order.get("orderTime") or "") or None,
+            "payScene": order.get("pay_scene") or order.get("payScene"),
             "orderItemStatus": self._int(
                 item.get("order_item_status", item.get("orderItemStatus"))
             ),
             "commentStatus": self._int(order.get("comment_status")),
             "_searchText": search_text,
         }
-
-    def _is_eligible(self, row: dict[str, Any], intent: str) -> bool:
-        status = row.get("orderStatus")
-        if intent == IntentKind.REFUND.value:
-            return (
-                status in REFUNDABLE_ORDER_STATUSES
-                and row.get("orderItemStatus") == ORDER_ITEM_STATUS_NORMAL
-            )
-        if intent == IntentKind.CONFIRM_RECEIPT.value:
-            return status in CONFIRM_RECEIPT_ORDER_STATUSES
-        if intent == IntentKind.CANCEL_ORDER.value:
-            return status == ORDER_STATUS_WAIT_PAYMENT
-        if intent == IntentKind.PRODUCT_REVIEW.value:
-            return status == ORDER_STATUS_COMPLETED and row.get("commentStatus") == 0
-        if intent == IntentKind.RECOMMENT.value:
-            return status == ORDER_STATUS_COMPLETED and row.get("commentStatus") == 1
-        if intent == IntentKind.QUERY_COMMENT.value:
-            return row.get("commentStatus") in {1, 2}
-        if intent == IntentKind.DAMAGED_OR_WRONG_ITEM.value:
-            return status in {
-                ORDER_STATUS_SHIPPED,
-                ORDER_STATUS_COMPLETED,
-                ORDER_STATUS_PARTIALLY_REFUNDED,
-            }
-        return True
 
     def _status_filter(self, text: str) -> frozenset[int] | None:
         for hints, statuses in _STATUS_HINTS:
@@ -521,11 +475,11 @@ class OrderReferenceResolver:
     def _no_match(
         self,
         intent: str,
-        eligible: list[dict[str, Any]],
+        candidates: list[dict[str, Any]],
         clues: dict[str, Any],
         user_text: str,
     ) -> OrderReferenceResolution:
-        suggestions = self._deduplicate(eligible, intent)[: self.CARD_LIMIT]
+        suggestions = self._deduplicate(candidates, intent)[: self.CARD_LIMIT]
         detail = ""
         if clues.get("productClues"):
             shown = "、".join(str(value) for value in clues["productClues"][:3])
@@ -544,7 +498,7 @@ class OrderReferenceResolver:
         else:
             reason = f"我没有在你的订单中找到{detail}目标。"
         if suggestions:
-            reason += "以下是最近可办理的订单，请选择一项继续。"
+            reason += "以下是最近相关的订单，请选择一项继续；具体资格会由业务系统单独核验。"
         else:
             reason += "请补充订单号或商品信息后继续；不要把本次未定位当作平台没有该订单。"
         return OrderReferenceResolution(
@@ -568,37 +522,6 @@ class OrderReferenceResolver:
                     )
                 ]
             ),
-        )
-
-    def _no_eligible(
-        self,
-        intent: str,
-        rows: list[dict[str, Any]],
-        clues: dict[str, Any],
-    ) -> OrderReferenceResolution:
-        rows = self._deduplicate(rows, intent)
-        first = rows[0] if rows else {}
-        status = first.get("orderStatusName") or "当前状态"
-        action = {
-            IntentKind.REFUND.value: "申请退款",
-            IntentKind.CONFIRM_RECEIPT.value: "确认收货",
-            IntentKind.CANCEL_ORDER.value: "取消订单",
-            IntentKind.PRODUCT_REVIEW.value: "首次评价",
-            IntentKind.RECOMMENT.value: "追评",
-            IntentKind.QUERY_COMMENT.value: "查看评价",
-            IntentKind.DAMAGED_OR_WRONG_ITEM.value: "发起破损/错发售后",
-            IntentKind.ADDRESS_CHANGE.value: "修改收货地址",
-            IntentKind.INVOICE.value: "申请发票",
-            IntentKind.AFTERSALES_UNKNOWN.value: "办理售后",
-        }.get(intent, "办理该操作")
-        return OrderReferenceResolution(
-            outcome=OrderReferenceOutcome.NO_ELIGIBLE,
-            intent=intent,
-            candidates=rows[: self.CARD_LIMIT],
-            matched_candidates=rows,
-            reason=f"找到了相关订单，但订单状态为“{status}”，当前不能{action}。",
-            clues=clues,
-            source_refs=order_refs(rows[: self.CARD_LIMIT]),
         )
 
     def _deduplicate(

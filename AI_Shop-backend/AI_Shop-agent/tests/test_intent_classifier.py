@@ -14,6 +14,8 @@ from app.domain.intent.classifier import (
     classify_intent_by_rules,
     classify_request_mode,
     extract_entities,
+    is_ambiguous_payment_failure,
+    is_confirmed_no_deduction_payment_failure,
     resolve_intent,
 )
 from app.domain.intent.rules import deterministic_social_reply
@@ -746,6 +748,50 @@ async def test_payment_blocked_without_fund_loss_is_not_fund_dispute():
     assert decision.intent == IntentKind.PAYMENT_ISSUE
     assert decision.risk_level != RiskLevel.HIGH
     assert decision.handoff_reason != "FUND_DISPUTE"
+
+
+@pytest.mark.asyncio
+async def test_new_payment_blocked_phrase_is_classified_without_fund_dispute():
+    decision = await resolve_intent("u1", "我现在付不了", allow_llm=False)
+
+    assert decision.intent == IntentKind.PAYMENT_ISSUE
+    assert decision.risk_level != RiskLevel.HIGH
+    assert decision.next_action != NextAction.HANDOFF
+
+
+@pytest.mark.asyncio
+async def test_non_owner_payment_is_a_high_risk_handoff():
+    decision = await resolve_intent("u1", "这不是本人支付，请处理", allow_llm=False)
+
+    assert decision.intent == IntentKind.PAYMENT_ISSUE
+    assert decision.risk_level == RiskLevel.HIGH
+    assert decision.next_action == NextAction.HANDOFF
+    assert decision.handoff_reason == "FUND_DISPUTE"
+
+
+def test_payment_failure_state_helpers_distinguish_no_deduction_and_risk():
+    assert is_confirmed_no_deduction_payment_failure("支付失败但没有扣款") is True
+    assert is_confirmed_no_deduction_payment_failure("支付失败了") is False
+    assert (
+        is_confirmed_no_deduction_payment_failure(
+            "支付失败但没有扣款，但支付成功后订单没生成"
+        )
+        is False
+    )
+    assert is_ambiguous_payment_failure("支付失败但没有扣款") is False
+    assert is_ambiguous_payment_failure("支付失败了") is True
+
+
+@pytest.mark.asyncio
+async def test_no_deduction_phrase_does_not_mask_non_owner_payment():
+    text = "支付失败但没有扣款，不过这是非本人支付"
+
+    decision = await resolve_intent("u1", text, allow_llm=False)
+
+    assert is_confirmed_no_deduction_payment_failure(text) is False
+    assert decision.intent == IntentKind.PAYMENT_ISSUE
+    assert decision.risk_level == RiskLevel.HIGH
+    assert decision.next_action == NextAction.HANDOFF
 
 
 @pytest.mark.asyncio

@@ -307,11 +307,38 @@ def deterministic_policy_evidence_fallback(
         )
         fact_id = "aftersales.request_and_refund_boundary"
     else:
-        answer = (
-            "退款申请应根据订单详情中的订单状态和商品情况提交，退款通常按原支付渠道返回，具体时间取决于支付渠道。"
-            f"[{citation}] 当前没有可核实的订单项和退款状态，因此本次不执行退款操作。[{citation}] "
-            f"请从订单详情查询或转人工核实。[{citation}]"
+        timing_markers = (
+            "多久到账",
+            "几天到账",
+            "何时到账",
+            "什么时候到账",
+            "多久退",
+            "几天退",
         )
+        live_refund_markers = (
+            "我的退款",
+            "这笔退款",
+            "退款单",
+            "已申请",
+            "已退款",
+            "订单",
+        )
+        if any(marker in normalized_query for marker in timing_markers) and not any(
+            marker in normalized_query for marker in live_refund_markers
+        ):
+            # A generic timing question must not be turned into an eligibility
+            # decision.  The published evidence supports only the return
+            # channel boundary, not a live refund status or a fixed number of
+            # days.
+            answer = (
+                "退款通常按原支付渠道返回，具体到账时间取决于支付渠道。"
+                f"[{citation}] 本地演示环境不执行真实资金操作。[{citation}]"
+            )
+        else:
+            answer = (
+                "退款申请应根据订单详情中的订单状态和商品情况提交，退款通常按原支付渠道返回，具体时间取决于支付渠道。"
+                f"[{citation}] 当前没有可核实的订单项和退款状态，请从订单详情查询或转人工核实。[{citation}]"
+            )
         fact_id = "refund.saga_progress"
     return {
         "answer": answer,

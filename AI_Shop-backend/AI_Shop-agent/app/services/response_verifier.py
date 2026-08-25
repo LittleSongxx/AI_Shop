@@ -19,11 +19,65 @@ _DYNAMIC_FACT_RE = re.compile(
     r"(?:订单|物流|退款|优惠券|库存|价格|工单).{0,20}"
     r"(?:待付款|已付款|已发货|已签收|已完成|处理中|成功|失败|剩余|￥|¥|\d+\.\d{2})"
 )
+_ORDER_STATUS_FACT_RE = re.compile(
+    r"(?:订单|订单状态|履约状态).{0,24}(?:待付款|已付款|待发货|已发货|运输中|已签收|已收货|已完成|已退款|退款中|处理中)"
+)
+_ORDER_AMOUNT_FACT_RE = re.compile(
+    r"(?:订单|订单项|退款|支付|金额|价格).{0,20}(?:金额|支付|退款|应付|实付)?"
+    r".{0,12}(?:￥|¥|人民币|\d+(?:\.\d{1,2})?元)"
+)
+_ORDER_PRODUCT_ASSERTION_RE = re.compile(
+    r"(?:商品(?:名称)?|商品名)\s*(?:是|为|：|:)\s*[“\"']?([^。！？!?；;\n]{1,100})|"
+    r"(?:买了|购买了|买的是|购买的是|已定位到)\s*[“\"']?([^。！？!?；;\n]{1,100})"
+)
+_ORDER_PROPERTY_FACT_RE = re.compile(
+    r"(?:订单|订单项|商品).{0,20}(?:规格|属性|型号|颜色|尺码|版本).{0,20}(?:是|为|：|:)"
+)
+_ORDER_PAYMENT_FACT_RE = re.compile(
+    r"(?:订单|支付|付款).{0,20}(?:支付方式|支付渠道|支付场景).{0,20}(?:是|为|：|:)"
+)
+_ORDER_QUANTITY_FACT_RE = re.compile(
+    r"(?:订单|订单项|商品).{0,20}(?:数量|买了|购买了).{0,12}(?:件|个|份|\d+)"
+)
 _POLICY_CLAIM_RE = re.compile(
     r"(?:\d+|七|十五|三十)天(?:内|无理由)|无理由退货|运费由.{0,12}承担|"
     r"政策规定|平台规定|仅限.{0,16}(?:退款|退货|换货)|必须.{0,16}(?:凭证|条件)|"
     r"(?:符合|满足|具备|不符合|不满足).{0,8}(?:退款|退货|换货)(?:条件|资格)?|"
     r"(?:可以|能够|不能|不可).{0,10}(?:退款|退货|换货)"
+)
+_ACTION_CAPABILITY_PATTERNS: dict[str, re.Pattern[str]] = {
+    "CANCEL_ORDER": re.compile(
+        r"(?:可以|能够|允许|可|不能|不可|不允许).{0,8}取消(?:订单)?"
+    ),
+    "CONFIRM_RECEIPT": re.compile(
+        r"(?:可以|能够|允许|可|不能|不可|不允许).{0,8}确认收货"
+    ),
+    "PRODUCT_REVIEW": re.compile(
+        r"(?:可以|能够|允许|可|不能|不可|不允许).{0,8}(?:首次)?评价"
+    ),
+    "RECOMMENT": re.compile(
+        r"(?:可以|能够|允许|可|不能|不可|不允许).{0,8}追评"
+    ),
+}
+_NEGATIVE_CAPABILITY_RE = re.compile(r"(?:不能|不可|不允许|不符合|无法)")
+_AFTER_SALES_CAPABILITY_RE = re.compile(
+    r"(?:可以|能够|可|不能|不可|不符合|符合).{0,10}(?:申请)?(?:退款|退货)|"
+    r"(?:退款|退货).{0,8}(?:资格|条件).{0,8}(?:符合|不符合)"
+)
+_GENERAL_POLICY_RULE_RE = re.compile(
+    r"(?:\d+|七|十五|三十)天(?:内|无理由)|政策规定|平台规定|运费由|必须.{0,16}凭证|"
+    r"待付款订单.{0,16}取消|进入发货流程.{0,20}取消|已发货.{0,16}售后"
+)
+_ORDER_ID_IN_TEXT_RE = re.compile(
+    r"订单(?:号)?\s*[：:]?\s*[\"'“”]?([A-Za-z0-9][A-Za-z0-9_-]{1,119})",
+    re.I,
+)
+_ORDER_ITEM_ID_IN_TEXT_RE = re.compile(
+    r"订单项(?:ID|编号)?\s*[：:]?\s*[\"'“”]?([A-Za-z0-9][A-Za-z0-9_-]{1,119})",
+    re.I,
+)
+_CASE_SPECIFIC_CAPABILITY_RE = re.compile(
+    r"(?:该订单|当前订单|本订单|这(?:个|笔|张)?订单|本次(?:资格)?核验|业务系统|订单号|订单项)"
 )
 _POLICY_ABSTENTION_RE = re.compile(
     r"(?:未找到|没有|缺少).{0,20}(?:政策|规则|依据|证据)|"
@@ -52,6 +106,10 @@ _FALLBACKS = {
     "DYNAMIC_FACT_WITHOUT_TOOL": (
         "暂时无法从业务系统核实这项实时信息。请稍后重试，或回复“转人工”。"
     ),
+    "DYNAMIC_FACT_WITHOUT_CLAIM": (
+        "订单事实的字段证据不完整，暂时不能确认这项具体信息。"
+        "请稍后重试，或回复“转人工”。"
+    ),
     "POLICY_WITHOUT_CITATION": (
         "当前没有检索到足够的已发布规则依据，我不能给出确定的政策结论。"
         "请补充具体商品与订单状态，或回复“转人工”。"
@@ -67,6 +125,10 @@ _FALLBACKS = {
     ),
     "INVALID_RAG_CITATION": (
         "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。"
+    ),
+    "ACTION_CAPABILITY_WITHOUT_DECISION": (
+        "已核验订单事实，但尚未取得与该订单和操作绑定的资格决定，"
+        "因此不能确认当前是否可办理。请稍后重试，或回复“转人工”。"
     ),
 }
 
@@ -196,12 +258,14 @@ class ResponseVerifier:
         required = _DYNAMIC_BIZ_TOOLS.get(str(biz_type or ""))
         order_outcome = str(order_resolution or "").upper()
         business_refs = _business_sources(source_refs)
-        # NO_ELIGIBLE is a verified read result, not an executable target. It
-        # may support a status-based refusal, but never authorizes a write.
-        verified_order_context = order_outcome == "RESOLVED" or (
-            order_outcome == "NO_ELIGIBLE"
-            and bool(business_refs)
-            and any(ref.get("matched", True) is not False for ref in business_refs)
+        # A resolver outcome is routing metadata, not evidence.  Only a
+        # Java-owned order ref with a self-consistent field claim can support
+        # a dynamic order statement.  Historical NO_ELIGIBLE checkpoints may
+        # still support their claimed status, but never an eligibility result
+        # unless a separate capability decision is present below.
+        verified_order_context = (
+            order_outcome in {"RESOLVED", "NO_ELIGIBLE"}
+            and has_dynamic_order_authority(business_refs)
         )
         if required and not called.intersection(required) and not verified_order_context:
             issues.append(
@@ -232,7 +296,38 @@ class ResponseVerifier:
                 )
             )
 
+        unsupported_order_fact = _unsupported_order_fact(text, business_refs)
+        if unsupported_order_fact:
+            issues.append(
+                VerificationIssue(
+                    "DYNAMIC_FACT_WITHOUT_CLAIM",
+                    unsupported_order_fact,
+                )
+            )
+
+        unsupported_capability = _unsupported_action_capability(text, business_refs)
+        unsupported_after_sales = _unsupported_after_sales_capability(
+            text, business_refs
+        )
+        if unsupported_capability:
+            issues.append(
+                VerificationIssue(
+                    "ACTION_CAPABILITY_WITHOUT_DECISION",
+                    unsupported_capability,
+                )
+            )
+
         unsupported_policy_claim = _has_unsupported_policy_claim(text)
+        if (
+            unsupported_policy_claim
+            and _after_sales_claim_supported(text, business_refs)
+            and not _GENERAL_POLICY_RULE_RE.search(text)
+        ):
+            # A persisted eligibility decision may support only the bounded
+            # conclusion for this order/item.  It cannot support general
+            # rules such as return windows, freight allocation, or evidence
+            # requirements; those still require published RAG evidence.
+            unsupported_policy_claim = False
         policy_abstained = bool(_POLICY_ABSTENTION_RE.search(text))
         if not _has_sources(effective_rag_refs) and (
             unsupported_policy_claim or (policy_evidence_required and not policy_abstained)
@@ -241,6 +336,13 @@ class ResponseVerifier:
                 VerificationIssue(
                     "POLICY_WITHOUT_CITATION",
                     "确定性政策结论缺少已发布知识引用",
+                )
+            )
+        if unsupported_after_sales:
+            issues.append(
+                VerificationIssue(
+                    "ACTION_CAPABILITY_WITHOUT_DECISION",
+                    unsupported_after_sales,
                 )
             )
 
@@ -353,6 +455,467 @@ def _business_sources(source_refs: list[dict] | dict | None) -> list[dict]:
     return []
 
 
+def _business_ref_rows(source_refs: list[dict] | dict | None) -> list[dict]:
+    """Normalize an explicitly supplied business channel for helper checks.
+
+    ``verify`` receives the v3 envelope, while runtime helpers sometimes
+    receive the already-separated ``tool_source_refs`` list.  A bare list is
+    therefore accepted only by these internal business-authority helpers; it
+    is never treated as RAG evidence by the verifier.
+    """
+
+    if isinstance(source_refs, list):
+        return [item for item in source_refs if isinstance(item, dict)]
+    return _business_sources(source_refs)
+
+
+def _trusted_order_ref(ref: dict[str, Any]) -> bool:
+    if (
+        str(ref.get("type") or "").lower() != "order"
+        or str(ref.get("source") or "") != "JAVA_ORDER_SERVICE"
+        or ref.get("matched", True) is False
+    ):
+        return False
+    order_id = str(ref.get("orderId") or ref.get("id") or "").strip()
+    if not order_id:
+        return False
+    return any(
+        isinstance(claim, dict)
+        and claim.get("claimType") == "DYNAMIC_FACT"
+        and claim.get("sourceType") == "JAVA_ORDER_SERVICE"
+        and claim.get("sourceId") == order_id
+        and claim.get("subjectType") == "order"
+        and claim.get("subjectId") == order_id
+        and claim.get("factPath") == "order.orderId"
+        and str(claim.get("value") or "") == order_id
+        for claim in ref.get("claims") or []
+    )
+
+
+def _trusted_order_refs_for_text(
+    source_refs: list[dict] | dict | None, text: str
+) -> list[dict[str, Any]]:
+    """Return authenticated order snapshots relevant to an answer.
+
+    A valid order id claim establishes object identity only.  The caller still
+    has to check the specific field claim before presenting a status, amount,
+    item or payment fact.
+    """
+
+    order_ids = _text_order_ids(text)
+    refs = [
+        ref
+        for ref in _business_ref_rows(source_refs)
+        if _trusted_order_ref(ref)
+    ]
+    if order_ids:
+        return [
+            ref
+            for ref in refs
+            if str(ref.get("orderId") or ref.get("id") or "").strip()
+            in order_ids
+        ]
+    # A deterministic order-reference response may omit the id in a short
+    # sentence, but only one authenticated snapshot may then be in scope.
+    return refs if len(refs) == 1 else []
+
+
+def _order_claims(refs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        claim
+        for ref in refs
+        for claim in ref.get("claims") or []
+        if isinstance(claim, dict)
+        and claim.get("claimType") == "DYNAMIC_FACT"
+        and claim.get("sourceType") == "JAVA_ORDER_SERVICE"
+        and claim.get("sourceId")
+        == str(ref.get("orderId") or ref.get("id") or "")
+    ]
+
+
+def _mentioned_order_product(text: str) -> str | None:
+    match = _ORDER_PRODUCT_ASSERTION_RE.search(text or "")
+    if not match:
+        return None
+    value = next((group for group in match.groups() if group), "")
+    # Keep order ids and trailing explanation out of the asserted product span.
+    value = re.split(r"[（(]?(?:订单|订单号)\s*[：:]?\s*[A-Za-z0-9_-]+", value)[0]
+    return value.strip(" 　“”\"'：:，,。") or None
+
+
+def _has_claim_path(
+    claims: list[dict[str, Any]], paths: set[str]
+) -> bool:
+    return any(claim.get("factPath") in paths for claim in claims)
+
+
+def _unsupported_order_fact(
+    text: str, source_refs: list[dict] | dict | None
+) -> str | None:
+    """Reject an order answer whose concrete field lacks a Java claim.
+
+    This closes the gap between “the response has a valid order id” and “the
+    response is allowed to invent the product, status or payment details of
+    that order”.  Generic policy prose without a concrete order id remains on
+    the RAG policy path.
+    """
+
+    refs = _trusted_order_refs_for_text(source_refs, text)
+    if not refs:
+        return None
+    claims = _order_claims(refs)
+    if _ORDER_STATUS_FACT_RE.search(text) and not _has_claim_path(
+        claims, {"order.orderStatus", "order.orderStatusName"}
+    ):
+        return "回答中的订单状态没有对应的 Java 动态字段 claim"
+    if _ORDER_AMOUNT_FACT_RE.search(text) and not _has_claim_path(
+        claims, {"order.amount", "order_item.itemAmount"}
+    ):
+        return "回答中的订单金额没有对应的 Java 动态字段 claim"
+    product = _mentioned_order_product(text)
+    if product:
+        product_claims = [
+            claim
+            for claim in claims
+            if claim.get("factPath") == "order_item.productName"
+            and str(claim.get("value") or "").strip()
+        ]
+        if not product_claims:
+            return "回答中的商品名没有对应的订单项动态字段 claim"
+        normalized_product = re.sub(r"\s+", "", product).lower()
+        if not any(
+            normalized_product in re.sub(r"\s+", "", str(claim.get("value") or "")).lower()
+            or re.sub(r"\s+", "", str(claim.get("value") or "")).lower()
+            in normalized_product
+            for claim in product_claims
+        ):
+            return "回答中的商品名与订单项动态字段 claim 不一致"
+    if _ORDER_PROPERTY_FACT_RE.search(text) and not _has_claim_path(
+        claims, {"order_item.propertyInfo", "order_item.productName"}
+    ):
+        return "回答中的商品规格没有对应的订单项动态字段 claim"
+    if _ORDER_PAYMENT_FACT_RE.search(text) and not _has_claim_path(
+        claims, {"order.payScene", "order.payChannel"}
+    ):
+        return "回答中的支付信息没有对应的 Java 动态字段 claim"
+    if _ORDER_QUANTITY_FACT_RE.search(text) and not _has_claim_path(
+        claims, {"order_item.buyCount"}
+    ):
+        return "回答中的商品数量没有对应的订单项动态字段 claim"
+    return None
+
+
+def has_dynamic_order_authority(source_refs: list[dict] | dict | None) -> bool:
+    """Whether the business channel contains a self-consistent order claim."""
+
+    return any(_trusted_order_ref(ref) for ref in _business_ref_rows(source_refs))
+
+
+def _trusted_action_decisions(
+    source_refs: list[dict] | dict | None,
+) -> list[dict[str, str | None]]:
+    decisions: list[dict[str, str | None]] = []
+    for ref in _business_ref_rows(source_refs):
+        if (
+            str(ref.get("type") or "").lower() != "action_capability"
+            or str(ref.get("source") or "") != "JAVA_ORDER_SERVICE"
+        ):
+            continue
+        action = str(ref.get("action") or "").strip().upper()
+        decision = str(ref.get("decision") or "").strip().upper()
+        order_id = str(ref.get("orderId") or "").strip()
+        item_id = str(ref.get("orderItemId") or "").strip() or None
+        if (
+            not action
+            or not order_id
+            or not str(ref.get("capabilityVersion") or "").strip()
+            or not str(ref.get("evaluatedAt") or "").strip()
+            or decision not in {
+            "ALLOWED",
+            "DENIED",
+            "MANUAL_REVIEW",
+            "UNAVAILABLE",
+            }
+        ):
+            continue
+        valid_claim = any(
+            isinstance(claim, dict)
+            and claim.get("claimType") == "ACTION_CAPABILITY_DECISION"
+            and claim.get("sourceType") == "JAVA_ORDER_SERVICE"
+            and claim.get("sourceId") == order_id
+            and claim.get("subjectId") == order_id
+            and claim.get("action") == action
+            and claim.get("decision") == decision
+            and (
+                item_id is None
+                or str(claim.get("orderItemId") or "") == item_id
+            )
+            for claim in ref.get("claims") or []
+        )
+        if valid_claim:
+            decisions.append(
+                {
+                    "action": action,
+                    "decision": decision,
+                    "orderId": order_id,
+                    "orderItemId": item_id,
+                }
+            )
+    return decisions
+
+
+def _trusted_after_sales_decisions(
+    source_refs: list[dict] | dict | None,
+) -> list[dict[str, str | None]]:
+    decisions: list[dict[str, str | None]] = []
+    for ref in _business_ref_rows(source_refs):
+        if (
+            str(ref.get("type") or "").lower() != "after_sales_eligibility"
+            or str(ref.get("source") or "")
+            != "AGENT_AFTER_SALES_POLICY_ENGINE"
+        ):
+            continue
+        decision_id = str(ref.get("decisionId") or "").strip()
+        action = str(ref.get("action") or "").strip().upper()
+        decision = str(ref.get("decision") or "").strip().upper()
+        order_id = str(ref.get("orderId") or "").strip()
+        item_id = str(ref.get("orderItemId") or "").strip() or None
+        if not decision_id or not action or not order_id or decision not in {
+            "ELIGIBLE",
+            "INELIGIBLE",
+            "NEEDS_EVIDENCE",
+            "POLICY_UNAVAILABLE",
+            "CONFLICT",
+        }:
+            continue
+        valid_claim = any(
+            isinstance(claim, dict)
+            and claim.get("claimType") == "AFTER_SALES_ELIGIBILITY_DECISION"
+            and claim.get("sourceType")
+            == "AGENT_AFTER_SALES_POLICY_ENGINE"
+            and claim.get("sourceId") == decision_id
+            and claim.get("subjectId") == order_id
+            and claim.get("decisionId") == decision_id
+            and claim.get("action") == action
+            and claim.get("decision") == decision
+            and (
+                item_id is None
+                or str(claim.get("orderItemId") or "") == item_id
+            )
+            for claim in ref.get("claims") or []
+        )
+        if valid_claim:
+            decisions.append(
+                {
+                    "decisionId": decision_id,
+                    "action": action,
+                    "decision": decision,
+                    "orderId": order_id,
+                    "orderItemId": item_id,
+                }
+            )
+    return decisions
+
+
+def _text_order_ids(text: str) -> set[str]:
+    ids = {value.strip() for value in _ORDER_ID_IN_TEXT_RE.findall(text or "")}
+    # Support the common compact form ``SM2026...`` even when the model omits
+    # the Chinese label.  This is intentionally narrower than a generic token
+    # extractor so ordinary prose cannot select a business reference.
+    ids.update(
+        value.strip()
+        for value in re.findall(
+            r"\b(?:SM|SO|ORD|ORDER)[-_A-Z0-9]{2,119}\b", text or "", re.I
+        )
+    )
+    return {value for value in ids if value}
+
+
+def _text_order_item_ids(text: str) -> set[str]:
+    return {value.strip() for value in _ORDER_ITEM_ID_IN_TEXT_RE.findall(text or "") if value.strip()}
+
+
+def _claim_clause(text: str, start: int, end: int) -> str:
+    left = max(
+        (text.rfind(separator, 0, start) for separator in "。！？!?；;，,\n"),
+        default=-1,
+    )
+    right_candidates = [
+        position
+        for separator in "。！？!?；;，,\n"
+        if (position := text.find(separator, end)) >= 0
+    ]
+    right = min(right_candidates) if right_candidates else len(text)
+    return text[left + 1 : right].strip()
+
+
+def _sentence_span(text: str, start: int, end: int) -> str:
+    """Return the full sentence around a claim, retaining adversative clauses."""
+
+    separators = "。！？!?；;\n"
+    left = max((text.rfind(separator, 0, start) for separator in separators), default=-1)
+    right_candidates = [
+        position
+        for separator in separators
+        if (position := text.find(separator, end)) >= 0
+    ]
+    right = min(right_candidates) if right_candidates else len(text)
+    return text[left + 1 : right].strip()
+
+
+def _capability_case_specific(clause: str, decisions: list[dict]) -> bool:
+    return bool(
+        _CASE_SPECIFIC_CAPABILITY_RE.search(clause or "")
+        or _text_order_ids(clause)
+        or _text_order_item_ids(clause)
+        or (decisions and not _GENERAL_POLICY_RULE_RE.search(clause or ""))
+    )
+
+
+def _decision_matches_target(
+    candidate: dict,
+    *,
+    action: str,
+    expected_decision: str,
+    order_ids: set[str],
+    item_ids: set[str],
+) -> bool:
+    if candidate.get("action") != action or candidate.get("decision") != expected_decision:
+        return False
+    if order_ids and str(candidate.get("orderId") or "") not in order_ids:
+        return False
+    candidate_item = str(candidate.get("orderItemId") or "")
+    if item_ids and candidate_item not in item_ids:
+        return False
+    return True
+
+
+def _capability_expected_decision(match_text: str) -> str:
+    if _NEGATIVE_CAPABILITY_RE.search(match_text):
+        return "DENIED"
+    if re.search(r"需要人工复核|转人工复核", match_text):
+        return "MANUAL_REVIEW"
+    if re.search(r"暂时无法取得|无法给出.*结论|资格服务.*不可用", match_text):
+        return "UNAVAILABLE"
+    return "ALLOWED"
+
+
+def _unsupported_action_capability(
+    text: str, source_refs: list[dict] | dict | None
+) -> str | None:
+    decisions = _trusted_action_decisions(source_refs)
+    order_ids = _text_order_ids(text)
+    item_ids = _text_order_item_ids(text)
+    for action, pattern in _ACTION_CAPABILITY_PATTERNS.items():
+        match = pattern.search(text or "")
+        if not match:
+            continue
+        clause = _claim_clause(text, match.start(), match.end())
+        if not _capability_case_specific(clause, decisions):
+            continue
+        expected = _capability_expected_decision(match.group(0))
+        if any(
+            _decision_matches_target(
+                candidate,
+                action=action,
+                expected_decision=expected,
+                order_ids=order_ids,
+                item_ids=item_ids,
+            )
+            for candidate in decisions
+        ):
+            continue
+        if not decisions:
+            return (
+                f"回答声称订单具备“{action}”资格，但缺少 Java 业务系统返回的匹配资格决定"
+            )
+        return (
+            f"回答中的“{action}/{expected}”与已核验的订单、订单项或资格决定不匹配"
+        )
+    return None
+
+
+def _after_sales_expected_decision(match_text: str) -> str | None:
+    if _NEGATIVE_CAPABILITY_RE.search(match_text) or re.search(
+        r"不符合|不满足", match_text
+    ):
+        return "INELIGIBLE"
+    if re.search(r"需要补充|缺少.*凭证|需要证据", match_text):
+        return "NEEDS_EVIDENCE"
+    if re.search(r"无法取得|暂时无法|政策服务.*不可用", match_text):
+        return "POLICY_UNAVAILABLE"
+    return "ELIGIBLE"
+
+
+def _unsupported_after_sales_capability(
+    text: str, source_refs: list[dict] | dict | None
+) -> str | None:
+    decisions = _trusted_after_sales_decisions(source_refs)
+    match = _AFTER_SALES_CAPABILITY_RE.search(text or "")
+    if not match:
+        return None
+    clause = _claim_clause(text, match.start(), match.end())
+    sentence = _sentence_span(text, match.start(), match.end())
+    local_start = max(0, clause.find(match.group(0)))
+    if _POLICY_ABSTENTION_RE.search(sentence) or (
+        _POLICY_UNCERTAINTY_PREFIX_RE.search(clause[:local_start])
+        and not _POLICY_ADVERSATIVE_RE.search(clause[:local_start])
+    ):
+        return None
+    # A sentence such as “平台规定七天内可退货” is a published-policy
+    # statement, not a per-order eligibility result.  Keep it on the RAG gate.
+    if not _capability_case_specific(clause, decisions):
+        return None
+    expected = _after_sales_expected_decision(match.group(0) if match else text)
+    if expected is None:
+        return None
+    order_ids = _text_order_ids(text)
+    item_ids = _text_order_item_ids(text)
+    for candidate in decisions:
+        if candidate.get("decision") != expected:
+            continue
+        if order_ids and str(candidate.get("orderId") or "") not in order_ids:
+            continue
+        if item_ids and str(candidate.get("orderItemId") or "") not in item_ids:
+            continue
+        return None
+    if not decisions:
+        return "回答声称该订单具备售后资格，但缺少策略引擎返回的匹配资格决定"
+    return "回答中的售后资格结论与已核验的订单、订单项或策略决定不匹配"
+
+
+def _after_sales_claim_supported(
+    text: str, source_refs: list[dict] | dict | None
+) -> bool:
+    return _unsupported_after_sales_capability(text, source_refs) is None and bool(
+        _trusted_after_sales_decisions(source_refs)
+    )
+
+
+def has_trusted_capability_decision(
+    source_refs: list[dict] | dict | None,
+) -> bool:
+    """Whether a business channel contains a validated capability decision."""
+
+    return bool(
+        _trusted_action_decisions(source_refs)
+        or _trusted_after_sales_decisions(source_refs)
+    )
+
+
+def requires_published_policy_evidence(
+    text: str, source_refs: list[dict] | dict | None = None
+) -> bool:
+    """Return whether prose contains a general rule needing published RAG."""
+
+    if _GENERAL_POLICY_RULE_RE.search(text or ""):
+        return True
+    unsupported = _has_unsupported_policy_claim(text or "")
+    if unsupported and _after_sales_claim_supported(text or "", source_refs):
+        return False
+    return unsupported
+
+
 def _source_count(source_refs: list[dict] | dict | None) -> int:
     if isinstance(source_refs, list):
         return sum(isinstance(item, dict) and bool(item) for item in source_refs)
@@ -393,9 +956,14 @@ def _recommendations_satisfy(constraints: dict, candidates: list[dict]) -> bool:
         for item in constraints.get("requiredTerms") or []
         if str(item).strip()
     }
-    excluded = {
+    excluded_brands = {
         str(item).strip().lower()
         for item in constraints.get("excludedBrands") or []
+        if str(item).strip()
+    }
+    excluded_terms = {
+        str(item).strip().lower()
+        for item in constraints.get("excludedTerms") or []
         if str(item).strip()
     }
     required_brands = {
@@ -417,15 +985,24 @@ def _recommendations_satisfy(constraints: dict, candidates: list[dict]) -> bool:
                 return False
         except (TypeError, ValueError):
             return False
-        brand = str(candidate.get("brand") or "").strip().lower()
-        if brand and brand in excluded:
-            return False
-        if required_brands and brand not in required_brands:
-            return False
         searchable = " ".join(
             str(candidate.get(key) or "").lower()
-            for key in ("name", "brand", "features", "description")
+            for key in (
+                "name",
+                "productName",
+                "brand",
+                "description",
+                "features",
+                "category",
+                "reason",
+            )
         )
+        if any(term in searchable for term in excluded_brands):
+            return False
+        if any(term in searchable for term in excluded_terms):
+            return False
+        if required_brands and not any(term in searchable for term in required_brands):
+            return False
         if required and not required.issubset({term for term in required if term in searchable}):
             return False
     return True

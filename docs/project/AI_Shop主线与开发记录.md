@@ -131,6 +131,14 @@
 - 14 条 badcase 已逐 case 固化：`004/005/006/008/014/016/017/035` 缺订单项或商品名等动态详情证据；`007/009` 缺工具能力或操作后果证据；`018/019/055` 缺售后资格规则；`012` 同时是取消订单结论过度确定、引用不足和转人工边界错误。下一轮必须把这些 case 变为回归，而不是靠放宽 `SUPPORTED` 定义消除。
 - 原 report 里的 `PENDING_HUMAN_REVIEW` 是生成时字段，不能覆盖；外部 final evidence 才是人工质量生命周期。v13 与历史 v1 答案、证据传播和 eligible 引用分母不同，禁止写成严格 A/B；免责声明评测器修复也仍只代表评测器正确性修复。
 
+### 2026-08-25：v20 真实回放、双盲与第三人仲裁完成
+
+- 在四项 regression preflight ready 后完成多轮定向修复和真实 HTTP 复验；最终 `customer-service-http-v20-20260825` 源码指纹为 `736cad91...a26`，执行 `60/60`、行为契约 `11/11`、handoff accuracy `1.0`、hard constraint violation `0`、fixture cleanup failure `0`。本地 P50/P95/P99 `1011.116/2010.016/7268.746 ms` 仅是 `LOCAL_FULL_STACK_NOT_PRODUCTION_SLO`，cost 保持 `UNPRICED`。
+- 最后两项高价值修复将无具体订单线索的通用退款政策问法从订单解析转到 RAG，并将“退款/退货 + 条件/资格/规则/政策/要求”映射到 canonical fact `aftersales.request_and_refund_boundary`。没有降低全局 evidence threshold；受影响回归 `321 passed`，Ruff、`compileall` 和 `git diff --check` 通过。
+- 两名真人 reviewer 的 60 条 sealed 表案件级一致 `56/60=93.33%`；4 条分歧 `014/029/043/059` 由独立 `reviewer-c` 仲裁。最终只读包 `customer-service-http-v20-answer-review-adjudicated-20260825` 状态为 `HUMAN_REVIEWED_ADJUDICATED`，答案正确 `57/60=95.00%`、引用支持 `25/36=69.44%`、转人工适当 `60/60`、unsafe `1/60`、联合质量 `49/60=81.67%`。
+- 11 条 final badcase 按原标签保留：`008/019/020/021/027/055` 缺工单能力或提交后果证据；`009/014` 缺退款/确认后果证据；`018` 已匹配订单却错误声称未定位；`029/043` 有商品/优惠/排序或 Android 硬约束证据缺口。`014` 同时是答案、引用和 unsafe badcase，是继续开发时的第一优先级。
+- v20 源 HTTP report 的 `PENDING_HUMAN_REVIEW` 仍是不可变生成时字段；外部 final package 才表示人审完成。v13/v20 可以作为不同冻结输出的描述性观察，不能只挑联合或引用上升而隐去答案正确与 unsafe 变化，也不能称严格因果 A/B。
+
 ## 关键踩坑、排错与效果
 
 下表只把同一数据、同一 observation 或同一候选规模的结果称为“前后对比”。不同 final 使用不同 dataset/source hash，只能作为排错生命周期，不能包装成严格 A/B。

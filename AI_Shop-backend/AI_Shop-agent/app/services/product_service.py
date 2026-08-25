@@ -23,6 +23,8 @@ from app.services.episode_service import episode_service
 from app.services.java_internal_client import java_internal_client
 from app.services.product_search_pipeline import (
     build_product_query_plan,
+    comparison_target_coverage,
+    filter_products_for_query_plan,
     product_search_pipeline,
 )
 from app.services.product_search_query import (
@@ -136,6 +138,8 @@ def _constraint_value(constraints: Mapping[str, Any], *keys: str) -> Any:
 
 def _constraint_terms(constraints: Mapping[str, Any], *keys: str) -> list[str]:
     value = _constraint_value(constraints, *keys)
+    if isinstance(value, str):
+        value = [value]
     if not isinstance(value, (list, tuple, set)):
         return []
     result: list[str] = []
@@ -193,6 +197,28 @@ def merge_runtime_constraints(
     )
     if preferred_features:
         soft["features"] = preferred_features
+    must_terms = _constraint_terms(
+        constraints, "mustTerms", "must_terms", "requiredTerms"
+    )
+    if must_terms:
+        hard["mustTerms"] = must_terms
+    comparison_targets = _constraint_terms(
+        constraints, "comparisonTargets", "comparison_targets"
+    )
+    if comparison_targets:
+        hard["comparisonTargets"] = comparison_targets
+    comparison_required = _constraint_value(
+        constraints, "comparisonRequired", "comparison_required"
+    )
+    if comparison_required is not None:
+        hard["comparisonRequired"] = comparison_required
+    explicit_must_not = _constraint_terms(
+        constraints, "mustNotTerms", "must_not_terms"
+    )
+    if explicit_must_not:
+        exclusions["terms"] = list(
+            dict.fromkeys([*(exclusions.get("terms") or []), *explicit_must_not])
+        )
 
     resolved["hardConstraints"] = hard
     resolved["softPreferences"] = soft
@@ -304,6 +330,8 @@ class ProductService:
 
         product_ids: list[str] = []
         source = "none"
+        fallback_blocked = False
+        search_result = None
 
         if query.startswith("category:"):
 
@@ -334,6 +362,21 @@ class ProductService:
             )
             if products:
                 source = "hybrid"
+            else:
+                source = search_result.trace.result_source or "none"
+                constraints = query_plan.constraints
+                explicit_hard_constraints = bool(
+                    constraints.budget_min is not None
+                    or constraints.budget_max is not None
+                    or constraints.required_brands
+                    or constraints.excluded_brands
+                    or constraints.must_terms
+                    or constraints.must_not_terms
+                    or constraints.comparison_required
+                )
+                fallback_blocked = source == "comparison_incomplete" or (
+                    source == "constraint_miss" and explicit_hard_constraints
+                )
             episode_service.record_step(
                 "PRODUCT_SEARCH_PIPELINE",
                 node_name="product_search",
@@ -357,7 +400,12 @@ class ProductService:
                 products = []
                 source = "none"
 
-        if not products and consult_product and is_vague_search_keyword(keyword or user_text):
+        if (
+            not products
+            and not fallback_blocked
+            and consult_product
+            and is_vague_search_keyword(keyword or user_text)
+        ):
             # Embedding i2i first: "有没有类似的" deserves content-similar items, not
             # just anything sharing the shelf. Falls back to category internally.
             similar, similar_source = await self.load_similar_products(
@@ -369,14 +417,14 @@ class ProductService:
                 products = similar
                 source = similar_source
 
-        if not products and looks_like_browse_recommend(user_text):
+        if not products and not fallback_blocked and looks_like_browse_recommend(user_text):
             products = await search_recommend_service.load_recommend_products(user_id, 8)
             if products:
                 source = "browse"
 
         # Hot-sale is a valid explicit request, never an undisclosed fallback
         # for a failed query or a constrained shopping mission.
-        if not products and looks_like_hot_sale_recommend(user_text):
+        if not products and not fallback_blocked and looks_like_hot_sale_recommend(user_text):
             products = await search_recommend_service.load_hot_sale(8)
             if products:
                 source = "hot_sale_explicit"
@@ -421,6 +469,27 @@ class ProductService:
             )
             search_result.trace.result_source = decision.source
         products = decision.products
+        products, terminal_rejections = filter_products_for_query_plan(
+            products, query_plan
+        )
+        if source == "hybrid" and terminal_rejections:
+            for row in terminal_rejections:
+                reason = row["reason"]
+                search_result.trace.rejection_counts[reason] = (
+                    search_result.trace.rejection_counts.get(reason, 0) + 1
+                )
+            search_result.trace.rejection_reasons.extend(terminal_rejections)
+        _coverage, comparison_complete, incomplete_reason = comparison_target_coverage(
+            products, query_plan
+        )
+        if comparison_complete is False:
+            if source == "hybrid":
+                search_result.trace.comparison_coverage = _coverage
+                search_result.trace.comparison_complete = False
+                search_result.trace.incomplete_reason = incomplete_reason
+                search_result.trace.result_source = "comparison_incomplete"
+                search_result.trace.result_count = 0
+            return "[]", None, "shopping_decision_v2", [], "comparison_incomplete"
         if not products:
             return "[]", None, "shopping_decision_v2", [], decision.source
 
@@ -694,6 +763,12 @@ def format_search_tool_message(
         clarification = next_clarification(mission)
         question = (clarification or {}).get("question") or "你最看重哪一项条件？"
         return f"【需求澄清】{question}"
+    if source == "comparison_incomplete":
+        return (
+            "【对比不完整】本次检索未能同时核验所有指定对比商品，"
+            "因此不输出可能误导的单边对比。\n"
+            "请稍后重试，或分别提供两个商品名称/型号后再次比较。"
+        )
     if source in {"constraint_miss", "no_match", "none"}:
         summary = mission_summary(mission) or shopping_profile_service.summary(profile)
         detail = f"（{summary}）" if summary else ""

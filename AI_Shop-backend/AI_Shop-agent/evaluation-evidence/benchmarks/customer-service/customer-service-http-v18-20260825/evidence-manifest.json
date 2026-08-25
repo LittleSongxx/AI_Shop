@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-25T04:53:23.162Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "033c4a34ec213910769925d548535772ed80acfea6acf7bfec25bb27d08847d9",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report.json": {
+      "bytes": 14495741,
+      "sha256": "348968ffc5f0edfc387ab0963f6c6346f6c719cf7f1a0d8cefe995a06c207c6e"
+    },
+    "report.md": {
+      "bytes": 1704,
+      "sha256": "985a1dbb1b5a35fe62b0d6a93475135163640544eb96072b190ddbe477d4fe21"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v18-20260825",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "675eba5dbbeac1c9298c5c92df13cbed7d26d92446c7a6ad98a0298ff6328acf",
+  "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW"
+}

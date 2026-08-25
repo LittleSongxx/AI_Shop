@@ -7,7 +7,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.constants import MSG_STATUS_NORMAL
-from app.domain.intent.types import IntentKind
+from app.domain.intent.types import IntentKind, NextAction, RequestMode, RiskLevel
 from app.graph.builder import build_agent_graph
 from app.graph.nodes import (
     agent_loop_node,
@@ -15,7 +15,7 @@ from app.graph.nodes import (
     should_open_agentic_rag,
     should_prefetch_rag,
 )
-from app.graph.runner import _should_resume
+from app.graph.runner import _should_resume, run_agent_graph
 from app.graph.state import initial_state, thread_id_for
 
 
@@ -33,9 +33,169 @@ def test_initial_state_shape():
     assert state["user_id"] == "u1"
     assert state["message_id"] == 1
     assert state["react_round"] == 0
+    assert state["deterministic_clarification"] is False
+
+
+def _agent_loop_state(
+    *,
+    intent: str,
+    user_text: str,
+    intent_decision: dict | None = None,
+    request_mode: str | None = None,
+) -> dict:
+    return {
+        "agent_msg": {"userMessage": user_text},
+        "user_id": "u1",
+        "message_id": 1,
+        "llm_messages": [HumanMessage(content=user_text)],
+        "react_round": 0,
+        "card": None,
+        "message_card": None,
+        "user_text": user_text,
+        "from_product": False,
+        "tools_called": [],
+        "pending_tool_calls": [],
+        "search_fallback_done": False,
+        "category_switch_search": False,
+        "intent": intent,
+        "intent_decision": intent_decision or {},
+        "intent_data": None,
+        "request_mode": request_mode,
+        "rag_evidence_required": False,
+        "chunks": [],
+    }
 
 def test_thread_id_format():
     assert thread_id_for("user_a", 42) == "user_a:42"
+
+
+@pytest.mark.asyncio
+async def test_product_consult_without_authoritative_identity_skips_llm(monkeypatch):
+    bind_llm = MagicMock(side_effect=AssertionError("LLM must not be called"))
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(graph_max_react_rounds=4),
+    )
+
+    result = await agent_loop_node(
+        _agent_loop_state(
+            intent=IntentKind.PRODUCT_CONSULT.value,
+            user_text="这款耳机支持主动降噪吗？",
+        )
+    )
+
+    bind_llm.assert_not_called()
+    assert result["llm_skipped"] is True
+    assert result["llm_skip_reason"] == "missing_authoritative_product_identity"
+    assert result["chunks"] == [
+        "要核对是否支持主动降噪，请提供具体耳机品牌/型号，或发送商品卡片。"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_payment_failure_skips_llm_for_funds_state(monkeypatch):
+    bind_llm = MagicMock(side_effect=AssertionError("LLM must not be called"))
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(graph_max_react_rounds=4),
+    )
+
+    result = await agent_loop_node(
+        _agent_loop_state(
+            intent=IntentKind.PAYMENT_ISSUE.value,
+            user_text="支付失败了",
+            intent_decision={"risk_level": RiskLevel.MEDIUM.value},
+        )
+    )
+
+    bind_llm.assert_not_called()
+    assert result["llm_skipped"] is True
+    assert result["llm_skip_reason"] == "funds_state_not_confirmed"
+    assert result["deterministic_clarification"] is True
+    assert "是否已有扣款记录" in result["chunks"][0]
+
+
+@pytest.mark.asyncio
+async def test_confirmed_no_deduction_payment_failure_skips_llm(monkeypatch):
+    bind_llm = MagicMock(side_effect=AssertionError("LLM must not be called"))
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+
+    result = await agent_loop_node(
+        _agent_loop_state(
+            intent=IntentKind.PAYMENT_ISSUE.value,
+            user_text="支付失败但没有扣款，怎么办",
+            intent_decision={"risk_level": RiskLevel.MEDIUM.value},
+            request_mode=RequestMode.INFORMATIONAL.value,
+        )
+    )
+
+    bind_llm.assert_not_called()
+    assert result["llm_skipped"] is True
+    assert result["llm_skip_reason"] == "funds_not_deducted"
+    assert result["deterministic_clarification"] is True
+    assert result["structured_result_finalized"] is True
+    assert result["route"] == "finalize"
+    assert result["chunks"] == [
+        "根据你的描述，本次支付失败且没有扣款。请先检查支付方式和页面提示，再自行重新发起支付；"
+        "若之后出现扣款、重复扣款或非本人支付，请回复“转人工”以进入人工核查。"
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("intent_decision", "request_mode", "user_text"),
+    [
+        ({"risk_level": RiskLevel.HIGH.value}, RequestMode.READ_QUERY.value, "支付失败了"),
+        ({"next_action": NextAction.HANDOFF.value}, RequestMode.READ_QUERY.value, "支付失败了"),
+        ({}, RequestMode.HUMAN_SUPPORT.value, "支付失败了"),
+        ({"risk_level": RiskLevel.HIGH.value}, RequestMode.READ_QUERY.value, "支付失败但没有扣款"),
+        ({"next_action": NextAction.HANDOFF.value}, RequestMode.READ_QUERY.value, "支付失败但没有扣款"),
+        ({}, RequestMode.HUMAN_SUPPORT.value, "支付失败但没有扣款"),
+    ],
+)
+async def test_payment_failure_clarification_does_not_override_risk_or_user_boundary(
+    monkeypatch,
+    intent_decision,
+    request_mode,
+    user_text,
+):
+    bind_llm = MagicMock(return_value=object())
+
+    async def stream(_llm, _messages, *_args, **_kwargs):
+        return AIMessage(content="已进入后续处理路径。")
+
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.rt.stream_llm_turn", stream)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(
+            graph_max_react_rounds=4,
+            force_mcp_on_llm_skip=False,
+            llm_model="test-model",
+        ),
+    )
+
+    result = await agent_loop_node(
+        _agent_loop_state(
+            intent=IntentKind.PAYMENT_ISSUE.value,
+            user_text=user_text,
+            intent_decision=intent_decision,
+            request_mode=request_mode,
+        )
+    )
+
+    bind_llm.assert_called_once()
+    assert result.get("llm_skipped") is not True
 
 
 def test_policy_and_support_intents_prefetch_published_knowledge():
@@ -145,6 +305,81 @@ async def test_grounded_policy_answer_uses_one_bounded_tool_free_turn(monkeypatc
     assert result["route"] == "finalize"
     assert result["pending_tool_calls"] == []
     assert result["chunks"] == ["支持七天无理由退货。[1]"]
+
+
+@pytest.mark.asyncio
+async def test_action_proposal_disables_sdk_retry_and_suppresses_fallback(
+    monkeypatch,
+):
+    bound_options: list[dict] = []
+    recorded = MagicMock()
+
+    def bind_llm(**kwargs):
+        bound_options.append(kwargs)
+        return object()
+
+    async def invoke(_llm, _messages, *, model):
+        assert model == "primary-model"
+        raise TimeoutError("provider timeout")
+
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.rt.push_chat_error", AsyncMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.redis_service.clear_bound_message_id", AsyncMock()
+    )
+    monkeypatch.setattr("app.graph.nodes.invoke_llm_with_metrics", invoke)
+    monkeypatch.setattr("app.graph.nodes.has_fallback_chat_llm", lambda: True)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", recorded)
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(
+            graph_max_react_rounds=3,
+            force_mcp_on_llm_skip=True,
+            llm_model="primary-model",
+            llm_fallback_model="fallback-model",
+        ),
+    )
+    state = {
+        "agent_msg": {"userMessage": "取消订单 A123"},
+        "user_id": "u1",
+        "message_id": 1,
+        "llm_messages": [HumanMessage(content="取消订单 A123")],
+        "react_round": 0,
+        "card": None,
+        "message_card": None,
+        "user_text": "取消订单 A123",
+        "from_product": False,
+        "tools_called": [],
+        "pending_tool_calls": [],
+        "search_fallback_done": False,
+        "category_switch_search": False,
+        "intent": IntentKind.CANCEL_ORDER.value,
+        "intent_data": None,
+        "request_mode": "ACTION_PROPOSAL",
+        "rag_evidence_required": False,
+        "chunks": [],
+    }
+
+    result = await agent_loop_node(state)
+
+    assert result == {"finished": True, "route": "end", "outcome": "llm_error"}
+    assert bound_options == [
+        {
+            "tools_enabled": True,
+            "max_tokens": None,
+            "disable_thinking": False,
+            "max_retries": 0,
+        }
+    ]
+    suppressed = next(
+        call
+        for call in recorded.call_args_list
+        if call.args[0] == "LLM_FALLBACK_SUPPRESSED"
+    )
+    assert suppressed.kwargs["output_data"]["reason"] == (
+        "non_idempotent_or_write_path"
+    )
 
 
 @pytest.mark.asyncio
@@ -367,3 +602,71 @@ async def test_should_resume_reads_dict_cursor_row():
                 mock_redis.client = MagicMock()
                 result = await _should_resume("u1", 1, "u1:1")
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_graph_end_exposes_deterministic_path_and_llm_call_outcomes(monkeypatch):
+    graph = SimpleNamespace(
+        ainvoke=AsyncMock(
+            return_value={
+                "outcome": "ok",
+                "intent": IntentKind.CHAT.value,
+                "tools_called": [],
+                "orchestration_mode": "workflow",
+                "orchestration_reason": "deterministic_business_path",
+                "llm_skipped": True,
+                "llm_skip_reason": "deterministic_social_reply",
+                "structured_result_finalized": True,
+            }
+        )
+    )
+    checkpointer = SimpleNamespace(adelete_thread=AsyncMock())
+    recorded = MagicMock()
+    monkeypatch.setattr("app.graph.runner.get_compiled_graph", lambda: graph)
+    monkeypatch.setattr(
+        "app.graph.runner.get_checkpointer", lambda _client: checkpointer
+    )
+    monkeypatch.setattr(
+        "app.graph.runner.redis_service", SimpleNamespace(client=object())
+    )
+    monkeypatch.setattr("app.graph.runner._should_resume", AsyncMock(return_value=False))
+    monkeypatch.setattr(
+        "app.graph.runner.get_settings",
+        lambda: SimpleNamespace(agent_budget_enabled=False),
+    )
+    monkeypatch.setattr(
+        "app.graph.runner.snapshot_cost_summary",
+        lambda **_kwargs: {
+            "llmCalls": 1,
+            "successfulLlmCalls": 0,
+            "failedLlmCalls": 1,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "costStatus": "MISSING_USAGE",
+        },
+    )
+    monkeypatch.setattr("app.graph.runner.episode_service.record_step", recorded)
+    monkeypatch.setattr("app.graph.runner.episode_service.update_run", MagicMock())
+    monkeypatch.setattr("app.graph.runner.episode_service.finish_run", MagicMock())
+
+    outcome = await run_agent_graph(
+        {
+            "userId": "u1",
+            "messageId": 7,
+            "userMessage": "谢谢",
+            "intent": IntentKind.CHAT.value,
+        }
+    )
+
+    assert outcome == "ok"
+    graph_end = next(
+        call for call in recorded.call_args_list if call.args[0] == "GRAPH_END"
+    )
+    output = graph_end.kwargs["output_data"]
+    assert output["orchestrationMode"] == "workflow"
+    assert output["llmSkipped"] is True
+    assert output["llmSkipReason"] == "deterministic_social_reply"
+    assert output["structuredResultFinalized"] is True
+    assert output["llmCallCount"] == 1
+    assert output["successfulLlmCallCount"] == 0
+    assert output["failedLlmCallCount"] == 1

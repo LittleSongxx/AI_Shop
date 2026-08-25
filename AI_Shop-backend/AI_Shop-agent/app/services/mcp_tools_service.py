@@ -6,19 +6,17 @@ from datetime import datetime
 import structlog
 
 from app.constants import (
-    CANCELLABLE_ORDER_STATUSES,
-    CONFIRM_RECEIPT_ORDER_STATUSES,
-    ORDER_ITEM_STATUS_NORMAL,
     ORDER_STATUS_NAMES,
-    REFUNDABLE_ORDER_STATUSES,
-    REVIEWABLE_ORDER_STATUSES,
 )
 from app.exceptions import PendingActionConflict
 from app.services.evidence_refs import (
+    action_capability_ref,
+    after_sales_eligibility_ref,
     negative_lookup_ref,
     order_refs,
     product_no_result_ref,
     product_refs,
+    product_search_constraint_ref,
 )
 from app.services.java_internal_client import java_internal_client
 from app.services.order_service import order_service
@@ -28,6 +26,77 @@ from app.services.tool_invoke_result import ToolInvokeResult
 from app.utils.biz_payload import build_action_confirm_payload
 
 logger = structlog.get_logger()
+
+
+def _structured_property_text(value: object, *, depth: int = 0) -> list[str]:
+    """Collect only known structured property fields for exclusion auditing."""
+
+    if depth > 3:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (int, float, bool)):
+        return [str(value)]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value[:80]:
+            result.extend(_structured_property_text(item, depth=depth + 1))
+        return result
+    if not isinstance(value, dict):
+        return []
+    result = [
+        str(value.get(key) or "")
+        for key in (
+            "property_name",
+            "propertyName",
+            "name",
+            "property_value",
+            "propertyValue",
+            "value",
+        )
+    ]
+    for key in ("property_values", "propertyValues", "properties", "values"):
+        if key in value:
+            result.extend(_structured_property_text(value[key], depth=depth + 1))
+    if not any(
+        key in value
+        for key in (
+            "property_name",
+            "propertyName",
+            "name",
+            "property_value",
+            "propertyValue",
+            "value",
+            "property_values",
+            "propertyValues",
+            "properties",
+            "values",
+        )
+    ):
+        for key, item in list(value.items())[:40]:
+            result.append(str(key))
+            result.extend(_structured_property_text(item, depth=depth + 1))
+    return [item for item in result if item]
+
+
+def _searchable_product_text(product: dict) -> str:
+    fields = (
+        "product_name",
+        "productName",
+        "product_desc",
+        "productDesc",
+        "description",
+        "category",
+        "categoryName",
+        "brand",
+    )
+    direct = [str(product.get(key) or "") for key in fields]
+    properties = [
+        *_structured_property_text(product.get("property_values")),
+        *_structured_property_text(product.get("propertyValues")),
+        *_structured_property_text(product.get("properties")),
+    ]
+    return " ".join([*direct, *properties]).casefold()
 
 
 def _search_constraint_evidence(
@@ -59,18 +128,7 @@ def _search_constraint_evidence(
             or product.get("id")
             or ""
         )
-        text = " ".join(
-            str(product.get(key) or "")
-            for key in (
-                "product_name",
-                "productName",
-                "product_desc",
-                "productDesc",
-                "category",
-                "categoryName",
-                "brand",
-            )
-        ).casefold()
+        text = _searchable_product_text(product)
         brand = shopping_profile_service.resolve_known_brand(product, profile)
         brand_hit = any(
             str(value).casefold() in str(brand or "").casefold()
@@ -460,6 +518,44 @@ async def _order_items_params(order_id: str, order: dict | None = None) -> list[
         for i in items[:5]
     ]
 
+
+async def _require_order_action_capability(
+    action: str,
+    order_id: str,
+) -> tuple[dict, ToolInvokeResult | None]:
+    """Fail closed unless Java explicitly allows this exact action/order."""
+
+    try:
+        decision = await java_internal_client.get_order_action_capability(
+            action, order_id
+        )
+    except Exception:
+        decision = {
+            "decision": "UNAVAILABLE",
+            "action": action,
+            "order_id": order_id,
+            "reason_code": "CAPABILITY_SERVICE_UNAVAILABLE",
+        }
+    outcome = str(decision.get("decision") or "UNAVAILABLE").upper()
+    if outcome == "ALLOWED":
+        return decision, None
+    ref = action_capability_ref(decision)
+    if outcome == "DENIED":
+        content = "【操作资格核验】业务系统判定当前不可执行该操作；如状态刚变化，请刷新后重试"
+        error_code = "ACTION_NOT_ALLOWED"
+    elif outcome == "MANUAL_REVIEW":
+        content = "【操作资格核验】该操作需要人工复核，请转人工处理"
+        error_code = "ACTION_MANUAL_REVIEW"
+    else:
+        content = "【操作资格核验失败】暂时无法取得可核验的资格结论，未生成确认卡"
+        error_code = "ACTION_CAPABILITY_UNAVAILABLE"
+    return decision, ToolInvokeResult(
+        content=content,
+        success=False,
+        error_code=error_code,
+        source_refs=[ref] if ref else [],
+    )
+
 async def propose_cancel_order(
     user_id: str, order_id: str, run_id: str | None = None
 ) -> str | ToolInvokeResult:
@@ -471,16 +567,26 @@ async def propose_cancel_order(
             return "【取消订单失败】订单不存在"
         if order["user_id"] != user_id:
             return "【取消订单失败】您没有权限操作此订单"
+        capability, rejected = await _require_order_action_capability(
+            "CANCEL_ORDER", order_id
+        )
+        if rejected is not None:
+            return rejected
         status = order.get("order_status")
-        if status not in CANCELLABLE_ORDER_STATUSES:
-            return (
-                f"【取消订单失败】当前订单状态无法取消，当前状态：{_status_name(status)}"
-            )
         params = {
             "orderId": order_id,
             "orderAmount": float(order["amount"]),
             "orderStatusBefore": status,
             "payScene": order.get("pay_scene"),
+            "capabilityDecision": {
+                "decision": capability.get("decision"),
+                "reasonCode": capability.get("reason_code")
+                or capability.get("reasonCode"),
+                "capabilityVersion": capability.get("capability_version")
+                or capability.get("capabilityVersion"),
+                "evaluatedAt": capability.get("evaluated_at")
+                or capability.get("evaluatedAt"),
+            },
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -512,15 +618,24 @@ async def propose_confirm_receipt(
             return "【确认收货失败】订单不存在"
         if order["user_id"] != user_id:
             return "【确认收货失败】您没有权限操作此订单"
-        st = order["order_status"]
-        if st not in CONFIRM_RECEIPT_ORDER_STATUSES:
-            return (
-                f"【确认收货失败】当前订单状态无法确认收货，当前状态：{_status_name(st)}"
-            )
+        capability, rejected = await _require_order_action_capability(
+            "CONFIRM_RECEIPT", order_id
+        )
+        if rejected is not None:
+            return rejected
         params = {
             "orderId": order_id,
             "orderAmount": float(order["amount"]),
             "payScene": order.get("pay_scene"),
+            "capabilityDecision": {
+                "decision": capability.get("decision"),
+                "reasonCode": capability.get("reason_code")
+                or capability.get("reasonCode"),
+                "capabilityVersion": capability.get("capability_version")
+                or capability.get("capabilityVersion"),
+                "evaluatedAt": capability.get("evaluated_at")
+                or capability.get("evaluatedAt"),
+            },
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -556,32 +671,24 @@ async def propose_refund(
         if not item:
             # LLM / force path often passes orderId instead of orderItemId.
             order_id = extract_order_id(normalized) or normalized
-            refundable = await order_service.list_refundable_items(user_id, order_id)
-            if len(refundable) == 1:
-                item = refundable[0]
+            owned_items = await java_internal_client.list_order_items(order_id)
+            if len(owned_items) == 1:
+                item = owned_items[0]
                 normalized = str(item.get("order_item_id") or "")
-            elif len(refundable) > 1:
+            elif len(owned_items) > 1:
                 lines = []
-                for row in refundable[:8]:
+                for row in owned_items[:8]:
                     oid = row.get("order_item_id")
                     name = row.get("product_name") or "商品"
                     lines.append(f"- {name}（订单项ID：{oid}）")
                 return (
-                    "【退款失败】该订单有多个可退款商品，请指定其中一个订单项ID后再试：\n"
+                    "【退款失败】该订单有多个商品，请指定其中一个订单项ID后再核验退款资格：\n"
                     + "\n".join(lines)
                 )
             else:
-                order = await order_service.get_order(order_id)
-                if order and order.get("user_id") == user_id:
-                    st = order.get("order_status")
-                    return (
-                        f"【退款失败】订单存在，但当前状态为{_status_name(st)}，"
-                        "仅待发货/已发货/部分退款订单可申请退款。"
-                        "若订单项ID形如「订单号_1」，请使用完整订单项ID重试。"
-                    )
                 return (
-                    "【退款失败】订单项不存在，请确认订单项ID是否正确"
-                    "（格式一般为：订单号_1）。"
+                    "【退款失败】未定位到可核验的订单项，尚未作出退款资格结论；"
+                    "请确认订单项ID后重试。"
                 )
         order_item_id = normalized
         if not item or not order_item_id:
@@ -589,19 +696,43 @@ async def propose_refund(
         order = await order_service.get_order(item["order_id"])
         if not order or order["user_id"] != user_id:
             return "【退款失败】您没有权限操作此订单项"
-        st = order.get("order_status")
-        if st not in REFUNDABLE_ORDER_STATUSES:
-            return (
-                f"【退款失败】当前订单状态为{_status_name(st)}，"
-                "仅待发货/已发货/部分退款订单可申请退款"
+        from app.services.after_sales_policy_service import after_sales_policy_service
+
+        eligibility = await after_sales_policy_service.evaluate(
+            user_id=user_id,
+            action="REFUND",
+            order_id=item["order_id"],
+            order_item_id=order_item_id,
+            evidence=[],
+        )
+        eligibility_ref = after_sales_eligibility_ref(eligibility)
+        if str(eligibility.get("decision") or "").upper() != "ELIGIBLE":
+            return ToolInvokeResult(
+                content=(
+                    "【退款资格核验】当前不符合退款资格"
+                    if eligibility.get("decision") == "INELIGIBLE"
+                    else "【退款资格核验】暂时无法取得可执行的资格结论，未生成确认卡"
+                ),
+                success=False,
+                error_code=str(eligibility.get("decision") or "POLICY_UNAVAILABLE"),
+                source_refs=[eligibility_ref] if eligibility_ref else [],
             )
-        if item.get("order_item_status") != ORDER_ITEM_STATUS_NORMAL:
-            return "【退款失败】当前订单项已退款，无法重复申请"
         params = {
             "orderItemId": order_item_id,
             "orderId": item["order_id"],
             "refundAmount": float(item["item_amount"]),
             "payScene": order.get("pay_scene"),
+            "eligibilityDecision": {
+                key: eligibility.get(key)
+                for key in (
+                    "decisionId",
+                    "decision",
+                    "policyId",
+                    "policyVersion",
+                    "evaluatedAt",
+                )
+                if eligibility.get(key) is not None
+            },
             "orderItems": [{
                 "orderItemId": order_item_id,
                 "productName": item.get("product_name"),
@@ -650,14 +781,23 @@ async def propose_product_review(
             return "【评价失败】订单不存在"
         if order["user_id"] != user_id:
             return "【评价失败】您没有权限评价此订单"
-        st = order["order_status"]
-        if st not in REVIEWABLE_ORDER_STATUSES:
-            return f"【评价失败】当前订单状态为{_status_name(st)}，订单完成后才能评价"
+        capability, rejected = await _require_order_action_capability(
+            "PRODUCT_REVIEW", order_id
+        )
+        if rejected is not None:
+            return rejected
         params = {
             "orderId": order_id,
             "commentContent": content,
             "star": star,
             "payScene": order.get("pay_scene"),
+            "capabilityDecision": {
+                "decision": capability.get("decision"),
+                "capabilityVersion": capability.get("capability_version")
+                or capability.get("capabilityVersion"),
+                "evaluatedAt": capability.get("evaluated_at")
+                or capability.get("evaluatedAt"),
+            },
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -692,13 +832,22 @@ async def propose_recomment(
             return "【追评失败】订单不存在"
         if order["user_id"] != user_id:
             return "【追评失败】您没有权限评价此订单"
-        st = order["order_status"]
-        if st not in REVIEWABLE_ORDER_STATUSES:
-            return f"【追评失败】当前订单状态为{_status_name(st)}，订单完成后才能追评"
+        capability, rejected = await _require_order_action_capability(
+            "RECOMMENT", order_id
+        )
+        if rejected is not None:
+            return rejected
         params = {
             "orderId": order_id,
             "reCommentContent": content,
             "payScene": order.get("pay_scene"),
+            "capabilityDecision": {
+                "decision": capability.get("decision"),
+                "capabilityVersion": capability.get("capability_version")
+                or capability.get("capabilityVersion"),
+                "evaluatedAt": capability.get("evaluated_at")
+                or capability.get("evaluatedAt"),
+            },
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -920,6 +1069,16 @@ async def tool_search_products(
                 authoritative=source not in {"", "none"},
             )
         ]
+    constraint_ref = product_search_constraint_ref(
+        constraint_evidence,
+        request_id=request_id,
+        source="JAVA_GATEWAY",
+    )
+    if constraint_ref is not None:
+        # Source refs are bounded for persistence. Preserve the newest audit
+        # alongside at most 29 product/no-result refs rather than leaving the
+        # constraint only in the opaque recommendation trace.
+        source_refs = [*source_refs[:29], constraint_ref]
     contract = build_response(
         RecommendationRequest(
             requestId=request_id,

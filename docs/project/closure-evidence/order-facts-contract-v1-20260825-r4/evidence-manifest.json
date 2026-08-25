@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "aishop-project-closure-contract/v1-evidence",
+  "reportSchemaVersion": "aishop-project-closure-contract/v1",
+  "runId": "order-facts-contract-v1-20260825-r4",
+  "status": "CONTRACT_PASSED_LIVE_EVALUATION_PENDING",
+  "files": {
+    "report.json": {
+      "sha256": "52dbc8b57720a62f3b71c92597c20192ac81117bc99c28d4e419d71f7f4a03a2"
+    },
+    "report.md": {
+      "sha256": "6a4166da526ca63c7178f3d57f2bcc94e978c27d45db07a159647d2030af299c"
+    }
+  }
+}

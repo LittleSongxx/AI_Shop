@@ -1,0 +1,48 @@
+{
+  "artifact": "SEALED_ANSWER_REVIEW_SHEET",
+  "blinding": "Expected labels, rule/HTTP intent predictions, quality scores, and other reviewer labels are omitted",
+  "caseCount": 60,
+  "containsExpectedOrSelfJudgment": false,
+  "createdAt": "2026-08-25T05:27:44.009Z",
+  "guidelinesVersion": "customer-service-answer-quality-v1",
+  "labelSchema": {
+    "citationSupportValues": [
+      "NOT_APPLICABLE",
+      "SUPPORTED",
+      "UNDECIDABLE",
+      "UNSUPPORTED"
+    ],
+    "fields": [
+      "answerCorrect",
+      "citationSupport",
+      "handoffAppropriate",
+      "unsafeAnswer"
+    ]
+  },
+  "lifecycle": "SEALED",
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "openSheetSha256AtExport": "4b80d49ea259941802541deab08c18bcfbc0cd8cbb701fa30e0b03abee2140c5",
+  "orderSeed": 1278853346581559368,
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "reviewerId": "human-reviewer-b",
+  "schemaVersion": "aishop-customer-service-answer-review/v2",
+  "sealedAt": "2026-08-25T07:22:09.327Z",
+  "sheetPath": "run/evaluation-observations/customer-service-http-v20-20260825.human-reviewer-b.sealed.jsonl",
+  "sheetSha256": "7bf246c923cfd8be4036a04c14b5861f9e47879d30f73aa2b88210902376c8c6",
+  "sourceOpenSheetPath": "run/evaluation-observations/customer-service-http-v20-20260825.human-reviewer-b.open.jsonl",
+  "sourceOpenSheetSha256": "7bf246c923cfd8be4036a04c14b5861f9e47879d30f73aa2b88210902376c8c6",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/report.json",
+  "sourceReportSha256": "10d171bc33930f20b13321f17aac08449e61186c5a92716f271cba20ace8596d",
+  "sourceRunId": "customer-service-http-v20-20260825"
+}

@@ -63,7 +63,14 @@ def test_multi_agent_and_data_analyst_are_enabled_by_default(monkeypatch):
     assert settings.orchestration_mode == "adaptive"
     assert settings.data_analyst_enabled is True
     assert settings.multi_agent_specialist_timeout_seconds == 12
-    assert settings.agent_llm_call_deadline_seconds == 45.0
+    assert settings.llm_timeout == 20
+    assert settings.llm_max_retries == 1
+    assert settings.agent_llm_call_deadline_seconds == 25.0
+    assert settings.agent_budget_max_tokens == 16_000
+    assert settings.agent_budget_max_steps == 16
+    assert settings.agent_budget_deadline_seconds == 60.0
+    assert settings.intent_llm_timeout_seconds == 8
+    assert settings.graph_max_react_rounds == 3
 
 
 @pytest.mark.parametrize("deadline", [4, 121])

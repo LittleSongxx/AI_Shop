@@ -98,6 +98,12 @@ class AgentGraphState(TypedDict, total=False):
     orchestration_mode: str | None
     orchestration_reason: str | None
     resolved_order_tool: dict | None
+    llm_skipped: bool
+    llm_skip_reason: str | None
+    # Set only by fixed graph branches that provide a non-policy next step.
+    # It never comes from model output or user-controlled state.
+    deterministic_clarification: bool
+    structured_result_finalized: bool
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -171,6 +177,10 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "orchestration_mode": None,
         "orchestration_reason": None,
         "resolved_order_tool": None,
+        "llm_skipped": False,
+        "llm_skip_reason": None,
+        "deterministic_clarification": False,
+        "structured_result_finalized": False,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

@@ -109,6 +109,8 @@ from evaluation.customer_service_http import (
     write_customer_service_http_evidence,
 )
 from evaluation.customer_service_answer_review import (
+    ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+    ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
     compare_answer_reviews,
     export_answer_adjudication_template,
     export_answer_review_sheet,
@@ -121,6 +123,10 @@ from evaluation.customer_service_answer_review import (
     verify_pending_answer_review_evidence,
     write_answer_review_evidence,
     write_pending_answer_review_evidence,
+)
+from evaluation.customer_service_model_assisted_diagnostic import (
+    run_model_assisted_diagnostic,
+    verify_model_assisted_diagnostic,
 )
 from evaluation.customer_service_review import (
     compare_human_reviews,
@@ -137,6 +143,7 @@ from evaluation.customer_service_slot_replay import (
 from evaluation.capacity_benchmark import (
     DEFAULT_CAPACITY_CASE_IDS,
     benchmark_capacity,
+    benchmark_open_arrival_capacity,
     load_capacity_cases,
     parse_concurrency_levels,
     write_capacity_evidence,
@@ -237,6 +244,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated level(s); repeatable (default: 1,2,4,8)",
     )
     capacity.add_argument("--requests-per-level", type=int, default=8)
+    capacity.add_argument(
+        "--arrival-rate-qps",
+        type=float,
+        help="fixed open-arrival rate; when set, bypasses closed-loop concurrency levels",
+    )
+    capacity.add_argument(
+        "--duration-seconds",
+        type=float,
+        default=30.0,
+        help="open-arrival measurement duration (default: 30)",
+    )
+    capacity.add_argument(
+        "--iterations",
+        type=int,
+        help="optional exact open-arrival count; overrides duration-derived count",
+    )
+    capacity.add_argument(
+        "--max-inflight",
+        type=int,
+        default=64,
+        help="maximum active requests and bounded waiting-queue capacity (default: 64)",
+    )
     capacity.add_argument(
         "--warmup-requests",
         type=int,
@@ -375,6 +404,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="diagnostic provenance note; repeatable",
     )
+    customer_http_model_diagnostic = customer_http_commands.add_parser(
+        "model-diagnostic",
+        help=(
+            "run isolated A/B model diagnostics and disagreement-only model adjudication; "
+            "never human review"
+        ),
+    )
+    customer_http_model_diagnostic.add_argument("--report", type=Path, required=True)
+    customer_http_model_diagnostic.add_argument("--output-dir", type=Path, required=True)
+    customer_http_model_diagnostic.add_argument("--concurrency", type=int, default=4)
+    customer_http_model_diagnostic_verify = customer_http_commands.add_parser(
+        "model-diagnostic-verify",
+        help="verify a read-only model-assisted diagnostic package",
+    )
+    customer_http_model_diagnostic_verify.add_argument(
+        "--output-dir", type=Path, required=True
+    )
     customer_http_export = customer_http_commands.add_parser(
         "review-export", help="export a blind final-answer review sheet"
     )
@@ -382,6 +428,18 @@ def build_parser() -> argparse.ArgumentParser:
     customer_http_export.add_argument("--annotator", required=True)
     customer_http_export.add_argument("--output", type=Path, required=True)
     customer_http_export.add_argument("--seed", type=int)
+    customer_http_export.add_argument(
+        "--message-projection",
+        choices=(
+            ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
+            ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
+        ),
+        default=ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
+        help=(
+            "question text shown to reviewers; use RUNTIME_FIXTURE_AWARE_V1 for "
+            "fixture-backed HTTP replays"
+        ),
+    )
     customer_http_score = customer_http_commands.add_parser(
         "review-score", help="score one complete independent final-answer review sheet"
     )
@@ -1331,12 +1389,24 @@ async def _main(args: argparse.Namespace) -> int:
             )
             _print(verification)
             return 0
+        if args.customer_http_command == "model-diagnostic":
+            verification = await run_model_assisted_diagnostic(
+                args.report,
+                args.output_dir,
+                concurrency=args.concurrency,
+            )
+            _print(verification)
+            return 0
+        if args.customer_http_command == "model-diagnostic-verify":
+            _print(verify_model_assisted_diagnostic(args.output_dir))
+            return 0
         if args.customer_http_command == "review-export":
             manifest = export_answer_review_sheet(
                 args.report,
                 args.output,
                 reviewer_id=args.annotator,
                 seed=args.seed,
+                message_projection=args.message_projection,
             )
             _print(manifest)
             return 0
@@ -1531,23 +1601,37 @@ async def _main(args: argparse.Namespace) -> int:
     if args.command == "fault-test":
         return await _fault_test(args)
     if args.command == "benchmark-capacity":
-        concurrencies = parse_concurrency_levels(args.concurrency)
         selected_ids = tuple(args.case_id) or DEFAULT_CAPACITY_CASE_IDS
         _rows, cases = load_capacity_cases(args.dataset, case_ids=selected_ids)
         await init_pool()
         try:
             await redis_service.ensure_connected()
             preflight = await run_preflight(cases)
-            report, observations = await benchmark_capacity(
-                args.dataset,
-                run_id=args.run_id,
-                concurrencies=concurrencies,
-                requests_per_level=args.requests_per_level,
-                warmup_requests=args.warmup_requests,
-                timeout_seconds=args.timeout_seconds,
-                case_ids=selected_ids,
-                preflight=preflight,
-            )
+            if args.arrival_rate_qps is not None:
+                report, observations = await benchmark_open_arrival_capacity(
+                    args.dataset,
+                    run_id=args.run_id,
+                    arrival_rate_qps=args.arrival_rate_qps,
+                    duration_seconds=args.duration_seconds,
+                    iterations=args.iterations,
+                    max_inflight=args.max_inflight,
+                    warmup_requests=args.warmup_requests,
+                    timeout_seconds=args.timeout_seconds,
+                    case_ids=selected_ids,
+                    preflight=preflight,
+                )
+            else:
+                concurrencies = parse_concurrency_levels(args.concurrency)
+                report, observations = await benchmark_capacity(
+                    args.dataset,
+                    run_id=args.run_id,
+                    concurrencies=concurrencies,
+                    requests_per_level=args.requests_per_level,
+                    warmup_requests=args.warmup_requests,
+                    timeout_seconds=args.timeout_seconds,
+                    case_ids=selected_ids,
+                    preflight=preflight,
+                )
         finally:
             await close_pool()
         root, digest = write_capacity_evidence(
@@ -1558,7 +1642,9 @@ async def _main(args: argparse.Namespace) -> int:
         _print(
             {
                 "runId": args.run_id,
-                "levels": report["levels"],
+                "mode": report.get("mode", "CLOSED_LOOP"),
+                "levels": report.get("levels"),
+                "summary": report.get("summary"),
                 "warmup": report["warmup"],
                 "notProductionSlo": True,
                 "evidence": str(root),
@@ -1570,10 +1656,20 @@ async def _main(args: argparse.Namespace) -> int:
             int(warmup.get("requestCount") or 0) == 0
             or float(warmup.get("successRate") or 0) == 1.0
         )
-        return 0 if warmup_ok and all(
-            float(level.get("successRate") or 0) == 1.0
-            for level in report["levels"].values()
-        ) else 2
+        if report.get("mode") == "OPEN_ARRIVAL":
+            summary = report.get("summary") or {}
+            measured_ok = (
+                int(summary.get("plannedArrivalCount") or 0) > 0
+                and int(summary.get("successfulCount") or 0)
+                == int(summary.get("plannedArrivalCount") or 0)
+                and int(summary.get("droppedCount") or 0) == 0
+            )
+        else:
+            measured_ok = all(
+                float(level.get("successRate") or 0) == 1.0
+                for level in (report.get("levels") or {}).values()
+            )
+        return 0 if warmup_ok and measured_ok else 2
     if args.command == "benchmark-db":
         sizes = [int(value.strip()) for value in str(args.sizes).split(",") if value.strip()]
         await init_pool()

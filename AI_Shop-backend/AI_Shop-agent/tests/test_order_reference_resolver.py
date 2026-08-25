@@ -249,7 +249,7 @@ async def test_explicit_recent_relation_uniquely_selects_the_newest_match():
 
 
 @pytest.mark.asyncio
-async def test_matching_but_ineligible_refund_is_not_proposed():
+async def test_refund_resolver_only_establishes_owned_reference_not_eligibility():
     orders = [
         _order(
             "SM202608050002",
@@ -268,8 +268,10 @@ async def test_matching_but_ineligible_refund_is_not_proposed():
             user_text="耳机我要退款",
         )
 
-    assert result.outcome == OrderReferenceOutcome.NO_ELIGIBLE
-    assert "待付款" in result.reason
+    assert result.outcome == OrderReferenceOutcome.RESOLVED
+    assert result.target is not None
+    assert result.target["orderStatus"] == 0
+    assert result.target["orderId"] == "SM202608050002"
 
 
 @pytest.mark.asyncio
@@ -316,18 +318,18 @@ async def test_dependency_failure_is_not_reported_as_no_order():
     ("intent", "text", "status", "comment_status", "expected"),
     [
         (IntentKind.CONFIRM_RECEIPT, "确认收货耳机订单", 2, 0, OrderReferenceOutcome.RESOLVED),
-        (IntentKind.CONFIRM_RECEIPT, "确认收货耳机订单", 1, 0, OrderReferenceOutcome.NO_ELIGIBLE),
+        (IntentKind.CONFIRM_RECEIPT, "确认收货耳机订单", 1, 0, OrderReferenceOutcome.RESOLVED),
         (IntentKind.CANCEL_ORDER, "取消耳机订单", 0, 0, OrderReferenceOutcome.RESOLVED),
-        (IntentKind.CANCEL_ORDER, "取消耳机订单", 1, 0, OrderReferenceOutcome.NO_ELIGIBLE),
+        (IntentKind.CANCEL_ORDER, "取消耳机订单", 1, 0, OrderReferenceOutcome.RESOLVED),
         (IntentKind.PRODUCT_REVIEW, "我要评价耳机", 3, 0, OrderReferenceOutcome.RESOLVED),
         (IntentKind.RECOMMENT, "我要追评耳机", 3, 1, OrderReferenceOutcome.RESOLVED),
-        (IntentKind.QUERY_COMMENT, "查看耳机评价", 3, 0, OrderReferenceOutcome.NO_ELIGIBLE),
+        (IntentKind.QUERY_COMMENT, "查看耳机评价", 3, 0, OrderReferenceOutcome.RESOLVED),
         (IntentKind.DAMAGED_OR_WRONG_ITEM, "我收到的耳机坏了", 2, 0, OrderReferenceOutcome.RESOLVED),
-        (IntentKind.DAMAGED_OR_WRONG_ITEM, "我收到的耳机坏了", 0, 0, OrderReferenceOutcome.NO_ELIGIBLE),
+        (IntentKind.DAMAGED_OR_WRONG_ITEM, "我收到的耳机坏了", 0, 0, OrderReferenceOutcome.NO_MATCH),
     ],
 )
 @pytest.mark.asyncio
-async def test_intent_specific_order_eligibility(
+async def test_intent_specific_order_reference_matching(
     intent: IntentKind,
     text: str,
     status: int,

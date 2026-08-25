@@ -61,8 +61,26 @@ def _public_runtime_identity(value: Any) -> dict[str, Any] | None:
     }
 
 
-async def _probe_agent_readiness(client: httpx.AsyncClient, url: str) -> dict[str, Any]:
-    """Require attested API/Worker/MCP source agreement, not bare liveness."""
+def _public_source_fingerprint(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    sha = str(value.get("sha256") or "")
+    if len(sha) != 64:
+        return None
+    return {
+        "scope": str(value.get("scope") or ""),
+        "sha256": sha,
+        "fileCount": int(value.get("fileCount") or 0),
+    }
+
+
+async def _probe_agent_readiness(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    expected_source: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Require serving processes to agree with each other and this workspace."""
 
     try:
         response = await client.get(url, timeout=10)
@@ -80,7 +98,9 @@ async def _probe_agent_readiness(client: httpx.AsyncClient, url: str) -> dict[st
         mcp_identity = _public_runtime_identity(
             mcp.get("mcpRuntimeIdentity") if isinstance(mcp, dict) else None
         )
-        source_match = bool(
+        expected_source_provided = expected_source is not None
+        expected_source_identity = _public_source_fingerprint(expected_source)
+        process_source_agreement = bool(
             isinstance(worker, dict)
             and worker.get("ok") is True
             and worker.get("sourceFingerprintMatch") is True
@@ -97,6 +117,20 @@ async def _probe_agent_readiness(client: httpx.AsyncClient, url: str) -> dict[st
             and api_identity["source"]["sha256"] == worker_identity["source"]["sha256"]
             and api_identity["source"]["sha256"] == mcp_identity["source"]["sha256"]
         )
+        runtime_matches_expected = bool(
+            not expected_source_provided
+            or (
+                expected_source_identity
+                and api_identity
+                and worker_identity
+                and mcp_identity
+                and all(
+                    identity["source"] == expected_source_identity
+                    for identity in (api_identity, worker_identity, mcp_identity)
+                )
+            )
+        )
+        source_match = process_source_agreement and runtime_matches_expected
         return {
             "name": "agent-readiness",
             "ok": source_match,
@@ -104,6 +138,10 @@ async def _probe_agent_readiness(client: httpx.AsyncClient, url: str) -> dict[st
             "url": url,
             "facts": {
                 "sourceFingerprintMatch": source_match,
+                "processSourceAgreement": process_source_agreement,
+                "expectedSourceProvided": expected_source_provided,
+                "expectedSourceFingerprint": expected_source_identity,
+                "runtimeMatchesExpectedSource": runtime_matches_expected,
                 "apiRuntimeIdentity": api_identity,
                 "workerRuntimeIdentity": worker_identity,
                 "mcpRuntimeIdentity": mcp_identity,
@@ -127,6 +165,7 @@ async def run_preflight(cases: Sequence[EvaluationCase]) -> dict[str, Any]:
     from app.rag.retriever import rag_retriever, rerank_evaluation_scope
     from app.services.llm_factory import chat_llm_config, chat_llm_for_config
     from app.services.redis_service import redis_service
+    from app.services.runtime_identity import source_fingerprint as runtime_source_fingerprint
     from evaluation.core.agent_fixtures import verify_write_fixture_prerequisites
     from evaluation.core.catalog import verify_live_catalog
 
@@ -156,6 +195,7 @@ async def run_preflight(cases: Sequence[EvaluationCase]) -> dict[str, Any]:
                 await _probe_agent_readiness(
                     client,
                     f"{agent_base_url()}/health/ready",
+                    expected_source=runtime_source_fingerprint(),
                 )
             )
     try:

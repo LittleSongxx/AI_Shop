@@ -168,9 +168,22 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
                     "outcome": outcome,
                     "intent": result.get("intent"),
                     "tools": result.get("tools_called") or [],
-                    "costSummary": snapshot_cost_summary(
-                        tools_called=result.get("tools_called")
+                    "orchestrationMode": result.get("orchestration_mode"),
+                    "orchestrationReason": result.get("orchestration_reason"),
+                    "llmSkipped": bool(result.get("llm_skipped")),
+                    "llmSkipReason": result.get("llm_skip_reason"),
+                    "structuredResultFinalized": bool(
+                        result.get("structured_result_finalized")
                     ),
+                    "llmCallCount": int(cost_summary.get("llmCalls") or 0),
+                    "successfulLlmCallCount": int(
+                        cost_summary.get("successfulLlmCalls") or 0
+                    ),
+                    "failedLlmCallCount": int(
+                        cost_summary.get("failedLlmCalls") or 0
+                    ),
+                    "usageStatus": cost_summary.get("costStatus"),
+                    "costSummary": cost_summary,
                 },
                 latency_ms=elapsed_ms,
             )

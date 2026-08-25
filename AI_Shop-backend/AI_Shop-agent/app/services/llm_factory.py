@@ -35,6 +35,7 @@ def chat_llm_config(
     fallback: bool = False,
     disable_thinking: bool = False,
     streaming: bool = True,
+    max_retries: int | None = None,
 ) -> ChatLLMConfig:
 
     s = get_settings()
@@ -45,7 +46,9 @@ def chat_llm_config(
         base_url=s.llm_base_url,
         model=model,
         timeout=s.llm_timeout,
-        max_retries=s.llm_max_retries,
+        max_retries=(
+            s.llm_max_retries if max_retries is None else max(0, int(max_retries))
+        ),
         streaming=streaming,
         disable_thinking=disable_thinking
         and (_is_deepseek_endpoint(s.llm_base_url) or _is_qwen_compatible_endpoint(s.llm_base_url)),

@@ -21,6 +21,7 @@
 | AI 客服 intent/slot/handoff | 见下节 | 独立 60 条双人盲标+仲裁 gold | bootstrap/Wilson | 3 intent、3 strict-format slot badcase |
 | AI 客服 HTTP 最终答案（历史 v1） | 正确率 `0.850000`；引用支持 `0.200000` | 60 条双盲+8 条第三人仲裁；引用分母 30 | Wilson | 9 answer、24 citation、28 joint badcase |
 | AI 客服 HTTP 最终答案（修复后 v13） | 正确 `59/60=0.983333`；引用支持 `20/34=0.588235`；联合 `46/60=0.766667` | 60 条真实 HTTP observation；双评封存、11 条独立第三人仲裁 | Wilson | 14 条，主要是动态订单详情/资格规则/操作后果缺少同一行证据 |
+| AI 客服 HTTP 最终答案（当前 v20） | 正确 `57/60=0.950000`；引用支持 `25/36=0.694444`；联合 `49/60=0.816667` | 60 条真实 HTTP observation；双评封存、4 条独立第三人仲裁 | Wilson | 11 条；`014` 为 unsafe，另有工单能力/后果、订单解析和商品硬约束证据缺口 |
 
 Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap 区间；由于运行 summary 与 scorecard 是两次独立重采样，NDCG 和 P95 的区间端点可能有小幅差异，点估计、分母和 badcase 必须一致。这里的表格明确标注为 scorecard 区间，不能把两套端点混写成一个“线上置信区间”。
 
@@ -29,7 +30,7 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 | 证据 | 当前可用程度 | 可以怎么说 | 不能怎么说 |
 |---|---|---|---|
 | Search 50 条离线 qrel | **可用于简历/面试** | `n=50`、44 条有 qrel 的 Recall/MRR/NDCG、95% CI、切片和漏召回/错排 case | 线上 CTR、个性化推荐收益或生产 SLO |
-| 客服 60 条 HUMAN_VERIFIED + HTTP 答案审查 | **可用于简历/面试，但须完整披露版本边界** | 双人盲标、25 条 lead 仲裁后的 intent/slot/handoff；历史 v1 的双盲+8 条第三人仲裁；v13 的双盲+11 条第三人仲裁，最终正确 `59/60`、引用支持 `20/34`、联合 `46/60` | 线上客服准确率、CSAT/FCR；不能隐去历史 v1 的 `6/30=20.0%`、v13 的 `20/34=58.82%` 及 14 条引用/流程 badcase，也不能把 v13 的执行 `60/60` 或单评结果当作答案质量 |
+| 客服 60 条 HUMAN_VERIFIED + HTTP 答案审查 | **可用于简历/面试，但须完整披露版本边界** | 双人盲标、25 条 lead 仲裁后的 intent/slot/handoff；当前 v20 的双盲+4 条第三人仲裁，最终正确 `57/60`、引用支持 `25/36`、联合 `49/60`；v1/v13 作为历史基线保留 | 线上客服准确率、CSAT/FCR；不能隐去 v20 的 `1/60` unsafe 与 11 条 badcase，也不能把 HTTP `60/60`、机器诊断或不同版本输出包装为严格因果提升 |
 | RAG 50 条、Agent 25 条 | **工程诊断可用** | RAG 检索/引用/拒答下界，Agent 幂等、终态和状态 diff 契约 | 人工语义准确率、开放世界 Agent 成功率 |
 | 本地延迟、容量、token、DB、故障矩阵 | **复盘/设计证据可用** | 环境、样本、并发/QPS、P50/P95/P99、usage unknown、batch/N+1 和恢复契约 | 持续生产容量、费用为 0、线上 SLO |
 
@@ -44,12 +45,12 @@ Search/RAG/Agent 的运行 summary 也保存了独立固定种子的 bootstrap �
 | Search 相关性与约束 | **达标** | Recall@10 `0.9621`、MRR `0.9375`、NDCG `0.9205`，硬约束违规 `0` | 足以支撑当前 47 商品、小流量场景的可用搜索/导购；多对象和比较型难例仍需 fallback/澄清 |
 | RAG 受控问答 | **有条件达标** | answerable Recall@5 `29/29`，lexical grounded/citation/no-answer 门禁通过 | 足以支撑封闭知识库 FAQ；没有独立人工语义真值，不能证明开放域答案准确率 |
 | 客服理解与转人工 | **当前离线点估计达标** | 同一 60 条 HUMAN_VERIFIED gold 重跑后 Intent Macro-F1 `1.0000`、高风险和 handoff Recall `1.0`；raw full-slot F1 `0.9964`、normalized F1/EM `1.0` | 可用于带澄清和人工兜底的客服路由；这是同集规则回放，不是开放世界泛化，写操作仍须 Java 校验和确认 |
-| 客服 HTTP 最终答案与引用 | **v13 正确性/转人工可用，引用与联合质量仍未达可靠 grounded-answer 门槛** | v13 人工仲裁后答案正确 `59/60=98.33%`，引用语义支持 `20/34=58.82%`，联合质量 `46/60=76.67%`；`012` 为取消订单流程错误，另有 13 条引用 badcase | 可用于展示受控客服、确认和人工兜底；未补齐逐 claim 证据前，不将其表述为可无人值守交付的 grounded 客服 |
+| 客服 HTTP 最终答案与引用 | **v20 受控问答可展示，仍未达到无人值守 grounded-answer 门槛** | v20 人工仲裁后答案正确 `57/60=95.00%`、引用语义支持 `25/36=69.44%`、联合质量 `49/60=81.67%`、转人工 `60/60`、unsafe `1/60`；11 条 badcase 保留 | 可用于展示受控客服、确认和人工兜底；必须披露 `014` 的售后权益风险和逐 claim 引用缺口，不能声称可独立上线 |
 | Agent 交易可靠性 | **冻结场景达标** | 25 case、200 trials，`pass^8=1.0`，state diff/终态全匹配，重复副作用 `0`；故障 contract `11/11 HARD + 1/1 SHADOW` | 支撑受控交易提案、确认和幂等执行；不等于开放世界 Agent 成功率 |
 | 单请求交互延迟 | **Search 可用，生成链路长尾偏高** | 本地 Search P95 `0.80s`、RAG `4.25s`、Agent `17.08s`、客服 HTTP `15.21s`，客服 P99 `60.14s` | 搜索体验可用；Agent/客服需要流式反馈、超时降级和长尾优化，不能承诺生产 SLO |
 | 容量与成本 | **已有扩大后的本地诊断，生产结论未建立** | 只读 4 case、warm-up `4`、正式 `80` 请求（并发 `1/2/4/8`、每档 20）；c8 `1.353 QPS`；生成路径 P95 `10.211–12.013s`；usage 有 token 但未定价 | 可定位并发瓶颈和回归，不能据此承诺持续吞吐、生产 SLO 或单位经济性 |
 
-综合结论：当前证据足以支撑小商品集、低并发、人工最终兜底下的检索、路由和受控交易演示，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。v13 已完成双盲和 11 条第三人仲裁：答案正确 `98.33%`、引用支持 `58.82%`、联合质量 `76.67%`，但 95% CI 宽且 14 条 badcase 仍集中在证据覆盖不足与取消流程边界，因此生成式客服不能独立上线。其余限制是 Agent/客服生成链路长尾、共享本机负载仍非生产容量、真实账单价格未知，以及客服金标仍只有 60 条。
+综合结论：当前证据足以支撑小商品集、低并发、人工最终兜底下的检索、路由和受控交易演示，也足以作为求职项目展示；尚不足以证明无人值守、高并发生产系统。最新 v20 已完成双盲和 4 条第三人仲裁：答案正确 `95.00%`、引用支持 `69.44%`、联合质量 `81.67%`，但 95% CI 仍宽，11 条 badcase 中还包含 `1/60` unsafe。生成式客服不能独立上线；其余限制是 Agent/客服生成链路长尾、共享本机负载仍非生产容量、真实账单价格未知，以及客服金标仍只有 60 条。
 
 ### Search slice（不加权掩盖失败）
 
@@ -177,6 +178,24 @@ v13 原始 report 的 `answerQuality.status` 仍不可变地是 `PENDING_HUMAN_R
 
 13 条引用 badcase 的可修复根因分为：订单快照没有订单项/商品名/支付场景（`004/005/006/008/014/016/017/035`），回答编入未声明工具能力或未引用的退款/确认后果（`007/009`），以及售后资格规则未随动态订单状态一并引用（`018/019/055`）。`012` 同时暴露取消资格判断和转人工边界。它们是下一轮回归集，不能通过把结构化 `sourceRefs` 存在本身当作 `SUPPORTED` 来消除。v13 与历史 v1 是不同冻结答案与证据传播版本；可描述为后续观察中的不同结果，但不是严格 A/B，也不能把免责声明评测器修复称为模型质量提升。
 
+### 客服 HTTP/LLM 全链路：当前 v20，已完成人工仲裁
+
+在 v13 后续修复与 v14-v18 诊断基础上，`customer-service-http-v20-20260825` 对同一 60 条 HUMAN_VERIFIED gold 重新执行真实 HTTP Agent 路径。运行完成 `60/60`，行为契约 `11/11`、handoff false positive/negative 均为 `0`、hard constraint violation 和 fixture cleanup failure 均为 `0`；这些机器结果仍不代替答案人工质量。冻结源 report SHA-256 为 `10d171bc...8596d`，源码指纹为 `736cad91...a26`。
+
+两名真人 reviewer 的 sealed 表案件级完全一致 `56/60=0.933333`；字段级一致为 answerCorrect `57/60`、citationSupport `59/60`（Cohen κ `0.973498`）、handoff `60/60`、unsafe `59/60`。4 条分歧 `014/029/043/059` 由独立第三人 `reviewer-c` 裁定。最终只读 evidence 状态为 `HUMAN_REVIEWED_ADJUDICATED`，完整包见 [customer-service-http-v20-answer-review-adjudicated-20260825](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/)；双评 pending 父包继续保留。
+
+| 指标 | 数值 | 分子/分母 | Wilson 95% CI | badcase |
+|---|---:|---:|---|---|
+| 答案正确率 | `0.950000` | `57/60` | `[0.862995, 0.982850]` | `014/018/043` |
+| 引用语义支持率 | `0.694444` | `25/36` eligible | `[0.531437, 0.819955]` | `008/009/014/018/019/020/021/027/029/043/055` |
+| 转人工适当率 | `1.000000` | `60/60` | `[0.939828, 1.000000]` | 无；小样本不能称绝对正确 |
+| Unsafe-answer rate（低更好） | `0.016667` | `1/60` | `[0.002948, 0.088551]` | `014`：无证据断言确认收货后无法退款，可能误导售后权益判断 |
+| 联合质量通过率 | `0.816667` | `49/60` | `[0.700802, 0.894422]` | 上述 11 条 |
+
+v20 的剩余问题已经收敛为可执行的四类：`008/019/020/021/027/055` 缺创建工单能力、待确认状态或提交后果的可见证据；`009/014` 编入未支持的退款去向、不可撤销性或确认收货后果；`018` 已精确匹配订单却错误声称未定位；`029/043` 的优惠、报价、排序或 Android 硬约束未被可见商品事实逐项支持。`014` 同时是答案错误、引用不支持和 unsafe，若继续改代码应首先修复。
+
+v20 与 v13 的点估计可作为不同冻结输出的描述性观察，但不是严格因果 A/B：答案文本、sourceRefs、Provider 状态及 eligible 引用分母均有变化。不能只报告联合质量 `46/60 -> 49/60` 或引用 `20/34 -> 25/36` 而隐去答案正确 `59/60 -> 57/60` 和 unsafe `0/60 -> 1/60`。源 HTTP report 的生成时字段仍保持 `PENDING_HUMAN_REVIEW`；外部 final package 才是已完成人工生命周期的权威证据。
+
 另已新增 60 条 v2 draft（20 个 intent 各 3 条，hard 35，应转人工 16），目标将金标扩到 120 条。在双人盲标、封存和仲裁完成前，它仍是
 `DRAFT_NEEDS_DUAL_HUMAN_REVIEW`，不与当前 60 条 HUMAN_VERIFIED 分母合并。
 
@@ -218,7 +237,7 @@ runtime safety error 必须全通过；任何失败阻断发布。不要用这�
 |---|---|---|
 | 客服理解 | 任务型对话通常分别评估 intent、slot、dialogue state/action；分类同时看 Macro-F1、关键类 Recall 和混淆 badcase | 已有 60 条双人盲标+仲裁；slot 另报 raw/normalized，风险与转人工独立。当前缺的是更大、领域经验标注的 holdout |
 | 商品检索 | BM25 是稳健 lexical baseline；向量用于同义泛化，RRF 融合多路排序，再做 rerank；硬型号/数字/品牌/否定约束必须在召回后强过滤 | 当前 Search 已有 Recall/MRR/NDCG、硬约束门禁；下一步只处理 `23/34/47` 的多对象/比较 query decomposition，不改 qrel 刷分 |
-| RAG/客服答案 | 检索质量与回答 groundedness/relevance/completeness 分开；LLM judge 只能作为 shadow，人工校准后才可升级为门禁 | lexical/citation 与 semantic shadow 并列；旧 HTTP 引用支持 `6/30=20.0%`，必须先补动态事实 sourceRef，再新 run 双盲审 |
+| RAG/客服答案 | 检索质量与回答 groundedness/relevance/completeness 分开；LLM judge 只能作为 shadow，人工校准后才可升级为门禁 | lexical/citation 与 semantic shadow 并列；v20 人工引用支持 `25/36=69.44%`，11 条逐 claim badcase 仍需保留，修复后只能用新 run 双盲审 |
 | Agent 工具使用 | 交互式评测应记录 tool-call accuracy、终态/状态变化、失败恢复和重复副作用，而非只报 task pass | 已有 `pass^5/pass^8`、state diff、幂等和故障矩阵；不把 `pass=100%` 当客服质量分数 |
 | 风险治理 | NIST AI RMF 的 Govern/Map/Measure/Manage 思路对应数据版本、风险边界、可复核证据和 fail-closed 发布 | current/archive、SHA-256、UNVERIFIABLE 与人工仲裁已落地；仍无专家资质或线上用户反馈证据 |
 
@@ -233,7 +252,7 @@ runtime safety error 必须全通过；任何失败阻断发布。不要用这�
 
 后续只按以下顺序投入：
 
-1. 用新预注册 holdout 验证 sourceRef 传播修复，重新做客服答案 correctness/grounding 双盲+仲裁；旧 `20%` 结果保持不可变。
+1. 优先修复 v20 `014` 的错误退款后果提示，再处理 `018/043` 和工单能力/提交后果 sourceRef；修改后必须新 run、新双盲+仲裁，v20 结果保持不可变。
 2. 完成 v2 另外 60 条的双人盲标，重点校准退款政策/状态、支付方式、比较和风险边界，再报分层 CI 与 badcase。
 3. 在固定 Search 难例上做查询拆解、候选集合保留和二阶段排序的 paired A/B；只有同一 qrel、同一分母、无约束回归才记录质量提升。
 4. 暂不投入 CTR/CVR/GMV、开放域客服成功率或生产 SLO；当前样本和环境不支持这些结论。

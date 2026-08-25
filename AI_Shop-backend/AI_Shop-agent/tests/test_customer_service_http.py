@@ -321,6 +321,101 @@ def test_hash_bound_http_behavior_contracts_detect_original_safety_badcase():
     assert report["releaseGateEligible"] is False
 
 
+def test_v2_behavior_contract_loader_accepts_required_action_proposals():
+    bundle = load_http_behavior_contracts(
+        AGENT_ROOT
+        / "evaluation"
+        / "datasets"
+        / "customer_service"
+        / "adjudicated"
+        / "http-behavior-contracts-v2.json",
+        AGENT_ROOT
+        / "evaluation"
+        / "datasets"
+        / "customer_service"
+        / "adjudicated"
+        / "gold-v1-human-adjudicated.jsonl",
+    )
+
+    logistics = next(
+        item for item in bundle["contracts"] if item["caseId"] == "cs-gold-v1-008"
+    )
+    assert logistics["expected"]["requiredActionProposals"] == [
+        "CREATE_SUPPORT_CASE"
+    ]
+
+
+@pytest.mark.parametrize("proposal_source", ["event", "answer_card"])
+def test_behavior_contract_accepts_required_support_case_proposal(proposal_source):
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {"eventType": "ORDER_REFERENCE_RESOLUTION", "output": {"outcome": "RESOLVED"}}
+    )
+    if proposal_source == "event":
+        result.output["episodes"][0]["steps"].append(
+            {
+                "eventType": "ACTION_PROPOSED",
+                "output": {"actionType": "CREATE_SUPPORT_CASE"},
+            }
+        )
+    else:
+        result.output["answer"] = (
+            '{"type":"ACTION_CONFIRM","actionType":"CREATE_SUPPORT_CASE"}'
+        )
+    observation = observe_http_result(result)
+    observation["stateDiff"] = {
+        "captureAvailable": True,
+        "changeCount": 0,
+        "matched": True,
+        "duplicateSideEffectCount": 0,
+    }
+    contract = {
+        "contractId": "required-support-case",
+        "caseId": "cs-gold-v1-008",
+        "category": "LOGISTICS_EXCEPTION_CONFIRMATION",
+        "expected": {
+            "requiredOrderOutcomes": ["RESOLVED"],
+            "requiredActionProposals": ["CREATE_SUPPORT_CASE"],
+            "requireEmptyStateDiff": True,
+        },
+    }
+
+    report = evaluate_http_behavior_contracts(
+        {"cs-gold-v1-008": observation}, [contract]
+    )
+
+    assert report["status"] == "SATISFIED"
+    assert report["results"][0]["failedChecks"] == []
+
+
+@pytest.mark.parametrize("actual_action", [None, "RECOMMENT"])
+def test_behavior_contract_rejects_missing_or_wrong_required_support_case_proposal(
+    actual_action,
+):
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {"eventType": "ORDER_REFERENCE_RESOLUTION", "output": {"outcome": "RESOLVED"}}
+    )
+    if actual_action:
+        result.output["episodes"][0]["steps"].append(
+            {"eventType": "ACTION_PROPOSED", "output": {"actionType": actual_action}}
+        )
+    observation = observe_http_result(result)
+    contract = {
+        "contractId": "required-support-case",
+        "caseId": "cs-gold-v1-008",
+        "category": "LOGISTICS_EXCEPTION_CONFIRMATION",
+        "expected": {"requiredActionProposals": ["CREATE_SUPPORT_CASE"]},
+    }
+
+    report = evaluate_http_behavior_contracts(
+        {"cs-gold-v1-008": observation}, [contract]
+    )
+
+    assert report["status"] == "VIOLATIONS_DETECTED"
+    assert report["results"][0]["failedChecks"] == ["REQUIRED_ACTION_PROPOSALS"]
+
+
 def test_http_behavior_contract_accepts_safe_missing_body_clarification():
     result = _result()
     result.output["answer"] = "已定位到商品。请告诉我想追加的评价内容。"

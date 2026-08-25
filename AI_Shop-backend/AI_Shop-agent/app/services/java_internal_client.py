@@ -216,6 +216,31 @@ class JavaInternalClient:
         )
         return normalize_keys(data or [])
 
+    async def get_order_action_capability(
+        self,
+        action: str,
+        order_id: str,
+        *,
+        order_item_id: str | None = None,
+    ) -> dict:
+        """Get a Java-owned, short-lived advisory action decision.
+
+        The delegated identity travels exclusively in ``X-Agent-User-Id``.
+        Neither a model-generated ``userId`` nor prose supplied by retrieval is
+        accepted by this endpoint as an authority for the action or target.
+        The eventual write path still performs its own transactional check to
+        close the time-of-check/time-of-use window.
+        """
+
+        body: dict[str, Any] = {
+            "action": str(action or "").strip().upper(),
+            "orderId": str(order_id or "").strip(),
+        }
+        if order_item_id:
+            body["orderItemId"] = str(order_item_id).strip()
+        data = await self.post_json("/internal/order/agent/actionCapability", body)
+        return normalize_keys(data) if isinstance(data, dict) else {}
+
     async def get_logistics(self, user_id: str, order_id: str) -> dict | None:
         data = await self.post_json(
             "/internal/order/agent/getLogistics",

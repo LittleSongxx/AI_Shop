@@ -7,6 +7,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.graph.order_reference_flow import resolve_order_reference_turn
+from app.services.order_reference_resolver import (
+    OrderReferenceOutcome,
+    OrderReferenceResolution,
+)
 
 
 def _order(order_id: str, item_id: str, name: str, when: str) -> dict:
@@ -41,6 +45,91 @@ def _state() -> dict:
     }
 
 
+def _refund_decision(decision: str, order_id: str, item_id: str) -> dict:
+    return {
+        "decision": decision,
+        "decisionId": f"after-sales-{decision.lower()}",
+        "action": "REFUND",
+        "orderId": order_id,
+        "orderItemId": item_id,
+        "policyId": "refund-policy",
+        "policyVersion": "v1",
+        "evaluatedAt": "2026-08-25T00:00:00+00:00",
+    }
+
+
+def _capability_decision(
+    decision: str, action: str, order_id: str, item_id: str | None = None
+) -> dict:
+    return {
+        "decision": decision,
+        "action": action,
+        "orderId": order_id,
+        "orderItemId": item_id,
+        "reasonCode": f"TEST_{decision}",
+        "capabilityVersion": "order-action-capability/v1",
+        "evaluatedAt": "2026-08-25T00:00:00+00:00",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "user_text",
+    [
+        "退款需要满足哪些条件",
+        "退款政策一般多久到账",
+        "退款多久到账呀",
+    ],
+)
+async def test_generic_refund_policy_bypasses_order_resolution(user_text: str) -> None:
+    resolver = AsyncMock(
+        side_effect=AssertionError("generic refund policy must not resolve an order")
+    )
+    with patch("app.graph.order_reference_flow.order_reference_resolver.resolve", resolver):
+        update = await resolve_order_reference_turn(
+            {
+                **_state(),
+                "request_mode": "INFORMATIONAL",
+                "user_text": user_text,
+            }
+        )
+
+    assert update == {"route": "orchestration_router"}
+    resolver.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("user_text", "request_mode"),
+    [
+        ("我要退款", "ACTION_PROPOSAL"),
+        ("订单 SM202608050002 能退款吗？", "INFORMATIONAL"),
+    ],
+)
+async def test_refund_action_or_specific_order_still_resolves_order(
+    user_text: str, request_mode: str
+) -> None:
+    resolver = AsyncMock(
+        return_value=OrderReferenceResolution(
+            outcome=OrderReferenceOutcome.NO_MATCH,
+            intent="REFUND",
+            reason="未找到可处理的订单。",
+        )
+    )
+    with patch("app.graph.order_reference_flow.order_reference_resolver.resolve", resolver):
+        update = await resolve_order_reference_turn(
+            {
+                **_state(),
+                "request_mode": request_mode,
+                "user_text": user_text,
+            }
+        )
+
+    resolver.assert_awaited_once()
+    assert update["route"] == "finalize"
+    assert update["order_resolution"] == "NO_MATCH"
+
+
 @pytest.mark.asyncio
 async def test_unique_target_prepares_verified_proposal_before_any_llm_turn():
     orders = [
@@ -55,6 +144,14 @@ async def test_unique_target_prepares_verified_proposal_before_any_llm_turn():
         patch(
             "app.services.order_reference_resolver.java_internal_client.list_orders",
             AsyncMock(return_value=orders),
+        ),
+        patch(
+            "app.graph.order_reference_flow.after_sales_policy_service.evaluate",
+            AsyncMock(
+                return_value=_refund_decision(
+                    "ELIGIBLE", "SM202608050002", "SMITEM202608050002"
+                )
+            ),
         ),
         patch("app.graph.order_reference_flow._clear_reference", AsyncMock()),
     ):
@@ -97,6 +194,44 @@ async def test_multiple_targets_persist_an_order_selection_card():
 
 
 @pytest.mark.asyncio
+async def test_invoice_without_a_verifiable_order_keeps_a_non_policy_clarification():
+    state = {
+        **_state(),
+        "intent": "INVOICE",
+        "request_mode": "ACTION_PROPOSAL",
+        "user_text": "¥199.00的订单我要开发票",
+        "intent_decision": {"entities": {"amount": "199.00"}},
+    }
+    with patch(
+        "app.services.order_reference_resolver.java_internal_client.list_orders",
+        AsyncMock(return_value=[]),
+    ):
+        update = await resolve_order_reference_turn(state)
+
+    assert update["route"] == "finalize"
+    assert update["order_resolution"] == "NO_MATCH"
+    assert update["llm_skipped"] is True
+    assert update["llm_skip_reason"] == "order_reference_deterministic_result"
+    assert update["structured_result_finalized"] is True
+    assert update["deterministic_clarification"] is True
+    assert "resolved_order_tool" not in update
+    assert update["chunks"] == [
+        "我需要先定位具体订单才能继续处理开票请求。仅凭金额无法唯一匹配订单，"
+        "请补充订单号或商品信息；如需人工帮助可回复“转人工”。"
+    ]
+    assert update["order_reference_evidence"] == {
+        "outcome": "NO_MATCH",
+        "route": "finalize",
+        "resolvedTool": None,
+        "businessSourceRefCount": 1,
+        "capabilityDecisionRefCount": 0,
+        "hasVerifiedOrderContext": False,
+        "matchedCandidateCount": 0,
+        "dependencyError": False,
+    }
+
+
+@pytest.mark.asyncio
 async def test_review_details_reuse_the_selected_order_reference():
     order = _order(
         "SM202608010001",
@@ -122,6 +257,17 @@ async def test_review_details_reuse_the_selected_order_reference():
         patch(
             "app.services.order_reference_resolver.java_internal_client.list_orders",
             AsyncMock(return_value=[order]),
+        ),
+        patch(
+            "app.graph.order_reference_flow.java_internal_client.get_order_action_capability",
+            AsyncMock(
+                return_value=_capability_decision(
+                    "ALLOWED",
+                    "PRODUCT_REVIEW",
+                    "SM202608010001",
+                    "SMITEM202608010001",
+                )
+            ),
         ),
         patch("app.graph.order_reference_flow._clear_reference", AsyncMock()),
     ):
@@ -203,6 +349,14 @@ async def test_no_eligible_keeps_verified_snapshot_without_proposing_write():
             "app.services.order_reference_resolver.java_internal_client.list_orders",
             AsyncMock(return_value=[order]),
         ),
+        patch(
+            "app.graph.order_reference_flow.java_internal_client.get_order_action_capability",
+            AsyncMock(
+                return_value=_capability_decision(
+                    "DENIED", "CANCEL_ORDER", "SM202608050002"
+                )
+            ),
+        ),
         patch("app.graph.order_reference_flow._remember_reference", AsyncMock()),
     ):
         update = await resolve_order_reference_turn(
@@ -217,10 +371,11 @@ async def test_no_eligible_keeps_verified_snapshot_without_proposing_write():
     assert update["order_resolution"] == "NO_ELIGIBLE"
     assert update["verified_order_context"]["orderStatusName"] == "已付款,待发货"
     assert update["order_reference_evidence"] == {
-        "outcome": "NO_ELIGIBLE",
+        "outcome": "RESOLVED",
         "route": "finalize",
         "resolvedTool": None,
-        "businessSourceRefCount": 1,
+        "businessSourceRefCount": 2,
+        "capabilityDecisionRefCount": 1,
         "hasVerifiedOrderContext": True,
         "matchedCandidateCount": 1,
         "dependencyError": False,
@@ -228,7 +383,7 @@ async def test_no_eligible_keeps_verified_snapshot_without_proposing_write():
 
 
 @pytest.mark.asyncio
-async def test_informational_damaged_item_still_checks_order_eligibility() -> None:
+async def test_capability_service_unavailable_never_prepares_a_write_proposal():
     order = _order(
         "SM202608050002",
         "SMITEM202608050002",
@@ -240,7 +395,43 @@ async def test_informational_damaged_item_still_checks_order_eligibility() -> No
             "app.services.order_reference_resolver.java_internal_client.list_orders",
             AsyncMock(return_value=[order]),
         ),
+        patch(
+            "app.graph.order_reference_flow.java_internal_client.get_order_action_capability",
+            AsyncMock(side_effect=TimeoutError("capability timeout")),
+        ),
         patch("app.graph.order_reference_flow._remember_reference", AsyncMock()),
+    ):
+        update = await resolve_order_reference_turn(
+            {
+                **_state(),
+                "intent": "CANCEL_ORDER",
+                "request_mode": "ACTION_PROPOSAL",
+                "user_text": "取消订单 SM202608050002",
+                "intent_decision": {"entities": {"orderId": "SM202608050002"}},
+            }
+        )
+
+    assert update["route"] == "finalize"
+    assert update["order_resolution"] == "RESOLVED"
+    assert "资格服务暂时无法" in update["chunks"][0]
+    assert "resolved_order_tool" not in update
+    assert update["order_reference_evidence"]["capabilityDecisionRefCount"] == 0
+
+
+@pytest.mark.asyncio
+async def test_informational_damaged_item_prepares_confirmation_card() -> None:
+    order = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "索尼无线降噪耳机",
+        "2026-08-05 21:00:00",
+    )
+    with (
+        patch(
+            "app.services.order_reference_resolver.java_internal_client.list_orders",
+            AsyncMock(return_value=[order]),
+        ),
+        patch("app.graph.order_reference_flow._clear_reference", AsyncMock()),
     ):
         update = await resolve_order_reference_turn(
             {
@@ -252,10 +443,11 @@ async def test_informational_damaged_item_still_checks_order_eligibility() -> No
             }
         )
 
-    assert update["route"] == "finalize"
-    assert update["order_resolution"] == "NO_ELIGIBLE"
-    assert "当前不能发起破损/错发售后" in update["chunks"][0]
-    assert "resolved_order_tool" not in update
+    assert update["route"] == "orchestration_router"
+    assert update["order_resolution"] == "RESOLVED"
+    assert update["resolved_order_tool"]["name"] == "PROPOSE_CREATE_SUPPORT_CASE"
+    assert update["resolved_order_tool"]["args"]["category"] == "WRONG_ITEM"
+    assert "chunks" not in update
     assert "assistant_cards" not in update
     assert update["order_reference_evidence"]["hasVerifiedOrderContext"] is True
 
@@ -314,13 +506,21 @@ async def test_read_only_refund_question_checks_eligibility_without_proposing_wr
             "app.services.order_reference_resolver.java_internal_client.list_orders",
             AsyncMock(return_value=[order]),
         ),
+        patch(
+            "app.graph.order_reference_flow.after_sales_policy_service.evaluate",
+            AsyncMock(
+                return_value=_refund_decision(
+                    "INELIGIBLE", "SM202608050002", "SMITEM202608050002"
+                )
+            ),
+        ),
         patch("app.graph.order_reference_flow._remember_reference", AsyncMock()),
     ):
         update = await resolve_order_reference_turn(state)
 
     assert update["order_resolution"] == "NO_ELIGIBLE"
     assert update["route"] == "finalize"
-    assert "当前不能申请退款" in update["chunks"][0]
+    assert "不符合退款资格" in update["chunks"][0]
     assert "resolved_order_tool" not in update
     assert update["verified_order_context"]["orderId"] == "SM202608050002"
 
@@ -351,12 +551,101 @@ async def test_selected_refund_rechecks_latest_status_before_proposing():
             "app.services.order_reference_resolver.java_internal_client.list_orders",
             AsyncMock(return_value=[order]),
         ),
+        patch(
+            "app.graph.order_reference_flow.after_sales_policy_service.evaluate",
+            AsyncMock(
+                return_value=_refund_decision(
+                    "INELIGIBLE", "SM202608050002", "SMITEM202608050002"
+                )
+            ),
+        ),
         patch("app.graph.order_reference_flow._remember_reference", AsyncMock()),
     ):
         update = await resolve_order_reference_turn(state)
 
     assert update["order_resolution"] == "NO_ELIGIBLE"
     assert "待付款" in update["chunks"][0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("intent", "user_text", "expected_category"),
+    [
+        (
+            "DAMAGED_OR_WRONG_ITEM",
+            "订单 SM202608050002 少了一个配件，麻烦处理。",
+            "MISSING_ITEM",
+        ),
+        (
+            "QUERY_LOGISTICS",
+            "订单 SM202608050002 的物流一直不动，麻烦核查。",
+            "LOGISTICS",
+        ),
+    ],
+)
+async def test_verified_exception_complaints_prepare_support_case_confirmation(
+    intent,
+    user_text,
+    expected_category,
+):
+    order = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "索尼无线降噪耳机",
+        "2026-08-05 21:00:00",
+    )
+    with (
+        patch(
+            "app.services.order_reference_resolver.java_internal_client.list_orders",
+            AsyncMock(return_value=[order]),
+        ),
+        patch("app.graph.order_reference_flow._clear_reference", AsyncMock()),
+    ):
+        update = await resolve_order_reference_turn(
+            {
+                **_state(),
+                "intent": intent,
+                "request_mode": "READ_QUERY",
+                "user_text": user_text,
+                "intent_decision": {"entities": {"orderId": "SM202608050002"}},
+            }
+        )
+
+    assert update["route"] == "orchestration_router"
+    assert update["order_resolution"] == "RESOLVED"
+    assert update["resolved_order_tool"]["name"] == "PROPOSE_CREATE_SUPPORT_CASE"
+    assert update["resolved_order_tool"]["args"]["category"] == expected_category
+    assert update["order_reference_evidence"]["resolvedTool"] == (
+        "PROPOSE_CREATE_SUPPORT_CASE"
+    )
+
+
+@pytest.mark.asyncio
+async def test_plain_unshipped_fulfillment_keeps_snapshot_response_without_capability_claim():
+    order = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "索尼无线降噪耳机",
+        "2026-08-05 21:00:00",
+    )
+    with patch(
+        "app.services.order_reference_resolver.java_internal_client.list_orders",
+        AsyncMock(return_value=[order]),
+    ):
+        update = await resolve_order_reference_turn(
+            {
+                **_state(),
+                "intent": "QUERY_FULFILLMENT",
+                "user_text": "订单 SM202608050002 怎么还没发货？",
+                "intent_decision": {"entities": {"orderId": "SM202608050002"}},
+            }
+        )
+
+    assert update["route"] == "finalize"
+    assert update["order_resolution"] == "RESOLVED"
+    assert "商家尚未发货" in update["chunks"][0]
+    assert "如需催发货或进一步核查" in update["chunks"][0]
+    assert "暂无催发货写工具" not in update["chunks"][0]
 
 
 @pytest.mark.asyncio

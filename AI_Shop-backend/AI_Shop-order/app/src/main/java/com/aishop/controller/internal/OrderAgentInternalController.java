@@ -1,5 +1,7 @@
 package com.aishop.controller.internal;
 
+import com.aishop.api.enums.OrderCommentStatusEnum;
+import com.aishop.api.enums.OrderStatusEnum;
 import com.aishop.biz.OrderCommentService;
 import com.aishop.biz.AgentActionStatusService;
 import com.aishop.biz.OrderInfoService;
@@ -8,7 +10,6 @@ import com.aishop.biz.OrderLogisticsInfoService;
 import com.aishop.biz.RefundSagaTransactionService;
 import com.aishop.controller.ABaseController;
 import com.aishop.security.AgentDelegatedIdentity;
-import com.aishop.api.enums.OrderStatusEnum;
 import com.aishop.entity.po.OrderComment;
 import com.aishop.entity.po.OrderInfo;
 import com.aishop.entity.po.OrderItem;
@@ -255,6 +256,45 @@ public class OrderAgentInternalController extends ABaseController {
         return getSuccessResponseVO(agentActionStatusService.resolve(body));
     }
 
+    /**
+     * Read-only, server-owned action preflight for the Agent.
+     *
+     * This is intentionally an advisory decision, not a write reservation.
+     * The real command remains responsible for its transactional/lock-aware
+     * validation at execution time.  Keeping the decision in the order service
+     * prevents the Python Agent from inferring a capability from an order
+     * status snapshot or from a retrieved policy sentence.
+     */
+    @PostMapping("/actionCapability")
+    public ResponseVO<Map<String, Object>> actionCapability(
+            @RequestBody Map<String, Object> body) {
+        String userId = AgentDelegatedIdentity.require();
+        String action = str(body, "action");
+        String orderId = str(body, "orderId");
+        String orderItemId = str(body, "orderItemId");
+        if (StringTools.isEmpty(action) || StringTools.isEmpty(orderId)) {
+            return getSuccessResponseVO(capabilityResult(
+                    "UNAVAILABLE", action, orderId, orderItemId,
+                    "INVALID_REQUEST"));
+        }
+        action = action.trim().toUpperCase();
+        OrderInfo order = orderInfoService.getOrderInfoByOrderId(orderId);
+        if (order == null) {
+            return getSuccessResponseVO(capabilityResult(
+                    "DENIED", action, orderId, orderItemId, "ORDER_NOT_FOUND"));
+        }
+        AgentDelegatedIdentity.requireOwner(userId, order.getUserId());
+        if (!StringTools.isEmpty(orderItemId)) {
+            OrderItem item = orderItemService.getOrderItemByOrderItemId(orderItemId);
+            if (item == null || !orderId.equals(item.getOrderId())) {
+                return getSuccessResponseVO(capabilityResult(
+                        "DENIED", action, orderId, orderItemId, "ORDER_ITEM_MISMATCH"));
+            }
+        }
+        return getSuccessResponseVO(evaluateActionCapability(
+                action, order, orderId, orderItemId));
+    }
+
     @PostMapping("/coPurchaseProductIds")
     public ResponseVO<List<String>> coPurchaseProductIds(@RequestBody Map<String, Object> body) {
         String productId = str(body, "productId");
@@ -307,6 +347,7 @@ public class OrderAgentInternalController extends ABaseController {
         m.put("orderId", o.getOrderId());
         m.put("userId", o.getUserId());
         m.put("orderStatus", o.getOrderStatus());
+        m.put("orderStatusName", orderStatusName(o.getOrderStatus()));
         m.put("amount", o.getAmount());
         m.put("payScene", o.getPayScene());
         m.put("payChannel", o.getPayChannel());
@@ -365,6 +406,89 @@ public class OrderAgentInternalController extends ABaseController {
             case "REJECTED" -> "退款申请已驳回";
             default -> "退款处理中";
         };
+    }
+
+    private static Map<String, Object> capabilityResult(
+            String decision,
+            String action,
+            String orderId,
+            String orderItemId,
+            String reasonCode) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("decision", decision);
+        result.put("action", action);
+        result.put("orderId", orderId);
+        result.put("orderItemId", StringTools.isEmpty(orderItemId) ? null : orderItemId);
+        result.put("reasonCode", reasonCode);
+        result.put("capabilityVersion", "order-action-capability/v1");
+        result.put("evaluatedAt", formatDate(new Date()));
+        return result;
+    }
+
+    private static Map<String, Object> evaluateActionCapability(
+            String action,
+            OrderInfo order,
+            String orderId,
+            String orderItemId) {
+        Integer status = order.getOrderStatus();
+        Integer commentStatus = order.getCommentStatus();
+        return switch (action) {
+            case "CANCEL_ORDER" -> capabilityResult(
+                    OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(status)
+                            ? "ALLOWED" : "DENIED",
+                    action,
+                    orderId,
+                    orderItemId,
+                    OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(status)
+                            ? "ORDER_STATUS_CANCELLABLE"
+                            : "ORDER_STATUS_NOT_CANCELLABLE");
+            case "CONFIRM_RECEIPT" -> capabilityResult(
+                    OrderStatusEnum.SHIPPED.getStatus().equals(status)
+                                    || OrderStatusEnum.PARTIALLY_REFUNDED.getStatus().equals(status)
+                            ? "ALLOWED" : "DENIED",
+                    action,
+                    orderId,
+                    orderItemId,
+                    OrderStatusEnum.SHIPPED.getStatus().equals(status)
+                                    || OrderStatusEnum.PARTIALLY_REFUNDED.getStatus().equals(status)
+                            ? "ORDER_STATUS_CONFIRMABLE"
+                            : "ORDER_STATUS_NOT_CONFIRMABLE");
+            // These conditions intentionally mirror the command services. Do
+            // not add a synthetic order-status rule here: postComment and
+            // postReComment own their real eligibility via commentStatus.
+            case "PRODUCT_REVIEW" -> capabilityResult(
+                    OrderCommentStatusEnum.NOT_EVALUATED.getStatus().equals(commentStatus)
+                            ? "ALLOWED" : "DENIED",
+                    action,
+                    orderId,
+                    orderItemId,
+                    OrderCommentStatusEnum.NOT_EVALUATED.getStatus().equals(commentStatus)
+                            ? "COMMENT_NOT_EVALUATED"
+                            : "COMMENT_ALREADY_EVALUATED");
+            case "RECOMMENT" -> capabilityResult(
+                    OrderCommentStatusEnum.EVALUATED.getStatus().equals(commentStatus)
+                            ? "ALLOWED" : "DENIED",
+                    action,
+                    orderId,
+                    orderItemId,
+                    OrderCommentStatusEnum.EVALUATED.getStatus().equals(commentStatus)
+                            ? "COMMENT_RECOMMENTABLE"
+                            : "COMMENT_NOT_RECOMMENTABLE");
+            default -> capabilityResult(
+                    "UNAVAILABLE", action, orderId, orderItemId, "UNSUPPORTED_ACTION");
+        };
+    }
+
+    private static String orderStatusName(Integer status) {
+        if (status == null) {
+            return null;
+        }
+        for (OrderStatusEnum value : OrderStatusEnum.values()) {
+            if (value.getStatus().equals(status)) {
+                return value.getDesc();
+            }
+        }
+        return null;
     }
 
     private static boolean inTimeRange(Date orderTime, String timeStart, String timeEnd) {

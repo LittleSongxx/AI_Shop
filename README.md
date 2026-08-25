@@ -262,6 +262,8 @@ development/regression 数据锁、文件 SHA、case 数、域分布、集合互
 [AI应用开发_Java后端_真实面试题与备考报告_20260824.md](AI应用开发_Java后端_真实面试题与备考报告_20260824.md)。
 
 当前评测协议为 `aishop-evaluation/v3`，Python 命令必须使用 Conda `shop` 环境：
+
+结果、数据集、人工审查生命周期和提交边界的稳定入口见 [结果与数据集索引](docs/evaluation/结果与数据集索引.md)；不可变 package 内文件只通过 `SHA256SUMS` 校验，不在原地整理。
 `/home/song/miniconda3/envs/shop/bin/python`。development 锁定 `43` 条（Search/RAG/Agent = `18/18/7`），
 regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
 `development-20260822-ai-quality-v9` 和 `regression-20260822-ai-quality-v9`，源码指纹均为
@@ -294,6 +296,8 @@ Episode 槽位经脱敏，因此 HTTP Slot F1/EM 不可测。答案质量已完�
 修复后已完成一轮新的真实 HTTP observation：`customer-service-http-v13-20260824`。它在同一冻结 60 条上完整终态 `60/60`、HTTP error `0`、行为契约 `10/10`，Provider usage 为 `18` 次调用、输入/输出 token `78,470/5,486`、`costCny=null` / `UNPRICED`；本地 P50/P95/P99 为 `1015.049/11372.651/22858.230 ms`，仅作本机诊断。`60/60`、Intent/slot 指标和行为契约都不是人工最终答案质量。API、Worker、MCP 已增加相同源码 fingerprint 的 readiness/preflight 检查，避免独立 MCP 进程仍加载旧代码。
 
 原始 Provider observation 已作为只读 [pre-evaluator-fix 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824/) 保存；其中四条“不能据此断言平台无货”被旧纯正则错误判为“平台无货”断言。正式 [v13 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/) 仅对同一 observation 做免责声明感知的确定性离线重算，未重跑 Provider。该评测器修复使行为契约从误报恢复，不能表述为模型质量提升。v13 源 report 内的原始字段仍为 `PENDING_HUMAN_REVIEW`，但外部人工答案评审已完成双人封存和 `11` 条独立第三人仲裁，生命周期为 `HUMAN_REVIEWED_ADJUDICATED`。案件级双评一致 `49/60=81.67%` 只反映标注可靠性；冻结 60 条回放的最终答案正确率为 `59/60=98.33%`（Wilson `91.14%–99.71%`）、可计分引用语义支持 `20/34=58.82%`（`42.22%–73.63%`）、转人工适当 `59/60=98.33%`、unsafe-answer `0/60`、联合质量 `46/60=76.67%`（`64.56%–85.56%`）。完整 [v13 最终人工证据包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/) 与只读 [pending 父包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/) 都保留 `SHA256SUMS`、sealed 原件、仲裁和逐 case badcase。引用 badcase 的主因是订单项/商品名、资格规则、写工具能力或操作后果未被同一行 `sourceRefs` 覆盖；`012` 还暴露出“待发货即不能取消”的过度确定结论。v13 与历史 v1 的答案、证据传播和可计分引用分母不同，不能称严格 A/B 或把评测器修复包装为质量提升；它也不能外推为 CSAT、FCR 或线上客服成功率。
+
+最新 [v20 HTTP 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/) 在源码指纹 `736cad91...a26` 下真实执行 `60/60`、行为契约 `11/11`、handoff accuracy `1.0`、hard constraint violation `0`。其外部双人盲审案件级一致 `56/60`，4 条分歧经独立第三人仲裁；[v20 最终人工证据包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/) 给出答案正确 `57/60=95.00%`、可计分引用支持 `25/36=69.44%`、转人工适当 `60/60`、unsafe `1/60`、联合质量 `49/60=81.67%`。11 条 badcase 中 `014` 的无证据退款后果提示被判为 unsafe；不能只报告引用或联合点估计变化而隐去答案正确和安全性回退，也不能把 v13/v20 不同冻结输出称作严格因果 A/B。
 
 另保留一对只读运行版本诊断：v11 在旧 MCP 进程仍加载旧源码时，于同一 10 条定向集出现 `6/10` 行为契约违例；完整重启后的 v12 为 `0/10`。二者由 manifest 成对校验相同数据哈希、状态、违例数和 `SHA256SUMS`，仅证明版本一致性修复有效，不构成答案质量分数。已被 v13 覆盖的 v5/v10 60 条中间运行与未完成 v3 盲审草稿已清理。
 
