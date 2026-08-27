@@ -1,0 +1,28 @@
+{
+  "baseCommit": "e5b94b9d8bb92e45bb889b29e72bdcc6fb0ba2e2",
+  "evaluationSourceSha256": "0234aebf6a3f846278441784f27ff4742f4f809ae825cd8ef7598d0506a77dfd",
+  "files": {
+    "README.md": {
+      "bytes": 474,
+      "sha256": "c4cb719cc788ad5a29858510a696580404119b98c2fbeb8bfc0a67fbcdb98d33"
+    },
+    "source-freeze.json": {
+      "bytes": 3279,
+      "sha256": "30350c849d73e655ac594ad2b9273bc0b25c39af3e63e2d1c7f293160415564b"
+    },
+    "tracked.patch": {
+      "bytes": 522945,
+      "sha256": "2eb3bb208499cec2b1647cea4625a4202f033882380618868bcc33288fe332a9"
+    },
+    "untracked-files.json": {
+      "bytes": 54516,
+      "sha256": "37fce44da6dbc986a72a0ef523e6bb5982467cf7d616974997f5ba246205f112"
+    }
+  },
+  "freezeId": "source-freeze-post-v2-quality-20260826",
+  "lifecycle": "LOCAL_SOURCE_BASELINE_IMMUTABLE",
+  "releaseGateEligible": false,
+  "runtimeSourceSha256": "ab685d19f7cc1d22dcfda9639e71a67248b86e29f04d3e5fbb580c84ecee4684",
+  "schemaVersion": "aishop-source-freeze-evidence/v1",
+  "trackedPatchSha256": "2eb3bb208499cec2b1647cea4625a4202f033882380618868bcc33288fe332a9"
+}

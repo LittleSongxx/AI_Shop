@@ -1,0 +1,70 @@
+{
+  "acceptance": {
+    "adjudicateEveryDisagreement": true,
+    "criticalTaxonomyAgreement": 1.0,
+    "publishSuccessorDataset": true,
+    "requiredReviewers": 2
+  },
+  "artifact": "SEALED_LABEL_POLICY_REVIEW_SHEET",
+  "caseCount": 25,
+  "containsCurrentGoldOrModelPredictions": false,
+  "createdAt": "2026-08-26T14:26:42Z",
+  "guidelinesVersion": "customer-service-taxonomy-v2.1",
+  "labelSchema": {
+    "handoffSeverityValues": [
+      "CRITICAL",
+      "NORMAL"
+    ],
+    "intentValues": [
+      "ADDRESS_CHANGE",
+      "AFTERSALES_UNKNOWN",
+      "CANCEL_ORDER",
+      "CHAT",
+      "COMPLAINT",
+      "CONFIRM_RECEIPT",
+      "DAMAGED_OR_WRONG_ITEM",
+      "HUMAN_REQUEST",
+      "INVOICE",
+      "PAYMENT_ISSUE",
+      "PRODUCT_CONSULT",
+      "PRODUCT_REVIEW",
+      "PRODUCT_SEARCH",
+      "QUERY_COUPON",
+      "QUERY_FULFILLMENT",
+      "QUERY_LOGISTICS",
+      "QUERY_ORDER",
+      "RECOMMENT",
+      "REFUND",
+      "REFUND_STATUS"
+    ],
+    "requiredFields": [
+      "intent",
+      "riskLevel",
+      "shouldHandoff",
+      "handoffSeverity",
+      "slots"
+    ],
+    "riskLevelValues": [
+      "HIGH",
+      "LOW",
+      "MEDIUM"
+    ]
+  },
+  "lifecycle": "SEALED",
+  "openSheetSha256AtExport": "d35e33962cbaf30c0b9823585200ebfe9c4da8bd707e20ce875bddf4d3700597",
+  "orderSeed": 2026082604,
+  "reviewerId": "label-policy-reviewer-b",
+  "schemaVersion": "aishop-customer-service-label-policy-reaudit/v1",
+  "sealedAt": "2026-08-26T16:27:43.140Z",
+  "selectionPolicy": "UNION_OF_DETERMINISTIC_LABEL_CONSISTENCY_FINDINGS",
+  "sheetPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-label-policy-v2.1-return-20260827/reviewer-b.sealed.jsonl",
+  "sheetSha256": "7a9f295ac9a9e3e2efb6dc12de49f80302d39c21938acea493298ea3a763aafe",
+  "sourceDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/source/customer-service-human-v2.jsonl",
+  "sourceDatasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "sourceOpenSheetPath": "holdout/01-label-policy-v2.1/reviewer-b.open.jsonl",
+  "sourceOpenSheetSha256": "7a9f295ac9a9e3e2efb6dc12de49f80302d39c21938acea493298ea3a763aafe",
+  "sourceTemplatePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/reaudit/label-policy-reaudit.open.jsonl",
+  "sourceTemplateSha256": "f40ebda1c3b5c6625b91e6471256c743ce1a05c88a2906db52dfe2a14e5c8e54",
+  "taxonomyContractPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/source/customer-service-taxonomy-contract-v2.1.json",
+  "taxonomyContractSha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+}

@@ -1,0 +1,44 @@
+{
+  "artifact": "BLINDED_ANSWER_REVIEW_SHEET",
+  "blinding": "Expected labels, rule/HTTP intent predictions, quality scores, and other reviewer labels are omitted",
+  "caseCount": 120,
+  "containsExpectedOrSelfJudgment": false,
+  "createdAt": "2026-08-26T14:26:43.071Z",
+  "guidelinesVersion": "customer-service-answer-quality-v1",
+  "labelSchema": {
+    "citationSupportValues": [
+      "NOT_APPLICABLE",
+      "SUPPORTED",
+      "UNDECIDABLE",
+      "UNSUPPORTED"
+    ],
+    "fields": [
+      "answerCorrect",
+      "citationSupport",
+      "handoffAppropriate",
+      "unsafeAnswer"
+    ]
+  },
+  "lifecycle": "OPEN",
+  "messageProjection": "SOURCE_DATASET_MESSAGE_V1",
+  "orderSeed": 16217836816370315752,
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "reviewerId": "reviewer-b",
+  "schemaVersion": "aishop-customer-service-answer-review/v2",
+  "sheetPath": "deliverables/human-review/AI-Shop-human-review-round1-20260826/02-answer-quality-v43/reviewer-b.open.jsonl",
+  "sheetSha256": "5782adb16467463445b2d815a6d09b983434faa0d4e078ff6854d2625a52712e",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826/report.json",
+  "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+  "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826"
+}

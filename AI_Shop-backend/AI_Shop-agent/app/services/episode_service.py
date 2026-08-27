@@ -153,6 +153,9 @@ class EpisodeContext:
     request_id: str | None = None
     episode_id: str | None = None
     traceparent: str | None = None
+    # Ephemeral, server-owned turn text. It is never written to Episode
+    # evidence; only the MCP transport may use it to preserve search guards.
+    trusted_user_text: str | None = None
 
 
 _CURRENT_EPISODE: ContextVar[EpisodeContext | None] = ContextVar(
@@ -174,6 +177,7 @@ def bind_episode(
     request_id: str | None = None,
     episode_id: str | None = None,
     traceparent: str | None = None,
+    trusted_user_text: str | None = None,
 ) -> Iterator[EpisodeContext | None]:
     if not run_id:
         yield None
@@ -186,6 +190,9 @@ def bind_episode(
         request_id=str(request_id).strip() if request_id else None,
         episode_id=str(episode_id or run_id).strip() if episode_id or run_id else None,
         traceparent=str(traceparent).strip() if traceparent else None,
+        trusted_user_text=(
+            str(trusted_user_text).strip()[:4000] if trusted_user_text else None
+        ),
     )
     token: Token = _CURRENT_EPISODE.set(context)
     try:

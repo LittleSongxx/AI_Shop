@@ -136,6 +136,21 @@ def test_adaptive_router_reserves_multi_agent_for_cross_domain_request():
     assert decision.reason == "cross_domain_request"
 
 
+def test_adaptive_router_keeps_one_coherent_order_policy_question_on_one_agent():
+    decision = select_orchestration(
+        {
+            "intent": "ADDRESS_CHANGE",
+            "request_mode": "READ_QUERY",
+            "user_text": "订单 A1 还没发货，收货地址怎么改",
+            "rag_evidence_required": True,
+            "verified_order_context": {"orderId": "A1"},
+        }
+    )
+
+    assert decision.mode == "single_agent"
+    assert decision.reason == "open_or_incomplete_request"
+
+
 def test_multi_agent_kill_switch_falls_back_to_one_agent():
     state = {
         "intent": "REFUND",
@@ -284,6 +299,65 @@ async def test_workflow_returns_auditable_social_reply_without_provider_or_tool(
             "sideEffectAllowed": False,
         },
     )
+
+
+@pytest.mark.asyncio
+async def test_workflow_clarifies_context_free_elliptical_product_search(monkeypatch):
+    invoke = AsyncMock(side_effect=AssertionError("search must not run without a category"))
+    monkeypatch.setattr("app.graph.nodes.forced_tool_for_intent", invoke)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", Mock())
+
+    update = await deterministic_workflow_node(
+        {
+            "user_id": "u1",
+            "message_id": 42,
+            "intent": "PRODUCT_SEARCH",
+            "intent_decision": {"entities": {"feature": "静音", "useCase": "小户型"}},
+            "user_text": "上一批都不适合小户型，重新给几个静音的",
+            "llm_messages": [],
+        }
+    )
+
+    invoke.assert_not_awaited()
+    assert update["tools_called"] == []
+    assert update["llm_skip_reason"] == "missing_followup_product_category"
+    assert "补充要重选的品类" in update["chunks"][0]
+
+
+@pytest.mark.asyncio
+async def test_coupon_checkout_failure_explains_visible_revalidation_rule(monkeypatch):
+    forced = AsyncMock(
+        return_value={
+            "llm_messages": [],
+            "tools_called": ["QUERY_COUPONS"],
+            "tool_source_refs": [{"type": "coupon", "matched": False}],
+            "chunks": ["【查询优惠券成功】当前没有符合条件的优惠券"],
+            "route": "finalize",
+        }
+    )
+    monkeypatch.setattr("app.graph.nodes.forced_tool_for_intent", forced)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", Mock())
+
+    update = await deterministic_workflow_node(
+        {
+            "user_id": "u1",
+            "message_id": 46,
+            "intent": "QUERY_COUPON",
+            "intent_data": None,
+            "user_text": "不是问商品打折，我的优惠券为什么结算时不可用",
+            "request_mode": "READ_QUERY",
+            "llm_messages": [],
+            "rag_source_refs": [
+                {"factIds": ["coupon.single_per_order_and_revalidate"]}
+            ],
+        }
+    )
+
+    answer = update["chunks"][0]
+    assert "当前符合条件的优惠券" in answer
+    assert "重新校验优惠券的门槛和归属" in answer
+    assert "预估优惠不代表结算时一定可用。[1]" in answer
+    assert "支付密码" in answer
 
 
 @pytest.mark.asyncio

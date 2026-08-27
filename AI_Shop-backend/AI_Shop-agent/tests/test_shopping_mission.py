@@ -171,3 +171,31 @@ async def test_mission_upsert_qualifies_existing_columns_for_mysql_84(monkeypatc
     sql = cur.execute.await_args.args[0]
     assert "agent_shopping_mission.source_message_id" in sql
     assert "agent_shopping_mission.revision+1" in sql
+
+
+@pytest.mark.asyncio
+async def test_server_observed_candidates_start_a_mission_when_profile_signals_are_absent(
+    monkeypatch,
+):
+    service = ShoppingMissionService()
+    monkeypatch.setattr(service, "load", AsyncMock(return_value=None))
+    save = AsyncMock()
+    monkeypatch.setattr(service, "_save", save)
+
+    result = await service.record_candidates(
+        "u1",
+        91,
+        [
+            {"productId": "p-xm6", "productName": "WH-1000XM6"},
+            {"productId": "p-anniversary", "productName": "十周年版"},
+        ],
+    )
+
+    assert result is not None
+    assert result["status"] == "ACTIVE"
+    assert [row["productId"] for row in result["candidateProducts"]] == [
+        "p-xm6",
+        "p-anniversary",
+    ]
+    assert result["sourceMessageIds"]["candidates"] == 91
+    save.assert_awaited_once_with("u1", result, source_message_id=91)

@@ -10,7 +10,12 @@ from app.services.mcp_tools_service import (
     propose_create_support_case,
     query_support_cases,
 )
-from app.services.support_case_service import SupportCaseService, support_case_service
+from app.services.support_case_service import (
+    SupportCaseEligibilityError,
+    SupportCaseService,
+    support_case_service,
+)
+from app.services.tool_invoke_result import ToolInvokeResult
 
 
 class _Cursor:
@@ -50,6 +55,12 @@ def test_category_mapping_keeps_after_sales_domains_deterministic():
         SupportCaseService.category_for_intent("DAMAGED_OR_WRONG_ITEM", "发错颜色了")
         == "WRONG_ITEM"
     )
+    assert (
+        SupportCaseService.category_for_intent(
+            "DAMAGED_OR_WRONG_ITEM", "收到的蓝色耳机变成红色了"
+        )
+        == "WRONG_ITEM"
+    )
 
 
 @pytest.mark.asyncio
@@ -82,6 +93,23 @@ async def test_build_proposal_carries_only_verified_image_evidence(monkeypatch):
         "app.services.support_case_service.java_internal_client.verify_agent_image",
         verify,
     )
+    eligibility = AsyncMock(
+        return_value={
+            "decision": "ELIGIBLE",
+            "action": "RETURN",
+            "orderId": "o1",
+            "orderItemId": None,
+            "decisionId": "after_sales_return_test",
+            "policyId": "return-policy",
+            "policyVersion": "v1",
+            "evaluatedAt": "2026-08-26T00:00:00+00:00",
+        }
+    )
+    monkeypatch.setattr(
+        service,
+        "_assert_return_eligible",
+        eligibility,
+    )
 
     proposal = await service.build_proposal(
         "u1",
@@ -96,6 +124,10 @@ async def test_build_proposal_carries_only_verified_image_evidence(monkeypatch):
     )
 
     assert proposal["ownedOrderValidated"] is True
+    assert proposal["afterSalesEligibility"]["decision"] == "ELIGIBLE"
+    eligibility.assert_awaited_once_with(
+        "u1", "DAMAGED", "o1", None, evidence=["IMAGE"]
+    )
     assert proposal["evidence"] == {
         "imageAssetId": "img_0123456789abcdef0123456789abcdef",
         "contentSha256": "a" * 64,
@@ -205,7 +237,17 @@ async def test_normal_proposal_requires_confirmation_but_forced_handoff_creates_
         "priority": "NORMAL",
         "forcedHandoff": False,
     }
-    pending = AsyncMock(return_value={"token": "act_case_1"})
+    pending = AsyncMock(
+        return_value={
+            "token": "act_case_1",
+            "actionType": "CREATE_SUPPORT_CASE",
+            "businessKey": "u1:CREATE_SUPPORT_CASE:u1:invoice:9",
+            "argsFingerprint": "a" * 64,
+            "status": 0,
+            "statusName": "PENDING",
+            "createTime": 1_777_777_777_000,
+        }
+    )
     monkeypatch.setattr(support_case_service, "build_proposal", AsyncMock(return_value=proposal))
     monkeypatch.setattr(
         "app.services.support_case_service.pending_action_service.create_pending",
@@ -215,6 +257,8 @@ async def test_normal_proposal_requires_confirmation_but_forced_handoff_creates_
     reply = await propose_create_support_case("u1", "INVOICE", "需要发票", run_id="run-1")
 
     assert "确认卡片" in reply
+    assert reply.source_refs[0]["type"] == "action_proposal"
+    assert reply.source_refs[0]["requiresUserConfirmation"] is True
     pending.assert_awaited_once()
     assert pending.await_args.args[:3] == (
         "CREATE_SUPPORT_CASE",
@@ -222,7 +266,12 @@ async def test_normal_proposal_requires_confirmation_but_forced_handoff_creates_
         proposal,
     )
 
-    forced_case = {"caseNo": "SC20260807FORCED"}
+    forced_case = {
+        "caseNo": "SC20260807FORCED",
+        "status": "OPEN",
+        "category": "PAYMENT_DISPUTE",
+        "forcedHandoff": True,
+    }
     monkeypatch.setattr(
         support_case_service,
         "build_proposal",
@@ -233,7 +282,152 @@ async def test_normal_proposal_requires_confirmation_but_forced_handoff_creates_
         "u1", "PAYMENT_DISPUTE", "支付风险", forced_handoff=True
     )
     assert "立即转人工" in forced_reply
+    assert forced_reply.source_refs[0]["type"] == "support_case"
+    assert forced_reply.source_refs[0]["forcedHandoff"] is True
     support_case_service.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_ineligible_physical_case_returns_structured_failure_without_pending(
+    monkeypatch,
+):
+    service = SupportCaseService()
+    decision = {
+        "decision": "INELIGIBLE",
+        "action": "RETURN",
+        "orderId": "o1",
+        "orderItemId": "i1",
+        "decisionId": "after_sales_return_ineligible",
+        "policyId": "system-return-state",
+        "policyVersion": "v1",
+        "evaluatedAt": "2026-08-26T00:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        service,
+        "_verify_order_owner",
+        AsyncMock(
+            return_value=(
+                {"order_id": "o1", "user_id": "u1", "order_status": 1},
+                {"order_id": "o1", "order_item_id": "i1"},
+                "o1",
+            )
+        ),
+    )
+    monkeypatch.setattr(service, "_return_eligibility", AsyncMock(return_value=decision))
+    create_pending = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.support_case_service.pending_action_service.create_pending",
+        create_pending,
+    )
+
+    result = await service.propose(
+        "u1",
+        "WRONG_ITEM",
+        "商家发错商品",
+        order_id="o1",
+        order_item_id="i1",
+    )
+
+    assert isinstance(result, ToolInvokeResult)
+    assert result.success is False
+    assert result.error_code == "INELIGIBLE"
+    assert result.source_refs[0]["type"] == "after_sales_eligibility"
+    create_pending.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_case_creation_rechecks_latest_return_eligibility_before_insert(
+    monkeypatch,
+):
+    service = SupportCaseService()
+    cursor = _Cursor()
+    monkeypatch.setattr(service, "get_by_idempotency", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        service,
+        "_verify_order_owner",
+        AsyncMock(
+            return_value=(
+                {"order_id": "o1", "user_id": "u1", "order_status": 1},
+                {"order_id": "o1", "order_item_id": "i1"},
+                "o1",
+            )
+        ),
+    )
+    decision = {
+        "decision": "INELIGIBLE",
+        "action": "RETURN",
+        "orderId": "o1",
+        "orderItemId": "i1",
+        "decisionId": "after_sales_return_changed",
+        "policyId": "system-return-state",
+        "policyVersion": "v1",
+        "evaluatedAt": "2026-08-26T00:01:00+00:00",
+    }
+    monkeypatch.setattr(
+        service,
+        "_assert_return_eligible",
+        AsyncMock(side_effect=SupportCaseEligibilityError(decision, "DAMAGED")),
+    )
+
+    with patch("app.services.support_case_service.acquire", _acquire_for(cursor)):
+        with pytest.raises(SupportCaseEligibilityError, match="不满足商品破损"):
+            await service.create(
+                "u1",
+                "DAMAGED",
+                "确认前订单状态已变化",
+                order_id="o1",
+                order_item_id="i1",
+                idempotency_key="act_case_changed",
+            )
+
+    assert cursor.calls == []
+
+
+@pytest.mark.asyncio
+async def test_forced_physical_handoff_bypasses_normal_return_proposal_gate(monkeypatch):
+    service = SupportCaseService()
+    monkeypatch.setattr(
+        service,
+        "_verify_order_owner",
+        AsyncMock(
+            return_value=(
+                {"order_id": "o1", "user_id": "u1", "order_status": 1},
+                {"order_id": "o1", "order_item_id": "i1"},
+                "o1",
+            )
+        ),
+    )
+    eligibility = AsyncMock(
+        side_effect=AssertionError("forced human handoff should bypass normal RETURN gate")
+    )
+    monkeypatch.setattr(service, "_return_eligibility", eligibility)
+    monkeypatch.setattr(
+        service,
+        "create",
+        AsyncMock(
+            return_value={
+                "caseNo": "SC20260826FORCED",
+                "status": "OPEN",
+                "category": "DAMAGED",
+                "forcedHandoff": True,
+            }
+        ),
+    )
+
+    result = await service.propose(
+        "u1",
+        "DAMAGED",
+        "高风险投诉转人工",
+        order_id="o1",
+        order_item_id="i1",
+        forced_handoff=True,
+        priority="CRITICAL",
+    )
+
+    assert isinstance(result, ToolInvokeResult)
+    assert result.success is True
+    assert result.source_refs[0]["forcedHandoff"] is True
+    eligibility.assert_not_awaited()
 
 
 @pytest.mark.asyncio

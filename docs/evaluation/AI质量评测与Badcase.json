@@ -1728,12 +1728,15 @@
     "sha256": "a04f4ca95cae3c7c41356625d4f58b05c251ae45503e0423905b83830d25c85f"
   },
   "customerService": {
-    "status": "HUMAN_VERIFIED",
+    "status": "HUMAN_APPROVED_AI_ASSISTED",
     "releaseGateEligible": false,
-    "caseCount": 60,
-    "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
-    "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
-    "reportPath": "docs/evaluation/customer-service/客服金标评测.json",
+    "currentAnswerReview": "httpFullPathV54",
+    "primaryQualityScope": "HTTP_HUMAN_REVIEWED_SEMANTIC_LABELS_ONLY",
+    "ruleReplayMetricsAreDiagnosticOnly": true,
+    "caseCount": 120,
+    "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/customer-service-human-v2.1-human-approved-ai-assisted.jsonl",
+    "datasetSha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3",
+    "reportPath": "docs/evaluation/AI-Shop人工审批评测最终结果与Badcase分析-20260827.json",
     "metrics": {
       "intentMacroF1": {
         "value": 1.0,
@@ -1859,6 +1862,147 @@
         "jointQualityPassRate": {"value": 0.766667, "numerator": 46, "denominator": 60, "confidenceInterval95": [0.645637, 0.855604], "badcaseIds": ["cs-gold-v1-004", "cs-gold-v1-005", "cs-gold-v1-006", "cs-gold-v1-007", "cs-gold-v1-008", "cs-gold-v1-009", "cs-gold-v1-012", "cs-gold-v1-014", "cs-gold-v1-016", "cs-gold-v1-017", "cs-gold-v1-018", "cs-gold-v1-019", "cs-gold-v1-035", "cs-gold-v1-055"]}
       }
     },
+    "httpFullPathV27": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "releaseGateEligible": false,
+      "resultRole": "FROZEN_REPLAY_HUMAN_QUALITY_EVIDENCE",
+      "normalQualityDenominatorExcluded": true,
+      "independentUnseenHoldout": false,
+      "sourceRunId": "customer-service-http-v27-full-quality-fixes-eval-contract-20260826",
+      "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/run/evaluation-observations/customer-service-http-v27-full-quality-fixes-eval-contract-20260826.json",
+      "sourceReportSha256": "f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61",
+      "sourceReportTrackedInGit": false,
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826",
+      "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-pending-adjudication-20260826",
+      "pendingEvidenceSha256SumsSha256": "4dfa2da7d3ab47ecc035226109b542584ebf2a2fed2301e8a069b7d51d44f1a6",
+      "sha256SumsSha256": "787191d12c8a6db4cd923b77b9ade1ffe3fb7cef2286e8ca7ec27c665f1aa042",
+      "caseCount": 60,
+      "blindReview": {
+        "reviewerIds": ["reviewer-a", "reviewer-b"],
+        "exactAgreementCaseCount": 58,
+        "disagreementCaseCount": 2,
+        "caseAgreementRate": 0.966667,
+        "adjudicator": "reviewer-c"
+      },
+      "answerQualityMetrics": {
+        "answerCorrectness": {"value": 0.983333, "numerator": 59, "denominator": 60, "confidenceInterval95": [0.911449, 0.997052], "badcaseIds": ["cs-gold-v1-001"]},
+        "citationGroundingSupport": {"value": 0.972222, "numerator": 35, "denominator": 36, "confidenceInterval95": [0.858303, 0.99508], "badcaseIds": ["cs-gold-v1-001"]},
+        "handoffAppropriateness": {"value": 1.0, "numerator": 60, "denominator": 60, "confidenceInterval95": [0.939828, 1.0], "badcaseIds": []},
+        "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 60, "confidenceInterval95": [0.0, 0.060172], "badcaseIds": []},
+        "jointQualityPassRate": {"value": 0.983333, "numerator": 59, "denominator": 60, "confidenceInterval95": [0.911449, 0.997052], "badcaseIds": ["cs-gold-v1-001"]}
+      },
+      "badcases": [
+        {"caseId": "cs-gold-v1-001", "failedMetrics": ["answerCorrectness", "citationGroundingSupport", "jointQualityPassRate"], "risk": "model_answer_scope_and_claim_binding"}
+      ],
+      "provenanceNote": "The final package is immutable and binds the ignored source report by complete-file SHA-256. This is a frozen replay, not a new unseen holdout or online accuracy measurement."
+    },
+    "httpFullPathV43": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "releaseGateEligible": false,
+      "independentUnseenHoldout": false,
+      "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827",
+      "sha256SumsSha256": "36ce5d57ef256784509a2b53f9f239759f23b4fcc8e94efbab611b3662e0122e",
+      "caseCount": 120,
+      "blindReview": {
+        "exactAgreementCaseCount": 117,
+        "disagreementCaseCount": 3,
+        "caseAgreementRate": 0.975,
+        "adjudicatedCaseCount": 3
+      },
+      "answerQualityMetrics": {
+        "answerCorrectness": {"value": 0.891667, "numerator": 107, "denominator": 120, "confidenceInterval95": [0.823446, 0.935589], "badcaseCount": 13},
+        "citationGroundingSupport": {"value": 0.942857, "numerator": 66, "denominator": 70, "confidenceInterval95": [0.862080, 0.977556], "badcaseCount": 4},
+        "handoffAppropriateness": {"value": 0.983333, "numerator": 118, "denominator": 120, "confidenceInterval95": [0.941264, 0.995417], "badcaseCount": 2},
+        "unsafeAnswerRate": {"value": 0.008333, "numerator": 1, "denominator": 120, "confidenceInterval95": [0.001473, 0.045696], "badcaseIds": ["cs-candidate-v2-111"]},
+        "jointQualityPassRate": {"value": 0.875, "numerator": 105, "denominator": 120, "confidenceInterval95": [0.803971, 0.922765], "badcaseCount": 15}
+      },
+      "routingRescore": {
+        "intentMacroF1": 1.0,
+        "highRiskIntentRecall": "13/13",
+        "handoffRecall": "29/29",
+        "criticalHandoffMissRate": "0/9",
+        "slotEntitySpanF1": 0.482551,
+        "slotExactMatch": "29/68"
+      },
+      "provenanceNote": "Humans retained final decision authority; AI assisted text output and recording. The visible development set is not an external unseen holdout."
+    },
+    "httpFullPathV54": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "annotationStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "releaseGateEligible": false,
+      "independentUnseenHoldout": false,
+      "sourceRunId": "customer-service-http-v54-full-badcase-fixes-handoff-evidence-20260827",
+      "sourceReportSha256": "7d659d4d1ac7f743cba2607ab1de8e2869ce2c5bcd1286df6dfadb07887db2d0",
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+      "sha256SumsSha256": "de953f60963da428670825c0e8ce7a544b74db2262033aef5fa4f062f1ada985",
+      "caseCount": 120,
+      "blindReview": {
+        "exactAgreementCaseCount": 112,
+        "disagreementCaseCount": 8,
+        "caseAgreementRate": 0.933333,
+        "adjudicatedCaseCount": 8,
+        "answerCorrectCohenKappa": 0.275362,
+        "citationSupportCohenKappa": 0.935109
+      },
+      "answerQualityMetrics": {
+        "answerCorrectness": {"value": 0.966667, "numerator": 116, "denominator": 120, "confidenceInterval95": [0.91742, 0.986962], "badcaseIds": ["cs-gold-v1-036", "cs-candidate-v2-075", "cs-candidate-v2-110", "cs-candidate-v2-116"]},
+        "citationGroundingSupport": {"value": 0.940299, "numerator": 63, "denominator": 67, "confidenceInterval95": [0.856305, 0.976541], "badcaseIds": ["cs-gold-v1-036", "cs-gold-v1-048", "cs-candidate-v2-090", "cs-candidate-v2-092"]},
+        "handoffAppropriateness": {"value": 1.0, "numerator": 120, "denominator": 120, "confidenceInterval95": [0.968981, 1.0], "badcaseIds": []},
+        "unsafeAnswerRate": {"value": 0.008333, "numerator": 1, "denominator": 120, "confidenceInterval95": [0.001473, 0.045696], "badcaseIds": ["cs-candidate-v2-110"]},
+        "jointQualityPassRate": {"value": 0.941667, "numerator": 113, "denominator": 120, "confidenceInterval95": [0.884474, 0.971459], "badcaseIds": ["cs-gold-v1-036", "cs-gold-v1-048", "cs-candidate-v2-075", "cs-candidate-v2-090", "cs-candidate-v2-092", "cs-candidate-v2-110", "cs-candidate-v2-116"]}
+      },
+      "pairedKnownSetComparisonToV43": {
+        "jointQualityDeltaPercentagePoints": 6.6667,
+        "passToFail": 5,
+        "failToPass": 13,
+        "failToFail": 2,
+        "exactMcNemarTwoSidedP": 0.096252,
+        "unseenGeneralizationClaimAllowed": false
+      },
+      "provenanceNote": "Humans retained final decision authority; AI assisted text editing and recording. The same 120 developer-visible cases support regression evidence only, not unseen generalization."
+    },
+    "httpFullPathV56": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "annotationStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "qualityClaimStatus": "DEVELOPMENT_DIAGNOSTIC_HUMAN_REVIEWED_ADJUDICATED",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "sourceRunId": "customer-service-http-v56-full-v3-knowledge-regressions-20260827",
+      "executionEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827",
+      "executionSha256SumsSha256": "1b40d562fbf77a464f5f11d75f7291a1c9b569c6e2b3151345b53a8ada211a4f",
+      "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+      "sha256SumsSha256": "b2e7b22768dd5d7a95bef87948c2dd45c3e1740e492dcb3461edd935b4433176",
+      "finalReportSha256": "8ce8c2877107d3aaadfa36dbdd44084828921a5d25389f28e3d802396f063cf4",
+      "sourceReportSha256": "6dbf1762c4c460a26c8a9d8809695c35a9bfddb4ea715c2cdf91803b1db06b6f",
+      "caseCount": 120,
+      "executionPassedCount": 120,
+      "behaviorContractPassedCount": 29,
+      "behaviorContractCount": 29,
+      "citationContractInvalidCount": 0,
+      "hardConstraintViolationCount": 0,
+      "fixtureCleanupFailureCount": 0,
+      "blindReview": {
+        "exactAgreementCaseCount": 118,
+        "disagreementCaseCount": 2,
+        "caseAgreementRate": 0.983333,
+        "adjudicatedCaseCount": 2
+      },
+      "answerQualityMetrics": {
+        "answerCorrectness": {"value": 1.0, "numerator": 120, "denominator": 120, "confidenceInterval95": [0.968981, 1.0], "badcaseIds": []},
+        "citationGroundingSupport": {"value": 1.0, "numerator": 67, "denominator": 67, "confidenceInterval95": [0.945774, 1.0], "badcaseIds": []},
+        "handoffAppropriateness": {"value": 1.0, "numerator": 120, "denominator": 120, "confidenceInterval95": [0.968981, 1.0], "badcaseIds": []},
+        "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 120, "confidenceInterval95": [0.0, 0.031019], "badcaseIds": []},
+        "jointQualityPassRate": {"value": 1.0, "numerator": 120, "denominator": 120, "confidenceInterval95": [0.968981, 1.0], "badcaseIds": []}
+      },
+      "badcases": [],
+      "normalQualityDenominatorExcluded": true,
+      "handoffPath": "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.json",
+      "provenanceNote": "Humans retained final decision authority and AI assisted editing/recording. The same 120 developer-visible cases support regression evidence only, not unseen generalization."
+    },
     "candidateV2": {
       "status": "DRAFT_NEEDS_DUAL_HUMAN_REVIEW",
       "additionalCaseCount": 60,
@@ -1895,11 +2039,27 @@
   },
   "interpretation": {
     "contractGatesAreNotShowcaseMetrics": true,
-    "customerServiceIntentMetricsNotMeasured": false,
+    "customerServiceIntentMetricsAreRuleReplayOnly": true,
+    "customerServiceHttpSlotMetricsUnavailable": true,
     "customerServiceGoldIsOfflineOnly": true,
     "localLatencyIsNotProductionSlo": true,
     "qualityFirst": true,
-    "semanticJudgeIsShadowOnly": true
+    "semanticJudgeIsShadowOnly": true,
+    "primaryMeasuredEvidence": [
+      "search.offline_qrel_ranking",
+      "customerService.httpFullPathV27.human_answer_review",
+      "customerService.httpFullPathV27.human_citation_support",
+      "auxiliaryEvidence.dbBenchmark.batch_vs_n_plus_one",
+      "auxiliaryEvidence.searchPairedReplay.known_hard_negative_replay"
+    ],
+    "excludedFromPrimaryQuality": [
+      "customerService.metrics.intentMacroF1",
+      "customerService.metrics.slotEntitySpanF1",
+      "customerService.httpFullPathV27.blindReview.caseAgreementRate",
+      "agent.contractGates.passPower",
+      "all_behavior_contract_pass_rates",
+      "runtime_latency_and_capacity_diagnostics"
+    ]
   },
   "runtimeDiagnostics": {
     "scope": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
@@ -2184,10 +2344,10 @@
     "productionReadinessEstablished": false,
     "searchQualityGate": "PASSED",
     "ragQualityGate": "PASSED_LEXICAL_AND_CONTRACT_ONLY",
-    "customerIntentAndHandoff": "PASSED_ON_60_HUMAN_VERIFIED_CASES",
-    "customerFullSlotQuality": "POINT_ESTIMATE_PASSES_PROJECT_REFERENCE_TARGET_ON_60_CASES",
-    "httpAnswerQuality": "PENDING_INDEPENDENT_HUMAN_REVIEW",
-    "agentReliability": "PASSED_ON_25_CASES_AND_200_TRIALS",
+    "customerIntentAndHandoff": "RULE_REPLAY_DIAGNOSTIC_ONLY_NOT_PRIMARY_QUALITY",
+    "customerFullSlotQuality": "RULE_REPLAY_ON_REDACTED_GOLD_HTTP_SLOT_UNAVAILABLE",
+    "httpAnswerQuality": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED_NON_GATING_V56",
+    "agentReliability": "CONTRACT_AND_REPEATABILITY_DIAGNOSTIC_ONLY",
     "latency": "SEARCH_USABLE_GENERATIVE_LONG_TAIL_HIGH",
     "capacityAndCost": "LOCAL_READ_ONLY_CURVE_OBSERVED_COST_NOT_ESTABLISHED",
     "supportedUse": "Small-catalog, low-concurrency, human-backed demo or controlled pre-production use.",

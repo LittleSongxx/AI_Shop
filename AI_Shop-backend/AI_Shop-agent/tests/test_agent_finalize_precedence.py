@@ -217,6 +217,67 @@ async def test_consult_without_card_asks_attribute_specific_identity_question():
 
 
 @pytest.mark.asyncio
+async def test_bounded_technology_explanation_is_not_replaced_by_identity_question():
+    explanation = "OLED 是像素自发光；Mini LED 是带分区背光的 LCD。"
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+    ):
+        await finalize_agent_response(
+            {
+                "userId": "u1",
+                "messageId": 39,
+                "userMessage": "只解释 OLED 和 Mini LED 的区别",
+                "intentDecision": {"intent": "PRODUCT_CONSULT"},
+            },
+            [explanation],
+            [],
+            tools_called=[],
+            user_text="只解释 OLED 和 Mini LED 的区别",
+            deterministic_consult_resolution=True,
+        )
+
+    assert complete.await_args.args[1] == explanation
+    assert complete.await_args.args[2] == "agent"
+
+
+@pytest.mark.asyncio
+async def test_named_comparison_search_clarification_is_not_replaced():
+    clarification = (
+        "已分别按两个版本检索，但当前只核验到不足两个可比较商品，"
+        "请补充另一款商品卡或链接。"
+    )
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+    ):
+        await finalize_agent_response(
+            {
+                "userId": "u1",
+                "messageId": 40,
+                "userMessage": "WH-1000XM6 和十周年版差在哪",
+                "intentDecision": {"intent": "PRODUCT_CONSULT"},
+            },
+            [clarification],
+            [],
+            tools_called=["SEARCH_PRODUCTS"],
+            user_text="WH-1000XM6 和十周年版差在哪",
+            deterministic_consult_resolution=True,
+        )
+
+    persisted = json.loads(complete.await_args.args[1])
+    assert persisted["intro"] == clarification
+    assert persisted["products"] == []
+    assert complete.await_args.args[2] == "product_search"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("card_type", "biz_type"),
     [

@@ -1,0 +1,48 @@
+{
+  "artifact": "SEALED_ANSWER_REVIEW_SHEET",
+  "blinding": "Expected labels, rule/HTTP intent predictions, quality scores, and other reviewer labels are omitted",
+  "caseCount": 10,
+  "containsExpectedOrSelfJudgment": false,
+  "createdAt": "2026-08-25T13:50:19.651Z",
+  "guidelinesVersion": "customer-service-answer-quality-v1",
+  "labelSchema": {
+    "citationSupportValues": [
+      "NOT_APPLICABLE",
+      "SUPPORTED",
+      "UNDECIDABLE",
+      "UNSUPPORTED"
+    ],
+    "fields": [
+      "answerCorrect",
+      "citationSupport",
+      "handoffAppropriate",
+      "unsafeAnswer"
+    ]
+  },
+  "lifecycle": "SEALED",
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "openSheetSha256AtExport": "1cc3b7f92ec6c4891dfe5a5fe18531f25635dfd2a5f8d3c2b761d48354e57cbe",
+  "orderSeed": 11687321412923296556,
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "reviewerId": "reviewer-b",
+  "schemaVersion": "aishop-customer-service-answer-review/v2",
+  "sealedAt": "2026-08-25T15:17:11.535Z",
+  "sheetPath": "run/review-workspaces/customer-service-http-v25-targeted-quality-fixes-20260825/sealed/reviewer-b.sealed.jsonl",
+  "sheetSha256": "ada2f35be89a815ada36f304fe0350358dfb40fbcc12f3d178d3cb8c926c4bd8",
+  "sourceOpenSheetPath": "run/review-workspaces/customer-service-http-v25-targeted-quality-fixes-20260825/reviewer-b.open.jsonl",
+  "sourceOpenSheetSha256": "ada2f35be89a815ada36f304fe0350358dfb40fbcc12f3d178d3cb8c926c4bd8",
+  "sourceReportPath": "run/evaluation-observations/customer-service-http-v25-targeted-quality-fixes-20260825.json",
+  "sourceReportSha256": "091583ec1b9f7c44a2e58e0769932407fa8f14f69db47715ce1446bea8c6089a",
+  "sourceRunId": "customer-service-http-v25-targeted-quality-fixes-20260825"
+}

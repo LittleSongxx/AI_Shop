@@ -1,0 +1,22 @@
+{
+  "artifactId": "customer-service-human-v2-provenance-pending-20260826",
+  "attestedAt": "2026-08-26T14:48:09.294Z",
+  "custodianIdentity": "NOT_PROVIDED_TO_REVIEWER",
+  "materialsProvided": [
+    "_ORIGINAL-SHA256SUMS",
+    "_PACKAGE-README.md",
+    "03-provenance-independent-reaudit/frozen-historical-guideline-v1.md",
+    "03-provenance-independent-reaudit/independent-reaudit-custody-attestation.template.json",
+    "03-provenance-independent-reaudit/independent-reaudit.open.jsonl",
+    "03-provenance-independent-reaudit/independent-reaudit.open.jsonl.manifest.json",
+    "03-provenance-independent-reaudit/复核方法.md"
+  ],
+  "reviewerDidNotViewDraftExpectedOrModelOutputs": true,
+  "reviewerDidNotViewPriorReviewsAgreementOrAdjudication": true,
+  "reviewerDidNotViewSourceHumanLabels": true,
+  "reviewerIdentity": "song",
+  "reviewerIndependentOfDatasetAndModelDevelopment": true,
+  "schemaVersion": "aishop-independent-reaudit-custody-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "status": "REVIEWER_ATTESTED_CUSTODIAN_UNATTESTED"
+}

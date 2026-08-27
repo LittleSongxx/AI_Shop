@@ -1,0 +1,10 @@
+{
+  "createdAt": "2026-08-26T16:33:45.977Z",
+  "custodyAttestationValid": false,
+  "finalUnseenEligible": false,
+  "full60ReviewRequired": true,
+  "labelGatePassed": false,
+  "lifecycle": "EXPANSION_REQUIRED",
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-customer-service-independent-reaudit-lifecycle/v1"
+}

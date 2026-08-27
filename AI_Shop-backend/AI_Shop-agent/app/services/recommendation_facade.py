@@ -49,6 +49,7 @@ class RecommendationFacade:
                 request_id=request.request_id,
                 episode_id=request.episode_id or run_id,
                 traceparent=request.traceparent,
+                trusted_user_text=request.query,
             ):
                 episode_service.start_run(
                     run_id=run_id,

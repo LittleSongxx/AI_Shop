@@ -215,6 +215,15 @@ def _assert_current_schema(database: str) -> None:
             (database,),
         )
         assert cursor.fetchone() == ("mediumtext",)
+        cursor.execute(
+            """
+            SELECT status, JSON_UNQUOTE(JSON_EXTRACT(rule_json, '$.action')),
+                   JSON_EXTRACT(rule_json, '$.orderStatuses')
+            FROM agent_after_sales_policy
+            WHERE policy_id='system-return-state' AND version='v1'
+            """
+        )
+        assert cursor.fetchone() == ("PUBLISHED", "RETURN", "[2, 3]")
 
 
 @pytest.mark.skipif(

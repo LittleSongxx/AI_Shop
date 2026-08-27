@@ -1,0 +1,19 @@
+{
+  "adjudicationTemplateSha256AtExport": "ba999cf087f9f386c6ef761367496a331f106bc2fce5d5a14541bbd492efcd04",
+  "adjudicatorId": null,
+  "adjudicatorIdentity": null,
+  "adjudicatorIsHuman": null,
+  "attestedAt": null,
+  "completedAdjudicationSha256": null,
+  "generativeAiProducedOrSuggestedFinalLabels": null,
+  "independentOfDatasetAndModelDevelopment": null,
+  "independentOfSourceReviewers": null,
+  "schemaVersion": "aishop-human-adjudicator-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "sourceReviewerIds": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "status": "TEMPLATE_NOT_EVIDENCE",
+  "taskId": "customer-service-http-v43-answer-quality-adjudication-20260827"
+}

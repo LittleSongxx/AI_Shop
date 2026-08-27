@@ -11,14 +11,15 @@ from pathlib import Path, PurePath
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 CATALOG_SCHEMA = "aishop-knowledge-catalog/v1"
+CATALOG_OVERLAY_SCHEMA = "aishop-knowledge-catalog-overlay/v1"
 LEGACY_V1_CATALOG_PATH = (
     Path(__file__).resolve().parents[3] / "data" / "demo_knowledge" / "catalog.v1.json"
 )
 DEFAULT_CATALOG_PATH = (
     Path(__file__).resolve().parents[3]
     / "data"
-    / "demo_knowledge_v2"
-    / "catalog.v2.json"
+    / "demo_knowledge_v3"
+    / "catalog.v3.json"
 )
 _CATALOG_PATH_OVERRIDE: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
     "canonical_fact_catalog_path", default=None
@@ -54,6 +55,83 @@ _COUNTED_NUMBER = re.compile(r"([零〇一二两三四五六七八九十]+)(张|
 def _source_name(value: Any) -> str:
     text = str(value or "").strip().replace("\\", "/")
     return PurePath(text).name if text else ""
+
+
+def _load_catalog_payload(
+    path: Path,
+    *,
+    seen: frozenset[Path] = frozenset(),
+) -> dict[str, Any]:
+    """Resolve an immutable catalog overlay into one effective catalog."""
+
+    resolved = path.resolve()
+    if resolved in seen:
+        raise ValueError("canonical fact catalog overlay cycle")
+    try:
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"canonical fact catalog is unreadable: {resolved}") from exc
+    schema = payload.get("schemaVersion") if isinstance(payload, dict) else None
+    if schema == CATALOG_SCHEMA:
+        return payload
+    if schema != CATALOG_OVERLAY_SCHEMA:
+        raise ValueError("unsupported canonical fact catalog schema")
+
+    extension = str(payload.get("extends") or "").strip()
+    if not extension or Path(extension).is_absolute():
+        raise ValueError("canonical fact catalog overlay has invalid extends")
+    base = _load_catalog_payload(
+        resolved.parent / extension,
+        seen=seen | {resolved},
+    )
+    documents = json.loads(json.dumps(base.get("documents") or []))
+    by_file = {
+        str(document.get("file") or ""): document
+        for document in documents
+        if isinstance(document, dict)
+    }
+    for override in payload.get("sectionOverrides") or []:
+        if not isinstance(override, dict):
+            raise ValueError("canonical fact catalog section override must be an object")
+        filename = str(override.get("file") or "")
+        heading = str(override.get("heading") or "")
+        document = by_file.get(filename)
+        section = next(
+            (
+                row
+                for row in (document or {}).get("sections") or []
+                if str(row.get("heading") or "") == heading
+            ),
+            None,
+        )
+        if section is None:
+            raise ValueError(
+                f"canonical fact catalog override target missing: {filename}#{heading}"
+            )
+        unsupported = set(override) - {"file", "heading", "equivalentRefs"}
+        if unsupported or not isinstance(override.get("equivalentRefs"), list):
+            raise ValueError("canonical fact catalog section override is invalid")
+        section["equivalentRefs"] = list(override["equivalentRefs"])
+
+    for document in payload.get("documents") or []:
+        if not isinstance(document, dict):
+            raise ValueError("canonical fact catalog overlay document must be an object")
+        filename = str(document.get("file") or "")
+        if not filename or filename in by_file:
+            raise ValueError(f"duplicate canonical fact catalog document: {filename}")
+        copied = json.loads(json.dumps(document))
+        documents.append(copied)
+        by_file[filename] = copied
+    return {
+        "schemaVersion": CATALOG_SCHEMA,
+        "catalogVersion": int(payload.get("catalogVersion") or 0),
+        "expectedDocumentCount": int(payload.get("expectedDocumentCount") or 0),
+        "expectedKnowledgeChunkCount": int(
+            payload.get("expectedKnowledgeChunkCount") or 0
+        ),
+        "expectedFaqCount": int(payload.get("expectedFaqCount") or 0),
+        "documents": documents,
+    }
 
 
 def reference_key(ref: Mapping[str, Any] | str) -> str | None:
@@ -155,9 +233,7 @@ class CanonicalFactCatalog:
 
     @classmethod
     def load(cls, path: Path = DEFAULT_CATALOG_PATH) -> "CanonicalFactCatalog":
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("schemaVersion") != CATALOG_SCHEMA:
-            raise ValueError("unsupported canonical fact catalog schema")
+        payload = _load_catalog_payload(path)
         fact_to_refs: dict[str, set[str]] = {}
         ref_to_facts: dict[str, set[str]] = {}
 
@@ -187,7 +263,7 @@ class CanonicalFactCatalog:
                 raise ValueError(f"FAQ {question_id} maps to unknown fact {fact_id}")
             bind(fact_id, f"faq:{question_id}")
         return cls(
-            path=path,
+            path=path.resolve(),
             catalog_version=int(payload.get("catalogVersion") or 0),
             fact_to_refs={
                 key: frozenset(sorted(value)) for key, value in fact_to_refs.items()

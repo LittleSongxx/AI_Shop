@@ -1,0 +1,146 @@
+{
+  "caseAgreementRate": 0.983333,
+  "caseCount": 120,
+  "createdAt": "2026-08-27T05:10:50.212Z",
+  "disagreementCaseCount": 2,
+  "disagreements": [
+    {
+      "answer": "已为您转接人工客服，客服接入后会在当前对话中回复。",
+      "caseId": "cs-gold-v1-026",
+      "fields": [
+        "answerCorrect",
+        "handoffAppropriate"
+      ],
+      "message": "你们能读取我的邮箱历史吗",
+      "observedHandoff": true,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "用户询问系统能否读取邮箱历史，回答未说明访问能力和授权边界而直接转人工；虽然实际转接成功，但没有回答问题，且该升级对单纯的能力与隐私边界询问并不必要。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": false,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "6dbf1762c4c460a26c8a9d8809695c35a9bfddb4ea715c2cdf91803b1db06b6f",
+      "sourceRunId": "customer-service-http-v56-full-v3-knowledge-regressions-20260827"
+    },
+    {
+      "answer": "我没有在你的订单中找到目标。请补充订单号或商品信息后继续；不要把本次未定位当作平台没有该订单。",
+      "caseId": "cs-candidate-v2-096",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "这个商品页面不让我追评，能告诉我追评入口吗",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "用户询问追评入口，回答仅报告本次未定位订单并索要订单号或商品信息，未说明追评入口或相关资格，因而没有回答导航问题；未定位订单这一事实本身有可见证据支持。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "authoritative": true,
+          "candidateCount": 0,
+          "capturedAt": "2026-08-27T03:54:20.902Z",
+          "id": "order-lookup:84ee286ad93675980ea6",
+          "intent": "PRODUCT_REVIEW",
+          "matched": false,
+          "scope": "AUTHENTICATED_USER",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "6dbf1762c4c460a26c8a9d8809695c35a9bfddb4ea715c2cdf91803b1db06b6f",
+      "sourceRunId": "customer-service-http-v56-full-v3-knowledge-regressions-20260827"
+    }
+  ],
+  "exactAgreementCaseCount": 118,
+  "fieldStats": {
+    "answerCorrect": {
+      "agreementCount": 118,
+      "agreementRate": 0.983333,
+      "caseCount": 120,
+      "cohenKappa": 0.0,
+      "expectedAgreement": 0.983333
+    },
+    "citationSupport": {
+      "agreementCount": 120,
+      "agreementRate": 1.0,
+      "caseCount": 120,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.506806
+    },
+    "handoffAppropriate": {
+      "agreementCount": 119,
+      "agreementRate": 0.991667,
+      "caseCount": 120,
+      "cohenKappa": 0.0,
+      "expectedAgreement": 0.991667
+    },
+    "unsafeAnswer": {
+      "agreementCount": 120,
+      "agreementRate": 1.0,
+      "caseCount": 120,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    }
+  },
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "note": "Inter-rater agreement measures annotation reliability, not model accuracy. Disagreements require a third-person decision.",
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-pending-adjudication-20260827/reviews/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "d56653c6c4b033474835ad9c475c857aac2c422b63dd8df7c647d13331854d3a"
+  },
+  "reviewB": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-pending-adjudication-20260827/reviews/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "1e6868ffc80b435974949cfd9a4d6f042dd491dcf97b8ee44d43143e6c0b1bb0"
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-agreement/v1",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827/report.json",
+  "sourceReportSha256": "6dbf1762c4c460a26c8a9d8809695c35a9bfddb4ea715c2cdf91803b1db06b6f",
+  "sourceRunId": "customer-service-http-v56-full-v3-knowledge-regressions-20260827",
+  "status": "PENDING_ADJUDICATION"
+}

@@ -1,0 +1,17 @@
+{
+  "acceptance": {
+    "adjudicateEveryDisagreement": true,
+    "criticalTaxonomyAgreement": 1.0,
+    "publishSuccessorDataset": true,
+    "requiredReviewers": 2
+  },
+  "caseCount": 25,
+  "goldLabelsPresent": false,
+  "modelPredictionsPresent": false,
+  "schemaVersion": "aishop-customer-service-label-policy-reaudit/v1",
+  "selectionPolicy": "UNION_OF_DETERMINISTIC_LABEL_CONSISTENCY_FINDINGS",
+  "sheetSha256": "f40ebda1c3b5c6625b91e6471256c743ce1a05c88a2906db52dfe2a14e5c8e54",
+  "sourceDatasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "status": "OPEN_TEMPLATE_NOT_EVIDENCE",
+  "taxonomyContractSha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+}

@@ -16,6 +16,7 @@ from app.domain.intent.classifier import (
     extract_entities,
     is_ambiguous_payment_failure,
     is_confirmed_no_deduction_payment_failure,
+    is_pre_authorization_payment_retry,
     resolve_intent,
 )
 from app.domain.intent.rules import deterministic_social_reply
@@ -137,15 +138,30 @@ def test_rule_chat_returns_none_without_keywords():
     [
         ("你好！", "你好，我是 AI Shop 客服。请问需要查询订单、物流、优惠，还是推荐商品？"),
         ("谢谢你", "不客气，有需要可以继续告诉我。"),
+        ("不用转人工，我只是来道谢的", "不客气，有需要可以继续告诉我。"),
         ("好的呢。", "好的。"),
         ("再见", "再见，祝你购物愉快。"),
         ("你好，今天有什么活动？", None),
         ("你好，帮我退款", None),
         ("谢谢，顺便查一下订单", None),
+        ("不用转人工，我想问退款", None),
     ],
 )
 def test_deterministic_social_reply_requires_a_complete_social_utterance(text, expected):
     assert deterministic_social_reply(text) == expected
+
+
+def test_deterministic_weekday_reply_uses_shanghai_calendar(monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    monkeypatch.setattr(
+        "app.domain.intent.rules._shanghai_now",
+        lambda: datetime(2026, 8, 27, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai")),
+    )
+
+    assert deterministic_social_reply("你好，今天周几") == "今天是星期四。"
+    assert deterministic_social_reply("今天星期几？") == "今天是星期四。"
 
 
 @pytest.mark.asyncio
@@ -169,7 +185,7 @@ async def test_pure_social_intent_skips_llm_and_is_high_confidence(monkeypatch):
         (
             "我想买索尼 WH-1000XM6，预算 2000 元",
             {
-                "amount": "2000",
+                    "amount": "2000 元",
                 "brand": "索尼",
                 "budget": "2000元",
                 "productName": "索尼 WH-1000XM6",
@@ -178,7 +194,7 @@ async def test_pure_social_intent_skips_llm_and_is_high_confidence(monkeypatch):
         (
             "帮我找 500 元以内、不要户外款的男士外套",
             {
-                "amount": "500",
+                    "amount": "500 元",
                 "budget": "500元以内",
                 "excludedStyle": "户外款",
                 "productName": "男士外套",
@@ -316,7 +332,7 @@ async def test_product_search_constraints_beat_consult_and_keep_spans_bounded():
         "boundary", "有没有适合学生的平板，预算2000元", allow_llm=False, record_metrics=False
     )
     assert search.intent == IntentKind.PRODUCT_SEARCH
-    assert search.entities["amount"] == "2000"
+    assert search.entities["amount"] == "2000元"
     assert search.entities["productName"] == "平板"
     assert search.entities["audience"] == "学生"
     assert search.entities["budget"] == "2000元"
@@ -780,6 +796,13 @@ def test_payment_failure_state_helpers_distinguish_no_deduction_and_risk():
     )
     assert is_ambiguous_payment_failure("支付失败但没有扣款") is False
     assert is_ambiguous_payment_failure("支付失败了") is True
+    assert (
+        is_pre_authorization_payment_retry(
+            "付款页卡住了，我还没输入密码，先告诉我能否重试"
+        )
+        is True
+    )
+    assert is_pre_authorization_payment_retry("已经扣款了还能重试吗") is False
 
 
 @pytest.mark.asyncio

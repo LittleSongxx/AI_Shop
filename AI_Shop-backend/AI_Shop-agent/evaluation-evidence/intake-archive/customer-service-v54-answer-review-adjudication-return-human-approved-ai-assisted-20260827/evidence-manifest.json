@@ -1,0 +1,37 @@
+{
+  "createdAt": "2026-08-27T03:03:06.058Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "files": {
+    "README.md": {
+      "bytes": 374,
+      "sha256": "21f04d6cf76a62436f427c0c026e0361db90468fa13ef59a35d0105a1afee21e"
+    },
+    "human-approval-clarification.json": {
+      "bytes": 1156,
+      "sha256": "bab4fd34ee5b9be6d0663289447842150331292086c4eb3499c0c60f20d9498b"
+    },
+    "raw-return/adjudication.open.jsonl": {
+      "bytes": 20124,
+      "sha256": "79d18e5eba46883bedf5993a7ee2a19e093398233223663e4c9312b2dea01113"
+    },
+    "raw-return/adjudicator-attestation.template.json": {
+      "bytes": 803,
+      "sha256": "55f9cca17e20dd378f8a68d31cdc8a576af6a9dc9551c0e8116e120158029bec"
+    },
+    "raw-return/original-return.zip": {
+      "bytes": 5671,
+      "sha256": "4664c31755683c674df66fed4cd4173daa8c5aaf06ed9ca99c2409670aeb6eca"
+    },
+    "source/adjudication.template.exported.jsonl": {
+      "bytes": 17625,
+      "sha256": "5510c759cddf400f1c9aab396760a42ea6e4c635246bab30ff2b897b9e043aa3"
+    },
+    "validation-audit.json": {
+      "bytes": 2338,
+      "sha256": "3ea6cb8f35ee362bee2213dd45e3dee7d00b99e9358ec1e4e7c372e7cf6e6915"
+    }
+  },
+  "readOnly": true,
+  "schemaVersion": "aishop-v54-answer-adjudication-return-evidence/v1",
+  "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATION_ACCEPTED"
+}

@@ -133,6 +133,13 @@ def test_query_fact_hints_cover_generic_refund_conditions_without_status_guessin
     assert query_fact_hints("我的退款状态是什么") == ()
 
 
+def test_query_fact_hints_cover_auto_receipt_aftersales_boundary():
+    assert query_fact_hints("自动确认收货后还能售后吗") == (
+        "logistics.confirm_receipt",
+        "aftersales.rule_engine_authoritative",
+    )
+
+
 def test_evidence_selector_promotes_preferred_fact_beyond_top_two_candidates():
     docs = [
         {"content": "普通地址说明"},
@@ -189,6 +196,15 @@ def test_query_fact_hints_cover_runtime_business_propositions():
     )
     assert query_fact_hints("平台是否承诺所有订单两小时内送达") == (
         "logistics.simulated_no_sla",
+    )
+    assert query_fact_hints("支付失败但没有扣款，怎么办") == (
+        "payment.safe_retry_guidance",
+    )
+    assert query_fact_hints("付款页卡住且未输入密码，能否重试") == (
+        "payment.safe_retry_guidance",
+    )
+    assert query_fact_hints("只解释 OLED 和 Mini LED 的区别") == (
+        "product.display_technology_boundary",
     )
 
 

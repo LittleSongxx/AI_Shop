@@ -1,0 +1,13 @@
+{
+  "artifactId": "customer-service-human-v2-provenance-pending-20260826",
+  "attestedAt": null,
+  "custodianIdentity": null,
+  "reviewerAIdentity": null,
+  "reviewerBIdentity": null,
+  "reviewersDidNotShareSheetsBeforeSealing": null,
+  "reviewersDidNotViewDraftOrModelLabels": null,
+  "reviewersWorkedIndependently": null,
+  "schemaVersion": "aishop-reviewer-independence-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "status": "TEMPLATE_NOT_EVIDENCE"
+}

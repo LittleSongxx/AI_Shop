@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-26T12:42:29.911Z",
+  "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "293ad1d048a9716169d01cdbe024f024557fb3cde1230928c34f79975bd8a880",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 3562,
+      "sha256": "d61f569bb25cb03bd6c0463cb0b8fa5f7a8a048e9f7001f39910ec431ef53931"
+    },
+    "report.json": {
+      "bytes": 1364910,
+      "sha256": "074a788109efa962fce2dd4059dc1d67e8c4a413aadc290ff6f8e67ec2669474"
+    },
+    "report.md": {
+      "bytes": 1627,
+      "sha256": "dba05f11e86b6b5adbc6ebebbf7c5ffac21993d06e61d206bc24d8b3c7bedbd5"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v34-routing-contract-fix-targeted-20260826",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "4b3b3cb78b1d48ede08c65ccd2de5424b9636c0c65a483810335ce71bb430d74",
+  "status": "TARGETED_POST_FIX_SMOKE_NON_GATING"
+}

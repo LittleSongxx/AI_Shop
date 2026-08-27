@@ -396,7 +396,13 @@ def _parse_budget(text: str) -> tuple[float | None, float | None]:
     match = _PLAIN_BUDGET_RE.search(text)
     if match:
         return None, _budget_from_match(match)
-    return None, None
+    # The legacy profile parser supports Arabic amounts and explicit 万/千/k
+    # units. Product-query constraints additionally recognize bounded Chinese
+    # numeral spans such as “预算一千二”; use the same value here so mission
+    # memory and serving-time filters cannot disagree about a hard budget.
+    from app.services.product_search_query import extract_budget_constraints
+
+    return extract_budget_constraints(text)
 
 
 def _brand_in_text(text: str, aliases: tuple[str, ...]) -> bool:

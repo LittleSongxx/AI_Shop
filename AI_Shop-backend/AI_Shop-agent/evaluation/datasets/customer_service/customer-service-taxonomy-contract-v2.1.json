@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "aishop-customer-service-taxonomy-contract/v1",
+  "contractVersion": "customer-service-taxonomy-v2.1",
+  "status": "PRODUCTION_ALIGNED",
+  "releaseGateEligible": false,
+  "purpose": "Canonicalize intent boundaries that must agree with production action routing before another human-label round.",
+  "intents": {
+    "PRODUCT_CONSULT": {
+      "actionFamily": "CATALOG_READ",
+      "definition": "Ask about attributes, compatibility, suitability, or comparison without requesting a candidate list."
+    },
+    "PRODUCT_SEARCH": {
+      "actionFamily": "CATALOG_RETRIEVAL",
+      "definition": "Find, filter, recommend, or refine a list of products, including 换一批、再推荐 and prior-result constraint changes."
+    },
+    "PRODUCT_REVIEW": {
+      "actionFamily": "ORDER_REVIEW_CREATE_OR_HELP",
+      "definition": "Create an initial product review or ask about review/recomment entry and rules."
+    },
+    "RECOMMENT": {
+      "actionFamily": "ORDER_REVIEW_APPEND_PROPOSAL",
+      "definition": "Append a follow-up review (追评/追加评价) to an identified order; this is not product recommendation refinement.",
+      "productionTool": "PROPOSE_RECOMMENT",
+      "requiresOrderContextForWrite": true
+    }
+  },
+  "invariants": [
+    "A single enum value must not map both to catalog retrieval and to an order write proposal.",
+    "Recommendation refinement remains PRODUCT_SEARCH because it routes to catalog retrieval.",
+    "RECOMMENT remains the historical production spelling for an order-bound follow-up review."
+  ],
+  "sourceAnchors": [
+    "app/domain/intent/types.py",
+    "app/graph/multi_agent.py",
+    "app/mcp/tools.py",
+    "app/services/pending_action_service.py"
+  ],
+  "note": "This contract corrects a discovered v2 annotation-guideline collision. Existing HUMAN_VERIFIED artifacts stay immutable and require independent re-adjudication; this file is not itself human evidence."
+}

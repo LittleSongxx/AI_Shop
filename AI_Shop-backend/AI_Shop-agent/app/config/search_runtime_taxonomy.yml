@@ -87,6 +87,9 @@ topics:
 # pass when the Java-owned product snapshot contains one of the declared
 # evidence terms; semantic similarity is not accepted as attribute evidence.
 verifiedQualifiers:
+  - id: android-operating-system
+    triggers: [安卓, Android]
+    evidenceTerms: [安卓, Android]
   - id: vegan
     triggers: [纯素食, 纯素, 素食]
     evidenceTerms: [纯素食, 纯素, 素食, 植物基]

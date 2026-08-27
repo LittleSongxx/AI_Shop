@@ -31,14 +31,55 @@ from app.services.order_selection_store import order_selection_store
 from app.services.product_search_query import topic_terms_for_text
 from app.services.redis_service import redis_service
 from app.utils.order_ids import extract_order_id
+from app.utils.refund_policy import asks_refund_conditions, cited_refund_conditions
 
 _STRONG_LOGISTICS_EXCEPTION_HINTS = (
     "物流一直不动",
     "物流不动",
+    "物流没更新",
+    "物流没有更新",
+    "物流未更新",
+    "快递没更新",
+    "快递没有更新",
+    "快递未更新",
+    "没更新",
+    "没有更新",
+    "未更新",
+    "没动静",
+    "卡住",
+    "停滞",
     "迟迟未发货",
     "一直没发货",
     "催发货",
 )
+
+# A physical after-sales complaint is only actionable after the versioned
+# RETURN policy has accepted the current, server-owned order snapshot.  Other
+# support domains (invoice, address, payment, logistics, complaint) are not
+# return requests and must not be accidentally gated by this policy.
+_RETURN_ELIGIBILITY_CATEGORIES = frozenset(
+    {"DAMAGED", "WRONG_ITEM", "MISSING_ITEM"}
+)
+
+
+def _state_has_rag_fact(state: AgentGraphState, fact_id: str) -> bool:
+    for ref in state.get("rag_source_refs") or []:
+        if not isinstance(ref, dict):
+            continue
+        values = ref.get("factIds") or ref.get("fact_ids") or []
+        if isinstance(values, str):
+            values = [values]
+        if fact_id in {str(value) for value in values}:
+            return True
+    return False
+
+
+def _reports_missing_order_record(user_text: str) -> bool:
+    text = str(user_text or "")
+    missing = any(marker in text for marker in ("少了", "不见", "消失", "找不到"))
+    return missing and "订单" in text and any(
+        marker in text for marker in ("列表", "记录", "一笔", "这笔", "那笔")
+    )
 
 
 async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
@@ -61,17 +102,59 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         IntentKind.QUERY_ORDER.value,
         IntentKind.QUERY_LOGISTICS.value,
         IntentKind.QUERY_FULFILLMENT.value,
-        IntentKind.REFUND_STATUS.value,
     }
     has_specific_order_clue = _has_specific_order_clue(user_text)
-    generic_refund_policy = (
-        intent == IntentKind.REFUND.value
+    generic_policy_query = (
+        intent
+        in {
+            IntentKind.REFUND.value,
+            IntentKind.CONFIRM_RECEIPT.value,
+        }
         and request_mode == RequestMode.INFORMATIONAL.value
         and not has_specific_order_clue
     )
+    # REFUND_STATUS is deliberately not part of the generic-query bypass.
+    # Even without an order ID, wording such as "我的退款" refers to an
+    # authenticated business record: resolve zero/one/many owned candidates
+    # deterministically before querying status. Sending that turn to RAG/LLM
+    # risks answering a live-status question with generic policy text.
     if (
-        intent in order_specific_query_intents and not has_specific_order_clue
-    ) or generic_refund_policy:
+        intent == IntentKind.QUERY_FULFILLMENT.value
+        and not has_specific_order_clue
+    ):
+        clarification = _missing_fulfillment_target_clarification(user_text)
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="order_reference",
+            output_data={
+                "policy": "FULFILLMENT_TARGET_CLARIFICATION",
+                "route": "workflow",
+                "mode": "workflow",
+                "llmSkipped": True,
+                "llmSkipReason": "missing_fulfillment_target",
+                "structuredResultFinalized": True,
+                "deterministicClarification": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [clarification],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "missing_fulfillment_target",
+            "deterministic_clarification": True,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+    missing_order_record_report = (
+        intent == IntentKind.QUERY_ORDER.value
+        and _reports_missing_order_record(user_text)
+    )
+    if (
+        intent in order_specific_query_intents
+        and not has_specific_order_clue
+        and not missing_order_record_report
+    ) or generic_policy_query:
         return {"route": "orchestration_router"}
 
     decision = state.get("intent_decision") or {}
@@ -119,7 +202,13 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
                 # It permits a next-step clarification, never a policy conclusion.
                 update["deterministic_clarification"] = True
         audit = {
-            "outcome": resolution.outcome.value,
+            # ``order_resolution`` can be refined after the resolver has
+            # verified an order (for example by an after-sales policy decision).
+            # Persist that effective outcome so black-box safety contracts do
+            # not observe only the pre-policy RESOLVED snapshot.
+            "outcome": str(
+                update.get("order_resolution") or resolution.outcome.value
+            ),
             "route": route,
             "resolvedTool": resolved_tool,
             "businessSourceRefCount": len(effective_refs),
@@ -202,20 +291,37 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
                 },
                 route="finalize",
             )
-        invoice_no_match = intent == IntentKind.INVOICE.value
+        if (
+            resolution.outcome == OrderReferenceOutcome.NO_MATCH
+            and intent == IntentKind.QUERY_ORDER.value
+            and _reports_missing_order_record(user_text)
+        ):
+            return with_evidence(
+                {
+                    **base,
+                    "dynamic_handoff_reason": "STATE_CONFLICT",
+                    "dynamic_handoff_order_refs": {},
+                    "route": "human_handoff",
+                },
+                route="human_handoff",
+            )
+        deterministic_reference_clarification = intent in {
+            IntentKind.INVOICE.value,
+            IntentKind.REFUND_STATUS.value,
+        }
         return with_evidence(
             {
                 **base,
                 "chunks": [
                     _missing_invoice_order_clarification()
-                    if invoice_no_match
+                    if intent == IntentKind.INVOICE.value
                     else resolution.reason
                 ],
                 "biz_type": "agent",
                 "route": "finalize",
             },
             route="finalize",
-            deterministic_clarification=invoice_no_match,
+            deterministic_clarification=deterministic_reference_clarification,
         )
     if resolution.outcome != OrderReferenceOutcome.RESOLVED or not resolution.target:
         return with_evidence(
@@ -229,6 +335,26 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
         )
 
     target = resolution.target
+    if (
+        intent == IntentKind.ADDRESS_CHANGE.value
+        and request_mode != RequestMode.ACTION_PROPOSAL.value
+        and _state_has_rag_fact(state, "address.post_order_contact_support")
+    ):
+        await _remember_reference(state, intent, target)
+        return with_evidence(
+            {
+                **base,
+                "verified_order_context": dict(target),
+                "dynamic_handoff_reason": "STATE_CONFLICT",
+                "dynamic_handoff_order_refs": {
+                    "orderId": target.get("orderId"),
+                    "orderItemId": target.get("orderItemId"),
+                },
+                "route": "human_handoff",
+            },
+            route="human_handoff",
+            has_context=True,
+        )
     tool = _tool_for_target(intent, user_text, target, state)
     if tool is None:
         await _remember_reference(state, intent, target)
@@ -282,6 +408,31 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
             eligibility_decision != "ELIGIBLE"
             or request_mode != RequestMode.ACTION_PROPOSAL.value
         ):
+            policy_conditions = (
+                cited_refund_conditions(state.get("rag_source_refs") or [])
+                if eligibility_decision == "ELIGIBLE"
+                and asks_refund_conditions(user_text)
+                else None
+            )
+            answer = (
+                _refund_conditions_with_eligibility_text(
+                    target,
+                    str(policy_conditions["answer"]),
+                )
+                if policy_conditions is not None
+                else _refund_eligibility_text(target, eligibility_decision)
+            )
+            if policy_conditions is not None:
+                episode_service.record_step(
+                    "REFUND_CONDITIONS_WITH_ELIGIBILITY",
+                    node_name="order_reference",
+                    status="OK",
+                    output_data={
+                        "citation": policy_conditions["citation"],
+                        "sourceId": policy_conditions.get("sourceId"),
+                        "eligibilityDecision": eligibility_decision,
+                    },
+                )
             await _remember_reference(state, intent, target)
             return with_evidence(
                 {
@@ -292,9 +443,7 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
                         else OrderReferenceOutcome.RESOLVED.value
                     ),
                     "verified_order_context": dict(target),
-                    "chunks": [
-                        _refund_eligibility_text(target, eligibility_decision)
-                    ],
+                    "chunks": [answer],
                     "biz_type": "agent",
                     "route": "finalize",
                 },
@@ -355,14 +504,58 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
                 route="finalize",
                 has_context=True,
             )
-        if request_mode != RequestMode.ACTION_PROPOSAL.value:
+    if (
+        tool_name == "PROPOSE_CREATE_SUPPORT_CASE"
+        and _requires_return_eligibility(args)
+        and not bool(args.get("forcedHandoff"))
+    ):
+        eligibility = await _return_eligibility(state, target)
+        eligibility_ref = after_sales_eligibility_ref(eligibility)
+        if eligibility_ref is not None:
+            base["tool_source_refs"] = [
+                *base["tool_source_refs"],
+                eligibility_ref,
+            ]
+        eligibility_decision = str(
+            eligibility.get("decision") or "POLICY_UNAVAILABLE"
+        ).upper()
+        episode_service.record_step(
+            "AFTER_SALES_ELIGIBILITY_DECISION",
+            node_name="order_reference",
+            status="OK"
+            if eligibility_decision
+            in {"ELIGIBLE", "INELIGIBLE", "NEEDS_EVIDENCE"}
+            else "DEGRADED",
+            input_data={
+                "action": "RETURN",
+                "category": args.get("category"),
+                "orderId": target.get("orderId"),
+                "orderItemId": target.get("orderItemId"),
+            },
+            output_data={
+                "decision": eligibility_decision,
+                "decisionId": eligibility.get("decisionId"),
+                "policyId": eligibility.get("policyId"),
+                "policyVersion": eligibility.get("policyVersion"),
+            },
+        )
+        if eligibility_decision != "ELIGIBLE":
             await _remember_reference(state, intent, target)
             return with_evidence(
                 {
                     **base,
+                    "order_resolution": (
+                        OrderReferenceOutcome.NO_ELIGIBLE.value
+                        if eligibility_decision == "INELIGIBLE"
+                        else OrderReferenceOutcome.RESOLVED.value
+                    ),
                     "verified_order_context": dict(target),
                     "chunks": [
-                        _capability_decision_text(intent, target, "ALLOWED")
+                        _return_eligibility_text(
+                            target,
+                            str(args.get("category") or "DAMAGED"),
+                            eligibility_decision,
+                        )
                     ],
                     "biz_type": "agent",
                     "route": "finalize",
@@ -387,8 +580,20 @@ async def resolve_order_reference_turn(state: AgentGraphState) -> dict:
     await _clear_reference(state)
     if (
         tool_name.startswith("PROPOSE_")
-        and tool_name != "PROPOSE_CREATE_SUPPORT_CASE"
         and request_mode != RequestMode.ACTION_PROPOSAL.value
+        # Verified physical/logistics exceptions intentionally offer a
+        # support-case confirmation even when phrased as "怎么处理".  Address
+        # and invoice how-to/read questions are different: resolving the
+        # order may inform the answer, but must not silently become a write
+        # proposal.
+        and (
+            tool_name != "PROPOSE_CREATE_SUPPORT_CASE"
+            or intent
+            in {
+                IntentKind.ADDRESS_CHANGE.value,
+                IntentKind.INVOICE.value,
+            }
+        )
     ):
         return with_evidence(
             {
@@ -495,6 +700,33 @@ async def _refund_eligibility(state: AgentGraphState, target: dict) -> dict:
             "orderItemId": target.get("orderItemId"),
             "reason": "资格服务暂时不可用",
         }
+
+
+async def _return_eligibility(state: AgentGraphState, target: dict) -> dict:
+    """Evaluate the current order against the published RETURN policy."""
+
+    try:
+        return await after_sales_policy_service.evaluate(
+            user_id=state["user_id"],
+            action="RETURN",
+            order_id=target.get("orderId"),
+            order_item_id=target.get("orderItemId"),
+            evidence=["IMAGE"] if state.get("verified_image_context") else [],
+        )
+    except Exception:
+        return {
+            "decision": "POLICY_UNAVAILABLE",
+            "action": "RETURN",
+            "orderId": target.get("orderId"),
+            "orderItemId": target.get("orderItemId"),
+            "reason": "资格服务暂时不可用",
+        }
+
+
+def _requires_return_eligibility(args: dict) -> bool:
+    return str(args.get("category") or "").strip().upper() in _RETURN_ELIGIBILITY_CATEGORIES
+
+
 def _capability_decision_text(intent: str, target: dict | None, decision: str) -> str:
     target = target or {}
     product = target.get("productName") or "该订单"
@@ -534,6 +766,41 @@ def _refund_eligibility_text(target: dict, decision: str) -> str:
     if decision == "CONFLICT":
         return f"{prefix}当前售后规则存在冲突，需要人工复核，请回复“转人工”。"
     return f"{prefix}售后资格服务暂时无法给出可核验结论，本次不会生成退款确认卡；请稍后重试或转人工。"
+
+
+def _refund_conditions_with_eligibility_text(
+    target: dict,
+    policy_conditions: str,
+) -> str:
+    product = target.get("productName") or "该订单商品"
+    order_id = target.get("orderId") or "未知"
+    status = target.get("orderStatusName") or "未知"
+    return (
+        f"已核验“{product}”（订单 {order_id}）当前状态为“{status}”，"
+        "本次资格核验结果为可申请退款。"
+        f"公开申请条件是：{policy_conditions} "
+        "你目前只询问条件，因此尚未创建退款确认卡；如需办理请明确回复申请退款。"
+    )
+
+
+def _return_eligibility_text(target: dict, category: str, decision: str) -> str:
+    product = target.get("productName") or "该订单商品"
+    order_id = target.get("orderId") or "未知"
+    status = target.get("orderStatusName") or "未知"
+    labels = {
+        "DAMAGED": "商品破损",
+        "WRONG_ITEM": "商品错发",
+        "MISSING_ITEM": "商品少件",
+    }
+    problem = labels.get(category.upper(), "该售后问题")
+    prefix = f"已核验“{product}”（订单 {order_id}）当前状态为“{status}”。"
+    if decision == "INELIGIBLE":
+        return f"{prefix}版本化售后规则的本次核验结果为暂不符合{problem}退货资格，因此不会生成售后工单确认卡；如订单状态刚发生变化，请刷新后重试或转人工。"
+    if decision == "NEEDS_EVIDENCE":
+        return f"{prefix}{problem}售后申请仍需补充可核验凭证，本次不会生成工单确认卡。"
+    if decision == "CONFLICT":
+        return f"{prefix}{problem}资格核验存在规则或订单事实冲突，需要人工复核，请回复“转人工”。"
+    return f"{prefix}售后资格服务暂时无法给出可核验结论，本次不会生成{problem}工单确认卡；请稍后重试或转人工。"
 
 
 def _tool_for_target(
@@ -719,6 +986,20 @@ def _missing_invoice_order_clarification() -> str:
     return (
         "我需要先定位具体订单才能继续处理开票请求。仅凭金额无法唯一匹配订单，"
         "请补充订单号或商品信息；如需人工帮助可回复“转人工”。"
+    )
+
+
+def _missing_fulfillment_target_clarification(user_text: str) -> str:
+    """Ask for a live fulfillment target without inventing a service level."""
+
+    if "预售" in str(user_text or ""):
+        return (
+            "我目前没有这件预售商品或订单的可核验标识，无法给出具体发货天数。"
+            "请发送商品卡片、商品链接或订单号；取得当前商品/订单的履约信息后再核验。"
+        )
+    return (
+        "你问的是仓库出库时间。当前没有定位到具体订单，我不能据此断言账户没有订单，"
+        "也不能给出未经核验的出库时限。请提供订单号或商品信息，我再查询当前履约状态。"
     )
 
 

@@ -1,13 +1,13 @@
 # AI_Shop 项目收口交付
 
-> 版本边界：最新真实 HTTP 候选为 `customer-service-http-v20-20260825`，源码指纹 `736cad916dd2cd1387e7a2dbfee5eca7f8107c78a749b469348e9490be2bea26`；订单事实 contract 另见 [order-facts-contract-v1-20260825-r4](closure-evidence/order-facts-contract-v1-20260825-r4/report.md)。
-> 本文把当前源码 contract、历史只读评测和 v20 人工答案证据分开记录；不把离线结果写成生产指标。
+> 版本边界：当前客服人工语义主证据为 v56 冻结 HTTP replay 的 A/B+第三人仲裁包；人工拥有最终决策权，AI 只辅助文字和落盘，证据等级为 `HUMAN_APPROVED_AI_ASSISTED`。
+> 本文把当前源码 contract、历史只读评测、当前已见集人工证据和尚未完成的 unseen/生产证据分开记录；不把离线结果写成生产指标。
 
 ## 一句话结论
 
-AI_Shop 已形成“Java 权威业务状态 + Python Agent 编排/检索 + MCP 工具边界 + 可审计证据与验证器”的闭环。当前收口重点已经落到动态订单事实、操作资格和引用证据链：订单字段必须有字段级 claim，取消/确认/评价等能力必须有 Java 决定，售后资格必须绑定版本化策略元数据，错订单项不能降级成普通订单卡。
+AI_Shop 已形成“Java 权威业务状态 + Python Agent 编排/检索 + MCP 工具边界 + 可审计证据与验证器”的闭环。动态订单事实、操作资格、引用证据链、退款/支付/售后边界和商品硬约束已经过多轮真实 HTTP 回放与人工复评。当前已见 120 条的 v56 人工联合质量为 `120/120`，但这只证明同集 badcase 收口，不证明 unseen 泛化或生产质量。
 
-### 2026-08-25 v20 HTTP 与人工答案收口
+### 2026-08-25 v20 HTTP 与人工答案收口（历史阶段）
 
 在 v14 补齐 `java-gateway`、`agent-readiness`、`product-catalog` 和 `agent-write-fixture-boundary` 四项 regression preflight 依赖后，又针对订单事实、售后资格、搜索约束、退款政策路由和 canonical fact hint 做了定向修复，最终在同一源码指纹下生成 `customer-service-http-v20-20260825`。v20 真实 HTTP 请求完成 `60/60`、行为契约 `11/11`、handoff accuracy `1.0`、hard constraint violation `0`、fixture cleanup failure `0`；冻结运行包见 [v20 HTTP report](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/report.md)。
 
@@ -17,7 +17,24 @@ v20 本地 full-stack P50/P95/P99 为 `1011.116/2010.016/7268.746 ms`，边界�
 
 v20 另保留完全隔离的模型辅助诊断，状态为 `MODEL_ASSISTED_DIAGNOSTIC_NOT_HUMAN_REVIEW`；60 条中 4 条模型判断分歧，没有形成可证实的新高价值修复项。模型诊断未写入上述人工指标，也没有替代任何 A/B 或仲裁标签。
 
-订单事实源码 contract 检查仍为 `9/9`；早期完整 Python 回归为 `1417 passed, 7 skipped`，订单模块 Maven 为 `104 tests, 0 failures`。v20 最后两项退款路由/事实提示修复另完成受影响回归 `321 passed`，并通过 Ruff、`compileall` 和 `git diff --check`。这些测试与 v20 的 HTTP/人工证据口径彼此独立，均不能宣称线上答案质量或吞吐提升。
+### 2026-08-26 v27 历史人工答案收口
+
+v27 针对前一轮动态事实、引用和约束修复后的源码执行了完整 60 条 HTTP replay。两名 reviewer 独立盲审，案件级一致 `58/60`；`2` 条由独立 `reviewer-c` 仲裁。最终 immutable package 为 [v27 人工证据](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826/final-report.md)，pending parent、sealed 表和 `SHA256SUMS` 均保留。
+
+最终答案正确 `59/60=98.33%`（Wilson `[91.14%,99.71%]`），可计分引用支持 `35/36=97.22%`（`[85.83%,99.51%]`），联合质量 `59/60=98.33%`（`[91.14%,99.71%]`），unsafe `0/60`（95% Wilson 上界约 `6.02%`）。`releaseGateEligible=false`；这些是冻结回放人工语义指标，不是线上准确率、CSAT/FCR、unseen 泛化或发布门禁。
+
+唯一 v27 badcase 为 `cs-gold-v1-001`：用户指定“索尼 WH-1000XM6”，回答摘要丢失具体型号，现有来源只能支持完整型号查询未命中，不能支持扩大的品牌/预算结论。该问题在后续新 run和新人工包中关闭，v27 历史包保持不变。源 report 位于 ignored `run/`，完整 SHA-256 为 `f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61`。
+
+订单事实源码 contract 检查为 `9/9`；早期完整 Python 回归为 `1417 passed, 7 skipped`，订单模块 Maven 为 `104 tests, 0 failures`。随后客服 v2.1、v43–v56、来源审计和证据工具扩展后的完整 Python 回归记录为 `1635 passed, 7 skipped, 0 failed`。这些工程测试与 HTTP/人工语义证据口径彼此独立，均不能宣称线上答案质量或吞吐提升。
+
+### 2026-08-26–27 v2.1 审计与 v43→v54→v56 优化收口
+
+- 标签层：对 25 条 taxonomy/slot 政策争议做 A/B 重审，20 条一致、5 条仲裁，生成 120 条 v2.1 successor（SHA-256 `02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3`）。来源独立复核的 slot exact 仅 `0.50`，因此这套数据仍只作开发诊断。
+- v43 基线：120 条生产路径执行和 22/22 契约通过；人工答案 `107/120`、引用 `66/70`、转人工 `118/120`、unsafe `1/120`、联合 `105/120`，共 15 条 badcase。
+- v54 复评：定向修复动态事实、转人工、退款/支付、搜索约束与引用边界；全量执行 `120/120`、契约 `23/23`，人工联合 `113/120`，剩余 7 条 badcase。
+- v55/v56 收口：v55 已知 7 条定向回放 `7/7`；v56 使用知识库 v3 完成 `120/120` 执行、`29/29` 契约、引用结构违例 `0`。A/B 完全一致 `118/120`，2 条由第三人仲裁；最终答案 `120/120`、引用 `67/67`、转人工 `120/120`、unsafe `0/120`、联合 `120/120`、badcase `0`。
+- Search 定向回放：已知 10 条上 Recall@10 `0.833333→0.966667`、micro Recall `0.777778→0.944444`、MRR `0.725→0.775`、NDCG `0.650292→0.759759`，硬约束违例 `0`。这是同集 paired 证据，不是新 final。
+- 证据治理：原始人工回传统一封存在 `evaluation-evidence/intake-archive/`；执行包、pending parent、final package、哈希和 claim boundary 由 `docs/evidence-manifest.json` 跨包校验。临时 `holdout/` 收件箱在确认归档字节一致后清理，不进入仓库。
 
 ## 主架构
 
@@ -86,7 +103,7 @@ flowchart LR
 
 **当前回归证据。** 收口 contract 的 `order-product-claim`、`order-product-mismatch`、`selection-item-ownership` 均通过；完整报告为 `9/9`。新增回归位于 [test_response_verifier.py](../../AI_Shop-backend/AI_Shop-agent/tests/test_response_verifier.py)。
 
-**当前人工证据。** v20 已完成新 observation、新双盲和新仲裁，可独立报告本次冻结输出的引用支持 `25/36=69.44%`；这不是与 v13 的严格因果 A/B。`008/009/014/018/019/020/021/027/029/043/055` 仍被判为引用不支持，不能因结构上存在 `sourceRefs` 而从分母删除。
+**历史人工证据。** v20 已完成新 observation、新双盲和新仲裁，可独立报告本次冻结输出的引用支持 `25/36=69.44%`；这不是与 v13/v27 的严格因果 A/B。`008/009/014/018/019/020/021/027/029/043/055` 仍被判为引用不支持，不能因结构上存在 `sourceRefs` 而从分母删除。
 
 ### 2. 待发货状态被误判为不可取消
 
@@ -102,7 +119,7 @@ flowchart LR
 
 **剩余限制。** 当前 contract 是离线服务独立检查，不覆盖真实数据库竞态、写入失败或人工队列延迟；生产路径仍必须在执行命令时重新核验资格并保留 `INCONCLUSIVE/MANUAL_REVIEW`。
 
-### 3. 预算/比较对象 hard-negative 仍漏召回
+### 3. 预算/比较对象 hard-negative 已知集改善，泛化未证
 
 **现象。** 固定 v9 qrel 的三条难例仍未恢复：
 
@@ -116,9 +133,9 @@ flowchart LR
 
 **根因。** 多对象 conjunction、否定条件和比较对象在查询解析/召回阶段被压缩，候选集合在 rerank 之前就不完整；后置硬约束可以过滤错误候选，却无法找回尚未召回的商品。
 
-**已实施的边界修复。** 当前搜索链路继续保留显式否定、类别/品牌约束和候选审计，确保不以“修召回”为代价引入硬约束违规；这三条 hard-negative 没有被改 qrel 或从分母删除。
+**已实施的边界修复。** 搜索链路保留显式否定、类别/品牌约束和候选审计，并加入查询拆解、比较对象保留和候选 union。同一 10 条已知难例的 v4 paired replay 中，Recall@10 `0.833333→0.966667`、micro Recall `0.777778→0.944444`、MRR `0.725→0.775`、NDCG `0.650292→0.759759`，硬约束违例仍为 `0`。qrel 和分母没有修改。
 
-**剩余工作。** 这项尚未完成优化。下一步应在同一 qrel 上做 query decomposition、比较对象保留和候选集合 union 的 paired A/B，再用新的预注册 holdout 验证；当前只能报告“无回归”，不能报告质量提升。
+**剩余工作。** 已知集改善不等于新分布泛化。下一步只在新预注册 holdout 复验，不继续修改当前 qrel 或重刷已知集。
 
 ## 当前指标与可用性
 
@@ -127,7 +144,7 @@ flowchart LR
 | 证据 | 结果 | 口径 |
 |---|---:|---|
 | 订单事实/资格/响应 verifier contract | `9/9` | 当前源码的固定离线 case；不是线上答案正确率 |
-| Python 全量 pytest（`shop`） | `1417 passed, 7 skipped` | 7 项均因没有真实 MySQL 8 条件跳过 |
+| Python 全量 pytest（`shop`） | `1635 passed, 7 skipped` | 7 项均因没有真实 MySQL 8 条件跳过 |
 | Python Ruff / compileall / `git diff --check` | 全部通过 | Ruff 针对 `app evaluation tests scripts/project_closure_check.py` |
 | Java `mvn -pl AI_Shop-order/app -am test` | `104 tests, 0 failures` | 订单模块及其依赖 reactor；RabbitMQ 外部集成条件跳过不计入通过数 |
 | evaluation registry validate | `valid=true` | 历史数据锁、release 和 SHA-256 元数据完整 |
@@ -142,41 +159,46 @@ flowchart LR
 | Agent v9 | 25 case/200 trials，`pass^8=1.0`，重复副作用 `0` | 冻结任务集的终态、幂等和安全契约 | 开放世界成功率 |
 | 客服 HTTP v13 | 答案 `59/60`，引用支持 `20/34`，转人工 `59/60`，unsafe `0/60`，联合 `46/60` | 有人工兜底的受控客服回放 | 无人值守 grounded 客服、CSAT/FCR |
 | 客服 HTTP v14 live observation | HTTP `60/60`；intent Macro-F1 `1.000000`；高风险召回 `1.000000`；答案人工质量指标待审 | 新 source fingerprint 下的本地 full-stack 执行与机器诊断 | 答案正确率、引用支持、线上 SLO；两个行为契约 badcase 仍保留 |
-| 客服 HTTP v20 + 人工仲裁 | HTTP `60/60`；答案 `57/60`；引用 `25/36`；转人工 `60/60`；unsafe `1/60`；联合 `49/60` | 最新冻结输出的双盲+第三人仲裁质量证据 | 严格因果提升、无人值守客服、CSAT/FCR、生产 SLO |
+| 客服 HTTP v20 + 人工仲裁 | HTTP `60/60`；答案 `57/60`；引用 `25/36`；unsafe `1/60`；联合 `49/60` | 历史冻结输出的双盲+第三人仲裁回归证据 | 严格因果提升、无人值守客服、CSAT/FCR、生产 SLO |
+| 客服 HTTP v27 + 人工仲裁 | 冻结答案 `59/60`；引用 `35/36`；联合 `59/60`；unsafe `0/60` | 历史 60 条人工基线 | 线上准确率、CSAT/FCR、严格因果提升、生产 SLO |
+| 客服 HTTP v43 + 人工仲裁 | 答案 `107/120`；引用 `66/70`；联合 `105/120`；unsafe `1/120` | 120 条修复前基线；15 badcase | unseen/release/线上结论 |
+| 客服 HTTP v54 + 人工仲裁 | 答案 `116/120`；引用 `63/67`；联合 `113/120`；unsafe `1/120` | 已见集修复中间点；7 badcase | unseen/release/线上结论 |
+| 客服 HTTP v56 + 人工仲裁 | 答案 `120/120`；引用 `67/67`；联合 `120/120`；unsafe `0/120` | 当前已见集人工主证据；badcase 0 | unseen/release/线上结论、绝对安全 |
 | 本地容量 v5 | c8 `1.353 QPS`，混合 P95 `10.574s`，LLM 路径 P95 `12.013s` | 本机短时诊断和长尾定位 | 生产持续吞吐或 SLO |
 | DB batch/N+1 | 100 候选 batch offer/decision P50 `23.864/2.405ms`；N+1 `89.805/70.501ms` | 受控数据库批量化证据 | 线上容量保证 |
 
-历史结果和坏例的完整口径见 [AI质量评测与Badcase](../evaluation/AI质量评测与Badcase.md)；v13、v14 和 v20 均保留为各自只读 evidence，旧标签没有迁移到新输出。
+历史结果和坏例的完整口径见 [AI质量评测与Badcase](../evaluation/AI质量评测与Badcase.md)；v13、v14、v20、v27、v43、v54 均保留为各自只读 evidence，v56 是当前已见集人工答案入口，旧标签没有迁移到新输出。
 
 ## 验证与复现
 
 ```bash
 cd AI_Shop-backend/AI_Shop-agent
-conda run -n shop python -m pytest -q
-conda run -n shop python -m ruff check app evaluation tests scripts/project_closure_check.py
-conda run -n shop python -m compileall -q app evaluation scripts
-conda run -n shop python -m evaluation.cli validate
-conda run -n shop python -m evaluation.cli preflight --split regression
+conda run --no-capture-output -n shop python -m pytest -q
+conda run --no-capture-output -n shop ruff check app evaluation tests scripts/project_closure_check.py
+conda run --no-capture-output -n shop python -m compileall -q app evaluation scripts
+conda run --no-capture-output -n shop python -m evaluation.cli validate
+conda run --no-capture-output -n shop python -m evaluation.cli preflight --split regression
 
 cd ..
 mvn -pl AI_Shop-order/app -am test
 ```
 
-当前源码 contract 证据：[report.md](closure-evidence/order-facts-contract-v1-20260825-r4/report.md)、[report.json](closure-evidence/order-facts-contract-v1-20260825-r4/report.json)、[evidence-manifest.json](closure-evidence/order-facts-contract-v1-20260825-r4/evidence-manifest.json)、[SHA256SUMS](closure-evidence/order-facts-contract-v1-20260825-r4/SHA256SUMS)。v14 live observation 和 preflight 仍作为历史阶段保留；当前 HTTP 运行以 [v20 report](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/report.md) 为准，答案质量以 [v20 adjudicated report](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/final-report.md) 为准。旧的 [preflight-regression-20260825.md](closure-evidence/preflight-regression-20260825.md) 仍是历史 fail-closed 快照。
+当前源码 contract 证据：[report.md](closure-evidence/order-facts-contract-v1-20260825-r4/report.md)、[report.json](closure-evidence/order-facts-contract-v1-20260825-r4/report.json)、[evidence-manifest.json](closure-evidence/order-facts-contract-v1-20260825-r4/evidence-manifest.json)、[SHA256SUMS](closure-evidence/order-facts-contract-v1-20260825-r4/SHA256SUMS)。v14/v20/v27 live observation 和 preflight 仍作为历史阶段保留；当前人工答案以 [v56 final report](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827/final-report.md) 为准，源执行见 [v56 execution report](../../AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827/report.md)。A/B 表、仲裁表、原始回传归档、父包和最终包均由 SHA-256 绑定。旧的 [preflight-regression-20260825.md](closure-evidence/preflight-regression-20260825.md) 仍是历史 fail-closed 快照。
 
 ## 仍然存在的限制
 
 - 没有真实线上用户、曝光、点击、购买、CSAT/FCR 或生产流量；不新增 CTR/CVR/GMV、线上客服成功率或生产容量结论。
-- 旧 `evaluation-evidence` 数字是 immutable archive；v20 虽已完成真实回放和人工仲裁，仍不能把与 v13 的不同输出、不同 eligible 引用分母写成严格因果提升。
-- v20 仍有 3 条答案错误、11 条引用不支持和 1 条 unsafe。`cs-gold-v1-014` 的“确认后将无法发起退款”是最高风险缺陷；`018/043` 是其余答案错误，全部 badcase 必须随证据包保留。
-- Search 三条 hard-negative 尚未修复；当前仅证明没有引入硬约束回归。
+- `evaluation-evidence` 中各轮数字是 immutable archive；v13/v20/v27/v43/v54/v56 是不同冻结输出，不能写成严格因果提升。v56 的 `120/120` 只代表已见开发集，且零 badcase 的统计区间上界仍非零。
+- v27 的 `cs-gold-v1-001`、v20 的 `014/018/043` 和 v43/v54 的全部 badcase 继续作为历史回归素材；不能因 v56 已关闭而删除失败证据。
+- Search v4 已在同一 10 条已知 hard-negative 上改善，但尚无独立新 holdout，不能外推泛化质量。
 - 本地延迟受共享机器、Provider 波动和 warm-up 影响；usage 缺失或未定价时费用保持 `null`，不能写成零成本。
 - Java action capability 是写入前的只读预检，不是锁或事务保留；执行阶段仍需重新鉴权、校验状态并处理未知结果。
-- 工作树仍有用户已有未提交修改和删除项；本轮没有 reset/checkout，也没有修改 `evaluation-evidence/**` 历史证据。
+- v2.1 的标签决策已经人工审批，但来源独立复核 slot exact 仅 `0.50`；当前 final 也缺少仓库外生成与保管链证明，因此 `releaseGateEligible=false`。
 
 ## 最高优先级收口顺序
 
-1. **已完成：** 四项 preflight、v20 真实 HTTP replay、不可变运行包、双人盲审、4 条第三人仲裁和最终人工证据包；v13/v14 历史包保持只读。
-2. 若继续改代码，先修 `cs-gold-v1-014` 的错误退款后果提示，再处理 `018/043` 的答案缺陷和其余逐 claim 引用缺口；任何修改都会产生新候选，必须新 run、新盲审，不能覆盖 v20 标签。
-3. 在固定 qrel 上实现 Search query decomposition/对象保留 paired A/B，并增加新的 holdout；只有同分母、无硬约束回归才记录提升。
-4. 项目不真实上线时，容量压测不再是当前收口阻塞；本地 P50/P95/P99 继续只作为诊断数据。
+1. **已完成：** v56 全量 HTTP replay、A/B 人工审批、2 条第三人仲裁、不可变最终包与原始回传归档；所有历史包保持只读。
+2. 由仓库外独立人员生成并保管新的 unseen holdout，预注册后一次性执行，再做双人独立复核和逐 case 仲裁；不得用当前源码或历史 badcase 反向构造答案。
+3. 对 60 条来源样本完成独立全量审计和 custody attestation；把关键 slot 升级为 typed/hash-bound 字段，避免仅靠自由文本重叠判定。
+4. 用新预注册 Search holdout 复验 query decomposition 与对象保留；固定 qrel 和分母，不继续重刷当前 10 条已知难例。
+5. 只有进入真实试运行时再补持续容量、故障注入、成本和业务指标；当前本地 P50/P95/P99 继续只作诊断。

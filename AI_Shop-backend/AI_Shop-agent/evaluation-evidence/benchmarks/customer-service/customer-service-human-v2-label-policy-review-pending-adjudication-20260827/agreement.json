@@ -1,0 +1,243 @@
+{
+  "caseAgreementRate": 0.8,
+  "caseCount": 25,
+  "createdAt": "2026-08-26T16:27:45.786Z",
+  "disagreementCaseCount": 5,
+  "disagreements": [
+    {
+      "fields": [
+        "shouldHandoff",
+        "handoffSeverity"
+      ],
+      "id": "cs-candidate-v2-073",
+      "input": {
+        "message": "客服连续三次答非所问，我要投诉这次服务"
+      },
+      "reviewerA": {
+        "comment": "最后的明确诉求是投诉客服服务，属于普通投诉并转人工；三次是发生次数，不是商品数量。",
+        "labels": {
+          "handoffSeverity": "NORMAL",
+          "intent": "COMPLAINT",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": true,
+          "slots": {}
+        },
+        "reviewerId": "label-policy-reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "主要诉求是投诉客服服务，需核验但无立即高后果风险；未明确要求人工。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "COMPLAINT",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {}
+        },
+        "reviewerId": "label-policy-reviewer-b"
+      }
+    },
+    {
+      "fields": [
+        "slots"
+      ],
+      "id": "cs-candidate-v2-112",
+      "input": {
+        "message": "刚才推荐的太贵了，换一批便宜点的"
+      },
+      "reviewerA": {
+        "comment": "要求基于上一批结果改为更便宜的候选，属于继续细化商品列表；无需转人工。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {}
+        },
+        "reviewerId": "label-policy-reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "“换一批便宜点的”是对既有商品列表继续细化；没有转人工依据。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "feature": "便宜点"
+          }
+        },
+        "reviewerId": "label-policy-reviewer-b"
+      }
+    },
+    {
+      "fields": [
+        "slots"
+      ],
+      "id": "cs-candidate-v2-113",
+      "input": {
+        "message": "不要苹果，再推荐两款安卓旗舰"
+      },
+      "reviewerA": {
+        "comment": "排除苹果并要求再推荐两款安卓旗舰，是继续细化商品列表；无需转人工。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "brand": "苹果",
+            "feature": "安卓旗舰",
+            "quantity": "两款"
+          }
+        },
+        "reviewerId": "label-policy-reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "“再推荐”是在既有结果上按安卓和数量继续细化，属于商品检索而非追评；没有转人工依据。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "brand": "苹果",
+            "feature": "安卓",
+            "quantity": "两款"
+          }
+        },
+        "reviewerId": "label-policy-reviewer-b"
+      }
+    },
+    {
+      "fields": [
+        "slots"
+      ],
+      "id": "cs-gold-v1-029",
+      "input": {
+        "message": "帮我找 500 元以内、不要户外款的男士外套"
+      },
+      "reviewerA": {
+        "comment": "按预算、非户外款及男士外套条件筛选商品，属于商品检索；无需转人工。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "500 元",
+            "budget": "500 元",
+            "feature": "户外款",
+            "productName": "男士外套"
+          }
+        },
+        "reviewerId": "label-policy-reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "按价格、品类和排除户外款条件查找商品；没有转人工依据。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "amount": "500 元",
+            "budget": "500 元",
+            "feature": "不要户外款",
+            "productName": "男士外套"
+          }
+        },
+        "reviewerId": "label-policy-reviewer-b"
+      }
+    },
+    {
+      "fields": [
+        "shouldHandoff",
+        "handoffSeverity"
+      ],
+      "id": "cs-gold-v1-052",
+      "input": {
+        "message": "我已经问了三次还没解决"
+      },
+      "reviewerA": {
+        "comment": "连续三次未解决主要是在表达对客服处理的不满；按普通投诉转人工，次数不是商品数量。",
+        "labels": {
+          "handoffSeverity": "NORMAL",
+          "intent": "COMPLAINT",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": true,
+          "slots": {}
+        },
+        "reviewerId": "label-policy-reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "连续三次未解决体现对服务不满，主要诉求归投诉；未明确要求人工且无不可逆风险。",
+        "labels": {
+          "handoffSeverity": null,
+          "intent": "COMPLAINT",
+          "riskLevel": "MEDIUM",
+          "shouldHandoff": false,
+          "slots": {}
+        },
+        "reviewerId": "label-policy-reviewer-b"
+      }
+    }
+  ],
+  "exactAgreementCaseCount": 20,
+  "fieldStats": {
+    "handoffSeverity": {
+      "agreementCount": 23,
+      "agreementRate": 0.92,
+      "caseCount": 25,
+      "cohenKappa": 0.637681,
+      "expectedAgreement": 0.7792
+    },
+    "intent": {
+      "agreementCount": 25,
+      "agreementRate": 1.0,
+      "caseCount": 25,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.2288
+    },
+    "riskLevel": {
+      "agreementCount": 25,
+      "agreementRate": 1.0,
+      "caseCount": 25,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.4912
+    },
+    "shouldHandoff": {
+      "agreementCount": 23,
+      "agreementRate": 0.92,
+      "caseCount": 25,
+      "cohenKappa": 0.626866,
+      "expectedAgreement": 0.7856
+    },
+    "slots": {
+      "agreementCount": 22,
+      "agreementRate": 0.88,
+      "caseCount": 25,
+      "cohenKappa": 0.871355,
+      "expectedAgreement": 0.0672
+    }
+  },
+  "note": "Agreement measures annotation reliability, not system quality. Every disagreement requires an independent third-person decision.",
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "reviews/reviewer-a.sealed.jsonl",
+    "reviewerId": "label-policy-reviewer-a",
+    "sha256": "795c27f86c9a79a2780c3f7033450e2c1bb7064ddd825083dc257956ef9f471b"
+  },
+  "reviewB": {
+    "path": "reviews/reviewer-b.sealed.jsonl",
+    "reviewerId": "label-policy-reviewer-b",
+    "sha256": "7a9f295ac9a9e3e2efb6dc12de49f80302d39c21938acea493298ea3a763aafe"
+  },
+  "schemaVersion": "aishop-customer-service-label-policy-review-agreement/v1",
+  "sourceDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/source/customer-service-human-v2.jsonl",
+  "sourceDatasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "sourceTemplatePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/reaudit/label-policy-reaudit.open.jsonl",
+  "sourceTemplateSha256": "f40ebda1c3b5c6625b91e6471256c743ce1a05c88a2906db52dfe2a14e5c8e54",
+  "status": "PENDING_ADJUDICATION",
+  "taxonomyContractPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/source/customer-service-taxonomy-contract-v2.1.json",
+  "taxonomyContractSha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+}

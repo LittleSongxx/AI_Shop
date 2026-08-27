@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-26T12:43:13.514Z",
+  "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "a676fbdd2ac0dd77510616d118654b75a35c0fa0c4578e2948da86ed9f495695",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 3562,
+      "sha256": "d61f569bb25cb03bd6c0463cb0b8fa5f7a8a048e9f7001f39910ec431ef53931"
+    },
+    "report.json": {
+      "bytes": 1346182,
+      "sha256": "95536257a4258d0dbf883d1cd0eef44aad1e1f49f27f4ec2e11ddc68576ae4a9"
+    },
+    "report.md": {
+      "bytes": 1624,
+      "sha256": "f69a48b53c5534e15b3aeb118b747813d244937b56cc1ffcef8af472a0c63b4a"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v35-handoff-metric-v2-targeted-20260826",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "969bcfe352a51d6c7014153da93841e971405cc125c8b518eda27b326394b9a2",
+  "status": "TARGETED_POST_FIX_SMOKE_NON_GATING"
+}

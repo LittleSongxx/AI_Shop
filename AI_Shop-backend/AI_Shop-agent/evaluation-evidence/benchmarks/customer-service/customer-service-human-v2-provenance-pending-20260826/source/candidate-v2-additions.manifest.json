@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "aishop-customer-service-candidate-manifest/v1",
+  "candidateVersion": "customer-service-v2-additions",
+  "status": "DRAFT_NEEDS_DUAL_HUMAN_REVIEW",
+  "releaseGateEligible": false,
+  "baseHumanVerified": {
+    "caseCount": 60,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823/customer-service-human-v1.jsonl",
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+  },
+  "additions": {
+    "caseCount": 60,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/candidate-v2-additions.jsonl",
+    "sha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353",
+    "annotationStatus": "DRAFT_NEEDS_HUMAN_REVIEW"
+  },
+  "targetVerifiedVersion": {
+    "caseCount": 120,
+    "status": "BLOCKED_UNTIL_DUAL_REVIEW_AND_ADJUDICATION"
+  },
+  "stratification": {
+    "intent": {
+      "ADDRESS_CHANGE": 3,
+      "AFTERSALES_UNKNOWN": 3,
+      "CANCEL_ORDER": 3,
+      "CHAT": 3,
+      "COMPLAINT": 3,
+      "CONFIRM_RECEIPT": 3,
+      "DAMAGED_OR_WRONG_ITEM": 3,
+      "HUMAN_REQUEST": 3,
+      "INVOICE": 3,
+      "PAYMENT_ISSUE": 3,
+      "PRODUCT_CONSULT": 3,
+      "PRODUCT_REVIEW": 3,
+      "PRODUCT_SEARCH": 3,
+      "QUERY_COUPON": 3,
+      "QUERY_FULFILLMENT": 3,
+      "QUERY_LOGISTICS": 3,
+      "QUERY_ORDER": 3,
+      "RECOMMENT": 3,
+      "REFUND": 3,
+      "REFUND_STATUS": 3
+    },
+    "riskLevel": {
+      "HIGH": 9,
+      "LOW": 28,
+      "MEDIUM": 23
+    },
+    "shouldHandoff": {
+      "false": 44,
+      "true": 16
+    },
+    "criticalHandoff": 9,
+    "casesWithSlots": 26,
+    "difficulty": {
+      "easy": 7,
+      "hard": 35,
+      "medium": 18
+    }
+  },
+  "priorityCoverage": [
+    "refund-policy-vs-status-vs-action",
+    "product-consult-vs-search-vs-comparison",
+    "negation-and-elliptical-requests",
+    "payment-privacy-account-and-battery-high-risk",
+    "forced-vs-voluntary-handoff",
+    "currency-full-width-comma-and-wording-normalization",
+    "order-id-product-name-quantity-and-missing-item-slots"
+  ],
+  "nextStep": "Export two blind sheets from additions, seal both, compare disagreements, adjudicate, merge additions to HUMAN_VERIFIED, then concatenate with the immutable v1 base into a new v2 evidence package."
+}

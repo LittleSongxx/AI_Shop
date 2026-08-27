@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-26T13:23:24.984Z",
+  "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "d5b56ec510e5eb9f08fc068ae30eec35db871cb067359eef9c6f02aa4a2a45e0",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 4182,
+      "sha256": "8ebc2de823e9505749e92928da66a6ba644dba4c5ad2afc17cf0db75232e8d72"
+    },
+    "report.json": {
+      "bytes": 186849,
+      "sha256": "4a943ddcaf9512bc52b2d455a07126a7d8b6727fb4e56d4d1a8555176c310756"
+    },
+    "report.md": {
+      "bytes": 1789,
+      "sha256": "8241cc0346a0f71ce9bd5a5bca7cd019a083464764e4db9e4480ef38382781e3"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v42-refund-reference-targeted-20260826",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "6b95124fe4d3e41af2462416c040275b9e42b691f91debe4283a9f8e635152a3",
+  "status": "TARGETED_REFUND_REFERENCE_FIX_VALIDATED"
+}

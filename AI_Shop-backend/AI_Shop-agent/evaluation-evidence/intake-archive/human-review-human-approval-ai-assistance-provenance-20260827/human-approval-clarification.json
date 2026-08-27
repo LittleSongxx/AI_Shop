@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "aishop-project-owner-human-approval-clarification/v1",
+  "status": "HUMAN_APPROVAL_CONFIRMED_AI_ASSISTANCE_DISCLOSED",
+  "recordedAt": "2026-08-27T01:16:24+08:00",
+  "recordedFrom": "active project-owner instruction in the shared Codex workspace",
+  "humanApproverId": "song",
+  "humanApproverIdentity": "HIT-Student",
+  "declarations": {
+    "allInScopeLabelsWereReviewedAndApprovedByHumans": true,
+    "twoReviewerLabelsReflectTheirHumanSubjectiveDecisions": true,
+    "adjudicationFinalLabelsWereHumanConfirmed": true,
+    "humanRetainedFinalDecisionAuthority": true,
+    "aiAssistanceUsed": true,
+    "aiAssistanceScopeDeclaredByOwner": "TEXT_OUTPUT_AND_RECORDING_ASSISTANCE",
+    "rawIdentityFieldsMayStillNameAI": true,
+    "claimPureUnaidedHumanAnnotation": false
+  },
+  "inScopeReturnedFiles": {
+    "answerQualityReviewerA": {
+      "path": "holdout/02-answer-quality-v43/reviewer-a.open.jsonl",
+      "sha256": "52363bf9036460d332c1144f38f0220c307436b101a40e73046fa9a4732c5e3f"
+    },
+    "answerQualityReviewerB": {
+      "path": "holdout/02-answer-quality-v43/reviewer-b.open.jsonl",
+      "sha256": "18b707b4f079e0cba35de813270a8afda9c980d41244abaf1c224d152675ff9c"
+    },
+    "answerQualityAdjudication": {
+      "path": "holdout/AI-Shop-answer-quality-adjudicator-c-20260827-completed/adjudication.open.jsonl",
+      "sha256": "561f93c52a918756f7e2b3b2a909950170dafb2e09fc79d11174a1cf5f39ee34"
+    },
+    "labelPolicyReviewerA": {
+      "path": "holdout/01-label-policy-v2.1/reviewer-a.open.jsonl",
+      "sha256": "795c27f86c9a79a2780c3f7033450e2c1bb7064ddd825083dc257956ef9f471b"
+    },
+    "labelPolicyReviewerB": {
+      "path": "holdout/01-label-policy-v2.1/reviewer-b.open.jsonl",
+      "sha256": "7a9f295ac9a9e3e2efb6dc12de49f80302d39c21938acea493298ea3a763aafe"
+    },
+    "labelPolicyAdjudication": {
+      "path": "holdout/AI-Shop-label-policy-adjudicator-c-20260827/adjudication.open.jsonl",
+      "sha256": "96058711dfbeeebd4b4de9c3340a89ee7ed00152b7c59b7e2302cacb05c3775c"
+    }
+  },
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "limitations": [
+    "This record does not claim that annotators authored every character without AI assistance.",
+    "AI assistance can create anchoring risk and must remain disclosed with reported metrics.",
+    "This record is a project-owner confirmation, not an external signature or proof of formal unseen custody."
+  ],
+  "externalSignaturePresent": false
+}

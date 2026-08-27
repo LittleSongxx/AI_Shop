@@ -1,0 +1,15 @@
+{
+  "artifactId": "customer-service-v2-routing-paired-fix-validity-gated-20260826",
+  "blockingControls": [
+    "LABEL_POLICY_READJUDICATION",
+    "INDEPENDENCE_PROVENANCE",
+    "FRESH_HTTP_RUN_AND_BLIND_ANSWER_REVIEW",
+    "EXTERNAL_UNSEEN_FINAL_RUN"
+  ],
+  "createdAt": "2026-08-26T12:31:19.583Z",
+  "developmentFixValidated": true,
+  "finalUnseenEligible": false,
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-customer-service-paired-evidence-package/v1",
+  "status": "DEVELOPMENT_FIX_EFFECT_CONFIRMED_LABEL_GATE_BLOCKED"
+}

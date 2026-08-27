@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "aishop-recovered-human-review-intake/v1",
+  "artifactId": "customer-service-v2-additions-original-submissions-recovered-20260826",
+  "archivedAt": "2026-08-26T14:07:08Z",
+  "status": "HISTORICAL_INTAKE_RECOVERED_PROVENANCE_STILL_BLOCKED",
+  "sourceDataset": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/candidate-v2-additions.jsonl",
+    "sha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353",
+    "caseCount": 60
+  },
+  "recoveredReviews": [
+    {
+      "reviewerId": "reviewer-a",
+      "originalPath": "reviewer-a.open.jsonl",
+      "archivedPath": "recovered-root-intake/reviewer-a.open.jsonl",
+      "sha256": "3b24ca2e3cded7c3d7e1330ccfc2580a14c850bac3541af62450b2443f78829a",
+      "caseCount": 60,
+      "completeValidationBeforeArchive": true,
+      "matchesOriginalManifestSheetSha256": true,
+      "matchesSealedManifestSourceOpenSheetSha256": true
+    },
+    {
+      "reviewerId": "reviewer-b",
+      "originalPath": "reviewer-b.open.jsonl",
+      "archivedPath": "recovered-root-intake/reviewer-b.open.jsonl",
+      "sha256": "9affe71c43465157b144897cc3ac77a736edad0a1d6089253a9d3394fcc3635b",
+      "caseCount": 60,
+      "completeValidationBeforeArchive": true,
+      "matchesOriginalManifestSheetSha256": true,
+      "matchesSealedManifestSourceOpenSheetSha256": true
+    }
+  ],
+  "supplementalFindingResolution": [
+    {
+      "originalCode": "REVIEW_A_FILLED_OPEN_SOURCE_MISSING",
+      "status": "SOURCE_BYTES_RECOVERED_BY_SUPPLEMENTAL_ARCHIVE",
+      "note": "The immutable original provenance audit remains unchanged; this package supplies the subsequently recovered bytes."
+    }
+  ],
+  "unresolvedFindings": [
+    "REVIEWA_EXPORT_HASH_SEMANTICS_INVALID",
+    "REVIEWB_EXPORT_HASH_SEMANTICS_INVALID",
+    "INDEPENDENCE_ATTESTATION_MISSING"
+  ],
+  "originalManifestPathSemanticsPreserved": true,
+  "hashAndLabelChainValid": true,
+  "reviewerIndependenceVerified": false,
+  "releaseGateEligible": false,
+  "finalUnseenEligible": false,
+  "allowedUse": [
+    "HISTORICAL_PROVENANCE_SUPPLEMENT",
+    "DEVELOPMENT_DIAGNOSTIC_AUDIT"
+  ],
+  "forbiddenClaims": [
+    "REVIEWER_INDEPENDENCE_VERIFIED",
+    "RELEASE_GRADE_CUSTOMER_SERVICE_QUALITY",
+    "FINAL_UNSEEN_GENERALIZATION"
+  ]
+}

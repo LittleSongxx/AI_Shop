@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -213,16 +214,23 @@ _MODEL_TOKEN_RE = re.compile(
 _SPEC_TOKEN_RE = re.compile(
     r"(?i)^(?:[345]g|\d+(?:\.\d+)?(?:gb|tb|g|w|mah|ml|cm|mm))$"
 )
+_MODEL_SURFACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,79}$")
+_MAX_MODEL_IDENTIFIERS = 8
+_MAX_QUERY_SCOPE_TERMS = 12
+_MAX_QUERY_SCOPE_TERM_CHARS = 120
+_ARABIC_BUDGET_NUMBER = r"\d+(?:\.\d+)?"
+_CHINESE_BUDGET_NUMBER = r"[零〇一二两三四五六七八九十百千万]+"
+_BUDGET_NUMBER = rf"(?:{_ARABIC_BUDGET_NUMBER}|{_CHINESE_BUDGET_NUMBER})"
 _BUDGET_RANGE_RE = re.compile(
-    r"(?P<min>\d+(?:\.\d+)?)\s*(?:元|块)?\s*(?:到|至|[-~—])\s*"
-    r"(?P<max>\d+(?:\.\d+)?)\s*(?:元|块)?"
+    rf"(?P<min>{_BUDGET_NUMBER})\s*(?:元|块)?\s*(?:到|至|[-~—])\s*"
+    rf"(?P<max>{_BUDGET_NUMBER})\s*(?:元|块)?"
 )
 _BUDGET_MAX_RE = re.compile(
-    r"(?P<value>\d+(?:\.\d+)?)\s*(?:元|块)\s*(?:以内|以下|不超过|至多|封顶|内)"
-    r"|(?:预算|价格)\s*(?P<budget>\d+(?:\.\d+)?)\s*(?:元|块)"
+    rf"(?P<value>{_BUDGET_NUMBER})\s*(?:元|块)\s*(?:以内|以下|不超过|至多|封顶|内)"
+    rf"|(?:预算|价格)\s*(?P<budget>{_BUDGET_NUMBER})\s*(?:元|块)?"
 )
 _BUDGET_MIN_RE = re.compile(
-    r"(?P<value>\d+(?:\.\d+)?)\s*(?:元|块)\s*(?:以上|起步|至少)"
+    rf"(?P<value>{_BUDGET_NUMBER})\s*(?:元|块)\s*(?:以上|起步|至少)"
 )
 _NEGATIVE_TERM_RE = re.compile(
     r"(?:不要|不含|排除|剔除|不选|别要|无需|不要买)\s*"
@@ -235,18 +243,39 @@ _QUERY_FILLER_RE = re.compile(
 )
 
 
+def _exact_model_identifiers(query: str | None) -> tuple[tuple[str, str], ...]:
+    """Return bounded ``(surface, normalized)`` model identifiers."""
+
+    identifiers: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for match in _MODEL_TOKEN_RE.finditer(str(query or "")):
+        raw = match.group(0).strip("-_")
+        if (
+            not raw
+            or _SPEC_TOKEN_RE.fullmatch(raw)
+            or not _MODEL_SURFACE_RE.fullmatch(raw)
+        ):
+            continue
+        normalized = re.sub(r"[^a-z0-9]", "", raw.casefold())
+        if len(normalized) < 2 or normalized in seen:
+            continue
+        seen.add(normalized)
+        identifiers.append((raw, normalized))
+        if len(identifiers) >= _MAX_MODEL_IDENTIFIERS:
+            break
+    return tuple(identifiers)
+
+
+def exact_model_surfaces(query: str | None) -> tuple[str, ...]:
+    """Preserve safe display forms for explicit model identifiers."""
+
+    return tuple(surface for surface, _token in _exact_model_identifiers(query))
+
+
 def exact_model_tokens(query: str | None) -> tuple[str, ...]:
     """Extract model-like identifiers while excluding common units and network labels."""
 
-    tokens: list[str] = []
-    for match in _MODEL_TOKEN_RE.finditer(str(query or "")):
-        raw = match.group(0).strip("-_")
-        if not raw or _SPEC_TOKEN_RE.fullmatch(raw):
-            continue
-        normalized = re.sub(r"[^a-z0-9]", "", raw.casefold())
-        if len(normalized) >= 2 and normalized not in tokens:
-            tokens.append(normalized)
-    return tuple(tokens)
+    return tuple(token for _surface, token in _exact_model_identifiers(query))
 
 
 def _clean_constraint_term(value: str | None) -> str:
@@ -257,23 +286,94 @@ def _clean_constraint_term(value: str | None) -> str:
     return text
 
 
+_CHINESE_DIGITS = {
+    "零": 0,
+    "〇": 0,
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+}
+_CHINESE_UNITS = {"十": 10, "百": 100, "千": 1000, "万": 10000}
+
+
+def parse_budget_number(value: str | None) -> float | None:
+    """Parse an explicit budget number, including common Chinese shorthand.
+
+    Conversational forms such as ``一千二`` and ``一万二`` mean 1,200 and
+    12,000 in a budget slot. The parser is only called from budget-bound
+    regular expressions, so arbitrary Chinese numerals elsewhere are not
+    interpreted as prices.
+    """
+
+    raw = re.sub(r"[\s,，]", "", str(value or ""))
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        pass
+    valid_characters = set(_CHINESE_DIGITS) | set(_CHINESE_UNITS)
+    if any(character not in valid_characters for character in raw):
+        return None
+
+    shorthand_tail = 0
+    if raw[-1] in _CHINESE_DIGITS and len(raw) >= 2 and raw[-2] not in {"零", "〇"}:
+        unit_positions = [
+            (index, _CHINESE_UNITS[character])
+            for index, character in enumerate(raw[:-1])
+            if character in _CHINESE_UNITS
+        ]
+        if unit_positions:
+            last_index, last_unit = unit_positions[-1]
+            if last_index == len(raw) - 2 and last_unit > 1:
+                shorthand_tail = _CHINESE_DIGITS[raw[-1]] * (last_unit // 10)
+                raw = raw[:-1]
+
+    total = 0
+    section = 0
+    number = 0
+    for character in raw:
+        if character in _CHINESE_DIGITS:
+            number = _CHINESE_DIGITS[character]
+            continue
+        unit = _CHINESE_UNITS[character]
+        if unit == 10000:
+            section += number
+            total += (section or 1) * unit
+            section = 0
+        else:
+            section += (number or 1) * unit
+        number = 0
+    return float(total + section + number + shorthand_tail)
+
+
 def extract_budget_constraints(query: str | None) -> tuple[float | None, float | None]:
     value = str(query or "")
     minimum: float | None = None
     maximum: float | None = None
     range_match = _BUDGET_RANGE_RE.search(value)
     if range_match:
-        minimum = float(range_match.group("min"))
-        maximum = float(range_match.group("max"))
+        minimum = parse_budget_number(range_match.group("min"))
+        maximum = parse_budget_number(range_match.group("max"))
+        if minimum is not None and maximum is not None and minimum > maximum:
+            minimum, maximum = maximum, minimum
     max_match = _BUDGET_MAX_RE.search(value)
     if max_match:
         raw = max_match.group("value") or max_match.group("budget")
         if raw is not None:
-            parsed = float(raw)
-            maximum = parsed if maximum is None else min(maximum, parsed)
+            parsed = parse_budget_number(raw)
+            if parsed is not None:
+                maximum = parsed if maximum is None else min(maximum, parsed)
     min_match = _BUDGET_MIN_RE.search(value)
     if min_match:
-        minimum = float(min_match.group("value"))
+        minimum = parse_budget_number(min_match.group("value"))
     return minimum, maximum
 
 
@@ -288,7 +388,18 @@ def extract_query_exclusions(query: str | None) -> tuple[str, ...]:
 
 def _comparison_segments(query: str | None) -> list[str]:
     value = primary_product_request(query)
-    value = re.sub(r"(?:如何|怎么|怎样)(?:比较|对比|选)\s*$", "", value)
+    value = re.sub(
+        r"(?:分别)?(?:"
+        r"有(?:什么|何)(?:不同|区别|差异)|"
+        r"(?:主要)?差(?:在)?哪(?:里)?|"
+        r"(?:区别|差别|差异)(?:是)?(?:什么|在哪|有哪些)?|"
+        r"(?:适合|用于)(?:什么|哪些|哪种)?(?:场景|人群|用途)|"
+        r"(?:哪个|哪款)(?:更好|更适合)?|"
+        r"(?:如何|怎么|怎样)(?:比较|对比|选(?:择)?)"
+        r")\s*$",
+        "",
+        value,
+    )
     value = _BUDGET_RANGE_RE.sub(" ", value)
     value = _BUDGET_MAX_RE.sub(" ", value)
     value = _BUDGET_MIN_RE.sub(" ", value)
@@ -300,6 +411,11 @@ def _comparison_segments(query: str | None) -> list[str]:
     result: list[str] = []
     for part in parts:
         cleaned = _clean_constraint_term(part)
+        cleaned = re.sub(
+            r"^(?:请|麻烦)?(?:帮我)?(?:看下|看看)?(?:这款|这两个|这两款|这两种)\s*",
+            "",
+            cleaned,
+        )
         compact = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]", "", cleaned)
         if len(compact) < 2:
             continue
@@ -395,6 +511,58 @@ def extract_query_hard_constraints(query: str | None) -> dict[str, Any]:
         "must_not_terms": must_not,
         "comparison_targets": targets,
         "comparison_required": comparison_required,
+    }
+
+
+def _bounded_query_scope_terms(values: Any) -> list[str]:
+    """Project parser-owned terms without carrying arbitrary query prose."""
+
+    if not isinstance(values, (list, tuple)):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        value = " ".join(str(raw or "").strip().split())
+        if not value or len(value) > _MAX_QUERY_SCOPE_TERM_CHARS:
+            continue
+        if any(ord(character) < 32 for character in value):
+            continue
+        identity = value.casefold()
+        if identity in seen:
+            continue
+        seen.add(identity)
+        result.append(value)
+        if len(result) >= _MAX_QUERY_SCOPE_TERMS:
+            break
+    return result
+
+
+def build_product_query_scope(query: str | None) -> dict[str, Any]:
+    """Build a bounded, auditable projection of the accepted constraint query.
+
+    The full user turn is represented only by its digest and character count.
+    Displayable values are limited to parser-owned model surfaces and explicit
+    hard constraints, so this object can be persisted in evidence safely.
+    """
+
+    raw = str(query or "").strip()
+    constraints = extract_query_hard_constraints(raw)
+    return {
+        "schemaVersion": "product-query-scope/v1",
+        "querySha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        "queryChars": len(raw),
+        "requestedModels": list(exact_model_surfaces(raw)),
+        "modelTokens": list(exact_model_tokens(raw)),
+        "budgetMin": constraints.get("budget_min"),
+        "budgetMax": constraints.get("budget_max"),
+        "mustTerms": _bounded_query_scope_terms(constraints.get("must_terms")),
+        "mustNotTerms": _bounded_query_scope_terms(
+            constraints.get("must_not_terms")
+        ),
+        "comparisonTargets": _bounded_query_scope_terms(
+            constraints.get("comparison_targets")
+        ),
+        "comparisonRequired": bool(constraints.get("comparison_required")),
     }
 
 

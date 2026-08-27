@@ -201,6 +201,38 @@ def test_broad_instrument_category_accepts_leaf_product_title_when_id_is_numeric
     assert _category_matches({"product_name": "无线降噪耳机", "category_id": "20002"}, "乐器") is False
 
 
+def test_snack_shelf_accepts_food_and_beverage_catalog_category():
+    assert _category_matches(
+        {"product_name": "可口可乐汽水", "categoryName": "食品饮料"}, "零食"
+    ) is True
+
+
+def test_comparison_target_scopes_brand_and_category_in_second_hard_filter():
+    mission = {
+        "category": "零食",
+        "hardConstraints": {
+            "requiredBrands": ["旺旺"],
+            "comparisonRequired": True,
+            "comparisonTargets": ["旺旺雪饼", "可乐"],
+        },
+        "softPreferences": {},
+        "exclusions": {},
+    }
+    snow = _offer_product("snow", category="零食", name="旺旺雪饼")
+    snow["brand"] = "旺旺"
+    cola = _offer_product("cola", category="饮料", name="可口可乐汽水")
+    cola["brand"] = "可口可乐"
+    other = _offer_product("other", category="饮料", name="无糖茶饮")
+    other["brand"] = "其他"
+
+    eligible, rejected = ShoppingDecisionService()._hard_filter(
+        [snow, cola, other], mission
+    )
+
+    assert [row["product_id"] for row in eligible] == ["snow", "cola"]
+    assert rejected == [{"productId": "other", "reason": "BRAND_REQUIRED"}]
+
+
 def test_rank_reports_real_slate_diversity_instead_of_recall_rank_prior():
     mission = {
         "category": "耳机",

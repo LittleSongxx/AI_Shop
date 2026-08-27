@@ -15,6 +15,7 @@ from app.graph.nodes import (
     build_context_node,
     cleanup_node,
     deterministic_workflow_node,
+    dynamic_handoff_node,
     entry_guard,
     finalize_node,
     orchestration_router_node,
@@ -50,6 +51,8 @@ def _after_order_reference(state: AgentGraphState) -> str:
         return "cleanup"
     if state.get("route") == "finalize":
         return "finalize"
+    if state.get("route") == "human_handoff":
+        return "human_handoff"
     if state.get("route") == "end":
         return "cleanup"
     return "orchestration_router"
@@ -96,6 +99,7 @@ def build_agent_graph():
     graph.add_node("entry", traced_node("entry", entry_guard))
     graph.add_node("build_context", traced_node("build_context", build_context_node))
     graph.add_node("order_reference", traced_node("order_reference", order_reference_node))
+    graph.add_node("human_handoff", traced_node("human_handoff", dynamic_handoff_node))
     graph.add_node(
         "orchestration_router",
         traced_node("orchestration_router", orchestration_router_node),
@@ -122,10 +126,12 @@ def build_agent_graph():
         _after_order_reference,
         {
             "orchestration_router": "orchestration_router",
+            "human_handoff": "human_handoff",
             "finalize": "finalize",
             "cleanup": "cleanup",
         },
     )
+    graph.add_edge("human_handoff", "cleanup")
     graph.add_conditional_edges(
         "orchestration_router",
         _after_orchestration,

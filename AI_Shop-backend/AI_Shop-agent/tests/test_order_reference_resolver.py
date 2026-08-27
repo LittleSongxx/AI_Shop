@@ -98,6 +98,38 @@ async def test_multiple_matching_items_require_selection():
 
 
 @pytest.mark.asyncio
+async def test_refund_status_amount_narrows_owned_candidate_without_claiming_status():
+    first = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "索尼无线降噪耳机",
+    )
+    second = _order(
+        "SM202608040001",
+        "SMITEM202608040001",
+        "苹果无线耳机",
+        order_time="2026-08-04 10:00:00",
+    )
+    second["amount"] = 199
+    second["items"][0]["item_amount"] = 199
+    with patch(
+        "app.services.order_reference_resolver.java_internal_client.list_orders",
+        AsyncMock(return_value=[first, second]),
+    ):
+        result = await order_reference_resolver.resolve(
+            user_id="u1",
+            intent=IntentKind.REFUND_STATUS.value,
+            user_text="我不是问退款规则，¥199.00 那笔一直没到账",
+            entities={"amount": "¥199.00"},
+        )
+
+    assert result.outcome == OrderReferenceOutcome.RESOLVED
+    assert result.target is not None
+    assert result.target["orderId"] == "SM202608040001"
+    assert result.clues["amount"] == 199.0
+
+
+@pytest.mark.asyncio
 async def test_one_order_with_multiple_matching_items_requires_item_selection():
     order = _order(
         "SM202608050002",
@@ -296,6 +328,30 @@ async def test_explicit_foreign_order_id_is_verified_with_current_user():
         time_end=None,
         limit=30,
     )
+
+
+@pytest.mark.asyncio
+async def test_explicit_owned_order_id_is_not_rejected_by_inferred_status_wording():
+    order = _order(
+        "SM202608050002",
+        "SMITEM202608050002",
+        "示例手机",
+        status=1,
+    )
+    with patch(
+        "app.services.order_reference_resolver.java_internal_client.list_orders",
+        AsyncMock(return_value=[order]),
+    ):
+        result = await order_reference_resolver.resolve(
+            user_id="u1",
+            intent=IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+            user_text="订单 SM202608050002 收到的商品坏了",
+        )
+
+    assert result.outcome == OrderReferenceOutcome.RESOLVED
+    assert result.target is not None
+    assert result.target["orderId"] == "SM202608050002"
+    assert result.clues["ignoredStatusHintForExplicitReference"] is True
 
 
 @pytest.mark.asyncio

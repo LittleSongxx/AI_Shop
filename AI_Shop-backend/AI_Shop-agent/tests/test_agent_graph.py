@@ -4,16 +4,19 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.constants import MSG_STATUS_NORMAL
 from app.domain.intent.types import IntentKind, NextAction, RequestMode, RiskLevel
 from app.graph.builder import build_agent_graph
 from app.graph.nodes import (
+    _rag_query_variants_for_turn,
     agent_loop_node,
+    dynamic_handoff_node,
     requires_rag_evidence,
     should_open_agentic_rag,
     should_prefetch_rag,
+    tools_node,
 )
 from app.graph.runner import _should_resume, run_agent_graph
 from app.graph.state import initial_state, thread_id_for
@@ -34,6 +37,61 @@ def test_initial_state_shape():
     assert state["message_id"] == 1
     assert state["react_round"] == 0
     assert state["deterministic_clarification"] is False
+    assert state["dynamic_handoff_reason"] is None
+
+
+def test_auto_receipt_policy_turn_adds_bounded_retrieval_variants():
+    variants = _rag_query_variants_for_turn(
+        "系统显示快自动收货了，自动确认后还能售后吗",
+        "自动确认收货后还能售后",
+    )
+
+    assert variants == [
+        "自动确认收货后还能售后",
+        "确认收货 订单完成状态 未实际收到不要提前确认",
+        "售后资格 订单状态 实时规则核验",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_read_query_blocks_model_selected_write_proposal(monkeypatch):
+    invoke = AsyncMock(side_effect=AssertionError("blocked proposal must not reach MCP"))
+    recorded = MagicMock()
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.mcp_tool_router.invoke", invoke)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", recorded)
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(rag_mode="conditional", graph_max_react_rounds=4),
+    )
+    call = {
+        "id": "call-1",
+        "name": "PROPOSE_CREATE_SUPPORT_CASE",
+        "args": {"category": "ADDRESS_CHANGE", "description": "怎么改地址"},
+    }
+    result = await tools_node(
+        {
+            "agent_msg": {"runId": "run-1"},
+            "user_id": "u1",
+            "message_id": 1,
+            "user_text": "订单 A1 还没发货，收货地址怎么改",
+            "request_mode": RequestMode.READ_QUERY.value,
+            "pending_tool_calls": [call],
+            "llm_messages": [AIMessage(content="", tool_calls=[call])],
+            "tools_called": [],
+            "react_round": 1,
+        }
+    )
+
+    invoke.assert_not_awaited()
+    assert result["route"] == "agent_loop"
+    assert result["tools_called"] == []
+    assert isinstance(result["llm_messages"][-1], ToolMessage)
+    assert "安全策略拒绝" in result["llm_messages"][-1].content
+    denied = next(
+        call for call in recorded.call_args_list if call.args[0] == "TOOL_POLICY_DENIED"
+    )
+    assert denied.kwargs["output_data"]["sideEffectAllowed"] is False
 
 
 def _agent_loop_state(
@@ -65,6 +123,108 @@ def _agent_loop_state(
         "chunks": [],
     }
 
+
+@pytest.mark.asyncio
+async def test_auto_receipt_policy_answers_from_numbered_visible_evidence(monkeypatch):
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(graph_max_react_rounds=4),
+    )
+    state = _agent_loop_state(
+        intent=IntentKind.CONFIRM_RECEIPT.value,
+        user_text="系统显示快自动收货了，自动确认后还能售后吗",
+        request_mode=RequestMode.INFORMATIONAL.value,
+    )
+    state["rag_source_refs"] = [
+        {"factIds": ["logistics.confirm_receipt"]},
+        {"factIds": ["aftersales.rule_engine_authoritative"]},
+    ]
+
+    result = await agent_loop_node(state)
+
+    assert result["route"] == "finalize"
+    assert result["llm_skip_reason"] == "auto_receipt_aftersales_boundary"
+    assert "完成状态。[1]" in result["chunks"][0]
+    assert "实时售后规则核验。[2]" in result["chunks"][0]
+    assert "不要提前手动确认。[1]" in result["chunks"][0]
+
+
+@pytest.mark.asyncio
+async def test_generic_refund_conditions_use_only_visible_snippet_claims(monkeypatch):
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    state = _agent_loop_state(
+        intent=IntentKind.REFUND.value,
+        user_text="退款需要满足哪些条件",
+        request_mode=RequestMode.INFORMATIONAL.value,
+    )
+    state["rag_source_refs"] = [
+        {
+            "id": "refund-policy",
+            "heading": "退货与退款",
+            "snippet": (
+                "用户应在订单详情中发起售后申请，并保持商品、附件和包装完整。"
+                "平台会根据商品类型、订单状态和实际情况审核。"
+            ),
+        }
+    ]
+
+    result = await agent_loop_node(state)
+
+    assert result["llm_skip_reason"] == "refund_conditions_evidence_answer"
+    assert "包装完整。[1]" in result["chunks"][0]
+    assert "实际情况审核。[1]" in result["chunks"][0]
+    assert "幂等" not in result["chunks"][0]
+
+
+@pytest.mark.asyncio
+async def test_dynamic_handoff_uses_post_resolution_reason_and_verified_order(monkeypatch):
+    transfer = AsyncMock(return_value={})
+    clear = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.agent_service.agent_orchestrator._transfer_to_support",
+        transfer,
+    )
+    monkeypatch.setattr("app.graph.nodes.redis_service.clear_bound_message_id", clear)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    agent_msg = {"userId": "u1", "messageId": 9, "runId": "run-9"}
+
+    result = await dynamic_handoff_node(
+        {
+            "agent_msg": agent_msg,
+            "user_id": "u1",
+            "message_id": 9,
+            "user_text": "订单还没发货，收货地址怎么改",
+            "intent": IntentKind.ADDRESS_CHANGE.value,
+            "intent_decision": {
+                "intent": IntentKind.ADDRESS_CHANGE.value,
+                "next_action": NextAction.ANSWER.value,
+                "request_mode": RequestMode.INFORMATIONAL.value,
+            },
+            "dynamic_handoff_reason": "STATE_CONFLICT",
+            "dynamic_handoff_order_refs": {
+                "orderId": "o-1",
+                "orderItemId": "i-1",
+            },
+        }
+    )
+
+    args = transfer.await_args.args
+    kwargs = transfer.await_args.kwargs
+    assert args[:2] == (agent_msg, "订单还没发货，收货地址怎么改")
+    assert args[2]["next_action"] == NextAction.HANDOFF.value
+    assert args[2]["request_mode"] == RequestMode.HUMAN_SUPPORT.value
+    assert args[2]["handoff_reason"] == "STATE_CONFLICT"
+    assert kwargs == {
+        "verified_order_refs": {"orderId": "o-1", "orderItemId": "i-1"},
+        "finish_episode": False,
+    }
+    clear.assert_awaited_once_with("u1")
+    assert result["outcome"] == "human_support"
+    assert result["route"] == "end"
+
 def test_thread_id_format():
     assert thread_id_for("user_a", 42) == "user_a:42"
 
@@ -93,6 +253,58 @@ async def test_product_consult_without_authoritative_identity_skips_llm(monkeypa
     assert result["chunks"] == [
         "要核对是否支持主动降噪，请提供具体耳机品牌/型号，或发送商品卡片。"
     ]
+
+
+@pytest.mark.asyncio
+async def test_display_technology_comparison_skips_identity_clarification_and_llm(
+    monkeypatch,
+):
+    bind_llm = MagicMock(side_effect=AssertionError("LLM must not be called"))
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+
+    state = _agent_loop_state(
+        intent=IntentKind.PRODUCT_CONSULT.value,
+        user_text="不要给我列一堆商品，只解释 OLED 和 Mini LED 的区别",
+    )
+    state["rag_source_refs"] = [
+        {
+            "id": "display-guide",
+            "factIds": ["product.display_technology_boundary"],
+        }
+    ]
+    result = await agent_loop_node(state)
+
+    bind_llm.assert_not_called()
+    assert result["llm_skip_reason"] == "bounded_display_technology_explanation"
+    assert "像素自发光" in result["chunks"][0]
+    assert "[1]" in result["chunks"][0]
+
+
+@pytest.mark.asyncio
+async def test_named_product_comparison_resolves_names_instead_of_reasking(monkeypatch):
+    compare = AsyncMock(
+        return_value={
+            "chunks": ["已比较"],
+            "tools_called": ["SEARCH_PRODUCTS", "COMPARE_PRODUCTS"],
+            "route": "finalize",
+        }
+    )
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.forced_named_product_comparison", compare)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+
+    result = await agent_loop_node(
+        _agent_loop_state(
+            intent=IntentKind.PRODUCT_CONSULT.value,
+            user_text="这款 WH-1000XM6 和十周年版主要差在哪",
+        )
+    )
+
+    compare.assert_awaited_once()
+    assert result["llm_skip_reason"] == "named_product_comparison"
+    assert result["tools_called"] == ["SEARCH_PRODUCTS", "COMPARE_PRODUCTS"]
 
 
 @pytest.mark.asyncio
@@ -128,25 +340,75 @@ async def test_confirmed_no_deduction_payment_failure_skips_llm(monkeypatch):
     monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
     monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
 
+    state = _agent_loop_state(
+        intent=IntentKind.PAYMENT_ISSUE.value,
+        user_text="支付失败但没有扣款，怎么办",
+        intent_decision={"risk_level": RiskLevel.MEDIUM.value},
+        request_mode=RequestMode.INFORMATIONAL.value,
+    )
+    state["rag_source_refs"] = [
+        {"id": "payment-guide", "factIds": ["payment.safe_retry_guidance"]}
+    ]
+    result = await agent_loop_node(state)
+
+    bind_llm.assert_not_called()
+    assert result["llm_skipped"] is True
+    assert result["llm_skip_reason"] == "funds_not_deducted"
+    assert result["deterministic_clarification"] is False
+    assert result["structured_result_finalized"] is True
+    assert result["route"] == "finalize"
+    assert "支付失败且没有扣款。[1]" in result["chunks"][0]
+    assert "若仍为待支付" in result["chunks"][0]
+    assert result["chunks"][0].endswith("[1]")
+
+
+@pytest.mark.asyncio
+async def test_payment_retry_before_password_entry_answers_conditions_without_llm(
+    monkeypatch,
+):
+    bind_llm = MagicMock(side_effect=AssertionError("LLM must not be called"))
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+
+    state = _agent_loop_state(
+        intent=IntentKind.PAYMENT_ISSUE.value,
+        user_text="付款页卡住了，我还没输入密码，先告诉我能否重试",
+        intent_decision={"risk_level": RiskLevel.MEDIUM.value},
+        request_mode=RequestMode.INFORMATIONAL.value,
+    )
+    state["rag_source_refs"] = [
+        {"id": "payment-guide", "factIds": ["payment.safe_retry_guidance"]}
+    ]
+    result = await agent_loop_node(state)
+
+    bind_llm.assert_not_called()
+    assert result["llm_skip_reason"] == "payment_preauth_retry_guidance"
+    assert "确认没有扣款。[1]" in result["chunks"][0]
+    assert "可从订单页重新发起一次支付。[1]" in result["chunks"][0]
+    assert result["route"] == "finalize"
+
+
+@pytest.mark.asyncio
+async def test_feedback_only_without_handoff_is_acknowledged_without_llm(monkeypatch):
+    bind_llm = MagicMock(side_effect=AssertionError("LLM must not be called"))
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+
     result = await agent_loop_node(
         _agent_loop_state(
-            intent=IntentKind.PAYMENT_ISSUE.value,
-            user_text="支付失败但没有扣款，怎么办",
+            intent=IntentKind.COMPLAINT.value,
+            user_text="物流慢归慢，我现在只反馈一下，不用转人工",
             intent_decision={"risk_level": RiskLevel.MEDIUM.value},
             request_mode=RequestMode.INFORMATIONAL.value,
         )
     )
 
     bind_llm.assert_not_called()
-    assert result["llm_skipped"] is True
-    assert result["llm_skip_reason"] == "funds_not_deducted"
-    assert result["deterministic_clarification"] is True
-    assert result["structured_result_finalized"] is True
+    assert result["llm_skip_reason"] == "feedback_only_acknowledgement"
+    assert "不会发起人工转接" in result["chunks"][0]
     assert result["route"] == "finalize"
-    assert result["chunks"] == [
-        "根据你的描述，本次支付失败且没有扣款。请先检查支付方式和页面提示，再自行重新发起支付；"
-        "若之后出现扣款、重复扣款或非本人支付，请回复“转人工”以进入人工核查。"
-    ]
 
 
 @pytest.mark.asyncio

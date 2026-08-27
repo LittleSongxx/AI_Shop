@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-26T12:35:26.685Z",
+  "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "596ddf7bc2f4aab0278205669814bd09d48705770a422f25940621effcb3a84e",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 4302,
+      "sha256": "6235078f7c7925c45476ad60518587d36fb1add73a0524d1ad1f42cbf49d6290"
+    },
+    "report.json": {
+      "bytes": 3510241,
+      "sha256": "474ecd9c994b31a3eee34e6e6989ca6d49d0e8550421822b6f4e4be47d4cab07"
+    },
+    "report.md": {
+      "bytes": 1702,
+      "sha256": "0dfe14828be545ca25d71f9ddc9625859786619a64c9661ade61201538b6f08c"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v33-routing-fix-targeted-20260826",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "11bee276bbcdb980333dec3c59cdf7e6dc488cc1fe48974eb81addfff39abe14",
+  "status": "TARGETED_POST_FIX_SMOKE_NON_GATING"
+}

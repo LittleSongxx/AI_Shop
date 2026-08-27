@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "aishop-human-review-adjudication-delivery/v1",
+  "status": "OPEN_HUMAN_ADJUDICATION",
+  "task": "CUSTOMER_SERVICE_V54_ANSWER_QUALITY_ADJUDICATION",
+  "sourceReview": {
+    "caseCount": 120,
+    "exactAgreementCaseCount": 112,
+    "disagreementCaseCount": 8,
+    "caseAgreementRate": 0.933333,
+    "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-pending-adjudication-20260827",
+    "pendingEvidenceSha256SumsSha256": "7cec67328e26fdfb54c2c6763906bd935692e7ad13e308a1685e2d1cb4db533c"
+  },
+  "adjudicatorC": {
+    "zipPath": "deliverables/human-review/AI-Shop-v54-answer-quality-adjudicator-c-20260827.zip",
+    "zipSha256": "03c46b156bbda65c940c4b2d251b59de327af943fc4f89a8beea7345a057edd9",
+    "adjudicationTemplateSha256": "5510c759cddf400f1c9aab396760a42ea6e4c635246bab30ff2b897b9e043aa3",
+    "caseCount": 8,
+    "returnDirectory": "holdout/v54/adjudicator-c",
+    "returnFiles": [
+      "adjudication.open.jsonl",
+      "adjudicator-attestation.template.json"
+    ]
+  },
+  "decisionAuthority": {
+    "adjudicatorMustBeHuman": true,
+    "humanRetainsFinalDecisionAuthority": true,
+    "aiAssistedTextOrRecordingAllowed": true,
+    "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED"
+  },
+  "releaseGateEligible": false,
+  "finalUnseenEligible": false
+}

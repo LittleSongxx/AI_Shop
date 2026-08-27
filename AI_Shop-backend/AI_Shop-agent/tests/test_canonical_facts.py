@@ -11,12 +11,14 @@ from app.rag.canonical_facts import (
 from app.rag.fact_metadata import get_fact_metadata_catalog
 
 
-def test_runtime_uses_v2_while_legacy_scope_keeps_v1_catalog_and_metadata():
+def test_runtime_uses_v3_overlay_while_legacy_scope_keeps_v1_catalog_and_metadata():
     runtime = get_canonical_fact_catalog()
 
-    assert runtime.catalog_version == 2
+    assert runtime.catalog_version == 3
     assert runtime.path.resolve() == DEFAULT_CATALOG_PATH.resolve()
-    assert get_fact_metadata_catalog().path.name == "fact-metadata.v2.json"
+    assert get_fact_metadata_catalog().path.name == "fact-metadata.v3.json"
+    assert "payment.safe_retry_guidance" in runtime.fact_to_refs
+    assert "product.display_technology_boundary" in runtime.fact_to_refs
 
     with canonical_fact_catalog_scope(LEGACY_V1_CATALOG_PATH) as legacy:
         assert legacy.catalog_version == 1
@@ -24,6 +26,20 @@ def test_runtime_uses_v2_while_legacy_scope_keeps_v1_catalog_and_metadata():
         assert get_fact_metadata_catalog().path.name == "fact-metadata.v1.json"
 
     assert get_canonical_fact_catalog() is runtime
+
+
+def test_v3_overlay_removes_topic_only_refund_equivalence():
+    catalog = get_canonical_fact_catalog()
+
+    facts = catalog.facts_for_ref(
+        {
+            "type": "knowledge_chunk",
+            "source": "02-orders-delivery-and-returns.md",
+            "heading": "退货与退款",
+        }
+    )
+
+    assert facts == frozenset({"aftersales.request_and_refund_boundary"})
 
 
 def test_catalog_maps_faq_and_markdown_equivalent_evidence_to_same_fact():

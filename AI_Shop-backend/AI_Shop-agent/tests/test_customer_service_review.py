@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from evaluation.customer_service_review import (
     seal_review_sheet,
     validate_review_sheet,
 )
+from evaluation.customer_service_v2 import CustomerServiceV2Error, combine_human_verified_v2
 
 DATASET = (
     Path(__file__).parents[1]
@@ -297,4 +299,184 @@ def test_adjudication_cannot_override_agreement(tmp_path: Path):
             adjudication_path=adjudication,
             output_dataset_path=tmp_path / "should-not-exist.jsonl",
             evidence_path=tmp_path / "should-not-exist.json",
+        )
+
+
+def _make_v2_additions_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    """Create a reviewed additions copy and its minimal merge evidence."""
+
+    base_path = (
+        Path(__file__).parents[1]
+        / "evaluation-evidence"
+        / "benchmarks"
+        / "customer-service"
+        / "customer-service-human-v1-20260823"
+        / "customer-service-human-v1.jsonl"
+    )
+    rows = load_jsonl(base_path)
+    additions = []
+    for index, row in enumerate(rows, 1):
+        copied = json.loads(json.dumps(row, ensure_ascii=False))
+        copied["id"] = f"cs-candidate-v2-reviewed-{index:03d}"
+        additions.append(copied)
+    additions_path = tmp_path / "additions-human-verified.jsonl"
+    atomic_write_jsonl(additions_path, additions)
+    additions_evidence = tmp_path / "additions-merge.evidence.json"
+    additions_evidence.write_text(
+        json.dumps(
+            {
+                "schemaVersion": "aishop-customer-service-review-evidence/v1",
+                "status": HUMAN_STATUS,
+                "releaseGateEligible": False,
+                "caseCount": len(additions),
+                "outputDatasetPath": str(additions_path),
+                "outputDatasetSha256": hashlib.sha256(additions_path.read_bytes()).hexdigest(),
+                "reviewA": {"reviewerId": "reviewer-a", "sha256": "a" * 64},
+                "reviewB": {"reviewerId": "reviewer-b", "sha256": "b" * 64},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return additions_path, additions_evidence
+
+
+def test_combine_v2_requires_reviewed_additions_and_binds_all_hashes(tmp_path: Path):
+    base_path = (
+        Path(__file__).parents[1]
+        / "evaluation-evidence"
+        / "benchmarks"
+        / "customer-service"
+        / "customer-service-human-v1-20260823"
+        / "customer-service-human-v1.jsonl"
+    )
+    base_manifest = (
+        Path(__file__).parents[1]
+        / "evaluation"
+        / "datasets"
+        / "customer_service"
+        / "adjudicated"
+        / "gold-v1-human-adjudicated.manifest.json"
+    )
+    additions_path, additions_evidence = _make_v2_additions_fixture(tmp_path)
+    output = tmp_path / "customer-service-human-v2.jsonl"
+    output_manifest = tmp_path / "customer-service-human-v2.jsonl.manifest.json"
+    evidence = tmp_path / "customer-service-human-v2.evidence.json"
+
+    result = combine_human_verified_v2(
+        base_path,
+        base_manifest,
+        additions_path,
+        additions_evidence,
+        output_dataset_path=output,
+        output_manifest_path=output_manifest,
+        evidence_path=evidence,
+    )
+
+    rows = load_gold_dataset(output)
+    assert len(rows) == 120
+    assert len({row["id"] for row in rows}) == 120
+    assert all(row["annotation"]["status"] == HUMAN_STATUS for row in rows)
+    assert result["caseCount"] == 120
+    assert result["qualityMetricsStatus"] == "NOT_COMPUTED"
+    manifest = json.loads(output_manifest.read_text(encoding="utf-8"))
+    assert manifest["datasetSha256"] == hashlib.sha256(output.read_bytes()).hexdigest()
+    assert manifest["releaseGateEligible"] is False
+
+
+def test_combine_v2_rejects_draft_or_mismatched_evidence_before_writing(tmp_path: Path):
+    base_path = (
+        Path(__file__).parents[1]
+        / "evaluation-evidence"
+        / "benchmarks"
+        / "customer-service"
+        / "customer-service-human-v1-20260823"
+        / "customer-service-human-v1.jsonl"
+    )
+    base_manifest = (
+        Path(__file__).parents[1]
+        / "evaluation"
+        / "datasets"
+        / "customer_service"
+        / "adjudicated"
+        / "gold-v1-human-adjudicated.manifest.json"
+    )
+    draft = tmp_path / "draft.jsonl"
+    draft_rows = load_jsonl(DATASET)
+    atomic_write_jsonl(draft, draft_rows)
+    evidence = tmp_path / "draft.evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schemaVersion": "aishop-customer-service-review-evidence/v1",
+                "status": HUMAN_STATUS,
+                "releaseGateEligible": False,
+                "caseCount": 60,
+                "outputDatasetPath": str(draft),
+                "outputDatasetSha256": "0" * 64,
+                "reviewA": {"reviewerId": "reviewer-a", "sha256": "a" * 64},
+                "reviewB": {"reviewerId": "reviewer-b", "sha256": "b" * 64},
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "should-not-exist.jsonl"
+    with pytest.raises(CustomerServiceV2Error, match="not uniformly HUMAN_VERIFIED"):
+        combine_human_verified_v2(
+            base_path,
+            base_manifest,
+            draft,
+            evidence,
+            output_dataset_path=output,
+            output_manifest_path=tmp_path / "should-not-exist.manifest.json",
+            evidence_path=tmp_path / "should-not-exist.evidence.json",
+        )
+    assert not output.exists()
+
+
+def test_combine_v2_rejects_duplicate_ids(tmp_path: Path):
+    base_path = (
+        Path(__file__).parents[1]
+        / "evaluation-evidence"
+        / "benchmarks"
+        / "customer-service"
+        / "customer-service-human-v1-20260823"
+        / "customer-service-human-v1.jsonl"
+    )
+    base_manifest = (
+        Path(__file__).parents[1]
+        / "evaluation"
+        / "datasets"
+        / "customer_service"
+        / "adjudicated"
+        / "gold-v1-human-adjudicated.manifest.json"
+    )
+    additions = tmp_path / "duplicate-additions.jsonl"
+    rows = load_jsonl(base_path)
+    atomic_write_jsonl(additions, rows)
+    evidence = tmp_path / "duplicate.evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schemaVersion": "aishop-customer-service-review-evidence/v1",
+                "status": HUMAN_STATUS,
+                "releaseGateEligible": False,
+                "caseCount": 60,
+                "outputDatasetPath": str(additions),
+                "outputDatasetSha256": hashlib.sha256(additions.read_bytes()).hexdigest(),
+                "reviewA": {"reviewerId": "reviewer-a", "sha256": "a" * 64},
+                "reviewB": {"reviewerId": "reviewer-b", "sha256": "b" * 64},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(CustomerServiceV2Error, match="duplicate case IDs"):
+        combine_human_verified_v2(
+            base_path,
+            base_manifest,
+            additions,
+            evidence,
+            output_dataset_path=tmp_path / "should-not-exist.jsonl",
+            output_manifest_path=tmp_path / "should-not-exist.manifest.json",
+            evidence_path=tmp_path / "should-not-exist.evidence.json",
         )

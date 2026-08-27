@@ -1,0 +1,52 @@
+{
+  "artifactId": "customer-service-human-v2-label-consistency-audit-20260826",
+  "createdAt": "2026-08-26T12:22:25.477Z",
+  "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "files": {
+    "README.md": {
+      "bytes": 380,
+      "sha256": "68820e7b407175a2474be14c650682b632be1f1ad2d596bdcf313733ef88af7f"
+    },
+    "label-consistency-audit.json": {
+      "bytes": 8440,
+      "sha256": "cbe8edceeeb7133250fcc9bac574773f8a4d347af15faa5d019d23ed65148492"
+    },
+    "label-consistency-audit.md": {
+      "bytes": 3308,
+      "sha256": "9750c9558f58824f7a6fab8e2f52c2753458a42bb7b01ef59c27b19daebfb2fd"
+    },
+    "lifecycle.json": {
+      "bytes": 588,
+      "sha256": "f897ab46fd0076a6a1c2249e53fa5617f450a3af7a63622809843842fa3556d6"
+    },
+    "reaudit/adjudication-context.after-sealing.jsonl": {
+      "bytes": 10634,
+      "sha256": "295b645f382452308b19a1dc261f784aea32c0ab0bdd0808f3a278f99305529d"
+    },
+    "reaudit/label-policy-reaudit.open.jsonl": {
+      "bytes": 9521,
+      "sha256": "f40ebda1c3b5c6625b91e6471256c743ce1a05c88a2906db52dfe2a14e5c8e54"
+    },
+    "reaudit/label-policy-reaudit.open.jsonl.manifest.json": {
+      "bytes": 714,
+      "sha256": "c46862cd1ad2a7b897f29514796b4e6d01765e1328e3a3958404e7029147bb83"
+    },
+    "source/customer-service-human-v2.jsonl": {
+      "bytes": 106916,
+      "sha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079"
+    },
+    "source/customer-service-taxonomy-contract-v2.1.json": {
+      "bytes": 1935,
+      "sha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+    },
+    "source/provenance-audit.json": {
+      "bytes": 16617,
+      "sha256": "688aef05cc3b7d931f85998fa71a9d2bf1f53e06a74aee542e548c2610c5eff9"
+    }
+  },
+  "finalUnseenEligible": false,
+  "findingCount": 5,
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-customer-service-label-audit-package/v1",
+  "status": "BLOCKED_HUMAN_READJUDICATION"
+}

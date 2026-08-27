@@ -13,6 +13,10 @@ from evaluation.core.datasets import (
     validate_final_against_known,
     validate_repository_datasets,
 )
+from evaluation.core.final_exposure import (
+    audit_final_input_exposure,
+    exposure_error_summary,
+)
 from evaluation.core.fingerprints import source_fingerprint, stable_fingerprint
 from evaluation.core.io import (
     EVALUATION_ROOT,
@@ -123,6 +127,12 @@ def claim_final(release_id: str, dataset_path: Path) -> dict[str, Any]:
     rows = load_jsonl(dataset_path)
     cases = [parse_case(row, expected_split=Split.FINAL) for row in rows]
     validate_final_against_known(cases)
+    exposures = audit_final_input_exposure(cases, dataset_path=dataset_path)
+    if exposures:
+        raise LifecycleError(
+            "final input is recoverable from repository source; claim refused: "
+            + exposure_error_summary(exposures)
+        )
     # Historical final content is immutable even when its .runs directory is
     # later removed.  Compare the actual {domain,input} fingerprints, not only
     # IDs or a registry hash, so a newly claimed holdout cannot silently reuse

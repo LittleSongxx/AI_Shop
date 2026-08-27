@@ -28,6 +28,7 @@ from app.services.product_search_pipeline import (
     product_search_pipeline,
 )
 from app.services.product_search_query import (
+    build_product_query_scope,
     normalize_product_search_query,
 )
 from app.services.recommendation_attribution_service import (
@@ -277,7 +278,11 @@ class ProductService:
             runtime_constraints=runtime_constraints,
         )
         query_plan_started = time.perf_counter()
-        query_plan = build_product_query_plan(query, mission)
+        query_plan = build_product_query_plan(
+            query,
+            mission,
+            constraint_query=user_text or query,
+        )
         query_parse_ms = round((time.perf_counter() - query_plan_started) * 1000, 4)
 
         # A concrete keyword is already enough to identify a shelf.  Otherwise
@@ -326,7 +331,11 @@ class ProductService:
                 or str(mission.get("category") or profile.get("category") or "").strip()
                 or query
             )
-            query_plan = build_product_query_plan(query, mission)
+            query_plan = build_product_query_plan(
+                query,
+                mission,
+                constraint_query=user_text or query,
+            )
 
         product_ids: list[str] = []
         source = "none"
@@ -373,6 +382,7 @@ class ProductService:
                     or constraints.must_terms
                     or constraints.must_not_terms
                     or constraints.comparison_required
+                    or query_plan.required_qualifier_ids
                 )
                 fallback_blocked = source == "comparison_incomplete" or (
                     source == "constraint_miss" and explicit_hard_constraints
@@ -452,9 +462,17 @@ class ProductService:
 
         recall_source = source
         decision_started = time.perf_counter()
+        decision_mission = merge_runtime_constraints(
+            mission, query_plan.constraints.public()
+        )
+        if (
+            query_plan.constraints.comparison_required
+            and query_plan.constraints.category is None
+        ):
+            decision_mission["category"] = None
         decision = await shopping_decision_service.decide(
             user_id=user_id,
-            mission=mission,
+            mission=decision_mission,
             candidates=products,
             source=recall_source,
             request_id=request_id,
@@ -523,10 +541,8 @@ class ProductService:
         intentionally avoiding a second online state store.
         """
         mission = await shopping_mission_service.load(user_id)
-        if mission_is_active(mission):
-            return merge_runtime_constraints(mission, runtime_constraints)
         derived = apply_explicit_turn(
-            None,
+            mission if mission_is_active(mission) else None,
             profile=profile,
             user_text=user_text,
             message_id=0,
@@ -726,6 +742,7 @@ def format_search_tool_message(
     source: str,
     profile: dict | None = None,
     mission: dict | None = None,
+    constraint_query: str | None = None,
 ) -> str:
 
     from app.domain.intent.rules import looks_like_browse_recommend, looks_like_hot_sale_recommend
@@ -735,7 +752,17 @@ def format_search_tool_message(
     similar_intent = _similar_intent(keyword, consult)
     alternative_sources = {"browse", "hot_sale", "hot_sale_explicit"}
     kw = (keyword or "").strip()
-    kw_display = (normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求"
+    query_scope = build_product_query_scope(constraint_query or kw)
+    requested_models = [
+        str(value)
+        for value in query_scope.get("requestedModels") or []
+        if str(value).strip()
+    ]
+    model_display = "、".join(requested_models)
+    kw_display = (
+        model_display
+        or ((normalize_product_search_query(kw) or kw)[:24] if kw else "你的需求")
+    )
     uncertainty_suffix = (
         " 当前条件仍不完整，结果按较宽范围返回，适配性存在不确定性。"
         if (mission or {}).get("uncertaintyDisclosureRequired")
@@ -771,7 +798,15 @@ def format_search_tool_message(
         )
     if source in {"constraint_miss", "no_match", "none"}:
         summary = mission_summary(mission) or shopping_profile_service.summary(profile)
-        detail = f"（{summary}）" if summary else ""
+        scope_summary = []
+        if summary:
+            scope_summary.append(summary)
+        if model_display and not any(
+            model.casefold() in str(summary or "").casefold()
+            for model in requested_models
+        ):
+            scope_summary.append(f"型号:{model_display}")
+        detail = f"（{' | '.join(scope_summary)}）" if scope_summary else ""
         return (
             f"【筛选结果】本次检索暂未返回同时满足你的条件{detail}的商品，"
             "不能据此断言平台无货。\n"

@@ -455,7 +455,14 @@ class RagRetriever:
             )
 
         cache_key = self._semantic_cache_key(
-            cleaned, version, effective_top_k, category_filter, bucket, settings, rerank_top_n
+            cleaned,
+            version,
+            effective_top_k,
+            category_filter,
+            bucket,
+            settings,
+            rerank_top_n,
+            query_variants=query_variants,
         )
         cached = None if include_evaluation_candidates else await self._get_cache(cache_key)
         if cached:
@@ -600,6 +607,7 @@ class RagRetriever:
         bucket: str,
         settings,
         rerank_top_n: int,
+        query_variants: list[str] | None = None,
     ) -> str:
         """语义缓存的键 = 所有会改变检索结果的配置维度的指纹。
 
@@ -610,6 +618,13 @@ class RagRetriever:
         """
         payload = {
             "q": cleaned,
+            # Supplied variants change both the candidate pool and RRF scores.
+            # They must not reuse a single-query cache entry (or vice versa).
+            "query_variants": [
+                self.normalize_query(str(value or ""))
+                for value in (query_variants or [])
+                if self.normalize_query(str(value or ""))
+            ],
             "top_k": top_k,
             "filters": category_filter or [],
             "bucket": bucket,

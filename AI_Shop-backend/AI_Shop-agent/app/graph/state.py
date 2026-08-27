@@ -12,6 +12,7 @@ RouteKind = Literal[
     "multi_agent_synthesis",
     "orchestration_router",
     "deterministic_workflow",
+    "human_handoff",
     "finalize",
     "post_turn",
     "end",
@@ -39,8 +40,8 @@ class AgentGraphState(TypedDict, total=False):
     finished: bool
     route: RouteKind
 
-    # 用户最终看到什么。Worker 以此决定任务终态：只有 ok 才进 COMPLETED，
-    # llm_error / graph_error 说明用户收到的是错误文案，绝不应当成成功任务。
+    # 用户最终看到什么。ok / human_support 是成功终态；llm_error /
+    # graph_error 说明用户收到的是错误文案，绝不应当成成功任务。
     outcome: str | None
 
     llm_messages: list[BaseMessage]
@@ -104,6 +105,8 @@ class AgentGraphState(TypedDict, total=False):
     # It never comes from model output or user-controlled state.
     deterministic_clarification: bool
     structured_result_finalized: bool
+    dynamic_handoff_reason: str | None
+    dynamic_handoff_order_refs: dict | None
 
 def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGraphState:
 
@@ -181,6 +184,8 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "llm_skip_reason": None,
         "deterministic_clarification": False,
         "structured_result_finalized": False,
+        "dynamic_handoff_reason": None,
+        "dynamic_handoff_order_refs": None,
     }
 
 def thread_id_for(user_id: str, message_id: int) -> str:

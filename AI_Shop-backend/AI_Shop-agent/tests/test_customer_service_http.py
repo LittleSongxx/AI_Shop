@@ -33,6 +33,47 @@ HUMAN_DATASET = (
     / "customer-service-human-v1-20260823"
     / "customer-service-human-v1.jsonl"
 )
+V2_HUMAN_DATASET = (
+    AGENT_ROOT
+    / "evaluation-evidence"
+    / "benchmarks"
+    / "customer-service"
+    / "customer-service-human-v2-provenance-pending-20260826"
+    / "labels"
+    / "customer-service-human-v2.jsonl"
+)
+V2_LABEL_AUDIT = (
+    AGENT_ROOT
+    / "evaluation-evidence"
+    / "benchmarks"
+    / "customer-service"
+    / "customer-service-human-v2-label-consistency-audit-20260826"
+    / "label-consistency-audit.json"
+)
+V21_HUMAN_DATASET = (
+    AGENT_ROOT
+    / "evaluation"
+    / "datasets"
+    / "customer_service"
+    / "adjudicated"
+    / "customer-service-human-v2.1-human-approved-ai-assisted.jsonl"
+)
+V21_LABEL_EVIDENCE = (
+    AGENT_ROOT
+    / "evaluation-evidence"
+    / "benchmarks"
+    / "customer-service"
+    / "customer-service-human-v2.1-label-policy-human-approved-ai-assisted-20260827"
+    / "evidence-manifest.json"
+)
+V23_BEHAVIOR_CONTRACTS = (
+    AGENT_ROOT
+    / "evaluation"
+    / "datasets"
+    / "customer_service"
+    / "adjudicated"
+    / "http-behavior-contracts-human-v2.3-v54-final-badcases.json"
+)
 
 
 def _result(*, handoff: bool = False, citation: int = 1) -> CaseResult:
@@ -149,6 +190,56 @@ def test_observation_separates_citation_shape_from_semantic_support():
     assert observation["assertions"] == []
 
 
+def test_specialist_orchestration_handoffs_do_not_count_as_human_support():
+    result = _result()
+    result.output["episodes"][0]["handoffs"] = [
+        {
+            "handoffId": "internal-1",
+            "sourceAgent": "supervisor",
+            "targetAgent": "after_sales_policy_specialist",
+            "status": "SUCCEEDED",
+        }
+    ]
+
+    observation = observe_http_result(result)
+
+    assert observation["handoffObserved"] is False
+    assert observation["handoffEvidence"] == {
+        "intentDecision": False,
+        "rootTerminal": False,
+        "explicitHumanEventCount": 0,
+        "specialistHandoffCountExcluded": 1,
+        "metricDefinition": "HUMAN_SUPPORT_ONLY_V2",
+    }
+
+
+def test_explicit_human_handoff_event_counts_without_internal_handoff_rows():
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {"eventType": "HUMAN_HANDOFF", "nodeName": "support", "output": {}}
+    )
+
+    assert observe_http_result(result)["handoffObserved"] is True
+
+
+def test_persisted_support_session_handoff_counts_as_human_support():
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {
+            "eventType": "HANDOFF",
+            "nodeName": "support",
+            "status": "OK",
+            "output": {"sessionId": "support-session-1"},
+        }
+    )
+
+    observation = observe_http_result(result)
+
+    assert observation["handoffObserved"] is True
+    assert observation["handoffEvidence"]["explicitHumanEventCount"] == 1
+    assert observation["prediction"]["shouldHandoff"] is False
+
+
 def test_observation_retains_fixture_cleanup_evidence():
     result = _result()
     result.output["fixtureEvidence"] = {
@@ -229,6 +320,110 @@ def test_source_ref_dedupe_merges_sanitized_boundary_variants_without_collapsing
     assert p1["price"] == 99
 
 
+def test_source_ref_dedupe_collapses_redacted_no_result_and_constraint_variants():
+    no_result = [
+        {
+            "type": "product",
+            "id": "product-search:raw",
+            "query": "我想买索尼 WH-1000XM6,预算 2000 元",
+            "queryScope": {
+                "querySha256": "a" * 64,
+                "schemaVersion": "product-query-scope/v1",
+            },
+            "matched": False,
+            "resultSource": "constraint_miss",
+            "requestId": "req-raw",
+            "capturedAt": "2026-08-26T03:16:54.042Z",
+        },
+        {
+            "type": "product",
+            "id": "product-search:<ID:hashed>",
+            "query": {"chars": 26, "sha256": "a" * 64},
+            "queryScope": {"querySha256": "<ID:hashed>"},
+            "matched": False,
+            "resultSource": "constraint_miss",
+            "requestId": "<ID:req>",
+            "capturedAt": "2026-08-26T03:16:54.042Z",
+        },
+    ]
+    constraints = [
+        {
+            "type": "product_search_constraint",
+            "excludedTerms": [],
+            "excludedBrands": [],
+            "requiredQualifierIds": [],
+            "returnedCandidateCount": 0,
+            "returnedCandidatesSatisfyExclusions": True,
+            "returnedCandidatesSatisfyRequiredQualifiers": True,
+            "requiredQualifierEvidenceSource": "JAVA_PRODUCT_SNAPSHOT",
+            "catalogAbsenceClaim": False,
+            "source": "JAVA_GATEWAY",
+            "requestId": "req-raw",
+            "capturedAt": "2026-08-26T03:16:54.042Z",
+        }
+    ]
+    result = _dedupe_refs([*no_result, *constraints, dict(constraints[0], requestId="<ID:req>")])
+    assert len(result) == 2
+    assert [item["type"] for item in result] == ["product", "product_search_constraint"]
+    # Prefer the richer, unsanitized boundary copy while retaining the stable
+    # source identity needed for review binding.
+    assert result[0]["query"] == no_result[0]["query"]
+
+
+def test_source_ref_dedupe_collapses_raw_and_sanitized_action_proposals():
+    raw = {
+        "type": "action_proposal",
+        "id": "action-proposal:raw-token",
+        "actionType": "CREATE_SUPPORT_CASE",
+        "status": "PENDING",
+        "argsFingerprint": "a" * 64,
+        "requiresUserConfirmation": True,
+        "effectExecuted": False,
+        "capturedAt": "2026-08-26T03:34:07.557Z",
+        "source": "AGENT_PENDING_ACTION_STORE",
+    }
+    sanitized = {
+        **raw,
+        "id": "action-proposal:<ID:hashed>",
+        "argsFingerprint": "<ID:args>",
+        "source": "<ID:source>",
+    }
+
+    result = _dedupe_refs([raw, sanitized])
+
+    assert len(result) == 1
+    assert result[0]["id"] == raw["id"]
+    assert result[0]["argsFingerprint"] == raw["argsFingerprint"]
+
+
+def test_http_projection_replaces_scoped_product_query_prose_with_digest():
+    report = {
+        "schemaVersion": "aishop-customer-service-http-evaluation/v1",
+        "runId": "run-query-projection",
+        "cases": [
+            {
+                "http": {
+                    "sourceRefs": [
+                        {
+                            "type": "product",
+                            "query": "请寄到上海市浦东新区某路 123 号，预算 2000 元",
+                            "queryScope": {
+                                "schemaVersion": "product-query-scope/v1",
+                                "querySha256": "b" * 64,
+                                "queryChars": 25,
+                            },
+                        }
+                    ]
+                }
+            }
+        ],
+    }
+    projected = sanitize_customer_service_http_report(report)
+    ref = projected["cases"][0]["http"]["sourceRefs"][0]
+    assert ref["query"] == {"chars": 25, "sha256": "b" * 64}
+    assert "浦东新区" not in str(projected)
+
+
 def test_observation_exposes_verifier_quality_and_hard_constraint_audit():
     result = _result()
     episode = result.output["episodes"][0]
@@ -271,6 +466,93 @@ def test_observation_exposes_verifier_quality_and_hard_constraint_audit():
     assert quality["terminalQuality"] == "SAFE_DEGRADED"
     assert observation["hardConstraintViolation"] is True
     assert observation["hardConstraintViolationProductIds"] == ["p-bad"]
+
+
+def test_observation_detects_unverified_required_qualifier_candidate():
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {
+            "eventType": "TOOL_CALL",
+            "nodeName": "tools",
+            "output": {
+                "contractData": {
+                    "trace": {
+                        "constraintEvidence": {
+                            "type": "HARD_CONSTRAINT_AUDIT",
+                            "requiredQualifierIds": ["android-operating-system"],
+                            "returnedCandidateCount": 1,
+                            "unverifiedRequiredQualifierProductIds": ["p-no-os"],
+                            "unverifiedRequiredQualifierCandidateCount": 1,
+                            "returnedCandidatesSatisfyRequiredQualifiers": False,
+                        }
+                    }
+                }
+            },
+        }
+    )
+
+    observation = observe_http_result(result)
+
+    assert observation["hardConstraintViolation"] is True
+    assert observation["hardConstraintViolationProductIds"] == ["p-no-os"]
+    assert observation["hardConstraintUnattributedViolationCount"] == 0
+
+
+def test_observation_allows_empty_required_qualifier_result():
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {
+            "eventType": "TOOL_CALL",
+            "nodeName": "tools",
+            "output": {
+                "contractData": {
+                    "trace": {
+                        "constraintEvidence": {
+                            "type": "HARD_CONSTRAINT_AUDIT",
+                            "requiredQualifierIds": ["android-operating-system"],
+                            "returnedCandidateCount": 0,
+                            "unverifiedRequiredQualifierProductIds": [],
+                            "unverifiedRequiredQualifierCandidateCount": 0,
+                            "returnedCandidatesSatisfyRequiredQualifiers": True,
+                        }
+                    }
+                }
+            },
+        }
+    )
+
+    observation = observe_http_result(result)
+
+    assert observation["hardConstraintViolation"] is False
+    assert observation["hardConstraintViolationProductIds"] == []
+    assert observation["hardConstraintUnattributedViolationCount"] == 0
+
+
+def test_observation_fails_closed_when_qualifier_success_proof_is_missing():
+    result = _result()
+    result.output["episodes"][0]["steps"].append(
+        {
+            "eventType": "TOOL_CALL",
+            "nodeName": "tools",
+            "output": {
+                "contractData": {
+                    "trace": {
+                        "constraintEvidence": {
+                            "type": "HARD_CONSTRAINT_AUDIT",
+                            "requiredQualifierIds": ["android-operating-system"],
+                            "returnedCandidateCount": 1,
+                        }
+                    }
+                }
+            },
+        }
+    )
+
+    observation = observe_http_result(result)
+
+    assert observation["hardConstraintViolation"] is True
+    assert observation["hardConstraintViolationProductIds"] == []
+    assert observation["hardConstraintUnattributedViolationCount"] == 1
 
 
 def test_hash_bound_http_behavior_contracts_detect_original_safety_badcase():
@@ -321,6 +603,82 @@ def test_hash_bound_http_behavior_contracts_detect_original_safety_badcase():
     assert report["releaseGateEligible"] is False
 
 
+def test_behavior_contract_requires_real_handoff_not_transfer_wording_only():
+    result = _result()
+    result.output["answer"] = "已为您转接人工客服。"
+    observation = observe_http_result(result)
+    contract = {
+        "contractId": "requires-real-human-transfer",
+        "caseId": "case-1",
+        "category": "HANDOFF_SAFETY",
+        "expected": {
+            "requireHumanHandoff": True,
+            "requiredAnswerRegexes": ["已为您转接人工客服"],
+        },
+    }
+
+    report = evaluate_http_behavior_contracts({"case-1": observation}, [contract])
+
+    assert report["status"] == "VIOLATIONS_DETECTED"
+    assert report["results"][0]["failedChecks"] == ["REQUIRED_HUMAN_HANDOFF"]
+
+
+def test_behavior_contract_can_prohibit_handoff_and_require_bound_rag_fact():
+    result = _result()
+    result.output["answer"] = "请按规则处理。[1]"
+    result.output["episodes"][0]["conversation"]["assistantMessage"] = (
+        "请按规则处理。[1]"
+    )
+    result.output["episodes"][0]["conversation"]["sourceRefs"] = [
+        {
+            "id": "knowledge-1",
+            "type": "knowledge_chunk",
+            "factIds": ["policy.safe_guidance"],
+        }
+    ]
+    observation = observe_http_result(result)
+    contract = {
+        "contractId": "requires-cited-policy-without-transfer",
+        "caseId": "case-1",
+        "category": "POLICY_GROUNDING",
+        "expected": {
+            "requireNoHumanHandoff": True,
+            "requireCitationContractValid": True,
+            "requiredRagFactIds": ["policy.safe_guidance"],
+        },
+    }
+
+    report = evaluate_http_behavior_contracts({"case-1": observation}, [contract])
+
+    assert report["status"] == "SATISFIED"
+    assert [check["name"] for check in report["results"][0]["checks"]] == [
+        "NO_HUMAN_HANDOFF",
+        "REQUIRED_RAG_FACT_IDS",
+        "VALID_CITATION_CONTRACT",
+    ]
+
+
+def test_behavior_contract_fails_missing_required_rag_fact():
+    observation = observe_http_result(_result())
+    contract = {
+        "contractId": "requires-cited-policy",
+        "caseId": "case-1",
+        "category": "POLICY_GROUNDING",
+        "expected": {
+            "requireCitationContractValid": True,
+            "requiredRagFactIds": ["policy.safe_guidance"],
+        },
+    }
+
+    report = evaluate_http_behavior_contracts({"case-1": observation}, [contract])
+
+    assert report["status"] == "VIOLATIONS_DETECTED"
+    assert report["results"][0]["failedChecks"] == [
+        "REQUIRED_RAG_FACT_IDS",
+        "VALID_CITATION_CONTRACT",
+    ]
+
+
 def test_v2_behavior_contract_loader_accepts_required_action_proposals():
     bundle = load_http_behavior_contracts(
         AGENT_ROOT
@@ -343,6 +701,31 @@ def test_v2_behavior_contract_loader_accepts_required_action_proposals():
     assert logistics["expected"]["requiredActionProposals"] == [
         "CREATE_SUPPORT_CASE"
     ]
+
+
+def test_v23_behavior_contracts_bind_all_v54_final_badcases():
+    bundle = load_http_behavior_contracts(V23_BEHAVIOR_CONTRACTS, V21_HUMAN_DATASET)
+    targets = {
+        "cs-gold-v1-036",
+        "cs-gold-v1-048",
+        "cs-candidate-v2-075",
+        "cs-candidate-v2-090",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-110",
+        "cs-candidate-v2-116",
+    }
+    target_contracts = {
+        item["caseId"]: item for item in bundle["contracts"] if item["caseId"] in targets
+    }
+
+    assert len(bundle["contracts"]) == 29
+    assert set(target_contracts) == targets
+    assert target_contracts["cs-candidate-v2-075"]["expected"][
+        "requireNoHumanHandoff"
+    ]
+    assert target_contracts["cs-gold-v1-048"]["expected"][
+        "requiredRagFactIds"
+    ] == ["payment.safe_retry_guidance"]
 
 
 @pytest.mark.parametrize("proposal_source", ["event", "answer_card"])
@@ -524,6 +907,141 @@ def test_report_scores_handoff_but_not_final_answer():
     assert report["answerQuality"]["answerCorrectness"] is None
     assert report["answerQuality"]["selfJudged"] is False
     assert report["qualityDiagnostics"]["status"] == "RUNTIME_DIAGNOSTIC_NOT_HUMAN_TRUTH"
+
+
+def test_initial_handoff_label_is_separate_from_post_resolution_support_transfer():
+    row = load_gold_dataset(HUMAN_DATASET)[0]
+    result = _result()
+    result.output["episodes"][0]["status"] = "HANDOFF"
+    result.output["episodes"][0]["steps"].append(
+        {
+            "eventType": "HANDOFF",
+            "nodeName": "support",
+            "status": "OK",
+            "output": {"sessionId": "support-session-1"},
+        }
+    )
+    observation = observe_http_result(result)
+
+    report = build_http_report(
+        [row],
+        rule_predictions={row["id"]: _perfect_rule(row)},
+        observations={row["id"]: observation},
+        dataset_path=HUMAN_DATASET,
+        run_id="customer-http-post-resolution-handoff-test",
+        preflight={"passed": True},
+    )
+
+    assert observation["handoffObserved"] is True
+    assert observation["prediction"]["shouldHandoff"] is False
+    assert report["handoffDecision"]["accuracy"]["value"] == 1.0
+    assert report["handoffDecision"]["metricDefinition"] == (
+        "INITIAL_API_INTENT_HANDOFF_DECISION_V1"
+    )
+    assert report["humanSupportTransfer"]["caseIds"] == [row["id"]]
+
+
+def test_report_binds_fail_closed_label_and_provenance_validity():
+    row = load_gold_dataset(V2_HUMAN_DATASET)[0]
+    report = build_http_report(
+        [row],
+        rule_predictions={row["id"]: _perfect_rule(row)},
+        observations={row["id"]: observe_http_result(_result())},
+        dataset_path=V2_HUMAN_DATASET,
+        run_id="customer-http-validity-test",
+        preflight={"passed": True},
+        label_audit_path=V2_LABEL_AUDIT,
+    )
+
+    assert report["dataset"]["annotationStatus"] == "HUMAN_VERIFIED"
+    assert report["dataset"]["annotationStatusInterpretation"] == (
+        "ROW_DECLARATION_NOT_VALIDITY_GATE"
+    )
+    assert report["qualityClaimStatus"] == (
+        "DEVELOPMENT_DIAGNOSTIC_LABEL_AND_PROVENANCE_BLOCKED"
+    )
+    assert report["evidenceValidity"]["blocking"] is True
+    assert report["evidenceValidity"]["gates"]["provenancePassed"] is False
+    assert report["rulePreRouter"]["metrics"]["intentMacroF1"][
+        "validityStatus"
+    ] == "CONFOUNDED_BY_TAXONOMY_COLLISION"
+
+
+def test_human_approved_ai_assisted_successor_is_valid_exposed_diagnostic():
+    rows = load_gold_dataset(V21_HUMAN_DATASET)
+    predictions = {row["id"]: _perfect_rule(row) for row in rows}
+    observations = {}
+    for row in rows:
+        prediction = _perfect_rule(row)
+        initial_handoff = bool(prediction["shouldHandoff"])
+        observations[row["id"]] = {
+            "executionOk": True,
+            "adapterStatus": "PASSED",
+            "prediction": prediction,
+            "handoffObserved": initial_handoff,
+            "handoffEvidence": {"intentDecision": initial_handoff},
+            "terminalStatuses": ["HANDOFF" if initial_handoff else "SUCCEEDED"],
+            "answer": "",
+            "sourceRefs": [],
+            "tools": [],
+            "events": [],
+        }
+
+    report = build_http_report(
+        rows,
+        rule_predictions=predictions,
+        observations=observations,
+        dataset_path=V21_HUMAN_DATASET,
+        run_id="customer-http-human-approved-validity-test",
+        preflight={"passed": True},
+        label_audit_path=V21_LABEL_EVIDENCE,
+    )
+
+    assert report["qualityClaimStatus"] == "REVIEWED_OFFLINE_DIAGNOSTIC"
+    assert report["evidenceValidity"]["blocking"] is False
+    assert report["evidenceValidity"]["evidenceTier"] == (
+        "HUMAN_APPROVED_AI_ASSISTED"
+    )
+    assert report["evidenceValidity"]["gates"]["provenancePassed"] is True
+    assert report["releaseGateEligible"] is False
+    assert report["rulePreRouter"]["metrics"]["intentMacroF1"][
+        "validityStatus"
+    ] == "HUMAN_APPROVED_EXPOSED_DEVELOPMENT_DIAGNOSTIC"
+    assert report["httpRoute"]["metrics"]["intentMacroF1"][
+        "validityStatus"
+    ] == "HUMAN_APPROVED_EXPOSED_DEVELOPMENT_DIAGNOSTIC"
+
+    subset = build_http_report(
+        rows[:1],
+        rule_predictions={rows[0]["id"]: predictions[rows[0]["id"]]},
+        observations={rows[0]["id"]: observations[rows[0]["id"]]},
+        dataset_path=V21_HUMAN_DATASET,
+        run_id="customer-http-human-approved-subset-test",
+        preflight={"passed": True},
+        label_audit_path=V21_LABEL_EVIDENCE,
+    )
+    assert subset["evidenceValidity"]["blocking"] is False
+    assert subset["dataset"]["caseCount"] == 1
+
+
+def test_report_separates_http_observation_from_failed_production_episode():
+    row = load_gold_dataset(HUMAN_DATASET)[0]
+    observation = observe_http_result(_result())
+    observation["executionOk"] = True
+    observation["adapterStatus"] = "FAILED"
+    report = build_http_report(
+        [row],
+        rule_predictions={row["id"]: _perfect_rule(row)},
+        observations={row["id"]: observation},
+        dataset_path=HUMAN_DATASET,
+        run_id="customer-http-failed-episode-test",
+        preflight={"passed": True},
+    )
+
+    assert report["status"] == "PARTIAL_EXECUTION_PENDING_HUMAN_ANSWER_REVIEW"
+    assert report["httpExecution"]["observationCaptureRate"]["value"] == 1.0
+    assert report["httpExecution"]["executionRate"]["value"] == 0.0
+    assert report["httpExecution"]["errorCaseIds"] == [row["id"]]
 
 
 def test_http_evidence_always_redacts_action_tokens_before_disk_write(tmp_path: Path):

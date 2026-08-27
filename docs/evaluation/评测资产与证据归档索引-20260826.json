@@ -1,0 +1,2453 @@
+{
+  "archivePolicy": {
+    "immutableEvidenceMoved": false,
+    "mode": "REFERENCE_SAFE_INDEXED_ARCHIVE",
+    "reason": "Moving canonical evidence would invalidate paths, manifests, and historical hash chains.",
+    "rootLooseStructuredFilesExpected": 0
+  },
+  "badCaseAssets": [
+    {
+      "bytes": 167707,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v2",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v2/bad-cases.jsonl",
+      "rowCount": 2,
+      "sha256": "6d105301ca3ea599c1ff1f9a63594f03c088af7b2646418cc17b8b75ae88439d"
+    },
+    {
+      "bytes": 1977854,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v3",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v3/bad-cases.jsonl",
+      "rowCount": 31,
+      "sha256": "ddc113876716e82b15b04f25b24b80434f46f9dc3ac2e805fbffdd7bd5e30371"
+    },
+    {
+      "bytes": 1555721,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260821-ai-quality-v4",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260821-ai-quality-v4/bad-cases.jsonl",
+      "rowCount": 18,
+      "sha256": "bb547fc11fad2db237508fd7ca6315f1cf5cf223996ea26b05a38e0655dac5bb"
+    },
+    {
+      "bytes": 211804,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v5",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v5/bad-cases.jsonl",
+      "rowCount": 3,
+      "sha256": "1728a436649c843db99caa7c695f590078e0d7ee69a613e7d70a23fcac70f53d"
+    },
+    {
+      "bytes": 89624,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v6",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v6/bad-cases.jsonl",
+      "rowCount": 3,
+      "sha256": "532fb781a54d352a7ab3a37276a2729142d56a72647946833f59de97d14c88ad"
+    },
+    {
+      "bytes": 48884,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v7",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v7/bad-cases.jsonl",
+      "rowCount": 1,
+      "sha256": "0bf2625205f16fba1ea66ae68627d2c0c5eb9dd238cf8af875c71ef0270be3cd"
+    },
+    {
+      "bytes": 68828,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v8",
+      "packageStatus": "EXECUTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v8/bad-cases.jsonl",
+      "rowCount": 2,
+      "sha256": "63983e6a14295fd7b7a3f7079b8aa0b257ca02c1dad4bbec3494735a614f775c"
+    },
+    {
+      "bytes": 19659,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824/badcases.jsonl",
+      "rowCount": 28,
+      "sha256": "fa9b7827734494ac63119930791dcae4a4666490ec3a1246799eabc8ec2caa12"
+    },
+    {
+      "bytes": 1595,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823/badcases.jsonl",
+      "rowCount": 3,
+      "sha256": "45c06ea6680ca24c75728059ef7d67dfb32f387aa085e0b3d65c4c90195be2ba"
+    },
+    {
+      "bytes": 2065,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v11-targeted-stale-worker-20260824",
+      "packageStatus": "STALE_WORKER_RUNTIME_DIAGNOSTIC",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v11-targeted-stale-worker-20260824/badcases.jsonl",
+      "rowCount": 6,
+      "sha256": "95426c11738e45a26444d5788b89406011923b5cb64c02f7b16d2c55558c4373"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v12-targeted-after-worker-restart-20260824",
+      "packageStatus": "POST_WORKER_RESTART_TARGETED_DIAGNOSTIC",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v12-targeted-after-worker-restart-20260824/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 10263,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/badcases.jsonl",
+      "rowCount": 14,
+      "sha256": "6404f4c146155382242b04f929e753110effb8746b32c8516503c1f1a9d516c3"
+    },
+    {
+      "bytes": 1184,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824/badcases.jsonl",
+      "rowCount": 4,
+      "sha256": "e0b3458cfde3c803b2dae239f648806fdcf58de4deb421de39e14ed0555410f5"
+    },
+    {
+      "bytes": 644,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v14-20260825",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v14-20260825/badcases.jsonl",
+      "rowCount": 2,
+      "sha256": "0cd757b1287f43903ac7018269b36fb9a2d37923e99eeca9e8f6693c5e6a5f74"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 7413,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825/badcases.jsonl",
+      "rowCount": 11,
+      "sha256": "363a74d1059e9b12afa1bf21c16f0e981875c767c5901982913fd5569d630d7e"
+    },
+    {
+      "bytes": 2125,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v24-cs043-context-bound-probe-20260825",
+      "packageStatus": "TARGETED_CONTEXT_BOUND_CONSTRAINT_PROBE",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v24-cs043-context-bound-probe-20260825/badcases.jsonl",
+      "rowCount": 10,
+      "sha256": "ca0d3e23e0c1c3d3c0a0b1b1de0dd58b19406a12e6b4595343f6fe5ec39bfe8d"
+    },
+    {
+      "bytes": 1901,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-20260825",
+      "packageStatus": "TARGETED_REGRESSION_OBSERVATION",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-20260825/badcases.jsonl",
+      "rowCount": 9,
+      "sha256": "ad19f7236508a489ecaa8fa5b36f5619bdbbeec82908c65ec1be47676d1a02fc"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 752,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826/badcases.jsonl",
+      "rowCount": 1,
+      "sha256": "e8253db45d40665500868480afe68e52b0c2e950b903359cc03cc8936c1e8db4"
+    },
+    {
+      "bytes": 25315,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v32-human-v2-pre-fix-20260826",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v32-human-v2-pre-fix-20260826/badcases.jsonl",
+      "rowCount": 45,
+      "sha256": "5b34031ad078b360f0e926c6603ef061bf0a9b9644cc9ded836375b85ac44117"
+    },
+    {
+      "bytes": 4302,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v33-routing-fix-targeted-20260826",
+      "packageStatus": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v33-routing-fix-targeted-20260826/badcases.jsonl",
+      "rowCount": 17,
+      "sha256": "6235078f7c7925c45476ad60518587d36fb1add73a0524d1ad1f42cbf49d6290"
+    },
+    {
+      "bytes": 3562,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v34-routing-contract-fix-handoff-metric-v2-20260826",
+      "packageStatus": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v34-routing-contract-fix-handoff-metric-v2-20260826/badcases.jsonl",
+      "rowCount": 17,
+      "sha256": "d61f569bb25cb03bd6c0463cb0b8fa5f7a8a048e9f7001f39910ec431ef53931"
+    },
+    {
+      "bytes": 3562,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v34-routing-contract-fix-targeted-20260826",
+      "packageStatus": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v34-routing-contract-fix-targeted-20260826/badcases.jsonl",
+      "rowCount": 17,
+      "sha256": "d61f569bb25cb03bd6c0463cb0b8fa5f7a8a048e9f7001f39910ec431ef53931"
+    },
+    {
+      "bytes": 3562,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v35-handoff-metric-v2-targeted-20260826",
+      "packageStatus": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v35-handoff-metric-v2-targeted-20260826/badcases.jsonl",
+      "rowCount": 17,
+      "sha256": "d61f569bb25cb03bd6c0463cb0b8fa5f7a8a048e9f7001f39910ec431ef53931"
+    },
+    {
+      "bytes": 4182,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v42-refund-reference-targeted-20260826",
+      "packageStatus": "TARGETED_REFUND_REFERENCE_FIX_VALIDATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v42-refund-reference-targeted-20260826/badcases.jsonl",
+      "rowCount": 20,
+      "sha256": "8ebc2de823e9505749e92928da66a6ba644dba4c5ad2afc17cf0db75232e8d72"
+    },
+    {
+      "bytes": 9828,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827/badcases.jsonl",
+      "rowCount": 15,
+      "sha256": "504959709547a01998d99ce83e17496caa8dcf9fef8ccc70edf74f5a26b63961"
+    },
+    {
+      "bytes": 2004,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826/badcases.jsonl",
+      "rowCount": 3,
+      "sha256": "ada1874a6be5bc241c3633ae3f7d7cf3055ae03bc0493b8c31c771f12122fc91"
+    },
+    {
+      "bytes": 3991,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v53-badcase-fixes-handoff-evidence-targeted-20260827",
+      "packageStatus": "TARGETED_BADCASE_FIXES_EXECUTED_PENDING_HUMAN_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v53-badcase-fixes-handoff-evidence-targeted-20260827/badcases.jsonl",
+      "rowCount": 19,
+      "sha256": "442f352277e9ffe43cddac8b0b1e426ba47bd87e5b1a6cacecd5ba2a5cad39fd"
+    },
+    {
+      "bytes": 4785,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827/badcases.jsonl",
+      "rowCount": 7,
+      "sha256": "84118f658d5ddc2120c191d73eb56a5147f70fe95e71bc34268192ea246553b4"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-pending-human-review-20260827",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-pending-human-review-20260827/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4619,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v55-final-seven-regressions-targeted-pending-human-review-20260827",
+      "packageStatus": "TARGETED_FINAL_SEVEN_REGRESSIONS_EXECUTED_PENDING_HUMAN_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v55-final-seven-regressions-targeted-pending-human-review-20260827/badcases.jsonl",
+      "rowCount": 22,
+      "sha256": "100324d02e96954ea11764a88a9c4798a904d5c7cd0a861c073ed74a9a376fcf"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827",
+      "packageStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+      "packageStatus": "HUMAN_REVIEWED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827/badcases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 29791,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2.1-label-policy-human-approved-ai-assisted-20260827",
+      "packageStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2.1-label-policy-human-approved-ai-assisted-20260827/routing-badcases.jsonl",
+      "rowCount": 44,
+      "sha256": "dd0d345fae1d3ed4e94d34d30da688c1b82e9c287a738a836581d74888e6bd20"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-development-v9-20260822",
+      "packageStatus": "STATUS_NOT_DECLARED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-development-v9-20260822/bad-cases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-regression-v9-20260822",
+      "packageStatus": "STATUS_NOT_DECLARED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-regression-v9-20260822/bad-cases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 205478,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/resilience/fault-v9-20260822",
+      "packageStatus": "STATUS_NOT_DECLARED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/resilience/fault-v9-20260822/bad-cases.jsonl",
+      "rowCount": 7,
+      "sha256": "1e6d4d6ff0ffdb1f25467541d93a8cd6f9125a8a5895d60492835a2dfd3de279"
+    },
+    {
+      "bytes": 1054,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823",
+      "packageStatus": "AUXILIARY_PAIRED_REPLAY",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823/badcases.jsonl",
+      "rowCount": 3,
+      "sha256": "4c8aabfb61b2f2a711682d03db0c6e447a86e8f52815d1b43da52e99de4edc84"
+    },
+    {
+      "bytes": 0,
+      "package": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",
+      "packageStatus": "HISTORICAL_FINAL_SOURCE_EXPOSED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current/bad-cases.jsonl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "claimBoundary": {
+    "currentCustomerServiceDataset": "DEVELOPMENT_DIAGNOSTIC_ONLY",
+    "finalUnseenEligible": false,
+    "releaseGateEligible": false,
+    "v21LabelPolicyReview": "25/25 human-approved; 5 disagreements adjudicated; exposed development evidence only",
+    "v2ProvenanceReaudit": "initial 12 failed slot gate; full 60 and custody evidence required",
+    "v43Execution": "120/120 production-path cases and 22/22 behavior contracts completed",
+    "v43HumanAnswerReview": "120/120 human-approved; 3 disagreements adjudicated; joint quality 105/120",
+    "v53TargetedRemediation": "15/15 execution and 4/4 applicable behavior contracts passed; not a normal quality denominator",
+    "v54PostFixExecution": "120/120 execution and 23/23 behavior contracts passed; 120/120 human-reviewed with 112 exact A/B agreements and 8 adjudications; joint quality 113/120",
+    "v56V3KnowledgeRegression": "120/120 execution and 29/29 behavior contracts passed; 118 exact A/B agreements and 2 human adjudications; answer, handoff, and joint quality 120/120; citation 67/67; unsafe 0/120"
+  },
+  "currentAuthorities": [
+    {
+      "path": "docs/evidence-manifest.json",
+      "role": "CENTRAL_MACHINE_INDEX",
+      "status": "AUTHORITATIVE_INDEX"
+    },
+    {
+      "path": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md",
+      "role": "SYSTEM_AND_EVALUATION_AUDIT",
+      "status": "CURRENT_DECISION_RECORD"
+    },
+    {
+      "path": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.json",
+      "role": "SYSTEM_AND_EVALUATION_AUDIT_MACHINE",
+      "status": "CURRENT_DECISION_RECORD"
+    },
+    {
+      "path": "docs/evaluation/人工标注交接总清单-20260826.md",
+      "role": "HUMAN_WORK_QUEUE",
+      "status": "CURRENT_HANDOFF_ENTRYPOINT"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_HUMAN_QUALITY_BASELINE",
+      "status": "HUMAN_REVIEWED_ADJUDICATED_NON_RELEASE"
+    },
+    {
+      "path": "docs/evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.md",
+      "role": "CURRENT_BADCASE_REMEDIATION_HANDOFF",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED_7_BADCASES"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v53-badcase-fixes-handoff-evidence-targeted-20260827",
+      "role": "CURRENT_POST_FIX_TARGETED_EXECUTION",
+      "status": "TARGETED_BADCASE_FIXES_EXECUTED_PENDING_HUMAN_REVIEW"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827",
+      "role": "CURRENT_POST_FIX_FULL_EXECUTION",
+      "status": "EXECUTED_LABEL_EVIDENCE_BOUND_HUMAN_REVIEW_COMPLETE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-pending-adjudication-20260827",
+      "role": "CURRENT_POST_FIX_ANSWER_REVIEW_PENDING",
+      "status": "SEALED_PARENT_FINAL_EVIDENCE_AVAILABLE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_POST_FIX_ANSWER_REVIEW_FINAL",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED_NON_RELEASE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_POST_FIX_REVIEW_RETURN_INTAKE",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_RETURNS_ARCHIVED_NORMALIZED_AND_SEALED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_POST_FIX_ADJUDICATION_RETURN_INTAKE",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATION_ACCEPTED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827",
+      "role": "CURRENT_V56_FULL_EXECUTION",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-pending-adjudication-20260827",
+      "role": "CURRENT_V56_ANSWER_REVIEW_PENDING",
+      "status": "SEALED_PARENT_FINAL_EVIDENCE_AVAILABLE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_V56_REVIEW_RETURN_INTAKE",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_RETURNS_ARCHIVED_NORMALIZED_AND_SEALED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_V56_ADJUDICATION_RETURN_INTAKE",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATION_ACCEPTED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_V56_ANSWER_REVIEW_FINAL",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED_NON_RELEASE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826",
+      "role": "CURRENT_LABEL_VALIDITY_AUDIT",
+      "status": "RESOLVED_BY_V2_1_SUCCESSOR_FOR_DEVELOPMENT_ONLY"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826",
+      "role": "CURRENT_PROVENANCE_AUDIT",
+      "status": "INITIAL_REAUDIT_FAILED_FULL_60_AND_CUSTODY_REQUIRED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-policy-review-pending-adjudication-20260827",
+      "role": "CURRENT_LABEL_POLICY_DUAL_REVIEW",
+      "status": "SEALED_PARENT_FINAL_SUCCESSOR_AVAILABLE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-pending-adjudication-20260827",
+      "role": "CURRENT_ANSWER_QUALITY_DUAL_REVIEW",
+      "status": "SEALED_PARENT_FINAL_EVIDENCE_AVAILABLE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2.1-label-policy-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_LABEL_POLICY_FINAL",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED_NON_RELEASE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827",
+      "role": "CURRENT_ANSWER_QUALITY_FINAL",
+      "status": "HUMAN_REVIEWED_ADJUDICATED_NON_RELEASE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-human-approval-ai-assistance-provenance-20260827",
+      "role": "CURRENT_HUMAN_APPROVAL_PROVENANCE",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_DISCLOSED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-independent-reaudit-initial-failed-20260827",
+      "role": "CURRENT_PROVENANCE_REAUDIT_RESULT",
+      "status": "EXPANSION_REQUIRED_CUSTODY_INCOMPLETE"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-round1-returns-20260827",
+      "role": "ROUND1_RETURN_INTAKE",
+      "status": "EXACT_RETURNS_ARCHIVED_ANSWER_AND_LABEL_FINALIZED_PROVENANCE_OPEN"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-adjudication-returns-20260827",
+      "role": "ADJUDICATION_RETURN_INTAKE",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_INTAKE_ACCEPTED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v2-additions-original-submissions-recovered-20260826",
+      "role": "RECOVERED_HISTORICAL_INTAKE",
+      "status": "HISTORICAL_INTAKE_RECOVERED_PROVENANCE_STILL_BLOCKED"
+    },
+    {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",
+      "role": "HISTORICAL_FINAL_POINTER",
+      "status": "HISTORICAL_FINAL_SOURCE_EXPOSED_NOT_CURRENT_QUALITY_AUTHORITY"
+    }
+  ],
+  "datasetRoleCounts": {
+    "ADJUDICATED_OR_BEHAVIOR_CONTRACT": 20,
+    "ANNOTATION_POLICY_CONTRACT": 1,
+    "CANDIDATE_INPUT": 2,
+    "GOLD_OR_HUMAN_LABEL_SOURCE": 1,
+    "HISTORICAL_FINAL_INPUT_LIFECYCLE": 2,
+    "HISTORICAL_REVIEW_WORKSPACE_SNAPSHOT": 4,
+    "LEGACY_COMPATIBILITY": 2,
+    "LIFECYCLE_LOCK": 3,
+    "VISIBLE_DEVELOPMENT_OR_REGRESSION": 6
+  },
+  "datasets": [
+    {
+      "bytes": 890,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/README.md",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "3cecf55760d62b5772f7211f569b94a9b63adeef669883bca91d90d95572380b"
+    },
+    {
+      "bytes": 62927,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/answer-review-v2-adjudicated.final-report.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "27710e265fc3876419c4e6fac280daefa3ef64f22239a1933d3a3764ee1b4685"
+    },
+    {
+      "bytes": 27023,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/answer-review-v2-adjudicated.labels.jsonl",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "rowCount": 60,
+      "sha256": "ef6379690f6ad4e6d457f4818a9d54b0c19fa156bbc55fe01778d654d3e328ff"
+    },
+    {
+      "bytes": 1348,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/answer-review-v2-adjudicated.manifest.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "4ddae30602a10477882b5983d41162b328074f4728a011c173a8f899c6dabe34"
+    },
+    {
+      "bytes": 114848,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/customer-service-human-v2.1-human-approved-ai-assisted.jsonl",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "rowCount": 120,
+      "sha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3"
+    },
+    {
+      "bytes": 1303,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/customer-service-human-v2.1-human-approved-ai-assisted.jsonl.manifest.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "66e85bd43042c3cd9c1dd19c22af9d74ccca140a21720c71d20aa9d48b8e1026"
+    },
+    {
+      "bytes": 51078,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "rowCount": 60,
+      "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+    },
+    {
+      "bytes": 1181,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.manifest.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "2ac0b40d50272acac9ce657e133ed67de5bf0835983eed6377ea24bdc638a37d"
+    },
+    {
+      "bytes": 12512,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2-routing-execution-fix.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "22ccf0377f369e7e6d4d94cbd85ce4e0ca5654b42b0d9c427e50bfe630e57b20"
+    },
+    {
+      "bytes": 10111,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2-routing-fix.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "5eb901cd709259de2b7e5c57533c52ba6f034e1fb7ec31f8e91b96138244b4d4"
+    },
+    {
+      "bytes": 13271,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2.1-human-approved-ai-assisted.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "4f84eea0fbaeecf87f8004ea9c74aabd27823686cbd5943aecf89bc21c952a11"
+    },
+    {
+      "bytes": 13426,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2.2-final-handoff-evidence.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "d23a80a5dcba9c4071d2d02aba7d048ccd00c4a6b0872e7add88ae6fa843ca20"
+    },
+    {
+      "bytes": 19122,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2.3-v54-final-badcases.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "6f54b9b7b6bfd2008939b821e0aa01ed35806ba33de909aafcd6c03861837e29"
+    },
+    {
+      "bytes": 10046,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "0b39e6bea8fa56b7eb177075c6d09b3c850def230f59bd17cd1e69739810ef71"
+    },
+    {
+      "bytes": 5564,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-v1.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "ffb2048cdefc5b5a4b30da1f97f40bc23b48bcd33ca5c45ca2a4dd8249e81706"
+    },
+    {
+      "bytes": 6325,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-v2.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "51345df0d2770d52b7d0e86243874f6f8efcc17fb58a25b471b0a2e1004cd3bc"
+    },
+    {
+      "bytes": 2371,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-fixtures-human-v2-routing-fix.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "ea7f13f997c2fa184d9e50faf4fe436b1d36fcd5c9a16ca2028e5c6e96580c36"
+    },
+    {
+      "bytes": 2371,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-fixtures-human-v2.1-human-approved-ai-assisted.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "0e8f1b42ca058f3b3342696fefce1d80443bcdff6e7073ae692b973907a856f5"
+    },
+    {
+      "bytes": 1911,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-fixtures-human-v2.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "d2d1f80111387b737d60b1cdc2ebb4b5d3473755a1a120ce16e02c1518e4fc69"
+    },
+    {
+      "bytes": 1227,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-fixtures-v1.json",
+      "role": "ADJUDICATED_OR_BEHAVIOR_CONTRACT",
+      "sha256": "fadf095fa921d901fc00315074e52234ae6ac15f011d9e3afe3be90fe6069f6f"
+    },
+    {
+      "bytes": 20665,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/annotation-v2/reviewer-a.open.jsonl",
+      "role": "HISTORICAL_REVIEW_WORKSPACE_SNAPSHOT",
+      "rowCount": 60,
+      "sha256": "0a6034ad7468788ebdf81134e62167edcb54ed0fcf1d540293be24d33dd62b32"
+    },
+    {
+      "bytes": 1610,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/annotation-v2/reviewer-a.open.jsonl.manifest.json",
+      "role": "HISTORICAL_REVIEW_WORKSPACE_SNAPSHOT",
+      "sha256": "004fb4ff76a90068fc3fd081f3d3644d21888fede71d2420a32a4f18148d33b7"
+    },
+    {
+      "bytes": 20665,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/annotation-v2/reviewer-b.open.jsonl",
+      "role": "HISTORICAL_REVIEW_WORKSPACE_SNAPSHOT",
+      "rowCount": 60,
+      "sha256": "1f240385f3712d9d99987b5505fdd46e1396e04f0b3c5d77785be2c736e9f003"
+    },
+    {
+      "bytes": 1611,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/annotation-v2/reviewer-b.open.jsonl.manifest.json",
+      "role": "HISTORICAL_REVIEW_WORKSPACE_SNAPSHOT",
+      "sha256": "158b93e949bc157833acebe79506f62544140361aca305c2ae1dec333f99680e"
+    },
+    {
+      "bytes": 23813,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/candidate-v2-additions.jsonl",
+      "role": "CANDIDATE_INPUT",
+      "rowCount": 60,
+      "sha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353"
+    },
+    {
+      "bytes": 2313,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/candidate-v2-additions.manifest.json",
+      "role": "CANDIDATE_INPUT",
+      "sha256": "88fda7aa36d3101f2be69c14ff68741c1ad84623d2e4792bf75092920bd6d13d"
+    },
+    {
+      "bytes": 1935,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/customer-service-taxonomy-contract-v2.1.json",
+      "role": "ANNOTATION_POLICY_CONTRACT",
+      "sha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+    },
+    {
+      "bytes": 24485,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/gold-v1.jsonl",
+      "role": "GOLD_OR_HUMAN_LABEL_SOURCE",
+      "rowCount": 60,
+      "sha256": "7c0b874ec9ec72657ec4726bb8cbfc837a22dee87b3c2e2507cddbb003ec85dd"
+    },
+    {
+      "bytes": 6361,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/development/agent.jsonl",
+      "role": "VISIBLE_DEVELOPMENT_OR_REGRESSION",
+      "rowCount": 7,
+      "sha256": "4e7461fc6d664cab0b640dfac2552f2b0c058912ea27df14657800887b41482d"
+    },
+    {
+      "bytes": 13125,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/development/rag.jsonl",
+      "role": "VISIBLE_DEVELOPMENT_OR_REGRESSION",
+      "rowCount": 18,
+      "sha256": "b6b4577e0ca58675a77e2d362c650490e5bdaca27318134836bed437031eba5b"
+    },
+    {
+      "bytes": 10142,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/development/search.jsonl",
+      "role": "VISIBLE_DEVELOPMENT_OR_REGRESSION",
+      "rowCount": 18,
+      "sha256": "1b8612ba509e9ac700362867c28ae9003b2d77f060c65fc69de3d950bcdf0a5a"
+    },
+    {
+      "bytes": 437,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/final-inputs/README.md",
+      "role": "HISTORICAL_FINAL_INPUT_LIFECYCLE",
+      "sha256": "b0e205148eb6fe910993af04ba6c57630672e192addaa9474a2ecebb93020509"
+    },
+    {
+      "bytes": 26300,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/final-inputs/final-holdout-20260820.jsonl",
+      "role": "HISTORICAL_FINAL_INPUT_LIFECYCLE",
+      "rowCount": 50,
+      "sha256": "268f44b77e62ac15db60022f18fc9e76c6d5f286f1a686b31096f944584ebf99"
+    },
+    {
+      "bytes": 6147,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/legacy/rag_golden.jsonl",
+      "role": "LEGACY_COMPATIBILITY",
+      "rowCount": 35,
+      "sha256": "4cd581038cea0503f78a7d092d0e630fd5b874f496beba9c316d5d54d0c36a88"
+    },
+    {
+      "bytes": 2178,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/legacy/rag_golden.lock.json",
+      "role": "LEGACY_COMPATIBILITY",
+      "sha256": "27c251d3c964557422cf38fd2c49c7def080118c096e26049aad62efce060863"
+    },
+    {
+      "bytes": 4286,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/locks/consumed-final.json",
+      "role": "LIFECYCLE_LOCK",
+      "sha256": "d737c11cf8b0d57cce1c28c73479dd7ef3c0d6be1caa24a3ce2d2aef8ba4f0a0"
+    },
+    {
+      "bytes": 916,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/locks/development.lock.json",
+      "role": "LIFECYCLE_LOCK",
+      "sha256": "cbf09fb07eabfbd85b669f90da1bfc43adb8cff9e78ceee9cc81eea3d5ad2be0"
+    },
+    {
+      "bytes": 912,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/locks/regression.lock.json",
+      "role": "LIFECYCLE_LOCK",
+      "sha256": "5451b5de4c64e2174981722a4c5c71c9e674530d88d5c4992b87ed2709cfa5d1"
+    },
+    {
+      "bytes": 3763,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/regression/agent.jsonl",
+      "role": "VISIBLE_DEVELOPMENT_OR_REGRESSION",
+      "rowCount": 5,
+      "sha256": "92286cf5a6ce19272233589ddb2e66266bc1e2c6a062f3d3349eb829437cc77d"
+    },
+    {
+      "bytes": 17443,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/regression/rag.jsonl",
+      "role": "VISIBLE_DEVELOPMENT_OR_REGRESSION",
+      "rowCount": 26,
+      "sha256": "095d4a6ba35587a3478a5de9c59dc265193cd96beed0cec879f6c5dc0bbe16fc"
+    },
+    {
+      "bytes": 11500,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/regression/search.jsonl",
+      "role": "VISIBLE_DEVELOPMENT_OR_REGRESSION",
+      "rowCount": 20,
+      "sha256": "fd32f1f16f8da74c3a87367de3a85211b9cde540bea0ae72c192d36492c52482"
+    }
+  ],
+  "documentation": [
+    {
+      "bytes": 14615,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/README.md",
+      "sha256": "44e20f0a969a400f3f5020318297c192f32982ee0fac74441ddcfe243d161f63"
+    },
+    {
+      "bytes": 11262,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/README.md",
+      "sha256": "7ef2a6b5cbddf76a8f7a4dd94afba45c4b683a7e4aba1bfff9970a0ba2e659d7"
+    },
+    {
+      "bytes": 30274,
+      "path": "README.md",
+      "sha256": "0721323faea7756da7f1e1127b7b3d233b0e534847f1d05edf2d48c4378d1a9c"
+    },
+    {
+      "bytes": 14915,
+      "path": "docs/README.md",
+      "sha256": "64a5734644c46e49bda97bd6ae378f1a4f3c34f7b2bdb7c2f7f2955180624687"
+    },
+    {
+      "bytes": 14334,
+      "path": "docs/evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.json",
+      "sha256": "565d17e0b32a6e3b9aa9c8269f946aeee206c014290324c5d9dcda1081af0ed7"
+    },
+    {
+      "bytes": 8616,
+      "path": "docs/evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.md",
+      "sha256": "bf79120ab96a735d57cddcd57cb5af8d37c6223931d3dd94f5db6b1d0f508096"
+    },
+    {
+      "bytes": 7280,
+      "path": "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.json",
+      "sha256": "60babfbc125acf61d9471cf348ceb04d310f89d5c732e9ffed376b716279ea93"
+    },
+    {
+      "bytes": 2679,
+      "path": "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md",
+      "sha256": "a3589475b171bd83695cc50fb038760056fadc7afa058a95fcb441cbede7184d"
+    },
+    {
+      "bytes": 6378,
+      "path": "docs/evaluation/AI-Shop人工审批评测最终结果与Badcase分析-20260827.json",
+      "sha256": "b91b7ea2cc3a9a4b80ed0f231eb92a836fa5d44e067a16bc85bf852479dbfd46"
+    },
+    {
+      "bytes": 10006,
+      "path": "docs/evaluation/AI-Shop人工审批评测最终结果与Badcase分析-20260827.md",
+      "sha256": "0a5672e92ea8c6337c02b92827b7d19f1a262e92596369b9e9fd4a5393f89da9"
+    },
+    {
+      "bytes": 8888,
+      "path": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.json",
+      "sha256": "0bf70553f25c5bcb8cf158b629f4fddf36a19e2e4b6c9610684f632e0e8faa97"
+    },
+    {
+      "bytes": 20638,
+      "path": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md",
+      "sha256": "775f5ea53f498914dbb79dae60e79ffaa4091af702d6a73266cb44f388884b1b"
+    },
+    {
+      "bytes": 94112,
+      "path": "docs/evaluation/AI质量评测与Badcase.json",
+      "sha256": "61e943b3d41312456f2c579b4043f75970496d72043e2503ca1dffab86043042"
+    },
+    {
+      "bytes": 40688,
+      "path": "docs/evaluation/AI质量评测与Badcase.md",
+      "sha256": "cd87b6729d917a1a841002937826acc0343b52687ad1af151a129c24cea7f13d"
+    },
+    {
+      "bytes": 16126,
+      "path": "docs/evaluation/customer-service/客服HTTP-v20-A-B盲审填写说明.md",
+      "sha256": "647248f636f9662161ebe58ff43e6d55d13282a15a75aa0c80d8c489a8f2d571"
+    },
+    {
+      "bytes": 10632,
+      "path": "docs/evaluation/customer-service/客服v2-additions分歧仲裁说明-20260826.md",
+      "sha256": "d86cd1b133e5f7793375db0f620448b804636f8a03316e2e704936ee3a770774"
+    },
+    {
+      "bytes": 11865,
+      "path": "docs/evaluation/customer-service/客服v2-additions双人盲标说明-20260826.md",
+      "sha256": "448bcdc20ec2d42827e4251120f8c85b75e270d2def01be4f3f3941d396189d5"
+    },
+    {
+      "bytes": 4952,
+      "path": "docs/evaluation/customer-service/客服v2.1标签政策双盲重标说明-20260826.md",
+      "sha256": "1e0a1baca9253a77649a900d16df71f8434777bbc2911d1fb03b19a5c2604b96"
+    },
+    {
+      "bytes": 2390,
+      "path": "docs/evaluation/customer-service/客服v2来源独立复核说明-20260826.md",
+      "sha256": "1a63db30b0ac280df35487dfcdd797912cf5f387198949489357ef6d941b3175"
+    },
+    {
+      "bytes": 3826,
+      "path": "docs/evaluation/customer-service/客服v43答案质量双盲说明-20260826.md",
+      "sha256": "03017c98dcc73c1d01228b27aa15316a9f4a30d0920f5e64dd6d2b4af6c3b5c2"
+    },
+    {
+      "bytes": 21174,
+      "path": "docs/evaluation/customer-service/客服标注审计.json",
+      "sha256": "c6bfa589ad32d8a3a8c0f06418d7bdc1604b4606ff8be257fb7eb2a51ba3e7da"
+    },
+    {
+      "bytes": 7840,
+      "path": "docs/evaluation/customer-service/客服标注审计.md",
+      "sha256": "5c189da3f1d19ebee983be829fd6bf44eb4ae0ad84a856fedc59c02433afd35a"
+    },
+    {
+      "bytes": 2197,
+      "path": "docs/evaluation/customer-service/客服盲审后仲裁说明-20260826.md",
+      "sha256": "39ae7caeefbbc1e604b030058e8a197adabc6b8d690d71fc802b744dada05802"
+    },
+    {
+      "bytes": 88282,
+      "path": "docs/evaluation/customer-service/客服金标评测.json",
+      "sha256": "001b99696d40fc81fae53d3124ef69c5ba8e6a65541dd1120d635401f8f5eae8"
+    },
+    {
+      "bytes": 10935,
+      "path": "docs/evaluation/customer-service/客服金标评测.md",
+      "sha256": "115a5b75ba05992111e6d1dbb7e84fd61eca5a1891bedf0e10fac52dca1b7c8a"
+    },
+    {
+      "bytes": 8524,
+      "path": "docs/evaluation/external-unseen-final-independent-generation-and-custody-20260826.md",
+      "sha256": "d065ae8711f87f784d336d3e72fc780195e5e1bc01d07e07ae7bd4f563d7db70"
+    },
+    {
+      "bytes": 4492,
+      "path": "docs/evaluation/external-unseen-final-registry-20260826.json",
+      "sha256": "3b19ec720aa277b4acb8e1dec2843495a978629f902d7d7a3a9217d383927272"
+    },
+    {
+      "bytes": 11528,
+      "path": "docs/evaluation/external-unseen-final人工标注说明-20260826.md",
+      "sha256": "93c12e3b40ce6873392aece8840fe7d822f2a67bffee7482b521b014aeea643e"
+    },
+    {
+      "bytes": 55673,
+      "path": "docs/evaluation/final-v9-source-exposure-audit-20260825.json",
+      "sha256": "53d5992460c808f151ea51a4bc18af56b407b7f8c592819c8da70cb52bc6c6a2"
+    },
+    {
+      "bytes": 1103,
+      "path": "docs/evaluation/model-pricing-estimate-20260824.json",
+      "sha256": "2727780993a68ee32593c169c7bbee2054d63111ada687a3b18c50105553ffbd"
+    },
+    {
+      "bytes": 15490,
+      "path": "docs/evaluation/人工标注交接总清单-20260826.md",
+      "sha256": "04428a1824e86a0aeb76d4547832607ac40da08f0f8898524b3dffac1178ac0f"
+    },
+    {
+      "bytes": 14505,
+      "path": "docs/evaluation/数据集合理性审计与重构建议-20260825.md",
+      "sha256": "0e69ebbb8fd08f470329c0b8644336a3a3158e37c265789d00a6104d288c37bb"
+    },
+    {
+      "bytes": 26692,
+      "path": "docs/evaluation/结果与数据集索引.md",
+      "sha256": "a9c1d4a09b0f80b7b44ba9ba50ca1c885f8d3f2f8c4c6f4fca32483e3d241e85"
+    },
+    {
+      "bytes": 23124,
+      "path": "docs/evaluation/质量缺口审计与优化-20260825.md",
+      "sha256": "db3e894aceb723c339aa9e90d02efad4c8b2adfb2bdcc3222311876eb0b4d2a6"
+    },
+    {
+      "bytes": 38609,
+      "path": "docs/project/AI_Shop主线与开发记录.md",
+      "sha256": "3c90d2bbacf3781f1797d77c73eadeb3f323794c7ace4479e06ea93512bff30f"
+    },
+    {
+      "bytes": 23865,
+      "path": "docs/project/AI_Shop项目收口交付.md",
+      "sha256": "68fc423eb6a5e153fbbcc64f266e31add4a2e30981b52aebca61809feffa28fa"
+    },
+    {
+      "bytes": 4255,
+      "path": "docs/project/closure-evidence/customer-service-http-v14-20260825.json",
+      "sha256": "dc1e737fc7dd47f2e5654b72da363a948ba19eb0e9b158c9d2ce178856b9dea9"
+    },
+    {
+      "bytes": 3685,
+      "path": "docs/project/closure-evidence/customer-service-http-v14-20260825.md",
+      "sha256": "333acd93e82b5462a6c1e4915a659cc47b297f63d0a77cd558a5ab07fc05af96"
+    },
+    {
+      "bytes": 3304,
+      "path": "docs/project/closure-evidence/customer-service-http-v14-model-assisted-review-20260825.json",
+      "sha256": "f3c3bb9253667dcf6ba68f9c311dfc880ac619dbe4477d1fcd1b517ae2f8b8bf"
+    },
+    {
+      "bytes": 2439,
+      "path": "docs/project/closure-evidence/customer-service-http-v14-model-assisted-review-20260825.md",
+      "sha256": "619149df8a856d0eb0113861018bf218018523c551c92b0af05c6f84771039fb"
+    },
+    {
+      "bytes": 243,
+      "path": "docs/project/closure-evidence/order-facts-contract-v1-20260825-r4/SHA256SUMS",
+      "sha256": "d934d6b196bc04e050bcbf5579fd5da163424dea9a6854c1dbe0808e9eec1c93"
+    },
+    {
+      "bytes": 474,
+      "path": "docs/project/closure-evidence/order-facts-contract-v1-20260825-r4/evidence-manifest.json",
+      "sha256": "8242356e451537e6dc6c49c04004a1f41825da566013ed036dc2f68c15a77474"
+    },
+    {
+      "bytes": 7609,
+      "path": "docs/project/closure-evidence/order-facts-contract-v1-20260825-r4/report.json",
+      "sha256": "52dbc8b57720a62f3b71c92597c20192ac81117bc99c28d4e419d71f7f4a03a2"
+    },
+    {
+      "bytes": 1250,
+      "path": "docs/project/closure-evidence/order-facts-contract-v1-20260825-r4/report.md",
+      "sha256": "6a4166da526ca63c7178f3d57f2bcc94e978c27d45db07a159647d2030af299c"
+    },
+    {
+      "bytes": 5704,
+      "path": "docs/project/closure-evidence/preflight-regression-20260825-r2.json",
+      "sha256": "7e99bb01b7d3ccaeeecb5402537fa86564e3734a2fa39aa4cfb758fe4ec297bc"
+    },
+    {
+      "bytes": 99,
+      "path": "docs/project/closure-evidence/preflight-regression-20260825.SHA256",
+      "sha256": "fcb5980f7e5a78e46198c4ab26c37e661cb2cc1fe7d4c4861aae18f3da5f1c3c"
+    },
+    {
+      "bytes": 1519,
+      "path": "docs/project/closure-evidence/preflight-regression-20260825.md",
+      "sha256": "e13e6a8b19b665dbd97d30602448fef50113caf3f70a9766ea9ae63361d56f8a"
+    }
+  ],
+  "evidenceCategoryCounts": {
+    "BENCHMARK_EVIDENCE": 62,
+    "HISTORICAL_CURRENT_POINTER": 1,
+    "HISTORICAL_INTAKE_ARCHIVE": 8,
+    "HISTORICAL_RUN_ARCHIVE": 7,
+    "SOURCE_FREEZE": 2
+  },
+  "evidencePackages": [
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 2,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 10,
+      "finalUnseenEligible": null,
+      "manifestSha256": "81ae1e32d91ec32b97b4e4820f6d2018b78f5da3a74d082c7478f3cc980abde0",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v2",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v2",
+      "sha256SumsSha256": "f9d754532faf7252b1ea42f6efcd8849beb926165b378062b50dd172b36b6f63",
+      "status": "EXECUTED",
+      "totalBytes": 1884677
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 31,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "728dd51d17f86b3f6cee26b5d6c117f700b0eead0036402399c14ff344c9a2ca",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260820-ai-quality-v3",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "a84e81c802868f50bb43f5f05f5a636e5975bc49611e2c57515e888c4770acd4",
+      "status": "EXECUTED",
+      "totalBytes": 17086571
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 18,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "3eaa76d249877d4d5038fe84d0b02435482af1c192a8a7caacd71b8857013bbc",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260821-ai-quality-v4",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "513fb63d35be01a776d46fc30be3f303b3642e0b0a72d37a37fdd16192d89dea",
+      "status": "EXECUTED",
+      "totalBytes": 17726008
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 3,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "b783f3849fc7f1b46197fd9cfaac900b17250806e8daae81e50b4fa1918150d4",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v5",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "222068cc81a67d18d47a5afeb335ba2c42a4a15a126315c02c0b53c072485d5e",
+      "status": "EXECUTED",
+      "totalBytes": 21212095
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 3,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "8c952e956a1d31899bf426982baf7a3fa0bdd2852bdbdd126ba254eac5e6ca28",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v6",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "1a755205637e1f16428c4acc55de04e83dfc28ed0b0090629bb8b86772455bc1",
+      "status": "EXECUTED",
+      "totalBytes": 21437690
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 1,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "724a626f9d8cfb14adac9e05e8426f85184f290292ff33887067e548ccb0f0b8",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v7",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "c3cce3413117ca8a208f112e18d6c84f08495980537a32b202696c57d31d77a1",
+      "status": "EXECUTED",
+      "totalBytes": 21520965
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 2,
+      "category": "HISTORICAL_RUN_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "6f9d316248f93760c01a2bd49309cf2fa95920dcd3ced019b90d48e95895c134",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/archive/final-20260822-ai-quality-v8",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "93beabac78642ccf2e642efa7ce1de9f7fc832aa53ef2ead5407b0781b236d44",
+      "status": "EXECUTED",
+      "totalBytes": 18015792
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "9474af09b638002c38ec1294f1870f82290d9af630bc8085b6f57e346c4b08d8",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-open-arrival-readonly-v1-20260825",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "335c742fc29e8977af632f0a3e6fae75cd850cd6f27985a2f22cfb233320cc86",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 98933
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "e2ba67480cfd27f83e51e2bb6ac71ae1defc4f3421638e927e35e3bc55aab264",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-open-arrival-readonly-v2-20260825",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "0a83b13ecc97c6c27e9ebc054e3ed39ce18af6f937528cfe9bc5db937a23b91c",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 94669
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "4d22c5264b57ba2a9d55aecba527b22ec7600c77dd34da828223b1d2a338db4b",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v1-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "bb87f5dcf51c97f3f51556e04aad42bed0b42600047714bc1b1a718e51148e07",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 199383
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "5bb8c11e40b69dfeb6b1efe955ec16c3c9332719d2e8fc313df151db73edaabd",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v2-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "9707e8b6b43c24559c31cd76acf25232474fd43aa019638ffa4eb605eaf56a3e",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 209650
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "5d7f0301a1e45ce1596245f50695bc996891fc173a5ada0b6e3f0790205d4e15",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v3-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "8f31a9da3b3420c3a04342d6b7c3b0e23c71021632050dcdfa484f8225fb1722",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 47534
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "ceff3434e6b4f2669b92e692822d1cf72922c7c184abeb9019393db6aba41a01",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v4-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "d77e1fb53c04a11e3667885a354a14a2e8b7ba7b3e5167c59319ef6627aaf190",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 184048
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "63531e578006fce5b58168ec5bcc4e02e269ebc3910c01f0b85d8543aa80ba88",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-readonly-v5-20260824",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "984bf9df5ddbcc6155c0d8e43eea89d8acb1bf8c6662a8582a83f95ec51837db",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 347411
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "f410d31fec9137ffa9962c2fe6915ea474c3a112648ca3741bef3dde9c31d50e",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-social-shortcut-v1-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "73b400bb458b62a97a867a6bb801263f0ecada44bc1928925aa5555292ff76f5",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 26081
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "4268329e99731551bb3a32003b06be9a63bc66aa6bc6c68077f23424959b1a8d",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-social-shortcut-v2-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "6a0a32ce8a073724c4d42afd407ce75641d9d02c4f0848625e6c232ffaaf6f13",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 26446
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "a20081911c9157b65c7b194e6bcfdaaac0907c8f5ba7c72a614dcc962646f2f4",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-social-shortcut-v3-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "91bbcca466bc5c1c78ff9dae8f2fcf4a080411c50c3dd7be9c2e777688e115f6",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 25983
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "4506c9d53b0580e7cf83a419aab58762bf4f4091cfb7500498a3de7f3a054ce5",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/capacity/capacity-social-shortcut-v4-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+      "sha256SumsSha256": "96c8000d4f1c0b163832e6de0850539334ac9e3745ef9d43c0a26622a4fbf118",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 26388
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 28,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "6d555b8394fb6ecc3bcf2b6a781453f475ec6846512d2e3e8f9d0f01647d45de",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-adjudicated-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "9180969093bfbf79cafc7e3c779cf0b840e985f635f3e1480c608d19df548816",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 359841
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "2f08ba08a0e7e83de0b3b2c99b6638eb0f390c2e07ce6b4800ac2a2233d09096",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-answer-review-v2-pending-adjudication-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "a0e169adccf00260ae4249593018222a09c0ef836ee7681058d586430924c149",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 280041
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 3,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "c38254442593ac6791a42190a211c183b11bdd69b2a69d445302f36a3ef3382f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v1-20260823",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "197bfa7edce9eb897dd6c60e869b1c11d601d42f141810362c7ea8d6b6df159b",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 15749994
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 6,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "21a6a6e9305f66d9c8958f63a5ff30981711a9eef6f569951898f039f89b75b4",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v11-targeted-stale-worker-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "7c00090d220f11d37d7f567eadfc840611f1a13e223f23c20a1c07bdff72bf22",
+      "status": "STALE_WORKER_RUNTIME_DIAGNOSTIC",
+      "totalBytes": 2834875
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "a5c2c48e206cb3b1e0fa4faf1dc99886526081f610fce5b124274220f20dd7cb",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v12-targeted-after-worker-restart-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "105246a70ee87bd126548d0d35c0daac85b2a1a93adb0e85017d09a1afdab453",
+      "status": "POST_WORKER_RESTART_TARGETED_DIAGNOSTIC",
+      "totalBytes": 2354939
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "752392dd663170057356617cfc32989569203464e027a2779a7876367014514f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "bc786e8c9d98510d4f3c4cd391ea4538cc7304166ae4cb25b390c0eeebd6533a",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 16745019
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 14,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "b51df463f246c83523cb4706ba48b641dd195d52520eeb382d3f0bfe25f10190",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "c28b30bc6ec862b6dbdae801bd839a42823a7d1aabc09283ad68b66f1da39013",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 287399
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "df5ea430a3e0a6da294a8e58976c6a51fa34a0ced4c03da5f28cdb413a760930",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "147d770692f503227699b96e26c73a36ba95320c3effd6f6c6c9fa9f28d06258",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 235435
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 4,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "25559cf3f1794c5d225eed5eda8ba7aba4f83f2656f0dae52d988a53c08958d2",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "34fd92ac62facaa58f129ff591c8e2a545182fffc79b893f808101bd05f3ae8c",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 16745740
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 2,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "f3226cafc8e8ec97b55fc78b827b26df5f8d16541d17dc4c08f4ade1cf5d3399",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v14-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "d366f934097f3c825ad5d2db7cd5d97741ba6121ea399f36301a02347a0240ae",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 17996536
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "6b85db74813cf59dcf7e4d04f06e0d97c9106f74d4ada249c58344a4811dc661",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "fc9a1b8797c0a6905bb7b1dffbd4547f4812778d080edb63bf25f6218bf005cc",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 15774140
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 11,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "52dbccb46e5e787e85e4dd69019fd3762f9f5339aadb0e038afef35753c55e92",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-adjudicated-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "364784e6a2faa753db69832f86a3bda40a2fef1ba5db27906277c57ae2de5aed",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 465479
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "e5b188eb86a515f34b17d0c424720ee430a3b94c639ff88d618003c2d7296f98",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-answer-review-pending-adjudication-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "2775b5199b7eb664f40e04a594e8bb1b84cc0ad5b91dc4e080615d8a194c6ebb",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 418833
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 10,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "38d71d35fef99934ed2238f4d0e9470bdfceeb0e97306bdcd134d17a3e0c781f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v24-cs043-context-bound-probe-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "73f613d556763fb1be6658354cb1338a2aae5806676d1de77ddf7a708ac114eb",
+      "status": "TARGETED_CONTEXT_BOUND_CONSTRAINT_PROBE",
+      "totalBytes": 106370
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 9,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "ae6bbb6b41c0f2686eddfaa812a2d8a07068c31aa394b4dc519174636e49948a",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "0cdcb352fcb85149dd3f488cb9807f267bc94a165e901595c29383e9796dce6d",
+      "status": "TARGETED_REGRESSION_OBSERVATION",
+      "totalBytes": 4133187
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "9aa52caebff28691325cc35e65d5b4636bd6d8af3a6f0b551e86d9b1589a71c9",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "29afcd48839f48b660061bff91c8d2d13e3da6ec839168d3d544eff6d5e68ff3",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 244373
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 1,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "a4050120702c2f7b244a2a152399c6603edf56a9873e1c26d04e17638b52e248",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "787191d12c8a6db4cd923b77b9ade1ffe3fb7cef2286e8ca7ec27c665f1aa042",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 498162
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "3259154f09b73fa418cae5422712efa8cd8373c71647f6687de77f0a821a3b82",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-pending-adjudication-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "4dfa2da7d3ab47ecc035226109b542584ebf2a2fed2301e8a069b7d51d44f1a6",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 462437
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 45,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "b34168d67233aeee5f53ac82c9d70bdccd04065f116ecc69a21060685a0a1403",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v32-human-v2-pre-fix-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "dce1259c8e497c7c39683e7f842dda15a0062449a69d69455f49e1ed69abe926",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 40073263
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 17,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "bfe8368ceea12a99d2e742e4899ee538ee09c31e22ee0426e4f1178939e76ca9",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v33-routing-fix-targeted-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "8de10bb18acfc1b5c0773f9178f38dac2379b1c1dd008d10b23620897c56afdd",
+      "status": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "totalBytes": 3517853
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 17,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "7e6296f5c8822214cb8875afca227b0ff54941e8456f0a9be64a81bdcfbb39ce",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v34-routing-contract-fix-handoff-metric-v2-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "cc06c972703d912f806bdb52b57699c79e62eb1c5ec7909240a96a9e024a0bbb",
+      "status": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "totalBytes": 1371716
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 17,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "f3880fb42381b98d687dd1a0639186b149f8415043d9b2edeb5143b8b700db01",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v34-routing-contract-fix-targeted-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "6480cf20f92853dbd5974c7f312ff7a1248a45f2305bf3e033464579055e91a2",
+      "status": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "totalBytes": 1371668
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 17,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "0da8919635abca14538b655343b12871c19f3021ba659a8784fab848779718ed",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v35-handoff-metric-v2-targeted-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "1ffc8792aa71b42a012c5438c80f6cb5e3b7115ff09d0a12e2387a66189c8b6d",
+      "status": "TARGETED_POST_FIX_SMOKE_NON_GATING",
+      "totalBytes": 1352982
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 20,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "2beb6cf5f5068d6522144aba0c16bc7036f4729b2bfa578c8c5c753b3a5cebb0",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v42-refund-reference-targeted-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "446e1d8fead5f4a2f909bfa8e7b9764bf9283ce56e301be98ee97350d4bf8e69",
+      "status": "TARGETED_REFUND_REFERENCE_FIX_VALIDATED",
+      "totalBytes": 194437
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 15,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "82c7cafaffb3270cf1c1d5bea62f673e50042fd743c9f88a68ba79819fba3887",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "36ce5d57ef256784509a2b53f9f239759f23b4fcc8e94efbab611b3662e0122e",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 1137650
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "b00621502bd7a79a1e918731173a24106835332ad8c714c422c8e6483a127034",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-pending-adjudication-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "7e5af0c553bd9a1bcba4c2bbb8e546402c75eae0f6f426280da175e82f9d1135",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 1058361
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 3,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "ac4809756fa849e0cb24b14efbb55883a4c0ee29ea4a9111e6b9c8127c7433eb",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "d8eb7d805c67b31ee7e57b0459e709ca424e68faf5a528b8ea4652e3f40ec211",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 31034048
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 19,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "73a5886985b840880973cd0b757e2f05cba996af2cd9d45d35a4f869ff23d325",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v53-badcase-fixes-handoff-evidence-targeted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "d1b2a7add5f25938b90b883bc985220128aee35782096c8514f7ef48c92eec5a",
+      "status": "TARGETED_BADCASE_FIXES_EXECUTED_PENDING_HUMAN_REVIEW",
+      "totalBytes": 4046650
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 7,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "006246ef5774437853862e195c0e6b5711ea1203c5dadbe163b252cfa45cf3dd",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "de953f60963da428670825c0e8ce7a544b74db2262033aef5fa4f062f1ada985",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 938424
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "9546078f388266ccae05f85576933f1ea1cf5e8415def7156e63856f012b9037",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-pending-adjudication-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "7cec67328e26fdfb54c2c6763906bd935692e7ad13e308a1685e2d1cb4db533c",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 873711
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "aea52e57424574ae6083de4074274ee447b5d0d1ac1bd3ad325f8d050389e658",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "5171e750b8a1c123a5348837a0365f6425d53e5bde7c19c6dede32d8db9a8709",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 30030392
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "52a04e92ecde835379877e6f2648cfda3f8e7dc6992ac1f20fb70551a08cd2ef",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-pending-human-review-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "3f6bae5cf9a7cef5b4dbe558e8af3a6261344743ec31165dc4eec1ac7580c637",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 30030392
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 22,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "5b62bfed3873075bdf90e11257582f8eee8612025d439b8eca76b363a280c23b",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v55-final-seven-regressions-targeted-pending-human-review-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "356c23359c284fd3affa744db54d01effe626d6cf6ab458a73da032f041de013",
+      "status": "TARGETED_FINAL_SEVEN_REGRESSIONS_EXECUTED_PENDING_HUMAN_REVIEW",
+      "totalBytes": 1001095
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "9d2eb565bbda0a492b142f3e331dea40c4fda9c990d79648ada05255f6758cf4",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-http-evidence/v1",
+      "sha256SumsSha256": "1b40d562fbf77a464f5f11d75f7291a1c9b569c6e2b3151345b53a8ada211a4f",
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "totalBytes": 29599366
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "96c68525487ee4c350309e96f83b0dc180e5177dde8464b0ea81cb44fe88faf9",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+      "sha256SumsSha256": "b2e7b22768dd5d7a95bef87948c2dd45c3e1740e492dcb3461edd935b4433176",
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "totalBytes": 892308
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "e9a6a940e46cc5171a77fce71e4a8f353155259226b50691b70e5083f629ae6e",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-pending-adjudication-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+      "sha256SumsSha256": "30cedb87ca24cc5d3bb9ac40c20ffa6395e688cf5254a6b5c94c34f1babdcfa9",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 839117
+    },
+    {
+      "artifactId": "customer-service-human-v1-20260823",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "b638e64af03fcd22a0895ad5dbba44670826726459507664e9d235c9c676c9f2",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v1-20260823",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-human-package/v1",
+      "sha256SumsSha256": "a509d68f728828d2e1ef374c752245f140caadaa1dc6bc266a6fdc2475c39e50",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 255801
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "f6b27ed460ecf3b40662978d864ebd4a4d7a51b9b5c63fcd9961161a648d9dde",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-independent-reaudit-initial-failed-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-independent-reaudit-evidence/v1",
+      "sha256SumsSha256": "cf38ce6bdd48773841c370b9b2701f118b7498f0382253b01b103c2779ad31c6",
+      "status": "EXPANSION_REQUIRED",
+      "totalBytes": 35655
+    },
+    {
+      "artifactId": "customer-service-human-v2-label-consistency-audit-20260826",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": false,
+      "manifestSha256": "2311b0fedd2b72c21547e6b1adc0cf1f3dfc105cf1c5f3045fefb09085f9c723",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-label-audit-package/v1",
+      "sha256SumsSha256": "1a49eca654ba795ee1d816c943bf2654fbaa17eace128a77e8ff4259b6d51374",
+      "status": "BLOCKED_HUMAN_READJUDICATION",
+      "totalBytes": 162117
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": null,
+      "manifestSha256": "bdd600775dd1801f06dce265625342dd285df765db2fdb731cf9b40eb957c57f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-policy-review-pending-adjudication-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-label-policy-review-pending-evidence/v1",
+      "sha256SumsSha256": "db6a548dd2def50b3e72cbce7f60736d82b02d422ebe490dce7c6558ab698c3c",
+      "status": "PENDING_ADJUDICATION",
+      "totalBytes": 54022
+    },
+    {
+      "artifactId": "customer-service-human-v2-provenance-pending-20260826",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 33,
+      "finalUnseenEligible": false,
+      "manifestSha256": "f57caee492c8b943333af031a5d4dba48dd6f5ab4d7b7c301ef4deb77c80dde6",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-v2-canonical-package/v1",
+      "sha256SumsSha256": "fb6a9d42149978b8103351e80e58fb1382a225b4f9456991a3c0fa092bc54e4e",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 936544
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 44,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 19,
+      "finalUnseenEligible": false,
+      "manifestSha256": "de360fb527773f1f739bce4e8588ea40ba9671d1a96415010a0b8c54e0cc4987",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2.1-label-policy-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-label-policy-final-evidence/v1",
+      "sha256SumsSha256": "d3d26d3ff5398b3645c83c412a5b6342371464875ccd4fa2ff85a01a789c637a",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "totalBytes": 442359
+    },
+    {
+      "artifactId": "customer-service-review-v1-pending-adjudication",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "6c907b0220c4d4b6238037509c02af3c464d0b955ee28388e96db93252c80489",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-review-v1-pending-adjudication",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-review-package/v1",
+      "sha256SumsSha256": "1b16e52d67d995c4c28d78eb702ad99477fad0bcb71e6f4233d08760df2a7480",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 94933
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 5,
+      "finalUnseenEligible": null,
+      "manifestSha256": "513ba7400ddf4cb1fb18f13872b6f86dac65610a6ec6a8b1cb995b2ec899e135",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-slot-replay-v1-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-customer-service-slot-replay-evidence/v1",
+      "sha256SumsSha256": "76bee98fb6a5d266434c4f2bcfbff93e94f292c64099e9f8f53f202ad605ea13",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 27482
+    },
+    {
+      "artifactId": "customer-service-v2-routing-paired-fix-20260826",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 9,
+      "finalUnseenEligible": false,
+      "manifestSha256": "dff11d4aaad20876246e3dee63786b738dd15fba82395960521cca21dc9a284e",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-v2-routing-paired-fix-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-paired-evidence-package/v1",
+      "sha256SumsSha256": "d9bb6530a4d22edc4c7c62d24038f780eb5618eeb89cbfffd7c620e8cf5f53f7",
+      "status": "DEVELOPMENT_FIX_EFFECT_CONFIRMED_LABEL_GATE_BLOCKED",
+      "totalBytes": 373703
+    },
+    {
+      "artifactId": "customer-service-v2-routing-paired-fix-validity-gated-20260826",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 9,
+      "finalUnseenEligible": false,
+      "manifestSha256": "cb179aba124bce885c95b16bc1cc0bc1a251680cf86a6db02bc551fb1d6b6db7",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-v2-routing-paired-fix-validity-gated-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-customer-service-paired-evidence-package/v1",
+      "sha256SumsSha256": "652694852a947314833e5043f439872e2ad5aaa2d395ad021b5d3037185804f8",
+      "status": "DEVELOPMENT_FIX_EFFECT_CONFIRMED_LABEL_GATE_BLOCKED",
+      "totalBytes": 376322
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 4,
+      "finalUnseenEligible": null,
+      "manifestSha256": "84efd1f3dd5266cf2787f1b9b90b78abac7ea3721ec12defbbf2e879b79fdf32",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/db/db-benchmark-v9-20260822",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-db-benchmark-evidence/v2",
+      "sha256SumsSha256": "59ff62b29458b10de1889b8234066cfd3ebe54bdabdbc7c839535c8a3ef23623",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 26312
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 10,
+      "finalUnseenEligible": null,
+      "manifestSha256": "476e32f0e31d2581cc3dca4e26c6f1c6fc00b1df13f17c1125cee5907deefc65",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-development-v9-20260822",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-auxiliary-evidence/v1",
+      "sha256SumsSha256": "3b84b059f6506a84ede475f6869bd46b85aa1c73a417bc84f49a021191d28e63",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 2021328
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 10,
+      "finalUnseenEligible": null,
+      "manifestSha256": "74d09c7f273e1f3c0f0357219b0f51c4f47149925bd3fa849484a521067cdef3",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/repeated-agent/agent-pass5-regression-v9-20260822",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-auxiliary-evidence/v1",
+      "sha256SumsSha256": "648f5332cf13ef971a3b2b032d7759564a5c943b215af720a528e6a0fa1a5b06",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 1710597
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 7,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 9,
+      "finalUnseenEligible": null,
+      "manifestSha256": "ec664fa0f0ae1283b0f05d61692664b9e0446fd68f3e515099aee57b017b529f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/resilience/fault-v9-20260822",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-auxiliary-evidence/v1",
+      "sha256SumsSha256": "9aebf69bd9552d520829e9474f5910917de4182c9ac148b73837a289c48f1868",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 531337
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 3,
+      "category": "BENCHMARK_EVIDENCE",
+      "checksumBound": true,
+      "fileCount": 6,
+      "finalUnseenEligible": null,
+      "manifestSha256": "bfa349cdc23550d2e5ae9a8b6f71085526f6257f7aedea7d8fe797429a65967f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/search/search-hard-negative-paired-v1-20260823",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-search-paired-replay-evidence/v1",
+      "sha256SumsSha256": "5b3828458d3893a9ad781035d74422d290e1c44907d33ec25ed9742a09f19f57",
+      "status": "AUXILIARY_PAIRED_REPLAY",
+      "totalBytes": 120003
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 1,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_CURRENT_POINTER",
+      "checksumBound": true,
+      "fileCount": 11,
+      "finalUnseenEligible": null,
+      "manifestSha256": "df5ec32f1806dc6eaf6c2ff9718011fabad8faf081c78cf630de268ed88d2daa",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/current",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-evaluation-evidence/v3",
+      "sha256SumsSha256": "94edeb894f3e2d36f597cb9cc9796d6e0e6f6b81da08f030b8723435e441c11a",
+      "status": "HISTORICAL_FINAL_SOURCE_EXPOSED",
+      "totalBytes": 22095236
+    },
+    {
+      "artifactId": "customer-service-v2-additions-original-submissions-recovered-20260826",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 13,
+      "finalUnseenEligible": false,
+      "manifestSha256": "630cae05a84755db403472b37d935c77c3a03096fe9e0caf3d5bc0c852401b4f",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v2-additions-original-submissions-recovered-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-evaluation-intake-archive/v1",
+      "sha256SumsSha256": "aa6e211d3cf1a9217442786442c74f414f88f428d587aa0348983fab7f46586c",
+      "status": "HISTORICAL_INTAKE_RECOVERED_PROVENANCE_STILL_BLOCKED",
+      "totalBytes": 109686
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 9,
+      "finalUnseenEligible": null,
+      "manifestSha256": "46111369b0a88bf25d46fad4cf9b38c10794bc72c00baf30442717cb8266abfd",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-v54-answer-adjudication-return-evidence/v1",
+      "sha256SumsSha256": "6e53ed158dca58a7c534baa53646603cb3f0af95ad09bea545593c37760d0ee2",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATION_ACCEPTED",
+      "totalBytes": 50199
+    },
+    {
+      "artifactId": "customer-service-v54-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 12,
+      "finalUnseenEligible": false,
+      "manifestSha256": "1942af233c42e4f789c3db6a10e629edad2e55deda40028e8631c6ab62de317b",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-v54-answer-review-return-archive/v1",
+      "sha256SumsSha256": "c134b2ed4a1982a3cbda8c6b9a7cbedd738cdc01bb47deeb6c16d6764922ca18",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_RETURNS_ARCHIVED_NORMALIZED_AND_SEALED",
+      "totalBytes": 927812
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 9,
+      "finalUnseenEligible": false,
+      "manifestSha256": "f82ccd9cc654f2decc521b26c066df9e94cec8f3631dcb2f3bef196644c507ed",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-v56-answer-adjudication-return-evidence/v1",
+      "sha256SumsSha256": "c61b3f8fd4bfad9e277afbd379b53c8dc06be82fc4dbefebef2a08f0b3038399",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATION_ACCEPTED",
+      "totalBytes": 14567
+    },
+    {
+      "artifactId": "customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 16,
+      "finalUnseenEligible": false,
+      "manifestSha256": "5c7cca079eba6d9de948acd140c14cb14e5f56d7e9305b7f757d96c43b4c7ab3",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-v56-answer-review-return-archive/v1",
+      "sha256SumsSha256": "743cdd9fcbb194217ec2a092aba8c5013ded53dff081e3e47ea014bac767715b",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_RETURNS_ARCHIVED_NORMALIZED_AND_SEALED",
+      "totalBytes": 936778
+    },
+    {
+      "artifactId": "human-review-adjudication-returns-20260827",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 9,
+      "finalUnseenEligible": null,
+      "manifestSha256": "9435e06c42941b9325792dd4828e044b398efa0585316bebcd99902ad37b6b64",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-adjudication-returns-20260827",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-human-adjudication-return-archive/v1",
+      "sha256SumsSha256": "8a3150bfde95bcf2ebd72591064a208ac3f39b412387fd3c2f144c0424cd222d",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_INTAKE_ACCEPTED",
+      "totalBytes": 31893
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 10,
+      "finalUnseenEligible": null,
+      "manifestSha256": "980b3c8f490def0b99b9c3e34120ccb74e388838e75991c9e608d9285ed9c6f9",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-human-approval-ai-assistance-provenance-20260827",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-human-approval-ai-assistance-provenance/v1",
+      "sha256SumsSha256": "7f8580be62dbf96f5994f5da471a42d197e16f31b590e710109327cff60cd1b9",
+      "status": "HUMAN_APPROVED_AI_ASSISTED_FINALIZED",
+      "totalBytes": 29893
+    },
+    {
+      "artifactId": "human-review-round1-returns-20260827",
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "HISTORICAL_INTAKE_ARCHIVE",
+      "checksumBound": true,
+      "fileCount": 15,
+      "finalUnseenEligible": null,
+      "manifestSha256": "0335567641af8c173d9a0e27728f8047eabeedad156825a785b5f738d6338e07",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-round1-returns-20260827",
+      "releaseGateEligible": null,
+      "schemaVersion": "aishop-human-review-return-archive/v1",
+      "sha256SumsSha256": "8a40770fc9fc6b9b1ab261aa8609231c1b97212afebf446f8d218901ccbf9380",
+      "status": "EXACT_RETURNS_ARCHIVED_PROCESSING_REQUIRED",
+      "totalBytes": 1065248
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "SOURCE_FREEZE",
+      "checksumBound": true,
+      "fileCount": 6,
+      "finalUnseenEligible": null,
+      "manifestSha256": "90482e46902c3bd0c7b08a0a3cfb07720903420e5920381cd691da4553e32bd3",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/source-freezes/source-freeze-post-v2-quality-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-source-freeze-evidence/v1",
+      "sha256SumsSha256": "473b255c687a47572fbfcf5aa4a00c0f0e917ebcfd69cf4304623c6e33254892",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 582731
+    },
+    {
+      "artifactId": null,
+      "badCaseFiles": 0,
+      "badCaseRows": 0,
+      "category": "SOURCE_FREEZE",
+      "checksumBound": true,
+      "fileCount": 6,
+      "finalUnseenEligible": null,
+      "manifestSha256": "8761b957aa119b23ee1946658a7890e6079dd53697864bfcfc74f6a0f9feec8a",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/source-freezes/source-freeze-pre-v2-quality-20260826",
+      "releaseGateEligible": false,
+      "schemaVersion": "aishop-source-freeze-evidence/v1",
+      "sha256SumsSha256": "3799107ceec7aad51aea0142b8f43ad4cc1e6425ed644d8ada676a31eaae0c5c",
+      "status": "STATUS_NOT_DECLARED",
+      "totalBytes": 416254
+    }
+  ],
+  "generatedAt": "2026-08-27T06:18:43Z",
+  "humanReviewQueue": [
+    {
+      "caseCount": 120,
+      "reviewers": 3,
+      "status": "COMPLETE_112_AGREED_8_ADJUDICATED_7_BADCASES",
+      "task": "CUSTOMER_SERVICE_V54_ANSWER_QUALITY_DUAL_REVIEW"
+    },
+    {
+      "caseCount": 120,
+      "reviewers": 3,
+      "status": "COMPLETE_118_AGREED_2_ADJUDICATED_0_BADCASES",
+      "task": "CUSTOMER_SERVICE_V56_ANSWER_QUALITY_ADJUDICATION"
+    },
+    {
+      "caseCount": 60,
+      "failureExpansionCaseCount": 60,
+      "initialCompletedCaseCount": 12,
+      "remainingCaseCount": 48,
+      "reviewers": 1,
+      "status": "EXPANSION_REQUIRED_CUSTODY_INCOMPLETE",
+      "task": "CUSTOMER_SERVICE_V2_PROVENANCE_INDEPENDENT_REAUDIT"
+    },
+    {
+      "current125CandidateEligible": false,
+      "minimumCaseCount": 100,
+      "status": "NOT_GENERATED_BY_INDEPENDENT_CUSTODIAN",
+      "task": "EXTERNAL_UNSEEN_FINAL_REPLACEMENT"
+    }
+  ],
+  "repositoryRoot": "/home/song/code/Java/AI_Shop",
+  "rootLooseStructuredFiles": [],
+  "runtimeWorkspaces": [
+    {
+      "fileCount": 32,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/evaluation-observations",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 309313032
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v26-full-quality-fixes-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 432659
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v27-full-quality-fixes-eval-contract-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 431058
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v28-full-quality-fixes-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 199556
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v28-model-scope-probe-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 7549
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v29-full-quality-fixes-deduped-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 166511
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v30-full-quality-fixes-deduped-fixture-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 403056
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v31-return-eligibility-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 390152
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v43-human-review-return-20260827",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 1020730
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 1013699
+    },
+    {
+      "fileCount": 5,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v54-full-badcase-fixes-handoff-evidence-20260827",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 814133
+    },
+    {
+      "fileCount": 18,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-20260827",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 2515215
+    },
+    {
+      "fileCount": 19,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 2480703
+    },
+    {
+      "fileCount": 4,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-label-policy-v2.1-return-20260827",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 31463
+    },
+    {
+      "fileCount": 7,
+      "path": "AI_Shop-backend/AI_Shop-agent/run/agent-service-logs",
+      "role": "NON_CANONICAL_RUNTIME_WORKSPACE",
+      "totalBytes": 302141
+    }
+  ],
+  "schemaVersion": "aishop-evaluation-asset-catalog/v1",
+  "sourceFreezes": [
+    {
+      "fileCount": 6,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/source-freezes/source-freeze-post-v2-quality-20260826",
+      "totalBytes": 582731
+    },
+    {
+      "fileCount": 6,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/source-freezes/source-freeze-pre-v2-quality-20260826",
+      "totalBytes": 416254
+    }
+  ],
+  "summary": {
+    "badCaseFileCount": 42,
+    "badCaseRowCount": 401,
+    "datasetFileCount": 41,
+    "documentationFileCount": 47,
+    "evidenceFileCount": 696,
+    "evidencePackageCount": 80,
+    "rootLooseJsonOrJsonlCount": 0,
+    "runtimeWorkspaceCount": 15,
+    "sourceFreezeCount": 2
+  }
+}

@@ -771,6 +771,33 @@ def test_rerank_protocol_and_instruction_are_part_of_the_semantic_cache_key():
     assert cache_key(compatible) != cache_key(different_instruction)
 
 
+def test_supplied_query_variants_are_part_of_the_semantic_cache_key():
+    retriever = RagRetriever()
+    settings = Settings()
+
+    base = retriever._semantic_cache_key(
+        "自动确认收货后还能售后吗",
+        1,
+        10,
+        None,
+        "A",
+        settings,
+        settings.rerank_top_n,
+    )
+    expanded = retriever._semantic_cache_key(
+        "自动确认收货后还能售后吗",
+        1,
+        10,
+        None,
+        "A",
+        settings,
+        settings.rerank_top_n,
+        query_variants=["确认收货 订单完成状态", "售后资格 实时规则核验"],
+    )
+
+    assert base != expanded
+
+
 @pytest.mark.asyncio
 async def test_java_catalog_is_saved_as_agent_owned_last_known_good(monkeypatch):
     retriever = RagRetriever()

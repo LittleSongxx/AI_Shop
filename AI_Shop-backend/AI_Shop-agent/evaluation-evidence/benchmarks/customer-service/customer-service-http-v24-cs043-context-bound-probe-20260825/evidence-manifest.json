@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-25T11:31:51.479Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "e440cdcd602c91bf9818970dfa1b6103b3aa5bb9632b0e2f7119e10666911f16",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 2125,
+      "sha256": "ca0d3e23e0c1c3d3c0a0b1b1de0dd58b19406a12e6b4595343f6fe5ec39bfe8d"
+    },
+    "report.json": {
+      "bytes": 101003,
+      "sha256": "2038ab8e75cd9dcfc1fc63a47ade817c5ebfdcadb8b54cc4279bdcaa2d23a629"
+    },
+    "report.md": {
+      "bytes": 1625,
+      "sha256": "5e96e8a80edb704db2a8a7d96ee74e982744826b2955f085b62b627fda45b766"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v24-cs043-context-bound-probe-20260825",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "3f21aa73256e4602327b3d9cc3a429a31ec88e2cf677067ca4f48564dcf876b4",
+  "status": "TARGETED_CONTEXT_BOUND_CONSTRAINT_PROBE"
+}

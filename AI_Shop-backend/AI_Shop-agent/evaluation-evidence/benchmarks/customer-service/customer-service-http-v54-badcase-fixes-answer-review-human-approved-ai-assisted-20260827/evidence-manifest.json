@@ -1,0 +1,78 @@
+{
+  "adjudicationSha256": "79d18e5eba46883bedf5993a7ee2a19e093398233223663e4c9312b2dea01113",
+  "aiAssistedTextOrRecording": true,
+  "annotationStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+  "caseCount": 120,
+  "createdAt": "2026-08-27T03:04:16.705Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "files": {
+    "agreement.json": {
+      "bytes": 24838,
+      "sha256": "738706e829287c325bb508947a1a4e0e4d70ebee20c28e40d0b8507e34025f33"
+    },
+    "agreement.md": {
+      "bytes": 1372,
+      "sha256": "bebdbea82394dbb8867a81416f8bab55d72ffcf3b0bfd464ad49e5ecab449e13"
+    },
+    "badcases.jsonl": {
+      "bytes": 4785,
+      "sha256": "84118f658d5ddc2120c191d73eb56a5147f70fe95e71bc34268192ea246553b4"
+    },
+    "final-report.json": {
+      "bytes": 63444,
+      "sha256": "4fa87de98dd42b9e3a9a10daaa3a4f0e6c46297c2ebfe42f28c228251081179a"
+    },
+    "final-report.md": {
+      "bytes": 993,
+      "sha256": "e1673f93f3119df406bed07c58ec9e2c79615ad1f06053c4447a49f4d78b9f2b"
+    },
+    "reviews/adjudication.final.jsonl": {
+      "bytes": 20124,
+      "sha256": "79d18e5eba46883bedf5993a7ee2a19e093398233223663e4c9312b2dea01113"
+    },
+    "reviews/reviewer-a.sealed.jsonl": {
+      "bytes": 406573,
+      "sha256": "d55c3421deda362c8f9993678b8917b4b41e3634902b730630f56a6a0059535a"
+    },
+    "reviews/reviewer-a.sealed.jsonl.manifest.json": {
+      "bytes": 2263,
+      "sha256": "df101249ae75a7ed6fc480f816b76218c7c714a4d6c5448af18071ceda40fd98"
+    },
+    "reviews/reviewer-b.sealed.jsonl": {
+      "bytes": 407427,
+      "sha256": "aac07f94a5ea60c3d6c141dd72786a2c09d567c68a426123cd24fddd52531817"
+    },
+    "reviews/reviewer-b.sealed.jsonl.manifest.json": {
+      "bytes": 2263,
+      "sha256": "66fac35898a2b8d91ce0208ad7d2da90ee8fb325b3bee78302f7907a40e80956"
+    }
+  },
+  "humanApprovalClarificationSha256": "bab4fd34ee5b9be6d0663289447842150331292086c4eb3499c0c60f20d9498b",
+  "humanDecisionAuthority": true,
+  "kind": "customer-service-answer-human-review",
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "normalQualityDenominatorExcluded": true,
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "rawReturnArchiveSha256SumsSha256": "6e53ed158dca58a7c534baa53646603cb3f0af95ad09bea545593c37760d0ee2",
+  "releaseGateEligible": false,
+  "reviewASha256": "d55c3421deda362c8f9993678b8917b4b41e3634902b730630f56a6a0059535a",
+  "reviewBSha256": "aac07f94a5ea60c3d6c141dd72786a2c09d567c68a426123cd24fddd52531817",
+  "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+  "selfJudged": false,
+  "sourceEvaluationStatus": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827/report.json",
+  "sourceReportSha256": "7d659d4d1ac7f743cba2607ab1de8e2869ce2c5bcd1286df6dfadb07887db2d0",
+  "sourceRunId": "customer-service-http-v54-full-badcase-fixes-handoff-evidence-20260827",
+  "status": "HUMAN_REVIEWED_ADJUDICATED"
+}

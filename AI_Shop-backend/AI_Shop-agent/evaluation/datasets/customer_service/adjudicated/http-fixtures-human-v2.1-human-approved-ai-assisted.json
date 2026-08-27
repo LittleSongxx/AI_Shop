@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "aishop-customer-service-http-fixture/v1",
+  "sourceDatasetSha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3",
+  "purpose": "Successor per-case Java snapshots for the 120-case v2 development diagnostic. Received-item and receipt-confirmation states are aligned with the source utterance; the pre-fix fixture remains immutable.",
+  "defaults": {
+    "kind": "CUSTOMER_SERVICE_ORDER_V1",
+    "scope": "LOCAL_EVALUATION_ONLY",
+    "sourceOrderId": "SM202608050002",
+    "orderStatus": 1,
+    "orderItemStatus": 1,
+    "amount": 199,
+    "productName": "客服评测耳机",
+    "propertyInfo": "评测规格",
+    "withLogistics": true,
+    "logisticsStatus": 0
+  },
+  "fixtures": {
+    "cs-gold-v1-004": {},
+    "cs-gold-v1-005": {},
+    "cs-gold-v1-006": {},
+    "cs-gold-v1-007": {},
+    "cs-gold-v1-008": {},
+    "cs-gold-v1-009": {},
+    "cs-gold-v1-010": {},
+    "cs-gold-v1-012": {
+      "orderStatus": 0,
+      "orderItemStatus": 0,
+      "withLogistics": false
+    },
+    "cs-gold-v1-014": {"orderStatus": 2, "logisticsStatus": 1},
+    "cs-gold-v1-016": {"orderStatus": 3, "commentStatus": 0},
+    "cs-gold-v1-017": {"orderStatus": 3, "commentStatus": 1},
+    "cs-gold-v1-018": {"orderStatus": 3, "logisticsStatus": 1},
+    "cs-gold-v1-019": {"orderStatus": 3, "logisticsStatus": 1},
+    "cs-gold-v1-020": {},
+    "cs-gold-v1-021": {},
+    "cs-gold-v1-027": {},
+    "cs-gold-v1-035": {},
+    "cs-gold-v1-037": {},
+    "cs-gold-v1-055": {"orderStatus": 3, "logisticsStatus": 1},
+    "cs-candidate-v2-061": {"sourceOrderId": "A20260823001"},
+    "cs-candidate-v2-062": {"sourceOrderId": "20260823002"},
+    "cs-candidate-v2-067": {
+      "sourceOrderId": "20260823003",
+      "orderStatus": 0,
+      "orderItemStatus": 0,
+      "withLogistics": false
+    },
+    "cs-candidate-v2-076": {
+      "sourceOrderId": "20260823004",
+      "orderStatus": 2,
+      "logisticsStatus": 1
+    },
+    "cs-candidate-v2-079": {
+      "sourceOrderId": "20260823005",
+      "orderStatus": 3,
+      "logisticsStatus": 1
+    },
+    "cs-candidate-v2-105": {"sourceOrderId": "20260823006"},
+    "cs-candidate-v2-106": {
+      "sourceOrderId": "20260823007",
+      "orderStatus": 2,
+      "logisticsStatus": 1
+    },
+    "cs-candidate-v2-109": {"sourceOrderId": "20260823008"},
+    "cs-candidate-v2-116": {"sourceOrderId": "20260823009"}
+  }
+}

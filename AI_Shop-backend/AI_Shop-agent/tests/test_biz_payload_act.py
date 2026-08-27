@@ -143,6 +143,35 @@ def test_action_confirm_payload_exposes_explicit_action_token():
     assert data["actionToken"] == token
 
 
+def test_wait_payment_cancel_card_does_not_claim_money_was_paid():
+    import json
+
+    from app.constants import ORDER_STATUS_WAIT_PAYMENT
+    from app.utils.biz_payload import build_action_confirm_payload
+
+    token = "act_" + "f" * 32
+    raw, _ = build_action_confirm_payload(
+        {
+            "token": token,
+            "actionType": "CANCEL_ORDER",
+            "paramsJson": json.dumps(
+                {
+                    "orderId": "EVAL-WAIT-PAY",
+                    "orderAmount": 199,
+                    "orderStatusBefore": ORDER_STATUS_WAIT_PAYMENT,
+                }
+            ),
+            "summary": "取消订单：订单 EVAL-WAIT-PAY，订单金额 199 元",
+            "status": 0,
+        }
+    )
+
+    card = json.loads(raw)
+    assert "实付金额" not in raw
+    assert {"label": "订单金额", "value": "199 元"} in card["details"]
+    assert "不会产生退款到账流程" in card["riskTip"]
+
+
 def test_extract_review_helpers():
     from app.domain.intent.write_args import extract_review_content, extract_review_star
 

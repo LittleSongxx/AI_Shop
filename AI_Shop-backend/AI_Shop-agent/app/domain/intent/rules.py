@@ -1,10 +1,29 @@
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.domain.category_terms import has_bare_bag_category
 
 # 转人工的显式请求。放在 rules 层是因为 classifier 和 product_consult 都要先于
 # 商品咨询分支拦截它：用户在咨询一款商品时要求转人工，不能被 PRODUCT_CONSULT 吃掉。
-HUMAN_HINTS = ("转人工", "人工客服", "找客服", "真人客服", "人工处理", "人工介入", "找你们主管")
+HUMAN_HINTS = (
+    "转人工",
+    "转个人",
+    "人工客服",
+    "找客服",
+    "找真人",
+    "真人客服",
+    "真人处理",
+    "人工处理",
+    "人工介入",
+    "人工确认",
+    "人工核对",
+    "人工核账",
+    "人工更正",
+    "安全人工",
+    "安全专员",
+    "找你们主管",
+)
 
 _PHONE_HINTS = ("手机", "iphone", "苹果", "三星", "华为", "小米", "oppo", "vivo", "荣耀")
 _SNACK_HINTS = (
@@ -361,6 +380,13 @@ _DETERMINISTIC_SOCIAL_REPLIES = {
     ),
 }
 
+_SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+_WEEKDAY_NAMES = ("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
+
+
+def _shanghai_now() -> datetime:
+    return datetime.now(_SHANGHAI_TZ)
+
 
 def deterministic_social_reply(user_text: str | None) -> str | None:
     """Return a fixed reply only for a complete, bounded social utterance.
@@ -379,6 +405,24 @@ def deterministic_social_reply(user_text: str | None) -> str | None:
     ).casefold()
     if not normalized:
         return None
+    if re.fullmatch(
+        r"(?:(?:你好|您好|哈喽|hello|hi|嗨)[，,\s]*)?"
+        r"今天(?:是)?(?:周几|星期几)",
+        normalized,
+    ):
+        now = _shanghai_now()
+        return f"今天是{_WEEKDAY_NAMES[now.weekday()]}。"
+    # A user may explicitly decline a human handoff while closing the
+    # conversation.  This is still a bounded social turn, but only when the
+    # complete utterance says that it is *just* a thank-you.  Keep the pattern
+    # narrow so business-bearing text such as "不用转人工，我想问退款" cannot
+    # bypass the normal intent and safety path.
+    if re.fullmatch(
+        r"(?:不用|不要|不需要)(?:转|找)?人工[，,\s]*"
+        r"(?:我)?(?:只是)?(?:来)?(?:道谢|感谢|谢谢)(?:的)?",
+        normalized,
+    ):
+        return _DETERMINISTIC_SOCIAL_REPLIES["thanks"][1]
     for phrases, reply in _DETERMINISTIC_SOCIAL_REPLIES.values():
         if normalized in phrases:
             return reply

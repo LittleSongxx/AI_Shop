@@ -68,24 +68,27 @@ def _retrieval_metrics(
             reciprocal_rank = 1 / rank
             break
 
-    def dcg(refs: Sequence[Mapping[str, Any]]) -> float:
-        import math
-
-        return sum(
-            ((2 ** len(relevant.intersection(_ref_facts(ref)))) - 1) / math.log2(rank + 1)
-            for rank, ref in enumerate(refs, 1)
-        )
-
-    ideal_grades = [1] * min(5, len(relevant))
     import math
 
-    ideal = sum((2**grade - 1) / math.log2(rank + 1) for rank, grade in enumerate(ideal_grades, 1))
-    ndcg = dcg(candidate_refs[:5]) / ideal if ideal else 0.0
+    grades = [len(relevant.intersection(_ref_facts(ref))) for ref in candidate_refs]
+
+    def dcg(values: Sequence[int]) -> float:
+        return sum(
+            (2**grade - 1) / math.log2(rank + 1)
+            for rank, grade in enumerate(values[:5], 1)
+        )
+
+    # NDCG compares the observed ranking with the ideal ordering of the same
+    # graded candidates. A chunk can support multiple facts, so the ideal gains
+    # must use those exact grades instead of pretending every fact is a separate
+    # binary-relevance document.
+    ideal = dcg(sorted(grades, reverse=True))
+    ndcg = dcg(grades) / ideal if ideal else 0.0
     return {
         "retrievalRecallAt3": recall(3),
         "retrievalRecallAt5": recall(5),
         "retrievalMrrAt10": reciprocal_rank,
-        "retrievalNdcgAt5": min(1.0, ndcg),
+        "retrievalNdcgAt5": ndcg,
     }
 
 

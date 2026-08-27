@@ -1,0 +1,20 @@
+{
+  "agreementSha256": "1b2ff0bbbd7576c5450eac4e9290088b991b8daba1181a1c2f8d90cd36765c31",
+  "caseCount": 120,
+  "changedCaseCount": 19,
+  "datasetId": "customer-service-human-v2.1-human-approved-ai-assisted",
+  "datasetSha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "finalUnseenEligible": false,
+  "humanApprovalClarificationSha256": "97a1b4aadbe03f1ad4e8564c6fd42705ca3fbc520538393f856ed8bce0899bcb",
+  "normalizedAdjudicationSha256": "19873655dacca4a7e054b08138e40273910ef33b5f3fddd0d0cd9ac5979c074a",
+  "rawAdjudicationSha256": "96058711dfbeeebd4b4de9c3340a89ee7ed00152b7c59b7e2302cacb05c3775c",
+  "releaseGateEligible": false,
+  "reviewASha256": "795c27f86c9a79a2780c3f7033450e2c1bb7064ddd825083dc257956ef9f471b",
+  "reviewBSha256": "7a9f295ac9a9e3e2efb6dc12de49f80302d39c21938acea493298ea3a763aafe",
+  "reviewedCaseCount": 25,
+  "schemaVersion": "aishop-customer-service-gold-successor/v1",
+  "sourceDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/source/customer-service-human-v2.jsonl",
+  "sourceDatasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+  "status": "HUMAN_VERIFIED"
+}

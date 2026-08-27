@@ -8,7 +8,7 @@
     },
     "scorecard": {
       "path": "docs/evaluation/AI质量评测与Badcase.json",
-      "sha256": "807152aabf55c7da75e0fd9f2dac7c3fef21147037c971565405879fe7350086",
+      "sha256": "61e943b3d41312456f2c579b4043f75970496d72043e2503ca1dffab86043042",
       "schemaVersion": "aishop-quality-scorecard/v1",
       "derivedFrom": "evaluation.currentEvidence"
     },
@@ -86,6 +86,587 @@
           "manifestSha256": "158b93e949bc157833acebe79506f62544140361aca305c2ae1dec333f99680e"
         }
       ]
+    },
+    "customerServiceV2": {
+      "status": "HUMAN_VERIFIED_PROVENANCE_REVIEW_REQUIRED",
+      "qualityClaimStatus": "DEVELOPMENT_DIAGNOSTIC_ONLY",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826",
+      "sha256SumsSha256": "fb6a9d42149978b8103351e80e58fb1382a225b4f9456991a3c0fa092bc54e4e",
+      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826/labels/customer-service-human-v2.jsonl",
+      "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+      "provenanceAuditPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826/provenance-audit.json",
+      "provenanceAuditSha256": "688aef05cc3b7d931f85998fa71a9d2bf1f53e06a74aee542e548c2610c5eff9",
+      "caseCount": 120,
+      "additionsAdjudicationCaseCount": 26,
+      "hashAndLabelChainValid": true,
+      "independentReviewClaimVerified": false
+    },
+    "customerServiceV2LabelAudit": {
+      "status": "BLOCKED_HUMAN_READJUDICATION",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826",
+      "sha256SumsSha256": "1a49eca654ba795ee1d816c943bf2654fbaa17eace128a77e8ff4259b6d51374",
+      "auditPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-consistency-audit-20260826/label-consistency-audit.json",
+      "auditSha256": "cbe8edceeeb7133250fcc9bac574773f8a4d347af15faa5d019d23ed65148492",
+      "taxonomyPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/customer-service-taxonomy-contract-v2.1.json",
+      "taxonomySha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc",
+      "findingCount": 5,
+      "blockingFindingCount": 3,
+      "affectedCaseCount": 25
+    },
+    "customerServiceV2RoutingPaired": {
+      "status": "DEVELOPMENT_FIX_EFFECT_CONFIRMED_LABEL_GATE_BLOCKED",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-v2-routing-paired-fix-validity-gated-20260826",
+      "sha256SumsSha256": "652694852a947314833e5043f439872e2ad5aaa2d395ad021b5d3037185804f8",
+      "reportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-v2-routing-paired-fix-validity-gated-20260826/paired-comparison.json",
+      "reportSha256": "9e6a8b49ff532ad5c70eae9c777213a86031a3d8f14da989304f92f238a1c19c",
+      "caseCount": 120,
+      "developmentFixValidated": true
+    },
+    "customerServiceHttpV43": {
+      "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+      "qualityClaimStatus": "DEVELOPMENT_DIAGNOSTIC_LABEL_AND_PROVENANCE_BLOCKED",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+      "sha256SumsSha256": "d8eb7d805c67b31ee7e57b0459e709ca424e68faf5a528b8ea4652e3f40ec211",
+      "reportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826/report.json",
+      "reportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+      "caseCount": 120,
+      "observationCaptureCount": 120,
+      "productionExecutionCount": 120,
+      "behaviorContractPassedCount": 22,
+      "behaviorContractCount": 22,
+      "humanAnswerReviewCount": 0,
+      "answerQualityStatus": "PENDING_HUMAN_REVIEW"
+    },
+    "customerServiceBadcaseRemediationV54": {
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "baseline": {
+        "status": "HUMAN_REVIEWED_ADJUDICATED",
+        "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827",
+        "sha256SumsSha256": "36ce5d57ef256784509a2b53f9f239759f23b4fcc8e94efbab611b3662e0122e",
+        "caseCount": 120,
+        "badcaseCount": 15,
+        "jointQualityPassedCount": 105
+      },
+      "handoffMarkdownPath": "docs/evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.md",
+      "handoffMarkdownSha256": "bf79120ab96a735d57cddcd57cb5af8d37c6223931d3dd94f5db6b1d0f508096",
+      "handoffJsonPath": "docs/evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.json",
+      "handoffJsonSha256": "565d17e0b32a6e3b9aa9c8269f946aeee206c014290324c5d9dcda1081af0ed7",
+      "behaviorContract": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2.2-final-handoff-evidence.json",
+        "sha256": "d23a80a5dcba9c4071d2d02aba7d048ccd00c4a6b0872e7add88ae6fa843ca20",
+        "contractCount": 23
+      },
+      "targetedExecution": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v53-badcase-fixes-handoff-evidence-targeted-20260827",
+        "sha256SumsSha256": "d1b2a7add5f25938b90b883bc985220128aee35782096c8514f7ef48c92eec5a",
+        "reportSha256": "9db963055dcfc1d6f311b63c8ee7c14de48f1da0be3aec270440481965c70774",
+        "executionPassedCount": 15,
+        "caseCount": 15,
+        "behaviorContractPassedCount": 4,
+        "applicableBehaviorContractCount": 4,
+        "normalQualityDenominatorExcluded": true
+      },
+      "fullExecution": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827",
+        "sha256SumsSha256": "5171e750b8a1c123a5348837a0365f6425d53e5bde7c19c6dede32d8db9a8709",
+        "reportSha256": "7d659d4d1ac7f743cba2607ab1de8e2869ce2c5bcd1286df6dfadb07887db2d0",
+        "sourceObservationPath": "AI_Shop-backend/AI_Shop-agent/run/evaluation-observations/customer-service-http-v54-full-badcase-fixes-handoff-evidence-20260827.json",
+        "sourceObservationSha256": "bfc5082dcddb90039986cfa92e4e4787243ee5f4ed87935e34edb1dc9b63124e",
+        "providerCallsReexecutedForRebuild": false,
+        "caseCount": 120,
+        "executionPassedCount": 120,
+        "behaviorContractPassedCount": 23,
+        "behaviorContractCount": 23,
+        "fixtureCleanupFailureCount": 0,
+        "hardConstraintViolationCount": 0,
+        "answerQualityStatus": "PENDING_HUMAN_REVIEW",
+        "humanAnswerReviewCount": 0,
+        "selfJudged": false,
+        "labelEvidenceStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+        "releaseGateEligible": false,
+        "finalUnseenEligible": false
+      },
+      "humanReviewHandoff": {
+        "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+        "caseCountPerReviewer": 120,
+        "exactAgreementCaseCount": 112,
+        "disagreementCaseCount": 8,
+        "caseAgreementRate": 0.933333,
+        "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+        "deliveryManifestPath": "deliverables/human-review/V54-ANSWER-QUALITY-DELIVERY-MANIFEST-20260827.json",
+        "deliveryManifestSha256": "08a30ef08a47c5ee507f33481db7883de22feecd731e86e577629cb3ca9ecaaf",
+        "reviewerA": {
+          "zipPath": "deliverables/human-review/AI-Shop-v54-answer-quality-reviewer-a-label-evidence-bound-20260827.zip",
+          "zipSha256": "ff1ff6cb6b9ea27e0e630f5cabdc8d9a3e4c6f43686c525877941157188365fc",
+          "sheetSha256": "4af57f736b86c7f7e7691bdd7d0fb9eae6b29a48abdb1c07f4217d4d081de87e",
+          "manifestSha256": "d2500d33486549368e83612636acd66273aaa11ec37ce2aff72b5738813b9f03"
+        },
+        "reviewerB": {
+          "zipPath": "deliverables/human-review/AI-Shop-v54-answer-quality-reviewer-b-label-evidence-bound-20260827.zip",
+          "zipSha256": "18ab1007324882a1739f84a16f32c55dc6acbb562dd94e407c8f46f5f8dc7ccc",
+          "sheetSha256": "ff3ca25a61c5e5a7189594566969c8e10630c01b8d5ecfef0046905d72e4b325",
+          "manifestSha256": "340ac332cc196be7cc2b359f2e89ff2d5f6ed8070137e733b15ca70988638d1d"
+        },
+        "roundOneReturnArchive": {
+          "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+          "sha256SumsSha256": "c134b2ed4a1982a3cbda8c6b9a7cbedd738cdc01bb47deeb6c16d6764922ca18",
+          "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+          "humanDecisionAuthority": true
+        },
+        "pendingAdjudicationEvidence": {
+          "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-pending-adjudication-20260827",
+          "sha256SumsSha256": "7cec67328e26fdfb54c2c6763906bd935692e7ad13e308a1685e2d1cb4db533c"
+        },
+        "adjudicatorC": {
+          "zipPath": "deliverables/human-review/AI-Shop-v54-answer-quality-adjudicator-c-20260827.zip",
+          "zipSha256": "03c46b156bbda65c940c4b2d251b59de327af943fc4f89a8beea7345a057edd9",
+          "caseCount": 8,
+          "deliveryManifestPath": "deliverables/human-review/V54-ANSWER-QUALITY-ADJUDICATION-DELIVERY-MANIFEST-20260827.json",
+          "deliveryManifestSha256": "b1d7e502b6f4d619eb64a6c8afbf6882dd3f2d7b1c5d6d2d3740c3afe0777885",
+          "returnedZipPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-adjudication-return-human-approved-ai-assisted-20260827/raw-return/original-return.zip",
+          "returnedZipSha256": "4664c31755683c674df66fed4cd4173daa8c5aaf06ed9ca99c2409670aeb6eca",
+          "adjudicationSha256": "79d18e5eba46883bedf5993a7ee2a19e093398233223663e4c9312b2dea01113",
+          "returnArchive": {
+            "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v54-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+            "sha256SumsSha256": "6e53ed158dca58a7c534baa53646603cb3f0af95ad09bea545593c37760d0ee2",
+            "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+            "humanDecisionAuthority": true,
+            "releaseGateEligible": false,
+            "finalUnseenEligible": false
+          }
+        }
+      },
+      "finalAnswerQuality": {
+        "status": "HUMAN_REVIEWED_ADJUDICATED",
+        "annotationStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+        "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+        "sha256SumsSha256": "de953f60963da428670825c0e8ce7a544b74db2262033aef5fa4f062f1ada985",
+        "finalReportSha256": "4fa87de98dd42b9e3a9a10daaa3a4f0e6c46297c2ebfe42f28c228251081179a",
+        "caseCount": 120,
+        "exactAgreementCaseCount": 112,
+        "adjudicatedCaseCount": 8,
+        "answerCorrectCount": 116,
+        "citationSupportedCount": 63,
+        "citationEligibleCount": 67,
+        "handoffAppropriateCount": 120,
+        "unsafeAnswerCount": 1,
+        "jointQualityPassedCount": 113,
+        "badcaseCount": 7,
+        "releaseGateEligible": false,
+        "finalUnseenEligible": false
+      }
+    },
+    "customerServiceV3KnowledgeRegressionV56": {
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "qualityClaimStatus": "DEVELOPMENT_DIAGNOSTIC_HUMAN_REVIEWED_ADJUDICATED",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false,
+      "sourceHumanConclusion": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+        "sha256SumsSha256": "de953f60963da428670825c0e8ce7a544b74db2262033aef5fa4f062f1ada985",
+        "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+        "humanDecisionAuthority": true,
+        "remainingBadcaseCount": 7,
+        "releaseGateEligible": false,
+        "finalUnseenEligible": false
+      },
+      "handoffMarkdownPath": "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md",
+      "handoffMarkdownSha256": "a3589475b171bd83695cc50fb038760056fadc7afa058a95fcb441cbede7184d",
+      "handoffJsonPath": "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.json",
+      "handoffJsonSha256": "60babfbc125acf61d9471cf348ceb04d310f89d5c732e9ffed376b716279ea93",
+      "knowledgeV3": {
+        "catalogPath": "AI_Shop-backend/data/demo_knowledge_v3/catalog.v3.json",
+        "catalogSha256": "1fa188bb40f9ace4e11394d8cf79fee18253466957f165c3581b76d0e7fa8770",
+        "factMetadataPath": "AI_Shop-backend/data/demo_knowledge_v3/fact-metadata.v3.json",
+        "factMetadataSha256": "dfc4ba7153982733b1d2c6c09691f865c3253219e4516411aca63e041991e395",
+        "factCount": 75,
+        "newFactIds": [
+          "payment.safe_retry_guidance",
+          "product.display_technology_boundary"
+        ]
+      },
+      "behaviorContract": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-human-v2.3-v54-final-badcases.json",
+        "sha256": "6f54b9b7b6bfd2008939b821e0aa01ed35806ba33de909aafcd6c03861837e29",
+        "contractCount": 29,
+        "targetBadcaseContractCount": 7
+      },
+      "targetedExecution": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v55-final-seven-regressions-targeted-pending-human-review-20260827",
+        "sha256SumsSha256": "356c23359c284fd3affa744db54d01effe626d6cf6ab458a73da032f041de013",
+        "reportSha256": "294ab23810b79b48f8f61e2e455b1b33e4deef81742b8073d22caee58df74781",
+        "caseCount": 7,
+        "executionPassedCount": 7,
+        "applicableBehaviorContractPassedCount": 7,
+        "normalQualityDenominatorExcluded": true,
+        "answerQualityStatus": "PENDING_HUMAN_REVIEW",
+        "releaseGateEligible": false,
+        "finalUnseenEligible": false
+      },
+      "fullExecution": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827",
+        "sha256SumsSha256": "1b40d562fbf77a464f5f11d75f7291a1c9b569c6e2b3151345b53a8ada211a4f",
+        "reportSha256": "6dbf1762c4c460a26c8a9d8809695c35a9bfddb4ea715c2cdf91803b1db06b6f",
+        "caseCount": 120,
+        "executionPassedCount": 120,
+        "observationCapturedCount": 120,
+        "behaviorContractPassedCount": 29,
+        "behaviorContractCount": 29,
+        "citationContractInvalidCount": 0,
+        "fixtureCleanupFailureCount": 0,
+        "hardConstraintViolationCount": 0,
+        "answerQualityStatus": "PENDING_HUMAN_REVIEW",
+        "humanAnswerReviewCount": 0,
+        "selfJudged": false,
+        "providerCallsReexecutedForRebuild": false,
+        "releaseGateEligible": false,
+        "finalUnseenEligible": false
+      },
+      "humanReviewHandoff": {
+        "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+        "caseCountPerReviewer": 120,
+        "exactAgreementCaseCount": 118,
+        "disagreementCaseCount": 2,
+        "caseAgreementRate": 0.983333,
+        "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+        "deliveryManifestPath": "deliverables/human-review/V56-ANSWER-QUALITY-DELIVERY-MANIFEST-20260827.json",
+        "deliveryManifestSha256": "97233830a44ff3bedcb8f2a24f668991f2840305332046c5c424519e9bb49cfd",
+        "reviewerA": {
+          "zipPath": "deliverables/human-review/AI-Shop-v56-answer-quality-reviewer-a-20260827.zip",
+          "zipSha256": "4585958acd274748a412c771e3ec1d86a4043785f5a680a1da1c38f585bf1ac4",
+          "sheetPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827/reviewer-a.open.jsonl",
+          "sheetSha256": "7fad72735fbd32957a5b28d35b367a7355ca4549981ab2b60ccb606aa0341b2a",
+          "manifestPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827/reviewer-a.open.jsonl.manifest.json",
+          "manifestSha256": "e2689d2b5492969d18e87c4950f6eee90cc5bcf372056d6e0779b2a2d3e8aa9e"
+        },
+        "reviewerB": {
+          "zipPath": "deliverables/human-review/AI-Shop-v56-answer-quality-reviewer-b-20260827.zip",
+          "zipSha256": "5c587d38cc80d361f94d91b8da2cc2f2924f6ac93a43ff4c8c1a983a9390f907",
+          "sheetPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827/reviewer-b.open.jsonl",
+          "sheetSha256": "b74b3c688f7e9cc47b907a31265223d93ad0a2cffdbce800a43046c40a11a8d3",
+          "manifestPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827/reviewer-b.open.jsonl.manifest.json",
+          "manifestSha256": "f99256d3a8e65644228503b85e8bf499a8efa4f65516a6cab45d9ef7b416c644"
+        },
+        "returnedReview": {
+          "reviewerARawZipPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827/returns/reviewer-a/AI-Shop-v56-answer-quality-reviewer-a-song-20260827.zip",
+          "reviewerARawZipSha256": "6d14f5fcf6abd9b966063ece4a86139a339d13f71317599235bdb971612cbdf4",
+          "reviewerBRawZipPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827/returns/reviewer-b/AI-Shop-v56-answer-quality-reviewer-b-ai-assisted-draft-for-zhang-20260827.zip",
+          "reviewerBRawZipSha256": "a2bb3c8a0f326986ccd25ce9ffbb789499c456811d866c64a3892a22c4afe206",
+          "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+          "humanDecisionAuthority": true,
+          "pureHumanUnaidedClaim": false
+        },
+        "roundOneReturnArchive": {
+          "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827",
+          "sha256SumsSha256": "743cdd9fcbb194217ec2a092aba8c5013ded53dff081e3e47ea014bac767715b",
+          "releaseGateEligible": false,
+          "finalUnseenEligible": false
+        },
+        "pendingAdjudicationEvidence": {
+          "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-pending-adjudication-20260827",
+          "sha256SumsSha256": "30cedb87ca24cc5d3bb9ac40c20ffa6395e688cf5254a6b5c94c34f1babdcfa9",
+          "releaseGateEligible": false,
+          "finalUnseenEligible": false
+        },
+        "adjudicatorC": {
+          "zipPath": "deliverables/human-review/AI-Shop-v56-answer-quality-adjudicator-c-20260827.zip",
+          "zipSha256": "e015d27ca44e2bcd7148b83ec6d7559fa795da31da726589330d5051c6c73af7",
+          "caseCount": 2,
+          "deliveryManifestPath": "deliverables/human-review/V56-ANSWER-QUALITY-ADJUDICATION-DELIVERY-MANIFEST-20260827.json",
+          "deliveryManifestSha256": "c4867ce2e84d2896496f4f0ee946e8e22eaa1b0ca9f537eb6483a7260b9d5eed",
+          "returnedZipPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-adjudication-return-human-approved-ai-assisted-20260827/raw-return/original-return.zip",
+          "returnedZipSha256": "b536d8e38bbee682d9bc1b73a3f7306306043f3f1d9e6af47ffa47935f218041",
+          "adjudicationSha256": "a49b03cd690d74122599d2d9da62804df140ea897ab68f03785a46fa8dcea852",
+          "rawAttestationSha256": "a802095d9f6bbbc7da7940a67d8dd3601577918fb9a5c18e80b24758d1c2fb44",
+          "adjudicatorId": "yang",
+          "returnArchive": {
+            "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v56-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+            "sha256SumsSha256": "c61b3f8fd4bfad9e277afbd379b53c8dc06be82fc4dbefebef2a08f0b3038399",
+            "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+            "humanDecisionAuthority": true,
+            "releaseGateEligible": false,
+            "finalUnseenEligible": false
+          }
+        },
+        "adjudicationSendNow": false
+      },
+      "finalAnswerQuality": {
+        "status": "HUMAN_REVIEWED_ADJUDICATED",
+        "annotationStatus": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+        "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+        "humanDecisionAuthority": true,
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+        "sha256SumsSha256": "b2e7b22768dd5d7a95bef87948c2dd45c3e1740e492dcb3461edd935b4433176",
+        "finalReportSha256": "8ce8c2877107d3aaadfa36dbdd44084828921a5d25389f28e3d802396f063cf4",
+        "caseCount": 120,
+        "exactAgreementCaseCount": 118,
+        "adjudicatedCaseCount": 2,
+        "answerCorrectCount": 120,
+        "citationSupportedCount": 67,
+        "citationEligibleCount": 67,
+        "handoffAppropriateCount": 120,
+        "unsafeAnswerCount": 0,
+        "jointQualityPassedCount": 120,
+        "badcaseCount": 0,
+        "normalQualityDenominatorExcluded": true,
+        "releaseGateEligible": false,
+        "finalUnseenEligible": false
+      }
+    },
+    "currentEvaluationAudit": {
+      "status": "DEVELOPMENT_DIAGNOSTIC_LABEL_AND_PROVENANCE_BLOCKED",
+      "markdownPath": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md",
+      "markdownSha256": "775f5ea53f498914dbb79dae60e79ffaa4091af702d6a73266cb44f388884b1b",
+      "jsonPath": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.json",
+      "jsonSha256": "0bf70553f25c5bcb8cf158b629f4fddf36a19e2e4b6c9610684f632e0e8faa97",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "evaluationAssetCatalog": {
+      "status": "REFERENCE_SAFE_INDEXED_ARCHIVE",
+      "jsonPath": "docs/evaluation/评测资产与证据归档索引-20260826.json",
+      "jsonSha256": "74c7a4348443f6dd0bb4a30ef73ef456dc0cf8eca727cab6c06ecb3a340570e9",
+      "markdownPath": "docs/evaluation/评测资产与证据归档索引-20260826.md",
+      "markdownSha256": "f6eb709916ab95be38b220e939d479a81ed42ec59c49ca9650605510795735a1",
+      "datasetFileCount": 41,
+      "evidencePackageCount": 80,
+      "badCaseFileCount": 42,
+      "badCaseRowCount": 401,
+      "rootLooseJsonOrJsonlCount": 0,
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "customerServiceRecoveredReviewIntake": {
+      "status": "HISTORICAL_INTAKE_RECOVERED_PROVENANCE_STILL_BLOCKED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v2-additions-original-submissions-recovered-20260826",
+      "sha256SumsSha256": "aa6e211d3cf1a9217442786442c74f414f88f428d587aa0348983fab7f46586c",
+      "recoveryAuditPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/customer-service-v2-additions-original-submissions-recovered-20260826/recovery-audit.json",
+      "recoveryAuditSha256": "a180cbc24bf8b39e668d7af4fd943e0a85f7880bce0999bfd4c9b73576d5f651",
+      "reviewerASha256": "3b24ca2e3cded7c3d7e1330ccfc2580a14c850bac3541af62450b2443f78829a",
+      "reviewerBSha256": "9affe71c43465157b144897cc3ac77a736edad0a1d6089253a9d3394fcc3635b",
+      "recoveredCaseCountPerReviewer": 60,
+      "sourceBytesRecovered": true,
+      "reviewerIndependenceVerified": false,
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "humanReviewHandoff": {
+      "status": "OPEN_HUMAN_WORK_PENDING",
+      "path": "deliverables/human-review/AI-Shop-human-review-round1-20260826",
+      "packageManifestPath": "deliverables/human-review/AI-Shop-human-review-round1-20260826/PACKAGE-MANIFEST.json",
+      "packageManifestSha256": "faed0ef09c7d35cf3c23b768770703a6036c047f040d6b82a23828b7042166c9",
+      "originalSha256SumsPath": "deliverables/human-review/AI-Shop-human-review-round1-20260826/ORIGINAL-SHA256SUMS",
+      "originalSha256SumsSha256": "a3906c0837632e710e7a585cf9ecf9901801900191aa5eb53ac9bf37256a2bcb",
+      "deliveryManifestPath": "deliverables/human-review/DELIVERY-MANIFEST-20260826.json",
+      "deliveryManifestSha256": "509619420a3ec0d43a01a87b4a074da0d3f6e9de7ad1135030c0bf7f6fd0799f",
+      "labelPolicyCaseCount": 25,
+      "answerQualityCaseCount": 120,
+      "provenanceReauditCaseCount": 12,
+      "openSheetSha256": {
+        "labelPolicyReviewerA": "ca2d5eb5c999ce55265b34517e0ac49c67704e37514f400ce4619ca8d415e09b",
+        "labelPolicyReviewerB": "d35e33962cbaf30c0b9823585200ebfe9c4da8bd707e20ce875bddf4d3700597",
+        "answerQualityReviewerA": "bf13a3aeb2cf2f2d5064388776af1a2318609585cd96bdde11e7f5815a8adc70",
+        "answerQualityReviewerB": "5782adb16467463445b2d815a6d09b983434faa0d4e078ff6854d2625a52712e",
+        "provenanceIndependentReviewer": "d76e51dc4ab8bce6c451ca8a41e573b3bf492dcb1bbd9596f21fd71fd5ae8386"
+      },
+      "completedHumanReviewCount": 0,
+      "adjudicationStatus": "WAITING_FOR_SEALED_A_B_COMPARISON",
+      "formalExternalUnseenCaseCount": 0,
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "humanReviewRound1Returns": {
+      "status": "SEALED_PENDING_ADJUDICATION_AND_EXPANSION",
+      "intakePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-round1-returns-20260827",
+      "intakeSha256SumsSha256": "8a40770fc9fc6b9b1ab261aa8609231c1b97212afebf446f8d218901ccbf9380",
+      "intakeAuditPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-round1-returns-20260827/intake-audit.json",
+      "intakeAuditSha256": "1cdf317b98480bd52dc365bbe4beea309e249d9215c5c18fe098109349ea1cd4",
+      "returnFileCount": 11,
+      "followupDeliveryManifestPath": "deliverables/human-review/FOLLOWUP-DELIVERY-MANIFEST-20260827.json",
+      "followupDeliveryManifestSha256": "5e68958bf2e6c9724d68dfd4e8c07dfc9ced56bea45b750e89cf43f9b6bb7da8",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "customerServiceV2LabelPolicyReview": {
+      "status": "PENDING_ADJUDICATION",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-label-policy-review-pending-adjudication-20260827",
+      "schemaVersion": "aishop-customer-service-label-policy-review-pending-evidence/v1",
+      "sha256SumsSha256": "db6a548dd2def50b3e72cbce7f60736d82b02d422ebe490dce7c6558ab698c3c",
+      "agreementSha256": "1b2ff0bbbd7576c5450eac4e9290088b991b8daba1181a1c2f8d90cd36765c31",
+      "sourceDatasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+      "sourceTemplateSha256": "f40ebda1c3b5c6625b91e6471256c743ce1a05c88a2906db52dfe2a14e5c8e54",
+      "taxonomyContractSha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc",
+      "caseCount": 25,
+      "exactAgreementCaseCount": 20,
+      "disagreementCaseCount": 5,
+      "caseAgreementRate": 0.8,
+      "reviewerIdentityEvidenceStatus": "ATTESTATIONS_PENDING",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "customerServiceAnswerReviewV43": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "releaseGateEligible": false,
+      "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+      "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826/report.json",
+      "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+      "caseCount": 120,
+      "reviewerIds": ["reviewer-a", "reviewer-b"],
+      "reviewerIdentityEvidenceStatus": "PROJECT_OWNER_CONFIRMED_HUMAN_APPROVAL_AI_ASSISTED",
+      "pendingEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-pending-adjudication-20260827",
+        "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+        "sha256SumsSha256": "7e5af0c553bd9a1bcba4c2bbb8e546402c75eae0f6f426280da175e82f9d1135",
+        "exactAgreementCaseCount": 117,
+        "disagreementCaseCount": 3,
+        "caseAgreementRate": 0.975,
+        "releaseGateEligible": false
+      },
+      "finalEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-human-approved-ai-assisted-20260827",
+        "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+        "sha256SumsSha256": "36ce5d57ef256784509a2b53f9f239759f23b4fcc8e94efbab611b3662e0122e",
+        "finalReportSha256": "548d91047b5362aeeeb4bad84436362c1fe791e4357685c9046e7bf7fd41c810",
+        "adjudicationSha256": "9913e6d68e3b4210f04bb3b74887e04c32474e4bd53e61d5cee9d48bf138961b",
+        "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+        "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826/report.json",
+        "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+        "caseCount": 120,
+        "adjudicationCaseCount": 3,
+        "badcaseCount": 15,
+        "selfJudged": false,
+        "releaseGateEligible": false,
+        "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+        "metrics": {
+          "answerCorrectness": {
+            "value": 0.891667,
+            "numerator": 107,
+            "denominator": 120,
+            "badcaseCount": 13
+          },
+          "citationGroundingSupport": {
+            "value": 0.942857,
+            "numerator": 66,
+            "denominator": 70,
+            "badcaseCount": 4
+          },
+          "handoffAppropriateness": {
+            "value": 0.983333,
+            "numerator": 118,
+            "denominator": 120,
+            "badcaseCount": 2
+          },
+          "unsafeAnswerRate": {
+            "value": 0.008333,
+            "numerator": 1,
+            "denominator": 120,
+            "badcaseCount": 1
+          },
+          "jointQualityPassRate": {
+            "value": 0.875,
+            "numerator": 105,
+            "denominator": 120,
+            "badcaseCount": 15
+          }
+        }
+      }
+    },
+    "humanReviewAdjudicationReturns": {
+      "status": "HUMAN_APPROVED_AI_ASSISTED_INTAKE_ACCEPTED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-adjudication-returns-20260827",
+      "schemaVersion": "aishop-human-adjudication-return-archive/v1",
+      "sha256SumsSha256": "8a3150bfde95bcf2ebd72591064a208ac3f39b412387fd3c2f144c0424cd222d",
+      "intakeAuditPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-adjudication-returns-20260827/intake-audit.json",
+      "intakeAuditSha256": "1b28d02b12bdf9ec9e78721a15a19f3619754845da531d116104207f163a0fba",
+      "approvalClarificationPath": "deliverables/human-review/HUMAN-APPROVAL-CLARIFICATION-20260827.json",
+      "approvalClarificationSha256": "97a1b4aadbe03f1ad4e8564c6fd42705ca3fbc520538393f856ed8bce0899bcb",
+      "humanApprovedAiAssistedEvidenceAccepted": true,
+      "pureHumanUnaidedEvidenceAccepted": false,
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "humanReviewHumanApprovalProvenance": {
+      "status": "HUMAN_APPROVED_AI_ASSISTED_FINALIZED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/intake-archive/human-review-human-approval-ai-assistance-provenance-20260827",
+      "schemaVersion": "aishop-human-approval-ai-assistance-provenance/v1",
+      "sha256SumsSha256": "7f8580be62dbf96f5994f5da471a42d197e16f31b590e710109327cff60cd1b9",
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "customerServiceV21LabelPolicyFinal": {
+      "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+      "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2.1-label-policy-human-approved-ai-assisted-20260827",
+      "schemaVersion": "aishop-customer-service-label-policy-final-evidence/v1",
+      "sha256SumsSha256": "d3d26d3ff5398b3645c83c412a5b6342371464875ccd4fa2ff85a01a789c637a",
+      "finalReportSha256": "0f91201e6c96bcec3ca3973ebd275d827051a9cc67ec15e31d176e1dabdd0ad9",
+      "caseCount": 120,
+      "reviewedCaseCount": 25,
+      "exactAgreementCaseCount": 20,
+      "adjudicatedCaseCount": 5,
+      "caseAgreementRate": 0.8,
+      "changedCaseCount": 19,
+      "successorDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/customer-service-human-v2.1-human-approved-ai-assisted.jsonl",
+      "successorDatasetSha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3",
+      "successorDatasetManifestPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/customer-service-human-v2.1-human-approved-ai-assisted.jsonl.manifest.json",
+      "successorDatasetManifestSha256": "66e85bd43042c3cd9c1dd19c22af9d74ccca140a21720c71d20aa9d48b8e1026",
+      "routingRescoreSha256": "f865e9ba3f965b5c660d69bce349b4ed0efa13e9c030f20da9208b23f3a77ab5",
+      "routingMetrics": {
+        "intentMacroF1": 1.0,
+        "highRiskIntentRecall": 1.0,
+        "handoffRecall": 1.0,
+        "criticalHandoffMissRate": 0.0,
+        "slotEntitySpanF1": 0.482551,
+        "slotExactMatch": 0.426471
+      },
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "customerServiceV2IndependentReaudit": {
+      "status": "EXPANSION_REQUIRED",
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-independent-reaudit-initial-failed-20260827",
+      "schemaVersion": "aishop-customer-service-independent-reaudit-evidence/v1",
+      "sha256SumsSha256": "cf38ce6bdd48773841c370b9b2701f118b7498f0382253b01b103c2779ad31c6",
+      "resultPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-independent-reaudit-initial-failed-20260827/result.json",
+      "resultSha256": "95b927f7ec1c3a923b3375713b27ba737a116a91fd8d9a9f43c2cfffc82e832e",
+      "returnedSheetSha256": "a1f852d9d22a5af2ed5262e5daadd0f537097feb479600c6d30a41de23b536a2",
+      "caseCount": 12,
+      "fullTargetCaseCount": 60,
+      "remainingCaseCount": 48,
+      "metrics": {
+        "criticalMismatchCount": 0,
+        "intentAgreement": 1.0,
+        "riskAgreement": 0.916667,
+        "handoffAgreement": 1.0,
+        "slotExactAgreement": 0.5
+      },
+      "labelGatePassed": false,
+      "attestationValid": false,
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
+    },
+    "humanReviewFollowup": {
+      "status": "OPEN_HUMAN_FOLLOWUP_REQUIRED",
+      "deliveryManifestPath": "deliverables/human-review/FOLLOWUP-DELIVERY-MANIFEST-20260827.json",
+      "deliveryManifestSha256": "5e68958bf2e6c9724d68dfd4e8c07dfc9ced56bea45b750e89cf43f9b6bb7da8",
+      "packageCount": 4,
+      "releaseGateEligible": false,
+      "finalUnseenEligible": false
     },
     "customerServiceAnswerReview": {
       "status": "HUMAN_REVIEWED_ADJUDICATED",
@@ -207,6 +788,127 @@
           "handoffAppropriateness": {"value": 1.0, "numerator": 60, "denominator": 60, "badcaseCount": 0},
           "unsafeAnswerRate": {"value": 0.016667, "numerator": 1, "denominator": 60, "badcaseCount": 1},
           "jointQualityPassRate": {"value": 0.816667, "numerator": 49, "denominator": 60, "badcaseCount": 11}
+        }
+      }
+    },
+    "customerServiceAnswerReviewV25Targeted": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "agreementStatus": "AGREED_NO_ADJUDICATION",
+      "resultRole": "TARGETED_REGRESSION_OBSERVATION",
+      "normalQualityDenominatorExcluded": true,
+      "releaseGateEligible": false,
+      "sourceRunId": "customer-service-http-v25-targeted-quality-fixes-20260825",
+      "sourceReportPath": "run/evaluation-observations/customer-service-http-v25-targeted-quality-fixes-20260825.json",
+      "sourceReportSha256": "091583ec1b9f7c44a2e58e0769932407fa8f14f69db47715ce1446bea8c6089a",
+      "caseCount": 10,
+      "reviewerIds": ["reviewer-a", "reviewer-b"],
+      "sourceExecutionEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-20260825",
+        "schemaVersion": "aishop-customer-service-http-evidence/v1",
+        "sha256SumsSha256": "0cdcb352fcb85149dd3f488cb9807f267bc94a165e901595c29383e9796dce6d",
+        "reportSha256": "260f4968158b2ce506d533e781ee7e77e5570b137616e7c5c570efec2ef340d8"
+      },
+      "finalEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
+        "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+        "sha256SumsSha256": "29afcd48839f48b660061bff91c8d2d13e3da6ec839168d3d544eff6d5e68ff3",
+        "finalReportSha256": "7071c92360e753bc2775548b562779a5d35dc08a9cd107f6336df04de0b01a7a",
+        "agreementSha256": "2fbf3ce480a04e5354c5487e0d6368653b1176ed1dd806593df2cbca78d53b03",
+        "exactAgreementCaseCount": 10,
+        "disagreementCaseCount": 0,
+        "adjudicationCaseCount": 0,
+        "badcaseCount": 0,
+        "selfJudged": false,
+        "normalQualityDenominatorExcluded": true,
+        "releaseGateEligible": false,
+        "metrics": {
+          "answerCorrectness": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseCount": 0, "confidenceInterval95": {"lower": 0.722467, "upper": 1.0, "method": "wilson", "confidenceLevel": 0.95}},
+          "citationGroundingSupport": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseCount": 0, "confidenceInterval95": {"lower": 0.722467, "upper": 1.0, "method": "wilson", "confidenceLevel": 0.95}},
+          "handoffAppropriateness": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseCount": 0, "confidenceInterval95": {"lower": 0.722467, "upper": 1.0, "method": "wilson", "confidenceLevel": 0.95}},
+          "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 10, "badcaseCount": 0, "confidenceInterval95": {"lower": 0.0, "upper": 0.277533, "method": "wilson", "confidenceLevel": 0.95}},
+          "jointQualityPassRate": {"value": 1.0, "numerator": 10, "denominator": 10, "badcaseCount": 0, "confidenceInterval95": {"lower": 0.722467, "upper": 1.0, "method": "wilson", "confidenceLevel": 0.95}}
+        }
+      }
+    },
+    "customerServiceAnswerReviewV27": {
+      "status": "HUMAN_REVIEWED_ADJUDICATED",
+      "releaseGateEligible": false,
+      "sourceRunId": "customer-service-http-v27-full-quality-fixes-eval-contract-20260826",
+      "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/run/evaluation-observations/customer-service-http-v27-full-quality-fixes-eval-contract-20260826.json",
+      "sourceReportSha256": "f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61",
+      "caseCount": 60,
+      "reviewerIds": ["reviewer-a", "reviewer-b"],
+      "provenanceBoundary": {
+        "sourceReportTrackedInGit": false,
+        "sourceReportNote": "The source report is a local ignored observation; the immutable final package binds its complete bytes by SHA-256. A fresh checkout must restore this provenance file before repository validation.",
+        "resultRole": "FROZEN_REPLAY_HUMAN_QUALITY_EVIDENCE",
+        "independentUnseenHoldout": false,
+        "normalQualityDenominatorExcluded": true
+      },
+      "pendingEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-pending-adjudication-20260826",
+        "schemaVersion": "aishop-customer-service-answer-review-pending-evidence/v1",
+        "sha256SumsSha256": "4dfa2da7d3ab47ecc035226109b542584ebf2a2fed2301e8a069b7d51d44f1a6",
+        "exactAgreementCaseCount": 58,
+        "disagreementCaseCount": 2,
+        "caseAgreementRate": 0.966667,
+        "releaseGateEligible": false
+      },
+      "finalEvidence": {
+        "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826",
+        "schemaVersion": "aishop-customer-service-answer-review-evidence/v1",
+        "sha256SumsSha256": "787191d12c8a6db4cd923b77b9ade1ffe3fb7cef2286e8ca7ec27c665f1aa042",
+        "finalReportSha256": "f4fc92a9a559ebf13ae385420617abc319fee157b5794f26576f65a9bca5a9b0",
+        "adjudicationSha256": "ae0a90bd0ceef84eb5005457d70f0596c1a05334925845e1e068a7155bec1cbc",
+        "sourceRunId": "customer-service-http-v27-full-quality-fixes-eval-contract-20260826",
+        "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/run/evaluation-observations/customer-service-http-v27-full-quality-fixes-eval-contract-20260826.json",
+        "sourceReportSha256": "f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61",
+        "caseCount": 60,
+        "adjudicationCaseCount": 2,
+        "badcaseCount": 1,
+        "selfJudged": false,
+        "releaseGateEligible": false,
+        "metrics": {
+          "answerCorrectness": {
+            "value": 0.983333,
+            "numerator": 59,
+            "denominator": 60,
+            "badcaseCount": 1,
+            "badcaseIds": ["cs-gold-v1-001"],
+            "confidenceInterval95": {"lower": 0.911449, "upper": 0.997052, "method": "wilson", "confidenceLevel": 0.95}
+          },
+          "citationGroundingSupport": {
+            "value": 0.972222,
+            "numerator": 35,
+            "denominator": 36,
+            "badcaseCount": 1,
+            "badcaseIds": ["cs-gold-v1-001"],
+            "confidenceInterval95": {"lower": 0.858303, "upper": 0.99508, "method": "wilson", "confidenceLevel": 0.95}
+          },
+          "handoffAppropriateness": {
+            "value": 1.0,
+            "numerator": 60,
+            "denominator": 60,
+            "badcaseCount": 0,
+            "badcaseIds": [],
+            "confidenceInterval95": {"lower": 0.939828, "upper": 1.0, "method": "wilson", "confidenceLevel": 0.95}
+          },
+          "unsafeAnswerRate": {
+            "value": 0.0,
+            "numerator": 0,
+            "denominator": 60,
+            "badcaseCount": 0,
+            "badcaseIds": [],
+            "confidenceInterval95": {"lower": 0.0, "upper": 0.060172, "method": "wilson", "confidenceLevel": 0.95}
+          },
+          "jointQualityPassRate": {
+            "value": 0.983333,
+            "numerator": 59,
+            "denominator": 60,
+            "badcaseCount": 1,
+            "badcaseIds": ["cs-gold-v1-001"],
+            "confidenceInterval95": {"lower": 0.911449, "upper": 0.997052, "method": "wilson", "confidenceLevel": 0.95}
+          }
         }
       }
     },
@@ -574,7 +1276,7 @@
       }
     ]
   },
-  "claimBoundary": "Current is the immutable v9 final: Search 50, RAG 50, Agent 25, executed once with real Provider preflight and all hard gates passed. Customer-service understanding has a separate 60-case HUMAN_VERIFIED offline package; same-gold slot replay improved Span F1 from 0.907652 to 0.996364 and exact match from 0.558824 to 0.911765 with zero regressions, but it is not a new holdout. Historical HTTP v1 has two independent answer reviews with 52/60 four-label exact agreement and 8 third-person adjudications: answer correctness 51/60=85.0%, citation grounding support 6/30=20.0%, handoff appropriateness 60/60, unsafe-answer rate 0/60, and joint quality 32/60=53.3%. Agreement is annotation reliability, not model accuracy; historical v1 is non-gating and does not establish CSAT/FCR, online success, or grounded-answer readiness. Redacted HTTP slots remain UNAVAILABLE. The repaired customer-service-http-v13-20260824 is a separate 60/60 real Provider observation with Java/MCP dynamic sourceRefs, API/Worker/MCP source-fingerprint preflight, and 10/10 safety/behavior contracts. Its raw observation and disclaimer-aware offline rebuild are both immutable; the four prior catalog-absence contract failures were evaluator false positives, not a model-quality gain. The source report retains PENDING_HUMAN_REVIEW, while the separate v13 answer-review lifecycle is HUMAN_REVIEWED_ADJUDICATED after 49/60 dual-review exact agreement and 11 independent third-person decisions: answer correctness 59/60=98.33%, citation grounding support 20/34=58.82%, handoff appropriateness 59/60=98.33%, unsafe-answer rate 0/60, and joint quality 46/60=76.67%. This is a frozen replay with a wide small-sample interval and 14 retained badcases; it is not a strict A/B claim against v1, a release gate, CSAT/FCR, online success, or grounded-answer production readiness. The additional 60-case v2 dataset remains a dual-review draft and is not part of any reported denominator. The 10-case Search hard-negative paired replay establishes no regression and zero metric delta, not a quality gain or a new final. Local read-only capacity evidence covers four cases, concurrency 1/2/4/8, warm-up 4 excluded from the denominator, and 20 formal requests per level (80 total); it is diagnostic only, not sustained production capacity or an SLO. Semantic judging is shadow-only until independent human calibration; missing usage or pricing is never converted to zero cost; no result establishes CTR, CVR, GMV, payment compliance, unit economics, or industrial personalization.",
+  "claimBoundary": "The manifest's only PUBLISHED_FINAL remains immutable v9, but its inputs are source-exposed and it is historical regression evidence rather than an unseen generalization result. Historical v1/v13/v20/v25/v27 customer-service answer reviews remain bound to their distinct frozen outputs and are non-gating. The v2.1 label-policy decisions and v43/v54/v56 answer reviews are human-approved with AI-assisted editing. v43 is the immutable pre-fix baseline at 105/120 joint passes; v54 completed 120/120 production-path cases, 23/23 behavior contracts, 120/120 human reviews and 8 adjudications, yielding 113/120 joint passes and 7 badcases. The v55 targeted replay passed 7/7 applicable regression contracts. v56 completed 120/120 production-path cases with 29/29 contracts; A/B agreed exactly on 118/120 and a third human adjudicated 2 cases, yielding answer 120/120, citation 67/67, handoff 120/120, unsafe 0/120, joint 120/120 and zero labeled badcases. v56 is the latest fully adjudicated same-set customer-service result, but all customer-service sets remain developer-visible development diagnostics, not unseen release evidence. Same-set improvements support regression fixes only, not unseen generalization. Local latency/capacity and unpriced usage remain diagnostics, not a production SLO or unit cost. No result establishes CSAT, FCR, CTR, CVR, GMV, payment compliance, absolute safety, industrial personalization, or future-output generalization; releaseGateEligible and finalUnseenEligible remain false.",
   "visibleRuns": {
     "development": {
       "runId": "development-20260822-ai-quality-v9",
@@ -601,11 +1303,20 @@
     "docs/project/AI_Shop主线与开发记录.md",
     "docs/evaluation/AI质量评测与Badcase.md",
     "docs/evaluation/AI质量评测与Badcase.json",
+    "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md",
+    "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.json",
     "docs/evaluation/结果与数据集索引.md",
+    "docs/evaluation/质量缺口审计与优化-20260825.md",
+    "docs/evaluation/数据集合理性审计与重构建议-20260825.md",
     "docs/evaluation/customer-service/客服金标评测.md",
     "docs/evaluation/customer-service/客服金标评测.json",
     "docs/evaluation/customer-service/客服标注审计.md",
     "docs/evaluation/customer-service/客服标注审计.json",
+    "docs/evaluation/评测资产与证据归档索引-20260826.md",
+    "docs/evaluation/customer-service/客服v2.1标签政策双盲重标说明-20260826.md",
+    "docs/evaluation/customer-service/客服v43答案质量双盲说明-20260826.md",
+    "docs/evaluation/customer-service/客服v2来源独立复核说明-20260826.md",
+    "docs/evaluation/customer-service/客服盲审后仲裁说明-20260826.md",
     "docs/evaluation/model-pricing-estimate-20260824.json",
     "AI_Shop-backend/AI_Shop-agent/evaluation/README.md",
     "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/README.md",
@@ -620,7 +1331,15 @@
         "docs/evaluation/customer-service/客服金标评测.md",
         "customer-service-http-v13-20260824",
         "HUMAN_REVIEWED_ADJUDICATED",
-        "20/34=58.82%"
+        "20/34=58.82%",
+        "customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
+        "normalQualityDenominatorExcluded=true",
+        "59/60=98.33%",
+        "规则/门禁全通过数字不作为主质量指标",
+        "customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+        "120/120",
+        "67/67",
+        "normalQualityDenominatorExcluded=true"
       ],
       "forbiddenTokens": [
         "docs/AI应用求职项目证据总览.md",
@@ -636,7 +1355,13 @@
         "customer-service/客服金标评测.md",
         "customer-service-http-v13-20260824",
         "HUMAN_REVIEWED_ADJUDICATED",
-        "20/34=58.82%"
+        "20/34=58.82%",
+        "customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826",
+        "59/60=98.33%",
+        "releaseGateEligible=false",
+        "customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+        "HUMAN_APPROVED_AI_ASSISTED",
+        "67/67"
       ],
       "forbiddenTokens": [
         "_20260820.md",
@@ -655,7 +1380,12 @@
         "6/30=20.0%",
         "customer-service-http-v13-20260824",
         "PENDING_HUMAN_REVIEW",
-        "关键踩坑、排错与效果"
+        "关键踩坑、排错与效果",
+        "customer-service-http-v27-full-quality-fixes-eval-contract-20260826",
+        "当前唯一 badcase",
+        "2026-08-27：v43→v54→v56",
+        "v56 以新冻结输出",
+        "normalQualityDenominatorExcluded=true"
       ],
       "forbiddenTokens": [
         "AI应用求职项目证据总览.md",
@@ -669,12 +1399,17 @@
         "NDCG@10",
         "Intent Macro-F1",
         "badcase",
-        "当前达标与可用性",
+        "当前可用性结论",
         "只读容量曲线",
         "0.996364",
         "6/30 eligible",
         "customer-service-http-v13-20260824",
-        "PENDING_HUMAN_REVIEW"
+        "PENDING_HUMAN_REVIEW",
+        "客服 HTTP v27 答案正确率",
+        "明确排除出主质量表的数字",
+        "cs-gold-v1-001",
+        "v56 全量运行",
+        "29/29 契约"
       ],
       "forbiddenTokens": [
         "AI质量指标与Badcase索引_20260822.md",
@@ -688,11 +1423,85 @@
         "HUMAN_REVIEWED_ADJUDICATED",
         "57/60 = 95.00%",
         "25/36 = 69.44%",
-        "releaseGateEligible=false"
+        "releaseGateEligible=false",
+        "AGREED_NO_ADJUDICATION",
+        "29afcd48839f48b660061bff91c8d2d13e3da6ec839168d3d544eff6d5e68ff3",
+        "历史 v27 人工答案质量",
+        "59/60 = 98.33%",
+        "35/36 = 97.22%",
+        "cs-gold-v1-001",
+        "AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md",
+        "v56 全量 120/120、29/29 契约",
+        "v56 双盲答案复核与仲裁",
+        "customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+        "联合质量 120/120"
       ],
       "forbiddenTokens": [
         "customer-service-http-v20-answer-review-adjudicated-20260824",
-        "releaseGateEligible=true"
+        "releaseGateEligible=true",
+        "完整 60 条新代码输出的同指纹执行与双人盲审仍未完成"
+      ]
+    },
+    {
+      "path": "docs/evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md",
+      "requiredTokens": [
+        "v55 定向复评：7/7",
+        "v56 全量复评：120/120",
+        "29/29 契约",
+        "HUMAN_APPROVED_AI_ASSISTED",
+        "不是 unseen/release final",
+        "customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+        "customer-service-v56-answer-review-adjudication-return-human-approved-ai-assisted-20260827",
+        "答案 120/120",
+        "badcase 0"
+      ],
+      "forbiddenTokens": [
+        "releaseGateEligible=true",
+        "finalUnseenEligible=true"
+      ]
+    },
+    {
+      "path": "docs/evaluation/质量缺口审计与优化-20260825.md",
+      "requiredTokens": [
+        "scikit-learn",
+        "customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
+        "AGREED_NO_ADJUDICATION",
+        "0.722467",
+        "normalQualityDenominatorExcluded=true",
+        "customer-service-http-v27-full-quality-fixes-eval-contract-20260826",
+        "RUNTIME_FIXTURE_AWARE_V1",
+        "f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61",
+        "HUMAN_REVIEWED_ADJUDICATED",
+        "58/60",
+        "59/60=98.33%",
+        "35/36=97.22%",
+        "releaseGateEligible=false"
+      ],
+      "forbiddenTokens": [
+        "v25 没有人工答案标签",
+        "releaseGateEligible=true",
+        "完整 60 条新代码输出已执行，双人盲审待回传"
+      ]
+    },
+    {
+      "path": "docs/evaluation/数据集合理性审计与重构建议-20260825.md",
+      "requiredTokens": [
+        "需要重构",
+        "10/10 完全一致",
+        "TARGETED_REGRESSION_OBSERVATION",
+        "EXTERNAL_FUTURE_FINAL",
+        "58/60",
+        "59/60",
+        "35/36",
+        "HUMAN_REVIEWED_ADJUDICATED",
+        "PENDING_HUMAN_REVIEW",
+        "releaseGateEligible=false"
+      ],
+      "forbiddenTokens": [
+        "releaseGateEligible=true",
+        "不需要重构",
+        "人工标签仍为 0/60",
+        "v27 的完整 60 条新输出已执行并生成双评表"
       ]
     },
     {
@@ -706,7 +1515,10 @@
         "HUMAN_REVIEWED_ADJUDICATED",
         "6/30 eligible",
         "customer-service-http-v13-20260824",
-        "PENDING_HUMAN_REVIEW"
+        "PENDING_HUMAN_REVIEW",
+        "customer-service-http-v27-full-quality-fixes-answer-review-adjudicated-20260826",
+        "59/60=98.33%",
+        "35/36=97.22%"
       ],
       "forbiddenTokens": [
         "HUMAN_VERIFIED_RESULT"
@@ -729,8 +1541,10 @@
         "可复现的评测输入",
         "人工标注的唯一正式位置",
         "customer-service-http-v13-answer-review-adjudicated-20260824",
+        "customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
         ".holdouts",
-        ".runs"
+        ".runs",
+        "customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827"
       ],
       "forbiddenTokens": [
         "生产准确率",
@@ -743,8 +1557,10 @@
         "不可变评测结果与人工证据",
         "SHA256SUMS",
         "customer-service-http-v13-answer-review-adjudicated-20260824",
+        "customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825",
         "capacity-readonly-v5-20260824",
-        "不替代 final"
+        "不替代 final",
+        "customer-service-http-v56-full-v3-knowledge-regressions-pending-human-review-20260827"
       ],
       "forbiddenTokens": [
         "线上 CSAT"
@@ -762,6 +1578,68 @@
       "forbiddenTokens": [
         "专家金标",
         "线上准确率"
+      ]
+    },
+    {
+      "path": "docs/evaluation/人工标注交接总清单-20260826.md",
+      "requiredTokens": [
+        "客服 v2.1 标签政策重仲裁",
+        "v43 冻结答案双人盲审",
+        "v2 来源独立性复核",
+        "DISQUALIFIED_DEVELOPER_VISIBLE",
+        "review-package",
+        "v56 修复后答案双人复评（已完成）",
+        "customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+        "pureHumanUnaidedClaim=false"
+      ],
+      "forbiddenTokens": [
+        "FINAL_UNSEEN 质量数字已完成",
+        "120 条已经自动 HUMAN_VERIFIED"
+      ]
+    },
+    {
+      "path": "docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md",
+      "requiredTokens": [
+        "DEVELOPMENT_DIAGNOSTIC_LABEL_AND_PROVENANCE_BLOCKED",
+        "BLOCKED_HUMAN_READJUDICATION",
+        "120/120",
+        "22/22",
+        "0/120",
+        "不能证明 unseen 泛化",
+        "releaseGateEligible=false"
+      ],
+      "forbiddenTokens": [
+        "releaseGateEligible=true",
+        "finalUnseenEligible=true"
+      ]
+    },
+    {
+      "path": "docs/evaluation/external-unseen-final人工标注说明-20260826.md",
+      "requiredTokens": [
+        "125 条 final 候选",
+        "DISQUALIFIED_DEVELOPER_VISIBLE",
+        "不能事后升级",
+        "external-unseen-final-independent-generation-and-custody-20260826.md",
+        "validate_external_final_review.py"
+      ],
+      "forbiddenTokens": [
+        "promotionEligible=true",
+        "当前候选已是 FINAL_UNSEEN"
+      ]
+    },
+    {
+      "path": "docs/evaluation/external-unseen-final-independent-generation-and-custody-20260826.md",
+      "requiredTokens": [
+        "DISQUALIFIED_DEVELOPER_VISIBLE",
+        "至少 100 条",
+        "source-exposure audit",
+        "独立保管人",
+        "替代批次",
+        "FINAL_UNSEEN"
+      ],
+      "forbiddenTokens": [
+        "当前批次已是 FINAL_UNSEEN",
+        "promotionEligible=true"
       ]
     }
   ]

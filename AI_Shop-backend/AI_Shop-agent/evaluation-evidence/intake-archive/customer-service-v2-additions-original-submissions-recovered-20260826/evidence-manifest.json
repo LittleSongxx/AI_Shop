@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "aishop-evaluation-intake-archive/v1",
+  "artifactId": "customer-service-v2-additions-original-submissions-recovered-20260826",
+  "createdAt": "2026-08-26T14:07:08Z",
+  "status": "HISTORICAL_INTAKE_RECOVERED_PROVENANCE_STILL_BLOCKED",
+  "immutable": true,
+  "releaseGateEligible": false,
+  "finalUnseenEligible": false,
+  "files": {
+    "README.md": {
+      "bytes": 1688,
+      "sha256": "529e5fc2bce381d8f33f89f436617bf811600593787a86d40595149cc4224f8e"
+    },
+    "bindings/original-provenance-audit.json": {
+      "bytes": 16617,
+      "sha256": "688aef05cc3b7d931f85998fa71a9d2bf1f53e06a74aee542e548c2610c5eff9"
+    },
+    "bindings/reviewer-a.sealed.jsonl.manifest.json": {
+      "bytes": 1851,
+      "sha256": "bb8a7e4ad8bd5c67c01bbb66f4d48e6246961daeff64a3cfc7500beadbabe3f6"
+    },
+    "bindings/reviewer-b.sealed.jsonl.manifest.json": {
+      "bytes": 1851,
+      "sha256": "6ef62bb56c2f929243c1e5c96834b714b1372b475bee61680ad1c17bad8891b2"
+    },
+    "recovered-root-intake/reviewer-a.open.jsonl": {
+      "bytes": 25145,
+      "sha256": "3b24ca2e3cded7c3d7e1330ccfc2580a14c850bac3541af62450b2443f78829a"
+    },
+    "recovered-root-intake/reviewer-a.open.jsonl.manifest.json": {
+      "bytes": 1358,
+      "sha256": "b9a9a059ce4f6c6527529f429011ec83e55471c731181b24eb4fbc93ee778ea3"
+    },
+    "recovered-root-intake/reviewer-b.open.jsonl": {
+      "bytes": 28016,
+      "sha256": "9affe71c43465157b144897cc3ac77a736edad0a1d6089253a9d3394fcc3635b"
+    },
+    "recovered-root-intake/reviewer-b.open.jsonl.manifest.json": {
+      "bytes": 1358,
+      "sha256": "8613f4458a5aa27c19e29b1012bedad10e145100d8ac4de03101642878472b65"
+    },
+    "recovery-audit.json": {
+      "bytes": 2282,
+      "sha256": "a180cbc24bf8b39e668d7af4fd943e0a85f7880bce0999bfd4c9b73576d5f651"
+    },
+    "source/candidate-v2-additions.jsonl": {
+      "bytes": 23813,
+      "sha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353"
+    },
+    "source/candidate-v2-additions.manifest.json": {
+      "bytes": 2313,
+      "sha256": "88fda7aa36d3101f2be69c14ff68741c1ad84623d2e4792bf75092920bd6d13d"
+    }
+  }
+}

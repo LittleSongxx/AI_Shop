@@ -462,8 +462,15 @@ def _load_answer_review_sheet(
     manifest_path_label = str(manifest.get("sheetPath") or "")
     actual_path_label = _path_label(sheet_path)
     if manifest_path_label != actual_path_label:
+        # Review sheets are intentionally handed to people outside the runtime
+        # workspace and normally return in an intake directory.  The path in an
+        # OPEN manifest records where the blank export was created; it is not a
+        # security boundary.  Permit a same-named returned copy while retaining
+        # the stronger controls below: source-report hash, reviewer identity,
+        # complete case set, immutable presentation fields, and (once SEALED)
+        # the exact sheet hash all remain mandatory.
         relocatable = (
-            lifecycle == "SEALED"
+            lifecycle in {"OPEN", "SEALED"}
             and bool(manifest_path_label)
             and Path(manifest_path_label).name == sheet_path.name
         )
@@ -1104,14 +1111,25 @@ def merge_answer_reviews(
             }
         )
     metrics, badcases = _score_final_labels(sources, labels_by_id, comments_by_id)
+    source_evaluation = {
+        "status": str(report.get("status") or "UNDECLARED"),
+        "releaseGateEligible": report.get("releaseGateEligible") is True,
+        "normalQualityDenominatorExcluded": (
+            report.get("normalQualityDenominatorExcluded") is True
+        ),
+    }
     final_report = {
         "schemaVersion": ANSWER_REVIEW_REPORT_SCHEMA,
         "status": "HUMAN_REVIEWED_ADJUDICATED",
         "releaseGateEligible": False,
+        "normalQualityDenominatorExcluded": source_evaluation[
+            "normalQualityDenominatorExcluded"
+        ],
         "selfJudged": False,
         "sourceRunId": report.get("runId"),
         "sourceReportPath": _path_label(report_path),
         "sourceReportSha256": report_sha,
+        "sourceEvaluation": source_evaluation,
         "reviewEvidence": {
             "reviewA": dict(agreement["reviewA"]),
             "reviewB": dict(agreement["reviewB"]),
@@ -1140,7 +1158,16 @@ def merge_answer_reviews(
         "badcases": badcases,
         "cases": cases,
         "limitations": [
-            "These labels score the frozen 60-case HTTP replay only; they are not CSAT, FCR, or online success rate.",
+            f"These labels score the frozen {len(sources)}-case HTTP replay only; "
+            "they are not CSAT, FCR, or online success rate.",
+            *(
+                [
+                    "The source HTTP observation is explicitly excluded from the "
+                    "normal quality denominator."
+                ]
+                if source_evaluation["normalQualityDenominatorExcluded"]
+                else []
+            ),
             "The review is bound to one immutable answer/source report and does not generalize to future Provider outputs.",
             "Release thresholds were not predeclared for this already-captured run, so the result remains quality evidence rather than a retroactive gate.",
         ],
@@ -1655,6 +1682,12 @@ def write_answer_review_evidence(
             "caseCount": final_report.get("caseCount"),
             "selfJudged": False,
             "releaseGateEligible": False,
+            "normalQualityDenominatorExcluded": final_report.get(
+                "normalQualityDenominatorExcluded"
+            ),
+            "sourceEvaluationStatus": (
+                final_report.get("sourceEvaluation") or {}
+            ).get("status"),
             "reviewASha256": sha256_file(review_a_path),
             "reviewBSha256": sha256_file(review_b_path),
             "adjudicationSha256": (
@@ -2066,6 +2099,38 @@ def verify_answer_review_evidence(root: Path) -> dict[str, Any]:
     ):
         raise CustomerServiceAnswerReviewError(
             "answer-review evidence manifest differs from final report"
+        )
+    source_evaluation = final_report.get("sourceEvaluation")
+    if source_evaluation is not None:
+        if (
+            not isinstance(source_evaluation, Mapping)
+            or set(source_evaluation)
+            != {
+                "status",
+                "releaseGateEligible",
+                "normalQualityDenominatorExcluded",
+            }
+            or not str(source_evaluation.get("status") or "")
+            or not isinstance(source_evaluation.get("releaseGateEligible"), bool)
+            or not isinstance(
+                source_evaluation.get("normalQualityDenominatorExcluded"), bool
+            )
+            or final_report.get("normalQualityDenominatorExcluded")
+            is not source_evaluation.get("normalQualityDenominatorExcluded")
+            or manifest.get("normalQualityDenominatorExcluded")
+            is not source_evaluation.get("normalQualityDenominatorExcluded")
+            or manifest.get("sourceEvaluationStatus")
+            != source_evaluation.get("status")
+        ):
+            raise CustomerServiceAnswerReviewError(
+                "answer-review source evaluation boundary is invalid"
+            )
+    elif (
+        "normalQualityDenominatorExcluded" in manifest
+        or "sourceEvaluationStatus" in manifest
+    ):
+        raise CustomerServiceAnswerReviewError(
+            "legacy answer-review evidence has unexpected source boundary fields"
         )
     if manifest.get("files") != _inventory(root):
         raise CustomerServiceAnswerReviewError(

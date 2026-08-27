@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "aishop-human-review-delivery/v1",
+  "status": "OPEN_INDEPENDENT_A_B_REVIEW",
+  "task": "CUSTOMER_SERVICE_V54_ANSWER_QUALITY_DUAL_REVIEW",
+  "caseCountPerReviewer": 120,
+  "sourceReport": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827/report.json",
+    "sha256": "7d659d4d1ac7f743cba2607ab1de8e2869ce2c5bcd1286df6dfadb07887db2d0",
+    "answerQualityStatus": "PENDING_HUMAN_REVIEW",
+    "messageProjection": "RUNTIME_FIXTURE_AWARE_V1"
+  },
+  "packages": {
+    "reviewerA": {
+      "path": "deliverables/human-review/AI-Shop-v54-answer-quality-reviewer-a-label-evidence-bound-20260827.zip",
+      "sha256": "ff1ff6cb6b9ea27e0e630f5cabdc8d9a3e4c6f43686c525877941157188365fc",
+      "returnDirectory": "holdout/v54/reviewer-a",
+      "returnFiles": [
+        "reviewer-a.open.jsonl",
+        "reviewer-a.open.jsonl.manifest.json"
+      ]
+    },
+    "reviewerB": {
+      "path": "deliverables/human-review/AI-Shop-v54-answer-quality-reviewer-b-label-evidence-bound-20260827.zip",
+      "sha256": "18ab1007324882a1739f84a16f32c55dc6acbb562dd94e407c8f46f5f8dc7ccc",
+      "returnDirectory": "holdout/v54/reviewer-b",
+      "returnFiles": [
+        "reviewer-b.open.jsonl",
+        "reviewer-b.open.jsonl.manifest.json"
+      ]
+    }
+  },
+  "editingRule": "Only edit labels and comment in all 120 JSONL rows; keep the manifest unchanged.",
+  "adjudication": {
+    "sendNow": false,
+    "reason": "Export only A/B disagreements after both completed sheets validate, seal, and compare."
+  },
+  "releaseGateEligible": false,
+  "finalUnseenEligible": false
+}

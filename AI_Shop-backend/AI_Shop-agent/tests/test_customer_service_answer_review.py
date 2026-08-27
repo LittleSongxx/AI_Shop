@@ -53,6 +53,9 @@ def _http_report(path: Path) -> Path:
         {
             "schemaVersion": HTTP_REPORT_SCHEMA,
             "runId": "customer-http-test",
+            "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+            "releaseGateEligible": False,
+            "normalQualityDenominatorExcluded": True,
             "cases": cases,
         },
         overwrite=False,
@@ -213,6 +216,34 @@ def test_answer_review_is_source_bound_and_requires_complete_labels(tmp_path: Pa
     atomic_write_jsonl(open_sheet, rows)
     with pytest.raises(CustomerServiceAnswerReviewError, match="source field answer"):
         validate_answer_review_sheet(report, open_sheet)
+
+
+def test_completed_open_answer_review_can_return_in_an_intake_directory(
+    tmp_path: Path,
+):
+    report = _http_report(tmp_path / "http-report.json")
+    exported = tmp_path / "delivery" / "reviewer-a.open.jsonl"
+    exported.parent.mkdir()
+    export_answer_review_sheet(report, exported, reviewer_id="reviewer-a")
+    _fill_sheet(
+        exported,
+        {f"case-{index}": _labels() for index in range(1, 4)},
+    )
+
+    returned = tmp_path / "intake" / exported.name
+    returned.parent.mkdir()
+    returned.write_bytes(exported.read_bytes())
+    returned.with_suffix(returned.suffix + ".manifest.json").write_bytes(
+        exported.with_suffix(exported.suffix + ".manifest.json").read_bytes()
+    )
+
+    manifest = validate_answer_review_sheet(report, returned, require_complete=True)
+    assert manifest["lifecycle"] == "OPEN"
+    sealed = tmp_path / "reviewer-a.sealed.jsonl"
+    seal_answer_review_sheet(report, returned, sealed)
+    assert validate_answer_review_sheet(report, sealed, require_complete=True)[
+        "lifecycle"
+    ] == "SEALED"
 
 
 def test_answer_review_projects_sensitive_runtime_fields_and_rejects_reviewer_leaks(
@@ -431,6 +462,17 @@ def test_answer_review_agreement_and_adjudicated_quality_metrics(tmp_path: Path)
     assert final_report["metrics"]["jointQualityPassRate"]["badcaseIds"] == [
         "case-2"
     ]
+    assert "frozen 3-case HTTP replay only" in final_report["limitations"][0]
+    assert final_report["normalQualityDenominatorExcluded"] is True
+    assert final_report["sourceEvaluation"] == {
+        "status": "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW",
+        "releaseGateEligible": False,
+        "normalQualityDenominatorExcluded": True,
+    }
+    assert any(
+        "excluded from the normal quality denominator" in limitation
+        for limitation in final_report["limitations"]
+    )
 
     evidence = tmp_path / "answer-review-evidence"
     verification = write_answer_review_evidence(
@@ -443,6 +485,12 @@ def test_answer_review_agreement_and_adjudicated_quality_metrics(tmp_path: Path)
     )
     assert verification["verified"] is True
     assert verify_answer_review_evidence(evidence)["caseCount"] == 3
+    evidence_manifest = load_json(evidence / "evidence-manifest.json")
+    assert evidence_manifest["normalQualityDenominatorExcluded"] is True
+    assert (
+        evidence_manifest["sourceEvaluationStatus"]
+        == "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW"
+    )
     assert all(
         not path.stat().st_mode & 0o222
         for path in evidence.rglob("*")

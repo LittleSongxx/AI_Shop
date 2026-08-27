@@ -54,6 +54,7 @@ def test_final_hash_is_claimed_once_and_execution_is_one_shot(tmp_path, monkeypa
     monkeypatch.setattr(lifecycle, "source_fingerprint", _fingerprint)
     monkeypatch.setattr(lifecycle, "validate_repository_datasets", lambda: {})
     monkeypatch.setattr(lifecycle, "validate_final_against_known", lambda cases: None)
+    monkeypatch.setattr(lifecycle, "audit_final_input_exposure", lambda *args, **kwargs: [])
     dataset = tmp_path / "final.jsonl"
     atomic_write_jsonl(dataset, [_final_case()])
 
@@ -84,6 +85,7 @@ def test_final_publication_error_is_terminal_and_not_retryable(tmp_path, monkeyp
     monkeypatch.setattr(lifecycle, "source_fingerprint", _fingerprint)
     monkeypatch.setattr(lifecycle, "validate_repository_datasets", lambda: {})
     monkeypatch.setattr(lifecycle, "validate_final_against_known", lambda cases: None)
+    monkeypatch.setattr(lifecycle, "audit_final_input_exposure", lambda *args, **kwargs: [])
     dataset = tmp_path / "final.jsonl"
     atomic_write_jsonl(dataset, [_final_case()])
 

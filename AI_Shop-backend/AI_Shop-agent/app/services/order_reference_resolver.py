@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -80,6 +81,17 @@ _ITEM_TARGET_INTENTS = frozenset(
         IntentKind.REFUND_STATUS.value,
         IntentKind.DAMAGED_OR_WRONG_ITEM.value,
         IntentKind.AFTERSALES_UNKNOWN.value,
+    }
+)
+
+# In these read-only lookup domains an explicitly supplied monetary span can
+# narrow owned records. It is only a reference clue: a collision remains
+# ambiguous, and no status/capability conclusion is derived from the amount.
+_AMOUNT_REFERENCE_INTENTS = frozenset(
+    {
+        IntentKind.QUERY_ORDER.value,
+        IntentKind.REFUND_STATUS.value,
+        IntentKind.INVOICE.value,
     }
 )
 
@@ -263,12 +275,29 @@ class OrderReferenceResolver:
             if not working:
                 return self._no_match(intent, candidates, clues, user_text)
 
+        amount_clue = self._money_number(entities.get("amount"))
+        if (
+            amount_clue is not None
+            and intent in _AMOUNT_REFERENCE_INTENTS
+            and not (explicit_order_id or explicit_item_id)
+        ):
+            clues["amount"] = amount_clue
+            working = [
+                row
+                for row in working
+                if self._same_money_value(row.get("amount"), amount_clue)
+            ]
+            if not working:
+                return self._no_match(intent, candidates, clues, user_text)
+
         status_filter = self._status_filter(user_text)
-        if status_filter:
+        if status_filter and not (explicit_order_id or explicit_item_id):
             clues["statuses"] = sorted(status_filter)
             working = [row for row in working if row.get("orderStatus") in status_filter]
             if not working:
                 return self._no_match(intent, candidates, clues, user_text)
+        elif status_filter:
+            clues["ignoredStatusHintForExplicitReference"] = True
 
         working, has_time_clue = self._apply_time_filter(working, user_text)
         if has_time_clue:
@@ -286,9 +315,19 @@ class OrderReferenceResolver:
             key=len,
             reverse=True,
         )
+        # Free-form lexical extraction is intentionally suppressed for a
+        # refund-status turn (and once an amount already narrows the record).
+        # Phrases such as "第 5 天" or "不是问退款规则" are status context,
+        # not product names. Recognized taxonomy terms above can still narrow
+        # a real product reference such as "耳机那笔退款".
         lexical_clues = (
             []
-            if explicit_order_id or explicit_item_id
+            if (
+                explicit_order_id
+                or explicit_item_id
+                or amount_clue is not None
+                or intent == IntentKind.REFUND_STATUS.value
+            )
             else self._lexical_product_clues(user_text, topic_terms)
         )
         if lexical_clues:
@@ -481,7 +520,9 @@ class OrderReferenceResolver:
     ) -> OrderReferenceResolution:
         suggestions = self._deduplicate(candidates, intent)[: self.CARD_LIMIT]
         detail = ""
-        if clues.get("productClues"):
+        if clues.get("amount") is not None:
+            detail = f"金额约 {clues['amount']:g} 元的"
+        elif clues.get("productClues"):
             shown = "、".join(str(value) for value in clues["productClues"][:3])
             detail = f"与“{shown}”商品描述匹配的"
         elif clues.get("productTerms"):
@@ -657,6 +698,25 @@ class OrderReferenceResolver:
             return float(value) if value is not None else None
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _money_number(value: Any) -> float | None:
+        text = unicodedata.normalize("NFKC", str(value or ""))
+        text = text.replace(",", "")
+        match = re.search(r"\d+(?:\.\d+)?", text)
+        if not match:
+            return None
+        try:
+            return float(match.group(0))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _same_money_value(candidate: Any, expected: float) -> bool:
+        try:
+            return abs(float(candidate) - expected) < 0.005
+        except (TypeError, ValueError):
+            return False
 
 
 order_reference_resolver = OrderReferenceResolver()

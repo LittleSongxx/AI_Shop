@@ -671,8 +671,13 @@ class ShoppingMissionService:
         candidates: list[dict[str, Any]],
     ) -> dict[str, Any] | None:
         mission = await self.load(user_id)
+        # A server-observed result list is itself sufficient to begin a
+        # shopping mission.  Named-product consultations may not contain a
+        # category/budget token, so waiting for an explicit profile signal
+        # would leave the just-resolved candidates unavailable to the
+        # comparison tool in the same turn.
         if mission is None:
-            return None
+            mission = empty_shopping_mission({})
         updated = deepcopy(mission)
         existing = {
             str(item.get("productId")): item

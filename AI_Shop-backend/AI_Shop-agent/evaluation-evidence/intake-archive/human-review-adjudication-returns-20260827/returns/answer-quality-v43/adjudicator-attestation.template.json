@@ -1,0 +1,19 @@
+{
+  "adjudicationTemplateSha256AtExport": "ba999cf087f9f386c6ef761367496a331f106bc2fce5d5a14541bbd492efcd04",
+  "adjudicatorId": "song",
+  "adjudicatorIdentity": "HIT-Student",
+  "adjudicatorIsHuman": false,
+  "attestedAt": "2026-08-26T16:51:05.391Z",
+  "completedAdjudicationSha256": "561f93c52a918756f7e2b3b2a909950170dafb2e09fc79d11174a1cf5f39ee34",
+  "generativeAiProducedOrSuggestedFinalLabels": true,
+  "independentOfDatasetAndModelDevelopment": true,
+  "independentOfSourceReviewers": true,
+  "schemaVersion": "aishop-human-adjudicator-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "sourceReviewerIds": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "status": "COMPLETE",
+  "taskId": "customer-service-http-v43-answer-quality-adjudication-20260827"
+}

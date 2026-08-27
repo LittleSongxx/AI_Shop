@@ -18,6 +18,11 @@ from app.services.episode_service import (
     episode_service,
     text_fingerprint,
 )
+from app.services.evidence_refs import (
+    after_sales_eligibility_ref,
+    pending_action_ref,
+    support_case_ref,
+)
 from app.services.java_internal_client import java_internal_client
 from app.services.pending_action_service import pending_action_service
 from app.services.tool_invoke_result import ToolInvokeResult
@@ -56,6 +61,30 @@ CASE_CATEGORY_LABELS = {
     "COMPLAINT": "投诉",
     "OTHER": "其他",
 }
+
+RETURN_ELIGIBILITY_CATEGORIES = frozenset(
+    {"DAMAGED", "WRONG_ITEM", "MISSING_ITEM"}
+)
+
+
+class SupportCaseEligibilityError(ValueError):
+    """A physical after-sales case failed the current RETURN policy check."""
+
+    def __init__(self, result: dict, category: str):
+        self.result = dict(result or {})
+        self.category = str(category or "OTHER").upper()
+        decision = str(self.result.get("decision") or "POLICY_UNAVAILABLE").upper()
+        super().__init__(self._message(decision))
+
+    def _message(self, decision: str) -> str:
+        label = CASE_CATEGORY_LABELS.get(self.category, "该售后问题")
+        if decision == "INELIGIBLE":
+            return f"当前订单状态不满足{label}售后资格，不会创建工单"
+        if decision == "NEEDS_EVIDENCE":
+            return f"{label}售后申请仍需补充可核验凭证，不会创建工单"
+        if decision == "CONFLICT":
+            return f"{label}资格核验存在订单或规则冲突，请转人工"
+        return f"{label}资格服务暂时不可用，请稍后重试或转人工"
 
 
 def _json(value) -> str:
@@ -110,7 +139,18 @@ class SupportCaseService:
                 for term in ("少件", "漏发", "少发", "缺件", "少了", "缺少")
             ):
                 return "MISSING_ITEM"
-            if any(term in content for term in ("错发", "发错", "寄错", "不是我买")):
+            wrong_color = bool(
+                re.search(
+                    r"(?:颜色不符|颜色不一致|颜色不对|颜色错了|发错颜色|错的颜色)"
+                    r"|(?:红|蓝|黑|白|绿|黄|灰|紫|粉|金|银)色"
+                    r"[^，,。！？!?；;]{0,16}(?:变成|却是|实际是|收到的是)"
+                    r"[^，,。！？!?；;]{0,8}(?:红|蓝|黑|白|绿|黄|灰|紫|粉|金|银)色",
+                    content,
+                )
+            )
+            if wrong_color or any(
+                term in content for term in ("错发", "发错", "寄错", "不是我买")
+            ):
                 return "WRONG_ITEM"
             return "DAMAGED"
         return cls.normalize_category(
@@ -152,6 +192,73 @@ class SupportCaseService:
             if str(order.get("user_id") or order.get("userId") or "") != str(user_id):
                 raise ValueError("只能关联本人订单")
         return order, item, normalized_order_id
+
+    async def _return_eligibility(
+        self,
+        user_id: str,
+        category: str,
+        order_id: str | None,
+        order_item_id: str | None,
+        *,
+        evidence: list[str] | None = None,
+    ) -> dict | None:
+        """Read the authoritative RETURN decision for physical complaint cases."""
+
+        normalized = self.normalize_category(category)
+        if normalized not in RETURN_ELIGIBILITY_CATEGORIES:
+            return None
+        if not order_id:
+            return {
+                "decision": "CONFLICT",
+                "action": "RETURN",
+                "orderId": order_id,
+                "orderItemId": order_item_id,
+                "reason": "实物售后缺少关联订单",
+            }
+        try:
+            from app.services.after_sales_policy_service import (
+                after_sales_policy_service,
+            )
+
+            return await after_sales_policy_service.evaluate(
+                user_id=user_id,
+                action="RETURN",
+                order_id=order_id,
+                order_item_id=order_item_id,
+                evidence=list(evidence or []),
+            )
+        except Exception as exc:
+            logger.warning(
+                "support_case_return_eligibility_failed",
+                error=type(exc).__name__,
+            )
+            return {
+                "decision": "POLICY_UNAVAILABLE",
+                "action": "RETURN",
+                "orderId": order_id,
+                "orderItemId": order_item_id,
+                "reason": "售后资格服务暂时不可用",
+            }
+
+    async def _assert_return_eligible(
+        self,
+        user_id: str,
+        category: str,
+        order_id: str | None,
+        order_item_id: str | None,
+        *,
+        evidence: list[str] | None = None,
+    ) -> dict | None:
+        result = await self._return_eligibility(
+            user_id,
+            category,
+            order_id,
+            order_item_id,
+            evidence=evidence,
+        )
+        if result is not None and str(result.get("decision") or "").upper() != "ELIGIBLE":
+            raise SupportCaseEligibilityError(result, self.normalize_category(category))
+        return result
 
     async def verify_image(
         self,
@@ -213,6 +320,15 @@ class SupportCaseService:
             )
             if image_understanding:
                 evidence["imageUnderstanding"] = str(image_understanding).strip()[:1000]
+        eligibility = None
+        if normalized in RETURN_ELIGIBILITY_CATEGORIES and not forced_handoff:
+            eligibility = await self._assert_return_eligible(
+                user_id,
+                normalized,
+                order_id,
+                order_item_id,
+                evidence=["IMAGE"] if evidence else [],
+            )
         description_hash = hashlib.sha256(description.encode("utf-8")).hexdigest()[:16]
         dedupe = (
             f"{user_id}:CASE:MESSAGE:{source_message_id}:{normalized}"
@@ -233,6 +349,8 @@ class SupportCaseService:
             "caseDedupeKey": dedupe,
             "ownedOrderValidated": True,
         }
+        if eligibility is not None:
+            params["afterSalesEligibility"] = eligibility
         if order:
             params["orderStatus"] = order.get("order_status") or order.get("orderStatus")
         if item:
@@ -290,10 +408,24 @@ class SupportCaseService:
             if existing:
                 await self._record_support_contact_outcome(user_id, existing)
                 return existing
-        evidence = await self._retain_case_evidence(user_id, evidence)
         _order, _item, order_id = await self._verify_order_owner(
             user_id, order_id, order_item_id
         )
+        verified_evidence = None
+        if evidence:
+            asset_id = str(evidence.get("imageAssetId") or "").strip()
+            if not asset_id:
+                raise ValueError("工单图片证据缺少图片资产标识")
+            verified_evidence = await self.verify_image(user_id, asset_id)
+        if category in RETURN_ELIGIBILITY_CATEGORIES and not forced_handoff:
+            await self._assert_return_eligible(
+                user_id,
+                category,
+                order_id,
+                order_item_id,
+                evidence=["IMAGE"] if verified_evidence else [],
+            )
+        evidence = await self._retain_case_evidence(user_id, evidence)
         case_no = self._case_no()
         try:
             async with acquire() as cur:
@@ -676,7 +808,24 @@ class SupportCaseService:
         description: str,
         **kwargs,
     ) -> str | ToolInvokeResult:
-        params = await self.build_proposal(user_id, category, description, **kwargs)
+        try:
+            params = await self.build_proposal(user_id, category, description, **kwargs)
+        except SupportCaseEligibilityError as exc:
+            ref = after_sales_eligibility_ref(exc.result)
+            decision = str(exc.result.get("decision") or "POLICY_UNAVAILABLE").upper()
+            return ToolInvokeResult(
+                content=f"【创建工单失败】{exc}",
+                success=False,
+                error_code=decision,
+                biz_type="after_sales_eligibility",
+                source_refs=[ref] if ref else [],
+                retrieval_trace={
+                    "decision": decision,
+                    "action": "RETURN",
+                    "category": exc.category,
+                    "decisionId": exc.result.get("decisionId"),
+                },
+            )
         forced = bool(params.get("forcedHandoff"))
         if forced:
             case = await self.create(
@@ -695,6 +844,7 @@ class SupportCaseService:
             return ToolInvokeResult(
                 content=f"已为您创建售后工单 {case['caseNo']}，该问题将立即转人工处理。",
                 biz_type="support_case",
+                source_refs=[ref] if (ref := support_case_ref(case)) else [],
             )
         pending = await pending_action_service.create_pending(
             "CREATE_SUPPORT_CASE",
@@ -707,6 +857,11 @@ class SupportCaseService:
             pending,
             intro="已生成创建售后工单确认卡片，请确认后提交。",
         )
+        refs = []
+        if (eligibility_ref := after_sales_eligibility_ref(params.get("afterSalesEligibility") or {})):
+            refs.append(eligibility_ref)
+        if (proposal_ref := pending_action_ref(pending)):
+            refs.append(proposal_ref)
         return ToolInvokeResult(
             content=(
                 "已生成创建售后工单确认卡片。请确认后提交，"
@@ -715,6 +870,7 @@ class SupportCaseService:
             biz_type="action_confirm",
             biz_data=biz_data,
             assistant_cards=assistant,
+            source_refs=refs,
             contract_data={
                 "type": "ACTION_CONFIRM",
                 "actionType": "CREATE_SUPPORT_CASE",

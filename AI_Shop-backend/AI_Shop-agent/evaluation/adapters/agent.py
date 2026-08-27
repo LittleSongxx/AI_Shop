@@ -46,7 +46,28 @@ _TERMINAL = {
     "MANUAL_REVIEW",
 }
 _TASK_TERMINAL = {"COMPLETED", "DEAD", "CANCELLED"}
+_DETERMINISTIC_RESPONSE_EVENTS = frozenset(
+    {
+        "AUTO_RECEIPT_AFTERSALES_BOUNDARY",
+        "BOUNDED_DISPLAY_TECHNOLOGY_EXPLANATION",
+        "FEEDBACK_ONLY_ACKNOWLEDGEMENT",
+        "NAMED_PRODUCT_COMPARISON",
+        "PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE",
+        "PAYMENT_FAILURE_STATE_CLARIFICATION",
+        "PAYMENT_PREAUTH_RETRY_GUIDANCE",
+        "PRODUCT_CONSULT_CLARIFICATION",
+        "REFUND_CONDITIONS_EVIDENCE_ANSWER",
+    }
+)
 _TASK_COMPLETION_VISIBILITY_GRACE_SECONDS = 5.0
+_EPISODE_POLL_INTERVAL_SECONDS = min(
+    1.0,
+    max(0.01, float(os.getenv("AI_EVAL_EPISODE_POLL_INTERVAL_SECONDS", "0.05"))),
+)
+_EPISODE_TERMINAL_SETTLE_SECONDS = min(
+    1.0,
+    max(0.0, float(os.getenv("AI_EVAL_EPISODE_TERMINAL_SETTLE_SECONDS", "0.02"))),
+)
 
 _DURABLE_EVENT_PREFIXES = (
     "ORDER_",
@@ -150,6 +171,23 @@ def _observable_fixture_subset(field: str, value: str) -> dict[str, Any]:
     return dict(sanitized)
 
 
+def agent_polling_measurement() -> dict[str, Any]:
+    """Describe evaluator-induced latency resolution for evidence reports."""
+
+    return {
+        "episodePollIntervalMs": round(_EPISODE_POLL_INTERVAL_SECONDS * 1000, 3),
+        "terminalSettleDelayMs": round(_EPISODE_TERMINAL_SETTLE_SECONDS * 1000, 3),
+        "terminalDetectionDelayUpperBoundMs": round(
+            _EPISODE_POLL_INTERVAL_SECONDS * 1000, 3
+        ),
+        "latencyIncludesHarnessPolling": True,
+        "configuration": {
+            "pollIntervalEnv": "AI_EVAL_EPISODE_POLL_INTERVAL_SECONDS",
+            "terminalSettleEnv": "AI_EVAL_EPISODE_TERMINAL_SETTLE_SECONDS",
+        },
+    }
+
+
 async def _poll_episode(run_id: str, timeout_seconds: float) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     last: dict[str, Any] | None = None
@@ -159,7 +197,7 @@ async def _poll_episode(run_id: str, timeout_seconds: float) -> dict[str, Any]:
             last = detail
             if str(detail.get("status") or "") in _TERMINAL:
                 return detail
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(_EPISODE_POLL_INTERVAL_SECONDS)
     status = (last or {}).get("status")
     raise TimeoutError(f"episode {run_id} did not reach a terminal state, last={status}")
 
@@ -193,7 +231,8 @@ async def _poll_execution(
             # transition a short window to become visible before taking the
             # snapshot used for quality and state-diff evidence.
             if last_episode and str(last_episode.get("status") or "") in _TERMINAL:
-                await asyncio.sleep(0.15)
+                if _EPISODE_TERMINAL_SETTLE_SECONDS:
+                    await asyncio.sleep(_EPISODE_TERMINAL_SETTLE_SECONDS)
                 refreshed = await episode_query_service.detail(run_id) or last_episode
                 # A checkpoint/provider exception can close the first Episode
                 # as FAILED while the same durable task is already retrying.
@@ -209,14 +248,14 @@ async def _poll_execution(
                         + _TASK_COMPLETION_VISIBILITY_GRACE_SECONDS,
                     )
                     while time.monotonic() < visibility_deadline:
-                        await asyncio.sleep(0.2)
+                        await asyncio.sleep(_EPISODE_POLL_INTERVAL_SECONDS)
                         candidate = await episode_query_service.detail(run_id)
                         if candidate:
                             refreshed = candidate
                             if str(candidate.get("status") or "") != "FAILED":
                                 break
                 return refreshed
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(_EPISODE_POLL_INTERVAL_SECONDS)
     episode_status = (last_episode or {}).get("status")
     task_status = (last_task or {}).get("status")
     raise TimeoutError(
@@ -260,13 +299,21 @@ def _deterministic_workflow_provider_snapshot(
 
     decisions: list[dict[str, Any]] = []
     order_reference_terminals: list[dict[str, Any]] = []
+    order_reference_handoffs: list[dict[str, Any]] = []
     direct_handoff_decisions: list[dict[str, Any]] = []
     direct_handoff_steps: list[dict[str, Any]] = []
+    post_resolution_handoff_policies: list[dict[str, Any]] = []
+    deterministic_responses: list[dict[str, Any]] = []
+    deterministic_clarifications: list[dict[str, Any]] = []
     workflow_nodes = 0
     fallbacks = 0
     llm_calls = 0
     llm_failures = 0
     for episode in episodes:
+        response_events: list[str] = []
+        llm_skip_policies = 0
+        response_verifiers = 0
+        clarification_policies: list[str] = []
         experiment = episode.get("experiment")
         if isinstance(experiment, Mapping):
             orchestration = experiment.get("orchestration")
@@ -281,6 +328,13 @@ def _deterministic_workflow_provider_snapshot(
                 and not bool(order_reference.get("dependencyError"))
             ):
                 order_reference_terminals.append(dict(order_reference))
+            if isinstance(order_reference, Mapping) and (
+                str(order_reference.get("route") or "") == "human_handoff"
+                and str(order_reference.get("outcome") or "")
+                in {"RESOLVED", "NO_ELIGIBLE", "NO_MATCH", "AMBIGUOUS"}
+                and not bool(order_reference.get("dependencyError"))
+            ):
+                order_reference_handoffs.append(dict(order_reference))
         for step in episode.get("steps") or []:
             if not isinstance(step, Mapping):
                 continue
@@ -304,12 +358,75 @@ def _deterministic_workflow_provider_snapshot(
                     dict(output) if isinstance(output, Mapping) else {}
                 )
             if (
+                event_type == "AGENT_POLICY"
+                and str(step.get("nodeName") or "") == "human_handoff"
+                and status == "OK"
+                and isinstance(output, Mapping)
+                and output.get("llmSkipped") is True
+                and str(output.get("reason") or "").strip()
+            ):
+                post_resolution_handoff_policies.append(dict(output))
+            if (
+                event_type in _DETERMINISTIC_RESPONSE_EVENTS
+                and status == "OK"
+                and isinstance(output, Mapping)
+                and str(output.get("reason") or "").strip()
+            ):
+                response_events.append(event_type)
+            if (
+                event_type == "AGENT_POLICY"
+                and status == "OK"
+                and isinstance(output, Mapping)
+                and str(output.get("route") or "") == "finalize"
+                and output.get("llmSkipped") is True
+                and str(output.get("llmSkipReason") or "").strip()
+                and output.get("structuredResultFinalized") is True
+                and output.get("sideEffectAllowed") is False
+            ):
+                llm_skip_policies += 1
+            if (
+                event_type == "AGENT_POLICY"
+                and status == "OK"
+                and isinstance(output, Mapping)
+                and output.get("deterministicClarification") is True
+                and output.get("llmSkipped") is True
+                and str(output.get("llmSkipReason") or "").strip()
+                and output.get("structuredResultFinalized") is True
+                and output.get("sideEffectAllowed") is False
+            ):
+                clarification_policies.append(str(output.get("llmSkipReason")))
+            if (
+                event_type == "RESPONSE_VERIFIER"
+                and status == "OK"
+                and isinstance(output, Mapping)
+                and output.get("verifierPassed") is True
+                and output.get("safeFallbackApplied") is False
+            ):
+                response_verifiers += 1
+            if (
                 str(step.get("nodeName") or "") == "deterministic_workflow"
                 and status == "OK"
             ):
                 workflow_nodes += 1
             if event_type == "ORCHESTRATION_FALLBACK":
                 fallbacks += 1
+        if response_events and llm_skip_policies and response_verifiers:
+            deterministic_responses.append(
+                {
+                    "eventTypes": sorted(set(response_events)),
+                    "eventCount": len(response_events),
+                    "policyCount": llm_skip_policies,
+                    "verifierCount": response_verifiers,
+                }
+            )
+        if clarification_policies and response_verifiers:
+            deterministic_clarifications.append(
+                {
+                    "reasons": sorted(set(clarification_policies)),
+                    "policyCount": len(clarification_policies),
+                    "verifierCount": response_verifiers,
+                }
+            )
 
     # A direct forced handoff is intentionally resolved before graph/LLM
     # orchestration. It is valid evidence for an LLM N/A result only when both
@@ -342,8 +459,113 @@ def _deterministic_workflow_provider_snapshot(
             },
         }
 
+    if (
+        order_reference_handoffs
+        and post_resolution_handoff_policies
+        and direct_handoff_steps
+        and llm_calls == 0
+        and llm_failures == 0
+        and fallbacks == 0
+    ):
+        outcomes = sorted(
+            {str(item.get("outcome")) for item in order_reference_handoffs}
+        )
+        return {
+            "notApplicable": True,
+            "notApplicableReason": (
+                "deterministic_order_reference_handoff:" + ",".join(outcomes)
+            ),
+            "workflowEvidence": {
+                "orderReferenceCount": len(order_reference_handoffs),
+                "handoffPolicyCount": len(post_resolution_handoff_policies),
+                "handoffCount": len(direct_handoff_steps),
+                "outcomes": outcomes,
+                "fallbackCount": fallbacks,
+                "llmCallCount": llm_calls,
+                "llmFailureCount": llm_failures,
+            },
+        }
+
+    # Some safe first-turn answers deliberately finish inside the single-agent
+    # path without entering the orchestration workflow. Accept that LLM short
+    # path only when one episode contains all three independent trace facts:
+    # an allow-listed deterministic response, an explicit read-only LLM-skip
+    # policy, and a successful clarification verifier. This keeps a silent
+    # provider outage from being mistaken for an intentional shortcut.
+    if (
+        deterministic_responses
+        and llm_calls == 0
+        and llm_failures == 0
+        and fallbacks == 0
+    ):
+        event_types = sorted(
+            {
+                event_type
+                for item in deterministic_responses
+                for event_type in item["eventTypes"]
+            }
+        )
+        return {
+            "notApplicable": True,
+            "notApplicableReason": "deterministic_response:" + ",".join(event_types),
+            "workflowEvidence": {
+                "responseCount": len(deterministic_responses),
+                "eventTypes": event_types,
+                "eventCount": sum(
+                    int(item["eventCount"]) for item in deterministic_responses
+                ),
+                "policyCount": sum(
+                    int(item["policyCount"]) for item in deterministic_responses
+                ),
+                "verifierCount": sum(
+                    int(item["verifierCount"]) for item in deterministic_responses
+                ),
+                "fallbackCount": fallbacks,
+                "llmCallCount": llm_calls,
+                "llmFailureCount": llm_failures,
+            },
+        }
+
+    if (
+        deterministic_clarifications
+        and llm_calls == 0
+        and llm_failures == 0
+        and fallbacks == 0
+    ):
+        reasons = sorted(
+            {
+                reason
+                for item in deterministic_clarifications
+                for reason in item["reasons"]
+            }
+        )
+        return {
+            "notApplicable": True,
+            "notApplicableReason": "deterministic_clarification:" + ",".join(reasons),
+            "workflowEvidence": {
+                "clarificationCount": len(deterministic_clarifications),
+                "reasons": reasons,
+                "policyCount": sum(
+                    int(item["policyCount"])
+                    for item in deterministic_clarifications
+                ),
+                "verifierCount": sum(
+                    int(item["verifierCount"])
+                    for item in deterministic_clarifications
+                ),
+                "fallbackCount": fallbacks,
+                "llmCallCount": llm_calls,
+                "llmFailureCount": llm_failures,
+            },
+        }
+
     if not decisions or workflow_nodes == 0 or fallbacks:
-        if not order_reference_terminals:
+        if (
+            not order_reference_terminals
+            or llm_calls != 0
+            or llm_failures != 0
+            or fallbacks != 0
+        ):
             return {}
         outcomes = sorted(
             {str(item.get("outcome")) for item in order_reference_terminals}

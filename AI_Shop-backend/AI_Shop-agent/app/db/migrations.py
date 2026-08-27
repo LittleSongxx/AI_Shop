@@ -488,9 +488,53 @@ def _normalize_existing_schema_history() -> None:
         engine.dispose()
 
 
+def _ensure_system_after_sales_policies() -> None:
+    """Seed immutable global policy defaults for databases already at ``current``.
+
+    The current Alembic revision is intentionally collapsed for legacy
+    deployments, so editing the revision's upgrade body alone would not run on
+    an existing database whose schema is already marked current.  ``INSERT
+    IGNORE`` preserves operator-authored replacements while making the default
+    RETURN rule available on both fresh and upgraded installations.
+    """
+
+    from app.config.settings import get_settings
+
+    settings = get_settings()
+    engine = create_engine(
+        settings.mysql_dsn.replace("mysql+aiomysql", "mysql+pymysql"),
+        pool_pre_ping=True,
+    )
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT IGNORE INTO agent_after_sales_policy
+                        (policy_id, version, status, priority, scope_json, rule_json,
+                         effective_start, effective_end, created_by, created_at, updated_at)
+                    VALUES
+                        ('system-return-state', 'v1', 'PUBLISHED', 0,
+                         JSON_OBJECT('scopeType', 'GLOBAL'),
+                         JSON_OBJECT(
+                             'action', 'RETURN',
+                             'orderStatuses', JSON_ARRAY(2, 3),
+                             'itemStatuses', JSON_ARRAY(1),
+                             'requiredEvidence', JSON_ARRAY()
+                         ),
+                         '2020-01-01 00:00:00.000', NULL,
+                         'SYSTEM_MIGRATION', NOW(3), NOW(3))
+                    """
+                )
+            )
+    finally:
+        engine.dispose()
+
+
 def run_migrations() -> None:
     root = Path(__file__).resolve().parents[2]
     _normalize_existing_schema_history()
     config = Config(str(root / "alembic.ini"))
     config.set_main_option("script_location", str(root / "scripts" / "alembic"))
     command.upgrade(config, "head")
+    _ensure_system_after_sales_policies()

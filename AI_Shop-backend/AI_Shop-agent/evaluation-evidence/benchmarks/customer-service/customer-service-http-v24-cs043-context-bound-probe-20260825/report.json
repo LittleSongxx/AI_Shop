@@ -1,0 +1,2877 @@
+{
+  "answerQuality": {
+    "answerCorrectness": null,
+    "citationGroundingSupport": null,
+    "reviewCoverage": {
+      "denominator": 1,
+      "numerator": 0
+    },
+    "selfJudged": false,
+    "status": "PENDING_HUMAN_REVIEW",
+    "unsafeAnswerRate": null
+  },
+  "behaviorContracts": {
+    "contractCount": 10,
+    "executedContractCount": 0,
+    "normalQualityDenominatorExcluded": true,
+    "notExecutedCaseIds": [
+      "cs-gold-v1-001",
+      "cs-gold-v1-002",
+      "cs-gold-v1-017",
+      "cs-gold-v1-019",
+      "cs-gold-v1-034",
+      "cs-gold-v1-039",
+      "cs-gold-v1-042",
+      "cs-gold-v1-054",
+      "cs-gold-v1-055",
+      "cs-gold-v1-056"
+    ],
+    "note": "These are deterministic safety/regression contracts. They do not measure blind human answer correctness or citation support.",
+    "provenance": {
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-behavior-contracts-v1.json",
+      "schemaVersion": "aishop-customer-service-http-behavior-contracts/v1",
+      "sha256": "ffb2048cdefc5b5a4b30da1f97f40bc23b48bcd33ca5c45ca2a4dd8249e81706",
+      "sourceDatasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+    },
+    "releaseGateEligible": false,
+    "results": [
+      {
+        "caseId": "cs-gold-v1-001",
+        "category": "SEARCH_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-001-no-unsupported-catalog-absence",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-002",
+        "category": "SEARCH_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-002-no-unsupported-catalog-absence",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-017",
+        "category": "WRITE_PROPOSAL_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-017-recomment-body-required",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-019",
+        "category": "ORDER_ELIGIBILITY_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-019-paid-unshipped-no-aftersales-proposal",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-034",
+        "category": "SEARCH_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-034-no-unsupported-catalog-absence",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-039",
+        "category": "AFTERSALES_ROUTING_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-039-aftersales-must-not-switch-to-shopping",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-042",
+        "category": "SEARCH_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-042-no-unsupported-catalog-absence",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-054",
+        "category": "AFTERSALES_ROUTING_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-054-missing-order-conservative-clarification",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-055",
+        "category": "ORDER_ELIGIBILITY_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-055-paid-unshipped-no-aftersales-proposal",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      },
+      {
+        "caseId": "cs-gold-v1-056",
+        "category": "AFTERSALES_ROUTING_SAFETY",
+        "checks": [],
+        "contractId": "cs-http-safety-v1-056-missing-order-conservative-clarification",
+        "failedChecks": [
+          "CASE_NOT_EXECUTED"
+        ],
+        "status": "NOT_EXECUTED"
+      }
+    ],
+    "status": "PARTIAL_NOT_EXECUTED",
+    "violationCaseIds": [],
+    "violationCount": 0
+  },
+  "cases": [
+    {
+      "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+      "caseId": "cs-gold-v1-043",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productName": "安卓手机"
+        }
+      },
+      "http": {
+        "adapterStatus": "PASSED",
+        "answer": "{\"type\": \"PRODUCT_SEARCH_RESULT\", \"intro\": \"【筛选结果】本次检索暂未返回同时满足你的条件（品类:手机）的商品，不能据此断言平台无货。\", \"products\": []}",
+        "assertions": [
+          {
+            "detail": [
+              "SUCCEEDED"
+            ],
+            "name": "terminal-state",
+            "passed": true
+          },
+          {
+            "detail": {
+              "actualEvents": [
+                "INTENT_DECISION",
+                "SHOPPING_MISSION_UPDATE",
+                "MQ_RECEIVE",
+                "MQ_PUBLISH",
+                "GRAPH_START",
+                "GUARD",
+                "NODE_TRANSITION",
+                "MEMORY_READ",
+                "INTENT_DECISION",
+                "CONTEXT_BUILT",
+                "NODE_TRANSITION",
+                "NODE_TRANSITION",
+                "ORCHESTRATION_DECISION",
+                "NODE_TRANSITION",
+                "TOOL_CALL",
+                "AGENT_POLICY",
+                "NODE_TRANSITION",
+                "GUARD",
+                "RESPONSE_VERIFIER",
+                "NODE_TRANSITION",
+                "MEMORY_WRITE",
+                "NODE_TRANSITION",
+                "NODE_TRANSITION",
+                "GRAPH_END",
+                "BUDGET_SUMMARY"
+              ],
+              "requiredEvents": [],
+              "unexpectedErrors": []
+            },
+            "name": "execution-complete",
+            "passed": true
+          },
+          {
+            "detail": [
+              "SEARCH_PRODUCTS"
+            ],
+            "name": "tool-selection",
+            "passed": true
+          },
+          {
+            "detail": [],
+            "name": "tool-arguments",
+            "passed": true
+          },
+          {
+            "detail": [],
+            "name": "output-contract",
+            "passed": true
+          },
+          {
+            "detail": {
+              "duplicateSideEffectCount": 0,
+              "stateMode": "READ_ONLY"
+            },
+            "name": "retry-idempotency",
+            "passed": true
+          },
+          {
+            "detail": [],
+            "name": "no-severe-safety-violation",
+            "passed": true
+          },
+          {
+            "detail": {
+              "agent-runtime": {
+                "complete": true,
+                "facts": {
+                  "runtimeError": false,
+                  "terminal": true,
+                  "terminalStatuses": [
+                    "SUCCEEDED"
+                  ]
+                },
+                "notApplicable": false,
+                "notApplicableValid": false,
+                "required": true
+              },
+              "llm": {
+                "complete": true,
+                "facts": {
+                  "failures": 0,
+                  "models": [],
+                  "notApplicable": true,
+                  "notApplicableReason": "deterministic_workflow:deterministic_business_path",
+                  "requests": 0,
+                  "successes": 0,
+                  "workflowEvidence": {
+                    "decisionCount": 1,
+                    "fallbackCount": 0,
+                    "reasons": [
+                      "deterministic_business_path"
+                    ],
+                    "workflowNodeCount": 2
+                  }
+                },
+                "notApplicable": true,
+                "notApplicableValid": true,
+                "required": true
+              }
+            },
+            "name": "provider-complete",
+            "passed": true
+          }
+        ],
+        "businessSourceRefs": [
+          {
+            "authoritative": true,
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "id": "product-search:f51705c8ce287ae3909b",
+            "matched": false,
+            "query": "不要苹果,推荐安卓手机",
+            "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+            "resultSource": "constraint_miss",
+            "source": "JAVA_GATEWAY",
+            "type": "product"
+          },
+          {
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "catalogAbsenceClaim": false,
+            "excludedBrands": [
+              "苹果"
+            ],
+            "excludedTerms": [],
+            "id": "product-search-constraint:b9bfee42bf2b9dd0586d",
+            "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+            "requiredQualifierEvidenceSource": "JAVA_PRODUCT_SNAPSHOT",
+            "requiredQualifierIds": [
+              "android-operating-system"
+            ],
+            "returnedCandidateCount": 0,
+            "returnedCandidatesSatisfyExclusions": true,
+            "returnedCandidatesSatisfyRequiredQualifiers": true,
+            "source": "JAVA_GATEWAY",
+            "type": "product_search_constraint",
+            "unverifiedRequiredQualifierCandidateCount": 0,
+            "unverifiedRequiredQualifierProductIds": [],
+            "violatingReturnedProductIds": []
+          },
+          {
+            "authoritative": true,
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "id": "product-search:<ID:3892adfa9f2d>",
+            "matched": false,
+            "query": {
+              "chars": 11,
+              "sha256": "0ba390c388f40c3f1e12a5278d8a4980e897c9d2ecfeeb3f77fa23bb2a7f3324"
+            },
+            "requestId": "<ID:43d9eb6e6581>",
+            "resultSource": "constraint_miss",
+            "source": "JAVA_GATEWAY",
+            "type": "product"
+          },
+          {
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "catalogAbsenceClaim": false,
+            "excludedBrands": [
+              "苹果"
+            ],
+            "excludedTerms": [],
+            "id": "<ID:b833c63f39c2>:<ID:f3cceaa0a9bc>",
+            "requestId": "<ID:43d9eb6e6581>",
+            "requiredQualifierEvidenceSource": "<ID:121699099310>",
+            "requiredQualifierIds": [
+              "<ID:aa94145810e1>"
+            ],
+            "returnedCandidateCount": 0,
+            "returnedCandidatesSatisfyExclusions": true,
+            "returnedCandidatesSatisfyRequiredQualifiers": true,
+            "source": "JAVA_GATEWAY",
+            "type": "product_search_constraint",
+            "unverifiedRequiredQualifierCandidateCount": 0,
+            "unverifiedRequiredQualifierProductIds": [],
+            "violatingReturnedProductIds": []
+          }
+        ],
+        "citationContract": {
+          "answerCitationNumbers": [],
+          "businessSourceRefCount": 4,
+          "contractValid": true,
+          "declaredCitationNumbers": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "invalidCitationNumbers": [],
+          "note": "Citation shape is observable; whether a source actually supports the answer is not auto-scored.",
+          "ragSourceRefCount": 0,
+          "semanticSupportStatus": "PENDING_HUMAN_REVIEW",
+          "sourceRefCount": 4
+        },
+        "episodes": [
+          {
+            "actorType": "USER",
+            "agentId": "supervisor",
+            "agentVersion": "v1",
+            "captureLevel": "FULL",
+            "children": [],
+            "completedAt": "2026-08-25T11:20:39.582",
+            "conversation": {
+              "assistantMessage": "{\"type\": \"PRODUCT_SEARCH_RESULT\", \"intro\": \"【筛选结果】本次检索暂未返回同时满足你的条件（品类:手机）的商品，不能据此断言平台无货。\", \"products\": []}",
+              "bizType": "shopping_decision_v2",
+              "messageId": 3349,
+              "sourceRefs": {
+                "businessSources": [
+                  {
+                    "authoritative": true,
+                    "capturedAt": "2026-08-25T11:20:39.556Z",
+                    "id": "product-search:f51705c8ce287ae3909b",
+                    "matched": false,
+                    "query": "不要苹果,推荐安卓手机",
+                    "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+                    "resultSource": "constraint_miss",
+                    "source": "JAVA_GATEWAY",
+                    "type": "product"
+                  },
+                  {
+                    "capturedAt": "2026-08-25T11:20:39.556Z",
+                    "catalogAbsenceClaim": false,
+                    "excludedBrands": [
+                      "苹果"
+                    ],
+                    "excludedTerms": [],
+                    "id": "product-search-constraint:b9bfee42bf2b9dd0586d",
+                    "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+                    "requiredQualifierEvidenceSource": "JAVA_PRODUCT_SNAPSHOT",
+                    "requiredQualifierIds": [
+                      "android-operating-system"
+                    ],
+                    "returnedCandidateCount": 0,
+                    "returnedCandidatesSatisfyExclusions": true,
+                    "returnedCandidatesSatisfyRequiredQualifiers": true,
+                    "source": "JAVA_GATEWAY",
+                    "type": "product_search_constraint",
+                    "unverifiedRequiredQualifierCandidateCount": 0,
+                    "unverifiedRequiredQualifierProductIds": [],
+                    "violatingReturnedProductIds": []
+                  }
+                ],
+                "ragSources": [],
+                "sources": [
+                  {
+                    "authoritative": true,
+                    "capturedAt": "2026-08-25T11:20:39.556Z",
+                    "id": "product-search:f51705c8ce287ae3909b",
+                    "matched": false,
+                    "query": "不要苹果,推荐安卓手机",
+                    "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+                    "resultSource": "constraint_miss",
+                    "source": "JAVA_GATEWAY",
+                    "type": "product"
+                  },
+                  {
+                    "capturedAt": "2026-08-25T11:20:39.556Z",
+                    "catalogAbsenceClaim": false,
+                    "excludedBrands": [
+                      "苹果"
+                    ],
+                    "excludedTerms": [],
+                    "id": "product-search-constraint:b9bfee42bf2b9dd0586d",
+                    "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+                    "requiredQualifierEvidenceSource": "JAVA_PRODUCT_SNAPSHOT",
+                    "requiredQualifierIds": [
+                      "android-operating-system"
+                    ],
+                    "returnedCandidateCount": 0,
+                    "returnedCandidatesSatisfyExclusions": true,
+                    "returnedCandidatesSatisfyRequiredQualifiers": true,
+                    "source": "JAVA_GATEWAY",
+                    "type": "product_search_constraint",
+                    "unverifiedRequiredQualifierCandidateCount": 0,
+                    "unverifiedRequiredQualifierProductIds": [],
+                    "violatingReturnedProductIds": []
+                  }
+                ],
+                "trace": null
+              },
+              "userMessage": "不要苹果,推荐安卓手机"
+            },
+            "costCny": null,
+            "datasetEligible": "UNREVIEWED",
+            "datasetReviewNote": null,
+            "datasetReviewedAt": null,
+            "datasetReviewedBy": null,
+            "episodeEvaluation": {
+              "datasetReviewStatus": "UNREVIEWED",
+              "factComplete": false,
+              "facts": {
+                "actionOutcome": null,
+                "actionProposed": false,
+                "actionType": null,
+                "caseCreated": false,
+                "caseStatus": null,
+                "humanResolved": false,
+                "remoteOutcomeKnown": false,
+                "supportResolutionComplete": false,
+                "userConfirmed": false
+              },
+              "orderAftersales": false,
+              "reviewEligible": false,
+              "runTerminal": true,
+              "schemaVersion": 1,
+              "trainingEligible": false,
+              "verdict": "NOT_ORDER_AFTERSALES",
+              "verifierPassed": true
+            },
+            "experiment": {
+              "bucket": "A",
+              "orchestration": {
+                "configuredMode": "adaptive",
+                "mode": "workflow",
+                "multiAgentAvailable": true,
+                "reason": "deterministic_business_path"
+              },
+              "ragMode": "conditional"
+            },
+            "handoffId": null,
+            "handoffs": [],
+            "inputTokens": 0,
+            "intent": "PRODUCT_SEARCH",
+            "latencyMs": 145,
+            "messageId": 3349,
+            "modelName": null,
+            "outcome": "ok",
+            "outputTokens": 0,
+            "parentRunId": null,
+            "quality": {
+              "fallbackVerified": false,
+              "terminalQuality": "PASS",
+              "verifierAction": "PASS",
+              "verifierIssues": [],
+              "verifierPassed": true
+            },
+            "queueName": "agent.shopping.low",
+            "rewardSignals": {
+              "toolResults": {
+                "25f975e8ab6e0fa3": {
+                  "bizType": "<ID:40f1599bad6c>",
+                  "hasCards": false,
+                  "hasSourceRefs": true,
+                  "success": true,
+                  "toolName": "SEARCH_PRODUCTS"
+                }
+              },
+              "verifier": {
+                "action": "PASS",
+                "issueCodes": [],
+                "passed": true
+              }
+            },
+            "runId": "ebd47036daa0444cb5f901857d6ed1fb",
+            "scenario": "product_search",
+            "sessionId": null,
+            "startedAt": "2026-08-25T11:20:39.362",
+            "status": "SUCCEEDED",
+            "steps": [
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "INTENT_DECISION",
+                "handoffId": null,
+                "input": {
+                  "message": {
+                    "chars": 11,
+                    "sha256": "0ba390c388f40c3f1e12a5278d8a4980e897c9d2ecfeeb3f77fa23bb2a7f3324"
+                  }
+                },
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "api",
+                "occurredAt": "2026-08-25T11:20:39.362",
+                "output": {
+                  "confidence": 0.9,
+                  "data": "",
+                  "entities": {
+                    "excludedBrand": "苹果",
+                    "operatingSystem": "安卓",
+                    "productName": "安卓手机"
+                  },
+                  "handoff_reason": null,
+                  "intent": "PRODUCT_SEARCH",
+                  "next_action": "TOOL",
+                  "request_mode": "READ_QUERY",
+                  "risk_level": "LOW",
+                  "sentiment": "NEUTRAL",
+                  "source": "rule",
+                  "urgency": "NORMAL"
+                },
+                "roundNo": null,
+                "spanId": "be010e7904d6d63a",
+                "status": "OK",
+                "stepId": 74259,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "SHOPPING_MISSION_UPDATE",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "api",
+                "occurredAt": "2026-08-25T11:20:39.380",
+                "output": {
+                  "category": "手机",
+                  "clarificationCount": 0,
+                  "hardConstraints": {
+                    "availability": "ON_SALE",
+                    "budgetMax": null,
+                    "budgetMin": null,
+                    "requiredBrands": []
+                  },
+                  "hasMission": true,
+                  "missionId": "<ID:7fb8f97cc611>",
+                  "softPreferences": {
+                    "acceptSubstitute": null,
+                    "brands": [],
+                    "features": []
+                  },
+                  "unknownSlots": [
+                    "useCase",
+                    "budget"
+                  ],
+                  "useCases": []
+                },
+                "roundNo": null,
+                "spanId": "be010e7904d6d63a",
+                "status": "OK",
+                "stepId": 74260,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "MQ_RECEIVE",
+                "handoffId": null,
+                "input": {
+                  "messageId": 3349,
+                  "queue": "agent.shopping.low",
+                  "redelivered": false
+                },
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "worker",
+                "occurredAt": "2026-08-25T11:20:39.411",
+                "output": null,
+                "roundNo": null,
+                "spanId": "4e44c7fc43b7e84d",
+                "status": "OK",
+                "stepId": 74262,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "MQ_PUBLISH",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "api",
+                "occurredAt": "2026-08-25T11:20:39.414",
+                "output": {
+                  "queue": "agent.shopping.low",
+                  "status": "QUEUED"
+                },
+                "roundNo": null,
+                "spanId": "be010e7904d6d63a",
+                "status": "OK",
+                "stepId": 74261,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "GRAPH_START",
+                "handoffId": null,
+                "input": {
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "queue": "agent.shopping.low"
+                },
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "graph",
+                "occurredAt": "2026-08-25T11:20:39.438",
+                "output": null,
+                "roundNo": null,
+                "spanId": "a1d51c619ae38a1f",
+                "status": "OK",
+                "stepId": 74263,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "GUARD",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "entry",
+                "occurredAt": "2026-08-25T11:20:39.445",
+                "output": {
+                  "decision": "PASS",
+                  "guard": "cancellation",
+                  "hasImage": false
+                },
+                "roundNo": null,
+                "spanId": "82967c80aa25591d",
+                "status": "OK",
+                "stepId": 74264,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": null,
+                  "messageId": 3349,
+                  "requestMode": null,
+                  "round": 0,
+                  "route": "agent_loop",
+                  "toolsCalled": []
+                },
+                "latencyMs": 2,
+                "modelName": null,
+                "nodeName": "entry",
+                "occurredAt": "2026-08-25T11:20:39.445",
+                "output": {
+                  "cancelled": false,
+                  "finished": null,
+                  "intent": null,
+                  "outcome": null,
+                  "route": null,
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "82967c80aa25591d",
+                "status": "OK",
+                "stepId": 74265,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "MEMORY_READ",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "build_context",
+                "occurredAt": "2026-08-25T11:20:39.448",
+                "output": {
+                  "hasSummary": true,
+                  "stateKeys": [
+                    "consultProduct",
+                    "estimatedTokens",
+                    "lastToolResults",
+                    "pendingAction",
+                    "shoppingMission",
+                    "<ID:8903b6fd99ec>",
+                    "turnCount"
+                  ],
+                  "turnCount": 0
+                },
+                "roundNo": null,
+                "spanId": "27db86b11ddbe8f9",
+                "status": "OK",
+                "stepId": 74266,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "INTENT_DECISION",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "build_context",
+                "occurredAt": "2026-08-25T11:20:39.448",
+                "output": {
+                  "confidence": 0.9,
+                  "intent": "PRODUCT_SEARCH",
+                  "nextAction": "TOOL",
+                  "requestMode": "READ_QUERY",
+                  "source": "category_switch"
+                },
+                "roundNo": null,
+                "spanId": "27db86b11ddbe8f9",
+                "status": "OK",
+                "stepId": 74267,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "CONTEXT_BUILT",
+                "handoffId": null,
+                "input": {
+                  "intent": "PRODUCT_SEARCH",
+                  "intentSource": "category_switch"
+                },
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "build_context",
+                "occurredAt": "2026-08-25T11:20:39.451",
+                "output": {
+                  "selectedFragments": [
+                    {
+                      "chars": 1060,
+                      "fragment": "global",
+                      "promptKey": "global",
+                      "source": "file"
+                    },
+                    {
+                      "chars": 196,
+                      "fragment": "intent",
+                      "promptKey": "product_search",
+                      "source": "file"
+                    },
+                    {
+                      "chars": 566,
+                      "fragment": "<ID:3fafa99aeaf7>",
+                      "promptKey": "<ID:3fafa99aeaf7>",
+                      "source": "file"
+                    }
+                  ],
+                  "systemPromptChars": 1822
+                },
+                "roundNo": null,
+                "spanId": "27db86b11ddbe8f9",
+                "status": "OK",
+                "stepId": 74268,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": null,
+                  "messageId": 3349,
+                  "requestMode": null,
+                  "round": 0,
+                  "route": "agent_loop",
+                  "toolsCalled": []
+                },
+                "latencyMs": 6,
+                "modelName": null,
+                "nodeName": "build_context",
+                "occurredAt": "2026-08-25T11:20:39.452",
+                "output": {
+                  "cancelled": null,
+                  "finished": null,
+                  "intent": "PRODUCT_SEARCH",
+                  "outcome": null,
+                  "route": "agent_loop",
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "27db86b11ddbe8f9",
+                "status": "OK",
+                "stepId": 74269,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "requestMode": "READ_QUERY",
+                  "round": 0,
+                  "route": "agent_loop",
+                  "toolsCalled": []
+                },
+                "latencyMs": 0,
+                "modelName": null,
+                "nodeName": "order_reference",
+                "occurredAt": "2026-08-25T11:20:39.454",
+                "output": {
+                  "cancelled": null,
+                  "finished": null,
+                  "intent": null,
+                  "outcome": null,
+                  "route": "<ID:1d3b4ec6955f>",
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "b5c184a833e8eb03",
+                "status": "OK",
+                "stepId": 74270,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "ORCHESTRATION_DECISION",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "orchestration_router",
+                "occurredAt": "2026-08-25T11:20:39.455",
+                "output": {
+                  "configuredMode": "adaptive",
+                  "mode": "workflow",
+                  "multiAgentAvailable": true,
+                  "reason": "deterministic_business_path"
+                },
+                "roundNo": null,
+                "spanId": "e3497d02d6262d31",
+                "status": "OK",
+                "stepId": 74271,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "requestMode": "READ_QUERY",
+                  "round": 0,
+                  "route": "<ID:1d3b4ec6955f>",
+                  "toolsCalled": []
+                },
+                "latencyMs": 0,
+                "modelName": null,
+                "nodeName": "orchestration_router",
+                "occurredAt": "2026-08-25T11:20:39.455",
+                "output": {
+                  "cancelled": null,
+                  "finished": null,
+                  "intent": null,
+                  "outcome": null,
+                  "route": "<ID:ed9b1dfdfd2b>",
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "e3497d02d6262d31",
+                "status": "OK",
+                "stepId": 74272,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": "forced_mcp",
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "TOOL_CALL",
+                "handoffId": null,
+                "input": {
+                  "args": {
+                    "keyword": "不要苹果,推荐安卓手机",
+                    "userId": "[REDACTED_ID:50732bb55fc3]"
+                  }
+                },
+                "latencyMs": 104,
+                "modelName": null,
+                "nodeName": "tools",
+                "occurredAt": "2026-08-25T11:20:39.561",
+                "output": {
+                  "bizType": "<ID:40f1599bad6c>",
+                  "contractData": {
+                    "catalogVersion": null,
+                    "contractVersion": "recommendation/v1",
+                    "degradation": null,
+                    "episodeId": "<ID:a7f4632cfd21>",
+                    "evidence": [],
+                    "fallbackUsed": false,
+                    "items": [],
+                    "message": {
+                      "chars": 77,
+                      "sha256": "2feeb870512aba2124b2b461b5c1ea97f809cdbcd363f61f2b3bfc46cf166b17"
+                    },
+                    "mode": "TEXT",
+                    "modelVersion": "unknown",
+                    "requestId": "<ID:43d9eb6e6581>",
+                    "retrievalTrace": {
+                      "constraintEvidence": {
+                        "catalogAbsenceClaim": false,
+                        "excludedBrands": [
+                          "苹果"
+                        ],
+                        "excludedTerms": [],
+                        "exclusionViolatingReturnedProductIds": [],
+                        "requiredQualifierEvidenceSource": "<ID:121699099310>",
+                        "requiredQualifierIds": [
+                          "<ID:aa94145810e1>"
+                        ],
+                        "returnedCandidateCount": 0,
+                        "returnedCandidatesSatisfyExclusions": true,
+                        "returnedCandidatesSatisfyRequiredQualifiers": true,
+                        "type": "HARD_CONSTRAINT_AUDIT",
+                        "unverifiedRequiredQualifierCandidateCount": 0,
+                        "unverifiedRequiredQualifierProductIds": [],
+                        "violatingReturnedProductIds": []
+                      },
+                      "source": "constraint_miss"
+                    },
+                    "runId": "<ID:a7f4632cfd21>",
+                    "status": "NO_RESULT",
+                    "traceparent": null
+                  },
+                  "errorCode": null,
+                  "hasCards": false,
+                  "productIds": [],
+                  "retrievalTrace": null,
+                  "sourceCount": 2,
+                  "sourceRefs": [
+                    {
+                      "authoritative": true,
+                      "capturedAt": "2026-08-25T11:20:39.556Z",
+                      "id": "product-search:<ID:3892adfa9f2d>",
+                      "matched": false,
+                      "query": {
+                        "chars": 11,
+                        "sha256": "0ba390c388f40c3f1e12a5278d8a4980e897c9d2ecfeeb3f77fa23bb2a7f3324"
+                      },
+                      "requestId": "<ID:43d9eb6e6581>",
+                      "resultSource": "constraint_miss",
+                      "source": "JAVA_GATEWAY",
+                      "type": "product"
+                    },
+                    {
+                      "capturedAt": "2026-08-25T11:20:39.556Z",
+                      "catalogAbsenceClaim": false,
+                      "excludedBrands": [
+                        "苹果"
+                      ],
+                      "excludedTerms": [],
+                      "id": "<ID:b833c63f39c2>:<ID:f3cceaa0a9bc>",
+                      "requestId": "<ID:43d9eb6e6581>",
+                      "requiredQualifierEvidenceSource": "<ID:121699099310>",
+                      "requiredQualifierIds": [
+                        "<ID:aa94145810e1>"
+                      ],
+                      "returnedCandidateCount": 0,
+                      "returnedCandidatesSatisfyExclusions": true,
+                      "returnedCandidatesSatisfyRequiredQualifiers": true,
+                      "source": "JAVA_GATEWAY",
+                      "type": "product_search_constraint",
+                      "unverifiedRequiredQualifierCandidateCount": 0,
+                      "unverifiedRequiredQualifierProductIds": [],
+                      "violatingReturnedProductIds": []
+                    }
+                  ],
+                  "success": true
+                },
+                "roundNo": null,
+                "spanId": "f613e63b7caa6d16",
+                "status": "OK",
+                "stepId": 74273,
+                "toolName": "SEARCH_PRODUCTS"
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "AGENT_POLICY",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "deterministic_workflow",
+                "occurredAt": "2026-08-25T11:20:39.562",
+                "output": {
+                  "llmSkipReason": "<ID:ce2112ad0974>",
+                  "llmSkipped": true,
+                  "mode": "workflow",
+                  "policy": "<ID:450b37e5bed6>",
+                  "route": "workflow",
+                  "sideEffectAllowed": false,
+                  "structuredResultFinalized": true
+                },
+                "roundNo": null,
+                "spanId": "87f106dba9f92623",
+                "status": "OK",
+                "stepId": 74274,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "requestMode": "READ_QUERY",
+                  "round": 0,
+                  "route": "<ID:ed9b1dfdfd2b>",
+                  "toolsCalled": []
+                },
+                "latencyMs": 105,
+                "modelName": null,
+                "nodeName": "deterministic_workflow",
+                "occurredAt": "2026-08-25T11:20:39.562",
+                "output": {
+                  "cancelled": null,
+                  "finished": null,
+                  "intent": null,
+                  "outcome": null,
+                  "route": "finalize",
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "87f106dba9f92623",
+                "status": "OK",
+                "stepId": 74275,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "GUARD",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "finalize",
+                "occurredAt": "2026-08-25T11:20:39.564",
+                "output": {
+                  "decision": "PASS",
+                  "guard": "<ID:b722f0a6885b>"
+                },
+                "roundNo": null,
+                "spanId": "21fdff3765a75e75",
+                "status": "OK",
+                "stepId": 74276,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "RESPONSE_VERIFIER",
+                "handoffId": null,
+                "input": {
+                  "bizType": "<ID:40f1599bad6c>",
+                  "businessSourceCount": 2,
+                  "hasPendingAction": false,
+                  "hasSources": true,
+                  "ragSourceCount": 0,
+                  "toolsCalled": [
+                    "SEARCH_PRODUCTS"
+                  ]
+                },
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "finalize",
+                "occurredAt": "2026-08-25T11:20:39.565",
+                "output": {
+                  "clarificationApplied": false,
+                  "fallbackVerified": false,
+                  "safeFallbackApplied": false,
+                  "terminalQuality": "PASS",
+                  "verifierAction": "PASS",
+                  "verifierIssues": [],
+                  "verifierPassed": true
+                },
+                "roundNo": null,
+                "spanId": "21fdff3765a75e75",
+                "status": "OK",
+                "stepId": 74277,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "requestMode": "READ_QUERY",
+                  "round": 0,
+                  "route": "finalize",
+                  "toolsCalled": [
+                    "SEARCH_PRODUCTS"
+                  ]
+                },
+                "latencyMs": 6,
+                "modelName": null,
+                "nodeName": "finalize",
+                "occurredAt": "2026-08-25T11:20:39.570",
+                "output": {
+                  "cancelled": null,
+                  "finished": true,
+                  "intent": null,
+                  "outcome": "ok",
+                  "route": "post_turn",
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "21fdff3765a75e75",
+                "status": "OK",
+                "stepId": 74278,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "MEMORY_WRITE",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "post_turn",
+                "occurredAt": "2026-08-25T11:20:39.579",
+                "output": {
+                  "hasCard": false,
+                  "toolsCalled": [
+                    "SEARCH_PRODUCTS"
+                  ]
+                },
+                "roundNo": null,
+                "spanId": "f1667bffda676bcc",
+                "status": "OK",
+                "stepId": 74279,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "requestMode": "READ_QUERY",
+                  "round": 0,
+                  "route": "post_turn",
+                  "toolsCalled": [
+                    "SEARCH_PRODUCTS"
+                  ]
+                },
+                "latencyMs": 8,
+                "modelName": null,
+                "nodeName": "post_turn",
+                "occurredAt": "2026-08-25T11:20:39.579",
+                "output": {
+                  "cancelled": null,
+                  "finished": true,
+                  "intent": null,
+                  "outcome": null,
+                  "route": null,
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "f1667bffda676bcc",
+                "status": "OK",
+                "stepId": 74280,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "NODE_TRANSITION",
+                "handoffId": null,
+                "input": {
+                  "hasPendingOrderReference": false,
+                  "hasRagEvidence": false,
+                  "intent": "PRODUCT_SEARCH",
+                  "messageId": 3349,
+                  "requestMode": "READ_QUERY",
+                  "round": 0,
+                  "route": "post_turn",
+                  "toolsCalled": [
+                    "SEARCH_PRODUCTS"
+                  ]
+                },
+                "latencyMs": 0,
+                "modelName": null,
+                "nodeName": "cleanup",
+                "occurredAt": "2026-08-25T11:20:39.580",
+                "output": {
+                  "cancelled": null,
+                  "finished": true,
+                  "intent": null,
+                  "outcome": null,
+                  "route": null,
+                  "toolCalls": []
+                },
+                "roundNo": 0,
+                "spanId": "be14be4efc173db5",
+                "status": "OK",
+                "stepId": 74281,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "GRAPH_END",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": 145,
+                "modelName": null,
+                "nodeName": "graph",
+                "occurredAt": "2026-08-25T11:20:39.582",
+                "output": {
+                  "costSummary": {
+                    "costCny": null,
+                    "costStatus": "NOT_APPLICABLE",
+                    "failedLlmCalls": 0,
+                    "inputTokens": 0,
+                    "llmCalls": 0,
+                    "missingReasons": {},
+                    "missingUsageCalls": 0,
+                    "models": [],
+                    "notApplicableReason": "no_llm_call",
+                    "outputTokens": 0,
+                    "path": "heavy",
+                    "pricedCalls": 0,
+                    "providerAttempts": 0,
+                    "providerCalls": 0,
+                    "successfulLlmCalls": 0,
+                    "unpricedCalls": 0,
+                    "usageSources": [
+                      "not_applicable"
+                    ]
+                  },
+                  "failedLlmCallCount": 0,
+                  "intent": "PRODUCT_SEARCH",
+                  "llmCallCount": 0,
+                  "llmSkipReason": "<ID:ce2112ad0974>",
+                  "llmSkipped": true,
+                  "orchestrationMode": "workflow",
+                  "orchestrationReason": "<ID:a55e2f3bf839>",
+                  "outcome": "ok",
+                  "structuredResultFinalized": true,
+                  "successfulLlmCallCount": 0,
+                  "tools": [
+                    "SEARCH_PRODUCTS"
+                  ],
+                  "usageStatus": "NOT_APPLICABLE"
+                },
+                "roundNo": null,
+                "spanId": "a1d51c619ae38a1f",
+                "status": "OK",
+                "stepId": 74282,
+                "toolName": null
+              },
+              {
+                "agentId": null,
+                "artifactType": null,
+                "callId": null,
+                "errorCode": null,
+                "errorMessage": null,
+                "eventType": "BUDGET_SUMMARY",
+                "handoffId": null,
+                "input": null,
+                "latencyMs": null,
+                "modelName": null,
+                "nodeName": "graph",
+                "occurredAt": "2026-08-25T11:20:39.582",
+                "output": {
+                  "limits": {
+                    "deadlineSeconds": 60.0,
+                    "maxCostCny": 1.0,
+                    "maxSteps": 16,
+                    "maxTokens": 16000,
+                    "warnThreshold": 0.8
+                  },
+                  "remaining": {
+                    "costCny": null,
+                    "seconds": 59.85513121999975,
+                    "steps": 8,
+                    "tokens": 16000
+                  },
+                  "usage": {
+                    "costUsedCny": 0.0,
+                    "elapsedSeconds": 0.1449,
+                    "stepsUsed": 8,
+                    "tokensUsed": 0
+                  },
+                  "warnedDimensions": []
+                },
+                "roundNo": null,
+                "spanId": "a1d51c619ae38a1f",
+                "status": "OK",
+                "stepId": 74283,
+                "toolName": null
+              }
+            ],
+            "tempoTraceUrl": "http://127.0.0.1:3001/explore?traceId=353dde61ae2e524c7e9b7557873ada88",
+            "traceId": "353dde61ae2e524c7e9b7557873ada88",
+            "ttftMs": null,
+            "userId": "[REDACTED_ID:7b08af3b3f31]",
+            "userMessage": "",
+            "version": {
+              "app": "dev",
+              "graph": "dev",
+              "memorySchema": "aishop-memory/v2",
+              "prompt": "<ID:e14b5dfe2987>",
+              "toolContract": "aishop-tools/v2"
+            }
+          }
+        ],
+        "error": null,
+        "events": [
+          "INTENT_DECISION",
+          "SHOPPING_MISSION_UPDATE",
+          "MQ_RECEIVE",
+          "MQ_PUBLISH",
+          "GRAPH_START",
+          "GUARD",
+          "NODE_TRANSITION",
+          "MEMORY_READ",
+          "INTENT_DECISION",
+          "CONTEXT_BUILT",
+          "NODE_TRANSITION",
+          "NODE_TRANSITION",
+          "ORCHESTRATION_DECISION",
+          "NODE_TRANSITION",
+          "TOOL_CALL",
+          "AGENT_POLICY",
+          "NODE_TRANSITION",
+          "GUARD",
+          "RESPONSE_VERIFIER",
+          "NODE_TRANSITION",
+          "MEMORY_WRITE",
+          "NODE_TRANSITION",
+          "NODE_TRANSITION",
+          "GRAPH_END",
+          "BUDGET_SUMMARY"
+        ],
+        "executionOk": true,
+        "fixtureEvidence": {},
+        "handoffObserved": false,
+        "handoffs": [],
+        "hardConstraintAudits": [
+          {
+            "catalogAbsenceClaim": false,
+            "excludedBrands": [
+              "苹果"
+            ],
+            "excludedTerms": [],
+            "exclusionViolatingReturnedProductIds": [],
+            "requiredQualifierEvidenceSource": "<ID:121699099310>",
+            "requiredQualifierIds": [
+              "<ID:aa94145810e1>"
+            ],
+            "returnedCandidateCount": 0,
+            "returnedCandidatesSatisfyExclusions": true,
+            "returnedCandidatesSatisfyRequiredQualifiers": true,
+            "type": "HARD_CONSTRAINT_AUDIT",
+            "unverifiedRequiredQualifierCandidateCount": 0,
+            "unverifiedRequiredQualifierProductIds": [],
+            "violatingReturnedProductIds": []
+          }
+        ],
+        "hardConstraintUnattributedViolationCount": 0,
+        "hardConstraintViolation": false,
+        "hardConstraintViolationProductIds": [],
+        "latencyMs": 469.913,
+        "metrics": {
+          "duplicateSideEffectCount": 0,
+          "executionCompleteness": 1,
+          "providerCompleteness": 1,
+          "repeatedReadToolCallCount": 0,
+          "repeatedToolCallCount": 0,
+          "retryIdempotency": 1,
+          "severeSafetyViolationCount": 0,
+          "stateDiffMatch": 1,
+          "taskSuccess": 1,
+          "terminalStateCorrectness": 1,
+          "toolArgumentAccuracy": 1,
+          "toolCallBudgetSatisfied": 1,
+          "toolCallBudgetViolationCount": 0,
+          "toolSelectionAccuracy": 1,
+          "unsafeAnswerCount": 0
+        },
+        "prediction": {
+          "confidence": 0.9,
+          "entities": {
+            "excludedBrand": "苹果",
+            "operatingSystem": "安卓",
+            "productName": "安卓手机"
+          },
+          "handoffReason": null,
+          "intent": "PRODUCT_SEARCH",
+          "nextAction": "TOOL",
+          "requestMode": "READ_QUERY",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "source": "rule"
+        },
+        "providers": {
+          "agent-runtime": {
+            "complete": true,
+            "facts": {
+              "runtimeError": false,
+              "terminal": true,
+              "terminalStatuses": [
+                "SUCCEEDED"
+              ]
+            },
+            "notApplicable": false,
+            "notApplicableValid": false,
+            "required": true
+          },
+          "llm": {
+            "complete": true,
+            "facts": {
+              "failures": 0,
+              "models": [],
+              "notApplicable": true,
+              "notApplicableReason": "deterministic_workflow:deterministic_business_path",
+              "requests": 0,
+              "successes": 0,
+              "workflowEvidence": {
+                "decisionCount": 1,
+                "fallbackCount": 0,
+                "reasons": [
+                  "deterministic_business_path"
+                ],
+                "workflowNodeCount": 2
+              }
+            },
+            "notApplicable": true,
+            "notApplicableValid": true,
+            "required": true
+          }
+        },
+        "qualityObservation": {
+          "clarificationApplied": false,
+          "fallbackVerified": false,
+          "safeFallbackApplied": false,
+          "status": "OBSERVED",
+          "terminalQuality": "PASS",
+          "verifierAction": "PASS",
+          "verifierIssues": [],
+          "verifierPassed": true
+        },
+        "ragSourceRefs": [],
+        "renderedFixtureTemplateFields": [],
+        "responses": [
+          {
+            "code": 200,
+            "data": {
+              "deliveryState": "QUEUED",
+              "entities": {
+                "excludedBrand": "苹果",
+                "operatingSystem": "安卓",
+                "productName": "安卓手机"
+              },
+              "episodeId": "ebd47036daa0444cb5f901857d6ed1fb",
+              "episodeKeep": true,
+              "fromProduct": false,
+              "handoffReason": null,
+              "imageAssetId": null,
+              "imageSnapshot": null,
+              "intent": "PRODUCT_SEARCH",
+              "intentConfidence": 0.9,
+              "intentDecision": {
+                "confidence": 0.9,
+                "data": "",
+                "entities": {
+                  "excludedBrand": "苹果",
+                  "operatingSystem": "安卓",
+                  "productName": "安卓手机"
+                },
+                "handoff_reason": null,
+                "intent": "PRODUCT_SEARCH",
+                "next_action": "TOOL",
+                "request_mode": "READ_QUERY",
+                "risk_level": "LOW",
+                "sentiment": "NEUTRAL",
+                "source": "rule",
+                "urgency": "NORMAL"
+              },
+              "messageId": 3349,
+              "nextAction": "TOOL",
+              "queueName": "agent.shopping.low",
+              "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+              "requestMode": "READ_QUERY",
+              "riskLevel": "LOW",
+              "runId": "ebd47036daa0444cb5f901857d6ed1fb",
+              "selectedVisualSubject": null,
+              "sendTime": "2026-08-25 19:20:39",
+              "sentiment": "NEUTRAL",
+              "sessionId": null,
+              "status": 1,
+              "traceId": "353dde61ae2e524c7e9b7557873ada88",
+              "traceparent": "00-353dde61ae2e524c7e9b7557873ada88-be010e7904d6d63a-03",
+              "unresolvedCount": 0,
+              "urgency": "NORMAL",
+              "userId": "[REDACTED_ID:7b08af3b3f31]",
+              "userMessage": "不要苹果,推荐安卓手机"
+            },
+            "info": null,
+            "status": "success"
+          }
+        ],
+        "sourceRefs": [
+          {
+            "authoritative": true,
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "id": "product-search:f51705c8ce287ae3909b",
+            "matched": false,
+            "query": "不要苹果,推荐安卓手机",
+            "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+            "resultSource": "constraint_miss",
+            "source": "JAVA_GATEWAY",
+            "type": "product"
+          },
+          {
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "catalogAbsenceClaim": false,
+            "excludedBrands": [
+              "苹果"
+            ],
+            "excludedTerms": [],
+            "id": "product-search-constraint:b9bfee42bf2b9dd0586d",
+            "requestId": "req_ebd47036daa0444cb5f901857d6ed1fb",
+            "requiredQualifierEvidenceSource": "JAVA_PRODUCT_SNAPSHOT",
+            "requiredQualifierIds": [
+              "android-operating-system"
+            ],
+            "returnedCandidateCount": 0,
+            "returnedCandidatesSatisfyExclusions": true,
+            "returnedCandidatesSatisfyRequiredQualifiers": true,
+            "source": "JAVA_GATEWAY",
+            "type": "product_search_constraint",
+            "unverifiedRequiredQualifierCandidateCount": 0,
+            "unverifiedRequiredQualifierProductIds": [],
+            "violatingReturnedProductIds": []
+          },
+          {
+            "authoritative": true,
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "id": "product-search:<ID:3892adfa9f2d>",
+            "matched": false,
+            "query": {
+              "chars": 11,
+              "sha256": "0ba390c388f40c3f1e12a5278d8a4980e897c9d2ecfeeb3f77fa23bb2a7f3324"
+            },
+            "requestId": "<ID:43d9eb6e6581>",
+            "resultSource": "constraint_miss",
+            "source": "JAVA_GATEWAY",
+            "type": "product"
+          },
+          {
+            "capturedAt": "2026-08-25T11:20:39.556Z",
+            "catalogAbsenceClaim": false,
+            "excludedBrands": [
+              "苹果"
+            ],
+            "excludedTerms": [],
+            "id": "<ID:b833c63f39c2>:<ID:f3cceaa0a9bc>",
+            "requestId": "<ID:43d9eb6e6581>",
+            "requiredQualifierEvidenceSource": "<ID:121699099310>",
+            "requiredQualifierIds": [
+              "<ID:aa94145810e1>"
+            ],
+            "returnedCandidateCount": 0,
+            "returnedCandidatesSatisfyExclusions": true,
+            "returnedCandidatesSatisfyRequiredQualifiers": true,
+            "source": "JAVA_GATEWAY",
+            "type": "product_search_constraint",
+            "unverifiedRequiredQualifierCandidateCount": 0,
+            "unverifiedRequiredQualifierProductIds": [],
+            "violatingReturnedProductIds": []
+          }
+        ],
+        "stateDiff": {
+          "afterHash": "6dc1004d064a3054989789b3d86d23861ed6ed8677624b82b5580fe5f26728f6",
+          "assertions": [
+            {
+              "after": null,
+              "before": null,
+              "expected": "EMPTY_DIFF",
+              "operator": "unchanged",
+              "passed": true,
+              "path": "/"
+            }
+          ],
+          "beforeHash": "6dc1004d064a3054989789b3d86d23861ed6ed8677624b82b5580fe5f26728f6",
+          "captureAvailable": true,
+          "changeCount": 0,
+          "changes": [],
+          "duplicateSideEffectCount": 0,
+          "matched": true,
+          "readOnly": true
+        },
+        "terminalStatuses": [
+          "SUCCEEDED"
+        ],
+        "tools": [
+          "SEARCH_PRODUCTS"
+        ],
+        "usage": {
+          "callEvidenceSource": "LLM_CALL_STEPS",
+          "costCny": null,
+          "costStatus": "NOT_APPLICABLE",
+          "episodeInputTokens": 0,
+          "episodeOutputTokens": 0,
+          "fallbackCalls": 0,
+          "inputTokens": 0,
+          "missingReason": "no_llm_call",
+          "missingUsageCalls": 0,
+          "model": "deterministic",
+          "outputTokens": 0,
+          "pricedCalls": 0,
+          "provider": "agent-runtime",
+          "providerCalls": 0,
+          "retryCount": 0,
+          "tokenTotalsMatchEpisodes": true,
+          "unpricedCalls": 0,
+          "usageReported": false,
+          "usageSource": "not_applicable"
+        }
+      },
+      "message": "不要苹果，推荐安卓手机",
+      "rulePrediction": {
+        "confidence": 0.9,
+        "entities": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productName": "安卓手机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-search",
+        "negative-constraint",
+        "brand"
+      ]
+    }
+  ],
+  "citationContractDiagnostic": {
+    "invalidCaseCount": 0,
+    "invalidCaseIds": [],
+    "note": "Only citation shape/linkage is automatic. Grounding support requires the answer review below.",
+    "semanticSupportMeasured": false
+  },
+  "createdAt": "2026-08-25T11:31:51.447Z",
+  "dataset": {
+    "annotationStatus": "HUMAN_VERIFIED",
+    "caseCount": 1,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+    "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527"
+  },
+  "diagnostic": {
+    "caseCount": 1,
+    "caseSubset": [
+      "cs-gold-v1-043"
+    ],
+    "fullHumanDatasetCaseCount": 60,
+    "notes": [
+      "Single-case request-bound trusted-context regression probe; excluded from the 60-case quality denominator.",
+      "Zero returned candidates proves only that observed snapshot candidates lacked verified Android evidence; it does not prove catalog-wide absence.",
+      "Answer correctness and citation grounding remain pending independent blind human review."
+    ],
+    "providerCallsReexecuted": false,
+    "redaction": "evaluation.core.redaction/v1",
+    "releaseGateEligible": false,
+    "schemaVersion": "aishop-customer-service-http-diagnostic/v1",
+    "scope": "TARGETED_HTTP_BADCASE_REPLAY",
+    "sourceCreatedAt": "2026-08-25T11:20:39.784Z",
+    "sourceReportPath": "run/evaluation-observations/customer-service-http-v24-cs043-context-bound-probe-20260825.json",
+    "sourceReportSha256": "3f21aa73256e4602327b3d9cc3a429a31ec88e2cf677067ca4f48564dcf876b4"
+  },
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "e440cdcd602c91bf9818970dfa1b6103b3aa5bb9632b0e2f7119e10666911f16",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "handoffDecision": {
+    "accuracy": {
+      "badcaseIds": [],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.206549,
+        "method": "wilson",
+        "upper": 1.0
+      },
+      "denominator": 1,
+      "numerator": 1,
+      "status": "MEASURED",
+      "value": 1.0
+    },
+    "confusion": {
+      "falseNegative": 0,
+      "falsePositive": 0,
+      "trueNegative": 1,
+      "truePositive": 0
+    },
+    "criticalMissCaseIds": [],
+    "f1": null,
+    "falseNegativeCaseIds": [],
+    "falsePositiveCaseIds": [],
+    "precision": null,
+    "recall": {
+      "badcaseIds": [],
+      "confidenceInterval95": null,
+      "denominator": 0,
+      "numerator": 0,
+      "status": "UNAVAILABLE",
+      "value": null
+    }
+  },
+  "httpExecution": {
+    "errorCaseIds": [],
+    "executionRate": {
+      "badcaseIds": [],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.206549,
+        "method": "wilson",
+        "upper": 1.0
+      },
+      "denominator": 1,
+      "numerator": 1,
+      "status": "MEASURED",
+      "value": 1.0
+    },
+    "missingCaseIds": []
+  },
+  "httpRoute": {
+    "badcases": [],
+    "bootstrapPolicy": {
+      "binaryMetrics": "Wilson intervals retained for directly binomial metrics",
+      "method": "stratified-percentile-bootstrap",
+      "primaryStrata": [
+        "intent",
+        "riskLevel",
+        "shouldHandoff"
+      ],
+      "samples": 2000,
+      "seed": 20260822
+    },
+    "canonicalSlotDiagnostics": {
+      "metrics": {
+        "canonicalSlotEntitySpanF1": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": null,
+          "denominator": 0,
+          "name": "canonicalSlotEntitySpanF1",
+          "numerator": 0,
+          "reason": "Episode entity values are redacted; raw gold slots cannot be compared safely.",
+          "releaseGateEligible": false,
+          "role": "NOT_MEASURED_AT_HTTP_BOUNDARY",
+          "status": "UNAVAILABLE",
+          "value": null
+        },
+        "canonicalSlotExactMatch": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": null,
+          "denominator": 0,
+          "name": "canonicalSlotExactMatch",
+          "numerator": 0,
+          "reason": "Episode entity values are redacted; raw gold slots cannot be compared safely.",
+          "releaseGateEligible": false,
+          "role": "NOT_MEASURED_AT_HTTP_BOUNDARY",
+          "status": "UNAVAILABLE",
+          "value": null
+        }
+      },
+      "reason": "HTTP Episode entities are redacted; canonical slot quality remains in rulePreRouter.",
+      "status": "UNAVAILABLE"
+    },
+    "cases": [
+      {
+        "difficulty": "hard",
+        "expected": {
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "excludedBrand": "苹果",
+            "operatingSystem": "安卓",
+            "productName": "安卓手机"
+          }
+        },
+        "id": "cs-gold-v1-043",
+        "matches": {
+          "handoff": true,
+          "intent": true,
+          "normalizedSlotExactMatch": null,
+          "riskLevel": true,
+          "slotExactMatch": null
+        },
+        "message": "不要苹果，推荐安卓手机",
+        "predicted": {
+          "confidence": 0.9,
+          "entities": {
+            "excludedBrand": "苹果",
+            "operatingSystem": "安卓",
+            "productName": "安卓手机"
+          },
+          "handoffReason": null,
+          "intent": "PRODUCT_SEARCH",
+          "nextAction": "TOOL",
+          "requestMode": "READ_QUERY",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "source": "rule"
+        },
+        "sliceTags": [
+          "product-search",
+          "negative-constraint",
+          "brand"
+        ]
+      }
+    ],
+    "confusionMatrix": {
+      "PRODUCT_SEARCH": {
+        "PRODUCT_SEARCH": 1
+      }
+    },
+    "dataset": {
+      "annotationStatuses": {
+        "HUMAN_VERIFIED": 1
+      },
+      "caseCount": 1,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+      "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+      "sliceCounts": {
+        "brand": 1,
+        "negative-constraint": 1,
+        "product-search": 1
+      }
+    },
+    "historicalBaseline": {
+      "badcaseIds": [
+        "cs-gold-v1-001",
+        "cs-gold-v1-002",
+        "cs-gold-v1-003",
+        "cs-gold-v1-011",
+        "cs-gold-v1-022",
+        "cs-gold-v1-026",
+        "cs-gold-v1-031",
+        "cs-gold-v1-032"
+      ],
+      "caseCount": 32,
+      "datasetSha256": "826114a806c879fe047b382d2e3a0519cf1428f19bb10efe70c137c8af73f1d3",
+      "label": "gold-v1-pre-optimization",
+      "metrics": {
+        "criticalHandoffMissRate": {
+          "denominator": 3,
+          "numerator": 1,
+          "value": 0.333333
+        },
+        "handoffRecall": {
+          "denominator": 5,
+          "numerator": 4,
+          "value": 0.8
+        },
+        "highRiskIntentRecall": {
+          "denominator": 3,
+          "numerator": 1,
+          "value": 0.333333
+        },
+        "intentMacroF1": {
+          "denominator": 20,
+          "numerator": 16.990477,
+          "value": 0.849524
+        },
+        "slotEntitySpanF1": {
+          "denominator": 261,
+          "numerator": 243,
+          "value": 0.964286
+        },
+        "slotExactMatch": {
+          "denominator": 21,
+          "numerator": 18,
+          "value": 0.857143
+        }
+      },
+      "note": "Recorded before resolver changes; provisional diagnostic only, not an A/B or human-verified result.",
+      "status": "PROVISIONAL_NOT_HUMAN_GOLD"
+    },
+    "humanReviewPlan": {
+      "adjudicationComplete": true,
+      "adjudicationRequired": true,
+      "blindedFirstPass": true,
+      "fields": [
+        "intent",
+        "riskLevel",
+        "shouldHandoff",
+        "handoffSeverity",
+        "slots"
+      ],
+      "freezeAfterAdjudication": true,
+      "metricsAfterFreeze": [
+        "intentMacroF1",
+        "highRiskIntentRecall",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "handoffRecall"
+      ],
+      "note": "Labels were independently reviewed and adjudicated; release publication still requires an explicit project gate decision.",
+      "requiredAnnotators": 2,
+      "status": "COMPLETE"
+    },
+    "limitations": [
+      "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
+      "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
+      "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion.",
+      "HTTP slot metrics are intentionally unavailable because Episode redaction prevents raw-value equivalence checks."
+    ],
+    "metricScope": "INTENT_RISK_HANDOFF_ONLY",
+    "metrics": {
+      "criticalHandoffMissRate": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "definition": "Severe漏转人工率 among gold handoffSeverity=CRITICAL cases; lower is better.",
+        "denominator": 0,
+        "name": "criticalHandoffMissRate",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "handoffRecall": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "definition": "Among gold shouldHandoff=true cases, only next_action=HANDOFF counts as immediate handoff; HANDOFF_SUGGESTED does not.",
+        "denominator": 0,
+        "name": "handoffRecall",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "highRiskIntentRecall": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "definition": "Recall of cases independently labelled riskLevel=HIGH, requiring predicted riskLevel=HIGH.",
+        "denominator": 0,
+        "name": "highRiskIntentRecall",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "intentMacroF1": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 1.0,
+          "method": "stratified-case-bootstrap-macro-F1",
+          "stratumCount": 1,
+          "upper": 1.0
+        },
+        "definition": "Gold intent labels are macro-averaged across the observed label set; prediction outside the set is counted as a miss/false positive.",
+        "denominator": 1,
+        "name": "intentMacroF1",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 1.0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "MEASURED",
+        "value": 1.0
+      },
+      "slotEntitySpanF1": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "denominator": 0,
+        "name": "slotEntitySpanF1",
+        "numerator": 0,
+        "reason": "Episode entity values are redacted; raw gold slots cannot be compared safely.",
+        "releaseGateEligible": false,
+        "role": "NOT_MEASURED_AT_HTTP_BOUNDARY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "slotExactMatch": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "denominator": 0,
+        "name": "slotExactMatch",
+        "numerator": 0,
+        "reason": "Episode entity values are redacted; raw gold slots cannot be compared safely.",
+        "releaseGateEligible": false,
+        "role": "NOT_MEASURED_AT_HTTP_BOUNDARY",
+        "status": "UNAVAILABLE",
+        "value": null
+      }
+    },
+    "perIntent": {
+      "PRODUCT_SEARCH": {
+        "badcaseIds": [],
+        "f1": 1.0,
+        "precision": 1.0,
+        "predicted": 1,
+        "recall": 1.0,
+        "support": 1
+      }
+    },
+    "provenance": {
+      "allowLlm": true,
+      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+      "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+      "mode": "production-http-agent-observed-routing"
+    },
+    "provisionalTargets": {
+      "criticalHandoffMissRate": {
+        "direction": "lower",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": false,
+        "target": 0.0
+      },
+      "handoffRecall": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": false,
+        "target": 1.0
+      },
+      "highRiskIntentRecall": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": false,
+        "target": 1.0
+      },
+      "intentMacroF1": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": true,
+        "target": 0.9
+      },
+      "slotEntitySpanF1": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": true,
+        "target": 0.95
+      },
+      "slotExactMatch": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": true,
+        "target": 0.9
+      }
+    },
+    "releaseGateEligible": false,
+    "schemaVersion": "aishop-customer-service-evidence/v1",
+    "status": "HUMAN_VERIFIED"
+  },
+  "limitations": [
+    "Full-path intent is read from the production Episode trace; it does not replace the separately reported rule pre-router score.",
+    "HTTP Episode slot values are redacted, so only the rule pre-router carries slot F1/EM; HTTP slot metrics are unavailable.",
+    "Final-answer correctness and citation support are unavailable until an independent reviewer completes the blind answer sheet.",
+    "Behavior contracts are deterministic safety regression diagnostics, not human answer-quality labels.",
+    "HTTP timings are local full-stack observations, not a production SLO.",
+    "This auxiliary run does not modify or republish the v9 final evidence.",
+    "This targeted subset is diagnostic-only and cannot replace the complete 60-case HTTP run.",
+    "All answer-quality labels remain pending; behavior contracts are not human review."
+  ],
+  "normalQualityDenominatorExcluded": true,
+  "observationProvenance": {
+    "behaviorContractsRecomputed": true,
+    "mode": "OFFLINE_DERIVATION_FROM_PRESERVED_TARGETED_OBSERVATIONS",
+    "providerCallsReexecuted": false,
+    "sourceCreatedAt": "2026-08-25T11:20:39.784Z",
+    "sourceReportPath": "run/evaluation-observations/customer-service-http-v24-cs043-context-bound-probe-20260825.json",
+    "sourceReportSha256": "3f21aa73256e4602327b3d9cc3a429a31ec88e2cf677067ca4f48564dcf876b4"
+  },
+  "preflight": {
+    "checkedAt": "2026-08-25T11:20:39.288Z",
+    "checks": [
+      {
+        "name": "java-gateway",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:8081/actuator/health"
+      },
+      {
+        "name": "elasticsearch",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:9200/_cluster/health"
+      },
+      {
+        "facts": {
+          "apiRuntimeIdentity": {
+            "processRole": "api",
+            "schemaVersion": "aishop-runtime-identity/v1",
+            "source": {
+              "fileCount": 184,
+              "scope": "agent-app-source-and-runtime-dependencies/v1",
+              "sha256": "a1246c07735bb2da4bb4680286a6e92c018e26cefc03ef7100a52f7e09756567"
+            },
+            "startedAt": "2026-08-25T11:19:45.917Z"
+          },
+          "expectedSourceFingerprint": {
+            "fileCount": 184,
+            "scope": "agent-app-source-and-runtime-dependencies/v1",
+            "sha256": "a1246c07735bb2da4bb4680286a6e92c018e26cefc03ef7100a52f7e09756567"
+          },
+          "expectedSourceProvided": true,
+          "mcpReason": null,
+          "mcpRuntimeIdentity": {
+            "processRole": "mcp",
+            "schemaVersion": "aishop-runtime-identity/v1",
+            "source": {
+              "fileCount": 184,
+              "scope": "agent-app-source-and-runtime-dependencies/v1",
+              "sha256": "a1246c07735bb2da4bb4680286a6e92c018e26cefc03ef7100a52f7e09756567"
+            },
+            "startedAt": "2026-08-25T11:19:43.358Z"
+          },
+          "processSourceAgreement": true,
+          "runtimeMatchesExpectedSource": true,
+          "sourceFingerprintMatch": true,
+          "workerReason": null,
+          "workerRuntimeIdentity": {
+            "processRole": "worker",
+            "schemaVersion": "aishop-runtime-identity/v1",
+            "source": {
+              "fileCount": 184,
+              "scope": "agent-app-source-and-runtime-dependencies/v1",
+              "sha256": "a1246c07735bb2da4bb4680286a6e92c018e26cefc03ef7100a52f7e09756567"
+            },
+            "startedAt": "2026-08-25T11:19:48.355Z"
+          }
+        },
+        "name": "agent-readiness",
+        "ok": true,
+        "statusCode": 200,
+        "url": "http://127.0.0.1:7096/health/ready"
+      },
+      {
+        "name": "redis",
+        "ok": true
+      },
+      {
+        "name": "mysql",
+        "ok": true
+      },
+      {
+        "facts": {
+          "canonicalSha256": "6b1e3b40b447419d381830f397a5e5dda82ce25d02dd629c49e7f659d57de0cb",
+          "index": "aishop-index",
+          "matchesFixture": true,
+          "productCount": 47
+        },
+        "name": "product-catalog",
+        "ok": true
+      },
+      {
+        "model": "qwen3.7-plus",
+        "name": "llm-provider",
+        "ok": true
+      }
+    ],
+    "configuration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 1,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 20
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "passed": true,
+    "requiredProviders": [
+      "agent-runtime",
+      "llm"
+    ],
+    "schemaVersion": "aishop-evaluation-preflight/v2"
+  },
+  "qualityDiagnostics": {
+    "clarificationCaseIds": [],
+    "clarificationCount": 0,
+    "fallbackVerifiedCaseIds": [],
+    "fallbackVerifiedCount": 0,
+    "fixtureCleanupFailureCaseIds": [],
+    "fixtureCleanupFailureCount": 0,
+    "fixtureProvisionedCount": 0,
+    "hardConstraintAuditObservedCount": 1,
+    "hardConstraintViolationCaseIds": [],
+    "hardConstraintViolationCount": 0,
+    "note": "Verifier/fallback/constraint fields describe server execution only; they do not replace blind human answer review.",
+    "safeDegradedCaseIds": [],
+    "safeDegradedCount": 0,
+    "status": "RUNTIME_DIAGNOSTIC_NOT_HUMAN_TRUTH",
+    "verifierObservedCount": 1,
+    "verifierPassCaseIds": [
+      "cs-gold-v1-043"
+    ],
+    "verifierPassCount": 1
+  },
+  "releaseGateEligible": false,
+  "rulePreRouter": {
+    "badcases": [],
+    "bootstrapPolicy": {
+      "binaryMetrics": "Wilson intervals retained for directly binomial metrics",
+      "method": "stratified-percentile-bootstrap",
+      "primaryStrata": [
+        "intent",
+        "riskLevel",
+        "shouldHandoff"
+      ],
+      "samples": 2000,
+      "seed": 20260822
+    },
+    "canonicalSlotDiagnostics": {
+      "extensionFieldCounts": {
+        "excludedBrand": 1,
+        "operatingSystem": 1
+      },
+      "extensionOnlyCaseCount": 0,
+      "metrics": {
+        "canonicalSlotEntitySpanF1": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "componentCounts": {
+            "falseNegative": 0,
+            "falsePositive": 0,
+            "truePositive": 4
+          },
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 1.0,
+            "method": "stratified-case-bootstrap-micro-F1",
+            "stratumCount": 1,
+            "upper": 1.0
+          },
+          "definition": "Diagnostic micro character-span F1 after projecting both sides to the five fields currently emitted by the production pre-router; it does not replace the full human-schema slot metric.",
+          "denominator": 8,
+          "name": "canonicalSlotEntitySpanF1",
+          "numerator": 8,
+          "releaseGateEligible": false,
+          "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
+          "status": "MEASURED",
+          "value": 1.0
+        },
+        "canonicalSlotExactMatch": {
+          "badcaseCount": 0,
+          "badcaseIds": [],
+          "confidenceInterval95": {
+            "confidenceLevel": 0.95,
+            "lower": 0.206549,
+            "method": "wilson",
+            "upper": 1.0
+          },
+          "definition": "Diagnostic request-level exact match after projecting to production canonical slots; extension-only human slots are excluded from this denominator.",
+          "denominator": 1,
+          "name": "canonicalSlotExactMatch",
+          "numerator": 1,
+          "releaseGateEligible": false,
+          "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
+          "status": "MEASURED",
+          "value": 1.0
+        }
+      },
+      "note": "This projection is a schema-alignment diagnostic. Full human-schema slot metrics remain the primary reported quality signal.",
+      "productionFields": [
+        "amount",
+        "orderId",
+        "orderItemId",
+        "productId",
+        "productName"
+      ]
+    },
+    "cases": [
+      {
+        "difficulty": "hard",
+        "expected": {
+          "intent": "PRODUCT_SEARCH",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "slots": {
+            "excludedBrand": "苹果",
+            "operatingSystem": "安卓",
+            "productName": "安卓手机"
+          }
+        },
+        "id": "cs-gold-v1-043",
+        "matches": {
+          "handoff": true,
+          "intent": true,
+          "riskLevel": true,
+          "slotExactMatch": true
+        },
+        "message": "不要苹果，推荐安卓手机",
+        "predicted": {
+          "confidence": 0.9,
+          "entities": {
+            "excludedBrand": "苹果",
+            "operatingSystem": "安卓",
+            "productName": "安卓手机"
+          },
+          "handoffReason": null,
+          "intent": "PRODUCT_SEARCH",
+          "nextAction": "TOOL",
+          "requestMode": "READ_QUERY",
+          "riskLevel": "LOW",
+          "shouldHandoff": false,
+          "source": "rule"
+        },
+        "sliceTags": [
+          "product-search",
+          "negative-constraint",
+          "brand"
+        ]
+      }
+    ],
+    "confusionMatrix": {
+      "PRODUCT_SEARCH": {
+        "PRODUCT_SEARCH": 1
+      }
+    },
+    "dataset": {
+      "annotationStatuses": {
+        "HUMAN_VERIFIED": 1
+      },
+      "caseCount": 1,
+      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+      "sha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+      "sliceCounts": {
+        "brand": 1,
+        "negative-constraint": 1,
+        "product-search": 1
+      }
+    },
+    "historicalBaseline": {
+      "badcaseIds": [
+        "cs-gold-v1-001",
+        "cs-gold-v1-002",
+        "cs-gold-v1-003",
+        "cs-gold-v1-011",
+        "cs-gold-v1-022",
+        "cs-gold-v1-026",
+        "cs-gold-v1-031",
+        "cs-gold-v1-032"
+      ],
+      "caseCount": 32,
+      "datasetSha256": "826114a806c879fe047b382d2e3a0519cf1428f19bb10efe70c137c8af73f1d3",
+      "label": "gold-v1-pre-optimization",
+      "metrics": {
+        "criticalHandoffMissRate": {
+          "denominator": 3,
+          "numerator": 1,
+          "value": 0.333333
+        },
+        "handoffRecall": {
+          "denominator": 5,
+          "numerator": 4,
+          "value": 0.8
+        },
+        "highRiskIntentRecall": {
+          "denominator": 3,
+          "numerator": 1,
+          "value": 0.333333
+        },
+        "intentMacroF1": {
+          "denominator": 20,
+          "numerator": 16.990477,
+          "value": 0.849524
+        },
+        "slotEntitySpanF1": {
+          "denominator": 261,
+          "numerator": 243,
+          "value": 0.964286
+        },
+        "slotExactMatch": {
+          "denominator": 21,
+          "numerator": 18,
+          "value": 0.857143
+        }
+      },
+      "note": "Recorded before resolver changes; provisional diagnostic only, not an A/B or human-verified result.",
+      "status": "PROVISIONAL_NOT_HUMAN_GOLD"
+    },
+    "humanReviewPlan": {
+      "adjudicationComplete": true,
+      "adjudicationRequired": true,
+      "blindedFirstPass": true,
+      "fields": [
+        "intent",
+        "riskLevel",
+        "shouldHandoff",
+        "handoffSeverity",
+        "slots"
+      ],
+      "freezeAfterAdjudication": true,
+      "metricsAfterFreeze": [
+        "intentMacroF1",
+        "highRiskIntentRecall",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "handoffRecall"
+      ],
+      "note": "Labels were independently reviewed and adjudicated; release publication still requires an explicit project gate decision.",
+      "requiredAnnotators": 2,
+      "status": "COMPLETE"
+    },
+    "limitations": [
+      "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
+      "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
+      "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion."
+    ],
+    "metrics": {
+      "criticalHandoffMissRate": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "definition": "Severe漏转人工率 among gold handoffSeverity=CRITICAL cases; lower is better.",
+        "denominator": 0,
+        "name": "criticalHandoffMissRate",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "handoffRecall": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "definition": "Among gold shouldHandoff=true cases, only next_action=HANDOFF counts as immediate handoff; HANDOFF_SUGGESTED does not.",
+        "denominator": 0,
+        "name": "handoffRecall",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "highRiskIntentRecall": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": null,
+        "definition": "Recall of cases independently labelled riskLevel=HIGH, requiring predicted riskLevel=HIGH.",
+        "denominator": 0,
+        "name": "highRiskIntentRecall",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "UNAVAILABLE",
+        "value": null
+      },
+      "intentMacroF1": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 1.0,
+          "method": "stratified-case-bootstrap-macro-F1",
+          "stratumCount": 1,
+          "upper": 1.0
+        },
+        "definition": "Gold intent labels are macro-averaged across the observed label set; prediction outside the set is counted as a miss/false positive.",
+        "denominator": 1,
+        "name": "intentMacroF1",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 1.0,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "MEASURED",
+        "value": 1.0
+      },
+      "normalizedSlotEntitySpanF1": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "componentCounts": {
+          "falseNegative": 0,
+          "falsePositive": 0,
+          "truePositive": 8
+        },
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 1.0,
+          "method": "stratified-case-bootstrap-micro-F1",
+          "stratumCount": 1,
+          "upper": 1.0
+        },
+        "definition": "Diagnostic micro character-span F1 after numeric/currency normalization of money-labelled slots; raw span F1 remains primary.",
+        "denominator": 16,
+        "name": "normalizedSlotEntitySpanF1",
+        "notes": [
+          "componentCounts: TP=8, FP=0, FN=0",
+          "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 16,
+        "releaseGateEligible": false,
+        "role": "DIAGNOSTIC_NORMALIZATION",
+        "status": "MEASURED",
+        "value": 1.0
+      },
+      "normalizedSlotExactMatch": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.206549,
+          "method": "wilson",
+          "upper": 1.0
+        },
+        "definition": "Diagnostic request-level slot equality after numeric/currency normalization of money-labelled slots; raw slot EM remains primary.",
+        "denominator": 1,
+        "name": "normalizedSlotExactMatch",
+        "notes": [
+          "Values such as 199, 199元 and ¥199.00 compare as CNY:199; incompatible currencies do not compare equal.",
+          "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 1,
+        "releaseGateEligible": false,
+        "role": "DIAGNOSTIC_NORMALIZATION",
+        "status": "MEASURED",
+        "value": 1.0
+      },
+      "slotEntitySpanF1": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "componentCounts": {
+          "falseNegative": 0,
+          "falsePositive": 0,
+          "truePositive": 8
+        },
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 1.0,
+          "method": "stratified-case-bootstrap-micro-F1",
+          "stratumCount": 1,
+          "upper": 1.0
+        },
+        "definition": "Micro character-span F1 over expected and predicted structured entity values; extra predicted fields count as false positives.",
+        "denominator": 16,
+        "name": "slotEntitySpanF1",
+        "notes": [
+          "componentCounts: TP=8, FP=0, FN=0",
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 16,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "MEASURED",
+        "value": 1.0
+      },
+      "slotExactMatch": {
+        "badcaseCount": 0,
+        "badcaseIds": [],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.206549,
+          "method": "wilson",
+          "upper": 1.0
+        },
+        "definition": "Request-level exact equality of all expected slots; cases with no expected slots are excluded from the denominator.",
+        "denominator": 1,
+        "name": "slotExactMatch",
+        "notes": [
+          "HUMAN_VERIFIED"
+        ],
+        "numerator": 1,
+        "releaseGateEligible": false,
+        "role": "PRIMARY_QUALITY",
+        "status": "MEASURED",
+        "value": 1.0
+      }
+    },
+    "perIntent": {
+      "PRODUCT_SEARCH": {
+        "badcaseIds": [],
+        "f1": 1.0,
+        "precision": 1.0,
+        "predicted": 1,
+        "recall": 1.0,
+        "support": 1
+      }
+    },
+    "provenance": {
+      "allowLlm": false,
+      "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/gold-v1-human-adjudicated.jsonl",
+      "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+      "mode": "rule-pre-router"
+    },
+    "provisionalTargets": {
+      "criticalHandoffMissRate": {
+        "direction": "lower",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": false,
+        "target": 0.0
+      },
+      "handoffRecall": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": false,
+        "target": 1.0
+      },
+      "highRiskIntentRecall": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": false,
+        "target": 1.0
+      },
+      "intentMacroF1": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": true,
+        "target": 0.9
+      },
+      "slotEntitySpanF1": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": true,
+        "target": 0.95
+      },
+      "slotExactMatch": {
+        "direction": "higher",
+        "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+        "pointEstimatePasses": true,
+        "target": 0.9
+      }
+    },
+    "releaseGateEligible": false,
+    "schemaVersion": "aishop-customer-service-evidence/v1",
+    "status": "HUMAN_VERIFIED"
+  },
+  "runId": "customer-service-http-v24-cs043-context-bound-probe-20260825",
+  "runtimeFixture": {
+    "caseCount": 19,
+    "isolation": "PER_CASE_PER_TRIAL_SQL_ORDER_ONLY_CLEANUP",
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/http-fixtures-v1.json",
+    "sha256": "fadf095fa921d901fc00315074e52234ae6ac15f011d9e3afe3be90fe6069f6f",
+    "sourceDatasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+    "status": "HASH_BOUND"
+  },
+  "runtimeMetrics": {
+    "latencyMs": {
+      "boundary": "LOCAL_FULL_STACK_NOT_PRODUCTION_SLO",
+      "p50": 469.913,
+      "p95": 469.913,
+      "p99": 469.913,
+      "sampleCount": 1
+    },
+    "usage": {
+      "costCny": null,
+      "costStatus": "NOT_APPLICABLE",
+      "inputTokens": 0,
+      "missingUsageCalls": 0,
+      "outputTokens": 0,
+      "pricedCalls": 0,
+      "providerCalls": 0,
+      "unpricedCalls": 0
+    }
+  },
+  "schemaVersion": "aishop-customer-service-http-evaluation/v1",
+  "status": "TARGETED_CONTEXT_BOUND_CONSTRAINT_PROBE"
+}

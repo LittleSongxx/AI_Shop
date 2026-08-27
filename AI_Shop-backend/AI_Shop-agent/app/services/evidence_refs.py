@@ -9,9 +9,16 @@ boundary, the query/result status and a bounded set of public facts.
 from __future__ import annotations
 
 import hashlib
+import json
+import math
 import re
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
+
+from app.utils.biz_payload import (
+    PUBLIC_PRODUCT_RANKING_FIELDS,
+    PUBLIC_PRODUCT_RECOMMENDATION_FIELDS,
+)
 
 
 def _text(value: Any, *, limit: int = 500) -> str | None:
@@ -27,6 +34,130 @@ def _number(value: Any) -> int | float | None:
     except (TypeError, ValueError):
         return None
     return int(number) if number.is_integer() else number
+
+
+_PRODUCT_QUERY_SCOPE_SCHEMA = "product-query-scope/v1"
+_QUERY_SCOPE_MODEL_SURFACE_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_-]{1,79}$"
+)
+_QUERY_SCOPE_MODEL_TOKEN_RE = re.compile(r"^[a-z0-9]{2,80}$")
+_QUERY_SCOPE_MAX_CHARS = 4000
+_QUERY_SCOPE_MAX_ITEMS = 12
+_QUERY_SCOPE_MAX_TERM_CHARS = 120
+
+
+def _query_scope_values(
+    value: Any,
+    *,
+    pattern: re.Pattern[str] | None = None,
+) -> list[str] | None:
+    if value is None:
+        return []
+    if not isinstance(value, (list, tuple)):
+        return None
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw in value:
+        if not isinstance(raw, str):
+            return None
+        item = " ".join(raw.strip().split())
+        if (
+            not item
+            or len(item) > _QUERY_SCOPE_MAX_TERM_CHARS
+            or any(ord(character) < 32 for character in item)
+            or (pattern is not None and not pattern.fullmatch(item))
+        ):
+            return None
+        identity = item.casefold()
+        if identity in seen:
+            continue
+        seen.add(identity)
+        result.append(item)
+        if len(result) > _QUERY_SCOPE_MAX_ITEMS:
+            return None
+    return result
+
+
+def _query_scope_number(value: Any) -> int | float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError("query scope budget must be numeric")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("query scope budget must be numeric") from exc
+    if not math.isfinite(number) or number < 0 or number > 1_000_000_000:
+        raise ValueError("query scope budget is outside the supported range")
+    return int(number) if number.is_integer() else number
+
+
+def _product_query_scope(value: Any) -> dict[str, Any] | None:
+    """Accept only the bounded query projection produced by the search parser."""
+
+    if not isinstance(value, Mapping):
+        return None
+    if value.get("schemaVersion") != _PRODUCT_QUERY_SCOPE_SCHEMA:
+        return None
+    digest = str(value.get("querySha256") or "")
+    query_chars = value.get("queryChars")
+    comparison_required = value.get("comparisonRequired")
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return None
+    if (
+        isinstance(query_chars, bool)
+        or not isinstance(query_chars, int)
+        or not 0 <= query_chars <= _QUERY_SCOPE_MAX_CHARS
+        or not isinstance(comparison_required, bool)
+    ):
+        return None
+
+    requested_models = _query_scope_values(
+        value.get("requestedModels"), pattern=_QUERY_SCOPE_MODEL_SURFACE_RE
+    )
+    model_tokens = _query_scope_values(
+        value.get("modelTokens"), pattern=_QUERY_SCOPE_MODEL_TOKEN_RE
+    )
+    must_terms = _query_scope_values(value.get("mustTerms"))
+    must_not_terms = _query_scope_values(value.get("mustNotTerms"))
+    comparison_targets = _query_scope_values(value.get("comparisonTargets"))
+    if any(
+        items is None
+        for items in (
+            requested_models,
+            model_tokens,
+            must_terms,
+            must_not_terms,
+            comparison_targets,
+        )
+    ):
+        return None
+    assert requested_models is not None
+    assert model_tokens is not None
+    if {
+        re.sub(r"[^a-z0-9]", "", item.casefold()) for item in requested_models
+    } != set(model_tokens):
+        return None
+    try:
+        budget_min = _query_scope_number(value.get("budgetMin"))
+        budget_max = _query_scope_number(value.get("budgetMax"))
+    except ValueError:
+        return None
+    if budget_min is not None and budget_max is not None and budget_min > budget_max:
+        return None
+    return {
+        "schemaVersion": _PRODUCT_QUERY_SCOPE_SCHEMA,
+        "querySha256": digest,
+        "queryChars": query_chars,
+        "requestedModels": requested_models,
+        "modelTokens": model_tokens,
+        "budgetMin": budget_min,
+        "budgetMax": budget_max,
+        "mustTerms": must_terms,
+        "mustNotTerms": must_not_terms,
+        "comparisonTargets": comparison_targets,
+        "comparisonRequired": comparison_required,
+    }
 
 
 def captured_at() -> str:
@@ -169,6 +300,281 @@ def _product_property_claims(
     return claims[:48]
 
 
+def _product_offer_claims(
+    product: Mapping[str, Any],
+    *,
+    product_id: str,
+    source: str,
+    captured: str,
+) -> list[dict[str, Any]]:
+    """Bind every structured offer/ranking card fact to its server snapshot."""
+
+    snapshot_id = _text(
+        product.get("offer_snapshot_id") or product.get("offerSnapshotId"), limit=120
+    )
+    offer_subject = snapshot_id or product_id
+
+    def claim(
+        fact_path: str,
+        value: Any,
+        *,
+        subject_type: str = "product",
+        subject_id: str = product_id,
+        claim_type: str = "DYNAMIC_FACT",
+    ) -> dict[str, Any] | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, (dict, list, tuple, set)):
+            return None
+        return {
+            "claimType": claim_type,
+            "subjectType": subject_type,
+            "subjectId": subject_id,
+            "factPath": fact_path,
+            "value": value,
+            "sourceType": source,
+            "sourceId": subject_id,
+            "capturedAt": captured,
+        }
+
+    price = _number(
+        product.get("estimated_payable")
+        if product.get("estimated_payable") is not None
+        else product.get("estimatedPayable")
+        if product.get("estimatedPayable") is not None
+        else product.get("min_price")
+        if product.get("min_price") is not None
+        else product.get("minPrice")
+    )
+    stock = _number(
+        product.get("total_stock")
+        if product.get("total_stock") is not None
+        else product.get("totalStock")
+    )
+    status = product.get("status")
+    in_stock = product.get("in_stock", product.get("inStock"))
+    if status is not None and str(status) != "1":
+        availability = "UNAVAILABLE"
+    elif in_stock is False:
+        availability = "OUT_OF_STOCK"
+    elif status is not None:
+        availability = "ON_SALE"
+    else:
+        availability = None
+    rows = [
+        claim(
+            "product.productName",
+            _text(product.get("product_name") or product.get("productName")),
+        ),
+        claim("product.cover", _text(product.get("cover"))),
+        claim(
+            "offer.offerSnapshotId",
+            snapshot_id,
+            subject_type="offer_snapshot",
+            subject_id=offer_subject,
+            claim_type="OFFER_SNAPSHOT_FACT",
+        ),
+        claim(
+            "offer.skuKey",
+            _text(product.get("sku_key") or product.get("skuKey"), limit=160),
+            subject_type="offer_snapshot",
+            subject_id=offer_subject,
+            claim_type="OFFER_SNAPSHOT_FACT",
+        ),
+        claim(
+            "offer.price",
+            price,
+            subject_type="offer_snapshot",
+            subject_id=offer_subject,
+            claim_type="OFFER_SNAPSHOT_FACT",
+        ),
+        claim(
+            "offer.stock",
+            stock,
+            subject_type="offer_snapshot",
+            subject_id=offer_subject,
+            claim_type="OFFER_SNAPSHOT_FACT",
+        ),
+        claim(
+            "offer.inStock",
+            in_stock,
+            subject_type="offer_snapshot",
+            subject_id=offer_subject,
+            claim_type="OFFER_SNAPSHOT_FACT",
+        ),
+        claim(
+            "offer.availability",
+            availability,
+            subject_type="offer_snapshot",
+            subject_id=offer_subject,
+            claim_type="OFFER_SNAPSHOT_FACT",
+        ),
+    ]
+    offer_fields = (
+        ("offer.minPrice", "min_price", "minPrice"),
+        ("offer.maxPrice", "max_price", "maxPrice"),
+        ("offer.basePrice", "base_price", "basePrice"),
+        ("offer.estimatedPayable", "estimated_payable", "estimatedPayable"),
+        ("offer.couponStatus", "coupon_status", "couponStatus"),
+        ("offer.quoteExpiresAt", "quote_expires_at", "quoteExpiresAt"),
+        ("offer.deliveryPromise", "delivery_promise", "deliveryPromise"),
+    )
+    for fact_path, snake, camel in offer_fields:
+        value = product.get(snake) if product.get(snake) is not None else product.get(camel)
+        if fact_path in {
+            "offer.minPrice",
+            "offer.maxPrice",
+            "offer.basePrice",
+            "offer.estimatedPayable",
+        }:
+            value = _number(value)
+        else:
+            value = _text(value)
+        rows.append(
+            claim(
+                fact_path,
+                value,
+                subject_type="offer_snapshot",
+                subject_id=offer_subject,
+                claim_type="OFFER_SNAPSHOT_FACT",
+            )
+        )
+    coupon = product.get("coupon")
+    if isinstance(coupon, Mapping):
+        for fact_path, snake, camel in (
+            ("offer.coupon.couponName", "coupon_name", "couponName"),
+            ("offer.coupon.estimatedDiscount", "estimated_discount", "estimatedDiscount"),
+            ("offer.coupon.validEndTime", "valid_end_time", "validEndTime"),
+        ):
+            value = coupon.get(snake) if coupon.get(snake) is not None else coupon.get(camel)
+            value = _number(value) if fact_path.endswith("estimatedDiscount") else _text(value)
+            rows.append(
+                claim(
+                    fact_path,
+                    value,
+                    subject_type="offer_snapshot",
+                    subject_id=offer_subject,
+                    claim_type="OFFER_SNAPSHOT_FACT",
+                )
+            )
+    ranking_subject = _text(
+        product.get("ranking_decision_id") or product.get("rankingDecisionId"), limit=120
+    ) or product_id
+    rows.extend(
+        (
+            claim(
+                "ranking.rankingDecisionId",
+                _text(
+                    product.get("ranking_decision_id")
+                    or product.get("rankingDecisionId"),
+                    limit=120,
+                ),
+                subject_type="product_ranking",
+                subject_id=ranking_subject,
+                claim_type="RANKING_DECISION_FACT",
+            ),
+            claim(
+                "ranking.position",
+                _number(product.get("position")),
+                subject_type="product_ranking",
+                subject_id=ranking_subject,
+                claim_type="RANKING_DECISION_FACT",
+            ),
+        )
+    )
+    ranking = product.get("ranking")
+    if isinstance(ranking, Mapping):
+        for key in sorted(PUBLIC_PRODUCT_RANKING_FIELDS):
+            rows.append(
+                claim(
+                    f"ranking.{key}",
+                    ranking.get(key),
+                    subject_type="product_ranking",
+                    subject_id=ranking_subject,
+                    claim_type="RANKING_DECISION_FACT",
+                )
+            )
+    reason = product.get("_recommend_reason") or product.get("recommend_reason")
+    rows.append(
+        claim(
+            "recommendation.reason",
+            _text(reason, limit=80),
+            subject_type="product_ranking",
+            subject_id=ranking_subject,
+            claim_type="RECOMMENDATION_DECISION_FACT",
+        )
+    )
+    recommendation = product.get("recommendation")
+    if isinstance(recommendation, Mapping):
+        for key in sorted(PUBLIC_PRODUCT_RECOMMENDATION_FIELDS - {"evidence"}):
+            rows.append(
+                claim(
+                    f"recommendation.{key}",
+                    recommendation.get(key),
+                    subject_type="product_ranking",
+                    subject_id=ranking_subject,
+                    claim_type="RECOMMENDATION_DECISION_FACT",
+                )
+            )
+    operation_recommended = product.get("operation_recommended") or product.get(
+        "operationRecommended"
+    )
+    rows.extend(
+        (
+            claim(
+                "recommendation.operationRecommended",
+                True if operation_recommended else None,
+                subject_type="product_ranking",
+                subject_id=ranking_subject,
+                claim_type="RECOMMENDATION_DECISION_FACT",
+            ),
+            claim(
+                "recommendation.commercialDisclosure",
+                _text(product.get("commercialDisclosure"), limit=48)
+                or ("运营推荐" if operation_recommended else None),
+                subject_type="product_ranking",
+                subject_id=ranking_subject,
+                claim_type="RECOMMENDATION_DECISION_FACT",
+            ),
+        )
+    )
+    for feature in product.get("decisionFeatures") or []:
+        if not isinstance(feature, Mapping) or feature.get("reviewStatus") != "VERIFIED":
+            continue
+        key = _text(feature.get("key"), limit=64)
+        value = _text(feature.get("value"), limit=160)
+        if not key or not value:
+            continue
+        path_key = re.sub(r"[\s.]+", "_", key).strip("_") or "feature"
+        rows.append(
+            claim(
+                f"recommendation.verifiedFeature.{path_key[:64]}",
+                value,
+                subject_type="product_ranking",
+                subject_id=ranking_subject,
+                claim_type="VERIFIED_DECISION_FEATURE",
+            )
+        )
+    for card_key, snake, camel in (
+        ("retrievalMode", "retrieval_mode", "retrievalMode"),
+        ("matchType", "match_type", "matchType"),
+        ("subjectLabel", "subject_label", "subjectLabel"),
+        ("recallSource", "recall_source", "recallSource"),
+        ("modelVersion", "model_version", "modelVersion"),
+    ):
+        value = product.get(snake) if product.get(snake) is not None else product.get(camel)
+        rows.append(
+            claim(
+                f"retrieval.{card_key}",
+                _text(value, limit=100),
+                subject_type="product_retrieval",
+                subject_id=product_id,
+                claim_type="RETRIEVAL_DECISION_FACT",
+            )
+        )
+    return [row for row in rows if row is not None]
+
+
 def product_refs(
     products: Iterable[dict[str, Any]],
     *,
@@ -188,6 +594,12 @@ def product_refs(
             continue
         snapshot_id = _text(product.get("offer_snapshot_id") or product.get("offerSnapshotId"), limit=120)
         sku_key = _text(product.get("sku_key") or product.get("skuKey"), limit=160)
+        offer_claims = _product_offer_claims(
+            product,
+            product_id=product_id,
+            source=source,
+            captured=now,
+        )
         ref: dict[str, Any] = {
             "type": "product",
             "id": product_id,
@@ -209,11 +621,13 @@ def product_refs(
                 if product.get("total_stock") is not None
                 else product.get("totalStock")
             ),
-            "availability": (
-                "ON_SALE"
-                if str(product.get("status") or "1") == "1"
-                and product.get("in_stock", product.get("inStock", True)) is not False
-                else "UNAVAILABLE"
+            "availability": next(
+                (
+                    row["value"]
+                    for row in offer_claims
+                    if row.get("factPath") == "offer.availability"
+                ),
+                None,
             ),
             "source": source,
             "requestId": _text(request_id, limit=120),
@@ -225,8 +639,9 @@ def product_refs(
             source=source,
             captured=now,
         )
+        claims.extend(offer_claims)
         if claims:
-            ref["claims"] = claims
+            ref["claims"] = claims[:96]
         # Keep the ref compact and deterministic; absent values are not evidence.
         refs.append({key: value for key, value in ref.items() if value not in (None, "")})
     return refs[:30]
@@ -256,17 +671,34 @@ def product_search_constraint_ref(
         for raw in payload.get("excludedTerms") or []
         if (value := _text(raw, limit=120))
     ]
-    if not excluded_brands and not excluded_terms:
+    required_qualifier_ids = [
+        value
+        for raw in payload.get("requiredQualifierIds") or []
+        if (value := _text(raw, limit=120))
+    ]
+    if not excluded_brands and not excluded_terms and not required_qualifier_ids:
         return None
     violating_ids = [
         value
         for raw in payload.get("violatingReturnedProductIds") or []
         if (value := _text(raw, limit=120))
     ][:30]
+    unverified_qualifier_ids = [
+        value
+        for raw in payload.get("unverifiedRequiredQualifierProductIds") or []
+        if (value := _text(raw, limit=120))
+    ][:30]
     try:
         candidate_count = max(0, int(payload.get("returnedCandidateCount") or 0))
     except (TypeError, ValueError):
         candidate_count = 0
+    try:
+        unverified_qualifier_count = max(
+            0,
+            int(payload.get("unverifiedRequiredQualifierCandidateCount") or 0),
+        )
+    except (TypeError, ValueError):
+        unverified_qualifier_count = len(unverified_qualifier_ids)
     now = captured or captured_at()
     return {
         "type": "product_search_constraint",
@@ -275,14 +707,25 @@ def product_search_constraint_ref(
             request_id,
             ",".join(excluded_brands),
             ",".join(excluded_terms),
+            ",".join(required_qualifier_ids),
             candidate_count,
         ),
         "excludedBrands": excluded_brands,
         "excludedTerms": excluded_terms,
+        "requiredQualifierIds": required_qualifier_ids,
         "returnedCandidateCount": candidate_count,
         "violatingReturnedProductIds": violating_ids,
+        "unverifiedRequiredQualifierProductIds": unverified_qualifier_ids,
+        "unverifiedRequiredQualifierCandidateCount": unverified_qualifier_count,
         "returnedCandidatesSatisfyExclusions": bool(
             payload.get("returnedCandidatesSatisfyExclusions")
+        ),
+        "returnedCandidatesSatisfyRequiredQualifiers": bool(
+            payload.get("returnedCandidatesSatisfyRequiredQualifiers")
+        ),
+        "requiredQualifierEvidenceSource": (
+            _text(payload.get("requiredQualifierEvidenceSource"), limit=120)
+            or "JAVA_PRODUCT_SNAPSHOT"
         ),
         "catalogAbsenceClaim": False,
         "source": source,
@@ -298,20 +741,35 @@ def product_no_result_ref(
     request_id: str | None = None,
     authoritative: bool = False,
     captured: str | None = None,
+    query_scope: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Represent a bounded no-result response without hiding uncertainty."""
 
-    return {
+    scope = _product_query_scope(query_scope)
+    scope_material = (
+        json.dumps(scope, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if scope is not None
+        else ""
+    )
+    ref_id = (
+        _ref_id("product-search", query, result_source, request_id, scope_material)
+        if scope is not None
+        else _ref_id("product-search", query, result_source, request_id)
+    )
+    ref = {
         "type": "product",
-        "id": _ref_id("product-search", query, result_source, request_id),
+        "id": ref_id,
         "query": _text(query, limit=500),
+        "queryScope": scope,
         "matched": False,
         "resultSource": _text(result_source, limit=80),
         "authoritative": bool(authoritative),
+        "catalogAbsenceClaim": False,
         "source": "JAVA_GATEWAY",
         "requestId": _text(request_id, limit=120),
         "capturedAt": captured or captured_at(),
     }
+    return {key: value for key, value in ref.items() if value is not None}
 
 
 def order_refs(
@@ -705,6 +1163,136 @@ def action_capability_ref(
         ],
     }
     return {key: value for key, value in ref.items() if value not in (None, "")}
+
+
+def pending_action_ref(
+    pending: Mapping[str, Any],
+    *,
+    source: str = "AGENT_PENDING_ACTION_STORE",
+    captured: str | None = None,
+) -> dict[str, Any] | None:
+    """Project a persisted proposal without exposing its action credential."""
+
+    if not isinstance(pending, Mapping):
+        return None
+    action = _text(pending.get("actionType"), limit=64)
+    args_fingerprint = _text(pending.get("argsFingerprint"), limit=64)
+    business_key = _text(pending.get("businessKey"), limit=500)
+    if not action or not args_fingerprint or not business_key:
+        return None
+    try:
+        status_code = int(pending.get("status", 0))
+    except (TypeError, ValueError):
+        return None
+    status_names = {
+        0: "PENDING",
+        1: "CONFIRMED",
+        2: "CANCELLED",
+        3: "EXECUTING",
+        4: "FAILED",
+        5: "EXPIRED",
+        6: "INCONCLUSIVE",
+        7: "MANUAL_REVIEW",
+    }
+    status = (
+        _text(pending.get("statusName"), limit=32) or status_names.get(status_code) or ""
+    ).upper()
+    if status not in set(status_names.values()):
+        return None
+    now = captured or captured_at()
+    proposal_id = _ref_id(
+        "action-proposal",
+        action,
+        hashlib.sha256(business_key.encode("utf-8")).hexdigest(),
+        args_fingerprint,
+        pending.get("createTime") or pending.get("createdAt"),
+    )
+    requires_confirmation = status == "PENDING"
+    claim = {
+        "claimType": "ACTION_PROPOSAL_STATE",
+        "subjectType": "action_proposal",
+        "subjectId": proposal_id,
+        "actionType": action,
+        "status": status,
+        "proposalPersisted": True,
+        "requiresUserConfirmation": requires_confirmation,
+        "sourceType": source,
+        "sourceId": proposal_id,
+        "capturedAt": now,
+    }
+    if requires_confirmation:
+        claim["effectExecuted"] = False
+    ref = {
+        "type": "action_proposal",
+        "id": proposal_id,
+        "actionType": action,
+        "status": status,
+        "proposalPersisted": True,
+        "requiresUserConfirmation": requires_confirmation,
+        "effectExecuted": False if requires_confirmation else None,
+        "argsFingerprint": args_fingerprint,
+        "source": source,
+        "capturedAt": now,
+        "claims": [claim],
+    }
+    return {key: value for key, value in ref.items() if value is not None}
+
+
+def support_case_ref(
+    case: Mapping[str, Any],
+    *,
+    source: str = "AGENT_SUPPORT_CASE_STORE",
+    captured: str | None = None,
+) -> dict[str, Any] | None:
+    """Project a persisted support case as bounded creation evidence."""
+
+    if not isinstance(case, Mapping):
+        return None
+    case_no = _text(case.get("caseNo") or case.get("case_no"), limit=120)
+    status = _text(case.get("status"), limit=32)
+    if not case_no or not status:
+        return None
+    now = captured or captured_at()
+    category = _text(case.get("category"), limit=64)
+    ref_id = _ref_id("support-case", case_no, status, category)
+    forced_handoff = bool(case.get("forcedHandoff") or case.get("forced_handoff"))
+    claims = [
+        {
+            "claimType": "SUPPORT_CASE_STATE",
+            "subjectType": "support_case",
+            "subjectId": case_no,
+            "factPath": "supportCase.status",
+            "value": status,
+            "sourceType": source,
+            "sourceId": case_no,
+            "capturedAt": now,
+        }
+    ]
+    if forced_handoff:
+        claims.append(
+            {
+                "claimType": "SUPPORT_CASE_STATE",
+                "subjectType": "support_case",
+                "subjectId": case_no,
+                "factPath": "supportCase.forcedHandoff",
+                "value": True,
+                "sourceType": source,
+                "sourceId": case_no,
+                "capturedAt": now,
+            }
+        )
+    ref = {
+        "type": "support_case",
+        "id": ref_id,
+        "caseNo": case_no,
+        "status": status,
+        "category": category,
+        "forcedHandoff": forced_handoff,
+        "source": source,
+        "capturedAt": now,
+        "claims": claims,
+    }
+    return {key: value for key, value in ref.items() if value is not None}
 
 
 def after_sales_eligibility_ref(

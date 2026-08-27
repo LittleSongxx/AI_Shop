@@ -884,6 +884,7 @@ async def specialist_runner_node(state: dict[str, Any]) -> dict[str, Any]:
         message_id=None,
         user_id=task.user_id,
         force_keep=True,
+        trusted_user_text=task.user_text,
     ):
         return await _execute_specialist_task(task)
 

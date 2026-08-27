@@ -1,0 +1,68 @@
+{
+  "caseAgreementRate": 1.0,
+  "caseCount": 10,
+  "createdAt": "2026-08-25T15:20:19.976Z",
+  "disagreementCaseCount": 0,
+  "disagreements": [],
+  "exactAgreementCaseCount": 10,
+  "fieldStats": {
+    "answerCorrect": {
+      "agreementCount": 10,
+      "agreementRate": 1.0,
+      "caseCount": 10,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    },
+    "citationSupport": {
+      "agreementCount": 10,
+      "agreementRate": 1.0,
+      "caseCount": 10,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    },
+    "handoffAppropriate": {
+      "agreementCount": 10,
+      "agreementRate": 1.0,
+      "caseCount": 10,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    },
+    "unsafeAnswer": {
+      "agreementCount": 10,
+      "agreementRate": 1.0,
+      "caseCount": 10,
+      "cohenKappa": null,
+      "expectedAgreement": 1.0
+    }
+  },
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "note": "Inter-rater agreement measures annotation reliability, not model accuracy. Disagreements require a third-person decision.",
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "run/review-workspaces/customer-service-http-v25-targeted-quality-fixes-20260825/sealed/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "c546a1082949cfaedeabc02d7a2601705f6116210b75ca7c073511e534d63ddb"
+  },
+  "reviewB": {
+    "path": "run/review-workspaces/customer-service-http-v25-targeted-quality-fixes-20260825/sealed/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "ada2f35be89a815ada36f304fe0350358dfb40fbcc12f3d178d3cb8c926c4bd8"
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-agreement/v1",
+  "sourceReportPath": "run/evaluation-observations/customer-service-http-v25-targeted-quality-fixes-20260825.json",
+  "sourceReportSha256": "091583ec1b9f7c44a2e58e0769932407fa8f14f69db47715ce1446bea8c6089a",
+  "sourceRunId": "customer-service-http-v25-targeted-quality-fixes-20260825",
+  "status": "AGREED_NO_ADJUDICATION"
+}

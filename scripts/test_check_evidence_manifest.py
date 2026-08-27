@@ -9,12 +9,17 @@ from check_evidence_manifest import (
     _parse_sums,
     _validate_auxiliary_evidence,
     _validate_benchmarks,
+    _validate_current_customer_service_v2,
     _validate_customer_service_answer_review,
+    _validate_customer_service_v54_remediation,
+    _validate_customer_service_v56_regression,
     _validate_diagnostic_evidence,
+    _validate_evaluation_archive_and_handoff,
     _validate_failed_final_attempts,
     _validate_lock,
     _validate_pricing_estimate,
     _validate_suite,
+    _validate_targeted_customer_service_answer_review,
     _validate_visible_runs,
     validate_repository,
 )
@@ -181,6 +186,96 @@ def test_current_customer_service_report_is_human_verified_but_release_fail_clos
     assert "historicalDraft" not in descriptor
 
 
+def test_current_v2_and_v43_evidence_remain_fail_closed_and_hash_bound() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    evaluation = deepcopy(manifest["evaluation"])
+    errors: list[str] = []
+
+    _validate_current_customer_service_v2(root, evaluation, errors)
+
+    assert errors == []
+    assert evaluation["customerServiceV2"]["releaseGateEligible"] is False
+    assert evaluation["customerServiceV2LabelAudit"]["affectedCaseCount"] == 25
+    assert evaluation["customerServiceHttpV43"]["humanAnswerReviewCount"] == 0
+
+    evaluation["customerServiceHttpV43"]["humanAnswerReviewCount"] = 120
+    errors = []
+    _validate_current_customer_service_v2(root, evaluation, errors)
+
+    assert any("execution, contracts, validity, or answer gate" in error for error in errors)
+
+
+def test_v54_human_adjudication_and_final_metrics_are_hash_bound() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    evaluation = deepcopy(manifest["evaluation"])
+    errors: list[str] = []
+
+    _validate_customer_service_v54_remediation(root, evaluation, errors)
+
+    assert errors == []
+    final = evaluation["customerServiceBadcaseRemediationV54"]["finalAnswerQuality"]
+    assert final["jointQualityPassedCount"] == 113
+    assert final["badcaseCount"] == 7
+    assert final["releaseGateEligible"] is False
+    assert final["finalUnseenEligible"] is False
+
+    final["jointQualityPassedCount"] = 114
+    errors = []
+    _validate_customer_service_v54_remediation(root, evaluation, errors)
+
+    assert any("finalAnswerQuality metrics or provenance" in error for error in errors)
+
+
+def test_v56_execution_and_final_human_review_are_hash_bound() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    evaluation = deepcopy(manifest["evaluation"])
+    errors: list[str] = []
+
+    _validate_customer_service_v56_regression(root, evaluation, errors)
+
+    assert errors == []
+    descriptor = evaluation["customerServiceV3KnowledgeRegressionV56"]
+    assert descriptor["fullExecution"]["executionPassedCount"] == 120
+    assert descriptor["fullExecution"]["behaviorContractPassedCount"] == 29
+    assert descriptor["fullExecution"]["humanAnswerReviewCount"] == 0
+    assert descriptor["humanReviewHandoff"]["exactAgreementCaseCount"] == 118
+    assert descriptor["humanReviewHandoff"]["disagreementCaseCount"] == 2
+    assert descriptor["humanReviewHandoff"]["adjudicationSendNow"] is False
+    assert descriptor["finalAnswerQuality"]["jointQualityPassedCount"] == 120
+    assert descriptor["finalAnswerQuality"]["badcaseCount"] == 0
+
+    descriptor["finalAnswerQuality"]["jointQualityPassedCount"] = 119
+    errors = []
+    _validate_customer_service_v56_regression(root, evaluation, errors)
+
+    assert any("final metrics or human provenance" in error for error in errors)
+
+
+def test_archive_catalog_recovered_intake_and_open_handoff_are_hash_bound() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    evaluation = deepcopy(manifest["evaluation"])
+    errors: list[str] = []
+
+    _validate_evaluation_archive_and_handoff(root, evaluation, errors)
+
+    assert errors == []
+    assert evaluation["evaluationAssetCatalog"]["rootLooseJsonOrJsonlCount"] == 0
+    assert evaluation["customerServiceRecoveredReviewIntake"][
+        "reviewerIndependenceVerified"
+    ] is False
+    assert evaluation["humanReviewHandoff"]["completedHumanReviewCount"] == 0
+
+    evaluation["humanReviewHandoff"]["completedHumanReviewCount"] = 1
+    errors = []
+    _validate_evaluation_archive_and_handoff(root, evaluation, errors)
+
+    assert any("lifecycle or task binding" in error for error in errors)
+
+
 def test_adjudicated_http_answer_review_requires_its_frozen_parent_and_metrics() -> None:
     root = Path(__file__).parents[1]
     manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
@@ -275,6 +370,65 @@ def test_v20_answer_review_binds_fixture_projection_metrics_and_reviewers() -> N
         descriptor,
         errors,
         label="evaluation.customerServiceAnswerReviewV20",
+    )
+    assert any("metric is invalid: answerCorrectness" in error for error in errors)
+
+
+def test_v25_targeted_answer_review_binds_agreement_without_adjudication() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = deepcopy(
+        manifest["evaluation"]["customerServiceAnswerReviewV25Targeted"]
+    )
+
+    errors: list[str] = []
+    _validate_targeted_customer_service_answer_review(root, descriptor, errors)
+
+    assert errors == []
+    assert descriptor["agreementStatus"] == "AGREED_NO_ADJUDICATION"
+    assert descriptor["finalEvidence"]["adjudicationCaseCount"] == 0
+    assert descriptor["normalQualityDenominatorExcluded"] is True
+
+    descriptor["finalEvidence"]["disagreementCaseCount"] = 1
+    errors = []
+    _validate_targeted_customer_service_answer_review(root, descriptor, errors)
+    assert any("no-adjudication agreement summary is invalid" in error for error in errors)
+
+    descriptor = deepcopy(
+        manifest["evaluation"]["customerServiceAnswerReviewV25Targeted"]
+    )
+    descriptor["finalEvidence"]["metrics"]["answerCorrectness"]["numerator"] = 9
+    errors = []
+    _validate_targeted_customer_service_answer_review(root, descriptor, errors)
+    assert any("final metrics or badcases are invalid" in error for error in errors)
+
+
+def test_v27_answer_review_binds_adjudication_and_current_metrics() -> None:
+    root = Path(__file__).parents[1]
+    manifest = json.loads((root / "docs/evidence-manifest.json").read_text("utf-8"))
+    descriptor = deepcopy(manifest["evaluation"]["customerServiceAnswerReviewV27"])
+
+    errors: list[str] = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV27",
+    )
+
+    assert errors == []
+    assert descriptor["releaseGateEligible"] is False
+    assert descriptor["pendingEvidence"]["exactAgreementCaseCount"] == 58
+    assert descriptor["finalEvidence"]["metrics"]["answerCorrectness"]["numerator"] == 59
+    assert descriptor["finalEvidence"]["metrics"]["citationGroundingSupport"]["denominator"] == 36
+
+    descriptor["finalEvidence"]["metrics"]["answerCorrectness"]["numerator"] = 58
+    errors = []
+    _validate_customer_service_answer_review(
+        root,
+        descriptor,
+        errors,
+        label="evaluation.customerServiceAnswerReviewV27",
     )
     assert any("metric is invalid: answerCorrectness" in error for error in errors)
 

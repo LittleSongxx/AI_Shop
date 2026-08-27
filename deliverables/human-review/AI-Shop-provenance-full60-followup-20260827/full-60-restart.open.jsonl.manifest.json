@@ -1,0 +1,14 @@
+{
+  "artifact": "BLINDED_INDEPENDENT_REAUDIT_EXPANSION_SHEET",
+  "caseCount": 60,
+  "failureTrigger": "INITIAL_12_CASE_PREREGISTERED_GATE_FAILED",
+  "fullTargetCaseCount": 60,
+  "goldLabelsPresent": false,
+  "lifecycle": "OPEN",
+  "mode": "RESTART_WITH_NEW_INDEPENDENT_HUMAN_REVIEWER",
+  "modelPredictionsPresent": false,
+  "reviewerId": "REPLACE_WITH_NEW_INDEPENDENT_HUMAN_REVIEWER_ID",
+  "schemaVersion": "aishop-customer-service-independent-reaudit-expansion/v1",
+  "sheetSha256": "37e2cce4cf502c53972fdf6ef149372ddbfeafc693362b685637796ffc36d062",
+  "sourceHumanDatasetSha256": "364366c64d8cb2aa5efb57a4de2e2fa8dac819c5d30849e2a634d86e0b2713c1"
+}

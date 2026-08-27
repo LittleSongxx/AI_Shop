@@ -19,7 +19,7 @@ from typing import Any
 import structlog
 from langchain_core.messages import ToolMessage
 
-from app.domain.intent.types import IntentKind
+from app.domain.intent.types import IntentKind, RequestMode
 from app.domain.intent.write_args import required_tool_for_intent
 from app.domain.tool_policy import fallback_biz_type
 from app.harness.observation import (
@@ -27,6 +27,7 @@ from app.harness.observation import (
     build_tool_result_observation,
 )
 from app.services.mcp_tool_router import mcp_tool_router
+from app.services.shopping_mission_service import shopping_mission_service
 from app.services.tool_invoke_result import ToolInvokeResult
 
 logger = structlog.get_logger()
@@ -193,6 +194,100 @@ async def forced_product_search(
     )
 
 
+async def forced_named_product_comparison(
+    *,
+    messages: list,
+    user_id: str,
+    message_id: int,
+    keyword: str,
+) -> dict:
+    """Resolve a user-named comparison through search, then live comparison.
+
+    Textual names are not comparison authority. SEARCH_PRODUCTS first resolves
+    them to current catalog candidates and writes those candidates into the
+    user's mission; COMPARE_PRODUCTS then accepts only those server-observed
+    IDs and refreshes their live offer/property snapshots.
+    """
+
+    try:
+        search = await mcp_tool_router.invoke(
+            "SEARCH_PRODUCTS", {"keyword": keyword}, user_id
+        )
+    except Exception as exc:
+        return _finalize_tool_failure(
+            messages, exc, intent=IntentKind.PRODUCT_CONSULT.value
+        )
+    if failed := _failed_result(
+        messages, search, intent=IntentKind.PRODUCT_CONSULT.value
+    ):
+        return failed
+    search_obs = build_tool_result_observation(
+        search, fallback="未查询到可比较的商品。"
+    )
+    if search_obs.contaminated:
+        return _finalize_quarantined(messages, "SEARCH_PRODUCTS", search_obs)
+    product_ids = list(
+        dict.fromkeys(str(value) for value in search.product_ids if value)
+    )
+    if len(product_ids) < 2:
+        return _finalize_with_tool(
+            messages=messages,
+            tool_name="SEARCH_PRODUCTS",
+            result=search,
+            chunks=[
+                "已按你给出的版本检索，但当前只核验到不足两个可比较商品，"
+                "暂时不能可靠断言它们的差异。请从结果中补充另一款商品卡或链接。"
+            ],
+            search_hint=search_obs.text,
+        )
+    refs_by_id = {
+        str(ref.get("productId") or ref.get("id") or ""): ref
+        for ref in search.source_refs or []
+        if isinstance(ref, dict)
+    }
+    await shopping_mission_service.record_candidates(
+        user_id,
+        message_id,
+        [
+            {
+                "productId": product_id,
+                "productName": (
+                    search.product_names[index]
+                    if index < len(search.product_names)
+                    else refs_by_id.get(product_id, {}).get("productName")
+                ),
+                "offerSnapshotId": refs_by_id.get(product_id, {}).get(
+                    "offerSnapshotId"
+                ),
+                "estimatedPayable": refs_by_id.get(product_id, {}).get("price"),
+            }
+            for index, product_id in enumerate(product_ids)
+        ],
+    )
+    try:
+        compared = await mcp_tool_router.invoke(
+            "COMPARE_PRODUCTS", {"productIds": product_ids[:2]}, user_id
+        )
+    except Exception as exc:
+        return _finalize_tool_failure(messages, exc, intent=IntentKind.PRODUCT_CONSULT.value)
+    if failed := _failed_result(messages, compared, intent=IntentKind.PRODUCT_CONSULT.value):
+        return failed
+    compare_obs = build_tool_result_observation(
+        compared, fallback="当前无法生成可靠的商品比较。"
+    )
+    if compare_obs.contaminated:
+        return _finalize_quarantined(messages, "COMPARE_PRODUCTS", compare_obs)
+    compared.source_refs = _merge_source_refs(search.source_refs, compared.source_refs)
+    update = _finalize_with_tool(
+        messages=messages,
+        tool_name="COMPARE_PRODUCTS",
+        result=compared,
+        chunks=[compared.content] if compared.content else [],
+    )
+    update["tools_called"] = ["SEARCH_PRODUCTS", "COMPARE_PRODUCTS"]
+    return update
+
+
 async def forced_tool_for_intent(
     *,
     messages: list,
@@ -200,6 +295,7 @@ async def forced_tool_for_intent(
     intent: str | None,
     intent_data: str | None,
     user_text: str,
+    request_mode: str | None = None,
 ) -> dict | None:
     """意图要求工具但模型没调时，替它调。参数不全则返回 None 交回模型追问。"""
     try:
@@ -215,6 +311,22 @@ async def forced_tool_for_intent(
     if not forced:
         return None
     tool_name, tool_args = forced
+    if (
+        tool_name.startswith("PROPOSE_")
+        and request_mode is not None
+        and str(request_mode) != RequestMode.ACTION_PROPOSAL.value
+    ):
+        # The forced-tool fallback repairs a missed *required* tool call; it
+        # must not change a read/informational request into a write proposal.
+        # Preverified exception workflows invoke their explicitly approved
+        # tool through ``invoke_deterministic_tool`` instead of this fallback.
+        logger.info(
+            "forced_write_proposal_suppressed",
+            intent=intent,
+            tool=tool_name,
+            request_mode=request_mode,
+        )
+        return None
     return await invoke_deterministic_tool(
         messages=messages,
         user_id=user_id,

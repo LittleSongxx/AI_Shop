@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "aishop-knowledge-catalog-overlay/v1",
+  "catalogVersion": 3,
+  "extends": "../demo_knowledge_v2/catalog.v2.json",
+  "expectedDocumentCount": 14,
+  "expectedKnowledgeChunkCount": 77,
+  "expectedFaqCount": 6,
+  "sectionOverrides": [
+    {
+      "file": "02-orders-delivery-and-returns.md",
+      "heading": "退货与退款",
+      "equivalentRefs": []
+    },
+    {
+      "file": "06-payment-and-refund-progress.md",
+      "heading": "退款申请与进度",
+      "equivalentRefs": [
+        "09-after-sales-evidence-and-review.md#售后状态"
+      ]
+    },
+    {
+      "file": "09-after-sales-evidence-and-review.md",
+      "heading": "发起售后申请",
+      "equivalentRefs": []
+    }
+  ],
+  "documents": [
+    {
+      "file": "13-payment-retry-guidance.md",
+      "title": "Smarlect 支付失败自助处理",
+      "domain": "PAYMENT",
+      "sha256": "c5d356c00eb70ef9b38352e10b3186e5fb63cca6b1c21323368d8b3e6d9cfe46",
+      "normalizedSha256": "061117e0caf363fdd21005ffb85f1f987b838368fc332dc37af307e6fe9b40d6",
+      "sections": [
+        {
+          "heading": "未扣款或未输入密码时的安全重试",
+          "factId": "payment.safe_retry_guidance",
+          "equivalentRefs": [],
+          "sourceFacts": [
+            "AI_Shop-backend/AI_Shop-agent/app/graph/nodes.py"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "14-display-technology-guide.md",
+      "title": "Smarlect 显示技术选购说明",
+      "domain": "PRODUCT",
+      "sha256": "affe67039cb96d98701ab8ecbceab1e36660ea65df0acc417669a5b57668959d",
+      "normalizedSha256": "0cf0c684cb5faae6f4d55c34b3d593b16df8c322d15ffff46bf066ecbd588791",
+      "sections": [
+        {
+          "heading": "OLED 与 Mini LED",
+          "factId": "product.display_technology_boundary",
+          "equivalentRefs": [],
+          "sourceFacts": [
+            "AI_Shop-backend/AI_Shop-agent/app/utils/product_consult.py"
+          ]
+        }
+      ]
+    }
+  ]
+}

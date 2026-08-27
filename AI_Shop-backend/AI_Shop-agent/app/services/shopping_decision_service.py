@@ -122,7 +122,39 @@ def _category_matches(product: dict[str, Any], category: str | None) -> bool:
                 "架子鼓",
             }
         )
+    elif target in {"零食", "休闲食品"}:
+        aliases.update(
+            {"零食", "休闲食品", "食品", "饮料", "汽水", "可乐", "小吃", "饼干"}
+        )
     return any(alias in fields for alias in aliases)
+
+
+def _matches_comparison_target(product: dict[str, Any], targets: tuple[str, ...]) -> bool:
+    text = "".join(character for character in _text(product) if character.isalnum())
+    for target in targets:
+        compact = "".join(
+            character
+            for character in str(target or "").casefold()
+            if character.isalnum()
+        )
+        if compact and (
+            compact in text
+            or (
+                len(compact) >= 4
+                and all("\u4e00" <= character <= "\u9fff" for character in compact)
+                and any(
+                    compact[:split] in text and compact[split:] in text
+                    for split in range(2, len(compact) - 1)
+                )
+            )
+            or (
+                len(compact) >= 3
+                and compact[-1:] in {"版", "款"}
+                and compact[:-1] in text
+            )
+        ):
+            return True
+    return False
 
 
 def _slate_diversity_score(product: dict[str, Any], selected: list[dict[str, Any]]) -> float:
@@ -321,6 +353,12 @@ class ShoppingDecisionService:
             for value in exclusions.get("terms") or []
             if str(value).strip()
         }
+        comparison_required = bool(hard.get("comparisonRequired"))
+        comparison_targets = tuple(
+            str(value).strip()
+            for value in hard.get("comparisonTargets") or []
+            if str(value or "").strip()
+        )
         required_category = str(mission.get("category") or "").strip()
         brand_profile = {
             "brands": list(hard.get("requiredBrands") or soft.get("brands") or []),
@@ -337,6 +375,10 @@ class ShoppingDecisionService:
             ).lower()
             if brand:
                 product["brand"] = brand
+            comparison_target_match = bool(
+                comparison_required
+                and _matches_comparison_target(product, comparison_targets)
+            )
             reason = None
             if str(product.get("status")) != "1" or product.get("in_stock") is False:
                 reason = "NOT_PURCHASABLE"
@@ -350,7 +392,11 @@ class ShoppingDecisionService:
                 reason = "OVER_BUDGET"
             elif min_budget is not None and price < min_budget:
                 reason = "BELOW_BUDGET_RANGE"
-            elif required_brands and brand not in required_brands:
+            elif (
+                required_brands
+                and brand not in required_brands
+                and not comparison_target_match
+            ):
                 reason = "BRAND_REQUIRED"
             elif brand and brand in excluded_brands:
                 reason = "BRAND_EXCLUDED"
@@ -358,7 +404,11 @@ class ShoppingDecisionService:
                 product, tuple(excluded_terms), selected_only=True
             )["violates"]:
                 reason = "TERM_EXCLUDED"
-            elif required_category and not _category_matches(product, required_category):
+            elif (
+                required_category
+                and not comparison_target_match
+                and not _category_matches(product, required_category)
+            ):
                 reason = "CATEGORY_REQUIRED"
             if reason:
                 rejected.append({"productId": product_id, "reason": reason})

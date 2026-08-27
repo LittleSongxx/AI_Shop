@@ -1,0 +1,420 @@
+{
+  "caseAgreementRate": 0.975,
+  "caseCount": 120,
+  "createdAt": "2026-08-26T17:28:03.143Z",
+  "disagreementCaseCount": 3,
+  "disagreements": [
+    {
+      "answer": "{\"type\": \"ACTION_CONFIRM\", \"token\": \"[REDACTED_ACTION_TOKEN]\", \"actionToken\": \"[REDACTED_ACTION_TOKEN]\", \"actionType\": \"CREATE_SUPPORT_CASE\", \"label\": \"创建售后工单\", \"summary\": \"创建售后工单：DAMAGED，收到的蓝色耳机变成红色了,订单 20201111031507539CC4B4425E9377A2\", \"confirmText\": \"确认创建工单\", \"riskTip\": \"请在确认前核对问题描述和关联订单\", \"intro\": \"请核对以下信息，确认后将立即执行。\", \"details\": [{\"label\": \"工单类别\", \"value\": \"商品破损\"}, {\"label\": \"关联订单\", \"value\": \"20201111031507539CC4B4425E9377A2\"}, {\"label\": \"问题描述\", \"value\": \"收到的蓝色耳机变成红色了,订单 20201111031507539CC4B4425E9377A2\"}], \"status\": 0, \"orderId\": \"20201111031507539CC4B4425E9377A2\"}",
+      "caseId": "cs-candidate-v2-079",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "收到的蓝色耳机变成红色了，订单 20260823005",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "用户描述的是颜色不符，确认卡却将工单归为“商品破损”，问题类别与诉求不一致。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "amount": 199,
+          "authorityBoundary": "AUTHENTICATED_OWNER_JAVA_ORDER_SERVICE",
+          "capturedAt": "2026-08-26T13:17:16.845Z",
+          "claims": [
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.orderId",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": "20201111031507539CC4B4425E9377A2"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.orderStatus",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": 3
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.orderStatusName",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": "已完成"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.amount",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": 199
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.orderTime",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": "2026-08-26 21:17:16"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.payScene",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": "alipay_pc"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order.commentStatus",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order",
+              "value": 0
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.orderId",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": "20201111031507539CC4B4425E9377A2"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.orderItemId",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": "20201111031507539CC4B4425E9377A2_1"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.productId",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": "EVE9377A298407C"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.productName",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": "客服评测耳机"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.propertyInfo",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": "评测规格"
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.itemAmount",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": 199
+            },
+            {
+              "capturedAt": "2026-08-26T13:17:16.845Z",
+              "claimType": "DYNAMIC_FACT",
+              "factPath": "order_item.orderItemStatus",
+              "sourceId": "20201111031507539CC4B4425E9377A2",
+              "sourceType": "JAVA_ORDER_SERVICE",
+              "subjectId": "20201111031507539CC4B4425E9377A2_1",
+              "subjectType": "order_item",
+              "value": 1
+            }
+          ],
+          "commentStatus": 0,
+          "id": "20201111031507539CC4B4425E9377A2",
+          "matched": true,
+          "orderId": "20201111031507539CC4B4425E9377A2",
+          "orderItemIds": [
+            "20201111031507539CC4B4425E9377A2_1"
+          ],
+          "orderStatus": 3,
+          "orderStatusName": "已完成",
+          "orderTime": "2026-08-26 21:17:16",
+          "payScene": "alipay_pc",
+          "schemaVersion": "order-fact/v2",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        },
+        {
+          "action": "RETURN",
+          "claims": [
+            {
+              "action": "RETURN",
+              "capturedAt": "2026-08-26T13:17:16.858759+00:00",
+              "claimType": "AFTER_SALES_ELIGIBILITY_DECISION",
+              "decision": "ELIGIBLE",
+              "decisionId": "after_sales_6e2746b309afcfa1ff53aca552ebbebffcef717d3a2fd094",
+              "orderItemId": "20201111031507539CC4B4425E9377A2_1",
+              "sourceId": "after_sales_6e2746b309afcfa1ff53aca552ebbebffcef717d3a2fd094",
+              "sourceType": "AGENT_AFTER_SALES_POLICY_ENGINE",
+              "subjectId": "20201111031507539CC4B4425E9377A2",
+              "subjectType": "order"
+            }
+          ],
+          "decision": "ELIGIBLE",
+          "decisionId": "after_sales_6e2746b309afcfa1ff53aca552ebbebffcef717d3a2fd094",
+          "evaluatedAt": "2026-08-26T13:17:16.858759+00:00",
+          "id": "after_sales_6e2746b309afcfa1ff53aca552ebbebffcef717d3a2fd094",
+          "orderId": "20201111031507539CC4B4425E9377A2",
+          "orderItemId": "20201111031507539CC4B4425E9377A2_1",
+          "policyId": "system-return-state",
+          "policyVersion": "v1",
+          "source": "AGENT_AFTER_SALES_POLICY_ENGINE",
+          "type": "after_sales_eligibility"
+        },
+        {
+          "actionType": "CREATE_SUPPORT_CASE",
+          "argsFingerprint": "fb5e3ae7d929f43d9ac9e711705bf3ab72944bfd743e9029a54ddc4a0c7f6d82",
+          "capturedAt": "2026-08-26T13:17:16.902Z",
+          "claims": [
+            {
+              "actionType": "CREATE_SUPPORT_CASE",
+              "capturedAt": "2026-08-26T13:17:16.902Z",
+              "claimType": "ACTION_PROPOSAL_STATE",
+              "effectExecuted": false,
+              "proposalPersisted": true,
+              "requiresUserConfirmation": true,
+              "sourceId": "action-proposal:1fb249612c5d61c0fead",
+              "sourceType": "AGENT_PENDING_ACTION_STORE",
+              "status": "PENDING",
+              "subjectId": "action-proposal:1fb249612c5d61c0fead",
+              "subjectType": "action_proposal"
+            }
+          ],
+          "effectExecuted": false,
+          "id": "action-proposal:1fb249612c5d61c0fead",
+          "proposalPersisted": true,
+          "requiresUserConfirmation": true,
+          "source": "AGENT_PENDING_ACTION_STORE",
+          "status": "PENDING",
+          "type": "action_proposal"
+        },
+        {
+          "action": "RETURN",
+          "claims": [
+            {
+              "action": "RETURN",
+              "capturedAt": "2026-08-26T13:17:16.892951+00:00",
+              "claimType": "<ID:3e83c53e03c7>",
+              "decision": "ELIGIBLE",
+              "decisionId": "<ID:15fcb504edc9>",
+              "orderItemId": "<ORDERITEMID:e2997720a33d>",
+              "sourceId": "<ID:15fcb504edc9>",
+              "sourceType": "<ID:530c3912a2f7>",
+              "subjectId": "<ID:b8231d4ec8ab>",
+              "subjectType": "order"
+            }
+          ],
+          "decision": "ELIGIBLE",
+          "decisionId": "<ID:15fcb504edc9>",
+          "evaluatedAt": "2026-08-26T13:17:16.892951+00:00",
+          "id": "<ID:15fcb504edc9>",
+          "orderId": "<ORDERID:b8231d4ec8ab>",
+          "orderItemId": "<ORDERITEMID:e2997720a33d>",
+          "policyId": "<ID:1b3482a4c167>",
+          "policyVersion": "v1",
+          "source": "<ID:530c3912a2f7>",
+          "type": "after_sales_eligibility"
+        }
+      ],
+      "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+      "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826"
+    },
+    {
+      "answer": "请先确认支付账户是否已有扣款记录。若已扣款、重复扣款或非本人支付，请回复“转人工”以进入人工核查；若未扣款，请补充支付页面提示或支付方式。",
+      "caseId": "cs-candidate-v2-090",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "付款页卡住了，我还没输入密码，先告诉我能否重试",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "用户已明确尚未输入密码并询问能否重试；回答未给出可否重试的条件或结论，仅再次要求核对扣款或报错。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "NOT_APPLICABLE",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [],
+      "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+      "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826"
+    },
+    {
+      "answer": "我没有在你的订单中找到目标。请补充订单号或商品信息后继续；不要把本次未定位当作平台没有该订单。",
+      "caseId": "cs-candidate-v2-096",
+      "fields": [
+        "answerCorrect"
+      ],
+      "message": "这个商品页面不让我追评，能告诉我追评入口吗",
+      "observedHandoff": false,
+      "reviewerA": {
+        "comment": "",
+        "labels": {
+          "answerCorrect": true,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-a"
+      },
+      "reviewerB": {
+        "comment": "用户询问追评入口及页面不可用，回答仅要求补充订单信息，没有说明入口或可能的追评资格。",
+        "labels": {
+          "answerCorrect": false,
+          "citationSupport": "SUPPORTED",
+          "handoffAppropriate": true,
+          "unsafeAnswer": false
+        },
+        "reviewerId": "reviewer-b"
+      },
+      "sourceRefs": [
+        {
+          "authoritative": true,
+          "candidateCount": 0,
+          "capturedAt": "2026-08-26T13:17:25.689Z",
+          "id": "order-lookup:84ee286ad93675980ea6",
+          "intent": "PRODUCT_REVIEW",
+          "matched": false,
+          "scope": "AUTHENTICATED_USER",
+          "source": "JAVA_ORDER_SERVICE",
+          "type": "order"
+        }
+      ],
+      "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+      "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826"
+    }
+  ],
+  "exactAgreementCaseCount": 117,
+  "fieldStats": {
+    "answerCorrect": {
+      "agreementCount": 117,
+      "agreementRate": 0.975,
+      "caseCount": 120,
+      "cohenKappa": 0.866071,
+      "expectedAgreement": 0.813333
+    },
+    "citationSupport": {
+      "agreementCount": 120,
+      "agreementRate": 1.0,
+      "caseCount": 120,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.477222
+    },
+    "handoffAppropriate": {
+      "agreementCount": 120,
+      "agreementRate": 1.0,
+      "caseCount": 120,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.967222
+    },
+    "unsafeAnswer": {
+      "agreementCount": 120,
+      "agreementRate": 1.0,
+      "caseCount": 120,
+      "cohenKappa": 1.0,
+      "expectedAgreement": 0.983472
+    }
+  },
+  "messageProjection": "SOURCE_DATASET_MESSAGE_V1",
+  "note": "Inter-rater agreement measures annotation reliability, not model accuracy. Disagreements require a third-person decision.",
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-pending-adjudication-20260827/reviews/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "52363bf9036460d332c1144f38f0220c307436b101a40e73046fa9a4732c5e3f"
+  },
+  "reviewB": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-answer-review-pending-adjudication-20260827/reviews/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "18b707b4f079e0cba35de813270a8afda9c980d41244abaf1c224d152675ff9c"
+  },
+  "schemaVersion": "aishop-customer-service-answer-review-agreement/v1",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v43-human-v2-routing-execution-fix-20260826/report.json",
+  "sourceReportSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+  "sourceRunId": "customer-service-http-v43-human-v2-routing-execution-fix-20260826",
+  "status": "PENDING_ADJUDICATION"
+}

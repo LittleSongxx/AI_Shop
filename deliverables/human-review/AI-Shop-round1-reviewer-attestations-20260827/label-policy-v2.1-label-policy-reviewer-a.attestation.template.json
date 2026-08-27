@@ -1,0 +1,22 @@
+{
+  "attestedAt": null,
+  "custodianIdentity": null,
+  "didNotViewHiddenMaterialsBeforeCompleting": null,
+  "generativeAiProducedOrSuggestedLabels": null,
+  "hiddenMaterials": [
+    "current immutable gold",
+    "model/rule predictions",
+    "the other reviewer's sheet before completion",
+    "adjudication context before both sheets were returned"
+  ],
+  "independentOfDatasetAndModelDevelopment": null,
+  "returnedSheetSha256": "795c27f86c9a79a2780c3f7033450e2c1bb7064ddd825083dc257956ef9f471b",
+  "reviewerId": "label-policy-reviewer-a",
+  "reviewerIdentity": null,
+  "reviewerIsHuman": null,
+  "schemaVersion": "aishop-human-reviewer-independence-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "status": "TEMPLATE_NOT_EVIDENCE",
+  "taskId": "label-policy-v2.1",
+  "workedIndependentlyFromOtherReviewer": null
+}

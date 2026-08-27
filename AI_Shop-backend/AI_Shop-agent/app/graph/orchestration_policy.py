@@ -150,9 +150,14 @@ def _workflow_eligible(state: Mapping[str, Any]) -> bool:
 
 
 def _cross_domain_request(state: Mapping[str, Any]) -> bool:
-    if state.get("rag_evidence_required") and state.get("verified_order_context"):
-        return True
     text = str(state.get("user_text") or "")
+    # A verified order snapshot plus policy evidence does not by itself make a
+    # request multi-agent.  A single, coherent question (for example, whether
+    # an unshipped order's address can be changed) is cheaper and more reliable
+    # on one grounded agent.  Reserve specialists for an explicitly composite
+    # request with multiple questions/domains.
+    if state.get("rag_evidence_required") and state.get("verified_order_context"):
+        return _looks_composite(text)
     domains = {
         domain
         for domain, markers in _DOMAIN_MARKERS.items()

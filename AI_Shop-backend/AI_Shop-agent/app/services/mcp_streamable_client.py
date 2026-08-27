@@ -24,6 +24,7 @@ import structlog
 
 from app.config.settings import get_settings
 from app.services.evaluation_fault_service import active_mcp_fault_meta
+from app.services.mcp_trusted_context import build_trusted_turn_meta
 from app.services.tool_invoke_result import (
     MCP_PROTOCOL,
     MCP_TOOL_CONTRACT,
@@ -214,10 +215,23 @@ class McpStreamableClient:
     ) -> ToolInvokeResult:
         args = arguments or {}
         evaluation_meta = active_mcp_fault_meta()
+        trusted_turn_meta = build_trusted_turn_meta(name, args)
+        request_meta = {
+            **(evaluation_meta or {}),
+            **(trusted_turn_meta or {}),
+        }
+        if trusted_turn_meta:
+            trusted_payload = next(iter(trusted_turn_meta.values()))
+            logger.info(
+                "mcp_trusted_turn_context_attached",
+                tool=name,
+                user_text_chars=len(str(trusted_payload.get("userText") or "")),
+                has_request_binding=bool(trusted_payload.get("requestId")),
+            )
         raw = await self._with_session(
             (
-                (lambda session: session.call_tool(name, args, meta=evaluation_meta))
-                if evaluation_meta
+                (lambda session: session.call_tool(name, args, meta=request_meta))
+                if request_meta
                 else (lambda session: session.call_tool(name, args))
             ),
             what=name,

@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-25T11:23:01.750Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "fca47fa50a6d62555f7dc1a734d4f978b7f2a7f43067336816045158febfbf79",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 1901,
+      "sha256": "ad19f7236508a489ecaa8fa5b36f5619bdbbeec82908c65ec1be47676d1a02fc"
+    },
+    "report.json": {
+      "bytes": 4127991,
+      "sha256": "260f4968158b2ce506d533e781ee7e77e5570b137616e7c5c570efec2ef340d8"
+    },
+    "report.md": {
+      "bytes": 1688,
+      "sha256": "c899ee3361e87102d92012eb9b710bf2b279ce004b64d579ecc652712af4b8f4"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v25-targeted-quality-fixes-20260825",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "091583ec1b9f7c44a2e58e0769932407fa8f14f69db47715ce1446bea8c6089a",
+  "status": "TARGETED_REGRESSION_OBSERVATION"
+}

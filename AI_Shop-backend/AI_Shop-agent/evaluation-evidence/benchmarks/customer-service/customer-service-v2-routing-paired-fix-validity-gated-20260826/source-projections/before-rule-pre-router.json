@@ -1,0 +1,7416 @@
+{
+  "badcases": [
+    {
+      "caseId": "cs-gold-v1-009",
+      "difficulty": null,
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "199元",
+          "orderId": "SM202608050002"
+        }
+      },
+      "message": "我要退款订单 SM202608050002，金额199元",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "199",
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": []
+    },
+    {
+      "caseId": "cs-gold-v1-020",
+      "difficulty": null,
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "199元",
+          "orderId": "SM202608050002"
+        }
+      },
+      "message": "我要开发票，订单 SM202608050002，金额199元",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "199",
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "INVOICE",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": []
+    },
+    {
+      "caseId": "cs-gold-v1-058",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "¥199.00"
+        }
+      },
+      "message": "¥199.00的订单我要开发票",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "199.00"
+        },
+        "handoffReason": null,
+        "intent": "INVOICE",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": [
+        "invoice",
+        "currency-slot"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-061",
+      "difficulty": "easy",
+      "expected": {
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "A20260823001"
+        }
+      },
+      "message": "订单 A20260823001 还没发货，收货地址怎么改",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "address-change",
+        "order-id"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-062",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "20260823002"
+        }
+      },
+      "message": "我不是要取消订单，只想把 20260823002 的地址换一下",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch",
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "ADDRESS_CHANGE",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "address-change",
+        "negation",
+        "intent-boundary"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-063",
+      "difficulty": "medium",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "addressType": "公司地址"
+        }
+      },
+      "message": "包裹已经出库了还能改到公司地址吗",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch",
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "ADDRESS_CHANGE",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "address-change",
+        "post-dispatch",
+        "policy-question"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-065",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "东西用着不对劲，但说不上是质量还是安装问题",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "aftersales-unknown",
+        "underspecified"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-066",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "message": "售后入口一直让我重选问题，转个人帮我看吧",
+      "metrics": [
+        "intentMacroF1",
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.65,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "nextAction": "ASK_CLARIFICATION",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "HANDOFF_OR_RISK_POLICY_GAP",
+      "sliceTags": [
+        "aftersales-unknown",
+        "explicit-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-067",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823003"
+        }
+      },
+      "message": "请取消订单 20260823003，先别退款到其他账户",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "cancel-order",
+        "order-id",
+        "write-intent"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-069",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "两次；一单"
+        }
+      },
+      "message": "这个订单误下了两次，帮我取消其中一单，拿不准就转人工",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "cancel-order",
+        "duplicate-order",
+        "conditional-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-073",
+      "difficulty": "medium",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "三次"
+        }
+      },
+      "message": "客服连续三次答非所问，我要投诉这次服务",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch",
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "COMPLAINT",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "complaint",
+        "service-quality",
+        "handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-074",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "personalDataType": "收货地址"
+        }
+      },
+      "message": "你们把我的收货地址发给陌生人了，立刻转安全专员",
+      "metrics": [
+        "intentMacroF1",
+        "highRiskIntentRecall",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch",
+        "handoffRecall",
+        "criticalHandoffMissRate"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "complaint",
+        "privacy",
+        "critical-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-075",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "物流慢归慢，我现在只反馈一下，不用转人工",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "complaint",
+        "negated-handoff",
+        "logistics-boundary"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-076",
+      "difficulty": "easy",
+      "expected": {
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823004"
+        }
+      },
+      "message": "订单 20260823004 已收到，帮我确认收货",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CONFIRM_RECEIPT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "confirm-receipt",
+        "order-id",
+        "write-intent"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-077",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "message": "我没收到货，千万别给我自动确认收货",
+      "metrics": [
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CONFIRM_RECEIPT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "HANDOFF_OR_RISK_POLICY_GAP",
+      "sliceTags": [
+        "confirm-receipt",
+        "negation",
+        "critical-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-078",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "系统显示快自动收货了，自动确认后还能售后吗",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.65,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "nextAction": "ASK_CLARIFICATION",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "confirm-receipt",
+        "policy-question",
+        "aftersales-boundary"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-079",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "expectedColor": "蓝色",
+          "orderId": "20260823005",
+          "productName": "耳机",
+          "receivedColor": "红色"
+        }
+      },
+      "message": "收到的蓝色耳机变成红色了，订单 20260823005",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {
+          "productName": "蓝色耳机"
+        },
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "wrong-item",
+        "order-id",
+        "product-name"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-080",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "productName": "充电宝"
+        }
+      },
+      "message": "充电宝鼓包而且发烫，我已经停止使用，马上转人工",
+      "metrics": [
+        "highRiskIntentRecall",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "damaged-item",
+        "battery-safety",
+        "critical-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-081",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "quantity": "12 瓶；10 瓶"
+        }
+      },
+      "message": "一箱应该有 12 瓶但只到 10 瓶，不是要退款，先查漏发",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "missing-item",
+        "quantity",
+        "refund-negation"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-083",
+      "difficulty": "medium",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "message": "我不是要机器人继续解释，找真人处理",
+      "metrics": [
+        "intentMacroF1",
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "HANDOFF_OR_RISK_POLICY_GAP",
+      "sliceTags": [
+        "human-request",
+        "negation",
+        "explicit-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-084",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "message": "账户疑似被盗，请转安全人工，不要让我再输支付信息",
+      "metrics": [
+        "intentMacroF1",
+        "highRiskIntentRecall",
+        "handoffRecall",
+        "criticalHandoffMissRate"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "HANDOFF_OR_RISK_POLICY_GAP",
+      "sliceTags": [
+        "human-request",
+        "account-compromise",
+        "critical-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-085",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "人民币199元"
+        }
+      },
+      "message": "人民币199元的订单怎么开电子发票",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "199"
+        },
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": [
+        "invoice",
+        "currency-wording",
+        "canonical-slot"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-086",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "￥１，２９９．００",
+          "invoiceTitleType": "公司抬头"
+        }
+      },
+      "message": "￥１，２９９．００ 这笔能开公司抬头吗",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "１"
+        },
+        "handoffReason": null,
+        "intent": "INVOICE",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "invoice",
+        "full-width-currency",
+        "canonical-slot"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-088",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "amount": "299.00 元",
+          "quantity": "两次"
+        }
+      },
+      "message": "同一订单扣了两次 299.00 元，请立即冻结处理",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "299.00"
+        },
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": [
+        "payment-issue",
+        "duplicate-charge",
+        "critical-handoff",
+        "canonical-slot"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-089",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "amount": "¥88"
+        }
+      },
+      "message": "支付显示失败但银行卡扣了 ¥88，钱去哪了",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "handoffRecall"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {
+          "amount": "88"
+        },
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": [
+        "payment-issue",
+        "unknown-outcome",
+        "critical-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-090",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "付款页卡住了，我还没输入密码，先告诉我能否重试",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "payment-issue",
+        "retry-question",
+        "no-secret"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-091",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "WH-1000XM6；十周年版"
+        }
+      },
+      "message": "这款 WH-1000XM6 和十周年版主要差在哪",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "product-consult",
+        "comparison",
+        "consult-search-boundary"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-092",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "displayTechnology": "OLED；Mini LED"
+        }
+      },
+      "message": "不要给我列一堆商品，只解释 OLED 和 Mini LED 的区别",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "product-consult",
+        "search-negation",
+        "terminology"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-093",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "这双鞋",
+          "useCase": "雨天通勤"
+        }
+      },
+      "message": "这双鞋适合雨天通勤吗",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "productName": "这双鞋"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "product-consult",
+        "use-case",
+        "elliptical-product"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-094",
+      "difficulty": "easy",
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "一周",
+          "rating": "五星"
+        }
+      },
+      "message": "订单商品已经用了一周，我想写个五星评价",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PRODUCT_REVIEW",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "product-review",
+        "positive-review"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-095",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      },
+      "message": "不是投诉客服，我要评价刚收到的耳机",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "COMPLAINT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "product-review",
+        "complaint-negation",
+        "product-name"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-096",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "这个商品页面不让我追评，能告诉我追评入口吗",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "RECOMMENT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "product-review",
+        "follow-up-review"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-097",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000 元",
+          "brand": "索尼",
+          "excludedFormFactor": "入耳式",
+          "feature": "降噪",
+          "productName": "耳机"
+        }
+      },
+      "message": "找 3000 元以内的索尼降噪耳机，不要入耳式",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "3000",
+          "brand": "索尼",
+          "budget": "3000元以内",
+          "feature": "降噪",
+          "productName": "索尼降噪耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "product-search",
+        "budget",
+        "negative-constraint"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-098",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机",
+          "quantity": "两款",
+          "useCase": "通勤"
+        }
+      },
+      "message": "我不想问耳机参数，直接帮我找两款能通勤用的",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "productName": "我不想问耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "product-search",
+        "consult-negation",
+        "quantity"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-099",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "一千二",
+          "feature": "能拍照",
+          "productName": "手机"
+        }
+      },
+      "message": "预算一千二，想买个能拍照的手机，有合适的吗",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "productName": "能拍照的手机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "product-search",
+        "chinese-number",
+        "budget"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-100",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "QUERY_COUPON",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "discount": "满 300 减 40"
+        }
+      },
+      "message": "满 300 减 40 的券在哪里领",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "query-coupon",
+        "threshold",
+        "amount-slot"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-103",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "这件预售商品"
+        }
+      },
+      "message": "这件预售商品大概几天能发货",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "query-fulfillment",
+        "presale",
+        "time-wording"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-104",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "我问的是仓库何时出库，不是快递到了哪里",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "query-fulfillment",
+        "logistics-boundary",
+        "negation"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-105",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823006",
+          "promisedShipTime": "今天"
+        }
+      },
+      "message": "承诺今天发货但还没出库，订单 20260823006",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "query-fulfillment",
+        "deadline",
+        "order-id"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-106",
+      "difficulty": "easy",
+      "expected": {
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "三天",
+          "orderId": "20260823007"
+        }
+      },
+      "message": "订单 20260823007 物流三天没更新了",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "query-logistics",
+        "stale-tracking",
+        "order-id"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-109",
+      "difficulty": "easy",
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823008"
+        }
+      },
+      "message": "帮我查订单 20260823008 当前是什么状态",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "query-order",
+        "order-id"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-110",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "message": "我不想取消，只想看看这单还在不在",
+      "metrics": [
+        "intentMacroF1"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CANCEL_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "INTENT_ROUTING_OR_TAXONOMY_GAP",
+      "sliceTags": [
+        "query-order",
+        "cancel-negation",
+        "intent-boundary"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-111",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1,299 元"
+        }
+      },
+      "message": "订单列表突然少了一笔 1,299 元的订单",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "299"
+        },
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "query-order",
+        "missing-record",
+        "canonical-slot"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-112",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "pricePreference": "便宜点"
+        }
+      },
+      "message": "刚才推荐的太贵了，换一批便宜点的",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "recomment",
+        "price-feedback",
+        "contextual"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-113",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productTier": "旗舰",
+          "quantity": "两款"
+        }
+      },
+      "message": "不要苹果，再推荐两款安卓旗舰",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "recomment",
+        "negative-brand",
+        "quantity"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-114",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "静音",
+          "quantity": "几个",
+          "useCase": "小户型"
+        }
+      },
+      "message": "上一批都不适合小户型，重新给几个静音的",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "recomment",
+        "use-case-feedback",
+        "elliptical"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-115",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "refundType": "七天无理由退款"
+        }
+      },
+      "message": "我想了解七天无理由退款多久到账，不是查某一笔进度",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "refund",
+        "policy-question",
+        "refund-status-boundary"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-116",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823009"
+        }
+      },
+      "message": "订单 20260823009 申请退款，先告诉我需要哪些条件",
+      "metrics": [
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_EXTRACTION_GAP",
+      "sliceTags": [
+        "refund",
+        "policy-before-action",
+        "order-id"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-117",
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "message": "不要把钱退到陌生卡里，我要人工确认退款账户",
+      "metrics": [
+        "intentMacroF1",
+        "highRiskIntentRecall",
+        "handoffRecall",
+        "criticalHandoffMissRate"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "HANDOFF_OR_RISK_POLICY_GAP",
+      "sliceTags": [
+        "refund",
+        "account-safety",
+        "critical-handoff"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-118",
+      "difficulty": "medium",
+      "expected": {
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "第 5 天"
+        }
+      },
+      "message": "退款单显示处理中第 5 天了，现在到哪一步",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch",
+        "normalizedSlotEntitySpanF1",
+        "normalizedSlotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED",
+      "sliceTags": [
+        "refund-status",
+        "pending",
+        "time-wording"
+      ]
+    },
+    {
+      "caseId": "cs-candidate-v2-119",
+      "difficulty": "hard",
+      "expected": {
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "¥199.00"
+        }
+      },
+      "message": "我不是问退款规则，¥199.00 那笔一直没到账",
+      "metrics": [
+        "intentMacroF1",
+        "slotEntitySpanF1",
+        "slotExactMatch"
+      ],
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "199.00"
+        },
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "rootCause": "SLOT_NORMALIZATION_GAP",
+      "sliceTags": [
+        "refund-status",
+        "policy-negation",
+        "canonical-slot"
+      ]
+    }
+  ],
+  "bootstrapPolicy": {
+    "binaryMetrics": "Wilson intervals retained for directly binomial metrics",
+    "method": "stratified-percentile-bootstrap",
+    "primaryStrata": [
+      "intent",
+      "riskLevel",
+      "shouldHandoff"
+    ],
+    "samples": 2000,
+    "seed": 20260822
+  },
+  "canonicalSlotDiagnostics": {
+    "extensionFieldCounts": {
+      "addressType": 1,
+      "audience": 1,
+      "bluetoothVersion": 1,
+      "brand": 3,
+      "budget": 5,
+      "compatibleModel": 1,
+      "discount": 1,
+      "displayTechnology": 1,
+      "duration": 3,
+      "excludedBrand": 2,
+      "excludedFormFactor": 1,
+      "excludedStyle": 1,
+      "expectedColor": 1,
+      "feature": 7,
+      "invoiceTitleType": 1,
+      "operatingSystem": 2,
+      "personalDataType": 1,
+      "pricePreference": 1,
+      "productTier": 1,
+      "promisedShipTime": 1,
+      "quantity": 8,
+      "rating": 1,
+      "receivedColor": 1,
+      "refundType": 1,
+      "useCase": 3
+    },
+    "extensionOnlyCaseCount": 13,
+    "metrics": {
+      "canonicalSlotEntitySpanF1": {
+        "badcaseCount": 24,
+        "badcaseIds": [
+          "cs-gold-v1-009",
+          "cs-gold-v1-020",
+          "cs-gold-v1-058",
+          "cs-candidate-v2-061",
+          "cs-candidate-v2-062",
+          "cs-candidate-v2-067",
+          "cs-candidate-v2-076",
+          "cs-candidate-v2-079",
+          "cs-candidate-v2-080",
+          "cs-candidate-v2-085",
+          "cs-candidate-v2-086",
+          "cs-candidate-v2-088",
+          "cs-candidate-v2-089",
+          "cs-candidate-v2-091",
+          "cs-candidate-v2-097",
+          "cs-candidate-v2-098",
+          "cs-candidate-v2-099",
+          "cs-candidate-v2-103",
+          "cs-candidate-v2-105",
+          "cs-candidate-v2-106",
+          "cs-candidate-v2-109",
+          "cs-candidate-v2-111",
+          "cs-candidate-v2-116",
+          "cs-candidate-v2-119"
+        ],
+        "componentCounts": {
+          "falseNegative": 149,
+          "falsePositive": 14,
+          "truePositive": 384
+        },
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.737104,
+          "method": "stratified-case-bootstrap-micro-F1",
+          "stratumCount": 20,
+          "upper": 0.895277
+        },
+        "definition": "Diagnostic micro character-span F1 after projecting both sides to the five fields currently emitted by the production pre-router; it does not replace the full human-schema slot metric.",
+        "denominator": 931,
+        "name": "canonicalSlotEntitySpanF1",
+        "numerator": 768,
+        "releaseGateEligible": false,
+        "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
+        "status": "MEASURED",
+        "value": 0.824919
+      },
+      "canonicalSlotExactMatch": {
+        "badcaseCount": 24,
+        "badcaseIds": [
+          "cs-gold-v1-009",
+          "cs-gold-v1-020",
+          "cs-gold-v1-058",
+          "cs-candidate-v2-061",
+          "cs-candidate-v2-062",
+          "cs-candidate-v2-067",
+          "cs-candidate-v2-076",
+          "cs-candidate-v2-079",
+          "cs-candidate-v2-080",
+          "cs-candidate-v2-085",
+          "cs-candidate-v2-086",
+          "cs-candidate-v2-088",
+          "cs-candidate-v2-089",
+          "cs-candidate-v2-091",
+          "cs-candidate-v2-097",
+          "cs-candidate-v2-098",
+          "cs-candidate-v2-099",
+          "cs-candidate-v2-103",
+          "cs-candidate-v2-105",
+          "cs-candidate-v2-106",
+          "cs-candidate-v2-109",
+          "cs-candidate-v2-111",
+          "cs-candidate-v2-116",
+          "cs-candidate-v2-119"
+        ],
+        "confidenceInterval95": {
+          "confidenceLevel": 0.95,
+          "lower": 0.449801,
+          "method": "wilson",
+          "upper": 0.698124
+        },
+        "definition": "Diagnostic request-level exact match after projecting to production canonical slots; extension-only human slots are excluded from this denominator.",
+        "denominator": 57,
+        "name": "canonicalSlotExactMatch",
+        "numerator": 33,
+        "releaseGateEligible": false,
+        "role": "DIAGNOSTIC_SCHEMA_ALIGNMENT",
+        "status": "MEASURED",
+        "value": 0.578947
+      }
+    },
+    "note": "This projection is a schema-alignment diagnostic. Full human-schema slot metrics remain the primary reported quality signal.",
+    "productionFields": [
+      "amount",
+      "orderId",
+      "orderItemId",
+      "productId",
+      "productName"
+    ]
+  },
+  "cases": [
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "2000",
+          "brand": "索尼",
+          "budget": "2000元",
+          "productName": "索尼 WH-1000XM6"
+        }
+      },
+      "id": "cs-gold-v1-001",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我想买索尼 WH-1000XM6，预算 2000 元",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "2000",
+          "brand": "索尼",
+          "budget": "2000元",
+          "productName": "索尼 WH-1000XM6"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000",
+          "brand": "华为",
+          "budget": "3000元",
+          "productName": "华为手机"
+        }
+      },
+      "id": "cs-gold-v1-002",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我想买华为手机，预算 3000 元",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "3000",
+          "brand": "华为",
+          "budget": "3000元",
+          "productName": "华为手机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "bluetoothVersion": "5.4",
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-gold-v1-003",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "这款耳机支持蓝牙 5.4 吗",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "bluetoothVersion": "5.4",
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-004",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "帮我查订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "QUERY_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-005",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "订单 SM202608050002 买了什么？",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "QUERY_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-006",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "订单 SM202608050002 的物流到哪了",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-007",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "订单 SM202608050002 怎么还没发货",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "QUERY_FULFILLMENT",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-008",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "物流一直不动怎么办，订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "199元",
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-009",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我要退款订单 SM202608050002，金额199元",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "199",
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-010",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我的退款订单 SM202608050002 什么时候到账",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "REFUND_STATUS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-011",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "退款政策一般多久到账",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-012",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我要取消订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "CANCEL_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-013",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "取消订单的条件是什么",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CANCEL_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-014",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "订单 SM202608050002 我已经收到货了，帮我确认收货",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "CONFIRM_RECEIPT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_COUPON",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-015",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我有哪些优惠券",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_COUPON",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-016",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我要评价订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_REVIEW",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-017",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我想追评订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "RECOMMENT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-018",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "收到的商品坏了，帮我处理订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-019",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "商家发错商品了，订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "199元",
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-020",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我要开发票，订单 SM202608050002，金额199元",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "199",
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "INVOICE",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-021",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "订单 SM202608050002 收货地址填错了，帮我改地址",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "ADDRESS_CHANGE",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-022",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "投诉一直没人解决，我要报警",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "COMPLAINT",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-023",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "请立即转人工客服",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-024",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "支付失败了",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-025",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "支付失败了但是钱扣了",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-026",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "你们能读取我的邮箱历史吗",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-027",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我想申请售后，订单 SM202608050002",
+      "predicted": {
+        "confidence": 0.65,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "nextAction": "ASK_CLARIFICATION",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-028",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "你好，今天有什么活动？",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "500",
+          "budget": "500元以内",
+          "excludedStyle": "户外款",
+          "productName": "男士外套"
+        }
+      },
+      "id": "cs-gold-v1-029",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "帮我找 500 元以内、不要户外款的男士外套",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "500",
+          "budget": "500元以内",
+          "excludedStyle": "户外款",
+          "productName": "男士外套"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "88"
+        }
+      },
+      "id": "cs-gold-v1-030",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "我要退款，金额 88 元",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "88"
+        },
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-031",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "这个问题一直没解决，还是不行，帮我处理",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "REPEATED_UNRESOLVED",
+        "intent": "COMPLAINT",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-032",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "收到商品是坏的",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "主动降噪",
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-gold-v1-033",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "这副耳机有没有主动降噪",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "feature": "主动降噪",
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1000",
+          "budget": "1000元以内",
+          "feature": "降噪",
+          "productName": "降噪耳机"
+        }
+      },
+      "id": "cs-gold-v1-034",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "推荐 1000 元以内的降噪耳机",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "1000",
+          "budget": "1000元以内",
+          "feature": "降噪",
+          "productName": "降噪耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-035",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "帮我看看订单 SM202608050002 当前状态",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": null,
+        "intent": "QUERY_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-036",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "退款需要满足哪些条件",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "SM202608050002"
+        }
+      },
+      "id": "cs-gold-v1-037",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "订单 SM202608050002 重复支付了两次",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002"
+        },
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-038",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "请人工处理我的个人信息删除请求",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-gold-v1-039",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "收到的耳机碎了",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": null,
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-040",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "找真人客服帮我处理",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": []
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "续航",
+          "productName": "手机"
+        }
+      },
+      "id": "cs-gold-v1-041",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "这款手机续航怎么样",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "feature": "续航",
+          "productName": "手机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-consult",
+        "attribute-question"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "2000",
+          "audience": "学生",
+          "budget": "2000元",
+          "productName": "平板"
+        }
+      },
+      "id": "cs-gold-v1-042",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "有没有适合学生的平板，预算2000元",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "2000",
+          "audience": "学生",
+          "budget": "2000元",
+          "productName": "平板"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-search",
+        "budget-constraint",
+        "consult-search-boundary"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productName": "安卓手机"
+        }
+      },
+      "id": "cs-gold-v1-043",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "不要苹果，推荐安卓手机",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productName": "安卓手机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-search",
+        "negative-constraint",
+        "brand"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-gold-v1-044",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "这款耳机和另一款相比哪个好",
+      "predicted": {
+        "confidence": 0.99,
+        "entities": {
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "structural"
+      },
+      "sliceTags": [
+        "product-search",
+        "comparison",
+        "consult-search-boundary"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "主动降噪",
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-gold-v1-045",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "耳机有主动降噪嘛",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "feature": "主动降噪",
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-consult",
+        "attribute-question"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-046",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "银行卡被扣了两次",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "payment-risk",
+        "duplicate-charge",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-047",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "付款成功但订单没生成",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "payment-risk",
+        "missing-order",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-048",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "支付失败但没有扣款，怎么办",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "payment",
+        "negation",
+        "risk-boundary"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-049",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "支付方式有哪些",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "payment-policy",
+        "low-risk-chat"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-050",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "删除我的个人资料",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "privacy",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-051",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "请导出我的账户数据",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "privacy",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-052",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我已经问了三次还没解决",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "REPEATED_UNRESOLVED",
+        "intent": "COMPLAINT",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "complaint",
+        "repeated-unresolved",
+        "handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-053",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我怀疑这笔支付不是我操作的",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "payment-risk",
+        "unauthorized-payment",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-054",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "收到的是错的颜色",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "after-sales",
+        "wrong-item",
+        "short-utterance"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "SM202608050002",
+          "productName": "配件",
+          "quantity": "1"
+        }
+      },
+      "id": "cs-gold-v1-055",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "少了一个配件，订单SM202608050002",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "orderId": "SM202608050002",
+          "productName": "配件",
+          "quantity": "1"
+        },
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "after-sales",
+        "missing-item",
+        "slot-order-id"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-056",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "商品质量有问题想换货",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "after-sales",
+        "exchange"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-057",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "退款多久到账呀",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "refund",
+        "timing-question",
+        "policy-status-boundary"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "¥199.00"
+        }
+      },
+      "id": "cs-gold-v1-058",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "¥199.00的订单我要开发票",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "199.00"
+        },
+        "handoffReason": null,
+        "intent": "INVOICE",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "invoice",
+        "currency-slot"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "compatibleModel": "iPhone 15",
+          "productName": "手机壳"
+        }
+      },
+      "id": "cs-gold-v1-059",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": true
+      },
+      "message": "手机壳有没有适配 iPhone 15",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "compatibleModel": "iPhone 15",
+          "productName": "手机壳"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_CONSULT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-consult",
+        "compatibility",
+        "slot-product-name"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-gold-v1-060",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "谢谢你",
+      "predicted": {
+        "confidence": 0.99,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "deterministic_social"
+      },
+      "sliceTags": [
+        "chat",
+        "acknowledgement",
+        "low-risk-chat"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "A20260823001"
+        }
+      },
+      "id": "cs-candidate-v2-061",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "订单 A20260823001 还没发货，收货地址怎么改",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "address-change",
+        "order-id"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "20260823002"
+        }
+      },
+      "id": "cs-candidate-v2-062",
+      "matches": {
+        "handoff": false,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "我不是要取消订单，只想把 20260823002 的地址换一下",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "ADDRESS_CHANGE",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "address-change",
+        "negation",
+        "intent-boundary"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "addressType": "公司地址"
+        }
+      },
+      "id": "cs-candidate-v2-063",
+      "matches": {
+        "handoff": false,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "包裹已经出库了还能改到公司地址吗",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "ADDRESS_CHANGE",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "address-change",
+        "post-dispatch",
+        "policy-question"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-064",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "售后页面只有一个红色感叹号，我也不知道该选哪类",
+      "predicted": {
+        "confidence": 0.65,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "nextAction": "ASK_CLARIFICATION",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "aftersales-unknown",
+        "ambiguous"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-065",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "东西用着不对劲，但说不上是质量还是安装问题",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "aftersales-unknown",
+        "underspecified"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-066",
+      "matches": {
+        "handoff": false,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "售后入口一直让我重选问题，转个人帮我看吧",
+      "predicted": {
+        "confidence": 0.65,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "nextAction": "ASK_CLARIFICATION",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "aftersales-unknown",
+        "explicit-handoff"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823003"
+        }
+      },
+      "id": "cs-candidate-v2-067",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "请取消订单 20260823003，先别退款到其他账户",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "cancel-order",
+        "order-id",
+        "write-intent"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-068",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "我只是想知道取消订单的规则，不要真的取消",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CANCEL_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "cancel-order",
+        "policy-question",
+        "negated-write"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "两次；一单"
+        }
+      },
+      "id": "cs-candidate-v2-069",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "这个订单误下了两次，帮我取消其中一单，拿不准就转人工",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "cancel-order",
+        "duplicate-order",
+        "conditional-handoff"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-070",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "你好，今天周几",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "chat",
+        "out-of-domain"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-071",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "不用转人工，我只是来道谢的",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "chat",
+        "negated-handoff",
+        "acknowledgement"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "CHAT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-072",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "嗯嗯，知道了",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "chat",
+        "elliptical"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "三次"
+        }
+      },
+      "id": "cs-candidate-v2-073",
+      "matches": {
+        "handoff": false,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "客服连续三次答非所问，我要投诉这次服务",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "COMPLAINT",
+        "nextAction": "ANSWER",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "complaint",
+        "service-quality",
+        "handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "personalDataType": "收货地址"
+        }
+      },
+      "id": "cs-candidate-v2-074",
+      "matches": {
+        "handoff": false,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "你们把我的收货地址发给陌生人了，立刻转安全专员",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "complaint",
+        "privacy",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-075",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "物流慢归慢，我现在只反馈一下，不用转人工",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "complaint",
+        "negated-handoff",
+        "logistics-boundary"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823004"
+        }
+      },
+      "id": "cs-candidate-v2-076",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "订单 20260823004 已收到，帮我确认收货",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CONFIRM_RECEIPT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "confirm-receipt",
+        "order-id",
+        "write-intent"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-077",
+      "matches": {
+        "handoff": false,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我没收到货，千万别给我自动确认收货",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CONFIRM_RECEIPT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "confirm-receipt",
+        "negation",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "CONFIRM_RECEIPT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-078",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "系统显示快自动收货了，自动确认后还能售后吗",
+      "predicted": {
+        "confidence": 0.65,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "AFTERSALES_UNKNOWN",
+        "nextAction": "ASK_CLARIFICATION",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "confirm-receipt",
+        "policy-question",
+        "aftersales-boundary"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "expectedColor": "蓝色",
+          "orderId": "20260823005",
+          "productName": "耳机",
+          "receivedColor": "红色"
+        }
+      },
+      "id": "cs-candidate-v2-079",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "收到的蓝色耳机变成红色了，订单 20260823005",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {
+          "productName": "蓝色耳机"
+        },
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "wrong-item",
+        "order-id",
+        "product-name"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "productName": "充电宝"
+        }
+      },
+      "id": "cs-candidate-v2-080",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "充电宝鼓包而且发烫，我已经停止使用，马上转人工",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "damaged-item",
+        "battery-safety",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "quantity": "12 瓶；10 瓶"
+        }
+      },
+      "id": "cs-candidate-v2-081",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "一箱应该有 12 瓶但只到 10 瓶，不是要退款，先查漏发",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "missing-item",
+        "quantity",
+        "refund-negation"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-082",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "请直接转人工客服",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "human-request",
+        "explicit-handoff"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-083",
+      "matches": {
+        "handoff": false,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我不是要机器人继续解释，找真人处理",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "human-request",
+        "negation",
+        "explicit-handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-084",
+      "matches": {
+        "handoff": false,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "账户疑似被盗，请转安全人工，不要让我再输支付信息",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "human-request",
+        "account-compromise",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "人民币199元"
+        }
+      },
+      "id": "cs-candidate-v2-085",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "人民币199元的订单怎么开电子发票",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "199"
+        },
+        "handoffReason": null,
+        "intent": "CHAT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "invoice",
+        "currency-wording",
+        "canonical-slot"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "￥１，２９９．００",
+          "invoiceTitleType": "公司抬头"
+        }
+      },
+      "id": "cs-candidate-v2-086",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "￥１，２９９．００ 这笔能开公司抬头吗",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "１"
+        },
+        "handoffReason": null,
+        "intent": "INVOICE",
+        "nextAction": "ANSWER",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "invoice",
+        "full-width-currency",
+        "canonical-slot"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-087",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "发票金额错了，不是咨询开票流程，帮我转人工更正",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "invoice",
+        "amount-mismatch",
+        "handoff"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "amount": "299.00 元",
+          "quantity": "两次"
+        }
+      },
+      "id": "cs-candidate-v2-088",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "同一订单扣了两次 299.00 元，请立即冻结处理",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "299.00"
+        },
+        "handoffReason": "FUND_DISPUTE",
+        "intent": "PAYMENT_ISSUE",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "payment-issue",
+        "duplicate-charge",
+        "critical-handoff",
+        "canonical-slot"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "amount": "¥88"
+        }
+      },
+      "id": "cs-candidate-v2-089",
+      "matches": {
+        "handoff": false,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "支付显示失败但银行卡扣了 ¥88，钱去哪了",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {
+          "amount": "88"
+        },
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "payment-issue",
+        "unknown-outcome",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PAYMENT_ISSUE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-090",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "付款页卡住了，我还没输入密码，先告诉我能否重试",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "payment-issue",
+        "retry-question",
+        "no-secret"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "WH-1000XM6；十周年版"
+        }
+      },
+      "id": "cs-candidate-v2-091",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "这款 WH-1000XM6 和十周年版主要差在哪",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "product-consult",
+        "comparison",
+        "consult-search-boundary"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "displayTechnology": "OLED；Mini LED"
+        }
+      },
+      "id": "cs-candidate-v2-092",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "不要给我列一堆商品，只解释 OLED 和 Mini LED 的区别",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "product-consult",
+        "search-negation",
+        "terminology"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "这双鞋",
+          "useCase": "雨天通勤"
+        }
+      },
+      "id": "cs-candidate-v2-093",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "这双鞋适合雨天通勤吗",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "productName": "这双鞋"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-consult",
+        "use-case",
+        "elliptical-product"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "一周",
+          "rating": "五星"
+        }
+      },
+      "id": "cs-candidate-v2-094",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "订单商品已经用了一周，我想写个五星评价",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PRODUCT_REVIEW",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-review",
+        "positive-review"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-candidate-v2-095",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": true
+      },
+      "message": "不是投诉客服，我要评价刚收到的耳机",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "productName": "耳机"
+        },
+        "handoffReason": null,
+        "intent": "COMPLAINT",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "product-review",
+        "complaint-negation",
+        "product-name"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-096",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "这个商品页面不让我追评，能告诉我追评入口吗",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "RECOMMENT",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-review",
+        "follow-up-review"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000 元",
+          "brand": "索尼",
+          "excludedFormFactor": "入耳式",
+          "feature": "降噪",
+          "productName": "耳机"
+        }
+      },
+      "id": "cs-candidate-v2-097",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "找 3000 元以内的索尼降噪耳机，不要入耳式",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "3000",
+          "brand": "索尼",
+          "budget": "3000元以内",
+          "feature": "降噪",
+          "productName": "索尼降噪耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-search",
+        "budget",
+        "negative-constraint"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "耳机",
+          "quantity": "两款",
+          "useCase": "通勤"
+        }
+      },
+      "id": "cs-candidate-v2-098",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我不想问耳机参数，直接帮我找两款能通勤用的",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "productName": "我不想问耳机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-search",
+        "consult-negation",
+        "quantity"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "一千二",
+          "feature": "能拍照",
+          "productName": "手机"
+        }
+      },
+      "id": "cs-candidate-v2-099",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "预算一千二，想买个能拍照的手机，有合适的吗",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "productName": "能拍照的手机"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "product-search",
+        "chinese-number",
+        "budget"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "QUERY_COUPON",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "discount": "满 300 减 40"
+        }
+      },
+      "id": "cs-candidate-v2-100",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "满 300 减 40 的券在哪里领",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "query-coupon",
+        "threshold",
+        "amount-slot"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_COUPON",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-101",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "不是问商品打折，我的优惠券为什么结算时不可用",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_COUPON",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "query-coupon",
+        "discount-boundary",
+        "negation"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-102",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "券显示已使用但我没下单，转人工核对一下",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "query-coupon",
+        "state-conflict",
+        "handoff"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "这件预售商品"
+        }
+      },
+      "id": "cs-candidate-v2-103",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "这件预售商品大概几天能发货",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "query-fulfillment",
+        "presale",
+        "time-wording"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-104",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我问的是仓库何时出库，不是快递到了哪里",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "query-fulfillment",
+        "logistics-boundary",
+        "negation"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823006",
+          "promisedShipTime": "今天"
+        }
+      },
+      "id": "cs-candidate-v2-105",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "承诺今天发货但还没出库，订单 20260823006",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "query-fulfillment",
+        "deadline",
+        "order-id"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "三天",
+          "orderId": "20260823007"
+        }
+      },
+      "id": "cs-candidate-v2-106",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "订单 20260823007 物流三天没更新了",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "query-logistics",
+        "stale-tracking",
+        "order-id"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-107",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "不是催发货，包裹已经寄出，我想查现在到哪了",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_LOGISTICS",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "query-logistics",
+        "fulfillment-boundary",
+        "negation"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-108",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "物流显示签收但我没收到，马上转人工查凭证",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "query-logistics",
+        "false-delivery",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "easy",
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823008"
+        }
+      },
+      "id": "cs-candidate-v2-109",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "帮我查订单 20260823008 当前是什么状态",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "QUERY_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "query-order",
+        "order-id"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-110",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "我不想取消，只想看看这单还在不在",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "CANCEL_ORDER",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "query-order",
+        "cancel-negation",
+        "intent-boundary"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "QUERY_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1,299 元"
+        }
+      },
+      "id": "cs-candidate-v2-111",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "订单列表突然少了一笔 1,299 元的订单",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {
+          "amount": "299"
+        },
+        "handoffReason": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "query-order",
+        "missing-record",
+        "canonical-slot"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "pricePreference": "便宜点"
+        }
+      },
+      "id": "cs-candidate-v2-112",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "刚才推荐的太贵了，换一批便宜点的",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "recomment",
+        "price-feedback",
+        "contextual"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productTier": "旗舰",
+          "quantity": "两款"
+        }
+      },
+      "id": "cs-candidate-v2-113",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "不要苹果，再推荐两款安卓旗舰",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓"
+        },
+        "handoffReason": null,
+        "intent": "PRODUCT_SEARCH",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "recomment",
+        "negative-brand",
+        "quantity"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "feature": "静音",
+          "quantity": "几个",
+          "useCase": "小户型"
+        }
+      },
+      "id": "cs-candidate-v2-114",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "上一批都不适合小户型，重新给几个静音的",
+      "predicted": {
+        "confidence": 0.4,
+        "entities": {},
+        "handoffReason": "LOW_CONFIDENCE",
+        "intent": "CHAT",
+        "nextAction": "HANDOFF_SUGGESTED",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "default"
+      },
+      "sliceTags": [
+        "recomment",
+        "use-case-feedback",
+        "elliptical"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "refundType": "七天无理由退款"
+        }
+      },
+      "id": "cs-candidate-v2-115",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "我想了解七天无理由退款多久到账，不是查某一笔进度",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "refund",
+        "policy-question",
+        "refund-status-boundary"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823009"
+        }
+      },
+      "id": "cs-candidate-v2-116",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": true,
+        "slotExactMatch": false
+      },
+      "message": "订单 20260823009 申请退款，先告诉我需要哪些条件",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "ACTION_PROPOSAL",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "refund",
+        "policy-before-action",
+        "order-id"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-117",
+      "matches": {
+        "handoff": false,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "不要把钱退到陌生卡里，我要人工确认退款账户",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "refund",
+        "account-safety",
+        "critical-handoff"
+      ]
+    },
+    {
+      "difficulty": "medium",
+      "expected": {
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "第 5 天"
+        }
+      },
+      "id": "cs-candidate-v2-118",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "退款单显示处理中第 5 天了，现在到哪一步",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {},
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "ANSWER",
+        "requestMode": "INFORMATIONAL",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "refund-status",
+        "pending",
+        "time-wording"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "¥199.00"
+        }
+      },
+      "id": "cs-candidate-v2-119",
+      "matches": {
+        "handoff": true,
+        "intent": false,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "我不是问退款规则，¥199.00 那笔一直没到账",
+      "predicted": {
+        "confidence": 0.9,
+        "entities": {
+          "amount": "199.00"
+        },
+        "handoffReason": null,
+        "intent": "REFUND",
+        "nextAction": "TOOL",
+        "requestMode": "READ_QUERY",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "source": "rule"
+      },
+      "sliceTags": [
+        "refund-status",
+        "policy-negation",
+        "canonical-slot"
+      ]
+    },
+    {
+      "difficulty": "hard",
+      "expected": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "id": "cs-candidate-v2-120",
+      "matches": {
+        "handoff": true,
+        "intent": true,
+        "riskLevel": false,
+        "slotExactMatch": false
+      },
+      "message": "退款页面说成功但银行卡没有入账，请转人工核账",
+      "predicted": {
+        "confidence": 0.96,
+        "entities": {},
+        "handoffReason": "USER_REQUEST",
+        "intent": "HUMAN_REQUEST",
+        "nextAction": "HANDOFF",
+        "requestMode": "HUMAN_SUPPORT",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "source": "rule_priority"
+      },
+      "sliceTags": [
+        "refund-status",
+        "state-conflict",
+        "critical-handoff"
+      ]
+    }
+  ],
+  "confusionMatrix": {
+    "ADDRESS_CHANGE": {
+      "ADDRESS_CHANGE": 3,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 1,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "AFTERSALES_UNKNOWN": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 2,
+      "CANCEL_ORDER": 0,
+      "CHAT": 1,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "CANCEL_ORDER": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 3,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 1,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 1,
+      "REFUND_STATUS": 0
+    },
+    "CHAT": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 6,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "COMPLAINT": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 4,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 1,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "CONFIRM_RECEIPT": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 1,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 3,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "DAMAGED_OR_WRONG_ITEM": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 1,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 8,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "HUMAN_REQUEST": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 1,
+      "CANCEL_ORDER": 0,
+      "CHAT": 2,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 12,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 1,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 1,
+      "REFUND_STATUS": 0
+    },
+    "INVOICE": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 1,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 3,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "PAYMENT_ISSUE": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 2,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 8,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "PRODUCT_CONSULT": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 2,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 6,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 1,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "PRODUCT_REVIEW": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 1,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 2,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 1,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "PRODUCT_SEARCH": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 9,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "QUERY_COUPON": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 1,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 2,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "QUERY_FULFILLMENT": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 2,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 1,
+      "QUERY_LOGISTICS": 1,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "QUERY_LOGISTICS": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 4,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "QUERY_ORDER": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 1,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 1,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 4,
+      "RECOMMENT": 0,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "RECOMMENT": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 1,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 2,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 1,
+      "REFUND": 0,
+      "REFUND_STATUS": 0
+    },
+    "REFUND": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 7,
+      "REFUND_STATUS": 0
+    },
+    "REFUND_STATUS": {
+      "ADDRESS_CHANGE": 0,
+      "AFTERSALES_UNKNOWN": 0,
+      "CANCEL_ORDER": 0,
+      "CHAT": 0,
+      "COMPLAINT": 0,
+      "CONFIRM_RECEIPT": 0,
+      "DAMAGED_OR_WRONG_ITEM": 0,
+      "HUMAN_REQUEST": 0,
+      "INVOICE": 0,
+      "PAYMENT_ISSUE": 0,
+      "PRODUCT_CONSULT": 0,
+      "PRODUCT_REVIEW": 0,
+      "PRODUCT_SEARCH": 0,
+      "QUERY_COUPON": 0,
+      "QUERY_FULFILLMENT": 0,
+      "QUERY_LOGISTICS": 0,
+      "QUERY_ORDER": 0,
+      "RECOMMENT": 0,
+      "REFUND": 2,
+      "REFUND_STATUS": 1
+    }
+  },
+  "dataset": {
+    "annotationStatuses": {
+      "HUMAN_VERIFIED": 120
+    },
+    "caseCount": 120,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826/labels/customer-service-human-v2.jsonl",
+    "sha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+    "sliceCounts": {
+      "account-compromise": "[REDACTED_ID:6b86b273ff34]",
+      "account-safety": "[REDACTED_ID:6b86b273ff34]",
+      "acknowledgement": 2,
+      "address-change": 3,
+      "after-sales": 3,
+      "aftersales-boundary": 1,
+      "aftersales-unknown": 3,
+      "ambiguous": 1,
+      "amount-mismatch": 1,
+      "amount-slot": 1,
+      "attribute-question": 2,
+      "battery-safety": 1,
+      "brand": 1,
+      "budget": 2,
+      "budget-constraint": 1,
+      "cancel-negation": 1,
+      "cancel-order": 3,
+      "canonical-slot": 5,
+      "chat": 4,
+      "chinese-number": 1,
+      "comparison": 2,
+      "compatibility": 1,
+      "complaint": 4,
+      "complaint-negation": 1,
+      "conditional-handoff": 1,
+      "confirm-receipt": 3,
+      "consult-negation": 1,
+      "consult-search-boundary": 3,
+      "contextual": 1,
+      "critical-handoff": 14,
+      "currency-slot": 1,
+      "currency-wording": 1,
+      "damaged-item": 1,
+      "deadline": 1,
+      "discount-boundary": 1,
+      "duplicate-charge": 2,
+      "duplicate-order": 1,
+      "elliptical": 2,
+      "elliptical-product": 1,
+      "exchange": 1,
+      "explicit-handoff": 3,
+      "false-delivery": 1,
+      "follow-up-review": 1,
+      "fulfillment-boundary": 1,
+      "full-width-currency": 1,
+      "handoff": 4,
+      "human-request": 3,
+      "intent-boundary": 2,
+      "invoice": 4,
+      "logistics-boundary": 2,
+      "low-risk-chat": 2,
+      "missing-item": 2,
+      "missing-order": 1,
+      "missing-record": 1,
+      "negated-handoff": 2,
+      "negated-write": 1,
+      "negation": 7,
+      "negative-brand": 1,
+      "negative-constraint": 2,
+      "no-secret": "[REDACTED_SECRET]",
+      "order-id": 8,
+      "out-of-domain": 1,
+      "payment": 1,
+      "payment-issue": 3,
+      "payment-policy": 1,
+      "payment-risk": 3,
+      "pending": 1,
+      "policy-before-action": 1,
+      "policy-negation": 1,
+      "policy-question": 4,
+      "policy-status-boundary": 1,
+      "positive-review": 1,
+      "post-dispatch": 1,
+      "presale": 1,
+      "price-feedback": 1,
+      "privacy": 3,
+      "product-consult": 6,
+      "product-name": 2,
+      "product-review": 3,
+      "product-search": 6,
+      "quantity": 3,
+      "query-coupon": 3,
+      "query-fulfillment": 3,
+      "query-logistics": 3,
+      "query-order": 3,
+      "recomment": 3,
+      "refund": 4,
+      "refund-negation": 1,
+      "refund-status": 3,
+      "refund-status-boundary": 1,
+      "repeated-unresolved": 1,
+      "retry-question": 1,
+      "risk-boundary": 1,
+      "search-negation": 1,
+      "service-quality": 1,
+      "short-utterance": 1,
+      "slot-order-id": 1,
+      "slot-product-name": 1,
+      "stale-tracking": 1,
+      "state-conflict": 2,
+      "terminology": 1,
+      "threshold": 1,
+      "time-wording": 2,
+      "timing-question": 1,
+      "unauthorized-payment": 1,
+      "underspecified": 1,
+      "unknown-outcome": 1,
+      "use-case": 1,
+      "use-case-feedback": 1,
+      "write-intent": 2,
+      "wrong-item": 2
+    }
+  },
+  "historicalBaseline": {
+    "badcaseIds": [
+      "cs-gold-v1-001",
+      "cs-gold-v1-002",
+      "cs-gold-v1-003",
+      "cs-gold-v1-011",
+      "cs-gold-v1-022",
+      "cs-gold-v1-026",
+      "cs-gold-v1-031",
+      "cs-gold-v1-032"
+    ],
+    "caseCount": 32,
+    "datasetSha256": "826114a806c879fe047b382d2e3a0519cf1428f19bb10efe70c137c8af73f1d3",
+    "label": "gold-v1-pre-optimization",
+    "metrics": {
+      "criticalHandoffMissRate": {
+        "denominator": 3,
+        "numerator": 1,
+        "value": 0.333333
+      },
+      "handoffRecall": {
+        "denominator": 5,
+        "numerator": 4,
+        "value": 0.8
+      },
+      "highRiskIntentRecall": {
+        "denominator": 3,
+        "numerator": 1,
+        "value": 0.333333
+      },
+      "intentMacroF1": {
+        "denominator": 20,
+        "numerator": 16.990477,
+        "value": 0.849524
+      },
+      "slotEntitySpanF1": {
+        "denominator": 261,
+        "numerator": 243,
+        "value": 0.964286
+      },
+      "slotExactMatch": {
+        "denominator": 21,
+        "numerator": 18,
+        "value": 0.857143
+      }
+    },
+    "note": "Recorded before resolver changes; provisional diagnostic only, not an A/B or human-verified result.",
+    "status": "PROVISIONAL_NOT_HUMAN_GOLD"
+  },
+  "humanReviewPlan": {
+    "adjudicationComplete": true,
+    "adjudicationRequired": true,
+    "blindedFirstPass": true,
+    "fields": [
+      "intent",
+      "riskLevel",
+      "shouldHandoff",
+      "handoffSeverity",
+      "slots"
+    ],
+    "freezeAfterAdjudication": true,
+    "metricsAfterFreeze": [
+      "intentMacroF1",
+      "highRiskIntentRecall",
+      "slotEntitySpanF1",
+      "slotExactMatch",
+      "handoffRecall"
+    ],
+    "note": "Labels were independently reviewed and adjudicated; release publication still requires an explicit project gate decision.",
+    "requiredAnnotators": 2,
+    "status": "COMPLETE"
+  },
+  "limitations": [
+    "Human labels are frozen for this dataset version; the result still measures offline understanding, not customer satisfaction or production success.",
+    "mode=rule evaluates the deterministic production pre-router with allow_llm=false, not the full HTTP Agent conversation.",
+    "The core metrics do not establish customer satisfaction, FCR, CSAT, production volume, or business conversion."
+  ],
+  "metrics": {
+    "criticalHandoffMissRate": {
+      "badcaseCount": 3,
+      "badcaseIds": [
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-084",
+        "cs-candidate-v2-117"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.097461,
+        "method": "wilson",
+        "upper": 0.565645
+      },
+      "definition": "Severe漏转人工率 among gold handoffSeverity=CRITICAL cases; lower is better.",
+      "denominator": 11,
+      "name": "criticalHandoffMissRate",
+      "notes": [
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 3,
+      "releaseGateEligible": false,
+      "role": "PRIMARY_QUALITY",
+      "status": "MEASURED",
+      "value": 0.272727
+    },
+    "handoffRecall": {
+      "badcaseCount": 10,
+      "badcaseIds": [
+        "cs-candidate-v2-062",
+        "cs-candidate-v2-063",
+        "cs-candidate-v2-066",
+        "cs-candidate-v2-073",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-077",
+        "cs-candidate-v2-083",
+        "cs-candidate-v2-084",
+        "cs-candidate-v2-089",
+        "cs-candidate-v2-117"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.514333,
+        "method": "wilson",
+        "upper": 0.820475
+      },
+      "definition": "Among gold shouldHandoff=true cases, only next_action=HANDOFF counts as immediate handoff; HANDOFF_SUGGESTED does not.",
+      "denominator": 32,
+      "name": "handoffRecall",
+      "notes": [
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 22,
+      "releaseGateEligible": false,
+      "role": "PRIMARY_QUALITY",
+      "status": "MEASURED",
+      "value": 0.6875
+    },
+    "highRiskIntentRecall": {
+      "badcaseCount": 4,
+      "badcaseIds": [
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-080",
+        "cs-candidate-v2-084",
+        "cs-candidate-v2-117"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.480496,
+        "method": "wilson",
+        "upper": 0.891025
+      },
+      "definition": "Recall of cases independently labelled riskLevel=HIGH, requiring predicted riskLevel=HIGH.",
+      "denominator": 15,
+      "name": "highRiskIntentRecall",
+      "notes": [
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 11,
+      "releaseGateEligible": false,
+      "role": "PRIMARY_QUALITY",
+      "status": "MEASURED",
+      "value": 0.733333
+    },
+    "intentMacroF1": {
+      "badcaseCount": 31,
+      "badcaseIds": [
+        "cs-candidate-v2-061",
+        "cs-candidate-v2-065",
+        "cs-candidate-v2-066",
+        "cs-candidate-v2-067",
+        "cs-candidate-v2-069",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-075",
+        "cs-candidate-v2-078",
+        "cs-candidate-v2-079",
+        "cs-candidate-v2-083",
+        "cs-candidate-v2-084",
+        "cs-candidate-v2-085",
+        "cs-candidate-v2-089",
+        "cs-candidate-v2-090",
+        "cs-candidate-v2-091",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-093",
+        "cs-candidate-v2-095",
+        "cs-candidate-v2-096",
+        "cs-candidate-v2-100",
+        "cs-candidate-v2-103",
+        "cs-candidate-v2-104",
+        "cs-candidate-v2-105",
+        "cs-candidate-v2-110",
+        "cs-candidate-v2-111",
+        "cs-candidate-v2-112",
+        "cs-candidate-v2-113",
+        "cs-candidate-v2-114",
+        "cs-candidate-v2-117",
+        "cs-candidate-v2-118",
+        "cs-candidate-v2-119"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.623179,
+        "method": "stratified-case-bootstrap-macro-F1",
+        "stratumCount": 32,
+        "upper": 0.779252
+      },
+      "definition": "Gold intent labels are macro-averaged across the observed label set; prediction outside the set is counted as a miss/false positive.",
+      "denominator": 20,
+      "name": "intentMacroF1",
+      "notes": [
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 14.344801,
+      "releaseGateEligible": false,
+      "role": "PRIMARY_QUALITY",
+      "status": "MEASURED",
+      "value": 0.71724
+    },
+    "normalizedSlotEntitySpanF1": {
+      "badcaseCount": 32,
+      "badcaseIds": [
+        "cs-candidate-v2-061",
+        "cs-candidate-v2-062",
+        "cs-candidate-v2-063",
+        "cs-candidate-v2-067",
+        "cs-candidate-v2-069",
+        "cs-candidate-v2-073",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-076",
+        "cs-candidate-v2-079",
+        "cs-candidate-v2-080",
+        "cs-candidate-v2-081",
+        "cs-candidate-v2-086",
+        "cs-candidate-v2-088",
+        "cs-candidate-v2-091",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-093",
+        "cs-candidate-v2-094",
+        "cs-candidate-v2-097",
+        "cs-candidate-v2-098",
+        "cs-candidate-v2-099",
+        "cs-candidate-v2-100",
+        "cs-candidate-v2-103",
+        "cs-candidate-v2-105",
+        "cs-candidate-v2-106",
+        "cs-candidate-v2-109",
+        "cs-candidate-v2-111",
+        "cs-candidate-v2-112",
+        "cs-candidate-v2-113",
+        "cs-candidate-v2-114",
+        "cs-candidate-v2-115",
+        "cs-candidate-v2-116",
+        "cs-candidate-v2-118"
+      ],
+      "componentCounts": {
+        "falseNegative": 228,
+        "falsePositive": 21,
+        "truePositive": 521
+      },
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.733391,
+        "method": "stratified-case-bootstrap-micro-F1",
+        "stratumCount": 44,
+        "upper": 0.872675
+      },
+      "definition": "Diagnostic micro character-span F1 after numeric/currency normalization of money-labelled slots; raw span F1 remains primary.",
+      "denominator": 1291,
+      "name": "normalizedSlotEntitySpanF1",
+      "notes": [
+        "componentCounts: TP=521, FP=21, FN=228",
+        "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 1042,
+      "releaseGateEligible": false,
+      "role": "DIAGNOSTIC_NORMALIZATION",
+      "status": "MEASURED",
+      "value": 0.807126
+    },
+    "normalizedSlotExactMatch": {
+      "badcaseCount": 32,
+      "badcaseIds": [
+        "cs-candidate-v2-061",
+        "cs-candidate-v2-062",
+        "cs-candidate-v2-063",
+        "cs-candidate-v2-067",
+        "cs-candidate-v2-069",
+        "cs-candidate-v2-073",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-076",
+        "cs-candidate-v2-079",
+        "cs-candidate-v2-080",
+        "cs-candidate-v2-081",
+        "cs-candidate-v2-086",
+        "cs-candidate-v2-088",
+        "cs-candidate-v2-091",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-093",
+        "cs-candidate-v2-094",
+        "cs-candidate-v2-097",
+        "cs-candidate-v2-098",
+        "cs-candidate-v2-099",
+        "cs-candidate-v2-100",
+        "cs-candidate-v2-103",
+        "cs-candidate-v2-105",
+        "cs-candidate-v2-106",
+        "cs-candidate-v2-109",
+        "cs-candidate-v2-111",
+        "cs-candidate-v2-112",
+        "cs-candidate-v2-113",
+        "cs-candidate-v2-114",
+        "cs-candidate-v2-115",
+        "cs-candidate-v2-116",
+        "cs-candidate-v2-118"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.426983,
+        "method": "wilson",
+        "upper": 0.654273
+      },
+      "definition": "Diagnostic request-level slot equality after numeric/currency normalization of money-labelled slots; raw slot EM remains primary.",
+      "denominator": 70,
+      "name": "normalizedSlotExactMatch",
+      "notes": [
+        "Values such as 199, 199元 and ¥199.00 compare as CNY:199; incompatible currencies do not compare equal.",
+        "Money normalization is diagnostic only and does not change the raw metric or historical denominator.",
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 38,
+      "releaseGateEligible": false,
+      "role": "DIAGNOSTIC_NORMALIZATION",
+      "status": "MEASURED",
+      "value": 0.542857
+    },
+    "slotEntitySpanF1": {
+      "badcaseCount": 38,
+      "badcaseIds": [
+        "cs-gold-v1-009",
+        "cs-gold-v1-020",
+        "cs-gold-v1-058",
+        "cs-candidate-v2-061",
+        "cs-candidate-v2-062",
+        "cs-candidate-v2-063",
+        "cs-candidate-v2-067",
+        "cs-candidate-v2-069",
+        "cs-candidate-v2-073",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-076",
+        "cs-candidate-v2-079",
+        "cs-candidate-v2-080",
+        "cs-candidate-v2-081",
+        "cs-candidate-v2-085",
+        "cs-candidate-v2-086",
+        "cs-candidate-v2-088",
+        "cs-candidate-v2-089",
+        "cs-candidate-v2-091",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-093",
+        "cs-candidate-v2-094",
+        "cs-candidate-v2-097",
+        "cs-candidate-v2-098",
+        "cs-candidate-v2-099",
+        "cs-candidate-v2-100",
+        "cs-candidate-v2-103",
+        "cs-candidate-v2-105",
+        "cs-candidate-v2-106",
+        "cs-candidate-v2-109",
+        "cs-candidate-v2-111",
+        "cs-candidate-v2-112",
+        "cs-candidate-v2-113",
+        "cs-candidate-v2-114",
+        "cs-candidate-v2-115",
+        "cs-candidate-v2-116",
+        "cs-candidate-v2-118",
+        "cs-candidate-v2-119"
+      ],
+      "componentCounts": {
+        "falseNegative": 246,
+        "falsePositive": 21,
+        "truePositive": 457
+      },
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.690415,
+        "method": "stratified-case-bootstrap-micro-F1",
+        "stratumCount": 44,
+        "upper": 0.845368
+      },
+      "definition": "Micro character-span F1 over expected and predicted structured entity values; extra predicted fields count as false positives.",
+      "denominator": 1181,
+      "name": "slotEntitySpanF1",
+      "notes": [
+        "componentCounts: TP=457, FP=21, FN=246",
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 914,
+      "releaseGateEligible": false,
+      "role": "PRIMARY_QUALITY",
+      "status": "MEASURED",
+      "value": 0.77392
+    },
+    "slotExactMatch": {
+      "badcaseCount": 38,
+      "badcaseIds": [
+        "cs-gold-v1-009",
+        "cs-gold-v1-020",
+        "cs-gold-v1-058",
+        "cs-candidate-v2-061",
+        "cs-candidate-v2-062",
+        "cs-candidate-v2-063",
+        "cs-candidate-v2-067",
+        "cs-candidate-v2-069",
+        "cs-candidate-v2-073",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-076",
+        "cs-candidate-v2-079",
+        "cs-candidate-v2-080",
+        "cs-candidate-v2-081",
+        "cs-candidate-v2-085",
+        "cs-candidate-v2-086",
+        "cs-candidate-v2-088",
+        "cs-candidate-v2-089",
+        "cs-candidate-v2-091",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-093",
+        "cs-candidate-v2-094",
+        "cs-candidate-v2-097",
+        "cs-candidate-v2-098",
+        "cs-candidate-v2-099",
+        "cs-candidate-v2-100",
+        "cs-candidate-v2-103",
+        "cs-candidate-v2-105",
+        "cs-candidate-v2-106",
+        "cs-candidate-v2-109",
+        "cs-candidate-v2-111",
+        "cs-candidate-v2-112",
+        "cs-candidate-v2-113",
+        "cs-candidate-v2-114",
+        "cs-candidate-v2-115",
+        "cs-candidate-v2-116",
+        "cs-candidate-v2-118",
+        "cs-candidate-v2-119"
+      ],
+      "confidenceInterval95": {
+        "confidenceLevel": 0.95,
+        "lower": 0.345727,
+        "method": "wilson",
+        "upper": 0.573017
+      },
+      "definition": "Request-level exact equality of all expected slots; cases with no expected slots are excluded from the denominator.",
+      "denominator": 70,
+      "name": "slotExactMatch",
+      "notes": [
+        "HUMAN_VERIFIED"
+      ],
+      "numerator": 32,
+      "releaseGateEligible": false,
+      "role": "PRIMARY_QUALITY",
+      "status": "MEASURED",
+      "value": 0.457143
+    }
+  },
+  "perIntent": {
+    "ADDRESS_CHANGE": {
+      "badcaseIds": [
+        "cs-candidate-v2-061"
+      ],
+      "f1": 0.857143,
+      "precision": 1.0,
+      "predicted": 3,
+      "recall": 0.75,
+      "support": 4
+    },
+    "AFTERSALES_UNKNOWN": {
+      "badcaseIds": [
+        "cs-candidate-v2-065"
+      ],
+      "f1": 0.571429,
+      "precision": 0.5,
+      "predicted": 4,
+      "recall": 0.666667,
+      "support": 3
+    },
+    "CANCEL_ORDER": {
+      "badcaseIds": [
+        "cs-candidate-v2-067",
+        "cs-candidate-v2-069"
+      ],
+      "f1": 0.666667,
+      "precision": 0.75,
+      "predicted": 4,
+      "recall": 0.6,
+      "support": 5
+    },
+    "CHAT": {
+      "badcaseIds": [],
+      "f1": 0.461538,
+      "precision": 0.3,
+      "predicted": 20,
+      "recall": 1.0,
+      "support": 6
+    },
+    "COMPLAINT": {
+      "badcaseIds": [
+        "cs-candidate-v2-075"
+      ],
+      "f1": 0.8,
+      "precision": 0.8,
+      "predicted": 5,
+      "recall": 0.8,
+      "support": 5
+    },
+    "CONFIRM_RECEIPT": {
+      "badcaseIds": [
+        "cs-candidate-v2-078"
+      ],
+      "f1": 0.857143,
+      "precision": 1.0,
+      "predicted": 3,
+      "recall": 0.75,
+      "support": 4
+    },
+    "DAMAGED_OR_WRONG_ITEM": {
+      "badcaseIds": [
+        "cs-candidate-v2-079"
+      ],
+      "f1": 0.888889,
+      "precision": 0.888889,
+      "predicted": 9,
+      "recall": 0.888889,
+      "support": 9
+    },
+    "HUMAN_REQUEST": {
+      "badcaseIds": [
+        "cs-candidate-v2-066",
+        "cs-candidate-v2-074",
+        "cs-candidate-v2-083",
+        "cs-candidate-v2-084",
+        "cs-candidate-v2-117"
+      ],
+      "f1": 0.8,
+      "precision": 0.923077,
+      "predicted": 13,
+      "recall": 0.705882,
+      "support": 17
+    },
+    "INVOICE": {
+      "badcaseIds": [
+        "cs-candidate-v2-085"
+      ],
+      "f1": 0.857143,
+      "precision": 1.0,
+      "predicted": 3,
+      "recall": 0.75,
+      "support": 4
+    },
+    "PAYMENT_ISSUE": {
+      "badcaseIds": [
+        "cs-candidate-v2-089",
+        "cs-candidate-v2-090"
+      ],
+      "f1": 0.888889,
+      "precision": 1.0,
+      "predicted": 8,
+      "recall": 0.8,
+      "support": 10
+    },
+    "PRODUCT_CONSULT": {
+      "badcaseIds": [
+        "cs-candidate-v2-091",
+        "cs-candidate-v2-092",
+        "cs-candidate-v2-093"
+      ],
+      "f1": 0.8,
+      "precision": 1.0,
+      "predicted": 6,
+      "recall": 0.666667,
+      "support": 9
+    },
+    "PRODUCT_REVIEW": {
+      "badcaseIds": [
+        "cs-candidate-v2-095",
+        "cs-candidate-v2-096"
+      ],
+      "f1": 0.666667,
+      "precision": 1.0,
+      "predicted": 2,
+      "recall": 0.5,
+      "support": 4
+    },
+    "PRODUCT_SEARCH": {
+      "badcaseIds": [],
+      "f1": 0.818182,
+      "precision": 0.692308,
+      "predicted": 13,
+      "recall": 1.0,
+      "support": 9
+    },
+    "QUERY_COUPON": {
+      "badcaseIds": [
+        "cs-candidate-v2-100"
+      ],
+      "f1": 0.8,
+      "precision": 1.0,
+      "predicted": 2,
+      "recall": 0.666667,
+      "support": 3
+    },
+    "QUERY_FULFILLMENT": {
+      "badcaseIds": [
+        "cs-candidate-v2-103",
+        "cs-candidate-v2-104",
+        "cs-candidate-v2-105"
+      ],
+      "f1": 0.4,
+      "precision": 1.0,
+      "predicted": 1,
+      "recall": 0.25,
+      "support": 4
+    },
+    "QUERY_LOGISTICS": {
+      "badcaseIds": [],
+      "f1": 0.8,
+      "precision": 0.666667,
+      "predicted": 6,
+      "recall": 1.0,
+      "support": 4
+    },
+    "QUERY_ORDER": {
+      "badcaseIds": [
+        "cs-candidate-v2-110",
+        "cs-candidate-v2-111"
+      ],
+      "f1": 0.8,
+      "precision": 1.0,
+      "predicted": 4,
+      "recall": 0.666667,
+      "support": 6
+    },
+    "RECOMMENT": {
+      "badcaseIds": [
+        "cs-candidate-v2-112",
+        "cs-candidate-v2-113",
+        "cs-candidate-v2-114"
+      ],
+      "f1": 0.333333,
+      "precision": 0.5,
+      "predicted": 2,
+      "recall": 0.25,
+      "support": 4
+    },
+    "REFUND": {
+      "badcaseIds": [],
+      "f1": 0.777778,
+      "precision": 0.636364,
+      "predicted": 11,
+      "recall": 1.0,
+      "support": 7
+    },
+    "REFUND_STATUS": {
+      "badcaseIds": [
+        "cs-candidate-v2-118",
+        "cs-candidate-v2-119"
+      ],
+      "f1": 0.5,
+      "precision": 1.0,
+      "predicted": 1,
+      "recall": 0.333333,
+      "support": 3
+    }
+  },
+  "provenance": {
+    "allowLlm": false,
+    "datasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-human-v2-provenance-pending-20260826/labels/customer-service-human-v2.jsonl",
+    "datasetSha256": "ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079",
+    "mode": "rule-pre-router"
+  },
+  "provisionalTargets": {
+    "criticalHandoffMissRate": {
+      "direction": "lower",
+      "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+      "pointEstimatePasses": false,
+      "target": 0.0
+    },
+    "handoffRecall": {
+      "direction": "higher",
+      "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+      "pointEstimatePasses": false,
+      "target": 1.0
+    },
+    "highRiskIntentRecall": {
+      "direction": "higher",
+      "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+      "pointEstimatePasses": false,
+      "target": 1.0
+    },
+    "intentMacroF1": {
+      "direction": "higher",
+      "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+      "pointEstimatePasses": false,
+      "target": 0.9
+    },
+    "slotEntitySpanF1": {
+      "direction": "higher",
+      "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+      "pointEstimatePasses": false,
+      "target": 0.95
+    },
+    "slotExactMatch": {
+      "direction": "higher",
+      "interpretation": "项目秋招参考门槛，不是统一行业标准；需人工复核和更大样本后才可作为 release gate。",
+      "pointEstimatePasses": false,
+      "target": 0.9
+    }
+  },
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-customer-service-evidence/v1",
+  "status": "HUMAN_VERIFIED"
+}

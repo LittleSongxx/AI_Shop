@@ -9,6 +9,7 @@ from typing import Any
 from app.rag.query_expander import deterministic_query_variants
 
 _DOMAIN_TERMS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("PRODUCT", ("OLED", "Mini LED", "显示技术")),
     ("CHECKOUT", ("购物车", "结算", "下单", "库存", "价格")),
     ("PAYMENT", ("支付", "付款", "支付宝", "退款进度", "比特币", "数字货币")),
     ("ACCOUNT", ("地址", "账户", "账号", "登录", "归属")),
@@ -105,6 +106,12 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
         term in text for term in ("规则引擎", "知识问答", "rag")
     ):
         add("aftersales.rule_engine_authoritative")
+    if "自动" in text and "收货" in text and "售后" in text:
+        # This is a composite policy question: one fact explains the receipt
+        # state transition and the other prevents that transition from being
+        # mistaken for a universal after-sales eligibility decision.
+        add("logistics.confirm_receipt")
+        add("aftersales.rule_engine_authoritative")
     if "地址" in text and any(term in text for term in ("别人", "他人", "归属")) and any(
         term in text for term in ("绕过", "校验", "下单")
     ):
@@ -156,6 +163,15 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
         add("privacy.retained_business_anonymization")
     if "演示" in text and any(term in text for term in ("资金", "扣款", "扣除")):
         add("payment.demo_no_real_funds")
+    if (
+        any(term in text for term in ("支付失败", "付款失败", "付款页卡住", "支付页卡住"))
+        and any(term in text for term in ("没有扣款", "没扣款", "未扣款", "没输入密码", "未输入密码"))
+    ):
+        add("payment.safe_retry_guidance")
+    if "oled" in text and "mini led" in text and any(
+        term in text for term in ("区别", "差别", "差异", "怎么选", "解释")
+    ):
+        add("product.display_technology_boundary")
     if (
         any(term in text for term in ("退货申请", "售后申请", "退货退款", "退款", "退货"))
         and any(

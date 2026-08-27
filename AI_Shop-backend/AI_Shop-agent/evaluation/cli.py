@@ -92,6 +92,28 @@ from evaluation.customer_service_gold import (
     load_gold_dataset,
     run_customer_service_gold,
 )
+from evaluation.customer_service_label_audit import (
+    build_label_audit_package,
+    verify_label_audit_package,
+)
+from evaluation.customer_service_label_policy_review import (
+    seal_label_policy_review_sheet,
+    validate_label_policy_review_sheet,
+    verify_pending_label_policy_review_evidence,
+    write_pending_label_policy_review_evidence,
+)
+from evaluation.customer_service_independent_reaudit import (
+    build_independent_reaudit_expansion_handoff,
+    score_independent_reaudit,
+    verify_independent_reaudit_evidence,
+    write_independent_reaudit_evidence,
+)
+from evaluation.customer_service_paired import (
+    build_paired_evidence_package,
+    verify_paired_evidence_package,
+)
+from evaluation.customer_service_provenance import verify_v2_package
+from evaluation.source_freeze import create_source_freeze, verify_source_freeze
 from evaluation.customer_service_annotation_audit import (
     DEFAULT_JSON as DEFAULT_CUSTOMER_SERVICE_AUDIT_JSON,
     DEFAULT_MD as DEFAULT_CUSTOMER_SERVICE_AUDIT_MD,
@@ -136,6 +158,7 @@ from evaluation.customer_service_review import (
     seal_review_sheet,
     validate_review_sheet,
 )
+from evaluation.customer_service_v2 import combine_human_verified_v2
 from evaluation.customer_service_slot_replay import (
     build_slot_replay,
     write_slot_replay_evidence,
@@ -172,6 +195,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("validate", help="validate suite, datasets, locks, and disjointness")
+
+    source_freeze = commands.add_parser(
+        "source-freeze",
+        help="create or verify a dirty-worktree source baseline",
+    )
+    source_freeze_commands = source_freeze.add_subparsers(
+        dest="source_freeze_command", required=True
+    )
+    source_freeze_create = source_freeze_commands.add_parser(
+        "create", help="freeze tracked patch and hash-bind untracked regular files"
+    )
+    source_freeze_create.add_argument("--output-dir", type=Path, required=True)
+    source_freeze_create.add_argument("--freeze-id", required=True)
+    source_freeze_create.add_argument("--purpose", required=True)
+    source_freeze_verify = source_freeze_commands.add_parser(
+        "verify", help="verify a source-freeze package"
+    )
+    source_freeze_verify.add_argument("--output-dir", type=Path, required=True)
 
     lock = commands.add_parser("lock", help="regenerate a visible dataset lock")
     lock.add_argument(
@@ -314,6 +355,160 @@ def build_parser() -> argparse.ArgumentParser:
     customer_service.add_argument(
         "--json-output", type=Path, default=DEFAULT_CUSTOMER_SERVICE_JSON_REPORT
     )
+    customer_service.add_argument(
+        "--label-audit",
+        type=Path,
+        help="optional checksum-bound label/provenance audit; failed controls keep metrics diagnostic-only",
+    )
+    customer_label_audit = commands.add_parser(
+        "customer-service-label-audit",
+        help="build or verify the fail-closed taxonomy/slot consistency package",
+    )
+    customer_label_audit_commands = customer_label_audit.add_subparsers(
+        dest="customer_label_audit_command", required=True
+    )
+    customer_label_audit_build = customer_label_audit_commands.add_parser(
+        "build", help="audit labels and export a blind successor re-adjudication handoff"
+    )
+    customer_label_audit_build.add_argument("--dataset", type=Path, required=True)
+    customer_label_audit_build.add_argument(
+        "--taxonomy-contract", type=Path, required=True
+    )
+    customer_label_audit_build.add_argument(
+        "--provenance-audit", type=Path, required=True
+    )
+    customer_label_audit_build.add_argument("--output-dir", type=Path, required=True)
+    customer_label_audit_verify = customer_label_audit_commands.add_parser(
+        "verify", help="verify checksums and fail-closed lifecycle controls"
+    )
+    customer_label_audit_verify.add_argument("--output-dir", type=Path, required=True)
+    customer_label_review_validate = customer_label_audit_commands.add_parser(
+        "review-validate", help="validate a returned v2.1 label-policy review"
+    )
+    customer_label_review_validate.add_argument("--dataset", type=Path, required=True)
+    customer_label_review_validate.add_argument(
+        "--source-template", type=Path, required=True
+    )
+    customer_label_review_validate.add_argument(
+        "--taxonomy-contract", type=Path, required=True
+    )
+    customer_label_review_validate.add_argument("--review", type=Path, required=True)
+    customer_label_review_validate.add_argument("--complete", action="store_true")
+    customer_label_review_seal = customer_label_audit_commands.add_parser(
+        "review-seal", help="seal one completed v2.1 label-policy review"
+    )
+    customer_label_review_seal.add_argument("--dataset", type=Path, required=True)
+    customer_label_review_seal.add_argument(
+        "--source-template", type=Path, required=True
+    )
+    customer_label_review_seal.add_argument(
+        "--taxonomy-contract", type=Path, required=True
+    )
+    customer_label_review_seal.add_argument("--review", type=Path, required=True)
+    customer_label_review_seal.add_argument("--output", type=Path, required=True)
+    customer_label_review_package = customer_label_audit_commands.add_parser(
+        "review-package",
+        help="freeze dual v2.1 reviews and export true disagreements",
+    )
+    customer_label_review_package.add_argument("--dataset", type=Path, required=True)
+    customer_label_review_package.add_argument(
+        "--source-template", type=Path, required=True
+    )
+    customer_label_review_package.add_argument(
+        "--taxonomy-contract", type=Path, required=True
+    )
+    customer_label_review_package.add_argument(
+        "--adjudication-context", type=Path, required=True
+    )
+    customer_label_review_package.add_argument("--review-a", type=Path, required=True)
+    customer_label_review_package.add_argument("--review-b", type=Path, required=True)
+    customer_label_review_package.add_argument("--output-dir", type=Path, required=True)
+    customer_label_review_package.add_argument(
+        "--adjudication-output", type=Path
+    )
+    customer_label_review_pending_verify = customer_label_audit_commands.add_parser(
+        "review-pending-verify",
+        help="verify immutable pending v2.1 label-policy evidence",
+    )
+    customer_label_review_pending_verify.add_argument(
+        "--output-dir", type=Path, required=True
+    )
+
+    customer_paired = commands.add_parser(
+        "customer-service-paired",
+        help="build or verify paired before/after development evidence",
+    )
+    customer_paired_commands = customer_paired.add_subparsers(
+        dest="customer_paired_command", required=True
+    )
+    customer_paired_build = customer_paired_commands.add_parser(
+        "build", help="run exact McNemar and paired stratified bootstrap comparisons"
+    )
+    customer_paired_build.add_argument("--before", type=Path, required=True)
+    customer_paired_build.add_argument("--after", type=Path, required=True)
+    customer_paired_build.add_argument("--label-audit", type=Path, required=True)
+    customer_paired_build.add_argument("--output-dir", type=Path, required=True)
+    customer_paired_verify = customer_paired_commands.add_parser(
+        "verify", help="verify an immutable paired comparison package"
+    )
+    customer_paired_verify.add_argument("--output-dir", type=Path, required=True)
+
+    customer_provenance_verify = commands.add_parser(
+        "customer-service-provenance-verify",
+        help="verify the canonical v2 provenance package without promoting its status",
+    )
+    customer_provenance_verify.add_argument("--output-dir", type=Path, required=True)
+    customer_provenance_reaudit = commands.add_parser(
+        "customer-service-provenance-reaudit",
+        help="score, archive, or expand the blind v2 provenance re-audit",
+    )
+    customer_provenance_reaudit_commands = customer_provenance_reaudit.add_subparsers(
+        dest="customer_provenance_reaudit_command", required=True
+    )
+    customer_provenance_reaudit_score = customer_provenance_reaudit_commands.add_parser(
+        "score", help="score the fixed preregistered re-audit sample"
+    )
+    customer_provenance_reaudit_package = customer_provenance_reaudit_commands.add_parser(
+        "package", help="archive a returned re-audit and its custody status"
+    )
+    for reaudit_parser in (
+        customer_provenance_reaudit_score,
+        customer_provenance_reaudit_package,
+    ):
+        reaudit_parser.add_argument("--dataset", type=Path, required=True)
+        reaudit_parser.add_argument("--initial-template", type=Path, required=True)
+        reaudit_parser.add_argument("--review", type=Path, required=True)
+        reaudit_parser.add_argument("--attestation", type=Path, required=True)
+    customer_provenance_reaudit_package.add_argument(
+        "--guideline", type=Path, required=True
+    )
+    customer_provenance_reaudit_package.add_argument(
+        "--output-dir", type=Path, required=True
+    )
+    customer_provenance_reaudit_expand = customer_provenance_reaudit_commands.add_parser(
+        "expand", help="export the required remaining-48 and full-60 restart paths"
+    )
+    customer_provenance_reaudit_expand.add_argument(
+        "--dataset", type=Path, required=True
+    )
+    customer_provenance_reaudit_expand.add_argument(
+        "--initial-template", type=Path, required=True
+    )
+    customer_provenance_reaudit_expand.add_argument(
+        "--review", type=Path, required=True
+    )
+    customer_provenance_reaudit_expand.add_argument(
+        "--guideline", type=Path, required=True
+    )
+    customer_provenance_reaudit_expand.add_argument(
+        "--output-dir", type=Path, required=True
+    )
+    customer_provenance_reaudit_verify = customer_provenance_reaudit_commands.add_parser(
+        "verify", help="verify immutable independent re-audit evidence"
+    )
+    customer_provenance_reaudit_verify.add_argument(
+        "--output-dir", type=Path, required=True
+    )
     customer_service_audit = commands.add_parser(
         "customer-service-audit",
         help="audit frozen customer-service human labels and evidence sufficiency",
@@ -369,6 +564,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
         help="hash-bound case-level HTTP safety contracts",
     )
+    customer_http_run.add_argument(
+        "--label-audit",
+        type=Path,
+        help="checksum-bound label/provenance audit; failed controls keep HTTP results diagnostic-only",
+    )
     customer_http_run.add_argument("--review-a-output", type=Path)
     customer_http_run.add_argument("--review-b-output", type=Path)
     customer_http_rebuild = customer_http_commands.add_parser(
@@ -383,6 +583,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
     )
+    customer_http_rebuild.add_argument("--label-audit", type=Path)
     customer_http_rebuild.add_argument("--review-a-output", type=Path)
     customer_http_rebuild.add_argument("--review-b-output", type=Path)
     customer_http_diagnostic = customer_http_commands.add_parser(
@@ -398,6 +599,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
     )
+    customer_http_diagnostic.add_argument("--label-audit", type=Path)
     customer_http_diagnostic.add_argument(
         "--note",
         action="append",
@@ -539,6 +741,40 @@ def build_parser() -> argparse.ArgumentParser:
     review_merge.add_argument("--adjudicator", default="consensus")
     review_merge.add_argument("--output-dataset", type=Path, required=True)
     review_merge.add_argument("--evidence", type=Path, required=True)
+    review_combine_v2 = review_commands.add_parser(
+        "combine-v2",
+        help="combine immutable v1 gold with a separately reviewed v2 additions artifact",
+    )
+    review_combine_v2.add_argument(
+        "--base-dataset",
+        type=Path,
+        default=(
+            Path(__file__).resolve().parents[1]
+            / "evaluation-evidence"
+            / "benchmarks"
+            / "customer-service"
+            / "customer-service-human-v1-20260823"
+            / "customer-service-human-v1.jsonl"
+        ),
+    )
+    review_combine_v2.add_argument(
+        "--base-manifest",
+        type=Path,
+        default=(
+            Path(__file__).resolve().parent
+            / "datasets"
+            / "customer_service"
+            / "adjudicated"
+            / "gold-v1-human-adjudicated.manifest.json"
+        ),
+    )
+    review_combine_v2.add_argument("--additions-dataset", type=Path, required=True)
+    review_combine_v2.add_argument("--additions-evidence", type=Path, required=True)
+    review_combine_v2.add_argument("--output-dataset", type=Path, required=True)
+    review_combine_v2.add_argument("--output-manifest", type=Path, required=True)
+    review_combine_v2.add_argument("--evidence", type=Path, required=True)
+    review_combine_v2.add_argument("--base-count", type=int, default=60)
+    review_combine_v2.add_argument("--additions-count", type=int, default=60)
     seal = commands.add_parser(
         "seal-auxiliary",
         help="copy a verified fault/repeat run into an immutable diagnostic package",
@@ -1105,6 +1341,18 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "source-freeze":
+        result = (
+            create_source_freeze(
+                args.output_dir,
+                freeze_id=args.freeze_id,
+                purpose=args.purpose,
+            )
+            if args.source_freeze_command == "create"
+            else verify_source_freeze(args.output_dir)
+        )
+        _print(result)
+        return 0 if result.get("valid") is True else 2
     if args.command == "lock":
         _print(build_lock(args.split))
         return 0
@@ -1212,6 +1460,7 @@ async def _main(args: argparse.Namespace) -> int:
             mode=args.mode,
             output_path=args.output,
             json_output_path=args.json_output,
+            label_audit_path=args.label_audit,
         )
         _print(
             {
@@ -1227,6 +1476,95 @@ async def _main(args: argparse.Namespace) -> int:
             }
         )
         return 0
+    if args.command == "customer-service-label-audit":
+        if args.customer_label_audit_command == "build":
+            result = build_label_audit_package(
+                args.dataset,
+                taxonomy_contract_path=args.taxonomy_contract,
+                provenance_audit_path=args.provenance_audit,
+                output_dir=args.output_dir,
+            )
+        elif args.customer_label_audit_command == "verify":
+            result = verify_label_audit_package(args.output_dir)
+        elif args.customer_label_audit_command == "review-validate":
+            result = {
+                "valid": True,
+                "manifest": validate_label_policy_review_sheet(
+                    args.dataset,
+                    args.source_template,
+                    args.taxonomy_contract,
+                    args.review,
+                    require_complete=args.complete,
+                ),
+            }
+        elif args.customer_label_audit_command == "review-seal":
+            result = seal_label_policy_review_sheet(
+                args.dataset,
+                args.source_template,
+                args.taxonomy_contract,
+                args.review,
+                args.output,
+            )
+        elif args.customer_label_audit_command == "review-package":
+            result = write_pending_label_policy_review_evidence(
+                args.dataset,
+                args.source_template,
+                args.taxonomy_contract,
+                args.adjudication_context,
+                args.review_a,
+                args.review_b,
+                output_dir=args.output_dir,
+                adjudication_output=args.adjudication_output,
+            )
+        else:
+            result = verify_pending_label_policy_review_evidence(args.output_dir)
+        _print(result)
+        return 0 if result.get("valid", True) else 2
+    if args.command == "customer-service-paired":
+        if args.customer_paired_command == "build":
+            result = build_paired_evidence_package(
+                args.before,
+                args.after,
+                label_audit_path=args.label_audit,
+                output_dir=args.output_dir,
+            )
+        else:
+            result = verify_paired_evidence_package(args.output_dir)
+        _print(result)
+        return 0 if result.get("valid", True) else 2
+    if args.command == "customer-service-provenance-verify":
+        result = verify_v2_package(args.output_dir)
+        _print(result)
+        return 0 if result.get("valid", True) else 2
+    if args.command == "customer-service-provenance-reaudit":
+        if args.customer_provenance_reaudit_command == "score":
+            result = score_independent_reaudit(
+                args.dataset,
+                args.initial_template,
+                args.review,
+                args.attestation,
+            )
+        elif args.customer_provenance_reaudit_command == "package":
+            result = write_independent_reaudit_evidence(
+                args.dataset,
+                args.initial_template,
+                args.review,
+                args.attestation,
+                args.guideline,
+                output_dir=args.output_dir,
+            )
+        elif args.customer_provenance_reaudit_command == "expand":
+            result = build_independent_reaudit_expansion_handoff(
+                args.dataset,
+                args.initial_template,
+                args.review,
+                args.guideline,
+                output_dir=args.output_dir,
+            )
+        else:
+            result = verify_independent_reaudit_evidence(args.output_dir)
+        _print(result)
+        return 0 if result.get("valid", True) else 2
     if args.command == "customer-service-audit":
         markdown_path = args.output or DEFAULT_CUSTOMER_SERVICE_AUDIT_MD
         json_path = args.json_output or DEFAULT_CUSTOMER_SERVICE_AUDIT_JSON
@@ -1305,6 +1643,7 @@ async def _main(args: argparse.Namespace) -> int:
                     case_ids=args.case_id,
                     fixture_map=fixture_map,
                     behavior_contract_file=args.behavior_contract_file,
+                    label_audit_path=args.label_audit,
                 )
             finally:
                 await close_pool()
@@ -1313,17 +1652,24 @@ async def _main(args: argparse.Namespace) -> int:
             review_safe_report = sanitize_customer_service_http_report(report)
             atomic_write_json(args.output, review_safe_report, overwrite=False)
             reviews: dict[str, Any] = {}
+            review_message_projection = (
+                ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE
+                if fixture_map
+                else ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE
+            )
             if args.review_a_output:
                 reviews["reviewA"] = export_answer_review_sheet(
                     args.output,
                     args.review_a_output,
                     reviewer_id="reviewer-a",
+                    message_projection=review_message_projection,
                 )
             if args.review_b_output:
                 reviews["reviewB"] = export_answer_review_sheet(
                     args.output,
                     args.review_b_output,
                     reviewer_id="reviewer-b",
+                    message_projection=review_message_projection,
                 )
             _print(
                 {
@@ -1346,6 +1692,7 @@ async def _main(args: argparse.Namespace) -> int:
                 args.source_report,
                 args.dataset,
                 behavior_contract_file=args.behavior_contract_file,
+                label_audit_path=args.label_audit,
             )
             verification = write_customer_service_http_evidence(
                 report, args.output_dir
@@ -1385,6 +1732,7 @@ async def _main(args: argparse.Namespace) -> int:
                 args.output_dir,
                 diagnostic_status=args.diagnostic_status,
                 behavior_contract_file=args.behavior_contract_file,
+                label_audit_path=args.label_audit,
                 notes=args.note,
             )
             _print(verification)
@@ -1590,6 +1938,20 @@ async def _main(args: argparse.Namespace) -> int:
                 evidence_path=args.evidence,
                 adjudication_path=args.adjudication,
                 default_adjudicator=args.adjudicator,
+            )
+            _print(evidence)
+            return 0
+        if args.review_command == "combine-v2":
+            evidence = combine_human_verified_v2(
+                args.base_dataset,
+                args.base_manifest,
+                args.additions_dataset,
+                args.additions_evidence,
+                output_dataset_path=args.output_dataset,
+                output_manifest_path=args.output_manifest,
+                evidence_path=args.evidence,
+                expected_base_count=args.base_count,
+                expected_additions_count=args.additions_count,
             )
             _print(evidence)
             return 0

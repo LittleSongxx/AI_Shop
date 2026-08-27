@@ -1,0 +1,24 @@
+{
+  "adjudicatorId": "yang",
+  "aiAssistanceScope": "TEXT_EDITING_AND_RECORDING_ONLY",
+  "aiAssistanceUsed": true,
+  "confirmedAt": "2026-08-27T03:03:06.058Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "externalSignaturePresent": false,
+  "finalUnseenEligible": false,
+  "humanAnnotationClaimAllowed": true,
+  "humanDecisionAuthority": true,
+  "pureHumanUnaidedClaim": false,
+  "rawAttestationInterpretation": "The returned attestation remains an unconfirmed draft template. The exact raw bytes are preserved; the project-owner confirmation supplies human-decision provenance for the derived HUMAN_APPROVED_AI_ASSISTED evidence only.",
+  "rawAttestationTemplateWasNotFullyUpdated": true,
+  "recordedFrom": "current project-owner instruction in the shared Codex workspace",
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-human-approval-ai-assistance-clarification/v3",
+  "source": "PROJECT_OWNER_CONFIRMATION_IN_CURRENT_WORKFLOW",
+  "sourceReviewerIds": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "status": "PROJECT_OWNER_CONFIRMED_HUMAN_ADJUDICATION_AI_ASSISTED_EDITING",
+  "task": "CUSTOMER_SERVICE_V54_ANSWER_QUALITY_ADJUDICATION"
+}

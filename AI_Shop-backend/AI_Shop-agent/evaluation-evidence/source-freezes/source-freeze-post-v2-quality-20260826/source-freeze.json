@@ -1,0 +1,88 @@
+{
+  "evaluationSourceFingerprint": {
+    "capturedAt": "2026-08-26T13:54:31.225Z",
+    "git": {
+      "commit": "e5b94b9d8bb92e45bb889b29e72bdcc6fb0ba2e2",
+      "worktreeDirty": true
+    },
+    "knowledge": {
+      "catalogSha256": "4be3813332639e7c78b55e3f02396cb4a50e24cf99de816ce07972bc9c77cb9e",
+      "fileCount": 14,
+      "sha256": "d16067f3ea9ff09981aef96793c9aec7f4c993a2184ec3a60069c3f7f2feeae7"
+    },
+    "providerConfiguration": {
+      "embedding": {
+        "configured": true,
+        "dimensions": 1024,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "model": "text-embedding-v4",
+        "provider": "openai"
+      },
+      "llm": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        "intentStructuredOutputMode": "disabled",
+        "maxRetries": 1,
+        "model": "qwen3.7-plus",
+        "timeoutSeconds": 20
+      },
+      "rerank": {
+        "configured": true,
+        "endpoint": "https://llm-en3p4oz5m2rwwgvv.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks",
+        "format": "compatible",
+        "model": "qwen3-rerank",
+        "topN": 6
+      },
+      "runtime": {
+        "elasticsearchEndpoints": [
+          "http://127.0.0.1:9200"
+        ],
+        "elasticsearchIndex": "aishop_vectorstore",
+        "javaEndpoint": "http://127.0.0.1:8081",
+        "redisDatabase": 0,
+        "redisHost": "127.0.0.1",
+        "redisPort": 6380,
+        "vectorField": "embedding"
+      }
+    },
+    "providerConfigurationSha256": "2a914729d4e01681c7f7e126e52a67959e0e1e428f259887aafffeb93f499e93",
+    "source": {
+      "fileCount": 264,
+      "sha256": "0234aebf6a3f846278441784f27ff4742f4f809ae825cd8ef7598d0506a77dfd"
+    }
+  },
+  "freezeId": "source-freeze-post-v2-quality-20260826",
+  "git": {
+    "branch": "refactor/ai-shop-mainline-quality",
+    "commit": "e5b94b9d8bb92e45bb889b29e72bdcc6fb0ba2e2",
+    "statusEntryCount": 259,
+    "trackedChangedFileCount": 65,
+    "untrackedFileCount": 194,
+    "worktreeDirty": true
+  },
+  "lifecycle": "LOCAL_SOURCE_BASELINE_IMMUTABLE",
+  "limitations": [
+    "This binds a dirty worktree and is not a Git commit or release.",
+    "The tracked patch plus base commit reconstructs tracked changes; untracked files are hash-bound but not embedded.",
+    "No metric or human-review result may inherit release eligibility from this package."
+  ],
+  "notModelQualityEvidence": true,
+  "purpose": "Bind the post-audit AI-Shop v2 routing, evaluation-validity, v43 evidence, documentation, and verification state relative to the declared Git base commit.",
+  "releaseGateEligible": false,
+  "runtimeSourceFingerprint": {
+    "fileCount": 184,
+    "scope": "agent-app-source-and-runtime-dependencies/v1",
+    "sha256": "ab685d19f7cc1d22dcfda9639e71a67248b86e29f04d3e5fbb580c84ecee4684"
+  },
+  "schemaVersion": "aishop-source-freeze/v1",
+  "trackedPatch": {
+    "bytes": 522945,
+    "path": "tracked.patch",
+    "sha256": "2eb3bb208499cec2b1647cea4625a4202f033882380618868bcc33288fe332a9"
+  },
+  "untrackedInventory": {
+    "fileCount": 194,
+    "note": "Hashes bind untracked regular files; their bytes are not embedded.",
+    "path": "untracked-files.json"
+  }
+}

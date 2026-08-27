@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "aishop-human-adjudicator-attestation/v2",
+  "status": "TEMPLATE_NOT_EVIDENCE",
+  "taskId": "customer-service-http-v54-answer-quality-adjudication-20260827",
+  "adjudicationTemplateSha256AtExport": "5510c759cddf400f1c9aab396760a42ea6e4c635246bab30ff2b897b9e043aa3",
+  "sourceReviewerIds": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "adjudicatorId": null,
+  "adjudicatorIdentity": null,
+  "adjudicatorIsHuman": null,
+  "independentOfSourceReviewers": null,
+  "humanRetainedFinalDecisionAuthority": null,
+  "aiAssistedTextOrRecording": null,
+  "completedAdjudicationSha256": null,
+  "attestedAt": null,
+  "signaturesOrExternalReferences": []
+}

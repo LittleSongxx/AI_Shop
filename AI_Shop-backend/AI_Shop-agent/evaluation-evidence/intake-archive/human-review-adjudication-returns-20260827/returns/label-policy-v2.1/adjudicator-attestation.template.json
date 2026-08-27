@@ -1,0 +1,19 @@
+{
+  "adjudicationTemplateSha256AtExport": "69f9fed19100d954cf584bd7716dc41c886583aa2512ab5da88159c651e4d59b",
+  "adjudicatorId": "song",
+  "adjudicatorIdentity": "HIT-Student",
+  "adjudicatorIsHuman": true,
+  "attestedAt": "2026-08-26T16:58:16.061Z",
+  "completedAdjudicationSha256": "96058711dfbeeebd4b4de9c3340a89ee7ed00152b7c59b7e2302cacb05c3775c",
+  "generativeAiProducedOrSuggestedFinalLabels": true,
+  "independentOfDatasetAndModelDevelopment": true,
+  "independentOfSourceReviewers": true,
+  "schemaVersion": "aishop-human-adjudicator-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "sourceReviewerIds": [
+    "label-policy-reviewer-a",
+    "label-policy-reviewer-b"
+  ],
+  "status": "TEMPLATE_NOT_EVIDENCE",
+  "taskId": "customer-service-label-policy-v2.1-adjudication-20260827"
+}

@@ -1,0 +1,41 @@
+{
+  "createdAt": "2026-08-26T17:28:04.698Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "files": {
+    "README.md": {
+      "bytes": 304,
+      "sha256": "beb3d3a2957acf21533fa7e0ca87699c751848a72a5b26e365078f1261022098"
+    },
+    "bindings.json": {
+      "bytes": 1581,
+      "sha256": "dfd0f6a338116912c3834a4dfd857d7400e50e259603f13b423c79f277bf3bdc"
+    },
+    "human-approval-clarification.json": {
+      "bytes": 2450,
+      "sha256": "97a1b4aadbe03f1ad4e8564c6fd42705ca3fbc520538393f856ed8bce0899bcb"
+    },
+    "normalization.json": {
+      "bytes": 1159,
+      "sha256": "1dca602d1651b6f89ca185b8a5b30abfdc0aa901a20f99a94e6e1e1604df1283"
+    },
+    "raw-return-bindings/answer-adjudication.returned.jsonl": {
+      "bytes": 12166,
+      "sha256": "561f93c52a918756f7e2b3b2a909950170dafb2e09fc79d11174a1cf5f39ee34"
+    },
+    "raw-return-bindings/answer-attestation.returned.json": {
+      "bytes": 767,
+      "sha256": "c6847ddf5b5bf702a36ddcb496d156e41164c647869d09848271e477d4055678"
+    },
+    "raw-return-bindings/label-adjudication.returned.jsonl": {
+      "bytes": 8254,
+      "sha256": "96058711dfbeeebd4b4de9c3340a89ee7ed00152b7c59b7e2302cacb05c3775c"
+    },
+    "raw-return-bindings/label-attestation.returned.json": {
+      "bytes": 800,
+      "sha256": "187760cf96fafa93b7f5ed33dd9cfb164813b36a6962b953640316b85b36071f"
+    }
+  },
+  "readOnly": true,
+  "schemaVersion": "aishop-human-approval-ai-assistance-provenance/v1",
+  "status": "HUMAN_APPROVED_AI_ASSISTED_FINALIZED"
+}

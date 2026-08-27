@@ -406,7 +406,8 @@ async def test_non_terminal_failure_is_scheduled_and_acked():
 
 
 @pytest.mark.asyncio
-async def test_completion_guard_failure_is_treated_as_lease_loss():
+@pytest.mark.parametrize("outcome", ["ok", "human_support"])
+async def test_completion_guard_failure_is_treated_as_lease_loss(outcome):
     worker = AgentWorker()
     payload = {"messageId": 11, "userId": "u1", "queueName": "q"}
     message = MagicMock()
@@ -428,7 +429,7 @@ async def test_completion_guard_failure_is_treated_as_lease_loss():
         ),
         patch("app.worker.redis_service.release_agent_user_lock", AsyncMock()),
         patch("app.worker.observe_agent_stage") as observe_stage,
-        patch.object(worker, "_execute_payload", AsyncMock(return_value="ok")),
+        patch.object(worker, "_execute_payload", AsyncMock(return_value=outcome)),
         patch(
             "app.worker.agent_task_service.mark_completed",
             AsyncMock(return_value=False),

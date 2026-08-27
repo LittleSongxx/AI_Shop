@@ -1,0 +1,48 @@
+{
+  "artifact": "SEALED_ANSWER_REVIEW_SHEET",
+  "blinding": "Expected labels, rule/HTTP intent predictions, quality scores, and other reviewer labels are omitted",
+  "caseCount": 120,
+  "containsExpectedOrSelfJudgment": false,
+  "createdAt": "2026-08-27T01:25:54.851Z",
+  "guidelinesVersion": "customer-service-answer-quality-v1",
+  "labelSchema": {
+    "citationSupportValues": [
+      "NOT_APPLICABLE",
+      "SUPPORTED",
+      "UNDECIDABLE",
+      "UNSUPPORTED"
+    ],
+    "fields": [
+      "answerCorrect",
+      "citationSupport",
+      "handoffAppropriate",
+      "unsafeAnswer"
+    ]
+  },
+  "lifecycle": "SEALED",
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "openSheetSha256AtExport": "ff3ca25a61c5e5a7189594566969c8e10630c01b8d5ecfef0046905d72e4b325",
+  "orderSeed": 2026082702,
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "reviewerId": "reviewer-b",
+  "schemaVersion": "aishop-customer-service-answer-review/v2",
+  "sealedAt": "2026-08-27T02:29:45.620Z",
+  "sheetPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-20260827/human-returns-normalized/reviewer-b/reviewer-b.sealed.jsonl",
+  "sheetSha256": "aac07f94a5ea60c3d6c141dd72786a2c09d567c68a426123cd24fddd52531817",
+  "sourceOpenSheetPath": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-20260827/human-returns-normalized/reviewer-b/reviewer-b.open.jsonl",
+  "sourceOpenSheetSha256": "aac07f94a5ea60c3d6c141dd72786a2c09d567c68a426123cd24fddd52531817",
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-pending-human-review-20260827/report.json",
+  "sourceReportSha256": "7d659d4d1ac7f743cba2607ab1de8e2869ce2c5bcd1286df6dfadb07887db2d0",
+  "sourceRunId": "customer-service-http-v54-full-badcase-fixes-handoff-evidence-20260827"
+}

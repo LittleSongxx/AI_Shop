@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.domain.intent.types import IntentKind
+from app.domain.intent.types import IntentKind, RequestMode
 from app.graph import forced_tools
 from app.harness.observation import CONTAMINATED_CONTENT_PLACEHOLDER
 from app.services.tool_invoke_result import ToolInvokeResult
@@ -60,6 +60,65 @@ async def test_category_switch_search_keeps_current_product(record_invoke):
     )
 
     assert calls == [("SEARCH_PRODUCTS", {"keyword": "想买零食"}, "u1")]
+
+
+async def test_named_comparison_resolves_catalog_ids_before_comparing(monkeypatch):
+    calls: list[tuple[str, dict, str]] = []
+    record_candidates = AsyncMock(return_value={})
+
+    async def invoke(tool_name, args, user_id, call_id=None):
+        calls.append((tool_name, args, user_id))
+        if tool_name == "SEARCH_PRODUCTS":
+            return ToolInvokeResult(
+                content="找到两款",
+                product_ids=["p-xm6", "p-anniversary"],
+                source_refs=[{"type": "product", "id": "p-xm6"}],
+            )
+        return ToolInvokeResult(
+            content="【商品比较】已刷新并比较 2 个商品的实时信息。",
+            biz_type="product_comparison",
+            assistant_cards='{"type":"PRODUCT_COMPARISON","products":[]}',
+        )
+
+    monkeypatch.setattr(forced_tools.mcp_tool_router, "invoke", invoke)
+    monkeypatch.setattr(
+        forced_tools.shopping_mission_service,
+        "record_candidates",
+        record_candidates,
+    )
+
+    out = await forced_tools.forced_named_product_comparison(
+        messages=[],
+        user_id="u1",
+        message_id=91,
+        keyword="WH-1000XM6 和十周年版主要差在哪",
+    )
+
+    assert calls == [
+        ("SEARCH_PRODUCTS", {"keyword": "WH-1000XM6 和十周年版主要差在哪"}, "u1"),
+        ("COMPARE_PRODUCTS", {"productIds": ["p-xm6", "p-anniversary"]}, "u1"),
+    ]
+    assert out["tools_called"] == ["SEARCH_PRODUCTS", "COMPARE_PRODUCTS"]
+    assert out["biz_type"] == "product_comparison"
+    assert out["tool_source_refs"] == [{"type": "product", "id": "p-xm6"}]
+    record_candidates.assert_awaited_once_with(
+        "u1",
+        91,
+        [
+            {
+                "productId": "p-xm6",
+                "productName": None,
+                "offerSnapshotId": None,
+                "estimatedPayable": None,
+            },
+            {
+                "productId": "p-anniversary",
+                "productName": None,
+                "offerSnapshotId": None,
+                "estimatedPayable": None,
+            },
+        ],
+    )
 
 
 async def test_forced_intent_tool_appends_tool_message_and_infers_biz_type(record_invoke):
@@ -115,6 +174,24 @@ async def test_cancel_order_uses_verified_proposal_result(record_invoke):
 
     assert out["chunks"] == ["订单详情"]
     assert out["biz_type"] == "action_confirm"
+
+
+async def test_forced_fallback_cannot_promote_read_query_to_write_proposal(
+    record_invoke,
+):
+    calls, _ = record_invoke
+
+    out = await forced_tools.forced_tool_for_intent(
+        messages=[],
+        user_id="u1",
+        intent=IntentKind.ADDRESS_CHANGE.value,
+        intent_data="order-1",
+        user_text="订单 order-1 还没发货，收货地址怎么改",
+        request_mode=RequestMode.READ_QUERY.value,
+    )
+
+    assert out is None
+    assert calls == []
 
 
 async def test_forced_intent_tool_returns_none_when_args_incomplete(record_invoke):

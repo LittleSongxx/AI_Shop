@@ -963,6 +963,9 @@ class AgentOrchestrator:
         agent_msg: dict,
         safe_message: str,
         decision: dict,
+        *,
+        verified_order_refs: dict | None = None,
+        finish_episode: bool = True,
     ) -> dict:
         support_case = None
         intent = str(decision.get("intent") or "")
@@ -1011,14 +1014,14 @@ class AgentOrchestrator:
                 "support_handoff_history_unavailable", error=type(exc).__name__
             )
             history = []
-        verified_refs = (
-            {
-                "orderId": support_case.get("orderId"),
-                "orderItemId": support_case.get("orderItemId"),
-            }
-            if support_case
-            else {}
-        )
+        verified_refs = dict(verified_order_refs or {})
+        if support_case:
+            verified_refs.update(
+                {
+                    "orderId": support_case.get("orderId"),
+                    "orderItemId": support_case.get("orderItemId"),
+                }
+            )
         try:
             handoff_context = await support_service.build_handoff_context(
                 agent_msg["userId"],
@@ -1104,9 +1107,10 @@ class AgentOrchestrator:
                 "caseId": (support_case or {}).get("caseId"),
             },
         )
-        episode_service.finish_run(
-            "handoff", run_id=agent_msg.get("runId"), force_keep=True
-        )
+        if finish_episode:
+            episode_service.finish_run(
+                "handoff", run_id=agent_msg.get("runId"), force_keep=True
+            )
         return agent_msg
 
     async def _verify_image_context(

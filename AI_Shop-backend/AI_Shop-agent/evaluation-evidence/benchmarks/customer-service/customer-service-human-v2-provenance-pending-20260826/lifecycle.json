@@ -1,0 +1,16 @@
+{
+  "artifactId": "customer-service-human-v2-provenance-pending-20260826",
+  "blockingControls": [
+    "SIGNED_INDEPENDENCE_ATTESTATION_OR_REPLACEMENT_REVIEW",
+    "BLIND_INDEPENDENT_REAUDIT",
+    "NEW_PRODUCTION_HTTP_RUN_AND_BLIND_ANSWER_REVIEW"
+  ],
+  "createdAt": "2026-08-26T11:52:10.523Z",
+  "developmentDiagnosticEligible": true,
+  "evidenceLifecycle": "CANONICALIZED_PROVENANCE_REVIEW_REQUIRED",
+  "finalUnseenEligible": false,
+  "labelLifecycle": "HUMAN_VERIFIED_IMMUTABLE",
+  "qualityMetricsStatus": "PRE_FIX_RULE_DIAGNOSTICS_ONLY",
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-customer-service-v2-canonical-package/v1"
+}

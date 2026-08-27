@@ -11,6 +11,7 @@ when a separately frozen review package is supplied, the report is marked
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import random
 import re
@@ -24,6 +25,7 @@ from typing import Any
 from evaluation.core.io import (
     atomic_write_json,
     atomic_write_text,
+    load_json,
     load_jsonl,
     relative_to_repo,
     sha256_file,
@@ -32,6 +34,10 @@ from evaluation.core.metrics import percentile, wilson_interval
 
 GOLD_SCHEMA = "aishop-customer-service-gold/v1"
 REPORT_SCHEMA = "aishop-customer-service-evidence/v1"
+LABEL_EVIDENCE_AUDIT_SCHEMA = "aishop-customer-service-label-consistency-audit/v1"
+LABEL_POLICY_FINAL_EVIDENCE_SCHEMA = (
+    "aishop-customer-service-label-policy-final-evidence/v1"
+)
 PROVISIONAL_STATUS = "PROVISIONAL_NOT_HUMAN_GOLD"
 HUMAN_STATUS = "HUMAN_VERIFIED"
 _BOOTSTRAP_SAMPLES = 2_000
@@ -1165,17 +1171,38 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     metrics = report.get("metrics") or {}
     dataset = report.get("dataset") or {}
     human_verified = report.get("status") == HUMAN_STATUS
+    evidence_validity = report.get("evidenceValidity") or {}
+    controls_complete = human_verified and not evidence_validity.get("blocking")
+    case_count = int(dataset.get("caseCount") or 0)
+    target_results = report.get("provisionalTargets") or {}
+    failed_targets = [
+        name for name, result in target_results.items() if not result.get("pointEstimatePasses")
+    ]
+    if failed_targets:
+        target_summary = (
+            f"当前 {case_count} 条点估计未通过参考门槛：{', '.join(failed_targets)}；"
+            "这些门槛不是统一行业标准，也不能替代人工答案质量。"
+        )
+    else:
+        target_summary = (
+            f"当前 {case_count} 条点估计通过所列参考门槛；这些门槛不是统一行业标准，"
+            "也不能替代人工答案质量。"
+        )
     review_intro = (
-        "当前数据集已完成双人独立复核并冻结；以下命令仅用于复核流程复现和新版本生成。"
-        if human_verified
+        "当前数据集保留 HUMAN_VERIFIED 生命周期，但来源独立性或标签一致性门禁未闭环；必须生成后继版本，不能把本报告当作发布证据。"
+        if human_verified and not controls_complete
+        else "当前数据集已完成双人独立复核并冻结；以下命令仅用于复核流程复现和新版本生成。"
+        if controls_complete
         else "当前仓库只冻结 draft 数据，人工复核工具已就绪但尚未产生人工标签。"
     )
     lines = [
-        "# AI 客服金标评测（v1）",
+        "# AI 客服输入理解金标评测",
         "",
         (
-            f"> 状态：`{report.get('status')}`；`releaseGateEligible=false`。标签已完成独立人工复核，但结果仍是离线理解指标。"
-            if human_verified
+            f"> 状态：`{report.get('status')}`；质量声明：`{report.get('qualityClaimStatus')}`；`releaseGateEligible=false`。标签生命周期已冻结，但独立性/一致性门禁未通过。"
+            if human_verified and not controls_complete
+            else f"> 状态：`{report.get('status')}`；`releaseGateEligible=false`。标签已完成独立人工复核，但结果仍是离线理解指标。"
+            if controls_complete
             else f"> 状态：`{report.get('status')}`；`releaseGateEligible=false`。标签未完成独立人工复核，不能称为人工准确率。"
         ),
         "> 本报告只测客服理解/转接的核心质量证据；Agent `pass^k`、工具契约和终态门禁不计入下表。",
@@ -1199,6 +1226,19 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         "",
         "流程为 `OPEN -> SEALED -> HUMAN_VERIFIED`；sheet 带源数据/内容 SHA-256，禁止写入 `expected`、模型预测或隐藏字段，冲突必须逐 case 仲裁。当前结果虽已完成人工复核，仍是离线质量证据，且不会自动进入 release gate。",
         "",
+        *(
+            [
+                "## 证据有效性门禁",
+                "",
+                f"- 标签一致性：`{(evidence_validity.get('gates') or {}).get('labelConsistencyPassed')}`",
+                f"- 来源独立性：`{(evidence_validity.get('gates') or {}).get('provenancePassed')}`",
+                f"- 审计状态：`{evidence_validity.get('status')}`；审计 SHA-256：`{evidence_validity.get('auditSha256')}`",
+                "- 当前数值只可用于已暴露开发集诊断；不得称为发布质量、最终未见集结果或答案正确率。",
+                "",
+            ]
+            if evidence_validity
+            else []
+        ),
         "## 核心指标",
         "",
         "| 指标 | 值 | 分子/分母 | 95% CI | badcase |",
@@ -1229,7 +1269,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             "",
             "## 证据版本边界",
             "",
-            "- 当前 60 条规则预路由结果是同一 HUMAN_VERIFIED 数据集上的 paired replay；槽位修复证据包 `customer-service-slot-replay-v1-20260823` 只证明无回归/修复，不是新 holdout 泛化结果。",
+            f"- 当前 {case_count} 条规则预路由结果绑定本报告数据集；它是输入理解/路由诊断，不是 HTTP 最终答案质量或新 holdout 泛化结果。",
             "- HTTP 最终答案另有独立 `HUMAN_REVIEWED_ADJUDICATED` 证据包；固定旧回放的引用语义支持为 `6/30 eligible`（20.0%），不能从本报告的意图/槽位结果推导生成答案质量。",
             "- HTTP 新输出必须重新双人盲审；旧答案 labels 绑定 source run 和答案 SHA-256，不能迁移到新代码结果。",
         ]
@@ -1269,11 +1309,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"slot EM `{((baseline.get('metrics') or {}).get('slotExactMatch') or {}).get('value')}`、"
             f"handoff Recall `{((baseline.get('metrics') or {}).get('handoffRecall') or {}).get('value')}`；"
             f"历史 badcase：{', '.join(baseline.get('badcaseIds') or [])}。",
-            (
-                f"当前扩展到 {dataset.get('caseCount', 0)} 条并完成双人复核，点估计通过参考门槛；样本量仍不足以推出行业级稳定性。"
-                if human_verified
-                else f"当前扩展到 {dataset.get('caseCount', 0)} 条并修复规则后，点估计通过参考门槛；标签仍未独立人工复核，样本量也不足以推出行业级稳定性。"
-            ),
+            target_summary,
+            "样本量、切片覆盖和评测模式仍不足以推出行业级稳定性或线上质量。",
             "扩展切片：" + "; ".join(
                 f"{tag}={count}" for tag, count in sorted((dataset.get('sliceCounts') or {}).items())
             ),
@@ -1329,12 +1366,231 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def apply_label_evidence_validity(
+    report: Mapping[str, Any],
+    label_audit_path: Path,
+) -> dict[str, Any]:
+    """Attach fail-closed provenance/label-policy gates without changing scores."""
+
+    result = copy.deepcopy(dict(report))
+    audit = load_json(label_audit_path)
+    if not isinstance(audit, Mapping):
+        raise CustomerServiceGoldError("label evidence audit must be a JSON object")
+    if audit.get("schemaVersion") == LABEL_POLICY_FINAL_EVIDENCE_SCHEMA:
+        report_dataset_sha = str((result.get("dataset") or {}).get("sha256") or "")
+        report_case_count = int((result.get("dataset") or {}).get("caseCount") or 0)
+        evidence_case_count = int(audit.get("caseCount") or 0)
+        if (
+            not report_dataset_sha
+            or audit.get("successorDatasetSha256") != report_dataset_sha
+            or report_case_count <= 0
+            or report_case_count > evidence_case_count
+        ):
+            raise CustomerServiceGoldError(
+                "final label-policy evidence differs from the report dataset"
+            )
+        if (
+            audit.get("status") != "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED"
+            or audit.get("evidenceTier") != "HUMAN_APPROVED_AI_ASSISTED"
+            or audit.get("releaseGateEligible") is not False
+            or audit.get("finalUnseenEligible") is not False
+        ):
+            raise CustomerServiceGoldError(
+                "final label-policy evidence has an invalid lifecycle boundary"
+            )
+        package_root = label_audit_path.resolve().parent
+        files = audit.get("files") or {}
+        required_files = {
+            "adjudication.normalized.jsonl",
+            "agreement.json",
+            "final-decisions.jsonl",
+            "final-report.json",
+            "human-approval-clarification.json",
+            "reviews/reviewer-a.sealed.jsonl",
+            "reviews/reviewer-b.sealed.jsonl",
+            "successor-dataset.jsonl",
+            "successor-dataset.manifest.json",
+            "taxonomy-contract-v2.1.json",
+        }
+        if not isinstance(files, Mapping) or not required_files.issubset(files):
+            raise CustomerServiceGoldError(
+                "final label-policy evidence inventory is incomplete"
+            )
+        for name, metadata in files.items():
+            if not isinstance(metadata, Mapping):
+                raise CustomerServiceGoldError(
+                    f"invalid final label-policy evidence metadata: {name}"
+                )
+            target = (package_root / str(name)).resolve()
+            try:
+                target.relative_to(package_root)
+            except ValueError as exc:
+                raise CustomerServiceGoldError(
+                    "final label-policy evidence inventory escapes package"
+                ) from exc
+            if (
+                not target.is_file()
+                or sha256_file(target) != metadata.get("sha256")
+                or target.stat().st_size != int(metadata.get("bytes") or -1)
+            ):
+                raise CustomerServiceGoldError(
+                    f"final label-policy evidence hash mismatch: {name}"
+                )
+        final_report = load_json(package_root / "final-report.json")
+        successor_manifest = load_json(
+            package_root / "successor-dataset.manifest.json"
+        )
+        if (
+            final_report.get("status")
+            != "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED"
+            or final_report.get("successorDatasetSha256") != report_dataset_sha
+            or successor_manifest.get("datasetSha256") != report_dataset_sha
+            or successor_manifest.get("evidenceTier")
+            != "HUMAN_APPROVED_AI_ASSISTED"
+            or successor_manifest.get("releaseGateEligible") is not False
+            or successor_manifest.get("finalUnseenEligible") is not False
+        ):
+            raise CustomerServiceGoldError(
+                "final label-policy evidence documents disagree"
+            )
+
+        validity_status = "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED"
+        metric_status = "HUMAN_APPROVED_EXPOSED_DEVELOPMENT_DIAGNOSTIC"
+        result["qualityClaimStatus"] = "REVIEWED_OFFLINE_DIAGNOSTIC"
+        result["evidenceValidity"] = {
+            "status": validity_status,
+            "evidenceTier": audit.get("evidenceTier"),
+            "auditPath": str(label_audit_path),
+            "auditSha256": sha256_file(label_audit_path),
+            "blocking": False,
+            "gates": {
+                "labelConsistencyPassed": True,
+                "taxonomyPassed": True,
+                "slotPolicyPassed": True,
+                "provenancePassed": True,
+                "releaseGateEligible": False,
+                "finalUnseenEligible": False,
+            },
+            "metricValidity": {
+                name: metric_status
+                for name in (
+                    "intentMacroF1",
+                    "slotEntitySpanF1",
+                    "slotExactMatch",
+                    "highRiskIntentRecall",
+                    "handoffRecall",
+                    "criticalHandoffMissRate",
+                )
+            },
+            "reviewedCaseCount": audit.get("reviewedCaseCount"),
+            "changedCaseCount": audit.get("changedCaseCount"),
+            "humanDecisionAuthority": True,
+        }
+        review = dict(result.get("humanReviewPlan") or {})
+        review.update(
+            {
+                "adjudicationComplete": True,
+                "independenceProvenanceComplete": True,
+                "labelPolicyConsistencyPassed": True,
+                "status": "COMPLETE_FOR_EXPOSED_DEVELOPMENT_DIAGNOSTIC",
+                "note": (
+                    "Human reviewers retained final decision authority; AI only "
+                    "assisted recording. The dataset remains exposed development "
+                    "evidence and is not an unseen release gate."
+                ),
+            }
+        )
+        result["humanReviewPlan"] = review
+        for metric in (result.get("metrics") or {}).values():
+            if not isinstance(metric, dict):
+                continue
+            metric["validityStatus"] = metric_status
+            metric["releaseGateEligible"] = False
+        for target in (result.get("provisionalTargets") or {}).values():
+            if isinstance(target, dict):
+                target["eligibleForQualityGate"] = False
+        result.setdefault("limitations", []).insert(
+            0,
+            "Labels are human-approved with AI-assisted recording; scores are exposed-set development diagnostics only, never unseen or release evidence.",
+        )
+        result["releaseGateEligible"] = False
+        return result
+    if audit.get("schemaVersion") != LABEL_EVIDENCE_AUDIT_SCHEMA:
+        raise CustomerServiceGoldError(
+            "label evidence audit schema must be "
+            f"{LABEL_EVIDENCE_AUDIT_SCHEMA} or {LABEL_POLICY_FINAL_EVIDENCE_SCHEMA}"
+        )
+    report_dataset_sha = str((result.get("dataset") or {}).get("sha256") or "")
+    audit_dataset_sha = str((audit.get("dataset") or {}).get("sha256") or "")
+    if not report_dataset_sha or report_dataset_sha != audit_dataset_sha:
+        raise CustomerServiceGoldError("label audit dataset SHA-256 differs from report")
+    gates = audit.get("gates") or {}
+    label_passed = gates.get("labelConsistencyPassed") is True
+    provenance_passed = gates.get("provenancePassed") is True
+    blocking = not (label_passed and provenance_passed)
+    result["qualityClaimStatus"] = (
+        "DEVELOPMENT_DIAGNOSTIC_LABEL_AND_PROVENANCE_BLOCKED"
+        if blocking
+        else "REVIEWED_OFFLINE_DIAGNOSTIC"
+    )
+    result["evidenceValidity"] = {
+        "status": audit.get("status"),
+        "auditPath": str(label_audit_path),
+        "auditSha256": sha256_file(label_audit_path),
+        "blocking": blocking,
+        "gates": {
+            "labelConsistencyPassed": label_passed,
+            "taxonomyPassed": gates.get("taxonomyPassed") is True,
+            "slotPolicyPassed": gates.get("slotPolicyPassed") is True,
+            "provenancePassed": provenance_passed,
+            "releaseGateEligible": False,
+            "finalUnseenEligible": False,
+        },
+        "metricValidity": dict(audit.get("metricValidity") or {}),
+        "findingCount": (audit.get("summary") or {}).get("findingCount"),
+        "affectedCaseCount": (audit.get("summary") or {}).get("affectedCaseCount"),
+    }
+    review = dict(result.get("humanReviewPlan") or {})
+    review["historicalAdjudicationComplete"] = bool(review.get("adjudicationComplete"))
+    review["adjudicationComplete"] = not blocking
+    review["independenceProvenanceComplete"] = provenance_passed
+    review["labelPolicyConsistencyPassed"] = label_passed
+    review["status"] = "COMPLETE" if not blocking else "SUCCESSOR_READJUDICATION_REQUIRED"
+    review["note"] = (
+        "Historical sheets were sealed and merged, but the provenance audit and cross-case "
+        "label-policy audit are blocking. Two independent blind reviews must create a new "
+        "dataset version before any release claim."
+        if blocking
+        else review.get("note")
+    )
+    result["humanReviewPlan"] = review
+    metric_validity = audit.get("metricValidity") or {}
+    for name, metric in (result.get("metrics") or {}).items():
+        if not isinstance(metric, dict):
+            continue
+        status = metric_validity.get(name)
+        if status:
+            metric["validityStatus"] = status
+            metric.setdefault("notes", []).append(str(status))
+        metric["releaseGateEligible"] = False
+    for target in (result.get("provisionalTargets") or {}).values():
+        if isinstance(target, dict):
+            target["eligibleForQualityGate"] = not blocking
+    result.setdefault("limitations", []).insert(
+        0,
+        "Label consistency and/or independent-review provenance gates are open; point estimates are exposed-set development diagnostics only.",
+    )
+    result["releaseGateEligible"] = False
+    return result
+
+
 async def run_customer_service_gold(
     dataset_path: Path,
     *,
     mode: str = "rule",
     output_path: Path | None = None,
     json_output_path: Path | None = None,
+    label_audit_path: Path | None = None,
 ) -> dict[str, Any]:
     if mode != "rule":
         raise CustomerServiceGoldError("only --mode rule is implemented; live mode requires a reviewed protocol")
@@ -1351,6 +1607,8 @@ async def run_customer_service_gold(
         "resolverSourceSha256": sha256_file(classifier_path) if classifier_path.is_file() else None,
     }
     report = evaluate_predictions(rows, predictions, provenance=provenance)
+    if label_audit_path is not None:
+        report = apply_label_evidence_validity(report, label_audit_path)
     if json_output_path:
         atomic_write_json(json_output_path, report)
     if output_path:

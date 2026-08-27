@@ -427,6 +427,9 @@ class AgentWorker:
             force_keep = bool(episode_payload.get("episodeKeep")) or str(
                 episode_payload.get("intent") or ""
             ) in _EPISODE_FULL_INTENTS
+            _trusted_card, trusted_user_text = parse_consult_card(
+                str(episode_payload.get("userMessage") or "")
+            )
             with bind_episode(
                 run_id,
                 message_id=message_id,
@@ -435,6 +438,7 @@ class AgentWorker:
                 request_id=request_id,
                 episode_id=episode_id,
                 traceparent=str(episode_payload.get("traceparent") or "") or None,
+                trusted_user_text=trusted_user_text,
             ):
                 if run_id and message_id is not None and user_id:
                     episode_service.start_run(
@@ -644,7 +648,7 @@ class AgentWorker:
                     lease_owner,
                 )
                 return
-            if outcome != "ok":
+            if outcome not in {"ok", "handoff", "human_support"}:
                 # 图内部已经把错误文案推给了用户（P0-1）。这一轮不能记成功，
                 # 也不自动重试——重试会向用户重复推送错误消息。
                 cancelled = outcome == "cancelled"

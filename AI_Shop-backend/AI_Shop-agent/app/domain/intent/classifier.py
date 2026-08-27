@@ -44,6 +44,10 @@ async def _invoke_intent_llm(llm, messages: list, *, model: str):
 _BOUNDED_HANDOFF_REASONS = frozenset({
     "USER_REQUEST",
     "FUND_DISPUTE",
+    "SAFETY_INCIDENT",
+    "PRIVACY_INCIDENT",
+    "ACCOUNT_SECURITY",
+    "STATE_CONFLICT",
     "SEVERE_NEGATIVE_SENTIMENT",
     "REPEATED_UNRESOLVED",
     "REPEATED_INTENT",
@@ -110,6 +114,7 @@ FUND_AT_RISK = (
     "扣了两次",
     "扣了两笔",
     "银行卡被扣",
+    "银行卡扣了",
     "钱没退",
     "退款没到账",
     "退款还没到账",
@@ -135,6 +140,10 @@ PAYMENT_BLOCKED = (
     "付款不成功",
     "付不了",
     "无法付款",
+    "付款页卡住",
+    "支付页卡住",
+    "付款页面卡住",
+    "支付页面卡住",
 )
 PAYMENT_ISSUE_HINTS = FUND_AT_RISK + PAYMENT_BLOCKED
 _PAYMENT_INFORMATION_HINTS = (
@@ -180,6 +189,7 @@ _FUND_INCIDENT_HINTS = (
     "扣了两次",
     "扣了两笔",
     "银行卡被扣",
+    "银行卡扣了",
     "钱没退",
     "退款没到账",
     "退款还没到账",
@@ -210,6 +220,8 @@ _UNRESOLVED_HINTS = (
     "反复咨询",
     "一直没人解决",
     "一直没人处理",
+    "答非所问",
+    "连续三次",
 )
 _PRIVACY_REQUEST_HINTS = (
     "读取我的邮箱",
@@ -223,11 +235,14 @@ _PRIVACY_REQUEST_HINTS = (
     "导出我的账户数据",
     "把聊天记录发给我",
     "查看我的个人资料",
+    "把我的收货地址发给陌生人",
+    "把我的地址发给陌生人",
+    "泄露我的收货地址",
 )
 _PRODUCT_ENTITY_MARKERS = (
     "手机壳", "安卓手机", "降噪耳机", "轻薄本", "手机", "耳机", "电脑", "笔记本",
     "平板", "外套", "衣服", "鞋", "零食", "饮料", "相机", "键盘", "鼠标", "音箱",
-    "空气净化器", "净水器", "吉他", "玩具", "配件",
+    "空气净化器", "净水器", "吉他", "玩具", "配件", "充电宝", "预售商品",
 )
 
 # Deterministic extension slots used by the customer-service contract.  These
@@ -255,6 +270,9 @@ _PRIVACY_DATA_TERMS = (
     "账号数据",
     "隐私数据",
     "个人数据",
+    "收货地址",
+    "联系电话",
+    "手机号",
 )
 _PRIVACY_ACTION_TERMS = (
     "读取",
@@ -268,6 +286,10 @@ _PRIVACY_ACTION_TERMS = (
     "清除",
     "发给我",
     "提供",
+    "发给陌生人",
+    "发给别人",
+    "泄露",
+    "暴露",
 )
 
 
@@ -279,14 +301,75 @@ def _is_privacy_request(text: str) -> bool:
     )
 
 
-_ACCOUNT_SECURITY_HINTS = ("账号被盗", "账户被盗", "账号被盗了", "账户被盗了")
+_ACCOUNT_SECURITY_HINTS = (
+    "账号被盗",
+    "账户被盗",
+    "账号被盗了",
+    "账户被盗了",
+    "账号疑似被盗",
+    "账户疑似被盗",
+    "账号被盗用",
+    "账户被盗用",
+    "账号异常登录",
+    "账户异常登录",
+)
 
 
 def _is_account_security_request(text: str) -> bool:
     return any(term in (text or "") for term in _ACCOUNT_SECURITY_HINTS)
 
 
+_PHYSICAL_SAFETY_HINTS = (
+    "鼓包",
+    "膨胀",
+    "发烫",
+    "过热",
+    "冒烟",
+    "起火",
+    "爆炸",
+    "漏液",
+    "烧焦",
+)
+
+
+def _is_physical_safety_incident(text: str) -> bool:
+    value = str(text or "")
+    return any(term in value for term in _PHYSICAL_SAFETY_HINTS)
+
+
+def _is_refund_destination_security_incident(text: str) -> bool:
+    value = str(text or "")
+    has_destination = any(
+        marker in value
+        for marker in ("陌生卡", "陌生账户", "其他人的卡", "非本人账户", "退款账户")
+    )
+    return has_destination and any(marker in value for marker in ("退款", "退到", "把钱退"))
+
+
 _HUMAN_NEGATION_MARKERS = ("不要", "不用", "无需", "先别", "暂不", "暂时不", "不想")
+
+_CONDITIONAL_HUMAN_MARKERS = (
+    "拿不准",
+    "不确定",
+    "无法判断",
+    "处理不了",
+    "解决不了",
+)
+
+
+def _is_conditional_human_request(text: str) -> bool:
+    """Keep the business intent when human support is only the fallback branch."""
+
+    value = str(text or "")
+    return _has_explicit_human_request(value) and (
+        any(marker in value for marker in _CONDITIONAL_HUMAN_MARKERS)
+        or bool(
+            re.search(
+                r"(?:如果|要是|若|实在).{0,12}(?:转人工|找真人|人工处理|人工客服)",
+                value,
+            )
+        )
+    )
 
 
 def _has_explicit_human_request(text: str) -> bool:
@@ -300,6 +383,27 @@ def _has_explicit_human_request(text: str) -> bool:
                     return True
                 start = clause.find(hint, start + len(hint))
     return False
+
+
+def _extract_contextual_order_id(text: str) -> str | None:
+    """Extract non-production order tokens only when explicitly order-bound.
+
+    Production IDs remain owned by ``app.utils.order_ids``.  This fallback is
+    deliberately contextual so an amount, date, phone number, or arbitrary
+    digit sequence cannot become an order ID merely because it is numeric.
+    """
+
+    value = str(text or "")
+    patterns = (
+        r"(?:订单(?:号)?|退款单)\s*[：:#号]?\s*([A-Za-z][A-Za-z0-9_-]{8,31}|\d{10,18})",
+        r"(?:订单|这单|该单)[^0-9A-Za-z]{0,16}([A-Za-z][A-Za-z0-9_-]{8,31}|\d{10,18})",
+        r"([A-Za-z][A-Za-z0-9_-]{8,31}|\d{10,18})\s*(?:这单|的订单|订单)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, value, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
 
 
 def _extract_product_name(text: str) -> str | None:
@@ -341,6 +445,7 @@ def _extract_product_name(text: str) -> str | None:
     if search:
         candidate = re.split(r"预算|价格|以内|不要|不超过", search.group(1), maxsplit=1)[0]
         candidate = candidate.strip(" ：:、 ")
+        candidate = re.sub(r"^(?:能拍照的|静音的)\s*", "", candidate).strip()
         if candidate and not re.fullmatch(r"[\d\s元￥¥.]+", candidate) and (
             any(marker in candidate for marker in _PRODUCT_ENTITY_MARKERS)
             or re.search(r"[A-Za-z]{2,}|\d", candidate)
@@ -358,6 +463,11 @@ def _extract_product_name(text: str) -> str | None:
             start = max(start_candidates) + 1
             candidate = value[start : marker_end + len(marker)].strip(" ：:、，, ")
             candidate = re.sub(r"^(?:不要|不想要|预算[^的]*的)", "", candidate).strip()
+            candidate = re.sub(r"^(?:我不想问|不想问)\s*", "", candidate).strip()
+            candidate = re.sub(r"^(?:能拍照的|适合[^的]{1,10}的)\s*", "", candidate).strip()
+            for prefix in (*_KNOWN_BRANDS, "主动降噪", "降噪", "静音"):
+                if candidate.startswith(prefix) and candidate != prefix:
+                    candidate = candidate[len(prefix) :].strip()
             candidate = re.sub(
                 r"^(?:这款|这副|这个|该款|此款|这台|包裹少了|少了|缺少|漏发|少发|收到的包裹少了)"
                 r"\s*(?:一个|一件|一只|1个|1件|1只)?",
@@ -428,6 +538,35 @@ def is_confirmed_no_deduction_payment_failure(text: str | None) -> bool:
     if not any(marker in value for marker in _FUND_NEGATED_HINTS):
         return False
     return not _funds_at_risk(value)
+
+
+def is_pre_authorization_payment_retry(text: str | None) -> bool:
+    """Whether the user asks to retry before entering a payment credential.
+
+    This remains a conditional guidance path: the graph still asks the user to
+    verify that no debit occurred and that the order remains unpaid before a
+    retry. Any observed funds incident keeps the existing HIGH-risk handoff.
+    """
+
+    value = str(text or "").strip()
+    if not value or not any(marker in value for marker in PAYMENT_BLOCKED):
+        return False
+    if _funds_at_risk(value):
+        return False
+    credential_not_entered = any(
+        marker in value
+        for marker in (
+            "还没输入密码",
+            "尚未输入密码",
+            "没有输入密码",
+            "没输入密码",
+            "还没输密码",
+            "尚未输密码",
+            "没输密码",
+        )
+    )
+    asks_retry = any(marker in value for marker in ("重试", "再试", "重新支付"))
+    return credential_not_entered and asks_retry
 
 
 _TOOL_INTENTS = frozenset(
@@ -535,7 +674,7 @@ _ACTION_CUES: dict[IntentKind, tuple[str, ...]] = {
         "继续退款",
     ),
     IntentKind.CANCEL_ORDER: (
-        "我要取消", "我想取消", "帮我取消", "给我取消", "取消这个订单",
+        "我要取消", "我想取消", "帮我取消", "给我取消", "请取消订单", "取消订单", "取消这个订单",
         "取消订单吧", "取消一下", "申请取消", "不要这个订单", "继续取消",
     ),
     IntentKind.CONFIRM_RECEIPT: (
@@ -550,6 +689,7 @@ _ACTION_CUES: dict[IntentKind, tuple[str, ...]] = {
     ),
     IntentKind.ADDRESS_CHANGE: (
         "修改收货地址", "帮我改地址", "我要改地址", "换个地址", "地址填错",
+        "地址换一下", "换一下地址", "改到公司地址", "改到单位地址",
     ),
     IntentKind.INVOICE: ("我要发票", "开发票", "开具发票", "申请发票", "帮我开票"),
     IntentKind.DAMAGED_OR_WRONG_ITEM: (
@@ -571,6 +711,7 @@ _ACTION_NEGATION_MARKERS = (
     "暂不",
     "暂时不",
     "别再",
+    "不是要",
 )
 
 # A proposal is a write-intent boundary, even though it must not mutate state.
@@ -670,7 +811,7 @@ def _is_direct_order_action(text: str, intent: IntentKind, asks_information: boo
         IntentKind.REFUND: ("退款", "退掉"),
         IntentKind.CANCEL_ORDER: ("取消订单", "取消这单", "取消该订单"),
     }.get(intent)
-    if not cues or not extract_order_id(text):
+    if not cues or not (extract_order_id(text) or _extract_contextual_order_id(text)):
         return False
     if asks_information or any(marker in text for marker in _ACTION_NEGATION_MARKERS):
         return False
@@ -685,6 +826,16 @@ def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     text = str(user_text or "").strip()
     if intent == IntentKind.HUMAN_REQUEST or _has_explicit_human_request(text):
         return RequestMode.HUMAN_SUPPORT
+
+    policy_first = any(
+        marker in text
+        for marker in ("先告诉我", "先说明", "先解释", "先了解", "先说说", "先问一下")
+    ) and any(
+        marker in text
+        for marker in ("条件", "规则", "政策", "流程", "能否", "是否", "可以吗")
+    )
+    if policy_first and intent in _PROPOSAL_INTENTS:
+        return RequestMode.INFORMATIONAL
 
     action_cues = _ACTION_CUES.get(intent, ())
     strong_action = _has_non_negated_action_cue(text, action_cues)
@@ -752,7 +903,7 @@ def _has_order_action_cue(text: str) -> bool:
         hint in value
         for hint in (
             "退款", "退货", "退钱", "取消", "确认收货", "物流", "快递",
-            "发货了吗", "没发货", "未发货", "催发货", "评价", "好评", "差评", "五星", "追评",
+            "发货", "出库", "预售", "评价", "好评", "差评", "五星", "追评",
             "发票", "改地址", "修改地址", "破损", "损坏", "坏了", "错发", "漏发",
         )
     )
@@ -787,14 +938,16 @@ def classify_intent_by_rules(
     if structural:
         return structural
 
-    if _has_explicit_human_request(text):
-        return IntentKind.HUMAN_REQUEST
     # Privacy/authority requests are safety-sensitive even when the user does
     # not literally say "转人工".  Route them to the human-support boundary
     # before generic chat or product rules can consume the turn.
     if _is_privacy_request(text):
         return IntentKind.HUMAN_REQUEST
     if _is_account_security_request(text):
+        return IntentKind.HUMAN_REQUEST
+    # A conditional fallback ("拿不准就转人工") retains its business intent;
+    # the handoff policy still honors the requested fallback after routing.
+    if _has_explicit_human_request(text) and not _is_conditional_human_request(text):
         return IntentKind.HUMAN_REQUEST
     # refund-007：进度问法只写死了「退款到账」，补上带时间词的问法——
     # 「退款要多久到账」之前被后面的「退款」泛匹配抢走判成 REFUND。
@@ -815,6 +968,29 @@ def classify_intent_by_rules(
         # question.  Keep it on the REFUND knowledge path; REFUND_STATUS is
         # reserved for user-specific progress lookup.
         return IntentKind.REFUND
+    if "退款" in text and any(
+        marker in text
+        for marker in ("处理中", "处理进度", "到哪一步", "没到账", "未到账", "没有入账")
+    ):
+        return IntentKind.REFUND_STATUS
+
+    if any(marker in text for marker in ("不想取消", "不是要取消", "不需要取消")) and any(
+        marker in text for marker in ("看看", "还在不在", "状态", "这单", "订单")
+    ) and not any(marker in text for marker in ("改地址", "地址换", "换一下地址")):
+        return IntentKind.QUERY_ORDER
+
+    # Preserve an explicit cancellation domain even when the same sentence
+    # says where a refund must *not* go.  A negated secondary refund phrase
+    # must not steal the affirmative cancellation request.
+    if _has_non_negated_action_cue(text, _ACTION_CUES[IntentKind.CANCEL_ORDER]):
+        return IntentKind.CANCEL_ORDER
+
+    # Missing rows in an order list are order-history incidents, not damaged
+    # goods merely because the phrase contains "少了一笔".
+    if "订单" in text and any(
+        marker in text for marker in ("订单列表", "少了一笔", "少一笔", "还在不在")
+    ):
+        return IntentKind.QUERY_ORDER
     if _is_informational_fund_question(text):
         return IntentKind.CHAT
     if any(k in text for k in PAYMENT_ISSUE_HINTS):
@@ -837,18 +1013,67 @@ def classify_intent_by_rules(
             "配件不全",
             "错的颜色",
             "颜色不对",
+            "颜色变成",
             "质量问题",
             "想换货",
             "换货",
             "假货",
+            "鼓包",
+            "发烫",
         )
-    ):
+    ) or (
+        "收到" in text
+        and "变成" in text
+        and any(color in text for color in ("红色", "蓝色", "黑色", "白色", "绿色", "黄色"))
+    ) or bool(re.search(r"应该有.{0,12}但(?:只)?(?:到|收到)", text)):
         return IntentKind.DAMAGED_OR_WRONG_ITEM
 
     if any(term in text for term in _UNRESOLVED_HINTS) and any(
         marker in text for marker in ("问题", "处理", "客服", "投诉", "解决")
     ):
         return IntentKind.COMPLAINT
+    if "反馈" in text and any(
+        marker in text for marker in ("慢", "差", "问题", "不对", "异常", "服务")
+    ):
+        return IntentKind.COMPLAINT
+
+    if any(
+        marker in text
+        for marker in ("售后页面", "售后入口", "不知道该选哪类", "说不上是质量还是安装")
+    ) or (
+        "用着不对劲" in text and any(marker in text for marker in ("质量", "安装", "售后"))
+    ):
+        return IntentKind.AFTERSALES_UNKNOWN
+
+    if "追评入口" in text or (
+        "追评" in text and any(marker in text for marker in ("入口", "页面", "在哪"))
+    ):
+        return IntentKind.PRODUCT_REVIEW
+
+    # Questions about a referenced item/model are consultation, even when the
+    # requested attribute is suitability or a technology comparison.  Search
+    # remains the route when discovery verbs or budget constraints are present.
+    current_product_reference = any(
+        marker in text for marker in ("这款", "这双", "这件", "这个商品", "该款", "此款")
+    )
+    model_comparison = bool(
+        re.search(r"[A-Za-z]{2,}[-\s]?[A-Za-z0-9-]*\d", text)
+        and any(marker in text for marker in ("差在哪", "区别", "相比", "对比"))
+    )
+    technology_comparison = (
+        any(marker.casefold() in lower for marker in ("oled", "mini led", "lcd", "micro led"))
+        and any(marker in text for marker in ("区别", "差异", "差在哪", "解释"))
+    )
+    cross_catalog_comparison = any(brand in text for brand in _KNOWN_BRANDS) and any(
+        marker in text for marker in ("哪个好", "哪款好", "推荐", "怎么选")
+    )
+    if (
+        current_product_reference or model_comparison or technology_comparison
+    ) and not cross_catalog_comparison and not any(
+        marker in text
+        for marker in ("买", "找", "推荐", "搜索", "预算", "发货", "出库", "物流", "快递")
+    ):
+        return IntentKind.PRODUCT_CONSULT
 
     # Product search constraints must win over the generic consultation
     # question route. ``有没有适合学生的平板，预算 2000`` is a search request,
@@ -906,8 +1131,11 @@ def classify_intent_by_rules(
         ))
         and any(k in text for k in ("催发货", "催一下发货", "发货了吗", "发货了没", "怎么还没发货", "怎么还不发货", "还没发货", "没发货", "未发货"))
     ):
-        if not any(k in text for k in ("一般多久发货", "通常多久发货", "多久能发货", "什么时候能发货")):
-            return IntentKind.QUERY_FULFILLMENT
+        return IntentKind.QUERY_FULFILLMENT
+    if any(marker in text for marker in ("出库", "预售商品")) and any(
+        marker in text for marker in ("何时", "什么时候", "几天", "发货", "还没", "承诺")
+    ):
+        return IntentKind.QUERY_FULFILLMENT
 
     # logi-006：物流异常问法（「物流一直不动怎么办」）要的是轨迹而不是操作说明，
     # 必须抢在 howto 分支之前——否则「怎么」+「物流」会先命中 howto 判成 CHAT。
@@ -918,9 +1146,9 @@ def classify_intent_by_rules(
     ):
         return IntentKind.QUERY_LOGISTICS
 
-    # 操作方法/如何/怎么类 → CHAT（必须在 INVOICE/ADDRESS_CHANGE 等专项分支之前执行，
-    # 否则「发票怎么申请」「确认收货在哪里点」会被专项分支抢走，导致错误路由或触发
-    # PROPOSE_CONFIRM_RECEIPT 等副作用）。
+    # How-to text retains its business domain. ``classify_request_mode`` and
+    # ``_build_decision`` keep informational turns read-only, so collapsing the
+    # domain to CHAT is neither necessary nor measurable.
     howto = any(
         k in text
         for k in (
@@ -943,27 +1171,27 @@ def classify_intent_by_rules(
             "哪里看",
         )
     )
-    if howto and any(
-        k in text
-        for k in (
-            "取消",
-            "优惠券",
-            "优惠卷",
-            "用券",
-            "退款",
-            "退货",
-            "退",     # refund-006：「七天无理由怎么退」只含单字「退」
-            "评价",
-            "追评",   # 「追评怎么写」
-            "收货",
-            "物流",
-            "快递",
-            "订单",
-            "发票",
-            "地址",
-        )
-    ):
-        return IntentKind.CHAT
+    if howto:
+        if any(k in text for k in ("优惠券", "优惠卷", "用券", "领券", "券在哪里", "券哪里")):
+            return IntentKind.QUERY_COUPON
+        if any(k in text for k in ("发票", "抬头", "税号")):
+            return IntentKind.INVOICE
+        if "地址" in text:
+            return IntentKind.ADDRESS_CHANGE
+        if any(k in text for k in ("追评", "评价入口")):
+            return IntentKind.PRODUCT_REVIEW
+        if "评价" in text:
+            return IntentKind.PRODUCT_REVIEW
+        if any(k in text for k in ("确认收货", "自动收货", "自动确认", "收货")):
+            return IntentKind.CONFIRM_RECEIPT
+        if "取消" in text:
+            return IntentKind.CANCEL_ORDER
+        if any(k in text for k in ("退款", "退货", "七天无理由", "怎么退")):
+            return IntentKind.REFUND
+        if any(k in text for k in ("物流", "快递")):
+            return IntentKind.QUERY_LOGISTICS
+        if "订单" in text:
+            return IntentKind.QUERY_ORDER
 
     if any(k in text for k in ("开发票", "发票", "抬头", "税号")):
         return IntentKind.INVOICE
@@ -971,9 +1199,12 @@ def classify_intent_by_rules(
         "地址" in text and any(k in text for k in ("改", "修改", "换"))
     ):
         return IntentKind.ADDRESS_CHANGE
-    if "投诉" in text or any(k in text for k in _VERY_NEGATIVE_HINTS):
+    complaint_negated = bool(re.search(r"(?:不是|不要|不想|并非).{0,5}投诉", text))
+    if ("投诉" in text and not complaint_negated) or any(k in text for k in _VERY_NEGATIVE_HINTS):
         return IntentKind.COMPLAINT
 
+    if "追评入口" in text or ("追评" in text and any(k in text for k in ("入口", "页面", "在哪"))):
+        return IntentKind.PRODUCT_REVIEW
     if any(k in text for k in ("追评", "再评", "二次评价")):
         return IntentKind.RECOMMENT
     # 订单已在上一轮被确定性定位后，用户通常只补充“五星，音质很好”，
@@ -1008,7 +1239,9 @@ def classify_intent_by_rules(
         and not re.match(r"^要退", text)
     ):
         return IntentKind.REFUND
-    if any(k in text for k in ("确认收货", "已收到", "收货确认")):
+    if any(k in text for k in (
+        "确认收货", "已收到", "收货确认", "自动收货", "自动确认"
+    )):
         return IntentKind.CONFIRM_RECEIPT
     # cancel-002：「这个订单不要了，取消」——「取消」和「订单」都在但原表里的
     # 固定短语一个都匹配不上，补一条组合判断（howto 分支在前，政策问法不受影响）。
@@ -1081,6 +1314,11 @@ def classify_intent_by_rules(
 
     if is_similar_or_recommend_request(text) or looks_like_new_product_search(text):
         return IntentKind.PRODUCT_SEARCH
+    if any(marker in text for marker in ("上一批", "刚才推荐", "换一批", "重新给")) and any(
+        marker in text
+        for marker in ("便宜", "贵", "适合", "静音", "推荐", "安卓", "旗舰")
+    ):
+        return IntentKind.PRODUCT_SEARCH
 
     if re.search(r"商品(?:ID|id)?[：:\s]*[A-Za-z0-9_-]{3,32}", text) and any(
         marker in text for marker in ("详情", "参数", "介绍", "查")
@@ -1130,7 +1368,7 @@ def classify_high_confidence_intent(
     text = (user_text or "").strip()
     if not text:
         return None, ""
-    order_id = extract_order_id(text) or ""
+    order_id = extract_order_id(text) or _extract_contextual_order_id(text) or ""
 
     ruled = classify_intent_by_rules(text, session_intent=session_intent)
     # An explicit order id plus cancellation-proposal wording is a closed,
@@ -1147,7 +1385,27 @@ def classify_high_confidence_intent(
         IntentKind.INVOICE,
         IntentKind.ADDRESS_CHANGE,
         IntentKind.QUERY_FULFILLMENT,
+        IntentKind.CONFIRM_RECEIPT,
     }:
+        return ruled, order_id
+    if ruled == IntentKind.CANCEL_ORDER and classify_request_mode(
+        text, IntentKind.CANCEL_ORDER
+    ) != RequestMode.INFORMATIONAL:
+        return ruled, order_id
+    if ruled == IntentKind.QUERY_ORDER and (
+        order_id or any(marker in text for marker in ("订单列表", "还在不在", "查订单"))
+    ):
+        return ruled, order_id
+    if ruled == IntentKind.QUERY_LOGISTICS and order_id:
+        return ruled, order_id
+    if ruled == IntentKind.QUERY_COUPON and any(
+        marker in text for marker in ("优惠券", "优惠卷", "用券")
+    ):
+        return ruled, order_id
+    if ruled == IntentKind.PRODUCT_CONSULT and (
+        any(marker in text for marker in ("这款", "这双", "这件", "OLED", "Mini LED"))
+        or bool(re.search(r"[A-Za-z]{2,}[-\s]?[A-Za-z0-9-]*\d", text))
+    ):
         return ruled, order_id
     if order_id and any(
         k in text for k in ("到哪里", "到哪了", "物流", "快递", "运单", "包裹", "轨迹")
@@ -1210,15 +1468,44 @@ def _normalize_budget_span(number: str, unit: str | None, qualifier: str | None)
 def _extract_budget(text: str) -> str | None:
     # Match both ``预算 2000 元`` and ``500 元以内``.  The qualifier is part of
     # the semantic slot, while ``amount`` continues to expose only the number.
+    number = r"(?:\d+(?:\.\d{1,2})?|[零〇一二两三四五六七八九十百千万]+)"
     patterns = (
         r"(?:预算|预算为|预算是|价格不超过|不超过|不高于)\s*[¥￥]?\s*"
-        r"(\d+(?:\.\d{1,2})?)\s*(元|块)?\s*(以内|以下|之内)?",
-        r"[¥￥]?\s*(\d+(?:\.\d{1,2})?)\s*(元|块)\s*(以内|以下|之内)",
+        rf"({number})\s*(元|块)?\s*(以内|以下|之内)?",
+        rf"[¥￥]?\s*({number})\s*(元|块)\s*(以内|以下|之内)",
     )
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
             return _normalize_budget_span(match.group(1), match.group(2), match.group(3))
+    return None
+
+
+def _extract_amount_span(text: str) -> str | None:
+    """Return the exact user-visible money span, including currency wording.
+
+    The previous extractor returned only the captured digits, which is useful
+    for arithmetic but is not a valid entity/span observation.  Numeric
+    normalization belongs in the metric or business parser, not in the NER
+    boundary.  Full-width and grouped numbers are accepted without rewriting
+    the source text.
+    """
+
+    number = (
+        r"(?:\d{1,3}(?:[,，]\d{3})+(?:[.．]\d{1,2})?"
+        r"|\d+(?:[.．]\d{1,2})?"
+        r"|[零〇一二两三四五六七八九十百千万]+)"
+    )
+    patterns = (
+        rf"(?P<amount>人民币\s*{number}\s*(?:元|块)?)",
+        rf"(?P<amount>[¥￥]\s*{number}\s*(?:元|块)?)",
+        rf"(?P<amount>{number}\s*(?:元|块))",
+        rf"(?:预算|金额)\s*(?P<amount>{number})",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return match.group("amount").strip()
     return None
 
 
@@ -1272,6 +1559,11 @@ def _extract_extended_entities(text: str) -> dict[str, str]:
             entities["feature"] = feature
             break
 
+    for feature in ("能拍照", "静音"):
+        if feature in text:
+            entities["feature"] = feature
+            break
+
     for audience in _KNOWN_AUDIENCES:
         if re.search(rf"适合\s*{re.escape(audience)}(?:的|用|人群|$)", text):
             entities["audience"] = audience
@@ -1303,6 +1595,100 @@ def _extract_extended_entities(text: str) -> dict[str, str]:
         quantity = re.sub(r"(?:件|个|只)$", "", quantity)
         entities["quantity"] = quantity or "1"
 
+    quantity_spans = [
+        match.group(0).strip()
+        for match in re.finditer(
+            r"(?:\d+|[一二三四五六七八九十两几]+)\s*(?:次|单|瓶|款|个|件|只)",
+            text,
+        )
+    ]
+    if quantity_spans and (
+        len(quantity_spans) > 1
+        or any(re.search(r"(?:次|款|瓶)$", value) for value in quantity_spans)
+        or any(value.startswith("几") for value in quantity_spans)
+    ):
+        entities["quantity"] = "；".join(quantity_spans)
+
+    rating = re.search(r"(?:[一二三四五1-5]|[壹贰叁肆伍])\s*(?:星|分)", text)
+    if rating:
+        entities["rating"] = rating.group(0).replace(" ", "")
+
+    duration_patterns = (
+        r"第\s*\d+\s*天",
+        r"(?:一|二|两|三|四|五|六|七|八|九|十|\d+)\s*(?:天|周|个月|月)",
+    )
+    if any(marker in text for marker in ("用了", "使用了", "没更新", "未更新", "处理中", "第")):
+        for pattern in duration_patterns:
+            duration = re.search(pattern, text)
+            if duration:
+                entities["duration"] = duration.group(0)
+                break
+
+    promised = re.search(r"承诺\s*(今天|明天|后天|本周|这周|下周)\s*发货", text)
+    if promised:
+        entities["promisedShipTime"] = promised.group(1)
+
+    address_type = re.search(r"(公司地址|单位地址|家庭地址|学校地址|办公室地址)", text)
+    if address_type:
+        entities["addressType"] = address_type.group(1)
+
+    if _is_privacy_request(text):
+        for data_type in ("收货地址", "手机号", "联系电话", "邮箱", "聊天记录"):
+            if data_type in text:
+                entities["personalDataType"] = data_type
+                break
+
+    if "公司抬头" in text:
+        entities["invoiceTitleType"] = "公司抬头"
+
+    technologies = [
+        technology
+        for technology in ("OLED", "Mini LED", "Micro LED", "LCD")
+        if technology.casefold() in text.casefold()
+    ]
+    if len(technologies) >= 2:
+        entities["displayTechnology"] = "；".join(technologies)
+
+    for use_case in ("雨天通勤", "小户型", "通勤"):
+        if use_case in text:
+            entities["useCase"] = use_case
+            break
+
+    form_factor = re.search(r"(?:不要|排除|不想要)\s*(入耳式|头戴式|半入耳式|开放式)", text)
+    if form_factor:
+        entities["excludedFormFactor"] = form_factor.group(1)
+
+    discount = re.search(r"满\s*\d+\s*减\s*\d+", text)
+    if discount:
+        entities["discount"] = discount.group(0)
+
+    if "便宜点" in text:
+        entities["pricePreference"] = "便宜点"
+    if "旗舰" in text:
+        entities["productTier"] = "旗舰"
+    refund_type = re.search(r"七天无理由(?:退款|退货)", text)
+    if refund_type:
+        entities["refundType"] = refund_type.group(0)
+
+    wrong_color = re.search(
+        r"收到的\s*(红色|蓝色|黑色|白色|绿色|黄色)\s*([^，,。！？!?；;]{1,12}?)"
+        r"(?:变成|却是|实际是)\s*(红色|蓝色|黑色|白色|绿色|黄色)",
+        text,
+    )
+    if wrong_color:
+        entities["expectedColor"] = wrong_color.group(1)
+        entities["productName"] = wrong_color.group(2).strip()
+        entities["receivedColor"] = wrong_color.group(3)
+
+    model = re.search(r"\b[A-Za-z]{2,}[A-Za-z0-9-]*\d[A-Za-z0-9-]*\b", text)
+    edition = re.search(r"[一二三四五六七八九十百\d]+周年版", text)
+    if model and edition and any(marker in text for marker in ("相比", "差在哪", "区别", "对比")):
+        entities["productName"] = f"{model.group(0)}；{edition.group(0)}"
+
+    presale_product = re.search(r"这件预售商品|该预售商品|这个预售商品", text)
+    if presale_product:
+        entities["productName"] = presale_product.group(0)
+
     compatible = re.search(
         r"(?:适配|兼容|适用于|支持)\s*"
         r"([A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z0-9-]+)*\s*\d+)",
@@ -1318,18 +1704,14 @@ def extract_entities(user_text: str, data: str = "") -> dict[str, str]:
     text = user_text or ""
     entities: dict[str, str] = {}
     order_item_id = extract_order_item_id(text, data)
-    order_id = extract_order_id(text, data)
+    order_id = extract_order_id(text, data) or _extract_contextual_order_id(text)
     if order_item_id:
         entities["orderItemId"] = order_item_id
     if order_id:
         entities["orderId"] = order_id
-    amount = re.search(
-        r"(?:[¥￥]\s*(\d+(?:\.\d{1,2})?)\s*(?:元|块)?|"
-        r"(\d+(?:\.\d{1,2})?)\s*(?:元|块))",
-        text,
-    )
+    amount = _extract_amount_span(text)
     if amount:
-        entities["amount"] = amount.group(1) or amount.group(2)
+        entities["amount"] = amount
     product_id = re.search(r"(?:商品(?:ID|id)?)[：:\s]*([A-Za-z0-9_-]{3,32})", text)
     if product_id:
         entities["productId"] = product_id.group(1)
@@ -1757,6 +2139,8 @@ def _build_decision(
         if _funds_at_risk(user_text)
         or _is_privacy_request(user_text)
         or _is_account_security_request(user_text)
+        or _is_physical_safety_incident(user_text)
+        or _is_refund_destination_security_incident(user_text)
         or (intent == IntentKind.COMPLAINT and sentiment == SentimentKind.VERY_NEGATIVE)
         else RiskLevel.LOW
     )
@@ -1767,20 +2151,37 @@ def _build_decision(
     }:
         risk = RiskLevel.MEDIUM
     if risk == RiskLevel.LOW and intent in {
+        IntentKind.ADDRESS_CHANGE,
+        IntentKind.CONFIRM_RECEIPT,
+        IntentKind.AFTERSALES_UNKNOWN,
+    }:
+        risk = RiskLevel.MEDIUM
+    if risk == RiskLevel.LOW and intent == IntentKind.HUMAN_REQUEST and any(
+        marker in user_text
+        for marker in (
+            "售后", "发票", "优惠券", "券", "物流", "签收", "退款", "核账", "更正"
+        )
+    ):
+        risk = RiskLevel.MEDIUM
+    if risk == RiskLevel.LOW and intent == IntentKind.REFUND and (
+        _extract_contextual_order_id(user_text)
+        or any(marker in user_text for marker in ("七天无理由", "申请退款"))
+    ):
+        risk = RiskLevel.MEDIUM
+    if risk == RiskLevel.LOW and intent in {
         IntentKind.REFUND,
         IntentKind.CANCEL_ORDER,
         IntentKind.CONFIRM_RECEIPT,
         IntentKind.ADDRESS_CHANGE,
         IntentKind.AFTERSALES_UNKNOWN,
-    } and classify_request_mode(user_text, intent) == RequestMode.ACTION_PROPOSAL:
+    } and classify_request_mode(user_text, intent) in {
+        RequestMode.ACTION_PROPOSAL,
+        RequestMode.HUMAN_SUPPORT,
+    }:
         # State-changing proposals need stronger guardrails than read-only
         # policy answers, even before a confirmation token is issued.
         risk = RiskLevel.MEDIUM
-    if risk == RiskLevel.LOW and intent == IntentKind.REFUND_STATUS and (
-        extract_order_id(user_text)
-        or extract_order_item_id(user_text)
-        or any(marker in user_text for marker in ("我的退款", "这笔退款", "退款单", "我退的"))
-    ):
+    if risk == RiskLevel.LOW and intent == IntentKind.REFUND_STATUS:
         risk = RiskLevel.MEDIUM
     urgency = UrgencyKind.NORMAL
     if sentiment == SentimentKind.VERY_NEGATIVE or risk == RiskLevel.HIGH:
@@ -1887,9 +2288,7 @@ def _apply_handoff_policy(
     unresolved_count: int,
     recent_intents: list[str] | None = None,
 ) -> IntentDecision:
-    explicit_human = decision.intent == IntentKind.HUMAN_REQUEST or _has_explicit_human_request(
-        user_text
-    )
+    explicit_human = _has_explicit_human_request(user_text)
     threshold = get_settings().intent_handoff_confidence
     current_unresolved = (
         decision.confidence < threshold
@@ -1902,7 +2301,23 @@ def _apply_handoff_policy(
         unresolved_count >= 2 and current_unresolved
     ) or any(k in user_text for k in _UNRESOLVED_HINTS)
     severe = decision.sentiment == SentimentKind.VERY_NEGATIVE
-    fund_dispute = decision.risk_level == RiskLevel.HIGH
+    fund_dispute = _funds_at_risk(user_text)
+
+    state_conflict = (
+        decision.intent == IntentKind.ADDRESS_CHANGE
+        and (
+            any(marker in user_text for marker in ("已经出库", "已出库", "已经发货", "已发货", "已经寄出"))
+            or (
+                any(marker in user_text for marker in ("不是要取消", "不想取消"))
+                and classify_request_mode(user_text, decision.intent)
+                == RequestMode.ACTION_PROPOSAL
+            )
+        )
+    ) or (
+        decision.intent == IntentKind.CONFIRM_RECEIPT
+        and any(marker in user_text for marker in ("没收到", "未收到", "没有收到", "未签收"))
+        and any(marker in user_text for marker in ("确认收货", "自动确认", "自动收货"))
+    )
 
     if explicit_human:
         return decision.model_copy(
@@ -1912,12 +2327,46 @@ def _apply_handoff_policy(
                 "urgency": UrgencyKind.HIGH,
             }
         )
+    if _is_privacy_request(user_text):
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "PRIVACY_INCIDENT",
+                "urgency": UrgencyKind.CRITICAL,
+            }
+        )
+    if _is_account_security_request(user_text) or _is_refund_destination_security_incident(
+        user_text
+    ):
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "ACCOUNT_SECURITY",
+                "urgency": UrgencyKind.CRITICAL,
+            }
+        )
+    if _is_physical_safety_incident(user_text):
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "SAFETY_INCIDENT",
+                "urgency": UrgencyKind.CRITICAL,
+            }
+        )
     if fund_dispute:
         return decision.model_copy(
             update={
                 "next_action": NextAction.HANDOFF,
                 "handoff_reason": "FUND_DISPUTE",
                 "urgency": UrgencyKind.CRITICAL,
+            }
+        )
+    if state_conflict:
+        return decision.model_copy(
+            update={
+                "next_action": NextAction.HANDOFF,
+                "handoff_reason": "STATE_CONFLICT",
+                "urgency": UrgencyKind.HIGH,
             }
         )
     if severe and decision.intent in {

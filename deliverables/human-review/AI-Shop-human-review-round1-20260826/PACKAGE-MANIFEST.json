@@ -1,0 +1,190 @@
+{
+  "createdAt": "2026-08-26T14:26:42Z",
+  "files": {
+    "00-common/人工标注交接总清单.md": {
+      "audience": null,
+      "bytes": 10300,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "34f9639b623d85296e33364b1aa615328796c1b11f6879d038b9253176e51981"
+    },
+    "01-label-policy-v2.1/customer-service-taxonomy-contract-v2.1.json": {
+      "audience": null,
+      "bytes": 1935,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+    },
+    "01-label-policy-v2.1/reviewer-a.open.jsonl": {
+      "audience": "reviewer-a",
+      "bytes": 9196,
+      "editable": true,
+      "role": "EDITABLE_BLIND_REVIEW_SHEET",
+      "sha256": "ca2d5eb5c999ce55265b34517e0ac49c67704e37514f400ce4619ca8d415e09b"
+    },
+    "01-label-policy-v2.1/reviewer-a.open.jsonl.manifest.json": {
+      "audience": null,
+      "bytes": 2514,
+      "editable": false,
+      "role": "READ_ONLY_SOURCE_BINDING",
+      "sha256": "eaa45ba163dd83964af3eb15b2e16305476798f0357614a947b3a00c4be49992"
+    },
+    "01-label-policy-v2.1/reviewer-b.open.jsonl": {
+      "audience": "reviewer-b",
+      "bytes": 9196,
+      "editable": true,
+      "role": "EDITABLE_BLIND_REVIEW_SHEET",
+      "sha256": "d35e33962cbaf30c0b9823585200ebfe9c4da8bd707e20ce875bddf4d3700597"
+    },
+    "01-label-policy-v2.1/reviewer-b.open.jsonl.manifest.json": {
+      "audience": null,
+      "bytes": 2514,
+      "editable": false,
+      "role": "READ_ONLY_SOURCE_BINDING",
+      "sha256": "445b40fa3293822c248efc4ad96e1fdb294d0f6ce7aaa495bb23d6f169c05704"
+    },
+    "01-label-policy-v2.1/标注方法.md": {
+      "audience": null,
+      "bytes": 4952,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "1e0a1baca9253a77649a900d16df71f8434777bbc2911d1fb03b19a5c2604b96"
+    },
+    "02-answer-quality-v43/reviewer-a.open.jsonl": {
+      "audience": "reviewer-a",
+      "bytes": 505112,
+      "editable": true,
+      "role": "EDITABLE_BLIND_REVIEW_SHEET",
+      "sha256": "bf13a3aeb2cf2f2d5064388776af1a2318609585cd96bdde11e7f5815a8adc70"
+    },
+    "02-answer-quality-v43/reviewer-a.open.jsonl.manifest.json": {
+      "audience": null,
+      "bytes": 1704,
+      "editable": false,
+      "role": "READ_ONLY_SOURCE_BINDING",
+      "sha256": "50427fa53672abd4660f31800bb756d052e9d88bf4548832950875055bb8d297"
+    },
+    "02-answer-quality-v43/reviewer-b.open.jsonl": {
+      "audience": "reviewer-b",
+      "bytes": 505112,
+      "editable": true,
+      "role": "EDITABLE_BLIND_REVIEW_SHEET",
+      "sha256": "5782adb16467463445b2d815a6d09b983434faa0d4e078ff6854d2625a52712e"
+    },
+    "02-answer-quality-v43/reviewer-b.open.jsonl.manifest.json": {
+      "audience": null,
+      "bytes": 1705,
+      "editable": false,
+      "role": "READ_ONLY_SOURCE_BINDING",
+      "sha256": "bcaf74ad55346bb4bcfa5f2ed2f8de194adbe313fbc626ebbea5dba0a569758d"
+    },
+    "02-answer-quality-v43/标注方法.md": {
+      "audience": null,
+      "bytes": 3826,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "03017c98dcc73c1d01228b27aa15316a9f4a30d0920f5e64dd6d2b4af6c3b5c2"
+    },
+    "03-provenance-independent-reaudit/frozen-historical-guideline-v1.md": {
+      "audience": null,
+      "bytes": 11865,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "448bcdc20ec2d42827e4251120f8c85b75e270d2def01be4f3f3941d396189d5"
+    },
+    "03-provenance-independent-reaudit/historical-a-b-independence-attestation.template.json": {
+      "audience": "custodian-and-specified-reviewer",
+      "bytes": 468,
+      "editable": true,
+      "role": "EDITABLE_ATTESTATION_TEMPLATE",
+      "sha256": "7ae8afffe9ea876a69dd4f8ec1109529b81ef31ad16eb9df2476580c650582ce"
+    },
+    "03-provenance-independent-reaudit/independent-reaudit-custody-attestation.template.json": {
+      "audience": "custodian-and-specified-reviewer",
+      "bytes": 579,
+      "editable": true,
+      "role": "EDITABLE_ATTESTATION_TEMPLATE",
+      "sha256": "0d37f579aa1f8f4b768e4233856ba1f5d0fceff5967e63e818c0e545462d0165"
+    },
+    "03-provenance-independent-reaudit/independent-reaudit.open.jsonl": {
+      "audience": "provenance-independent-reviewer",
+      "bytes": 3996,
+      "editable": true,
+      "role": "EDITABLE_INDEPENDENT_REAUDIT_SHEET",
+      "sha256": "d76e51dc4ab8bce6c451ca8a41e573b3bf492dcb1bbd9596f21fd71fd5ae8386"
+    },
+    "03-provenance-independent-reaudit/independent-reaudit.open.jsonl.manifest.json": {
+      "audience": null,
+      "bytes": 1276,
+      "editable": false,
+      "role": "READ_ONLY_SOURCE_BINDING",
+      "sha256": "8706b4da0d46a79e91c8e09886749ce398e5e480ff4654c8a9da299b33668373"
+    },
+    "03-provenance-independent-reaudit/复核方法.md": {
+      "audience": null,
+      "bytes": 2390,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "1a63db30b0ac280df35487dfcdd797912cf5f387198949489357ef6d941b3175"
+    },
+    "04-adjudication-after-sealing/仲裁方法.md": {
+      "audience": null,
+      "bytes": 2197,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "39ae7caeefbbc1e604b030058e8a197adabc6b8d690d71fc802b744dada05802"
+    },
+    "05-external-unseen-not-ready/README.md": {
+      "audience": null,
+      "bytes": 537,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "757f87fc992d4f142f773d0abe6ec1c131f4eefdcaf9958c0073f8155f5e414b"
+    },
+    "05-external-unseen-not-ready/独立生成与保管规范.md": {
+      "audience": null,
+      "bytes": 8524,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "d065ae8711f87f784d336d3e72fc780195e5e1bc01d07e07ae7bd4f563d7db70"
+    },
+    "README.md": {
+      "audience": null,
+      "bytes": 2020,
+      "editable": false,
+      "role": "READ_ONLY_GUIDANCE_OR_CONTRACT",
+      "sha256": "ec1c3c831cd49146da6256fd3e53c3f64975208a3eeb4cfac06071bd3e4348ac"
+    }
+  },
+  "finalUnseenEligible": false,
+  "humanWorkComplete": false,
+  "lifecycle": "OPEN_HUMAN_WORK_PENDING",
+  "packageId": "AI-Shop-human-review-round1-20260826",
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-human-review-handoff/v1",
+  "tasks": {
+    "adjudication": {
+      "caseCount": null,
+      "status": "WAITING_FOR_SEALED_A_B_COMPARISON"
+    },
+    "answerQualityV43": {
+      "caseCount": 120,
+      "completed": 0,
+      "reviewers": 2
+    },
+    "externalUnseenReplacement": {
+      "caseCount": 0,
+      "status": "NOT_YET_CUSTODIAN_GENERATED"
+    },
+    "labelPolicyV2_1": {
+      "caseCount": 25,
+      "completed": 0,
+      "reviewers": 2
+    },
+    "provenanceIndependentReaudit": {
+      "caseCount": 12,
+      "completed": 0,
+      "reviewers": 1
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "artifactId": "customer-service-human-v2-provenance-pending-20260826",
+  "attestedAt": null,
+  "custodianIdentity": null,
+  "exceptions": [],
+  "materialsProvided": [],
+  "reviewerDidNotViewDraftExpectedOrModelOutputs": null,
+  "reviewerDidNotViewPriorReviewsAgreementOrAdjudication": null,
+  "reviewerDidNotViewSourceHumanLabels": null,
+  "reviewerIdentity": null,
+  "reviewerIndependentOfDatasetAndModelDevelopment": null,
+  "schemaVersion": "aishop-independent-reaudit-custody-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "status": "TEMPLATE_NOT_EVIDENCE"
+}

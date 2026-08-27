@@ -48,6 +48,7 @@ from evaluation.core.redaction import (
 )
 from evaluation.customer_service_gold import (
     HUMAN_STATUS,
+    apply_label_evidence_validity,
     evaluate_predictions,
     load_gold_dataset,
     predict_rule_baseline,
@@ -93,6 +94,34 @@ class CustomerServiceHttpError(ValueError):
     """Raised when full-path evidence cannot be built without guessing."""
 
 
+def _project_bounded_product_queries(value: Any) -> Any:
+    """Remove raw product-search prose once a validated query scope exists.
+
+    The user message remains available to the blinded reviewer through the
+    declared message projection.  Product evidence itself only needs the
+    parser-owned scope and a digest; retaining arbitrary ``query`` prose in a
+    nested tool trace would make address or other sensitive text unnecessarily
+    durable.
+    """
+
+    if isinstance(value, Mapping):
+        projected = {
+            str(key): _project_bounded_product_queries(item)
+            for key, item in value.items()
+        }
+        if str(projected.get("type") or "").strip().casefold() == "product":
+            scope = projected.get("queryScope")
+            if isinstance(scope, Mapping):
+                digest = str(scope.get("querySha256") or "").strip().casefold()
+                chars = scope.get("queryChars")
+                if re.fullmatch(r"[0-9a-f]{64}", digest) and isinstance(chars, int) and not isinstance(chars, bool):
+                    projected["query"] = {"chars": chars, "sha256": digest}
+        return projected
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_project_bounded_product_queries(item) for item in value]
+    return value
+
+
 def sanitize_customer_service_http_report(
     report: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -132,6 +161,7 @@ def sanitize_customer_service_http_report(
             "rawInputPersisted": False,
             "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
         }
+    sanitized = _project_bounded_product_queries(sanitized)
     if contains_unredacted_sensitive(sanitized):
         raise CustomerServiceHttpError(
             "HTTP report still contains unredacted sensitive data after sanitization"
@@ -239,6 +269,7 @@ def load_http_behavior_contracts(path: Path, dataset_path: Path) -> dict[str, An
             "prohibitedTools",
             "requiredAnswerRegexes",
             "prohibitedAnswerRegexes",
+            "requiredRagFactIds",
         ):
             value = expected.get(key, [])
             if not isinstance(value, list) or not all(
@@ -260,6 +291,9 @@ def load_http_behavior_contracts(path: Path, dataset_path: Path) -> dict[str, An
             "requireEmptyStateDiff",
             "requireNoHardConstraintViolation",
             "requireNoCatalogAbsenceClaim",
+            "requireHumanHandoff",
+            "requireNoHumanHandoff",
+            "requireCitationContractValid",
         ):
             if key in expected and not isinstance(expected[key], bool):
                 raise CustomerServiceHttpError(
@@ -439,11 +473,121 @@ def _dedupe_refs(refs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     richer record rather than silently dropping evidence fields.
     """
 
+    def _valid_digest(value: Any) -> str | None:
+        text = str(value or "").strip().casefold()
+        return text if re.fullmatch(r"[0-9a-f]{64}", text) else None
+
+    def _captured_at(item: Mapping[str, Any]) -> str:
+        return str(item.get("capturedAt") or item.get("captured_at") or "").strip()
+
+    def _capture_bucket(item: Mapping[str, Any]) -> str:
+        """Use one proposal observation boundary across raw/sanitized views."""
+
+        value = _captured_at(item)
+        if not value:
+            return ""
+        # Episode sanitizer preserves timestamps while replacing long IDs.  A
+        # millisecond-level boundary is stable for the same persisted proposal
+        # and avoids merging later proposals from another turn.
+        return value[:23] if "T" in value and len(value) >= 23 else value
+
+    def _query_digest(item: Mapping[str, Any]) -> str | None:
+        scope = item.get("queryScope")
+        if isinstance(scope, Mapping):
+            digest = _valid_digest(scope.get("querySha256"))
+            if digest:
+                return digest
+        query = item.get("query")
+        if isinstance(query, Mapping):
+            digest = _valid_digest(query.get("sha256"))
+            if digest:
+                return digest
+        return None
+
+    def _request_id(item: Mapping[str, Any]) -> str:
+        return str(item.get("requestId") or item.get("request_id") or "").strip()
+
+    def _entity_value(item: Mapping[str, Any], *keys: str) -> str:
+        for key in keys:
+            value = str(item.get(key) or "").strip()
+            if value:
+                return value
+        return ""
+
+    def _semantic_constraint_digest(item: Mapping[str, Any]) -> str:
+        # Request IDs are sanitized independently in conversation and tool
+        # traces.  Hash only the stable audit payload so those two projections
+        # still collapse to one reviewer-visible constraint source.
+        payload = {
+            key: item.get(key)
+            for key in (
+                "type",
+                "excludedBrands",
+                "excludedTerms",
+                # Qualifier IDs are stable in the raw tool result but may be
+                # replaced by Episode's long-identifier sanitizer.  Preserve
+                # cardinality for the cross-boundary identity and keep the
+                # richer raw row when the records merge.
+                "returnedCandidateCount",
+                "violatingReturnedProductIds",
+                "unverifiedRequiredQualifierProductIds",
+                "unverifiedRequiredQualifierCandidateCount",
+                "returnedCandidatesSatisfyExclusions",
+                "returnedCandidatesSatisfyRequiredQualifiers",
+                "catalogAbsenceClaim",
+                "source",
+                "capturedAt",
+            )
+        }
+        payload["requiredQualifierCount"] = len(
+            item.get("requiredQualifierIds") or []
+            if isinstance(item.get("requiredQualifierIds"), (list, tuple))
+            else []
+        )
+        return sha256_bytes(canonical_json_bytes(payload))
+
     def identity(item: Mapping[str, Any]) -> tuple[str, ...]:
         ref_type = str(item.get("type") or "").strip().casefold()
-        request_id = str(item.get("requestId") or item.get("request_id") or "").strip()
-        specific = ""
-        for key in (
+        captured_at = _captured_at(item)
+
+        if ref_type == "product" and item.get("matched") is False:
+            query_digest = _query_digest(item)
+            if query_digest:
+                return ("no-result", query_digest, str(item.get("resultSource") or ""), captured_at)
+
+        if ref_type == "product":
+            product_id = _entity_value(item, "productId", "product_id", "id")
+            if product_id and product_id != "<ID>":
+                # The same product can be emitted once by the final envelope
+                # and once by the tool trace.  Episode sanitization can hash
+                # the offer/SKU ID in only one of those copies, so use the
+                # product identity and capture instant as the cross-boundary
+                # key.  A later call has a distinct capture instant and is not
+                # silently collapsed.
+                return ("product", product_id, captured_at)
+
+        if ref_type == "product_search_constraint":
+            return ("constraint", _semantic_constraint_digest(item))
+
+        if ref_type == "action_proposal":
+            action = _entity_value(item, "actionType", "action_type")
+            status = _entity_value(item, "status", "statusName")
+            # The sanitizer may replace the args fingerprint with ``<ID:...>``
+            # in only one projection.  The persisted proposal's action/status
+            # and capture boundary remain stable, so use them as the identity
+            # and retain the richer raw fingerprint when the records merge.
+            return (
+                "action-proposal",
+                action,
+                status,
+                _entity_value(item, "requiresUserConfirmation"),
+                _entity_value(item, "effectExecuted"),
+                _capture_bucket(item),
+            )
+
+        request_id = _request_id(item)
+        specific = _entity_value(
+            item,
             "chunkId",
             "chunk_id",
             "questionId",
@@ -454,11 +598,7 @@ def _dedupe_refs(refs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
             "order_id",
             "orderItemId",
             "order_item_id",
-        ):
-            value = str(item.get(key) or "").strip()
-            if value:
-                specific = value
-                break
+        )
         if request_id and specific:
             return ("request", ref_type, request_id, specific)
         if request_id:
@@ -838,17 +978,33 @@ def observe_http_result(result: CaseResult) -> dict[str, Any]:
         for item in episode.get("handoffs") or []
         if isinstance(item, Mapping)
     ]
-    handoff_events = [
-        step
-        for step in _steps(episodes)
-        if "HANDOFF" in str(step.get("eventType") or "").upper()
-    ]
-    observed_handoff = (
-        str(decision.get("next_action") or decision.get("nextAction") or "") == "HANDOFF"
-        or "HANDOFF" in terminal_statuses
-        or bool(handoff_rows)
-        or bool(handoff_events)
+    # ``episode.handoffs`` is the Supervisor -> specialist orchestration
+    # table.  It is not a customer-support transfer and must never count as a
+    # human handoff metric.  Only an explicit human event, the production
+    # intent decision, or the root terminal state is admissible evidence.
+    human_handoff_events = []
+    for step in _steps(episodes):
+        event_type = str(step.get("eventType") or "").upper()
+        output = step.get("output")
+        explicitly_human = event_type in {
+            "HUMAN_HANDOFF",
+            "HANDOFF_TO_HUMAN",
+            "HUMAN_SUPPORT_HANDOFF",
+        }
+        persisted_support_transfer = (
+            event_type == "HANDOFF"
+            and str(step.get("nodeName") or "") == "support"
+            and isinstance(output, Mapping)
+            and bool(output.get("sessionId") or output.get("caseId"))
+        )
+        if explicitly_human or persisted_support_transfer:
+            human_handoff_events.append(step)
+    decision_handoff = (
+        str(decision.get("next_action") or decision.get("nextAction") or "")
+        == "HANDOFF"
     )
+    terminal_handoff = "HANDOFF" in terminal_statuses
+    observed_handoff = decision_handoff or terminal_handoff or bool(human_handoff_events)
     answer = str(result.output.get("answer") or "")
     rag_refs, business_refs = _source_channels(episodes)
     refs = [*rag_refs, *business_refs]
@@ -857,9 +1013,47 @@ def observe_http_result(result: CaseResult) -> dict[str, Any]:
     hard_constraint_violations = [
         str(value)
         for audit in hard_constraint_audits
-        for value in (audit.get("violatingReturnedProductIds") or [])
+        for value in (
+            list(audit.get("violatingReturnedProductIds") or [])
+            + list(audit.get("unverifiedRequiredQualifierProductIds") or [])
+        )
         if str(value).strip()
     ]
+    unattributed_qualifier_violations = 0
+    for audit in hard_constraint_audits:
+        required_qualifiers = list(audit.get("requiredQualifierIds") or [])
+        if not required_qualifiers:
+            continue
+        try:
+            returned_count = max(0, int(audit.get("returnedCandidateCount") or 0))
+        except (TypeError, ValueError):
+            returned_count = 0
+        try:
+            declared_unverified_count = max(
+                0,
+                int(audit.get("unverifiedRequiredQualifierCandidateCount") or 0),
+            )
+        except (TypeError, ValueError):
+            declared_unverified_count = 0
+        identified_count = len(
+            {
+                str(value)
+                for value in audit.get("unverifiedRequiredQualifierProductIds") or []
+                if str(value).strip()
+            }
+        )
+        unattributed_qualifier_violations += max(
+            0, declared_unverified_count - identified_count
+        )
+        # A required qualifier audit with returned candidates must explicitly
+        # prove success. Missing/contradictory fields are evaluation failures,
+        # not an opportunity to guess zero violations.
+        if (
+            returned_count > 0
+            and audit.get("returnedCandidatesSatisfyRequiredQualifiers") is not True
+            and declared_unverified_count == 0
+        ):
+            unattributed_qualifier_violations += returned_count
     root_intent = next(
         (str(episode.get("intent") or "") for episode in roots if episode.get("intent")),
         "",
@@ -873,7 +1067,10 @@ def observe_http_result(result: CaseResult) -> dict[str, Any]:
         "nextAction": str(
             decision.get("next_action") or decision.get("nextAction") or "UNKNOWN"
         ),
-        "shouldHandoff": observed_handoff,
+        # Gold ``shouldHandoff`` is an initial routing-policy label.  A later
+        # state-dependent support transfer is retained separately as
+        # ``handoffObserved`` and must not rewrite the initial prediction.
+        "shouldHandoff": decision_handoff,
         "handoffReason": decision.get("handoff_reason") or decision.get("handoffReason"),
         "entities": dict(decision.get("entities") or {}),
         "requestMode": decision.get("request_mode") or decision.get("requestMode"),
@@ -911,6 +1108,13 @@ def observe_http_result(result: CaseResult) -> dict[str, Any]:
         ),
         "handoffObserved": observed_handoff,
         "handoffs": handoff_rows,
+        "handoffEvidence": {
+            "intentDecision": decision_handoff,
+            "rootTerminal": terminal_handoff,
+            "explicitHumanEventCount": len(human_handoff_events),
+            "specialistHandoffCountExcluded": len(handoff_rows),
+            "metricDefinition": "HUMAN_SUPPORT_ONLY_V2",
+        },
         "tools": list(result.output.get("tools") or []),
         "events": list(result.output.get("events") or []),
         "usage": dict(result.usage or {}),
@@ -926,8 +1130,11 @@ def observe_http_result(result: CaseResult) -> dict[str, Any]:
         "responses": list(result.output.get("responses") or []),
         "qualityObservation": quality,
         "hardConstraintAudits": hard_constraint_audits,
-        "hardConstraintViolation": bool(hard_constraint_violations),
+        "hardConstraintViolation": bool(
+            hard_constraint_violations or unattributed_qualifier_violations
+        ),
         "hardConstraintViolationProductIds": list(dict.fromkeys(hard_constraint_violations)),
+        "hardConstraintUnattributedViolationCount": unattributed_qualifier_violations,
         "episodes": episodes,
         "error": result.error,
     }
@@ -1014,6 +1221,13 @@ def _behavior_contract_result(
     }
     order_outcomes.discard("")
     observed_tools = {str(value) for value in observation.get("tools") or [] if value}
+    rag_fact_ids = {
+        str(fact_id)
+        for source_ref in observation.get("ragSourceRefs") or []
+        if isinstance(source_ref, Mapping)
+        for fact_id in source_ref.get("factIds") or []
+        if str(fact_id).strip()
+    }
     answer = str(observation.get("answer") or "")
     state_diff = observation.get("stateDiff") or {}
     if not isinstance(state_diff, Mapping):
@@ -1054,6 +1268,18 @@ def _behavior_contract_result(
             observation.get("hardConstraintViolation") is False,
             actual=observation.get("hardConstraintViolationProductIds") or [],
         )
+    if expected.get("requireHumanHandoff"):
+        add(
+            "REQUIRED_HUMAN_HANDOFF",
+            observation.get("handoffObserved") is True,
+            actual=dict(observation.get("handoffEvidence") or {}),
+        )
+    if expected.get("requireNoHumanHandoff"):
+        add(
+            "NO_HUMAN_HANDOFF",
+            observation.get("handoffObserved") is False,
+            actual=dict(observation.get("handoffEvidence") or {}),
+        )
     required_outcomes = set(expected.get("requiredOrderOutcomes") or [])
     if required_outcomes:
         add(
@@ -1074,6 +1300,26 @@ def _behavior_contract_result(
             "NO_PROHIBITED_TOOL",
             not prohibited_tools.intersection(observed_tools),
             actual=sorted(observed_tools),
+        )
+    required_rag_fact_ids = set(expected.get("requiredRagFactIds") or [])
+    if required_rag_fact_ids:
+        add(
+            "REQUIRED_RAG_FACT_IDS",
+            required_rag_fact_ids.issubset(rag_fact_ids),
+            actual=sorted(rag_fact_ids),
+        )
+    if expected.get("requireCitationContractValid"):
+        citation_contract = observation.get("citationContract") or {}
+        add(
+            "VALID_CITATION_CONTRACT",
+            bool(
+                isinstance(citation_contract, Mapping)
+                and citation_contract.get("contractValid") is True
+                and int(citation_contract.get("ragSourceRefCount") or 0) > 0
+            ),
+            actual=dict(citation_contract)
+            if isinstance(citation_contract, Mapping)
+            else citation_contract,
         )
     required_regexes = list(expected.get("requiredAnswerRegexes") or [])
     if required_regexes:
@@ -1201,7 +1447,14 @@ def _handoff_metrics(
     for row in rows:
         case_id = str(row["id"])
         expected = bool((row.get("expected") or {}).get("shouldHandoff"))
-        observed = bool((observations.get(case_id) or {}).get("handoffObserved"))
+        observation = observations.get(case_id) or {}
+        evidence = observation.get("handoffEvidence") or {}
+        prediction = observation.get("prediction") or {}
+        observed = (
+            bool(evidence.get("intentDecision"))
+            if "intentDecision" in evidence
+            else str(prediction.get("nextAction") or "") == "HANDOFF"
+        )
         if expected and observed:
             tp += 1
         elif expected:
@@ -1220,6 +1473,8 @@ def _handoff_metrics(
         else None
     )
     return {
+        "metricDefinition": "INITIAL_API_INTENT_HANDOFF_DECISION_V1",
+        "labelScope": "INITIAL_ROUTING_POLICY_NOT_POST_RESOLUTION_TRANSFER",
         "confusion": {"truePositive": tp, "falsePositive": fp, "falseNegative": fn, "trueNegative": tn},
         "accuracy": _ratio_metric(tp + tn, len(rows), badcase_ids=[*false_positive, *false_negative]),
         "precision": None if precision is None else round(precision, 6),
@@ -1247,6 +1502,7 @@ def build_http_report(
     fixture_provenance: Mapping[str, Any] | None = None,
     behavior_contracts: Sequence[Mapping[str, Any]] = (),
     behavior_contract_provenance: Mapping[str, Any] | None = None,
+    label_audit_path: Path | None = None,
 ) -> dict[str, Any]:
     if not rows or any(
         (row.get("annotation") or {}).get("status") != HUMAN_STATUS for row in rows
@@ -1271,24 +1527,40 @@ def build_http_report(
             "allowLlm": False,
         },
     )
-    http_route_report = _routing_only_report(
-        evaluate_predictions(
-            rows,
-            http_predictions,
-            provenance={
-                "mode": "production-http-agent-observed-routing",
-                "datasetPath": _portable_path(dataset_path),
-                "datasetSha256": sha256_file(dataset_path),
-                "allowLlm": True,
-            },
-        )
+    if label_audit_path is not None:
+        rule_report = apply_label_evidence_validity(rule_report, label_audit_path)
+    http_route_evaluation = evaluate_predictions(
+        rows,
+        http_predictions,
+        provenance={
+            "mode": "production-http-agent-observed-routing",
+            "datasetPath": _portable_path(dataset_path),
+            "datasetSha256": sha256_file(dataset_path),
+            "allowLlm": True,
+        },
     )
-    execution_bad = [
+    if label_audit_path is not None:
+        http_route_evaluation = apply_label_evidence_validity(
+            http_route_evaluation, label_audit_path
+        )
+    http_route_report = _routing_only_report(http_route_evaluation)
+    observation_bad = [
         str(row["id"])
         for row in rows
         if not bool(
             (normalized_observations.get(str(row["id"])) or {}).get("executionOk")
         )
+    ]
+    production_execution_bad = [
+        str(row["id"])
+        for row in rows
+        if str(
+            (normalized_observations.get(str(row["id"])) or {}).get(
+                "adapterStatus"
+            )
+            or ""
+        ).upper()
+        != "PASSED"
     ]
     citation_bad = [
         case_id
@@ -1366,7 +1638,7 @@ def build_http_report(
         "runId": run_id,
         "status": (
             "EXECUTED_PENDING_HUMAN_ANSWER_REVIEW"
-            if not execution_bad and not missing
+            if not production_execution_bad and not missing
             else "PARTIAL_EXECUTION_PENDING_HUMAN_ANSWER_REVIEW"
         ),
         "releaseGateEligible": False,
@@ -1377,21 +1649,64 @@ def build_http_report(
             "sha256": sha256_file(dataset_path),
             "caseCount": len(rows),
             "annotationStatus": HUMAN_STATUS,
+            "annotationStatusInterpretation": "ROW_DECLARATION_NOT_VALIDITY_GATE",
         },
+        "qualityClaimStatus": rule_report.get(
+            "qualityClaimStatus", "DEVELOPMENT_DIAGNOSTIC_VALIDITY_NOT_ASSESSED"
+        ),
+        "evidenceValidity": dict(
+            rule_report.get("evidenceValidity")
+            or {
+                "status": "NOT_ASSESSED",
+                "blocking": True,
+                "releaseGateEligible": False,
+                "note": "No checksum-bound label/provenance audit was supplied.",
+            }
+        ),
         "runtimeFixture": dict(fixture_provenance or {"status": "NOT_USED"}),
         "preflight": dict(preflight),
         "rulePreRouter": rule_report,
         "httpRoute": http_route_report,
         "httpExecution": {
-            "executionRate": _ratio_metric(
-                len(rows) - len(execution_bad) - len(missing),
+            # ``executionOk`` means the HTTP response and its Episode were
+            # observable.  It must not make a terminal FAILED run look like a
+            # successful production execution.  Keep capture and production
+            # completeness as two explicit denominators.
+            "observationCaptureRate": _ratio_metric(
+                len(rows) - len(observation_bad) - len(missing),
                 len(rows),
-                badcase_ids=[*execution_bad, *missing],
+                badcase_ids=[*observation_bad, *missing],
             ),
-            "errorCaseIds": execution_bad,
+            "executionRate": _ratio_metric(
+                len(rows) - len(production_execution_bad) - len(missing),
+                len(rows),
+                badcase_ids=[*production_execution_bad, *missing],
+            ),
+            "errorCaseIds": production_execution_bad,
+            "observationErrorCaseIds": observation_bad,
             "missingCaseIds": missing,
+            "metricDefinition": "PRODUCTION_EPISODE_ADAPTER_STATUS_PASSED_V2",
         },
         "handoffDecision": _handoff_metrics(rows, normalized_observations),
+        "humanSupportTransfer": {
+            "status": "OBSERVED_NOT_LABEL_SCORED",
+            "transferCount": sum(
+                observation.get("handoffObserved") is True
+                for observation in normalized_observations.values()
+            ),
+            "caseIds": [
+                case_id
+                for case_id, observation in normalized_observations.items()
+                if observation.get("handoffObserved") is True
+            ],
+            "metricDefinition": "FINAL_HUMAN_SUPPORT_TRANSFER_OPERATIONAL_V1",
+            "releaseGateEligible": False,
+            "note": (
+                "Final support transfers are exported to blind answer review and "
+                "behavior contracts; the initial-routing gold label is not a "
+                "post-resolution transfer label."
+            ),
+        },
         "runtimeMetrics": _runtime_metrics(normalized_observations),
         "citationContractDiagnostic": {
             "invalidCaseCount": len(citation_bad),
@@ -1436,8 +1751,10 @@ def build_http_report(
             "HTTP Episode slot values are redacted, so only the rule pre-router carries slot F1/EM; HTTP slot metrics are unavailable.",
             "Final-answer correctness and citation support are unavailable until an independent reviewer completes the blind answer sheet.",
             "Behavior contracts are deterministic safety regression diagnostics, not human answer-quality labels.",
+            "The handoffDecision metric scores only the initial API intent decision; state-dependent final support transfers are reported separately and reviewed with the final answer.",
             "HTTP timings are local full-stack observations, not a production SLO.",
             "This auxiliary run does not modify or republish the v9 final evidence.",
+            "HUMAN_VERIFIED is a row-level lifecycle declaration; label-policy and independent-review validity are reported separately and fail closed.",
         ],
     }
 
@@ -1451,6 +1768,7 @@ async def run_customer_service_http(
     case_ids: Sequence[str] = (),
     fixture_map: Mapping[str, Any] | None = None,
     behavior_contract_file: Path | None = DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
+    label_audit_path: Path | None = None,
 ) -> dict[str, Any]:
     rows = load_gold_dataset(dataset_path)
     selected = {str(value) for value in case_ids if str(value)}
@@ -1521,6 +1839,7 @@ async def run_customer_service_http(
             if behavior_contract_bundle
             else {"status": "NOT_CONFIGURED"}
         ),
+        label_audit_path=label_audit_path,
     )
 
 
@@ -1529,6 +1848,7 @@ def rebuild_customer_service_http_report(
     dataset_path: Path,
     *,
     behavior_contract_file: Path | None = None,
+    label_audit_path: Path | None = None,
 ) -> dict[str, Any]:
     """Rebuild derived metrics from already captured HTTP observations."""
 
@@ -1579,6 +1899,7 @@ def rebuild_customer_service_http_report(
             if behavior_contract_bundle
             else {"status": "NOT_CONFIGURED"}
         ),
+        label_audit_path=label_audit_path,
     )
     rebuilt["observationProvenance"] = {
         "mode": "OFFLINE_REBUILD_FROM_PRESERVED_OBSERVATIONS",
@@ -1610,6 +1931,7 @@ def render_http_markdown(report: Mapping[str, Any]) -> str:
     citation = report.get("citationContractDiagnostic") or {}
     quality = report.get("qualityDiagnostics") or {}
     behavior = report.get("behaviorContracts") or {}
+    validity = report.get("evidenceValidity") or {}
     lines = [
         "# AI 客服 HTTP/LLM 全链路证据",
         "",
@@ -1617,6 +1939,9 @@ def render_http_markdown(report: Mapping[str, Any]) -> str:
         "",
         f"Run：`{report.get('runId')}`；样本：`{((report.get('dataset') or {}).get('caseCount'))}`；"
         f"数据 SHA-256：`{((report.get('dataset') or {}).get('sha256'))}`。",
+        "",
+        f"标签/来源有效性：`{validity.get('status')}`；blocking=`{validity.get('blocking')}`；"
+        f"审计 SHA-256：`{validity.get('auditSha256') or 'NOT_SUPPLIED'}`。",
         "",
         "| 指标 | 数值 | 分子/分母 | badcase |",
         "|---|---:|---:|---|",
@@ -1668,6 +1993,7 @@ def seal_customer_service_http_diagnostic(
     *,
     diagnostic_status: str,
     behavior_contract_file: Path = DEFAULT_HTTP_BEHAVIOR_CONTRACTS,
+    label_audit_path: Path | None = None,
     notes: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Seal a partial or full HTTP observation as immutable diagnostic evidence.
@@ -1725,6 +2051,7 @@ def seal_customer_service_http_diagnostic(
         behavior_contract_provenance={
             key: value for key, value in behavior_bundle.items() if key != "contracts"
         },
+        label_audit_path=label_audit_path,
     )
     rebuilt["status"] = str(diagnostic_status or "").strip()
     if not rebuilt["status"]:
@@ -1755,7 +2082,7 @@ def seal_customer_service_http_diagnostic(
     }
     rebuilt["limitations"] = [
         *list(rebuilt.get("limitations") or []),
-        "This targeted subset is diagnostic-only and cannot replace the complete 60-case HTTP run.",
+        f"This targeted subset is diagnostic-only and cannot replace the complete {len(full_rows)}-case HTTP run.",
         "All answer-quality labels remain pending; behavior contracts are not human review.",
     ]
     return write_customer_service_http_evidence(rebuilt, output_dir)

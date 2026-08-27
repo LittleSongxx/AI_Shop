@@ -1,4 +1,5 @@
 import json
+import re
 
 CONSULT_PREFIX = "<<<PRODUCT_CONSULT>>>"
 CONSULT_SUFFIX = "<<<END_CARD>>>"
@@ -37,6 +38,66 @@ def normalize_consult_card(card: dict | None) -> dict | None:
         "cover": card.get("cover"),
         "categoryId": card.get("categoryId") or card.get("category_id"),
     }
+
+
+def named_product_comparison_terms(user_text: str | None) -> tuple[str, ...]:
+    """Extract the two independently searchable names from a comparison turn."""
+
+    text = str(user_text or "").strip()
+    if not any(marker in text for marker in ("差在哪", "区别", "差别", "对比", "比较")):
+        return ()
+    models = re.findall(
+        r"\b[A-Za-z]{2,}[A-Za-z0-9-]*\d[A-Za-z0-9-]*\b", text
+    )
+    editions = re.findall(r"[一二三四五六七八九十百\d]+周年(?:典藏)?版", text)
+    return tuple(dict.fromkeys([*models, *editions]))[:2]
+
+
+def named_product_comparison_requested(user_text: str | None) -> bool:
+    """Recognize a comparison whose two textual identities are already present."""
+
+    return len(named_product_comparison_terms(user_text)) >= 2
+
+
+def bounded_display_technology_explanation(
+    user_text: str | None,
+    *,
+    citation: int | None = None,
+) -> str | None:
+    """Answer only the stable, generic OLED/Mini LED terminology boundary."""
+
+    text = str(user_text or "").strip().casefold()
+    if "oled" not in text or "mini led" not in text:
+        return None
+    if not any(marker in text for marker in ("区别", "差别", "差异", "怎么选", "解释")):
+        return None
+    answer = (
+        "OLED 是像素自发光，每个像素可单独关闭，因此黑位和对比度更好，也更容易做薄；"
+        "长期显示固定高亮内容时需留意残影或烧屏风险。Mini LED 本质上仍是 LCD，"
+        "用大量微型背光分区提升亮度和控光，通常更适合明亮环境，但高反差边缘可能出现光晕，"
+        "黑位取决于分区数量和控光算法。偏暗室观影和纯黑表现可优先看 OLED；"
+        "偏高亮 HDR、明亮客厅或长时间固定界面，可优先比较 Mini LED。"
+    )
+    if citation is None:
+        return answer
+    marker = f"[{citation}]"
+    return answer.replace("风险。", f"风险。{marker} ").replace(
+        "算法。", f"算法。{marker} "
+    ) + marker
+
+
+def elliptical_product_search_needs_category(user_text: str | None) -> bool:
+    """Prevent a context-free follow-up from becoming a whole-catalog search."""
+
+    text = str(user_text or "").strip()
+    if not any(
+        marker in text
+        for marker in ("上一批", "上一组", "刚才那些", "前面那些", "重新给", "换几个")
+    ):
+        return False
+    from app.services.product_search_query import infer_product_category
+
+    return infer_product_category(text) is None
 
 def is_product_consult_turn(
     user_text: str | None,

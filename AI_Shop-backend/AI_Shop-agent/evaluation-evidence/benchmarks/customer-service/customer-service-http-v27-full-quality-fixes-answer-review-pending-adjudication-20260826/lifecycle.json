@@ -1,0 +1,36 @@
+{
+  "adjudicationTemplatePath": "adjudication.template.jsonl",
+  "adjudicationTemplateSha256AtExport": "bc6cb88e9e063954a5e70029ec0a703be044ea5395df1859784f430eeb42060d",
+  "artifact": "CUSTOMER_SERVICE_ANSWER_REVIEW",
+  "caseCount": 60,
+  "createdAt": "2026-08-26T00:52:35.860Z",
+  "disagreementCaseCount": 2,
+  "exactAgreementCaseCount": 58,
+  "lifecycle": "PENDING_ADJUDICATION",
+  "messageProjection": "RUNTIME_FIXTURE_AWARE_V1",
+  "note": "This is inter-rater reliability evidence only. Final answer-quality metrics remain unavailable until an independent third reviewer adjudicates every disagreement.",
+  "presentationRedaction": {
+    "fields": [
+      "message",
+      "answer",
+      "sourceRefs",
+      "observedHandoff"
+    ],
+    "profile": "evaluation.core.redaction/v1",
+    "projection": "REDACTED_REVIEW_SAFE_FIELDS",
+    "rawInputPersistedByExporter": false,
+    "sourceHashBinding": "COMPLETE_SOURCE_REPORT_FILE_BYTES"
+  },
+  "releaseGateEligible": false,
+  "reviewerASha256": "ca30ff20317cc3ac293af4a67f7c8af805942ca287e516c2fe575f6f80a1cc5b",
+  "reviewerBSha256": "9ddc0f3fca01a636baefc93a179324518efc6693b72f53cefafa1781cd1aabc5",
+  "reviewers": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "schemaVersion": "aishop-customer-service-answer-review-pending-lifecycle/v1",
+  "selfJudged": false,
+  "sourceReportPath": "AI_Shop-backend/AI_Shop-agent/run/evaluation-observations/customer-service-http-v27-full-quality-fixes-eval-contract-20260826.json",
+  "sourceReportSha256": "f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61",
+  "sourceRunId": "customer-service-http-v27-full-quality-fixes-eval-contract-20260826"
+}

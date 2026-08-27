@@ -1,0 +1,829 @@
+{
+  "caseAgreementRate": 0.5666666666666667,
+  "caseCount": 60,
+  "createdAt": "2026-08-26T09:25:27.011Z",
+  "disagreementCaseCount": 26,
+  "disagreements": [
+    {
+      "caseId": "cs-candidate-v2-062",
+      "comments": {
+        "reviewerA": "用户明确要求修改指定订单地址，但没有提供新地址，需人工核验后处理。",
+        "reviewerB": "用户明确排除取消，最后诉求是修改指定订单地址。"
+      },
+      "fields": [
+        "shouldHandoff",
+        "handoffSeverity"
+      ],
+      "message": "我不是要取消订单，只想把 20260823002 的地址换一下",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "orderId": "20260823002"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823002"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-063",
+      "comments": {
+        "reviewerA": "包裹已出库，改址会影响履约，需人工核验；address 按原话记录目标地址类型。",
+        "reviewerB": "最后诉求是询问出库后能否改址；addressType 记录明确的新地址类型，尚未提供具体地址。"
+      },
+      "fields": [
+        "shouldHandoff",
+        "handoffSeverity",
+        "slots"
+      ],
+      "message": "包裹已经出库了还能改到公司地址吗",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "address": "公司地址"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "ADDRESS_CHANGE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "addressType": "公司地址"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-066",
+      "comments": {
+        "reviewerA": "虽然背景是售后入口反复重选，最后明确诉求是转人工查看。",
+        "reviewerB": "主要问题仍是无法归类的售后故障；因入口反复失败且明确要求人员处理，需常规转人工。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "售后入口一直让我重选问题，转个人帮我看吧",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "AFTERSALES_UNKNOWN",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-069",
+      "comments": {
+        "reviewerA": "用户要取消重复订单中的一单，但未提供可区分订单的信息；quantity 按出现顺序保留两个原话值。",
+        "reviewerB": "重复下单但未给出可区分的订单号，直接取消可能误伤；用户也要求拿不准时转人工。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这个订单误下了两次，帮我取消其中一单，拿不准就转人工",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "两次；一单"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "CANCEL_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "两次"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-073",
+      "comments": {
+        "reviewerA": "用户投诉连续三次答非所问，属于重复未解决的常规投诉。",
+        "reviewerB": "连续多次答非所问且明确要投诉当前服务，属于常规投诉转人工。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "客服连续三次答非所问，我要投诉这次服务",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "三次"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-074",
+      "comments": {
+        "reviewerA": "用户称收货地址已泄露给陌生人，并要求立即转安全专员；主要诉求是紧急人工处置。",
+        "reviewerB": "主要事件是收货地址被泄露给陌生人；personalDataType 记录泄露的数据类型，需立即安全人工处置。"
+      },
+      "fields": [
+        "intent",
+        "slots"
+      ],
+      "message": "你们把我的收货地址发给陌生人了，立刻转安全专员",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "COMPLAINT",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "personalDataType": "收货地址"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-079",
+      "comments": {
+        "reviewerA": "颜色槽按原话顺序记录应为蓝色、实收红色两个值。",
+        "reviewerB": "用 expectedColor 与 receivedColor 区分原话中的应有颜色和实收颜色。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "收到的蓝色耳机变成红色了，订单 20260823005",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "color": "蓝色；红色",
+          "orderId": "20260823005",
+          "productName": "耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "expectedColor": "蓝色",
+          "orderId": "20260823005",
+          "productName": "耳机",
+          "receivedColor": "红色"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-080",
+      "comments": {
+        "reviewerA": "充电宝鼓包发烫涉及人身安全，用户最后明确要求马上转人工。",
+        "reviewerB": "充电宝鼓包发热具有即时人身安全风险，且用户明确要求马上转人工。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "充电宝鼓包而且发烫，我已经停止使用，马上转人工",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "productName": "充电宝"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {
+          "productName": "充电宝"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-081",
+      "comments": {
+        "reviewerA": "用户要求核查漏发且未提供订单信息；quantity 按应有和实收顺序保留两个原话值。",
+        "reviewerB": "quantity 按原话顺序记录应到数量和实到数量；用户明确先查漏发而非退款。"
+      },
+      "fields": [
+        "shouldHandoff",
+        "handoffSeverity"
+      ],
+      "message": "一箱应该有 12 瓶但只到 10 瓶，不是要退款，先查漏发",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {
+          "quantity": "12 瓶；10 瓶"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "DAMAGED_OR_WRONG_ITEM",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "quantity": "12 瓶；10 瓶"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-083",
+      "comments": {
+        "reviewerA": "用户拒绝继续由机器人解释并明确要求真人处理。",
+        "reviewerB": "主要诉求是停止机器人解释并由真人处理，未说明紧急高风险事件。"
+      },
+      "fields": [
+        "riskLevel"
+      ],
+      "message": "我不是要机器人继续解释，找真人处理",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "LOW",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-086",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": "amount 原样保留全角字符，invoiceTitleType 记录明确的抬头类型。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "￥１，２９９．００ 这笔能开公司抬头吗",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "￥１，２９９．００"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "INVOICE",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "￥１，２９９．００",
+          "invoiceTitleType": "公司抬头"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-087",
+      "comments": {
+        "reviewerA": "背景是发票金额错误，最后明确诉求是转人工更正。",
+        "reviewerB": "核心问题是发票金额错误；用户明确要求人工更正，因此常规转人工。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "发票金额错了，不是咨询开票流程，帮我转人工更正",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "INVOICE",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-093",
+      "comments": {
+        "reviewerA": "useCase 记录用户明确提出的使用场景。",
+        "reviewerB": "咨询特定鞋款的使用场景适配，useCase 保留“雨天通勤”。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这双鞋适合雨天通勤吗",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "鞋",
+          "useCase": "雨天通勤"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_CONSULT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "这双鞋",
+          "useCase": "雨天通勤"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-094",
+      "comments": {
+        "reviewerA": "rating 记录用户明确给出的评价星级。",
+        "reviewerB": "duration 和 rating 分别保留使用时长与明确评分。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "订单商品已经用了一周，我想写个五星评价",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "rating": "五星"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_REVIEW",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "duration": "一周",
+          "rating": "五星"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-097",
+      "comments": {
+        "reviewerA": "excludedStyle 记录用户明确排除的入耳式条件。",
+        "reviewerB": "明确动作是查找商品；feature 和 excludedFormFactor 分别保留功能要求与排除形态。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "找 3000 元以内的索尼降噪耳机，不要入耳式",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000 元",
+          "brand": "索尼",
+          "excludedStyle": "入耳式",
+          "productName": "降噪耳机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "3000 元",
+          "brand": "索尼",
+          "excludedFormFactor": "入耳式",
+          "feature": "降噪",
+          "productName": "耳机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-099",
+      "comments": {
+        "reviewerA": "amount 按预算原话保留；feature 记录明确的拍照要求。",
+        "reviewerB": "明确寻找预算内商品；金额、商品类别和拍照要求均按原话保留。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "预算一千二，想买个能拍照的手机，有合适的吗",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "一千二",
+          "feature": "能拍照",
+          "productName": "手机"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "PRODUCT_SEARCH",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "一千二",
+          "feature": "拍照",
+          "productName": "手机"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-102",
+      "comments": {
+        "reviewerA": "优惠券显示已使用但用户称未下单，最后明确要求转人工核对。",
+        "reviewerB": "优惠券显示已使用但用户未下单，并明确要求人工核对，可能影响优惠权益。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "券显示已使用但我没下单，转人工核对一下",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "QUERY_COUPON",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-103",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": "询问预售商品的发货时效，属于履约咨询。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "这件预售商品大概几天能发货",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "预售商品"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "productName": "这件预售商品"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-105",
+      "comments": {
+        "reviewerA": "promisedDate 按用户原话记录承诺发货时间。",
+        "reviewerB": "核心诉求是承诺发货时间已到但尚未出库；promisedShipTime 保留“今天”。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "承诺今天发货但还没出库，订单 20260823006",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823006",
+          "promisedDate": "今天"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_FULFILLMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "orderId": "20260823006",
+          "promisedShipTime": "今天"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-108",
+      "comments": {
+        "reviewerA": "物流显示签收但用户未收到，最后明确要求马上转人工核查凭证。",
+        "reviewerB": "物流显示签收但用户未收到，并明确要求立即人工核查签收凭证。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "物流显示签收但我没收到，马上转人工查凭证",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "QUERY_LOGISTICS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-111",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": "订单列表缺失可能影响订单权益，但当前可先按金额查询或补充信息，无需立即转人工。"
+      },
+      "fields": [
+        "riskLevel"
+      ],
+      "message": "订单列表突然少了一笔 1,299 元的订单",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "QUERY_ORDER",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1,299 元"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "QUERY_ORDER",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "amount": "1,299 元"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-112",
+      "comments": {
+        "reviewerA": "",
+        "reviewerB": "基于上一批结果要求重新推荐，pricePreference 保留明确的降价偏好。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "刚才推荐的太贵了，换一批便宜点的",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "pricePreference": "便宜点"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-113",
+      "comments": {
+        "reviewerA": "brand 是用户明确排除的品牌；quantity 按原话保留。",
+        "reviewerB": "“再推荐”决定 intent；excludedBrand、operatingSystem 和 productTier 保留推荐约束。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "不要苹果，再推荐两款安卓旗舰",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "brand": "苹果",
+          "productName": "安卓旗舰",
+          "quantity": "两款"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "RECOMMENT",
+        "riskLevel": "LOW",
+        "shouldHandoff": false,
+        "slots": {
+          "excludedBrand": "苹果",
+          "operatingSystem": "安卓",
+          "productTier": "旗舰",
+          "quantity": "两款"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-115",
+      "comments": {
+        "reviewerA": "refundType 记录用户明确询问的退款类型。",
+        "reviewerB": "用户明确排除某笔退款进度查询，询问的是七天无理由退款的一般规则。"
+      },
+      "fields": [
+        "slots"
+      ],
+      "message": "我想了解七天无理由退款多久到账，不是查某一笔进度",
+      "reviewerA": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "refundType": "七天无理由退款"
+        }
+      },
+      "reviewerB": {
+        "handoffSeverity": null,
+        "intent": "REFUND",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": false,
+        "slots": {
+          "policyName": "七天无理由"
+        }
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-117",
+      "comments": {
+        "reviewerA": "用户担心退款进入陌生卡并要求人工确认账户，存在即时资金风险。",
+        "reviewerB": "用户担心退款进入陌生卡并要求人工确认账户，涉及潜在资金去向风险。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "不要把钱退到陌生卡里，我要人工确认退款账户",
+      "reviewerA": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "CRITICAL",
+        "intent": "REFUND",
+        "riskLevel": "HIGH",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    },
+    {
+      "caseId": "cs-candidate-v2-120",
+      "comments": {
+        "reviewerA": "退款页面显示成功但银行卡未入账，最后明确要求转人工核账。",
+        "reviewerB": "页面显示退款成功但银行卡未入账，用户明确要求人工核账，属于常规资金进度核查。"
+      },
+      "fields": [
+        "intent"
+      ],
+      "message": "退款页面说成功但银行卡没有入账，请转人工核账",
+      "reviewerA": {
+        "handoffSeverity": "NORMAL",
+        "intent": "HUMAN_REQUEST",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      },
+      "reviewerB": {
+        "handoffSeverity": "NORMAL",
+        "intent": "REFUND_STATUS",
+        "riskLevel": "MEDIUM",
+        "shouldHandoff": true,
+        "slots": {}
+      }
+    }
+  ],
+  "exactAgreementCaseCount": 34,
+  "fieldAgreement": {
+    "handoffSeverity": 57,
+    "intent": 52,
+    "riskLevel": 58,
+    "shouldHandoff": 57,
+    "slots": 45
+  },
+  "fieldStats": {
+    "handoffSeverity": {
+      "agreementCount": 57,
+      "agreementRate": 0.95,
+      "caseCount": 60,
+      "cohenKappa": 0.8886827458256029,
+      "expectedAgreement": 0.5508333333333333
+    },
+    "intent": {
+      "agreementCount": 52,
+      "agreementRate": 0.8666666666666667,
+      "caseCount": 60,
+      "cohenKappa": 0.8596491228070176,
+      "expectedAgreement": 0.05
+    },
+    "riskLevel": {
+      "agreementCount": 58,
+      "agreementRate": 0.9666666666666667,
+      "caseCount": 60,
+      "cohenKappa": 0.9418040737148398,
+      "expectedAgreement": 0.4272222222222222
+    },
+    "shouldHandoff": {
+      "agreementCount": 57,
+      "agreementRate": 0.95,
+      "caseCount": 60,
+      "cohenKappa": 0.8793565683646112,
+      "expectedAgreement": 0.5855555555555556
+    },
+    "slots": {
+      "agreementCount": 45,
+      "agreementRate": 0.75,
+      "caseCount": 60,
+      "cohenKappa": 0.6927278934790031,
+      "expectedAgreement": 0.18638888888888888
+    }
+  },
+  "note": "Pre-adjudication inter-annotator evidence only. It is not a model score, not an accuracy estimate, and must not replace independent adjudication.",
+  "releaseGateEligible": false,
+  "reviewA": {
+    "path": "/home/song/AI_Shop-human-review-v2-20260826/reviewer-a.sealed.jsonl",
+    "reviewerId": "reviewer-a",
+    "sha256": "60c5925936f8a4ab1d3e395d232dc086f561914eda03d1eeb1805f4ba14bd503"
+  },
+  "reviewB": {
+    "path": "/home/song/AI_Shop-human-review-v2-20260826/reviewer-b.sealed.jsonl",
+    "reviewerId": "reviewer-b",
+    "sha256": "658209d5445c0269e073e2aa7a2b53eafba92b0e054d51611df2608d3f552770"
+  },
+  "schemaVersion": "aishop-customer-service-review-agreement/v1",
+  "slotStats": {
+    "commonSlotCount": 43,
+    "commonSlotValueAgreementCount": 38,
+    "commonSlotValueAgreementRate": 0.8837209302325582,
+    "keySetAgreementCount": 49,
+    "keySetAgreementRate": 0.8166666666666667,
+    "note": "Raw slot-key agreement is reported separately because the current draft guideline does not yet freeze an operational slot taxonomy."
+  },
+  "sourceDatasetPath": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/candidate-v2-additions.jsonl",
+  "sourceDatasetSha256": "7110835813e32f6ed3823bd22c2e1487f7e9c2c62bb31d4eac92fb61f9bf4353",
+  "status": "PENDING_ADJUDICATION"
+}

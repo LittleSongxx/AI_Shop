@@ -139,6 +139,33 @@
 - 11 条 final badcase 按原标签保留：`008/019/020/021/027/055` 缺工单能力或提交后果证据；`009/014` 缺退款/确认后果证据；`018` 已匹配订单却错误声称未定位；`029/043` 有商品/优惠/排序或 Android 硬约束证据缺口。`014` 同时是答案、引用和 unsafe badcase，是继续开发时的第一优先级。
 - v20 源 HTTP report 的 `PENDING_HUMAN_REVIEW` 仍是不可变生成时字段；外部 final package 才表示人审完成。v13/v20 可以作为不同冻结输出的描述性观察，不能只挑联合或引用上升而隐去答案正确与 unsafe 变化，也不能称严格因果 A/B。
 
+### 2026-08-26：v27 完整 HTTP 回放、双盲与仲裁完成
+
+- 针对 v20 后的动态事实、对象保留和引用边界修复，完成 60 条真实 HTTP 输出的 v27 冻结 replay。源 run 为 `customer-service-http-v27-full-quality-fixes-eval-contract-20260826`，完整源 report SHA-256 为 `f8724dac5c951b30a046dbe30ad3a4ce65b2a60a935aaf42a5720406fb172a61`；源文件在被 `.gitignore` 的 `run/`，最终 immutable package 以该 hash 绑定。
+- 两名 reviewer 独立盲审案件级一致 `58/60`，2 条由独立 `reviewer-c` 仲裁。最终答案正确 `59/60=98.33%`（Wilson `[0.911449,0.997052]`），可计分引用支持 `35/36=97.22%`（`[0.858303,0.995080]`），联合质量 `59/60=98.33%`，unsafe `0/60`（95% 上界约 `6.02%`）。这些是人工语义结果；案件一致率仅是审查可靠性，行为契约全通过不进入主质量分母。
+- 当前唯一 badcase 为 `cs-gold-v1-001`：具体型号“索尼 WH-1000XM6”在回答摘要中丢失，来源只支持完整型号未命中，不能支持扩大的品牌/预算结论。修复后必须新 HTTP run、新双盲和仲裁，不能改写 v27 包；v20 的 `014/018/043` 保留为历史回归素材。
+- 中央 `docs/evidence-manifest.json` 新增 v27 descriptor 和完整 package/CI/hash 校验；scorecard 与所有当前入口改为 v27 主质量入口。v27 明确 `releaseGateEligible=false`、不是 unseen holdout、不是线上准确率。
+- 非线上剩余查漏补缺固定为：源码/历史 badcase 隔离的新 unseen holdout、客服 claim-level 独立人工评审、隐私保护 HTTP slot typed/hash projection、Search `23/34/47` 的 query decomposition paired A/B，以及独占环境 steady-state/stress/soak。规则回放、门禁全通过、标注一致率和共享本机容量只作诊断。
+
+### 2026-08-26：v2 有效性审计、生产路由修复与 v43 全链路复验
+
+- 将 v1 60 条与 additions 60 条的历史人工结果组装为 hash-bound canonical package；120 条数据 SHA-256 为 `ab5129a73cf6f986173d92e3f5f04ab7e8689bae9ad4c7d7294fa13b587ee079`。sealed review、26 条仲裁和合并投影均可验证，但 reviewer-a 填写后的 OPEN bytes 缺失、A/B export hash 字段语义错误且无独立性声明，故状态保持 `HUMAN_VERIFIED_PROVENANCE_REVIEW_REQUIRED`、`releaseGateEligible=false`。
+- 新增 taxonomy v2.1 与跨 case label consistency audit：`RECOMMENT` 的生产语义是订单追评写提案，不是推荐 refinement；后者归 `PRODUCT_SEARCH`。同时发现 amount raw span、budget 完整性、quantity occurrence 和复合 productName/feature 政策分裂。共 5 项发现、25 条受影响、3 项 blocking，已生成不含 gold/model 的独立重仲裁模板，旧 120 条 immutable 不原地改写。
+- 修复推荐/搜索/追评、退款政策/状态、否定和人工接管边界；修复 verified order/RAG/写提案编排、forced read-to-write、物流停滞和缺失退款引用的确定性 owned-record 解析。退款状态没有可核验订单时现在保守澄清，不调用 LLM 猜到账状态，也不执行写工具。
+- 修正评测执行口径：observation capture 与 `adapterStatus=PASSED` 生产成功分离；人工接管只统计生产 HUMAN/HANDOFF，不再把内部 specialist handoff 算成功。HTTP 与离线指标都继承 label/provenance audit，行级 `HUMAN_VERIFIED` 不再自动成为 validity gate。
+- 同一暴露 120 条 paired 结果为 intent accuracy `0.741667 -> 0.975`（改善 28、回退 0，McNemar `p≈1e-8`）、handoff recall `0.6875 -> 1.0`（10/0，`p=0.00195312`）、Intent Macro-F1 `0.717240 -> 0.962857`（Δ `0.245617`，bootstrap 95% CI `[0.180408,0.334601]`）、raw slot F1 `0.773920 -> 0.982481`（Δ `0.208560`）。这些只证明 development fix；标签门禁和 unseen 泛化仍未通过。
+- 最新 `customer-service-http-v43-human-v2-routing-execution-fix-20260826` 在本地 Java/MySQL/Agent/Worker/MCP/RAG/Provider 路径完成 observation `120/120`、生产 episode `120/120`、人工接管 TP/TN/FP/FN `32/88/0/0`、行为契约 `22/22`、hard constraint `0`、fixture cleanup failure `0`。本地 P50/P95/P99 `623.195/6161.334/7795.156 ms`，20 次 Provider、token `64606/2698`、费用 `UNPRICED/null`；不是生产 SLO。
+- v43 的两份 120 条独立随机空白答案盲审表已绑定 report SHA-256 `c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3`。当前人审覆盖 `0/120`，答案正确、引用语义支持和 unsafe 全部保持 `null`；`013/068/115` 的安全降级仅证明 fail-safe 生效，不代表答案正确。
+- 新增 binary-safe dirty-worktree source-freeze 创建/验证工具：tracked changes 保存相对 HEAD 的完整 patch，untracked regular files 只记录 path/size/SHA-256 而不复制潜在敏感 bytes。全面结论和外部人工门槛见 [评测体系全面审计](../evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md) 与 [人工交接总清单](../evaluation/人工标注交接总清单-20260826.md)。
+
+### 2026-08-27：v43→v54→v56 badcase 修复与人工复评收口
+
+- v43 完成 A/B 120 条审批与 3 条仲裁，联合质量 `105/120`、unsafe `1/120`；15 条 badcase 被固化为回归合同。v54 修复后人工联合质量为 `113/120`，剩余 7 条 badcase。
+- v55 在 7 条已知难例上完成 `7/7` 定向回放；v56 以新冻结输出完成 `120/120` 生产路径执行、`29/29` 行为契约与引用结构违例 `0`。生成时 report 仍保留 `PENDING_HUMAN_REVIEW`，人工语义结果由独立证据包承载。
+- v56 A/B 案件级完全一致 `118/120`，`cs-gold-v1-026`与 `cs-candidate-v2-096` 由第三人仲裁。最终答案正确 `120/120`（Wilson 95% 下界 `96.90%`）、引用语义支持 `67/67`（下界 `94.58%`）、转人工 `120/120`、unsafe `0/120`（上界 `3.10%`）、联合质量 `120/120`、badcase `0`。
+- 人工拥有最终决策权，AI 只辅助文字与落盘；证据口径为 `HUMAN_APPROVED_AI_ASSISTED`、`humanDecisionAuthority=true`、`aiAssistanceUsed=true`、`pureHumanUnaidedClaim=false`。原始回传和最终包分别独立封存、哈希绑定。
+- v43→v54→v56 只是开发者已见 120 条上的描述性修复链。v56 明确 `normalQualityDenominatorExcluded=true`、`releaseGateEligible=false`、`finalUnseenEligible=false`，不证明 unseen 泛化、线上安全率或 CSAT/FCR。
+
 ## 关键踩坑、排错与效果
 
 下表只把同一数据、同一 observation 或同一候选规模的结果称为“前后对比”。不同 final 使用不同 dataset/source hash，只能作为排错生命周期，不能包装成严格 A/B。
@@ -183,11 +210,11 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 
 ## 当前边界与下一步
 
-- 客服 gold 当前主线为 `HUMAN_VERIFIED`；release gate 仍显式关闭，避免把离线人工金标误写成线上成功率。
-- 优先修复客服 HTTP 的动态事实来源绑定与政策-动作引用边界；使用新预注册 holdout 再做双盲+仲裁，不能改写当前 60 条或只报告同集优化。
-- 完成 v2 新增 60 条的双人盲标/仲裁后，生成 120 条 HUMAN_VERIFIED v2 并重算分层 CI；当前 draft 不可报分。
+- 客服 v2.1 标签和 v56 答案均是人工最终决策、AI 辅助编辑的已见开发证据；release gate 仍显式关闭。
+- v56 在当前已见集上已无人工 badcase；下一项客服质量工作不是继续重刷同集，而是由独立保管者生成开发者未见、预注册的新 holdout，一次性执行后再双盲+仲裁。
+- 完成 v2 来源独立复核的全 60 条扩展与保管声明；当前来源审计 slot exact `0.50` 未达 `0.70` 门槛，因此 intent/slot/handoff 仍只作开发诊断。
 - 每次修改都要保留指标级 badcase、输入/gold/prediction、根因和新旧数据集哈希；Search hard negative 继续只做 paired replay，不改标签刷分。
 - Search 成对回放基线已固定；后续只针对 `23/34/47` 做 query decomposition/对象保留的可见集 A/B，不能改标签或重刷 final 制造提升。
 - 当前容量曲线只证明本地短时只读诊断可运行；固定独占环境的 warm-up、steady-state、stress/soak 和 Provider 分层完成前，不新增生产 SLO 结论。
 - 当前真实账单价格和 endpoint 合同仍未核验；目录价估算仅用于面试中的成本量级说明，不能写成实际单请求成本。
-- 真实曝光/点击/购买、授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论；HTTP 答案已有人审基线，但当前引用支持不足以支撑“可信生成客服”主张。
+- 真实曝光/点击/购买、授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论；v56 的全通过仅支持当前已见回放的可信性，不支持绝对安全或未来输出泛化主张。

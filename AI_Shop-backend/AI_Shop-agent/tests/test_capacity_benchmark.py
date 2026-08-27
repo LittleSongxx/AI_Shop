@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from evaluation.adapters.agent import agent_polling_measurement
 from evaluation.capacity_benchmark import (
     CAPACITY_SCHEMA,
     CapacityBenchmarkError,
@@ -60,6 +61,26 @@ def test_capacity_order_query_declares_deterministic_provider_contract(monkeypat
     )
 
     _rows, cases = load_capacity_cases(Path("unused.jsonl"), case_ids=("case-1",))
+
+    assert cases[0].required_providers == ("agent-runtime",)
+
+
+def test_capacity_deictic_consult_declares_deterministic_clarification_contract(
+    monkeypatch,
+):
+    row = _gold_row(
+        case_id="cs-gold-v1-003",
+        intent="PRODUCT_CONSULT",
+    )
+    row["input"]["message"] = "这款耳机支持蓝牙 5.4 吗"
+    monkeypatch.setattr(
+        "evaluation.capacity_benchmark.load_gold_dataset",
+        lambda _path: [row],
+    )
+
+    _rows, cases = load_capacity_cases(
+        Path("unused.jsonl"), case_ids=("cs-gold-v1-003",)
+    )
 
     assert cases[0].required_providers == ("agent-runtime",)
 
@@ -328,6 +349,7 @@ async def test_capacity_warmup_is_excluded_from_measured_observations(
     assert report["warmup"]["excludedFromMeasuredLevels"] is True
     assert report["warmup"]["observationsStored"] is False
     assert report["configuration"]["warmupRequests"] == 2
+    assert report["configuration"]["latencyMeasurement"] == agent_polling_measurement()
 
 
 def test_open_arrival_summary_separates_drops_timeouts_429_and_end_to_end_latency():
@@ -472,6 +494,7 @@ async def test_open_arrival_scheduler_uses_fixed_clock_and_reports_queue_drops(
     assert report["notProductionSlo"] is True
     assert report["configuration"]["iterations"] == 8
     assert report["configuration"]["maxInflight"] == 1
+    assert report["configuration"]["latencyMeasurement"] == agent_polling_measurement()
     assert summary["plannedArrivalCount"] == 8
     assert summary["actualLaunchCount"] < 8
     assert summary["droppedCount"] > 0

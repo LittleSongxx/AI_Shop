@@ -1,5 +1,5 @@
-import json
 import inspect
+import json
 from pathlib import Path
 
 import httpx
@@ -47,28 +47,38 @@ def test_find_demo_ai_message_accepts_nfkc_stored_punctuation() -> None:
     assert find_demo_ai_message([row]) is row
 
 
-def test_repository_knowledge_catalog_locks_twelve_documents_and_75_sections() -> None:
+def test_repository_knowledge_catalog_locks_v3_overlay_release() -> None:
     catalog = load_knowledge_catalog()
 
-    assert catalog["catalogVersion"] == 2
-    assert catalog["expectedDocumentCount"] == 12
-    assert catalog["expectedKnowledgeChunkCount"] == 75
+    assert catalog["catalogVersion"] == 3
+    assert catalog["expectedDocumentCount"] == 14
+    assert catalog["expectedKnowledgeChunkCount"] == 77
     assert catalog["expectedFaqCount"] == 6
-    assert len(catalog["documents"]) == 12
-    assert sum(len(item["sections"]) for item in catalog["documents"]) == 75
+    assert len(catalog["documents"]) == 14
+    assert sum(len(item["sections"]) for item in catalog["documents"]) == 77
     assert all(len(item["sha256"]) == 64 for item in catalog["documents"])
     assert all(len(item["normalizedSha256"]) == 64 for item in catalog["documents"])
+    refund = next(
+        section
+        for item in catalog["documents"]
+        if item["file"] == "02-orders-delivery-and-returns.md"
+        for section in item["sections"]
+        if section["heading"] == "退货与退款"
+    )
+    assert refund["equivalentRefs"] == []
 
 
 def test_activate_knowledge_release_binds_exact_documents_and_catalog_sha() -> None:
     catalog = load_knowledge_catalog()
-    expected_ids = list(range(1, 13))
+    expected_ids = list(range(1, 15))
+    membership_sha = "a" * 64
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/admin-api/knowledge/activateRelease"
         body = json.loads(request.read())
         assert body["documentIds"] == expected_ids
-        assert body["releaseName"].startswith("demo-knowledge-v2-")
+        assert body["releaseName"].startswith("demo-knowledge-v3-")
+        assert body["catalogSha256"] == membership_sha
         return httpx.Response(
             200,
             json={
@@ -85,7 +95,12 @@ def test_activate_knowledge_release_binds_exact_documents_and_catalog_sha() -> N
     with httpx.Client(
         base_url="http://example.test", transport=httpx.MockTransport(handler)
     ) as client:
-        result = activate_knowledge_release(client, catalog, expected_ids)
+        result = activate_knowledge_release(
+            client,
+            catalog,
+            expected_ids,
+            membership_catalog_sha256=membership_sha,
+        )
 
     assert result["releaseVersion"] == 17
 

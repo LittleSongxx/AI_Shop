@@ -1,0 +1,31 @@
+{
+  "artifact": "BLINDED_INDEPENDENT_REAUDIT_SHEET",
+  "caseCount": 12,
+  "createdAt": "2026-08-26T11:52:10.513Z",
+  "goldLabelsPresent": false,
+  "instructions": [
+    "Custodian must transfer only this sheet and the frozen guideline to the reviewer.",
+    "Reviewer must not receive the source human dataset, draft labels, model output, or prior reviews.",
+    "Replace reviewerId with a stable independent identity and complete every label."
+  ],
+  "lifecycle": "OPEN_UNASSIGNED",
+  "modelPredictionsPresent": false,
+  "preregisteredAcceptance": {
+    "criticalMismatchCount": 0,
+    "failureAction": "EXPAND_TO_FULL_60_CASE_INDEPENDENT_REAUDIT",
+    "handoffAgreementMinimum": 0.9,
+    "intentAgreementMinimum": 0.8,
+    "riskAgreementMinimum": 0.9,
+    "slotExactAgreementMinimum": 0.7
+  },
+  "schemaVersion": "aishop-customer-service-independent-reaudit/v1",
+  "selectionPolicy": {
+    "highRiskSelected": 5,
+    "includeAllHighRisk": true,
+    "nonHighWithSlotsTarget": 4,
+    "remainingFromNoSlotPool": true
+  },
+  "selectionSeed": "customer-service-v2-independent-reaudit-20260826",
+  "sheetSha256": "d76e51dc4ab8bce6c451ca8a41e573b3bf492dcb1bbd9596f21fd71fd5ae8386",
+  "sourceHumanDatasetSha256": "364366c64d8cb2aa5efb57a4de2e2fa8dac819c5d30849e2a634d86e0b2713c1"
+}

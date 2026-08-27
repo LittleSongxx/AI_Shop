@@ -9,6 +9,7 @@ from app.config.settings import get_settings
 from app.domain.intent.classifier import (
     is_ambiguous_payment_failure,
     is_confirmed_no_deduction_payment_failure,
+    is_pre_authorization_payment_retry,
     resolve_intent,
 )
 from app.domain.intent.rules import (
@@ -26,6 +27,7 @@ from app.domain.intent.types import (
 )
 from app.domain.intent.write_args import TOOL_REQUIRED_INTENTS
 from app.graph.forced_tools import (
+    forced_named_product_comparison,
     forced_order_list,
     forced_product_search,
     forced_tool_for_intent,
@@ -47,6 +49,7 @@ from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.observability.telemetry import get_tracer
 from app.rag.ab_test import get_bucket
 from app.rag.prompt_builder import (
+    RAG_REFUSAL_TEXT,
     build_grounding_prompt,
     deterministic_grounding_policy_fallback,
     deterministic_policy_evidence_fallback,
@@ -75,21 +78,21 @@ from app.utils.biz_payload import (
 )
 from app.utils.order_ids import extract_order_id
 from app.utils.product_consult import (
+    bounded_display_technology_explanation,
+    elliptical_product_search_needs_category,
     is_product_consult_turn,
+    named_product_comparison_requested,
     normalize_consult_card,
     product_consult_clarification,
 )
 from app.utils.prompt_boundary import isolate_knowledge_text
+from app.utils.refund_policy import asks_refund_conditions, cited_refund_conditions
 
 logger = structlog.get_logger()
 
 # A3：HANDOFF_SUGGESTED（REPEATED_INTENT / 低置信）时追加在回答末尾的
 # 建议转人工文案。只是建议，不强制；用户可继续提问或直接说"转人工"。
 _HANDOFF_SUGGEST_TEXT = "\n\n如仍未解决，可以回复“转人工”，由人工客服继续协助。"
-_PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE = (
-    "根据你的描述，本次支付失败且没有扣款。请先检查支付方式和页面提示，再自行重新发起支付；"
-    "若之后出现扣款、重复扣款或非本人支付，请回复“转人工”以进入人工核查。"
-)
 output_guard = OutputGuardrail()
 _WRITE_PROPOSAL_TOOLS = frozenset(
     {
@@ -101,6 +104,52 @@ _WRITE_PROPOSAL_TOOLS = frozenset(
         "PROPOSE_RECOMMENT",
     }
 )
+
+
+def _rag_fact_ref(
+    state: AgentGraphState,
+    fact_id: str,
+) -> tuple[int, dict] | None:
+    for citation, ref in enumerate(state.get("rag_source_refs") or [], start=1):
+        if not isinstance(ref, dict):
+            continue
+        values = ref.get("factIds") or ref.get("fact_ids") or []
+        if isinstance(values, str):
+            values = [values]
+        if fact_id in {str(value) for value in values}:
+            return citation, ref
+    return None
+
+
+def _cited_payment_guidance(kind: str, citation: int) -> str:
+    marker = f"[{citation}]"
+    if kind == "preauthorization":
+        return (
+            "尚未输入支付密码且付款页卡住时，应先退出卡住页面并确认没有扣款。"
+            f"{marker} 若订单仍为待支付，可从订单页重新发起一次支付。{marker} "
+            f"不要连续快速重复提交；若出现扣款、重复扣款、非本人支付或状态不一致，"
+            f"请停止重试并联系人工客服核查。{marker}"
+        )
+    return (
+        f"根据你的描述，本次支付失败且没有扣款。{marker} "
+        f"请先查看订单或支付记录的最终状态。{marker} "
+        f"若仍为待支付，可退出失败页面，再从订单页重新发起一次支付。{marker} "
+        f"不要连续快速重复提交；若之后出现扣款、重复扣款、非本人支付或状态不一致，"
+        f"请停止重试并联系人工客服核查。{marker}"
+    )
+
+
+def _feedback_only_without_handoff(user_text: str) -> bool:
+    text = str(user_text or "")
+    feedback_only = any(
+        marker in text
+        for marker in ("只反馈", "反馈一下", "先反馈", "只是反馈", "就是反馈")
+    )
+    declines_handoff = any(
+        marker in text
+        for marker in ("不用转人工", "不要转人工", "不需要转人工", "先别转人工")
+    )
+    return feedback_only and declines_handoff
 
 
 def _allow_llm_fallback_retry(
@@ -235,6 +284,117 @@ def requires_rag_evidence(user_text: str, intent: IntentKind) -> bool:
     return has_policy_marker and (
         intent in _RAG_PREFETCH_INTENTS
         or any(marker in text for marker in _RAG_BUSINESS_MARKERS)
+    )
+
+
+def _rag_query_variants_for_turn(user_text: str, rewritten_query: str) -> list[str]:
+    """Add bounded retrieval variants for a known composite policy question."""
+
+    text = str(user_text or "")
+    variants = [str(rewritten_query or "").strip()]
+    if "自动" in text and "收货" in text and "售后" in text:
+        variants.extend(
+            [
+                "确认收货 订单完成状态 未实际收到不要提前确认",
+                "售后资格 订单状态 实时规则核验",
+            ]
+        )
+    return list(dict.fromkeys(value for value in variants if value))[:3]
+
+
+def _citation_for_fact(
+    source_refs: list[dict] | None,
+    fact_ids: set[str] | frozenset[str],
+) -> int | None:
+    for index, ref in enumerate(source_refs or [], start=1):
+        if not isinstance(ref, dict):
+            continue
+        values = ref.get("factIds") or ref.get("fact_ids") or []
+        if isinstance(values, str):
+            values = [values]
+        nested = ref.get("ref")
+        if isinstance(nested, dict):
+            nested_values = nested.get("factIds") or nested.get("fact_ids") or []
+            if isinstance(nested_values, str):
+                nested_values = [nested_values]
+            values = [*values, *nested_values]
+        if fact_ids.intersection(str(value) for value in values):
+            return index
+    return None
+
+
+def _auto_receipt_aftersales_policy_answer(state: AgentGraphState) -> str | None:
+    text = str(state.get("user_text") or "")
+    if not (
+        str(state.get("intent") or "") == IntentKind.CONFIRM_RECEIPT.value
+        and "自动" in text
+        and "收货" in text
+        and "售后" in text
+    ):
+        return None
+    refs = list(state.get("rag_source_refs") or [])
+    receipt_citation = _citation_for_fact(refs, {"logistics.confirm_receipt"})
+    if receipt_citation is None:
+        return None
+    eligibility_citation = _citation_for_fact(
+        refs,
+        {
+            "aftersales.rule_engine_authoritative",
+            "aftersales.request_and_refund_boundary",
+        },
+    )
+    if eligibility_citation is not None:
+        return (
+            f"自动确认收货会把订单推进到完成状态。[{receipt_citation}] "
+            "是否还能办理售后不能只凭“已自动确认”统一下结论，"
+            f"仍要按具体订单状态和实时售后规则核验。[{eligibility_citation}] "
+            f"如果尚未实际收到商品或包裹异常，不要提前手动确认。[{receipt_citation}] "
+            "请提供订单号，我可以继续核验该订单。"
+        )
+    return (
+        f"自动确认收货会把订单推进到完成状态。[{receipt_citation}] "
+        "当前可见规则不足以对所有订单统一判断完成后是否仍可售后；"
+        "请提供订单号，以便按该订单的实时状态核验。"
+        f"如果尚未实际收到商品或包裹异常，不要提前手动确认。[{receipt_citation}]"
+    )
+
+
+def _coupon_checkout_unavailable_answer(
+    state: AgentGraphState, tool_update: dict
+) -> str | None:
+    text = str(state.get("user_text") or "")
+    if not (
+        str(state.get("intent") or "") == IntentKind.QUERY_COUPON.value
+        and "优惠券" in text
+        and "结算" in text
+        and any(marker in text for marker in ("不可用", "不能用", "用不了"))
+    ):
+        return None
+    citation = _citation_for_fact(
+        list(state.get("rag_source_refs") or []),
+        {"coupon.single_per_order_and_revalidate"},
+    )
+    if citation is None:
+        return None
+    refs = list(tool_update.get("tool_source_refs") or [])
+    no_match = any(
+        isinstance(ref, dict)
+        and str(ref.get("type") or "").lower() == "coupon"
+        and ref.get("matched") is False
+        for ref in refs
+    ) or "没有符合条件" in "".join(tool_update.get("chunks") or [])
+    lookup = (
+        "本次账户查询没有返回当前符合条件的优惠券；"
+        if no_match
+        else "已查询当前账户的优惠券记录；"
+    )
+    return (
+        lookup
+        + "但仅凭这次列表查询，不能定位某张券具体是哪项校验未通过。"
+        + "提交订单时会按当前商品金额重新校验优惠券的门槛和归属，"
+        + f"购物车预估优惠不代表结算时一定可用。[{citation}] "
+        + "请补充券名称和门槛、结算商品金额及页面提示，以便继续核对具体券的可用状态；"
+        + "不要提供支付密码。"
     )
 
 
@@ -452,7 +612,9 @@ async def build_context_node(state: AgentGraphState) -> dict:
                     user_text,
                     category_filter=category_filter,
                     bucket=ab_bucket,
-                    query_variants=[rag_query],
+                    query_variants=_rag_query_variants_for_turn(
+                        user_text, rag_query
+                    ),
                     security_flags=list(
                         (state.get("agent_msg") or {}).get("inputSecurityFlags") or []
                     ),
@@ -741,6 +903,207 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         tool in {"GET_PRODUCT_DETAIL", "COMPARE_PRODUCTS"}
         for tool in state.get("tools_called") or []
     )
+    auto_receipt_answer = _auto_receipt_aftersales_policy_answer(state)
+    if auto_receipt_answer is not None:
+        episode_service.record_step(
+            "AUTO_RECEIPT_AFTERSALES_BOUNDARY",
+            node_name="agent_loop",
+            status="OK",
+            output_data={"reason": "visible_policy_evidence"},
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "AUTO_RECEIPT_AFTERSALES_BOUNDARY",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "auto_receipt_aftersales_boundary",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [auto_receipt_answer],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "auto_receipt_aftersales_boundary",
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+    if (
+        intent_name == IntentKind.COMPLAINT.value
+        and _feedback_only_without_handoff(user_text)
+    ):
+        answer = (
+            "收到你对物流速度偏慢的反馈。本次不会发起人工转接，也不会查询或修改订单；"
+            "如果之后需要核查具体订单，再提供订单号即可。"
+        )
+        episode_service.record_step(
+            "FEEDBACK_ONLY_ACKNOWLEDGEMENT",
+            node_name="agent_loop",
+            status="OK",
+            input_data={"intent": intent_name},
+            output_data={
+                "reason": "feedback_only_acknowledgement",
+                "handoffStarted": False,
+                "sideEffectAllowed": False,
+            },
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "FEEDBACK_ONLY_ACKNOWLEDGEMENT",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "feedback_only_acknowledgement",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [answer],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "feedback_only_acknowledgement",
+            "deterministic_clarification": True,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+    refund_conditions = (
+        cited_refund_conditions(state.get("rag_source_refs") or [])
+        if intent_name == IntentKind.REFUND.value
+        and asks_refund_conditions(user_text)
+        else None
+    )
+    if refund_conditions is not None:
+        episode_service.record_step(
+            "REFUND_CONDITIONS_EVIDENCE_ANSWER",
+            node_name="agent_loop",
+            status="OK",
+            input_data={"intent": intent_name},
+            output_data={
+                "reason": "visible_policy_evidence",
+                "citation": refund_conditions["citation"],
+                "sourceId": refund_conditions.get("sourceId"),
+            },
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "REFUND_CONDITIONS_EVIDENCE_ANSWER",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "refund_conditions_evidence_answer",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [str(refund_conditions["answer"])],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "refund_conditions_evidence_answer",
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+    display_requested = (
+        bounded_display_technology_explanation(user_text)
+        if intent_name == IntentKind.PRODUCT_CONSULT.value
+        else None
+    )
+    display_fact = _rag_fact_ref(state, "product.display_technology_boundary")
+    display_explanation = None
+    if display_requested is not None:
+        display_explanation = (
+            bounded_display_technology_explanation(
+                user_text,
+                citation=display_fact[0],
+            )
+            if display_fact is not None
+            else RAG_REFUSAL_TEXT
+        )
+    if display_explanation is not None:
+        episode_service.record_step(
+            "BOUNDED_DISPLAY_TECHNOLOGY_EXPLANATION",
+            node_name="agent_loop",
+            status="OK",
+            output_data={
+                "reason": (
+                    "visible_published_technology_source"
+                    if display_fact is not None
+                    else "published_technology_source_missing"
+                ),
+                "citation": display_fact[0] if display_fact is not None else None,
+                "sourceId": display_fact[1].get("id") if display_fact is not None else None,
+            },
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "BOUNDED_DISPLAY_TECHNOLOGY_EXPLANATION",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "bounded_display_technology_explanation",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [display_explanation],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "bounded_display_technology_explanation",
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+    if (
+        intent_name == IntentKind.PRODUCT_CONSULT.value
+        and not has_consult_identity
+        and not has_product_evidence
+        and not state.get("comparison_product_ids")
+        and named_product_comparison_requested(user_text)
+    ):
+        update = await forced_named_product_comparison(
+            messages=list(state.get("llm_messages") or []),
+            user_id=state["user_id"],
+            message_id=state["message_id"],
+            keyword=user_text,
+        )
+        episode_service.record_step(
+            "NAMED_PRODUCT_COMPARISON",
+            node_name="agent_loop",
+            status="OK",
+            output_data={
+                "reason": "catalog_identity_resolution",
+                "tools": list(update.get("tools_called") or []),
+            },
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "NAMED_PRODUCT_COMPARISON",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "named_product_comparison",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            **update,
+            "llm_skipped": True,
+            "llm_skip_reason": "named_product_comparison",
+            "structured_result_finalized": True,
+        }
     if (
         intent_name == IntentKind.PRODUCT_CONSULT.value
         and not has_consult_identity
@@ -777,6 +1140,37 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             "route": "finalize",
         }
 
+    if (
+        intent_name == IntentKind.PRODUCT_SEARCH.value
+        and elliptical_product_search_needs_category(user_text)
+    ):
+        clarification = (
+            "我已记录“小户型、静音”这两个条件，但当前对话里没有可核验的上一批商品类别。"
+            "请补充要重选的品类（例如空气净化器、风扇或其他家电），我再只返回该品类中有静音依据的商品。"
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "ELLIPTICAL_SEARCH_CATEGORY_CLARIFICATION",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "missing_followup_product_category",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [clarification],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "missing_followup_product_category",
+            "deterministic_clarification": True,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+
     payment_guidance_allowed = (
         intent_name == IntentKind.PAYMENT_ISSUE.value
         and str(state.get("request_mode") or "")
@@ -784,15 +1178,65 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         and decision_risk != RiskLevel.HIGH.value
         and decision_action != NextAction.HANDOFF.value
     )
+    payment_fact = _rag_fact_ref(state, "payment.safe_retry_guidance")
+    if payment_guidance_allowed and is_pre_authorization_payment_retry(user_text):
+        payment_answer = (
+            _cited_payment_guidance("preauthorization", payment_fact[0])
+            if payment_fact is not None
+            else RAG_REFUSAL_TEXT
+        )
+        episode_service.record_step(
+            "PAYMENT_PREAUTH_RETRY_GUIDANCE",
+            node_name="agent_loop",
+            status="OK",
+            input_data={"intent": intent_name},
+            output_data={
+                "reason": "credential_not_entered",
+                "citation": payment_fact[0] if payment_fact is not None else None,
+                "sourceId": payment_fact[1].get("id") if payment_fact is not None else None,
+            },
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="agent_loop",
+            output_data={
+                "policy": "PAYMENT_PREAUTH_RETRY_GUIDANCE",
+                "route": "finalize",
+                "llmSkipped": True,
+                "llmSkipReason": "payment_preauth_retry_guidance",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "chunks": [payment_answer],
+            "pending_tool_calls": [],
+            "biz_type": "agent",
+            "llm_skipped": True,
+            "llm_skip_reason": "payment_preauth_retry_guidance",
+            "deterministic_clarification": payment_fact is None,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
+
     if payment_guidance_allowed and is_confirmed_no_deduction_payment_failure(
         user_text
     ):
+        payment_answer = (
+            _cited_payment_guidance("no_deduction", payment_fact[0])
+            if payment_fact is not None
+            else RAG_REFUSAL_TEXT
+        )
         episode_service.record_step(
             "PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE",
             node_name="agent_loop",
             status="OK",
             input_data={"intent": intent_name},
-            output_data={"reason": "funds_not_deducted"},
+            output_data={
+                "reason": "funds_not_deducted",
+                "citation": payment_fact[0] if payment_fact is not None else None,
+                "sourceId": payment_fact[1].get("id") if payment_fact is not None else None,
+            },
         )
         episode_service.record_step(
             "AGENT_POLICY",
@@ -807,12 +1251,12 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             },
         )
         return {
-            "chunks": [_PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE],
+            "chunks": [payment_answer],
             "pending_tool_calls": [],
             "biz_type": "agent",
             "llm_skipped": True,
             "llm_skip_reason": "funds_not_deducted",
-            "deterministic_clarification": True,
+            "deterministic_clarification": payment_fact is None,
             "structured_result_finalized": True,
             "route": "finalize",
         }
@@ -1087,6 +1531,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             intent=intent_name,
             intent_data=intent_data,
             user_text=user_text,
+            request_mode=state.get("request_mode"),
         )
         if forced:
             return forced
@@ -1243,6 +1688,59 @@ async def order_reference_node(state: AgentGraphState) -> dict:
     return await resolve_order_reference_turn(state)
 
 
+async def dynamic_handoff_node(state: AgentGraphState) -> dict:
+    """Perform a handoff justified by facts learned after initial routing."""
+
+    if state.get("cancelled"):
+        return {"finished": True, "route": "end", "outcome": "cancelled"}
+    # Lazy import avoids agent_service -> graph.runner -> graph.builder -> nodes
+    # import cycles during worker startup.
+    from app.services.agent_service import agent_orchestrator
+
+    decision = dict(state.get("intent_decision") or {})
+    decision.update(
+        {
+            "intent": str(state.get("intent") or decision.get("intent") or "CHAT"),
+            "next_action": NextAction.HANDOFF.value,
+            "request_mode": RequestMode.HUMAN_SUPPORT.value,
+            "handoff_reason": str(
+                state.get("dynamic_handoff_reason") or "STATE_CONFLICT"
+            ),
+        }
+    )
+    verified_refs = dict(state.get("dynamic_handoff_order_refs") or {})
+    episode_service.record_step(
+        "AGENT_POLICY",
+        node_name="human_handoff",
+        output_data={
+            "policy": "POST_RESOLUTION_HUMAN_HANDOFF",
+            "reason": decision["handoff_reason"],
+            "hasVerifiedOrderReference": bool(verified_refs),
+            "llmSkipped": True,
+            "sideEffectAllowed": True,
+        },
+    )
+    try:
+        await agent_orchestrator._transfer_to_support(
+            state["agent_msg"],
+            str(state.get("user_text") or ""),
+            decision,
+            verified_order_refs=verified_refs,
+            finish_episode=False,
+        )
+    finally:
+        await redis_service.clear_bound_message_id(state["user_id"])
+    return {
+        "finished": True,
+        "route": "end",
+        "outcome": "human_support",
+        "biz_type": "human_support",
+        "llm_skipped": True,
+        "llm_skip_reason": "post_resolution_human_handoff",
+        "structured_result_finalized": True,
+    }
+
+
 async def orchestration_router_node(state: AgentGraphState) -> dict:
     settings = get_settings()
     decision = select_orchestration(
@@ -1307,6 +1805,40 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
             "structured_result_finalized": True,
             "route": "finalize",
         }
+    user_text = str(state.get("user_text") or "")
+    if (
+        intent == IntentKind.PRODUCT_SEARCH.value
+        and elliptical_product_search_needs_category(user_text)
+    ):
+        clarification = (
+            "我已记录“小户型、静音”这两个条件，但当前对话里没有可核验的上一批商品类别。"
+            "请补充要重选的品类（例如空气净化器、风扇或其他家电），我再只返回该品类中有静音依据的商品。"
+        )
+        episode_service.record_step(
+            "AGENT_POLICY",
+            node_name="deterministic_workflow",
+            output_data={
+                "policy": "ELLIPTICAL_SEARCH_CATEGORY_CLARIFICATION",
+                "route": "workflow",
+                "mode": "workflow",
+                "llmSkipped": True,
+                "llmSkipReason": "missing_followup_product_category",
+                "structuredResultFinalized": True,
+                "sideEffectAllowed": False,
+            },
+        )
+        return {
+            "llm_messages": messages,
+            "tools_called": [],
+            "biz_type": "agent",
+            "chunks": [clarification],
+            "pending_tool_calls": [],
+            "llm_skipped": True,
+            "llm_skip_reason": "missing_followup_product_category",
+            "deterministic_clarification": True,
+            "structured_result_finalized": True,
+            "route": "finalize",
+        }
     if tool_name and isinstance(tool_args, dict):
         episode_service.record_step(
             "AGENT_POLICY",
@@ -1343,13 +1875,21 @@ async def deterministic_workflow_node(state: AgentGraphState) -> dict:
         intent=intent,
         intent_data=state.get("intent_data"),
         user_text=str(state.get("user_text") or ""),
+        request_mode=state.get("request_mode"),
     )
     if update is not None:
+        coupon_answer = _coupon_checkout_unavailable_answer(state, update)
+        if coupon_answer is not None:
+            update = {**update, "chunks": [coupon_answer]}
         episode_service.record_step(
             "AGENT_POLICY",
             node_name="deterministic_workflow",
             output_data={
-                "policy": "DETERMINISTIC_BUSINESS_TOOL",
+                "policy": (
+                    "COUPON_CHECKOUT_REVALIDATION_EXPLANATION"
+                    if coupon_answer is not None
+                    else "DETERMINISTIC_BUSINESS_TOOL"
+                ),
                 "route": "workflow",
                 "mode": "workflow",
                 "llmSkipped": True,
@@ -1534,6 +2074,43 @@ async def tools_node(state: AgentGraphState) -> dict:
     for tc in state.get("pending_tool_calls") or []:
         if await rt.is_cancelled(user_id, message_id):
             return {"cancelled": True, "finished": True, "route": "end", "outcome": "cancelled"}
+        if (
+            tc["name"] in _WRITE_PROPOSAL_TOOLS
+            and str(state.get("request_mode") or "")
+            in {
+                RequestMode.READ_QUERY.value,
+                RequestMode.INFORMATIONAL.value,
+            }
+        ):
+            # Model-selected tools are untrusted.  A read/informational turn
+            # cannot silently escalate into even a confirmation-stage write
+            # proposal.  Preverified exception workflows (for example a
+            # strong logistics incident) bypass this model-tool path and keep
+            # their separately audited deterministic capability decision.
+            episode_service.record_step(
+                "TOOL_POLICY_DENIED",
+                node_name="tools",
+                status="BLOCKED",
+                input_data={
+                    "tool": tc["name"],
+                    "requestMode": state.get("request_mode"),
+                },
+                output_data={
+                    "reason": "WRITE_PROPOSAL_REQUIRES_ACTION_PROPOSAL_MODE",
+                    "sideEffectAllowed": False,
+                },
+            )
+            messages.append(
+                ToolMessage(
+                    content=(
+                        "【工具调用被安全策略拒绝】当前请求仅为查询或说明，"
+                        "不能生成写操作确认卡。请使用已有事实与知识证据直接回答；"
+                        "如用户明确要求执行，再重新进入操作提案流程。"
+                    ),
+                    tool_call_id=tc["id"],
+                )
+            )
+            continue
         if tc["name"] == "SEARCH_PRODUCTS" and is_product_consult_turn(
             state.get("user_text"),
             state.get("message_card"),
@@ -1998,6 +2575,13 @@ async def finalize_node(state: AgentGraphState) -> dict:
             deterministic_clarification=bool(
                 state.get("deterministic_clarification")
             ),
+            deterministic_consult_resolution=str(
+                state.get("llm_skip_reason") or ""
+            )
+            in {
+                "bounded_display_technology_explanation",
+                "named_product_comparison",
+            },
             verifier_fallback=verifier_fallback,
         )
     except Exception as e:

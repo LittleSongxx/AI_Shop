@@ -920,6 +920,23 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        INSERT IGNORE INTO agent_after_sales_policy
+            (policy_id, version, status, priority, scope_json, rule_json,
+             effective_start, effective_end, created_by, created_at, updated_at)
+        VALUES
+            ('system-return-state', 'v1', 'PUBLISHED', 0,
+             JSON_OBJECT('scopeType', 'GLOBAL'),
+             JSON_OBJECT(
+                 'action', 'RETURN',
+                 'orderStatuses', JSON_ARRAY(2, 3),
+                 'itemStatuses', JSON_ARRAY(1),
+                 'requiredEvidence', JSON_ARRAY()
+             ),
+             '2020-01-01 00:00:00.000', NULL, 'SYSTEM_MIGRATION', NOW(3), NOW(3))
+        """
+    )
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS agent_inventory_supply_parameter
         (
             product_id          varchar(64) NOT NULL,

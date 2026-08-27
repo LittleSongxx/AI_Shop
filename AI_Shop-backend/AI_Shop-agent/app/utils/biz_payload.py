@@ -3,7 +3,7 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from app.constants import ORDER_STATUS_NAMES
+from app.constants import ORDER_STATUS_NAMES, ORDER_STATUS_WAIT_PAYMENT
 
 ASSISTANT_MESSAGE_MAX_LEN = 16000
 MAX_PRODUCT_SEARCH_INTRO_LEN = 12000
@@ -11,18 +11,44 @@ MAX_ORDER_CARDS = 30
 MAX_PRODUCT_CARDS = 20
 MAX_ORDER_ITEMS = 5
 ACTION_CONFIRM_HINT = "请核对以下信息，确认后将立即执行。"
+PUBLIC_PRODUCT_RANKING_FIELDS = frozenset(
+    {
+        "baseUtilityScore",
+        "useCaseScore",
+        "featureScore",
+        "offerScore",
+        "explicitPreferenceScore",
+        "recallPriorScore",
+        "utilityScore",
+        "diversityScore",
+        "policyVersion",
+        "operationalPlacement",
+    }
+)
+PUBLIC_PRODUCT_RECOMMENDATION_FIELDS = frozenset(
+    {
+        "role",
+        "summary",
+        "bestFor",
+        "notIdealFor",
+        "tradeoff",
+        "evidence",
+        "offerSnapshotId",
+        "quoteExpiresAt",
+    }
+)
 
 ACTION_LABELS = {
-    "REFUND": ("退款", "确认退款", "退款将原路返回，提交后无法撤销"),
-    "CANCEL_ORDER": ("取消订单", "确认取消订单", "取消后订单将关闭，不能恢复"),
-    "CONFIRM_RECEIPT": ("确认收货", "确认收货", "确认后将无法发起退款"),
+    "REFUND": ("退款", "确认退款", "请在确认前核对退款订单项与金额"),
+    "CANCEL_ORDER": ("取消订单", "确认取消订单", "请在确认前核对订单号与取消信息"),
+    "CONFIRM_RECEIPT": ("确认收货", "确认收货", "请确认已收到商品并核对订单号"),
     "CREATE_SUPPORT_CASE": (
         "创建售后工单",
         "确认创建工单",
-        "工单提交后将进入客服处理流程",
+        "请在确认前核对问题描述和关联订单",
     ),
-    "PRODUCT_REVIEW": ("提交评价", "确认提交评价", "评价提交后不可修改"),
-    "RECOMMENT": ("提交追评", "确认提交追评", "追评提交后不可修改"),
+    "PRODUCT_REVIEW": ("提交评价", "确认提交评价", "请在确认前核对评价星级和内容"),
+    "RECOMMENT": ("提交追评", "确认提交追评", "请在确认前核对追评内容"),
 }
 
 def _json_default(obj: Any) -> Any:
@@ -209,11 +235,16 @@ def build_product_payload(products: list[dict], request_id: str | None = None) -
             card["recommendation"] = {
                 key: value
                 for key, value in recommendation.items()
-                if key in {"role", "summary", "bestFor", "notIdealFor", "tradeoff", "evidence", "offerSnapshotId", "quoteExpiresAt"}
+                if key in PUBLIC_PRODUCT_RECOMMENDATION_FIELDS
             }
         ranking = p.get("ranking")
         if isinstance(ranking, dict):
-            card["ranking"] = ranking
+            card["ranking"] = {
+                key: value
+                for key, value in ranking.items()
+                if key in PUBLIC_PRODUCT_RANKING_FIELDS
+                and not isinstance(value, (dict, list, tuple, set))
+            }
         position = p.get("position")
         if position is not None:
             card["position"] = _to_number(position)
@@ -693,6 +724,11 @@ def build_action_confirm_payload(pending: dict, intro: str | None = None) -> tup
     action_type = pending.get("actionType", "")
     label, confirm_text, risk_tip = ACTION_LABELS.get(action_type, (action_type, "确认", ""))
     params = json.loads(pending.get("paramsJson") or "{}")
+    if (
+        action_type == "CANCEL_ORDER"
+        and params.get("orderStatusBefore") == ORDER_STATUS_WAIT_PAYMENT
+    ):
+        risk_tip = "该订单尚未支付，取消后不会产生退款到账流程；请核对订单号后确认"
     card: dict[str, Any] = {
         "type": "ACTION_CONFIRM",
         "token": pending.get("token"),
@@ -747,7 +783,11 @@ def _build_details(action_type: str, params: dict, summary: str | None) -> list[
         _add(details, "订单号", params.get("orderId"))
         _add(
             details,
-            "实付金额",
+            (
+                "订单金额"
+                if params.get("orderStatusBefore") == ORDER_STATUS_WAIT_PAYMENT
+                else "实付金额"
+            ),
             f"{params.get('orderAmount')} 元" if params.get("orderAmount") else None,
         )
     elif action_type == "CONFIRM_RECEIPT":

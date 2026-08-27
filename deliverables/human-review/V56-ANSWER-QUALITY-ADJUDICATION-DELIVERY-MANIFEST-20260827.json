@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "aishop-human-review-adjudication-delivery/v1",
+  "status": "OPEN_HUMAN_ADJUDICATION",
+  "task": "CUSTOMER_SERVICE_V56_ANSWER_QUALITY_ADJUDICATION",
+  "sourceReview": {
+    "caseCount": 120,
+    "exactAgreementCaseCount": 118,
+    "disagreementCaseCount": 2,
+    "caseAgreementRate": 0.983333,
+    "pendingEvidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-pending-adjudication-20260827",
+    "pendingEvidenceSha256SumsSha256": "30cedb87ca24cc5d3bb9ac40c20ffa6395e688cf5254a6b5c94c34f1babdcfa9"
+  },
+  "adjudicatorC": {
+    "zipPath": "deliverables/human-review/AI-Shop-v56-answer-quality-adjudicator-c-20260827.zip",
+    "zipSha256": "e015d27ca44e2bcd7148b83ec6d7559fa795da31da726589330d5051c6c73af7",
+    "adjudicationTemplateSha256": "86ef460bafdebda2198bd57e46de4eb7bdbe28a44a9b5ad5ad0c235e0e22476b",
+    "caseCount": 2,
+    "returnDirectory": "holdout/v56/adjudicator-c",
+    "returnFiles": [
+      "adjudication.open.jsonl",
+      "adjudicator-attestation.template.json"
+    ]
+  },
+  "decisionAuthority": {
+    "adjudicatorMustBeHuman": true,
+    "humanRetainsFinalDecisionAuthority": true,
+    "aiAssistedTextOrRecordingAllowed": true,
+    "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED"
+  },
+  "releaseGateEligible": false,
+  "finalUnseenEligible": false
+}

@@ -1,0 +1,28 @@
+{
+  "benchmarkId": "capacity-open-arrival-readonly-v2-20260825",
+  "benchmarkSchemaVersion": "aishop-capacity-benchmark/v1",
+  "claim": "LOCAL_OPEN_ARRIVAL_READ_ONLY_OBSERVATION",
+  "createdAt": "2026-08-25T11:27:55.802Z",
+  "datasetSha256": "112dfd6ba7546b7cbad317597d944e3ab4dc02627d4ca6018733031d8eddc527",
+  "files": {
+    "observations.jsonl": {
+      "bytes": 57220,
+      "sha256": "a0e42b06b6eb6409a4c5607b6973cff51887604f5df8be7800e0090f27b8b6db"
+    },
+    "report.json": {
+      "bytes": 35161,
+      "sha256": "fc55664cbc63561429ed5ac7e32814269d9ca4cba8d34af227889a57c96105d4"
+    },
+    "report.md": {
+      "bytes": 827,
+      "sha256": "df9ccbd42b984fd07231c164cb529d6deec5c2632eb3ff3ca3cd06a749cea34b"
+    }
+  },
+  "normalQualityDenominatorExcluded": true,
+  "notProductionSlo": true,
+  "preflightPassed": true,
+  "providerConfigurationSha256": "2a914729d4e01681c7f7e126e52a67959e0e1e428f259887aafffeb93f499e93",
+  "runId": "capacity-open-arrival-readonly-v2-20260825",
+  "schemaVersion": "aishop-capacity-benchmark-evidence/v1",
+  "sourceSha256": "7961df577601f7c52d2bc498cdd53bc68806e795a89fc2335a4907ba4b1f3cb1"
+}

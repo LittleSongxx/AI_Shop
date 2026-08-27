@@ -1,0 +1,44 @@
+{
+  "createdAt": "2026-08-26T16:36:40.005Z",
+  "expectedReturns": {
+    "answerQualityAdjudicator": [
+      "adjudication.open.jsonl",
+      "adjudicator-attestation.template.json"
+    ],
+    "labelPolicyAdjudicator": [
+      "adjudication.open.jsonl",
+      "adjudicator-attestation.template.json"
+    ],
+    "provenanceFull60Followup": [
+      "exactly one completed review JSONL and its original manifest",
+      "custody-attestation-v2.template.json"
+    ],
+    "round1ReviewerAttestations": [
+      "four completed *.attestation.template.json files"
+    ]
+  },
+  "packages": {
+    "answerQualityAdjudicator": {
+      "bytes": 8150,
+      "path": "/home/song/code/Java/AI_Shop/deliverables/human-review/AI-Shop-answer-quality-adjudicator-c-20260827.zip",
+      "sha256": "7d7fd670fe47bea40fbe941efd386e5b6d591a5fa7ba21c37d14ec7e7a91613f"
+    },
+    "labelPolicyAdjudicator": {
+      "bytes": 5079,
+      "path": "/home/song/code/Java/AI_Shop/deliverables/human-review/AI-Shop-label-policy-adjudicator-c-20260827.zip",
+      "sha256": "8b13054475ce221f979319330104c2525cd53513ec46c087cc9cc8bd243aabac"
+    },
+    "provenanceFull60Followup": {
+      "bytes": 14534,
+      "path": "/home/song/code/Java/AI_Shop/deliverables/human-review/AI-Shop-provenance-full60-followup-20260827.zip",
+      "sha256": "4dbab520370bfecbc76a1ffc7384d1bfd7d9e77e8105a3ece7cb6543af84eab9"
+    },
+    "round1ReviewerAttestations": {
+      "bytes": 3908,
+      "path": "/home/song/code/Java/AI_Shop/deliverables/human-review/AI-Shop-round1-reviewer-attestations-20260827.zip",
+      "sha256": "06943d3e0e9dfa019986cd24e043a3f39be453155562f1f1c43a1d89e51ec310"
+    }
+  },
+  "schemaVersion": "aishop-human-review-followup-delivery/v1",
+  "status": "OPEN_HUMAN_FOLLOWUP_REQUIRED"
+}

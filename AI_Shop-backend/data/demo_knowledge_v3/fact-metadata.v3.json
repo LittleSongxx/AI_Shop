@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "aishop-fact-metadata-overlay/v1",
+  "metadataVersion": 3,
+  "extends": "../demo_knowledge_v2/fact-metadata.v2.json",
+  "canonicalCatalogSha256": "1fa188bb40f9ace4e11394d8cf79fee18253466957f165c3581b76d0e7fa8770",
+  "factCount": 75,
+  "generation": "deterministic v2 base plus reviewed v3 policy additions; no LLM",
+  "facts": [
+    {
+      "factId": "payment.safe_retry_guidance",
+      "factType": "PAYMENT",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "PAYMENT",
+      "aliases": [
+        "支付失败未扣款怎么办",
+        "付款页卡住但未输入密码能否重试",
+        "未扣款或未输入密码时的安全重试"
+      ],
+      "atomicClaims": [
+        "支付失败且确认没有扣款时，应先查看订单或支付记录的最终状态",
+        "若仍为待支付，可退出失败页面，再从订单页重新发起一次支付",
+        "尚未输入支付密码且付款页卡住时，也应先确认没有扣款再重试",
+        "不要连续快速重复提交",
+        "若出现扣款、重复扣款、非本人支付，或订单与支付状态不一致，应停止重试并联系人工客服核查"
+      ]
+    },
+    {
+      "factId": "product.display_technology_boundary",
+      "factType": "PRODUCT",
+      "polarity": "MIXED",
+      "capabilityBoundary": false,
+      "domain": "PRODUCT",
+      "aliases": [
+        "OLED 与 Mini LED",
+        "OLED 和 Mini LED 的区别",
+        "显示技术选购说明"
+      ],
+      "atomicClaims": [
+        "OLED 由像素自发光，每个像素可单独关闭，因此通常具有更好的黑位和对比度，也更容易做薄",
+        "OLED 长期显示固定高亮内容时需要留意残影或烧屏风险",
+        "Mini LED 本质上仍是使用液晶面板的显示技术，通过大量微型背光分区提升亮度和控光表现，通常更适合明亮环境",
+        "Mini LED 在高反差画面边缘可能出现光晕，黑位表现取决于分区数量和控光算法",
+        "偏暗室观影和纯黑表现可优先比较 OLED，偏高亮 HDR、明亮客厅或长时间固定界面可优先比较 Mini LED"
+      ]
+    }
+  ]
+}

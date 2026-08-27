@@ -67,6 +67,22 @@ class ProductQueryPlan:
     retrieval_variants: tuple[str, ...]
     constraints: ProductRuntimeConstraints
     normalization_rules: tuple[str, ...] = ()
+    # The model-visible keyword remains the retrieval/rerank query. The original
+    # server-owned turn is held only in memory and governs hard constraints.
+    # It is intentionally omitted from ``public()`` and Episode evidence.
+    constraint_query: str | None = field(default=None, repr=False)
+
+    @property
+    def constraint_text(self) -> str:
+        return self.constraint_query or self.raw_query
+
+    @property
+    def required_qualifier_ids(self) -> tuple[str, ...]:
+        return tuple(
+            str(contract.get("id") or "").strip()
+            for contract in verified_qualifier_contracts(self.constraint_text)
+            if str(contract.get("id") or "").strip()
+        )
 
     def public(self) -> dict[str, Any]:
         return {
@@ -74,6 +90,8 @@ class ProductQueryPlan:
             "retrievalVariants": list(self.retrieval_variants),
             "runtimeConstraints": self.constraints.public(),
             "normalizationRules": list(self.normalization_rules),
+            "trustedConstraintQueryApplied": bool(self.constraint_query),
+            "requiredQualifierIds": list(self.required_qualifier_ids),
         }
 
 
@@ -214,11 +232,22 @@ def build_product_query_plan(
     raw_query: str | None,
     mission: Mapping[str, Any] | None,
     *,
+    constraint_query: str | None = None,
     max_variants: int = 3,
 ) -> ProductQueryPlan:
-    """Build additive retrieval variants without replacing the user's request."""
+    """Build retrieval variants while preserving server-owned hard constraints.
+
+    ``raw_query`` is the concise MCP keyword used for recall and reranking.
+    ``constraint_query`` is the original accepted user turn and is never made
+    public; when supplied, all explicit query constraints are parsed from it.
+    """
 
     raw = " ".join(str(raw_query or "").strip().split())
+    constraint_raw = " ".join(str(constraint_query or raw).strip().split())
+    retrieval_raw = raw or constraint_raw
+    has_separate_constraint_query = bool(
+        constraint_raw and constraint_raw.casefold() != retrieval_raw.casefold()
+    )
     mission = mission or {}
     hard = mission.get("hardConstraints") if isinstance(mission, Mapping) else {}
     soft = mission.get("softPreferences") if isinstance(mission, Mapping) else {}
@@ -227,13 +256,30 @@ def build_product_query_plan(
     soft = soft if isinstance(soft, Mapping) else {}
     exclusions = exclusions if isinstance(exclusions, Mapping) else {}
 
-    primary_request = primary_product_request(raw)
-    comparison_suffix = bool(primary_request and primary_request != raw)
+    raw_hard = extract_query_hard_constraints(constraint_raw)
+    mission_targets = hard.get("comparisonTargets", hard.get("comparison_targets")) or ()
+    comparison_targets = _unique_text(
+        (*_text_values(mission_targets), *_text_values(raw_hard.get("comparison_targets")))
+    )
+    comparison_required = bool(
+        _boolean(hard.get("comparisonRequired", hard.get("comparison_required", False)))
+        or raw_hard.get("comparison_required")
+    )
+
+    primary_request = primary_product_request(constraint_raw)
+    comparison_suffix = bool(primary_request and primary_request != constraint_raw)
     mission_category = str(mission.get("category") or "").strip() or None
-    inferred_category = infer_product_category(raw)
+    inferred_category = infer_product_category(constraint_raw)
     comparison_target_only = comparison_suffix and inferred_category is None
+    normalization_input = (
+        retrieval_raw
+        if has_separate_constraint_query and retrieval_raw
+        else primary_request
+        if comparison_target_only
+        else constraint_raw
+    )
     normalized = normalize_product_search_query(
-        primary_request if comparison_target_only else raw
+        normalization_input
     )
     broad_categories = {
         "电脑",
@@ -250,17 +296,37 @@ def build_product_query_plan(
     }
     if inferred_category and not is_managed_search_keyword(normalized):
         normalized = inferred_category
-    category = None if comparison_target_only else mission_category
-    if not comparison_target_only and inferred_category and (
+    comparison_categories = {
+        str(contract.get("category") or "").casefold()
+        for contract in runtime_surface_contracts(constraint_raw)
+        if str(contract.get("category") or "").strip()
+    }
+    heterogeneous_comparison = comparison_required and len(comparison_categories) > 1
+    category = None if comparison_target_only or heterogeneous_comparison else mission_category
+    if not comparison_target_only and not heterogeneous_comparison and inferred_category and (
         not mission_category
         or mission_category in broad_categories
         or inferred_category.casefold() in mission_category.casefold()
     ):
         category = inferred_category
-    variants = _unique_text((raw, normalized, category))[: max(1, max_variants)]
+    variant_inputs: Sequence[Any]
+    if comparison_required and comparison_targets:
+        variant_inputs = (retrieval_raw, *comparison_targets, normalized, category)
+    else:
+        variant_inputs = (retrieval_raw, normalized, category)
+    variants = _unique_text(variant_inputs)[: max(1, max_variants)]
     rules: list[str] = []
-    if normalized and normalized.casefold() != raw.casefold():
+    variant_keys = {value.casefold() for value in variants}
+    if (
+        normalized
+        and normalized.casefold() != retrieval_raw.casefold()
+        and normalized.casefold() in variant_keys
+    ):
         rules.append("managed_taxonomy_additive_variant")
+    if any(target.casefold() in variant_keys for target in comparison_targets):
+        rules.append("comparison_target_retrieval_variants")
+    if heterogeneous_comparison:
+        rules.append("heterogeneous_comparison_category_union")
     if category and category.casefold() not in {value.casefold() for value in variants[:2]}:
         rules.append("shopping_mission_category_variant")
     if category and category != mission_category:
@@ -268,7 +334,6 @@ def build_product_query_plan(
     if comparison_target_only:
         rules.append("comparison_target_excluded_from_requested_category")
 
-    raw_hard = extract_query_hard_constraints(raw)
     mission_budget_min = _number(hard.get("budgetMin", hard.get("budget_min")))
     mission_budget_max = _number(hard.get("budgetMax", hard.get("budget_max")))
     raw_budget_min = _number(raw_hard.get("budget_min"))
@@ -277,19 +342,11 @@ def build_product_query_plan(
     budget_maxes = [value for value in (mission_budget_max, raw_budget_max) if value is not None]
     mission_must_terms = hard.get("mustTerms", hard.get("must_terms")) or hard.get("requiredTerms", ())
     mission_must_not_terms = exclusions.get("terms") or ()
-    mission_targets = hard.get("comparisonTargets", hard.get("comparison_targets")) or ()
     must_terms = _unique_text(
         (*_text_values(mission_must_terms), *_text_values(raw_hard.get("must_terms")))
     )
     must_not_terms = _merge_exclusion_terms(
         mission_must_not_terms, raw_hard.get("must_not_terms")
-    )
-    comparison_targets = _unique_text(
-        (*_text_values(mission_targets), *_text_values(raw_hard.get("comparison_targets")))
-    )
-    comparison_required = bool(
-        _boolean(hard.get("comparisonRequired", hard.get("comparison_required", False)))
-        or raw_hard.get("comparison_required")
     )
     constraints = ProductRuntimeConstraints(
         category=category,
@@ -306,10 +363,11 @@ def build_product_query_plan(
         comparison_required=comparison_required,
     )
     return ProductQueryPlan(
-        raw_query=raw,
-        retrieval_variants=variants or ((raw,) if raw else ()),
+        raw_query=retrieval_raw,
+        retrieval_variants=variants or ((retrieval_raw,) if retrieval_raw else ()),
         constraints=constraints,
         normalization_rules=tuple(rules),
+        constraint_query=constraint_raw if has_separate_constraint_query else None,
     )
 
 
@@ -375,6 +433,92 @@ def _product_id(product: Mapping[str, Any]) -> str:
     return str(product.get("product_id") or product.get("productId") or product.get("id") or "")
 
 
+def _verified_product_attribute_text(product: Mapping[str, Any]) -> str:
+    values: list[str] = []
+    for item in product.get("property_values") or product.get("propertyValues") or ():
+        if not isinstance(item, Mapping):
+            continue
+        values.extend(
+            str(item.get(key) or "")
+            for key in (
+                "property_name",
+                "propertyName",
+                "name",
+                "property_value",
+                "propertyValue",
+                "value",
+            )
+        )
+    for prop in product.get("properties") or ():
+        if not isinstance(prop, Mapping):
+            continue
+        values.append(str(prop.get("propertyName") or prop.get("property_name") or ""))
+        for item in prop.get("propertyValues") or prop.get("property_values") or ():
+            if isinstance(item, Mapping):
+                values.append(
+                    str(
+                        item.get("propertyValue")
+                        or item.get("property_value")
+                        or item.get("value")
+                        or ""
+                    )
+                )
+    for feature in product.get("decisionFeatures") or ():
+        if not isinstance(feature, Mapping) or feature.get("reviewStatus") != "VERIFIED":
+            continue
+        values.extend(
+            str(feature.get(key) or "") for key in ("key", "label", "value")
+        )
+    return " ".join(values).casefold()
+
+
+def _product_satisfies_required_qualifiers(
+    product: Mapping[str, Any],
+    contracts: Sequence[Mapping[str, Any]],
+) -> bool:
+    text = _verified_product_attribute_text(product)
+    return all(
+        bool(contract.get("evidenceTerms"))
+        and any(
+            str(term).casefold() in text
+            for term in contract.get("evidenceTerms") or []
+            if str(term or "").strip()
+        )
+        for contract in contracts
+    )
+
+
+def required_qualifier_evidence(
+    products: Sequence[Mapping[str, Any]],
+    query: str | None,
+) -> dict[str, Any]:
+    """Audit returned candidates against snapshot-verifiable query qualifiers."""
+
+    contracts = verified_qualifier_contracts(query)
+    required_ids = [
+        str(contract.get("id") or "").strip()
+        for contract in contracts
+        if str(contract.get("id") or "").strip()
+    ]
+    unverified_ids: list[str] = []
+    unverified_count = 0
+    if contracts:
+        for product in products:
+            if _product_satisfies_required_qualifiers(product, contracts):
+                continue
+            unverified_count += 1
+            product_id = _product_id(product)
+            if product_id and product_id not in unverified_ids:
+                unverified_ids.append(product_id)
+    return {
+        "requiredQualifierIds": required_ids,
+        "unverifiedRequiredQualifierProductIds": unverified_ids,
+        "unverifiedRequiredQualifierCandidateCount": unverified_count,
+        "returnedCandidatesSatisfyRequiredQualifiers": unverified_count == 0,
+        "requiredQualifierEvidenceSource": "JAVA_PRODUCT_SNAPSHOT",
+    }
+
+
 def _product_price(product: Mapping[str, Any]) -> float | None:
     for key in ("estimated_payable", "price", "min_price", "minPrice"):
         value = _number(product.get(key))
@@ -403,6 +547,16 @@ def _product_matches_term(product: Mapping[str, Any], term: str) -> bool:
     compact_term = _compact_text(raw_term)
     compact_product = _compact_text(text)
     if compact_term and compact_term in compact_product:
+        return True
+    if (
+        len(compact_term) >= 4
+        and all("\u4e00" <= character <= "\u9fff" for character in compact_term)
+        and any(
+            compact_term[:split] in compact_product
+            and compact_term[split:] in compact_product
+            for split in range(2, len(compact_term) - 1)
+        )
+    ):
         return True
     return bool(
         len(compact_term) >= 3
@@ -459,6 +613,13 @@ def filter_products_by_runtime_constraints(
         if brand:
             product["brand"] = brand
         price = _product_price(product)
+        comparison_target_match = bool(
+            constraints.comparison_required
+            and any(
+                _product_matches_term(product, target)
+                for target in constraints.comparison_targets
+            )
+        )
         reason: str | None = None
         if (constraints.budget_max is not None or constraints.budget_min is not None) and price is None:
             reason = "BUDGET_UNVERIFIED"
@@ -466,7 +627,7 @@ def filter_products_by_runtime_constraints(
             reason = "OVER_BUDGET"
         elif constraints.budget_min is not None and price < constraints.budget_min:
             reason = "BELOW_BUDGET_RANGE"
-        elif required and brand not in required:
+        elif required and brand not in required and not comparison_target_match:
             reason = "BRAND_REQUIRED"
         elif brand and brand in excluded:
             reason = "BRAND_EXCLUDED"
@@ -507,17 +668,18 @@ def filter_products_for_query_plan(
 
     candidates = [dict(product) for product in products]
     surface_rejected: list[dict[str, str]] = []
+    constraint_text = plan.constraint_text
     excluded_model_tokens = {
         _compact_text(term) for term in plan.constraints.must_not_terms
     }
     model_tokens = tuple(
         token
-        for token in exact_model_tokens(plan.raw_query)
+        for token in exact_model_tokens(constraint_text)
         if _compact_text(token) not in excluded_model_tokens
     )
     if model_tokens:
-        model_match = any if is_comparison_query(plan.raw_query) else all
-        retained_terms = comparison_target_terms(plan.raw_query)
+        model_match = any if is_comparison_query(constraint_text) else all
+        retained_terms = comparison_target_terms(constraint_text)
 
         def matches_model_or_retained_target(product: Mapping[str, Any]) -> bool:
             name = "".join(
@@ -532,7 +694,7 @@ def filter_products_for_query_plan(
                 for token in model_tokens
             )
             return model_hit or bool(
-                is_comparison_query(plan.raw_query)
+                is_comparison_query(constraint_text)
                 and any(
                     term in name
                     or (len(term) >= 3 and term[:-1] in name)
@@ -556,7 +718,7 @@ def filter_products_for_query_plan(
         )
         candidates = matched
 
-    type_contracts = runtime_surface_contracts(plan.raw_query)
+    type_contracts = runtime_surface_contracts(constraint_text)
     if type_contracts and candidates:
         matched = []
         for product in candidates:
@@ -591,18 +753,11 @@ def filter_products_for_query_plan(
                 )
         candidates = matched
 
-    qualifier_contracts = verified_qualifier_contracts(plan.raw_query)
+    qualifier_contracts = verified_qualifier_contracts(constraint_text)
     if qualifier_contracts and candidates:
         matched = []
         for product in candidates:
-            text = _product_text(product)
-            if all(
-                any(
-                    str(term).casefold() in text
-                    for term in contract.get("evidenceTerms") or []
-                )
-                for contract in qualifier_contracts
-            ):
+            if _product_satisfies_required_qualifiers(product, qualifier_contracts):
                 matched.append(product)
             else:
                 surface_rejected.append(
@@ -614,7 +769,7 @@ def filter_products_for_query_plan(
         candidates = matched
     if "comparison_target_excluded_from_requested_category" in plan.normalization_rules:
         matched = filter_products_by_query_relevance(
-            candidates, primary_product_request(plan.raw_query)
+            candidates, primary_product_request(constraint_text)
         )
         matched_ids = {id(product) for product in matched}
         # The relevance helper returns original dict objects for this list.
@@ -665,7 +820,7 @@ def filter_products_for_query_plan(
             if id(product) not in matched_ids
         )
         candidates = matched
-    managed_category = infer_product_category(plan.raw_query)
+    managed_category = infer_product_category(constraint_text)
     if managed_category and candidates and not type_contracts:
         # A Java offer snapshot may intentionally omit human-readable category
         # fields.  In that case absence of the category word in a title is not

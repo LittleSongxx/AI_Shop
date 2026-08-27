@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.server import Settings as FastMCPSettings
 from starlette.responses import JSONResponse
 
@@ -25,6 +25,7 @@ from app.services.evaluation_fault_service import (
     record_fault_events,
 )
 from app.services.java_internal_client import delegated_user_scope
+from app.services.mcp_trusted_context import trusted_turn_context_from_meta
 from app.services.redis_service import redis_service
 from app.services.runtime_identity import (
     current_runtime_identity,
@@ -49,9 +50,7 @@ class EvaluationAwareFastMCP(FastMCP):
 
     async def call_tool(self, name: str, arguments: dict[str, Any]):
         context = self.get_context()
-        capability = mcp_fault_capability_from_meta(
-            context.request_context.meta
-        )
+        capability = mcp_fault_capability_from_meta(context.request_context.meta)
         if not capability:
             return await super().call_tool(name, arguments)
 
@@ -152,7 +151,23 @@ async def search_products(
     excludeProductId: str | None = None,
     requestId: str | None = None,
     runId: str | None = None,
+    ctx: Context | None = None,
 ) -> str:
+    trusted_turn = trusted_turn_context_from_meta(
+        ctx.request_context.meta if ctx is not None else None,
+        tool_name="SEARCH_PRODUCTS",
+        arguments={
+            "userId": userId,
+            "requestId": requestId,
+            "runId": runId,
+        },
+    )
+    logger.info(
+        "mcp_trusted_turn_context_received",
+        tool="SEARCH_PRODUCTS",
+        attached=trusted_turn is not None,
+        user_text_chars=len(trusted_turn.user_text) if trusted_turn else 0,
+    )
     return _text(
         await _run_as_delegated_user(
             userId,
@@ -162,6 +177,7 @@ async def search_products(
                 excludeProductId,
                 request_id=requestId,
                 run_id=runId,
+                trusted_user_text=(trusted_turn.user_text if trusted_turn else None),
             ),
         )
     )

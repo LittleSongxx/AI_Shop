@@ -1,0 +1,22 @@
+{
+  "adjudicatorId": "yang",
+  "aiAssistanceScope": "TEXT_EDITING_AND_RECORDING_ONLY",
+  "aiAssistanceUsed": true,
+  "confirmedAt": "2026-08-27T05:10:49.360Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "externalSignaturePresent": false,
+  "finalUnseenEligible": false,
+  "humanAnnotationClaimAllowed": true,
+  "humanDecisionAuthority": true,
+  "pureHumanUnaidedClaim": false,
+  "rawAttestationTemplateWasNotFullyUpdated": true,
+  "releaseGateEligible": false,
+  "schemaVersion": "aishop-human-approval-ai-assistance-clarification/v3",
+  "source": "PROJECT_OWNER_CONFIRMATION_IN_CURRENT_WORKFLOW",
+  "sourceReviewerIds": [
+    "reviewer-a",
+    "reviewer-b"
+  ],
+  "status": "PROJECT_OWNER_CONFIRMED_HUMAN_ADJUDICATION_AI_ASSISTED_EDITING",
+  "task": "CUSTOMER_SERVICE_V56_ANSWER_QUALITY_ADJUDICATION"
+}

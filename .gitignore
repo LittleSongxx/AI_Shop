@@ -54,6 +54,9 @@ coverage/
 artifacts/
 security/dependency-check-suppression.xml
 
+# Human-review intake inbox (canonical bytes live in evaluation-evidence/intake-archive)
+holdout/
+
 # Frontend local
 **/.vite/
 **/playwright-report/

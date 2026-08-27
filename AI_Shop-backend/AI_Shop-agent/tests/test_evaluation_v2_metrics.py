@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import pytest
 
+from evaluation.adapters.rag import _retrieval_metrics
 from evaluation.core.config import load_suite
 from evaluation.core.gates import evaluate_gates
 from evaluation.core.metrics import (
@@ -22,6 +23,27 @@ def test_standard_ranking_metrics_use_graded_qrels():
     assert recall_at_k(ranking, qrels, 3) == 1.0
     assert reciprocal_rank_at_k(ranking, qrels, 10) == 1.0
     assert 0 < ndcg_at_k(ranking, qrels, 3) < 1
+
+
+def test_rag_ndcg_uses_the_same_multi_fact_candidate_grades_for_ideal_dcg():
+    metrics = _retrieval_metrics(
+        [
+            {"factIds": ["fact-a"]},
+            {"factIds": ["fact-a", "fact-b"]},
+            {"factIds": []},
+        ],
+        ["fact-a", "fact-b"],
+    )
+
+    assert 0 < metrics["retrievalNdcgAt5"] < 1
+    perfect = _retrieval_metrics(
+        [
+            {"factIds": ["fact-a", "fact-b"]},
+            {"factIds": ["fact-a"]},
+        ],
+        ["fact-a", "fact-b"],
+    )
+    assert perfect["retrievalNdcgAt5"] == 1
 
 
 def test_wilson_interval_is_bounded_and_not_fake_certainty():

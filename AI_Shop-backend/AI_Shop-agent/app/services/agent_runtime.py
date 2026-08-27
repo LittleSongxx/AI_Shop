@@ -456,6 +456,7 @@ async def finalize_agent_response(
     rag_evidence_required: bool = False,
     rag_evidence_state: str = "INSUFFICIENT",
     deterministic_clarification: bool = False,
+    deterministic_consult_resolution: bool = False,
     verifier_fallback: str | None = None,
 ) -> None:
     user_id = agent_msg["userId"]
@@ -560,8 +561,13 @@ async def finalize_agent_response(
                 cards_json, forced_biz = await _resolve_product_cards_json(
                     assistant_cards, tool_biz, tools_called, search_tool_hint
                 )
-                if cards_json and is_consult_turn and not _consult_cards_match(
-                    cards_json, consult_card or message_card
+                if (
+                    cards_json
+                    and is_consult_turn
+                    and not deterministic_consult_resolution
+                    and not _consult_cards_match(
+                        cards_json, consult_card or message_card
+                    )
                 ):
                     # A model/tool may widen a property question into a fresh
                     # shelf search.  Showing those cards is worse than asking
@@ -647,6 +653,7 @@ async def finalize_agent_response(
     if (
         is_consult_turn
         and not (consult_card or message_card)
+        and not deterministic_consult_resolution
         and not any(tool in called for tool in ("GET_PRODUCT_DETAIL", "COMPARE_PRODUCTS"))
     ):
         assistant = product_consult_clarification(user_text)

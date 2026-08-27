@@ -1,0 +1,21 @@
+{
+  "attestedAt": null,
+  "custodianIdentity": null,
+  "didNotViewHiddenMaterialsBeforeCompleting": null,
+  "generativeAiProducedOrSuggestedLabels": null,
+  "hiddenMaterials": [
+    "expected labels and automated quality judgments",
+    "the other reviewer's sheet before completion",
+    "adjudication decisions"
+  ],
+  "independentOfDatasetAndModelDevelopment": null,
+  "returnedSheetSha256": "18b707b4f079e0cba35de813270a8afda9c980d41244abaf1c224d152675ff9c",
+  "reviewerId": "reviewer-b",
+  "reviewerIdentity": null,
+  "reviewerIsHuman": null,
+  "schemaVersion": "aishop-human-reviewer-independence-attestation/v1",
+  "signaturesOrExternalReferences": [],
+  "status": "TEMPLATE_NOT_EVIDENCE",
+  "taskId": "answer-quality-v43",
+  "workedIndependentlyFromOtherReviewer": null
+}

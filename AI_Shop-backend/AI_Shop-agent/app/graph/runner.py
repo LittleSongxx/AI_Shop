@@ -25,6 +25,7 @@ from app.services.redis_service import redis_service
 
 logger = structlog.get_logger()
 tracer = get_tracer()
+_SUCCESS_OUTCOMES = frozenset({"ok", "handoff", "human_support"})
 
 
 def _runtime_budget_config() -> BudgetConfig | None:
@@ -66,17 +67,19 @@ async def _should_resume(user_id: str, message_id: int, thread_id: str) -> bool:
 async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = None) -> str:
     """跑完一轮图，返回用户实际看到的结果类型。
 
-    返回值是 outcome 字段：``ok`` / ``cancelled`` / ``llm_error`` / ``graph_error`` / ``budget_exceeded``。
-    Worker 只把 ``ok`` 记成 COMPLETED——llm_error / graph_error 意味着用户收到的是
-    错误文案，绝不应当进成功率（P0-1）。图内异常已经被节点消化成用户可见错误，
-    这里不重抛，避免 Worker 把"用户已收到错误"再当一次可重试的普通异常。
+    返回值是 outcome 字段：``ok`` / ``human_support`` / ``cancelled`` /
+    ``llm_error`` / ``graph_error`` / ``budget_exceeded``。``human_support``
+    表示人工会话已经创建并投递成功，也是成功完成的任务终态；错误文案绝不应
+    进入成功率（P0-1）。图内异常已经被节点消化成用户可见错误，这里不重抛，
+    避免 Worker 把"用户已收到错误"再当一次可重试的普通异常。
 
     Args:
         agent_msg: Agent消息对象
         budget_config: 显式预算配置；None 使用 Settings 中的运行时预算
 
     Returns:
-        执行结果类型：ok / cancelled / llm_error / graph_error / budget_exceeded
+        执行结果类型：ok / human_support / cancelled / llm_error /
+        graph_error / budget_exceeded
     """
 
     user_id = agent_msg["userId"]
@@ -163,7 +166,7 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             episode_service.record_step(
                 "GRAPH_END",
                 node_name="graph",
-                status="OK" if outcome == "ok" else "ERROR",
+                status="OK" if outcome in _SUCCESS_OUTCOMES else "ERROR",
                 output_data={
                     "outcome": outcome,
                     "intent": result.get("intent"),

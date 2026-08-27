@@ -1,0 +1,94 @@
+{
+  "aiAssistanceScope": "TEXT_EDITING_AND_RECORDING_ONLY",
+  "createdAt": "2026-08-27T04:46:16.961Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "finalUnseenEligible": false,
+  "humanDecisionAuthority": true,
+  "normalizationPolicy": "Restore immutable source projection from the validated blank export; preserve returned labels and comment exactly.",
+  "pureHumanUnaidedClaim": false,
+  "releaseGateEligible": false,
+  "reviewers": {
+    "reviewer-a": {
+      "caseCount": 120,
+      "labelsPreservedCount": 120,
+      "manifestSha256": "e2689d2b5492969d18e87c4950f6eee90cc5bcf372056d6e0779b2a2d3e8aa9e",
+      "normalizedPath": "run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827/human-returns-normalized/reviewer-a/reviewer-a.open.jsonl",
+      "normalizedSha256": "d56653c6c4b033474835ad9c475c857aac2c422b63dd8df7c647d13331854d3a",
+      "rawReturnPath": "evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827/returns/reviewer-a/reviewer-a.open.jsonl",
+      "rawReturnSha256": "daf94fb3fe9667e609586d38111c78a8c0c4c666053bdd808ad5cfed330630ac",
+      "restoredImmutableCaseCount": 4,
+      "restoredImmutableCases": [
+        {
+          "caseId": "cs-candidate-v2-098",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        },
+        {
+          "caseId": "cs-candidate-v2-091",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        },
+        {
+          "caseId": "cs-gold-v1-029",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        },
+        {
+          "caseId": "cs-candidate-v2-097",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        }
+      ]
+    },
+    "reviewer-b": {
+      "caseCount": 120,
+      "labelsPreservedCount": 120,
+      "manifestSha256": "f99256d3a8e65644228503b85e8bf499a8efa4f65516a6cab45d9ef7b416c644",
+      "normalizedPath": "run/review-workspaces/customer-service-http-v56-full-v3-knowledge-regressions-20260827/human-returns-normalized/reviewer-b/reviewer-b.open.jsonl",
+      "normalizedSha256": "1e6868ffc80b435974949cfd9a4d6f042dd491dcf97b8ee44d43143e6c0b1bb0",
+      "rawReturnPath": "evaluation-evidence/intake-archive/customer-service-v56-answer-review-round1-returns-human-approved-ai-assisted-20260827/returns/reviewer-b/reviewer-b.open.jsonl",
+      "rawReturnSha256": "7e0e97723c121679083d8f2478b3d69bcbf1884bc899583e59c37d060cdd84bb",
+      "restoredImmutableCaseCount": 4,
+      "restoredImmutableCases": [
+        {
+          "caseId": "cs-gold-v1-029",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        },
+        {
+          "caseId": "cs-candidate-v2-098",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        },
+        {
+          "caseId": "cs-candidate-v2-097",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        },
+        {
+          "caseId": "cs-candidate-v2-091",
+          "fields": [
+            "sourceRefs"
+          ],
+          "reason": "JSON_NUMERIC_REPRESENTATION_ONLY"
+        }
+      ]
+    }
+  },
+  "schemaVersion": "aishop-answer-review-return-normalization/v1",
+  "status": "NORMALIZED_WITH_HUMAN_DECISIONS_PRESERVED"
+}

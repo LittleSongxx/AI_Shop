@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "aishop-human-approved-evaluation-conclusion/v1",
+  "generatedAt": "2026-08-27",
+  "status": "HUMAN_APPROVED_AI_ASSISTED_FINALIZED",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "humanDecisionAuthority": true,
+  "aiAssistedTextAndRecording": true,
+  "pureHumanUnaidedClaim": false,
+  "dataset": {
+    "caseCount": 120,
+    "reviewedLabelPolicyCaseCount": 25,
+    "exactAgreementCaseCount": 20,
+    "adjudicatedCaseCount": 5,
+    "changedCaseCount": 19,
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation/datasets/customer_service/adjudicated/customer-service-human-v2.1-human-approved-ai-assisted.jsonl",
+    "sha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3"
+  },
+  "answerReviewV43Baseline": {
+    "caseCount": 120,
+    "exactAgreementCaseCount": 117,
+    "adjudicatedCaseCount": 3,
+    "metrics": {
+      "answerCorrectness": {"value": 0.891667, "numerator": 107, "denominator": 120, "ci95": [0.823446, 0.935589]},
+      "citationGroundingSupport": {"value": 0.942857, "numerator": 66, "denominator": 70, "ci95": [0.862080, 0.977556]},
+      "handoffAppropriateness": {"value": 0.983333, "numerator": 118, "denominator": 120, "ci95": [0.941264, 0.995417]},
+      "unsafeAnswerRate": {"value": 0.008333, "numerator": 1, "denominator": 120, "ci95": [0.001473, 0.045696]},
+      "jointQualityPassRate": {"value": 0.875000, "numerator": 105, "denominator": 120, "ci95": [0.803971, 0.922765]}
+    },
+    "badcaseCount": 15,
+    "highestRiskCaseId": "cs-candidate-v2-111"
+  },
+  "answerReviewV54Baseline": {
+    "runId": "customer-service-http-v54-full-badcase-fixes-handoff-evidence-20260827",
+    "caseCount": 120,
+    "exactAgreementCaseCount": 112,
+    "adjudicatedCaseCount": 8,
+    "caseAgreementRate": 0.933333,
+    "fieldReliability": {
+      "answerCorrectCohenKappa": 0.275362,
+      "citationSupportCohenKappa": 0.935109,
+      "handoffAndUnsafeKappaPrevalenceLimited": true
+    },
+    "metrics": {
+      "answerCorrectness": {"value": 0.966667, "numerator": 116, "denominator": 120, "ci95": [0.917420, 0.986962]},
+      "citationGroundingSupport": {"value": 0.940299, "numerator": 63, "denominator": 67, "ci95": [0.856305, 0.976541]},
+      "handoffAppropriateness": {"value": 1.0, "numerator": 120, "denominator": 120, "ci95": [0.968981, 1.0]},
+      "unsafeAnswerRate": {"value": 0.008333, "numerator": 1, "denominator": 120, "ci95": [0.001473, 0.045696]},
+      "jointQualityPassRate": {"value": 0.941667, "numerator": 113, "denominator": 120, "ci95": [0.884474, 0.971459]}
+    },
+    "badcaseCount": 7,
+    "badcaseIds": ["cs-gold-v1-036", "cs-gold-v1-048", "cs-candidate-v2-075", "cs-candidate-v2-090", "cs-candidate-v2-092", "cs-candidate-v2-110", "cs-candidate-v2-116"],
+    "highestRiskCaseId": "cs-candidate-v2-110",
+    "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-human-approved-ai-assisted-20260827",
+    "sha256SumsSha256": "de953f60963da428670825c0e8ce7a544b74db2262033aef5fa4f062f1ada985"
+  },
+  "answerReview": {
+    "runId": "customer-service-http-v56-full-v3-knowledge-regressions-20260827",
+    "caseCount": 120,
+    "exactAgreementCaseCount": 118,
+    "adjudicatedCaseCount": 2,
+    "caseAgreementRate": 0.983333,
+    "fieldReliability": {
+      "answerCorrectCohenKappa": 0.0,
+      "citationSupportCohenKappa": 1.0,
+      "handoffCohenKappa": 0.0,
+      "unsafeCohenKappa": null,
+      "prevalenceLimitedFields": ["answerCorrect", "handoffAppropriate", "unsafeAnswer"]
+    },
+    "metrics": {
+      "answerCorrectness": {"value": 1.0, "numerator": 120, "denominator": 120, "ci95": [0.968981, 1.0]},
+      "citationGroundingSupport": {"value": 1.0, "numerator": 67, "denominator": 67, "ci95": [0.945774, 1.0]},
+      "handoffAppropriateness": {"value": 1.0, "numerator": 120, "denominator": 120, "ci95": [0.968981, 1.0]},
+      "unsafeAnswerRate": {"value": 0.0, "numerator": 0, "denominator": 120, "ci95": [0.0, 0.031019]},
+      "jointQualityPassRate": {"value": 1.0, "numerator": 120, "denominator": 120, "ci95": [0.968981, 1.0]}
+    },
+    "badcaseCount": 0,
+    "badcaseIds": [],
+    "evidencePath": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827",
+    "sha256SumsSha256": "b2e7b22768dd5d7a95bef87948c2dd45c3e1740e492dcb3461edd935b4433176",
+    "finalReportSha256": "8ce8c2877107d3aaadfa36dbdd44084828921a5d25389f28e3d802396f063cf4",
+    "normalQualityDenominatorExcluded": true
+  },
+  "pairedKnownSetComparisonV43ToV54": {
+    "scope": "SAME_120_DEVELOPER_VISIBLE_CASES_EXPLORATORY",
+    "answerCorrectnessDeltaPercentagePoints": 7.5,
+    "jointQualityDeltaPercentagePoints": 6.6667,
+    "jointTransitions": {"passToPass": 100, "passToFail": 5, "failToPass": 13, "failToFail": 2},
+    "jointExactMcNemarTwoSidedP": 0.096252,
+    "unseenGeneralizationClaimAllowed": false
+  },
+  "pairedKnownSetComparisonV54ToV56": {
+    "scope": "SAME_120_DEVELOPER_VISIBLE_CASES_EXPLORATORY",
+    "answerCorrectnessDeltaPercentagePoints": 3.3333,
+    "jointQualityDeltaPercentagePoints": 5.8333,
+    "jointTransitions": {"passToPass": 113, "passToFail": 0, "failToPass": 7, "failToFail": 0},
+    "jointExactMcNemarTwoSidedP": 0.015625,
+    "targetedFixAndRepeatedExposure": true,
+    "unseenGeneralizationClaimAllowed": false
+  },
+  "routingRescore": {
+    "intentMacroF1": 1.0,
+    "highRiskIntentRecall": {"value": 1.0, "numerator": 13, "denominator": 13},
+    "handoffRecall": {"value": 1.0, "numerator": 29, "denominator": 29},
+    "criticalHandoffMissRate": {"value": 0.0, "numerator": 0, "denominator": 9},
+    "slotEntitySpanF1": 0.482551,
+    "slotExactMatch": {"value": 0.426471, "numerator": 29, "denominator": 68},
+    "slotRootCauseCounts": {
+      "SLOT_EXTRACTION_GAP": 32,
+      "SLOT_NORMALIZATION_GAP": 6,
+      "GOLD_SCHEMA_EXTENSION_NOT_PRODUCTION_MAPPED": 6
+    }
+  },
+  "validFor": [
+    "VISIBLE_DEVELOPMENT_SET_QUALITY_BASELINE",
+    "ROUTING_AND_HANDOFF_REGRESSION",
+    "FROZEN_ANSWER_HUMAN_SEMANTIC_REVIEW",
+    "BADCASE_DIAGNOSIS"
+  ],
+  "notValidFor": [
+    "EXTERNAL_UNSEEN_GENERALIZATION",
+    "PRODUCTION_SLO",
+    "ONLINE_CSAT_OR_FCR",
+    "PROJECT_WIDE_SINGLE_QUALITY_SCORE"
+  ],
+  "releaseGateEligible": false,
+  "finalUnseenEligible": false
+}

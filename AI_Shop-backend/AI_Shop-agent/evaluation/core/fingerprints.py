@@ -56,12 +56,11 @@ def _source_files() -> list[Path]:
 
 def _knowledge_files() -> list[Path]:
     root = REPO_ROOT / "AI_Shop-backend" / "data"
-    return sorted(
-        [
-            *(root / "demo_knowledge").glob("*.md"),
-            *(root / "demo_knowledge_v2").glob("*.json"),
-        ]
-    )
+    files: list[Path] = []
+    for directory in (root / "demo_knowledge_v2", root / "demo_knowledge_v3"):
+        files.extend(directory.glob("*.md"))
+        files.extend(directory.glob("*.json"))
+    return sorted(files)
 
 
 def _git_facts() -> dict[str, Any]:
@@ -130,7 +129,13 @@ def source_fingerprint() -> dict[str, Any]:
     source_files = _source_files()
     knowledge_files = _knowledge_files()
     provider = provider_configuration()
-    catalog_path = REPO_ROOT / "AI_Shop-backend" / "data" / "demo_knowledge_v2" / "catalog.v2.json"
+    catalog_path = (
+        REPO_ROOT
+        / "AI_Shop-backend"
+        / "data"
+        / "demo_knowledge_v3"
+        / "catalog.v3.json"
+    )
     return {
         "capturedAt": utc_now(),
         "git": _git_facts(),

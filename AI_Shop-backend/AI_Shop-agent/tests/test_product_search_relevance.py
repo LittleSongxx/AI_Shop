@@ -1,6 +1,8 @@
 import pytest
 
 from app.services.product_search_query import (
+    build_product_query_scope,
+    exact_model_surfaces,
     filter_products_by_query_relevance,
     infer_product_category,
     match_terms_for_query,
@@ -111,3 +113,33 @@ def test_hard_exclusion_is_visible_without_claiming_catalog_absence():
     )
     assert "排除：户外款" in msg
     assert "全目录" not in msg
+
+
+def test_no_result_summary_preserves_requested_model_scope():
+    query = "我想买索尼 WH-1000XM6，预算 2000 元"
+
+    message = format_search_tool_message(
+        "索尼",
+        None,
+        [],
+        "constraint_miss",
+        profile={"budgetMax": 2000, "brands": ["索尼"]},
+        constraint_query=query,
+    )
+
+    assert "WH-1000XM6" in message
+    assert "不能据此断言平台无货" in message
+    assert "预算内没有索尼商品" not in message
+    assert "没有索尼商品" not in message
+
+
+def test_query_scope_keeps_model_surface_without_persisting_full_query():
+    query = "我想买索尼 WH-1000XM6，预算 2000 元"
+
+    assert exact_model_surfaces(query) == ("WH-1000XM6",)
+    scope = build_product_query_scope(query)
+
+    assert scope["requestedModels"] == ["WH-1000XM6"]
+    assert scope["modelTokens"] == ["wh1000xm6"]
+    assert scope["budgetMax"] == 2000
+    assert "我想买索尼" not in scope

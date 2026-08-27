@@ -7,6 +7,7 @@ import structlog
 
 from app.constants import (
     ORDER_STATUS_NAMES,
+    ORDER_STATUS_WAIT_PAYMENT,
 )
 from app.exceptions import PendingActionConflict
 from app.services.evidence_refs import (
@@ -14,6 +15,7 @@ from app.services.evidence_refs import (
     after_sales_eligibility_ref,
     negative_lookup_ref,
     order_refs,
+    pending_action_ref,
     product_no_result_ref,
     product_refs,
     product_search_constraint_ref,
@@ -21,7 +23,12 @@ from app.services.evidence_refs import (
 from app.services.java_internal_client import java_internal_client
 from app.services.order_service import order_service
 from app.services.pending_action_service import pending_action_service
-from app.services.shopping_profile_service import shopping_profile_service
+from app.services.product_search_pipeline import required_qualifier_evidence
+from app.services.shopping_profile_service import (
+    extract_profile,
+    merge_profiles,
+    shopping_profile_service,
+)
 from app.services.tool_invoke_result import ToolInvokeResult
 from app.utils.biz_payload import build_action_confirm_payload
 
@@ -100,16 +107,19 @@ def _searchable_product_text(product: dict) -> str:
 
 
 def _search_constraint_evidence(
-    products: list[dict], profile: dict | None
+    products: list[dict],
+    profile: dict | None,
+    *,
+    constraint_query: str | None = None,
 ) -> dict:
-    """Expose a conservative audit of returned candidates and hard exclusions.
+    """Expose a conservative audit of returned candidates and hard constraints.
 
     The catalog filter remains authoritative in the search pipeline.  This
     projection deliberately says what was checked on returned cards; it does
     not claim that an excluded item is absent from the full catalogue.
     """
 
-    profile = profile or {}
+    profile = merge_profiles(profile, extract_profile(constraint_query))
     excluded_brands = [
         str(value).strip()
         for value in profile.get("excludedBrands") or []
@@ -120,7 +130,7 @@ def _search_constraint_evidence(
         for value in profile.get("excludedTerms") or []
         if str(value).strip()
     ]
-    violating_ids: list[str] = []
+    exclusion_violating_ids: list[str] = []
     for product in products:
         product_id = str(
             product.get("product_id")
@@ -137,14 +147,23 @@ def _search_constraint_evidence(
         )
         term_hit = any(str(value).casefold() in text for value in excluded_terms)
         if brand_hit or term_hit:
-            violating_ids.append(product_id)
+            exclusion_violating_ids.append(product_id)
+    qualifier = required_qualifier_evidence(products, constraint_query)
+    qualifier_violating_ids = list(
+        qualifier["unverifiedRequiredQualifierProductIds"]
+    )
+    violating_ids = list(
+        dict.fromkeys([*exclusion_violating_ids, *qualifier_violating_ids])
+    )
     return {
         "type": "HARD_CONSTRAINT_AUDIT",
         "excludedBrands": excluded_brands,
         "excludedTerms": excluded_terms,
         "returnedCandidateCount": len(products),
+        "exclusionViolatingReturnedProductIds": exclusion_violating_ids,
         "violatingReturnedProductIds": violating_ids,
-        "returnedCandidatesSatisfyExclusions": not violating_ids,
+        "returnedCandidatesSatisfyExclusions": not exclusion_violating_ids,
+        **qualifier,
         "catalogAbsenceClaim": False,
     }
 
@@ -154,7 +173,12 @@ def _status_name(status: int | None) -> str:
         return "未知"
     return ORDER_STATUS_NAMES.get(status, str(status))
 
-def _propose_reply(label: str, pending: dict) -> ToolInvokeResult:
+def _propose_reply(
+    label: str,
+    pending: dict,
+    *,
+    source_refs: list[dict] | None = None,
+) -> ToolInvokeResult:
     """Return a server-authored confirmation card and a small model observation.
 
     The action credential is intentionally present in the structured card and
@@ -169,6 +193,10 @@ def _propose_reply(label: str, pending: dict) -> ToolInvokeResult:
             "勿写【成功/失败】）。"
         ),
     )
+    proposal_ref = pending_action_ref(pending)
+    refs = [ref for ref in (source_refs or []) if isinstance(ref, dict)]
+    if proposal_ref is not None:
+        refs.append(proposal_ref)
     return ToolInvokeResult(
         content=(
             f"已生成{label}确认卡片。请确认后提交，"
@@ -177,6 +205,7 @@ def _propose_reply(label: str, pending: dict) -> ToolInvokeResult:
         biz_type="action_confirm",
         biz_data=biz_data,
         assistant_cards=assistant,
+        source_refs=refs,
         contract_data={
             "type": "ACTION_CONFIRM",
             "actionType": pending.get("actionType"),
@@ -593,10 +622,19 @@ async def propose_cancel_order(
             "CANCEL_ORDER",
             user_id,
             params,
-            f"取消订单：订单 {order_id}，实付金额 {order['amount']} 元",
+            (
+                f"取消订单：订单 {order_id}，订单金额 {order['amount']} 元"
+                if status == ORDER_STATUS_WAIT_PAYMENT
+                else f"取消订单：订单 {order_id}，实付金额 {order['amount']} 元"
+            ),
             run_id=run_id,
         )
-        return _propose_reply("取消订单", pending)
+        capability_ref = action_capability_ref(capability)
+        return _propose_reply(
+            "取消订单",
+            pending,
+            source_refs=[*order_refs([order]), *([capability_ref] if capability_ref else [])],
+        )
     except PendingActionConflict as exc:
         return f"【取消订单失败】{exc}"
     except Exception:
@@ -645,7 +683,12 @@ async def propose_confirm_receipt(
             f"确认收货：订单 {order_id}，实付金额 {order['amount']} 元",
             run_id=run_id,
         )
-        return _propose_reply("确认收货", pending)
+        capability_ref = action_capability_ref(capability)
+        return _propose_reply(
+            "确认收货",
+            pending,
+            source_refs=[*order_refs([order]), *([capability_ref] if capability_ref else [])],
+        )
     except PendingActionConflict as exc:
         return f"【确认收货失败】{exc}"
     except Exception:
@@ -750,7 +793,15 @@ async def propose_refund(
             f"退款：订单项 {order_item_id}（{name}），金额 {item['item_amount']} 元",
             run_id=run_id,
         )
-        return _propose_reply("退款", pending)
+        order_with_item = {**order, "items": [item]}
+        return _propose_reply(
+            "退款",
+            pending,
+            source_refs=[
+                *order_refs([order_with_item]),
+                *([eligibility_ref] if eligibility_ref else []),
+            ],
+        )
     except PendingActionConflict as exc:
         return f"【退款失败】{exc}"
     except Exception:
@@ -807,7 +858,12 @@ async def propose_product_review(
             f"提交评价：订单 {order_id}，{star} 星，内容「{_truncate(content)}」",
             run_id=run_id,
         )
-        return _propose_reply("评价", pending)
+        capability_ref = action_capability_ref(capability)
+        return _propose_reply(
+            "评价",
+            pending,
+            source_refs=[*order_refs([order]), *([capability_ref] if capability_ref else [])],
+        )
     except PendingActionConflict as exc:
         return f"【评价失败】{exc}"
     except Exception:
@@ -857,7 +913,12 @@ async def propose_recomment(
             f"提交追评：订单 {order_id}，内容「{_truncate(content)}」",
             run_id=run_id,
         )
-        return _propose_reply("追评", pending)
+        capability_ref = action_capability_ref(capability)
+        return _propose_reply(
+            "追评",
+            pending,
+            source_refs=[*order_refs([order]), *([capability_ref] if capability_ref else [])],
+        )
     except PendingActionConflict as exc:
         return f"【追评失败】{exc}"
     except Exception:
@@ -1000,10 +1061,12 @@ async def tool_search_products(
     exclude_product_id: str | None = None,
     request_id: str | None = None,
     run_id: str | None = None,
+    trusted_user_text: str | None = None,
 ) -> "ToolInvokeResult":
 
     from app.domain.recommendation.contracts import RecommendationRequest
     from app.services.episode_service import current_episode
+    from app.services.product_search_query import build_product_query_scope
     from app.services.product_service import product_service
     from app.services.recommendation_contract_service import build_response
     from app.services.redis_service import redis_service
@@ -1013,10 +1076,12 @@ async def tool_search_products(
 
     if not await redis_service.is_consult_active(user_id):
         consult = None
+    constraint_query = trusted_user_text or keyword or ""
+    query_scope = build_product_query_scope(constraint_query)
     assistant, biz_data, biz_type, products, source = await product_service.search_products(
         user_id,
         keyword,
-        user_text=keyword or "",
+        user_text=constraint_query,
         consult_product=consult,
         exclude_product_id=exclude_product_id,
         request_id=request_id,
@@ -1034,8 +1099,13 @@ async def tool_search_products(
         source,
         profile=effective_profile,
         mission=mission,
+        constraint_query=constraint_query,
     )
-    constraint_evidence = _search_constraint_evidence(products, effective_profile)
+    constraint_evidence = _search_constraint_evidence(
+        products,
+        effective_profile,
+        constraint_query=constraint_query,
+    )
     request_id = str(
         request_id
         or
@@ -1064,6 +1134,7 @@ async def tool_search_products(
                 keyword or "",
                 result_source=source or "constraint_miss",
                 request_id=request_id,
+                query_scope=query_scope,
                 # ``none`` can also mean a provider returned no usable data;
                 # keep that case visible but do not call it authoritative.
                 authoritative=source not in {"", "none"},
@@ -1096,7 +1167,11 @@ async def tool_search_products(
             else "NO_RESULT"
         ),
         fallback_used=source in {"rrf_fallback", "category", "browse", "hot_sale_explicit"},
-        trace={"source": source, "constraintEvidence": constraint_evidence},
+        trace={
+            "source": source,
+            "constraintEvidence": constraint_evidence,
+            "queryScope": query_scope,
+        },
         message=content if not products else None,
     ).model_dump(mode="json", by_alias=True)
     if not products:
@@ -1130,7 +1205,10 @@ async def tool_query_orders(user_id: str, order_id: str | None = None) -> "ToolI
     assistant, biz_data, biz_type = await order_service.query_orders(user_id, order_id or None)
     if assistant == "[]":
         return ToolInvokeResult(
-            content="【订单查询】未找到相关订单。",
+            content=(
+                "【订单查询】本次按当前登录账户查询未返回订单，但这不能证明订单不存在。"
+                "请提供订单号、商品名称或大致下单时间后重试；本次不会取消或修改任何订单。"
+            ),
             biz_type=biz_type,
             source_refs=[
                 negative_lookup_ref(

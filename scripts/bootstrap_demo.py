@@ -20,13 +20,12 @@ import httpx
 import redis
 from dotenv import dotenv_values
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ENV = ROOT / "run" / "runtime.env"
 LOCAL_ENV = ROOT / ".env.local"
 SEED_SQL = ROOT / "AI_Shop-backend" / "data" / "03_smarlect_demo_seed.sql"
-KNOWLEDGE_DIR = ROOT / "AI_Shop-backend" / "data" / "demo_knowledge_v2"
-KNOWLEDGE_CATALOG = KNOWLEDGE_DIR / "catalog.v2.json"
+KNOWLEDGE_DIR = ROOT / "AI_Shop-backend" / "data" / "demo_knowledge_v3"
+KNOWLEDGE_CATALOG = KNOWLEDGE_DIR / "catalog.v3.json"
 
 DEMO_USER_EMAIL = "demo@smarlect.local"
 DEMO_USER_PASSWORD = "Demo1234"
@@ -35,6 +34,7 @@ AI_DEMO_MESSAGE = (
 )
 FAQ_VECTOR_IDS = [f"faq{question_id}" for question_id in range(9001, 9007)]
 KNOWLEDGE_CATALOG_SCHEMA = "aishop-knowledge-catalog/v1"
+KNOWLEDGE_CATALOG_OVERLAY_SCHEMA = "aishop-knowledge-catalog-overlay/v1"
 KNOWLEDGE_VECTOR_INDEX = "aishop_vectorstore"
 KNOWLEDGE_INDEX_SCHEMA_VERSION = 1
 
@@ -79,8 +79,7 @@ def seed_database() -> None:
     result = subprocess.run(
         command,
         input=SEED_SQL.read_bytes(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=False,
     )
     if result.returncode != 0:
@@ -224,7 +223,9 @@ def sync_sign_cache(client: httpx.Client) -> None:
         client.post(
             "/admin-api/signRecord/syncSignDatesFromDb",
             data={
-                "syncEndDate": (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+                "syncEndDate": (datetime.now().astimezone() - timedelta(days=1)).strftime(
+                    "%Y%m%d"
+                )
             },
         ),
         "同步签到日历缓存",
@@ -238,6 +239,35 @@ def document_title(path: Path) -> str:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _catalog_membership_sha(documents: list[dict[str, Any]]) -> str:
+    """Mirror Search's release-membership digest exactly."""
+
+    def value(row: dict[str, Any], camel: str, snake: str) -> Any:
+        return row.get(camel) if row.get(camel) is not None else row.get(snake)
+
+    ordered = sorted(
+        documents,
+        key=lambda row: int(value(row, "documentId", "document_id") or 0),
+    )
+    canonical = "".join(
+        "|".join(
+            str(value(row, camel, snake) or "")
+            for camel, snake in (
+                ("documentId", "document_id"),
+                ("version", "version"),
+                ("sourceName", "source_name"),
+                ("contentHash", "content_hash"),
+                ("domain", "domain"),
+                ("indexSchemaVersion", "index_schema_version"),
+                ("chunkCount", "chunk_count"),
+            )
+        )
+        + "\n"
+        for row in ordered
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _normalized_knowledge_text(value: str) -> str:
@@ -286,16 +316,101 @@ def _markdown_sections(path: Path) -> list[tuple[str, str]]:
     return sections
 
 
+def _repository_catalog_payload(
+    path: Path,
+    *,
+    seen: frozenset[Path] = frozenset(),
+) -> dict[str, Any]:
+    """Resolve a versioned catalog overlay while preserving each source path."""
+
+    resolved = path.resolve()
+    if resolved in seen:
+        raise BootstrapError("知识目录 overlay 存在循环引用")
+    try:
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BootstrapError(f"知识目录不可读取：{exc}") from exc
+    if not isinstance(payload, dict):
+        raise BootstrapError("知识目录必须是 JSON 对象")
+    schema = payload.get("schemaVersion")
+    if schema == KNOWLEDGE_CATALOG_SCHEMA:
+        result = json.loads(json.dumps(payload))
+        for document in result.get("documents") or []:
+            if isinstance(document, dict):
+                document["_repositoryPath"] = str(
+                    (resolved.parent / str(document.get("file") or "")).resolve()
+                )
+        result["_repositoryCatalogPath"] = str(resolved)
+        return result
+    if schema != KNOWLEDGE_CATALOG_OVERLAY_SCHEMA:
+        raise BootstrapError("知识目录 schemaVersion 不受支持")
+
+    extension = str(payload.get("extends") or "").strip()
+    if not extension or Path(extension).is_absolute():
+        raise BootstrapError("知识目录 overlay extends 非法")
+    extension_path = (resolved.parent / extension).resolve()
+    data_root = (ROOT / "AI_Shop-backend" / "data").resolve()
+    try:
+        extension_path.relative_to(data_root)
+    except ValueError as exc:
+        raise BootstrapError("知识目录 overlay extends 越出 data 目录") from exc
+    base = _repository_catalog_payload(
+        extension_path,
+        seen=seen | {resolved},
+    )
+    documents = json.loads(json.dumps(base.get("documents") or []))
+    by_file = {
+        str(document.get("file") or ""): document
+        for document in documents
+        if isinstance(document, dict)
+    }
+    for override in payload.get("sectionOverrides") or []:
+        if not isinstance(override, dict):
+            raise BootstrapError("知识目录 sectionOverrides 必须为对象数组")
+        filename = str(override.get("file") or "")
+        heading = str(override.get("heading") or "")
+        document = by_file.get(filename)
+        section = next(
+            (
+                row
+                for row in (document or {}).get("sections") or []
+                if str(row.get("heading") or "") == heading
+            ),
+            None,
+        )
+        if section is None:
+            raise BootstrapError(f"知识目录 override 目标不存在：{filename}#{heading}")
+        unsupported = set(override) - {"file", "heading", "equivalentRefs"}
+        if unsupported or not isinstance(override.get("equivalentRefs"), list):
+            raise BootstrapError(f"知识目录 override 非法：{filename}#{heading}")
+        section["equivalentRefs"] = list(override["equivalentRefs"])
+    for document in payload.get("documents") or []:
+        if not isinstance(document, dict):
+            raise BootstrapError("知识目录 overlay documents 必须为对象数组")
+        copied = json.loads(json.dumps(document))
+        filename = str(copied.get("file") or "")
+        if not filename or filename in by_file:
+            raise BootstrapError(f"知识目录 overlay 包含重复文件：{filename!r}")
+        copied["_repositoryPath"] = str((resolved.parent / filename).resolve())
+        documents.append(copied)
+        by_file[filename] = copied
+    return {
+        "schemaVersion": KNOWLEDGE_CATALOG_SCHEMA,
+        "catalogVersion": int(payload.get("catalogVersion") or 0),
+        "expectedDocumentCount": int(payload.get("expectedDocumentCount") or 0),
+        "expectedKnowledgeChunkCount": int(
+            payload.get("expectedKnowledgeChunkCount") or 0
+        ),
+        "expectedFaqCount": int(payload.get("expectedFaqCount") or 0),
+        "documents": documents,
+        "_repositoryCatalogPath": str(resolved),
+    }
+
+
 def load_knowledge_catalog(path: Path = KNOWLEDGE_CATALOG) -> dict[str, Any]:
     """Validate the repository knowledge contract before any remote mutation."""
 
-    try:
-        catalog = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise BootstrapError(f"知识目录不可读取：{exc}") from exc
-    if not isinstance(catalog, dict) or catalog.get("schemaVersion") != KNOWLEDGE_CATALOG_SCHEMA:
-        raise BootstrapError("知识目录 schemaVersion 不受支持")
-    knowledge_dir = path.parent
+    catalog = _repository_catalog_payload(path)
     documents = catalog.get("documents")
     expected_documents = int(catalog.get("expectedDocumentCount") or 0)
     expected_chunks = int(catalog.get("expectedKnowledgeChunkCount") or 0)
@@ -306,6 +421,7 @@ def load_knowledge_catalog(path: Path = KNOWLEDGE_CATALOG) -> dict[str, Any]:
         )
 
     expected_files: set[str] = set()
+    expected_files_by_root: dict[Path, set[str]] = {}
     section_refs: set[str] = set()
     fact_locations: dict[str, list[str]] = {}
     section_count = 0
@@ -318,9 +434,10 @@ def load_knowledge_catalog(path: Path = KNOWLEDGE_CATALOG) -> dict[str, Any]:
         if filename in expected_files:
             raise BootstrapError(f"知识目录包含重复文件：{filename}")
         expected_files.add(filename)
-        document_path = knowledge_dir / filename
+        document_path = Path(str(document.get("_repositoryPath") or ""))
         if not document_path.is_file():
             raise BootstrapError(f"知识文档不存在：{filename}")
+        expected_files_by_root.setdefault(document_path.parent, set()).add(filename)
         expected_sha = str(document.get("sha256") or "")
         actual_sha = _sha256(document_path)
         if expected_sha != actual_sha:
@@ -373,12 +490,14 @@ def load_knowledge_catalog(path: Path = KNOWLEDGE_CATALOG) -> dict[str, Any]:
                     raise BootstrapError(f"源码事实来源不存在：{location} -> {source}")
         section_count += len(actual_sections)
 
-    actual_files = {item.name for item in knowledge_dir.glob("*.md")}
-    if actual_files != expected_files:
-        raise BootstrapError(
-            "知识目录与本地 Markdown 文件集合不一致："
-            f"缺少={sorted(expected_files - actual_files)}，多出={sorted(actual_files - expected_files)}"
-        )
+    for root, expected_at_root in expected_files_by_root.items():
+        actual_at_root = {item.name for item in root.glob("*.md")}
+        if actual_at_root != expected_at_root:
+            raise BootstrapError(
+                "知识目录与本地 Markdown 文件集合不一致："
+                f"目录={root}，缺少={sorted(expected_at_root - actual_at_root)}，"
+                f"多出={sorted(actual_at_root - expected_at_root)}"
+            )
     if section_count != expected_chunks:
         raise BootstrapError(
             f"知识切片数不一致：期望 {expected_chunks}，实际 {section_count}"
@@ -425,7 +544,9 @@ def publish_knowledge(
     published = 0
     existing = 0
     for item in contract["documents"]:
-        path = KNOWLEDGE_DIR / str(item["file"])
+        path = Path(str(item.get("_repositoryPath") or ""))
+        if not path.is_file():
+            raise BootstrapError(f"知识文档不存在：{item.get('file')}")
         data = response_data(
             client.post(
                 "/admin-api/knowledge/upload",
@@ -486,6 +607,7 @@ def activate_knowledge_release(
     document_ids: list[int],
     *,
     catalog_path: Path = KNOWLEDGE_CATALOG,
+    membership_catalog_sha256: str | None = None,
 ) -> dict[str, Any]:
     expected_count = int(catalog.get("expectedDocumentCount") or 0)
     unique_ids = list(dict.fromkeys(int(value) for value in document_ids))
@@ -494,9 +616,14 @@ def activate_knowledge_release(
             "知识发布集合文档数不一致："
             f"期望 {expected_count}，实际 {len(unique_ids)}"
         )
-    catalog_sha = _sha256(catalog_path)
+    repository_catalog_sha = _sha256(catalog_path)
+    catalog_sha = str(membership_catalog_sha256 or repository_catalog_sha).lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", catalog_sha):
+        raise BootstrapError("知识发布集合 catalog SHA 非法")
     catalog_version = int(catalog.get("catalogVersion") or 0)
-    release_name = f"demo-knowledge-v{catalog_version}-{catalog_sha[:12]}"
+    release_name = (
+        f"demo-knowledge-v{catalog_version}-{repository_catalog_sha[:12]}"
+    )
     result = response_data(
         client.post(
             "/admin-api/knowledge/activateRelease",
@@ -591,15 +718,22 @@ def wait_for_knowledge_contract(
     """Verify the database release catalog and active ES knowledge snapshot."""
 
     remote = _remote_knowledge_catalog(env)
-    expected_catalog_sha = _sha256(catalog_path)
-    if str(remote.get("catalogSha256") or "").lower() != expected_catalog_sha:
+    repository_catalog_sha = _sha256(catalog_path)
+    documents = remote.get("documents")
+    active_ids = remote.get("activeDocumentIds")
+    if not isinstance(documents, list) or not isinstance(active_ids, list):
+        raise BootstrapError("知识发布目录缺少 documents 或 activeDocumentIds")
+    expected_membership_sha = _catalog_membership_sha(
+        [item for item in documents if isinstance(item, dict)]
+    )
+    if str(remote.get("catalogSha256") or "").lower() != expected_membership_sha:
         raise BootstrapError(
-            "知识发布目录 catalog SHA 不一致："
-            f"期望 {expected_catalog_sha}，实际 {remote.get('catalogSha256')}"
+            "知识发布目录 membership SHA 不一致："
+            f"期望 {expected_membership_sha}，实际 {remote.get('catalogSha256')}"
         )
     expected_release_name = (
         f"demo-knowledge-v{int(catalog.get('catalogVersion') or 0)}-"
-        f"{expected_catalog_sha[:12]}"
+        f"{repository_catalog_sha[:12]}"
     )
     if str(remote.get("releaseName") or "") != expected_release_name:
         raise BootstrapError(
@@ -607,10 +741,6 @@ def wait_for_knowledge_contract(
             f"期望 {expected_release_name}，实际 {remote.get('releaseName')}"
         )
     expected_docs = {str(item["file"]): item for item in catalog["documents"]}
-    documents = remote.get("documents")
-    active_ids = remote.get("activeDocumentIds")
-    if not isinstance(documents, list) or not isinstance(active_ids, list):
-        raise BootstrapError("知识发布目录缺少 documents 或 activeDocumentIds")
     by_source = {
         str(item.get("sourceName") or ""): item
         for item in documents
@@ -788,7 +918,7 @@ def verify_user_features(client: httpx.Client) -> dict[str, int]:
     response_data(
         client.post(
             "/api/sign/getSignCalendar",
-            data={"yearMonth": datetime.now().strftime("%Y%m")},
+            data={"yearMonth": datetime.now().astimezone().strftime("%Y%m")},
         ),
         "检查签到日历",
     )
@@ -921,8 +1051,25 @@ def run(args: argparse.Namespace) -> None:
             admin_client, catalog, document_ids=document_ids
         )
         print(f"      新发布 {published} 份，已存在 {existing} 份")
+        current_catalog = _remote_knowledge_catalog(env)
+        current_documents = current_catalog.get("documents")
+        current_ids = {
+            str(value) for value in current_catalog.get("activeDocumentIds") or []
+        }
+        if not isinstance(current_documents, list) or current_ids != {
+            str(value) for value in document_ids
+        }:
+            raise BootstrapError("逐文档发布后的激活集合与待发布集合不一致")
+        membership_sha = _catalog_membership_sha(
+            [item for item in current_documents if isinstance(item, dict)]
+        )
+        if str(current_catalog.get("catalogSha256") or "").lower() != membership_sha:
+            raise BootstrapError("逐文档发布后的 membership SHA 回读不一致")
         release = activate_knowledge_release(
-            admin_client, catalog, document_ids
+            admin_client,
+            catalog,
+            document_ids,
+            membership_catalog_sha256=membership_sha,
         )
         print(
             "      已激活知识快照 "

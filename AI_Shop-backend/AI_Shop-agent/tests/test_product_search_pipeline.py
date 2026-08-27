@@ -13,7 +13,12 @@ from app.services.product_search_pipeline import (
     merge_ranked_lists,
     product_search_evaluation_scope,
 )
-from app.services.product_search_query import exact_model_tokens
+from app.services.product_search_query import (
+    comparison_target_terms,
+    exact_model_tokens,
+    extract_budget_constraints,
+    parse_budget_number,
+)
 
 
 def test_query_plan_preserves_raw_query_and_adds_normalized_variant():
@@ -33,6 +38,29 @@ def test_query_plan_preserves_raw_query_and_adds_normalized_variant():
     assert plan.constraints.budget_max == 3000
     assert plan.constraints.required_brands == ("华为",)
     assert "managed_taxonomy_additive_variant" in plan.normalization_rules
+
+
+@pytest.mark.parametrize(
+    ("surface", "value"),
+    [
+        ("一千二", 1200.0),
+        ("两千五", 2500.0),
+        ("一千零二", 1002.0),
+        ("十二", 12.0),
+        ("一万二", 12000.0),
+    ],
+)
+def test_parse_budget_number_supports_bounded_chinese_shorthand(surface, value):
+    assert parse_budget_number(surface) == value
+
+
+def test_chinese_budget_is_a_hard_search_constraint():
+    assert extract_budget_constraints("预算一千二，想买个能拍照的手机") == (
+        None,
+        1200.0,
+    )
+    plan = build_product_query_plan("预算一千二，想买个能拍照的手机", None)
+    assert plan.constraints.budget_max == 1200.0
 
 
 def test_runtime_constraints_do_not_use_dataset_gold_fields():
@@ -346,6 +374,55 @@ def test_raw_query_hard_constraints_merge_with_mission_and_keep_string_fields_at
     assert plan.constraints.must_not_terms == ("临期",)
     assert plan.constraints.comparison_targets == ("旺旺雪饼", "可乐")
     assert plan.constraints.comparison_required is True
+    assert plan.retrieval_variants == (
+        "100元以内旺旺雪饼和可乐零食",
+        "旺旺雪饼",
+        "可乐",
+    )
+
+
+@pytest.mark.parametrize(
+    ("query", "targets"),
+    [
+        ("水光唇釉和雾面哑光唇釉有什么不同", ("水光唇釉", "雾面哑光唇釉")),
+        ("净水器和空气净化器分别适合什么场景", ("净水器", "空气净化器")),
+        ("这款 WH-1000XM6 和十周年版主要差在哪", ("wh1000xm6", "十周年版")),
+    ],
+)
+def test_comparison_targets_exclude_question_suffixes(query, targets):
+    assert comparison_target_terms(query) == targets
+
+
+def test_cross_category_comparison_uses_target_union_without_global_category():
+    plan = build_product_query_plan("净水器和空气净化器分别适合什么场景", {})
+
+    assert plan.constraints.category is None
+    assert plan.constraints.comparison_targets == ("净水器", "空气净化器")
+    assert plan.retrieval_variants == (
+        "净水器和空气净化器分别适合什么场景",
+        "净水器",
+        "空气净化器",
+    )
+    assert "heterogeneous_comparison_category_union" in plan.normalization_rules
+
+
+def test_comparison_target_is_not_rejected_by_another_targets_brand_constraint():
+    plan = build_product_query_plan(
+        "100元以内旺旺雪饼和可乐零食",
+        {"hardConstraints": {"requiredBrands": ["旺旺"]}},
+    )
+
+    eligible, rejected = filter_products_by_runtime_constraints(
+        [
+            {"id": "snow", "productName": "旺旺雪饼", "brand": "旺旺", "price": 25},
+            {"id": "cola", "productName": "可口可乐汽水", "brand": "可口可乐", "price": 39},
+            {"id": "other", "productName": "薯片", "brand": "其他", "price": 20},
+        ],
+        plan.constraints,
+    )
+
+    assert [row["id"] for row in eligible] == ["snow", "cola"]
+    assert rejected == [{"productId": "other", "reason": "BRAND_REQUIRED"}]
 
 
 def test_named_snack_comparison_requires_both_targets_and_budget_evidence():
@@ -403,6 +480,35 @@ def test_named_headphone_comparison_tracks_each_target_independently():
     assert reason is None
 
 
+def test_comparison_target_accepts_separately_verified_finish_and_product_type():
+    plan = build_product_query_plan("水光唇釉和雾面哑光唇釉有什么不同", {})
+    eligible, rejected = filter_products_for_query_plan(
+        [
+            {
+                "id": "dual",
+                "productName": "双头唇釉 镜面水光唇蜜 雾面哑光丝绒口红",
+            },
+            {
+                "id": "matte",
+                "productName": "迷你空气唇釉 唇露丝绒雾面哑光口红",
+            },
+            {"id": "unrelated", "productName": "水光保湿面霜"},
+        ],
+        plan,
+    )
+
+    from app.services.product_search_pipeline import comparison_target_coverage
+
+    coverage, complete, reason = comparison_target_coverage(eligible, plan)
+    assert [row["id"] for row in eligible] == ["dual", "matte"]
+    assert rejected == [
+        {"productId": "unrelated", "reason": "COMPARISON_TARGET_MISSING"}
+    ]
+    assert coverage == {"水光唇釉": 1, "雾面哑光唇釉": 2}
+    assert complete is True
+    assert reason is None
+
+
 def test_runtime_surface_contract_keeps_verified_target_product():
     plan = build_product_query_plan("入门民谣琴排除电箱款", {})
 
@@ -412,6 +518,72 @@ def test_runtime_surface_contract_keeps_verified_target_product():
 
     assert [row["id"] for row in eligible] == ["fg800"]
     assert rejected == []
+
+
+def test_android_request_requires_snapshot_backed_operating_system_attribute():
+    plan = build_product_query_plan("不要苹果，推荐安卓手机", {})
+    eligible, rejected = filter_products_for_query_plan(
+        [
+            {
+                "id": "verified-android",
+                "productName": "三星智能手机",
+                "property_values": [
+                    {"propertyName": "操作系统", "propertyValue": "Android 16"}
+                ],
+            },
+            {"id": "unverified-os", "productName": "三星智能手机"},
+            {
+                "id": "marketing-only",
+                "productName": "Android 智能手机",
+                "productDesc": "兼容 Android 生态",
+                "decisionFeatures": [
+                    {
+                        "key": "操作系统",
+                        "value": "Android 16",
+                        "reviewStatus": "PENDING",
+                    }
+                ],
+            },
+            {"id": "iphone", "productName": "Apple iPhone 智能手机"},
+        ],
+        plan,
+    )
+
+    assert [row["id"] for row in eligible] == ["verified-android"]
+    assert {row["productId"]: row["reason"] for row in rejected} == {
+        "unverified-os": "UNVERIFIED_REQUIRED_ATTRIBUTE",
+        "marketing-only": "UNVERIFIED_REQUIRED_ATTRIBUTE",
+        "iphone": "UNVERIFIED_REQUIRED_ATTRIBUTE",
+    }
+
+
+def test_trusted_constraint_query_is_separate_from_model_retrieval_keyword():
+    trusted_text = "不要苹果，推荐安卓手机"
+    plan = build_product_query_plan(
+        "手机",
+        {},
+        constraint_query=trusted_text,
+    )
+
+    assert plan.raw_query == "手机"
+    assert plan.retrieval_variants == ("手机",)
+    assert plan.required_qualifier_ids == ("android-operating-system",)
+    assert plan.public()["trustedConstraintQueryApplied"] is True
+    assert plan.public()["requiredQualifierIds"] == ["android-operating-system"]
+    assert trusted_text not in str(plan.public())
+
+    eligible, rejected = filter_products_for_query_plan(
+        [{"id": "unverified-os", "productName": "三星智能手机"}],
+        plan,
+    )
+
+    assert eligible == []
+    assert rejected == [
+        {
+            "productId": "unverified-os",
+            "reason": "UNVERIFIED_REQUIRED_ATTRIBUTE",
+        }
+    ]
 
 
 def test_negative_category_alias_does_not_create_positive_surface_contract():

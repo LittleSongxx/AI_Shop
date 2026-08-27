@@ -1,0 +1,33 @@
+{
+  "answerReviewStatus": "PENDING_HUMAN_REVIEW",
+  "createdAt": "2026-08-27T01:21:18.921Z",
+  "datasetSha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3",
+  "evidenceRedaction": {
+    "inputCanonicalSha256": "25759b3c71670e5609f18b2e7f3e460eed9f6a1e569982d73d787e4f852800b4",
+    "inputKind": "IN_MEMORY_CAPTURE",
+    "presentation": "REDACTED_REVIEW_SAFE_PROJECTION",
+    "profile": "evaluation.core.redaction/v1",
+    "rawInputPersisted": false
+  },
+  "files": {
+    "badcases.jsonl": {
+      "bytes": 3991,
+      "sha256": "442f352277e9ffe43cddac8b0b1e426ba47bd87e5b1a6cacecd5ba2a5cad39fd"
+    },
+    "report.json": {
+      "bytes": 4039092,
+      "sha256": "9db963055dcfc1d6f311b63c8ee7c14de48f1da0be3aec270440481965c70774"
+    },
+    "report.md": {
+      "bytes": 1922,
+      "sha256": "faf4124d617230a925eb6783de6902c141ba240f8ddd5dc7a9d25aed7b36390e"
+    }
+  },
+  "kind": "customer-service-http",
+  "providerCallsReexecuted": false,
+  "releaseGateEligible": false,
+  "runId": "customer-service-http-v53-badcase-fixes-handoff-evidence-targeted-20260827",
+  "schemaVersion": "aishop-customer-service-http-evidence/v1",
+  "sourceObservationReportSha256": "2325f1c2f9f419f0264b693077dede48b448b9b7686f802fffb136970ef18848",
+  "status": "TARGETED_BADCASE_FIXES_EXECUTED_PENDING_HUMAN_REVIEW"
+}

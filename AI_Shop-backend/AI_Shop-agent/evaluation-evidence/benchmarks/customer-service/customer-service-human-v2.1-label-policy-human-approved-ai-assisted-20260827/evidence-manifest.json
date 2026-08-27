@@ -1,0 +1,84 @@
+{
+  "caseCount": 120,
+  "changedCaseCount": 19,
+  "createdAt": "2026-08-26T17:28:02.156Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "files": {
+    "adjudication.normalized.jsonl": {
+      "bytes": 8129,
+      "sha256": "19873655dacca4a7e054b08138e40273910ef33b5f3fddd0d0cd9ac5979c074a"
+    },
+    "adjudication.returned.jsonl": {
+      "bytes": 8254,
+      "sha256": "96058711dfbeeebd4b4de9c3340a89ee7ed00152b7c59b7e2302cacb05c3775c"
+    },
+    "adjudicator-attestation.returned.json": {
+      "bytes": 800,
+      "sha256": "187760cf96fafa93b7f5ed33dd9cfb164813b36a6962b953640316b85b36071f"
+    },
+    "agreement.json": {
+      "bytes": 8160,
+      "sha256": "1b2ff0bbbd7576c5450eac4e9290088b991b8daba1181a1c2f8d90cd36765c31"
+    },
+    "final-decisions.jsonl": {
+      "bytes": 37822,
+      "sha256": "21f803be728d1dd0693333a98730795b974d97355341360d121844d5a877af18"
+    },
+    "final-report.json": {
+      "bytes": 1473,
+      "sha256": "0f91201e6c96bcec3ca3973ebd275d827051a9cc67ec15e31d176e1dabdd0ad9"
+    },
+    "final-report.md": {
+      "bytes": 486,
+      "sha256": "9baabd33756542193b08251b26aaae90d14193613b843c5a72e4daa926533de9"
+    },
+    "human-approval-clarification.json": {
+      "bytes": 2450,
+      "sha256": "97a1b4aadbe03f1ad4e8564c6fd42705ca3fbc520538393f856ed8bce0899bcb"
+    },
+    "reviews/reviewer-a.sealed.jsonl": {
+      "bytes": 13067,
+      "sha256": "795c27f86c9a79a2780c3f7033450e2c1bb7064ddd825083dc257956ef9f471b"
+    },
+    "reviews/reviewer-a.sealed.jsonl.manifest.json": {
+      "bytes": 2849,
+      "sha256": "4c62ece0af08d92019f3ab323451f0f40d320eabc964f30f7e943e72a3233fe9"
+    },
+    "reviews/reviewer-b.sealed.jsonl": {
+      "bytes": 12698,
+      "sha256": "7a9f295ac9a9e3e2efb6dc12de49f80302d39c21938acea493298ea3a763aafe"
+    },
+    "reviews/reviewer-b.sealed.jsonl.manifest.json": {
+      "bytes": 2849,
+      "sha256": "d9623132a51e82d154f729d47ff1697eb526c030009f178062b793b4064143e7"
+    },
+    "routing-badcases.jsonl": {
+      "bytes": 29791,
+      "sha256": "dd0d345fae1d3ed4e94d34d30da688c1b82e9c287a738a836581d74888e6bd20"
+    },
+    "routing-rescore.json": {
+      "bytes": 190575,
+      "sha256": "f865e9ba3f965b5c660d69bce349b4ed0efa13e9c030f20da9208b23f3a77ab5"
+    },
+    "successor-dataset.jsonl": {
+      "bytes": 114848,
+      "sha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3"
+    },
+    "successor-dataset.manifest.json": {
+      "bytes": 1303,
+      "sha256": "66e85bd43042c3cd9c1dd19c22af9d74ccca140a21720c71d20aa9d48b8e1026"
+    },
+    "taxonomy-contract-v2.1.json": {
+      "bytes": 1935,
+      "sha256": "2149b824d34b583ac843ae31df60ab66673f16febd7b3f705b72cc02d3c177fc"
+    }
+  },
+  "finalUnseenEligible": false,
+  "kind": "customer-service-label-policy-human-approved-review",
+  "releaseGateEligible": false,
+  "reviewedCaseCount": 25,
+  "routingPredictionSourceSha256": "c8efc7d69e4e85f1478c74c6365f749b36842168f8e08cb3f86a2244704498d3",
+  "schemaVersion": "aishop-customer-service-label-policy-final-evidence/v1",
+  "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATED",
+  "successorDatasetSha256": "02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3"
+}

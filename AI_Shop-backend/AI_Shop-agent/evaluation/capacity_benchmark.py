@@ -18,7 +18,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from evaluation.adapters.agent import run_agent_case
+from evaluation.adapters.agent import agent_polling_measurement, run_agent_case
 from evaluation.core.contracts import CaseResult, CaseStatus, EvaluationCase
 from evaluation.core.fingerprints import source_fingerprint
 from evaluation.core.io import (
@@ -42,7 +42,7 @@ CAPACITY_SCHEMA = "aishop-capacity-benchmark/v1"
 CAPACITY_EVIDENCE_SCHEMA = "aishop-capacity-benchmark-evidence/v1"
 DEFAULT_CAPACITY_CASE_IDS = (
     "cs-gold-v1-001",  # deterministic product Search
-    "cs-gold-v1-003",  # product consultation / generation
+    "cs-gold-v1-003",  # deterministic missing-model clarification
     "cs-gold-v1-004",  # deterministic order query
     "cs-gold-v1-028",  # general customer-service answer
 )
@@ -64,6 +64,13 @@ _CAPACITY_PROVIDER_CONTRACTS = {
     # It intentionally does not need an LLM and has no workflow node with which
     # to prove the generic Agent adapter's deterministic-workflow exemption.
     "QUERY_ORDER": ("agent-runtime",),
+}
+_CAPACITY_CASE_PROVIDER_CONTRACTS = {
+    # This deictic attribute question has no selected product/model context.
+    # The production route is a server-authored clarification, so requiring an
+    # LLM call would turn every valid execution into a false capacity failure.
+    # The mixed benchmark still measures a real LLM path through case 028.
+    "cs-gold-v1-003": ("agent-runtime",),
 }
 
 
@@ -122,7 +129,9 @@ def load_capacity_cases(
         expected = row.get("expected") if isinstance(row.get("expected"), Mapping) else {}
         intent = str(expected.get("intent") or "")
         case = build_http_agent_case(row)
-        required = _CAPACITY_PROVIDER_CONTRACTS.get(intent)
+        required = _CAPACITY_CASE_PROVIDER_CONTRACTS.get(
+            str(row["id"])
+        ) or _CAPACITY_PROVIDER_CONTRACTS.get(intent)
         cases.append(replace(case, required_providers=required) if required else case)
     return chosen, cases
 
@@ -648,6 +657,7 @@ async def benchmark_capacity(
                     "idempotencyKey",
                     "traceId",
                 ],
+                "latencyMeasurement": agent_polling_measurement(),
             },
             "preflight": dict(preflight),
             "warmup": warmup_report,
@@ -1028,6 +1038,7 @@ async def benchmark_open_arrival_capacity(
                 "idempotencyKey",
                 "traceId",
             ],
+            "latencyMeasurement": agent_polling_measurement(),
         },
         "preflight": dict(preflight),
         "warmup": warmup_report,
@@ -1039,6 +1050,7 @@ async def benchmark_open_arrival_capacity(
             "Local single-host infrastructure and external Provider conditions; not a production SLO or capacity commitment.",
             "The bounded waiting queue has the same capacity as maxInflight; queue-full arrivals are reported as dropped.",
             "Generator delay, queue delay, service latency, and end-to-end latency are reported separately.",
+            "Client-observed latency includes the bounded evaluator polling and terminal-settle delay declared in configuration.latencyMeasurement.",
             "The fixed read-only case mix is an engineering probe, not production traffic distribution.",
             "Answer content is hashed; semantic quality remains outside this benchmark.",
         ],

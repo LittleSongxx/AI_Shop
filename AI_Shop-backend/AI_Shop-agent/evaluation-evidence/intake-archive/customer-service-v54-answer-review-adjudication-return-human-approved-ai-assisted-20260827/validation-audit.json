@@ -1,0 +1,61 @@
+{
+  "aiAssistedTextOrRecording": true,
+  "claimPureUnaidedHumanAnnotation": false,
+  "createdAt": "2026-08-27T03:03:06.058Z",
+  "evidenceTier": "HUMAN_APPROVED_AI_ASSISTED",
+  "exportedTemplate": {
+    "path": "AI_Shop-backend/AI_Shop-agent/run/review-workspaces/customer-service-http-v54-full-badcase-fixes-label-evidence-rebuilt-20260827/adjudicator-c/adjudication.open.jsonl",
+    "sha256": "5510c759cddf400f1c9aab396760a42ea6e4c635246bab30ff2b897b9e043aa3"
+  },
+  "humanDecisionAuthority": true,
+  "returnZip": {
+    "exactBytesPreserved": true,
+    "path": "holdout/AI-Shop-v54-answer-quality-adjudicator-c-20260827-draft.zip",
+    "sha256": "4664c31755683c674df66fed4cd4173daa8c5aaf06ed9ca99c2409670aeb6eca"
+  },
+  "returnedAdjudication": {
+    "path": "holdout/v54/adjudicator-c/adjudication.open.jsonl",
+    "sha256": "79d18e5eba46883bedf5993a7ee2a19e093398233223663e4c9312b2dea01113"
+  },
+  "returnedAttestation": {
+    "path": "holdout/v54/adjudicator-c/adjudicator-attestation.template.json",
+    "rawDraftFieldsPreserved": true,
+    "sha256": "55f9cca17e20dd378f8a68d31cdc8a576af6a9dc9551c0e8116e120158029bec"
+  },
+  "schemaVersion": "aishop-v54-answer-adjudication-return-intake-audit/v1",
+  "sourcePendingEvidence": {
+    "path": "AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v54-badcase-fixes-answer-review-pending-adjudication-20260827",
+    "sha256SumsSha256": "7cec67328e26fdfb54c2c6763906bd935692e7ad13e308a1685e2d1cb4db533c"
+  },
+  "status": "HUMAN_APPROVED_AI_ASSISTED_ADJUDICATION_ACCEPTED",
+  "validation": {
+    "adjudicatorId": "yang",
+    "caseCount": 8,
+    "caseIds": [
+      "cs-candidate-v2-090",
+      "cs-candidate-v2-092",
+      "cs-candidate-v2-096",
+      "cs-candidate-v2-110",
+      "cs-candidate-v2-116",
+      "cs-gold-v1-026",
+      "cs-gold-v1-036",
+      "cs-gold-v1-048"
+    ],
+    "finalLabelsComplete": true,
+    "frozenFieldChanges": [],
+    "rawAttestationPlaceholdersNotUpdated": [
+      "status",
+      "adjudicatorIdentity",
+      "adjudicatorIsHuman",
+      "independentOfSourceReviewers",
+      "humanRetainedFinalDecisionAuthority",
+      "attestedAt"
+    ],
+    "rawAttestationStatus": "DRAFT_PENDING_HUMAN_CONFIRMATION",
+    "reasonsComplete": true,
+    "sourceReviewerIds": [
+      "reviewer-a",
+      "reviewer-b"
+    ]
+  }
+}

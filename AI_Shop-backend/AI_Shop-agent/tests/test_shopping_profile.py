@@ -36,6 +36,15 @@ def test_extract_profile_parses_budget_brand_category_and_preferences():
     assert profile["features"] == ["续航"]
 
 
+def test_extract_profile_parses_chinese_shorthand_budget():
+    profile = extract_profile("预算一千二，想买个能拍照的手机")
+
+    assert profile["budgetMin"] is None
+    assert profile["budgetMax"] == 1200.0
+    assert profile["category"] == "手机"
+    assert profile["scenarios"] == ["拍照"]
+
+
 def test_extract_profile_prefers_explicit_use_case_over_audience_substrings():
     profile = extract_profile(
         "预算2201元以内，想买荣耀品牌的咖啡机，用于办公室，适合上班族"

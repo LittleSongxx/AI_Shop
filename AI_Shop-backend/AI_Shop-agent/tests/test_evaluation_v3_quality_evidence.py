@@ -196,6 +196,231 @@ def test_direct_handoff_does_not_hide_llm_call_or_orchestration_fallback() -> No
     ) == {}
 
 
+def test_post_resolution_order_handoff_proves_llm_not_applicable() -> None:
+    snapshot = _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "experiment": {
+                    "orderReference": {
+                        "outcome": "NO_MATCH",
+                        "route": "human_handoff",
+                        "dependencyError": False,
+                    }
+                },
+                "steps": [
+                    {
+                        "eventType": "AGENT_POLICY",
+                        "nodeName": "human_handoff",
+                        "status": "OK",
+                        "output": {
+                            "llmSkipped": True,
+                            "reason": "STATE_CONFLICT",
+                        },
+                    },
+                    {
+                        "eventType": "HANDOFF",
+                        "nodeName": "support",
+                        "status": "OK",
+                        "output": {"reason": "STATE_CONFLICT"},
+                    },
+                ],
+            }
+        ]
+    )
+
+    assert snapshot["notApplicable"] is True
+    assert snapshot["notApplicableReason"] == (
+        "deterministic_order_reference_handoff:NO_MATCH"
+    )
+    assert snapshot["workflowEvidence"]["handoffPolicyCount"] == 1
+
+
+def test_order_reference_handoff_requires_policy_and_no_llm_failure() -> None:
+    episode = {
+        "experiment": {
+            "orderReference": {
+                "outcome": "RESOLVED",
+                "route": "human_handoff",
+                "dependencyError": False,
+            }
+        },
+        "steps": [
+            {"eventType": "HANDOFF", "nodeName": "support", "status": "OK"}
+        ],
+    }
+    assert _deterministic_workflow_provider_snapshot([episode]) == {}
+    episode["steps"].extend(
+        [
+            {
+                "eventType": "AGENT_POLICY",
+                "nodeName": "human_handoff",
+                "status": "OK",
+                "output": {"llmSkipped": True, "reason": "STATE_CONFLICT"},
+            },
+            {"eventType": "LLM_CALL", "status": "ERROR"},
+        ]
+    )
+    assert _deterministic_workflow_provider_snapshot([episode]) == {}
+
+
+def test_deterministic_order_reference_clarification_proves_llm_not_applicable() -> None:
+    snapshot = _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "steps": [
+                    {
+                        "eventType": "AGENT_POLICY",
+                        "nodeName": "order_reference",
+                        "status": "OK",
+                        "output": {
+                            "deterministicClarification": True,
+                            "llmSkipped": True,
+                            "llmSkipReason": "missing_order_reference",
+                            "structuredResultFinalized": True,
+                            "sideEffectAllowed": False,
+                        },
+                    },
+                    {
+                        "eventType": "RESPONSE_VERIFIER",
+                        "status": "OK",
+                        "output": {
+                            "clarificationApplied": True,
+                            "verifierPassed": True,
+                            "safeFallbackApplied": False,
+                        },
+                    },
+                ]
+            }
+        ]
+    )
+
+    assert snapshot["notApplicableReason"] == (
+        "deterministic_clarification:missing_order_reference"
+    )
+
+
+@pytest.mark.parametrize(
+    "event_type",
+    [
+        "AUTO_RECEIPT_AFTERSALES_BOUNDARY",
+        "BOUNDED_DISPLAY_TECHNOLOGY_EXPLANATION",
+        "FEEDBACK_ONLY_ACKNOWLEDGEMENT",
+        "NAMED_PRODUCT_COMPARISON",
+        "PAYMENT_PREAUTH_RETRY_GUIDANCE",
+        "PRODUCT_CONSULT_CLARIFICATION",
+        "REFUND_CONDITIONS_EVIDENCE_ANSWER",
+        "PAYMENT_FAILURE_STATE_CLARIFICATION",
+        "PAYMENT_FAILURE_NO_DEDUCTION_GUIDANCE",
+    ],
+)
+def test_deterministic_response_trace_proves_llm_not_applicable(event_type: str) -> None:
+    snapshot = _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "steps": [
+                    {
+                        "eventType": event_type,
+                        "status": "OK",
+                        "output": {"reason": "verified_deterministic_route"},
+                    },
+                    {
+                        "eventType": "AGENT_POLICY",
+                        "status": "OK",
+                        "output": {
+                            "route": "finalize",
+                            "llmSkipped": True,
+                            "llmSkipReason": "verified_deterministic_route",
+                            "structuredResultFinalized": True,
+                            "sideEffectAllowed": False,
+                        },
+                    },
+                    {
+                        "eventType": "RESPONSE_VERIFIER",
+                        "status": "OK",
+                        "output": {
+                            "clarificationApplied": True,
+                            "verifierPassed": True,
+                            "safeFallbackApplied": False,
+                        },
+                    },
+                ]
+            }
+        ]
+    )
+
+    complete, facts = provider_complete(
+        ["llm"], {"llm": {"requests": 0, "failures": 0, **snapshot}}
+    )
+
+    assert snapshot["notApplicableReason"] == f"deterministic_response:{event_type}"
+    assert snapshot["workflowEvidence"]["policyCount"] == 1
+    assert snapshot["workflowEvidence"]["verifierCount"] == 1
+    assert complete == 1
+    assert facts["llm"]["notApplicableValid"] is True
+
+
+def test_deterministic_response_does_not_accept_incomplete_or_unsafe_trace() -> None:
+    response = {
+        "eventType": "PRODUCT_CONSULT_CLARIFICATION",
+        "status": "OK",
+        "output": {"reason": "missing_authoritative_product_identity"},
+    }
+    policy = {
+        "eventType": "AGENT_POLICY",
+        "status": "OK",
+        "output": {
+            "route": "finalize",
+            "llmSkipped": True,
+            "llmSkipReason": "missing_authoritative_product_identity",
+            "structuredResultFinalized": True,
+            "sideEffectAllowed": False,
+        },
+    }
+    verifier = {
+        "eventType": "RESPONSE_VERIFIER",
+        "status": "OK",
+        "output": {
+            "clarificationApplied": True,
+            "verifierPassed": True,
+            "safeFallbackApplied": False,
+        },
+    }
+
+    assert _deterministic_workflow_provider_snapshot(
+        [{"steps": [response, verifier]}]
+    ) == {}
+    assert _deterministic_workflow_provider_snapshot(
+        [{"steps": [response, policy]}]
+    ) == {}
+    assert _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "steps": [
+                    response,
+                    policy,
+                    verifier,
+                    {"eventType": "LLM_CALL", "status": "ERROR"},
+                ]
+            }
+        ]
+    ) == {}
+    assert _deterministic_workflow_provider_snapshot(
+        [
+            {
+                "steps": [
+                    response,
+                    policy,
+                    verifier,
+                    {
+                        "eventType": "ORCHESTRATION_FALLBACK",
+                        "status": "FALLBACK",
+                    },
+                ]
+            }
+        ]
+    ) == {}
+
+
 def test_action_token_extraction_is_scoped_and_shape_validated() -> None:
     token = "act_" + "a" * 32
     assert _find_action_token({"authorization": token}) is None
