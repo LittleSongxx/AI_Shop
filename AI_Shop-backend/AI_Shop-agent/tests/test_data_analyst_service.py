@@ -25,6 +25,7 @@ from app.services.data_analyst_service import (
     _contract_failure,
     _deterministic_narrative,
     _normalize_supply_chain_plan,
+    _quality_disclosures,
     _response_contract_errors,
     _structured_json_llm,
     _supply_chain_disclosures,
@@ -952,6 +953,151 @@ def test_supply_chain_semantic_compiler_rejects_mysql_backslash_escape():
 
 
 @pytest.mark.parametrize(
+    ("branch", "expected_sql"),
+    [
+        (
+            DataAnalysisBranch(
+                branch_id="recommendation-detail",
+                semantic_view="analytics_recommendation_quality_daily",
+                dimensions=["date", "product_id"],
+                metrics=[
+                    "payment_count",
+                    "refund_count",
+                    "return_count",
+                    "negative_review_count",
+                    "support_contact_count",
+                    "repeat_purchase_count",
+                ],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+                order_by=[SemanticOrder(column="date"), SemanticOrder(column="product_id")],
+            ),
+            "SELECT date, product_id, payment_count, refund_count, return_count, "
+            "negative_review_count, support_contact_count, repeat_purchase_count FROM "
+            "analytics_recommendation_quality_daily WHERE date BETWEEN '2026-08-21' AND "
+            "'2026-08-27' ORDER BY date ASC, product_id ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="recommendation-aggregate",
+                semantic_view="analytics_recommendation_quality_daily",
+                dimensions=["product_id"],
+                metrics=["refund_count", "return_count"],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+                order_by=[SemanticOrder(column="product_id")],
+            ),
+            "SELECT product_id, SUM(refund_count) AS refund_count, "
+            "SUM(return_count) AS return_count FROM analytics_recommendation_quality_daily "
+            "WHERE date BETWEEN '2026-08-21' AND '2026-08-27' GROUP BY product_id "
+            "ORDER BY product_id ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="recommendation-or",
+                semantic_view="analytics_recommendation_quality_daily",
+                dimensions=["product_id"],
+                metrics=["negative_review_count", "support_contact_count"],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+                filters=[
+                    SemanticFilter(column="negative_review_count", operator="GT", value=0),
+                    SemanticFilter(column="support_contact_count", operator="GT", value=0),
+                ],
+                order_by=[SemanticOrder(column="product_id")],
+            ),
+            "SELECT product_id, SUM(negative_review_count) AS negative_review_count, "
+            "SUM(support_contact_count) AS support_contact_count FROM "
+            "analytics_recommendation_quality_daily WHERE date BETWEEN '2026-08-21' AND "
+            "'2026-08-27' GROUP BY product_id HAVING SUM(negative_review_count) + "
+            "SUM(support_contact_count) > 0 ORDER BY product_id ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="tool-detail",
+                semantic_view="analytics_tool_quality_daily",
+                dimensions=["date", "agent_id", "tool_name"],
+                metrics=["call_count", "success_count", "failure_count", "avg_latency_ms"],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+                order_by=[
+                    SemanticOrder(column="date"),
+                    SemanticOrder(column="agent_id"),
+                    SemanticOrder(column="tool_name"),
+                ],
+            ),
+            "SELECT date, agent_id, tool_name, call_count, success_count, failure_count, "
+            "avg_latency_ms FROM analytics_tool_quality_daily WHERE date BETWEEN '2026-08-21' "
+            "AND '2026-08-27' ORDER BY date ASC, agent_id ASC, tool_name ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="tool-top",
+                semantic_view="analytics_tool_quality_daily",
+                dimensions=["tool_name"],
+                metrics=["failure_count"],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+                order_by=[
+                    SemanticOrder(column="failure_count", direction="DESC"),
+                    SemanticOrder(column="tool_name"),
+                ],
+                top_k=1,
+            ),
+            "SELECT tool_name, SUM(failure_count) AS failure_count FROM "
+            "analytics_tool_quality_daily WHERE date BETWEEN '2026-08-21' AND '2026-08-27' "
+            "GROUP BY tool_name ORDER BY failure_count DESC, tool_name ASC LIMIT 1",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="tool-aggregate",
+                semantic_view="analytics_tool_quality_daily",
+                dimensions=["tool_name"],
+                metrics=["call_count", "success_count", "failure_count"],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+                order_by=[SemanticOrder(column="tool_name")],
+            ),
+            "SELECT tool_name, SUM(call_count) AS call_count, SUM(success_count) AS "
+            "success_count, SUM(failure_count) AS failure_count FROM analytics_tool_quality_daily "
+            "WHERE date BETWEEN '2026-08-21' AND '2026-08-27' GROUP BY tool_name ORDER BY "
+            "tool_name ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="tool-total",
+                semantic_view="analytics_tool_quality_daily",
+                dimensions=[],
+                metrics=["call_count", "success_count", "failure_count"],
+                start_date=date(2026, 8, 21),
+                end_date=date(2026, 8, 27),
+            ),
+            "SELECT SUM(call_count) AS call_count, SUM(success_count) AS success_count, "
+            "SUM(failure_count) AS failure_count FROM analytics_tool_quality_daily WHERE date "
+            "BETWEEN '2026-08-21' AND '2026-08-27' LIMIT 200",
+        ),
+    ],
+)
+def test_quality_semantic_compiler_is_deterministic(branch, expected_sql):
+    assert _compile_branch_sql(branch) == expected_sql
+
+
+def test_quality_or_equivalent_stays_inside_sql_guard():
+    question = "2026-08-21 到 2026-08-27 哪些商品出现过低分评价或售后联系事件？"
+    plan = _normalize_supply_chain_plan(question, DataAnalysisPlan(), end=date(2026, 8, 27))
+    branch = plan.branches[0]
+    from app.services.sql_guard import validate_sql
+
+    guarded = validate_sql(
+        _compile_branch_sql(branch),
+        expected_view=branch.semantic_view,
+        expected_start_date=branch.start_date,
+        expected_end_date=branch.end_date,
+    )
+    assert guarded.allowed
+
+
+@pytest.mark.parametrize(
     ("question", "expected"),
     [
         (
@@ -1151,6 +1297,72 @@ def test_supply_chain_plan_normalizer_fills_explicit_slots(question, expected):
     assert all(branch.start_date == branch.end_date == date(2026, 8, 27) for branch in plan.branches)
 
 
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        (
+            "列出 2026-08-21 到 2026-08-27 每天每个商品的 VERIFIED 推荐结果事件计数。",
+            [("recommendation_quality", "analytics_recommendation_quality_daily", ["date", "product_id"], [
+                "payment_count", "refund_count", "return_count", "negative_review_count",
+                "support_contact_count", "repeat_purchase_count",
+            ], [], [("date", "ASC"), ("product_id", "ASC")], 200)],
+        ),
+        (
+            "2026-08-21 到 2026-08-27 各商品的 VERIFIED 退款和退货事件数是多少？",
+            [("recommendation_quality", "analytics_recommendation_quality_daily", ["product_id"], ["refund_count", "return_count"], [], [("product_id", "ASC")], 200)],
+        ),
+        (
+            "2026-08-21 到 2026-08-27 哪些商品出现过低分评价或售后联系事件？",
+            [("recommendation_quality", "analytics_recommendation_quality_daily", ["product_id"], ["negative_review_count", "support_contact_count"], [
+                ("negative_review_count", "GT", 0), ("support_contact_count", "GT", 0),
+            ], [("product_id", "ASC")], 200)],
+        ),
+        (
+            "导出 2026-08-21 到 2026-08-27 各商品 VERIFIED 支付与复购事件数。",
+            [("recommendation_quality", "analytics_recommendation_quality_daily", ["product_id"], ["payment_count", "repeat_purchase_count"], [], [("product_id", "ASC")], 200)],
+        ),
+        (
+            "列出 2026-08-21 到 2026-08-27 每天各 Agent 和工具的调用数、成功数、失败数与平均延迟。",
+            [("tool_quality", "analytics_tool_quality_daily", ["date", "agent_id", "tool_name"], ["call_count", "success_count", "failure_count", "avg_latency_ms"], [], [("date", "ASC"), ("agent_id", "ASC"), ("tool_name", "ASC")], 200)],
+        ),
+        (
+            "2026-08-21 到 2026-08-27 哪个工具的失败调用数最多？",
+            [("tool_quality", "analytics_tool_quality_daily", ["tool_name"], ["failure_count"], [], [("failure_count", "DESC"), ("tool_name", "ASC")], 1)],
+        ),
+        (
+            "2026-08-21 到 2026-08-27 各工具的调用数、成功数和失败数是多少？",
+            [("tool_quality", "analytics_tool_quality_daily", ["tool_name"], ["call_count", "success_count", "failure_count"], [], [("tool_name", "ASC")], 200)],
+        ),
+        (
+            "汇总 2026-08-21 到 2026-08-27 的工具调用与 Agent 运行质量；如果 Agent 分支超时，返回工具分支并标记部分完成。",
+            [
+                ("tool_quality", "analytics_tool_quality_daily", [], ["call_count", "success_count", "failure_count"], [], [], 200),
+                ("agent_quality", "analytics_agent_quality_daily", [], ["run_count", "success_count", "failure_count", "human_handoff_count"], [], [], 200),
+            ],
+        ),
+    ],
+)
+def test_quality_plan_normalizer_fills_explicit_slots(question, expected):
+    plan = _normalize_supply_chain_plan(question, DataAnalysisPlan(), end=date(2026, 8, 27))
+    actual = [
+        (
+            branch.branch_id,
+            branch.semantic_view,
+            branch.dimensions,
+            branch.metrics,
+            [(item.column, item.operator, item.value) for item in branch.filters],
+            [(item.column, item.direction) for item in branch.order_by],
+            branch.top_k,
+        )
+        for branch in plan.branches
+    ]
+    assert actual == expected
+    assert all(
+        branch.start_date == date(2026, 8, 21) and branch.end_date == date(2026, 8, 27)
+        for branch in plan.branches
+    )
+
+
 def test_supply_chain_plan_normalizer_removes_duplicate_snapshot_filter():
     plan = DataAnalysisPlan(
         branches=[
@@ -1249,6 +1461,64 @@ def test_supply_chain_disclosures_cover_compiled_semantics(question, expected_fa
     assert statements
 
 
+@pytest.mark.parametrize(
+    ("question", "expected_facts"),
+    [
+        (
+            "列出 2026-08-21 到 2026-08-27 每天每个商品的 VERIFIED 推荐结果事件计数。",
+            {"all VERIFIED result event counts", "VERIFIED event-day attribution"},
+        ),
+        (
+            "2026-08-21 到 2026-08-27 各商品的 VERIFIED 退款和退货事件数是多少？",
+            {"VERIFIED refund events", "VERIFIED return events"},
+        ),
+        (
+            "2026-08-21 到 2026-08-27 哪些商品出现过低分评价或售后联系事件？",
+            {"OR filter", "VERIFIED event-day attribution"},
+        ),
+        (
+            "导出 2026-08-21 到 2026-08-27 各商品 VERIFIED 支付与复购事件数。",
+            {"VERIFIED payment events", "VERIFIED repeat-purchase events", "export requires ANALYTICS_EXPORT"},
+        ),
+        (
+            "2026-08-21 到 2026-08-27 哪个工具的失败调用数最多？",
+            {"technical call status", "top 1", "stable tie-break"},
+        ),
+    ],
+)
+def test_quality_disclosures_cover_compiled_semantics(question, expected_facts):
+    plan = _normalize_supply_chain_plan(question, DataAnalysisPlan(), end=date(2026, 8, 27))
+    facts, statements = _quality_disclosures(plan)
+
+    assert expected_facts.issubset(facts)
+    assert statements
+
+
+def test_quality_disclosures_report_partial_timeout_only_from_observed_branch():
+    question = (
+        "汇总 2026-08-21 到 2026-08-27 的工具调用与 Agent 运行质量；"
+        "如果 Agent 分支超时，返回工具分支并标记部分完成。"
+    )
+    plan = _normalize_supply_chain_plan(question, DataAnalysisPlan(), end=date(2026, 8, 27))
+    facts, _ = _quality_disclosures(
+        plan,
+        result={
+            "completion": "PARTIAL",
+            "branches": [
+                {"branchId": "tool_quality", "status": "SUCCEEDED"},
+                {"branchId": "agent_quality", "status": "QUERY_TIMEOUT"},
+            ],
+        },
+    )
+
+    assert {
+        "tool branch succeeds",
+        "agent branch timeout",
+        "partial completion",
+        "technical status only",
+    }.issubset(facts)
+
+
 @pytest.mark.asyncio
 async def test_supply_chain_compiler_never_calls_free_sql_model(monkeypatch):
     service = DataAnalystService()
@@ -1294,6 +1564,41 @@ async def test_supply_chain_compiler_never_calls_free_sql_model(monkeypatch):
     assert result["sqlSource"] == "DETERMINISTIC_COMPILER"
     assert "stock <= 0" in result["sql"]
     assert "DATA_ANALYST_SQL_COMPILE" in events
+    draft.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_quality_compiler_never_calls_free_sql_model(monkeypatch):
+    service = DataAnalystService()
+    question = "2026-08-21 到 2026-08-27 各工具的调用数、成功数和失败数是多少？"
+    plan = _normalize_supply_chain_plan(question, DataAnalysisPlan(), end=date(2026, 8, 27))
+    draft = AsyncMock(side_effect=AssertionError("covered view must not draft SQL"))
+    monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
+    monkeypatch.setattr(service, "_plan", AsyncMock(return_value=plan))
+    monkeypatch.setattr(service, "_draft_sql", draft)
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._explain_sql", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._execute_sql",
+        AsyncMock(
+            return_value=[
+                {
+                    "tool_name": "inventory",
+                    "call_count": 3,
+                    "success_count": 2,
+                    "failure_count": 1,
+                }
+            ]
+        ),
+    )
+    _stub_episode(monkeypatch)
+
+    result = await service.ask(question, admin_id="admin")
+
+    assert result["outcome"] == "ANSWER"
+    assert result["sqlSource"] == "DETERMINISTIC_COMPILER"
+    assert "SUM(call_count)" in result["sql"]
     draft.assert_not_awaited()
 
 

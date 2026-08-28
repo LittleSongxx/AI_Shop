@@ -35,6 +35,7 @@ from app.services.analytics_result_service import (
     normalize_typed_rows,
 )
 from app.services.analytics_semantic_compiler import (
+    QUALITY_COMPILER_VIEWS,
     SUPPLY_CHAIN_COMPILER_VIEWS,
     SemanticFilter,
     SemanticOrder,
@@ -51,7 +52,7 @@ from app.services.sql_guard import (
 
 _EXPLAIN_VIEW_PRIVILEGE_ERROR = 1345
 _EXPLAIN_VIEW_PRIVILEGE_REASON = "EXPLAIN_UNAVAILABLE_VIEW_PRIVILEGE"
-_DATA_ANALYST_VERSION = "v2-supply-compiler"
+_DATA_ANALYST_VERSION = "v3-quality-compiler"
 
 
 class DataAnalysisBranch(BaseModel):
@@ -155,7 +156,7 @@ def _normalize_supply_chain_plan(
     *,
     end: date,
 ) -> DataAnalysisPlan:
-    """Fill only explicit inventory slots before deterministic compilation."""
+    """Fill high-confidence inventory and quality slots before compilation."""
     text = str(question or "").strip()
 
     def branch(
@@ -166,22 +167,172 @@ def _normalize_supply_chain_plan(
         filters: list[SemanticFilter] | None = None,
         order_by: list[SemanticOrder] | None = None,
         top_k: int = 200,
+        branch_id: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> DataAnalysisBranch:
         return DataAnalysisBranch(
-            branch_id=view.removeprefix("analytics_"),
+            branch_id=branch_id or view.removeprefix("analytics_"),
             purpose=text,
             semantic_view=view,
             metrics=metrics,
             dimensions=dimensions,
-            start_date=end,
-            end_date=end,
+            start_date=start_date or end,
+            end_date=end_date or end,
             filters=filters or [],
             order_by=order_by or [],
             top_k=top_k,
         )
 
+    quality_start, quality_end = end - timedelta(days=6), end
+    date_match = re.search(
+        r"(?P<start>\d{4}-\d{2}-\d{2})\s*(?:到|至|~|～|—)\s*"
+        r"(?P<end>\d{4}-\d{2}-\d{2})",
+        text,
+    )
+    if date_match:
+        try:
+            quality_start = date.fromisoformat(date_match.group("start"))
+            quality_end = date.fromisoformat(date_match.group("end"))
+        except ValueError:
+            quality_start, quality_end = end - timedelta(days=6), end
+
+    def quality_branch(
+        view: str,
+        metrics: list[str],
+        dimensions: list[str],
+        *,
+        branch_id: str,
+        filters: list[SemanticFilter] | None = None,
+        order_by: list[SemanticOrder] | None = None,
+        top_k: int = 200,
+    ) -> DataAnalysisBranch:
+        return branch(
+            view,
+            metrics,
+            dimensions,
+            branch_id=branch_id,
+            filters=filters,
+            order_by=order_by,
+            top_k=top_k,
+            start_date=quality_start,
+            end_date=quality_end,
+        )
+
     branches: list[DataAnalysisBranch] | None = None
-    if (
+    upper = text.upper()
+    if "工具调用与 AGENT 运行质量" in upper and "分支超时" in text:
+        branches = [
+            quality_branch(
+                "analytics_tool_quality_daily",
+                ["call_count", "success_count", "failure_count"],
+                [],
+                branch_id="tool_quality",
+            ),
+            branch(
+                "analytics_agent_quality_daily",
+                ["run_count", "success_count", "failure_count", "human_handoff_count"],
+                [],
+                branch_id="agent_quality",
+                start_date=quality_start,
+                end_date=quality_end,
+            ),
+        ]
+    elif "VERIFIED" in upper and "推荐结果事件" in text and "每天" in text and "商品" in text:
+        branches = [
+            quality_branch(
+                "analytics_recommendation_quality_daily",
+                [
+                    "payment_count",
+                    "refund_count",
+                    "return_count",
+                    "negative_review_count",
+                    "support_contact_count",
+                    "repeat_purchase_count",
+                ],
+                ["date", "product_id"],
+                branch_id="recommendation_quality",
+                order_by=[
+                    SemanticOrder(column="date"),
+                    SemanticOrder(column="product_id"),
+                ],
+            )
+        ]
+    elif "VERIFIED" in upper and "退款" in text and "退货" in text and "商品" in text:
+        branches = [
+            quality_branch(
+                "analytics_recommendation_quality_daily",
+                ["refund_count", "return_count"],
+                ["product_id"],
+                branch_id="recommendation_quality",
+                order_by=[SemanticOrder(column="product_id")],
+            )
+        ]
+    elif "低分评价" in text and "售后联系" in text and "商品" in text:
+        branches = [
+            quality_branch(
+                "analytics_recommendation_quality_daily",
+                ["negative_review_count", "support_contact_count"],
+                ["product_id"],
+                branch_id="recommendation_quality",
+                filters=[
+                    SemanticFilter(
+                        column="negative_review_count", operator="GT", value=0
+                    ),
+                    SemanticFilter(column="support_contact_count", operator="GT", value=0),
+                ],
+                order_by=[SemanticOrder(column="product_id")],
+            )
+        ]
+    elif "导出" in text and "VERIFIED" in upper and "支付" in text and "复购" in text:
+        branches = [
+            quality_branch(
+                "analytics_recommendation_quality_daily",
+                ["payment_count", "repeat_purchase_count"],
+                ["product_id"],
+                branch_id="recommendation_quality",
+                order_by=[SemanticOrder(column="product_id")],
+            )
+        ]
+    elif "平均延迟" in text and "工具" in text and "AGENT" in upper:
+        branches = [
+            quality_branch(
+                "analytics_tool_quality_daily",
+                ["call_count", "success_count", "failure_count", "avg_latency_ms"],
+                ["date", "agent_id", "tool_name"],
+                branch_id="tool_quality",
+                order_by=[
+                    SemanticOrder(column="date"),
+                    SemanticOrder(column="agent_id"),
+                    SemanticOrder(column="tool_name"),
+                ],
+            )
+        ]
+    elif "失败调用数最多" in text and "工具" in text:
+        branches = [
+            quality_branch(
+                "analytics_tool_quality_daily",
+                ["failure_count"],
+                ["tool_name"],
+                branch_id="tool_quality",
+                order_by=[
+                    SemanticOrder(column="failure_count", direction="DESC"),
+                    SemanticOrder(column="tool_name"),
+                ],
+                top_k=1,
+            )
+        ]
+    elif "各工具" in text and "调用数" in text and "成功数" in text and "失败数" in text:
+        branches = [
+            quality_branch(
+                "analytics_tool_quality_daily",
+                ["call_count", "success_count", "failure_count"],
+                ["tool_name"],
+                branch_id="tool_quality",
+                order_by=[SemanticOrder(column="tool_name")],
+            )
+        ]
+    elif (
         "补货建议" in text
         and "库存风险" in text
         and ("两张表" in text or "分别返回" in text)
@@ -1176,6 +1327,90 @@ def _supply_chain_disclosures(plan: DataAnalysisPlan) -> tuple[list[str], list[s
     return list(dict.fromkeys(facts)), list(dict.fromkeys(statements))
 
 
+def _quality_disclosures(
+    plan: DataAnalysisPlan,
+    *,
+    result: dict[str, Any] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Render the narrow, view-specific boundaries for quality event counts."""
+    agent_view = "analytics_agent_quality_daily"
+    branches = [
+        branch
+        for branch in plan.branches
+        if branch.semantic_view in {*QUALITY_COMPILER_VIEWS, agent_view}
+    ]
+    if not branches:
+        return [], []
+
+    facts: list[str] = []
+    statements: list[str] = []
+    if any(branch.semantic_view == agent_view for branch in branches):
+        facts.append("technical status only")
+    snapshots = {
+        str(item.get("branchId")): item
+        for item in (result or {}).get("branches") or []
+        if isinstance(item, dict)
+    }
+    for branch in branches:
+        metrics = set(branch.metrics)
+        if branch.semantic_view == "analytics_recommendation_quality_daily":
+            facts.extend(["event-day attribution", "VERIFIED event-day attribution"])
+            statements.append("推荐结果只按 VERIFIED 事件发生日统计")
+            if metrics == {
+                "payment_count",
+                "refund_count",
+                "return_count",
+                "negative_review_count",
+                "support_contact_count",
+                "repeat_purchase_count",
+            }:
+                facts.append("all VERIFIED result event counts")
+            if "refund_count" in metrics:
+                facts.append("VERIFIED refund events")
+            if "return_count" in metrics:
+                facts.append("VERIFIED return events")
+            if "payment_count" in metrics:
+                facts.append("VERIFIED payment events")
+            if "repeat_purchase_count" in metrics:
+                facts.append("VERIFIED repeat-purchase events")
+            filter_columns = {item.column for item in branch.filters}
+            if filter_columns == {"negative_review_count", "support_contact_count"}:
+                facts.append("OR filter")
+                statements.append("按低分评价或售后联系任一事件筛选商品")
+            if "导出" in branch.purpose:
+                facts.append("export requires ANALYTICS_EXPORT")
+                statements.append("导出需要 ANALYTICS_EXPORT 权限，并沿用冻结结果")
+            continue
+
+        facts.append("technical call status")
+        statements.append("工具质量只反映技术调用状态和延迟，不代表业务层判断")
+        orders = {item.column: item.direction for item in branch.order_by}
+        if (
+            branch.top_k == 1
+            and "failure_count" in metrics
+            and orders.get("failure_count") == "DESC"
+        ):
+            facts.extend(["top 1", "stable tie-break"])
+            statements.append("失败调用数取前 1 项，并列按工具名稳定排序")
+
+        snapshot = snapshots.get(branch.branch_id) or {}
+        if branch.semantic_view == agent_view:
+            continue
+        if snapshot.get("status") in {"SUCCEEDED", "EMPTY_RESULT"}:
+            facts.append("tool branch succeeds")
+
+    agent_failed = any(
+        branch.semantic_view == agent_view
+        and (snapshots.get(branch.branch_id) or {}).get("status")
+        not in {None, "SUCCEEDED", "EMPTY_RESULT"}
+        for branch in branches
+    )
+    if agent_failed or (result or {}).get("completion") == "PARTIAL":
+        facts.extend(["agent branch timeout", "partial completion"])
+        statements.append("Agent 分支超时，已返回成功的工具分支并标记部分完成")
+    return list(dict.fromkeys(facts)), list(dict.fromkeys(statements))
+
+
 class DataAnalystService:
     @staticmethod
     def _validate_plan_dates_and_contract(
@@ -1447,7 +1682,10 @@ class DataAnalystService:
             warnings.append("ANALYTICS_MAX_ROWS_REACHED")
         views = [branch.semantic_view for branch in plan.branches]
         disclosure = disclosure_contract(views)
-        semantic_facts, semantic_disclosures = _supply_chain_disclosures(plan)
+        supply_facts, supply_disclosures = _supply_chain_disclosures(plan)
+        quality_facts, quality_disclosures = _quality_disclosures(plan, result=result)
+        semantic_facts = list(dict.fromkeys([*supply_facts, *quality_facts]))
+        semantic_disclosures = list(dict.fromkeys([*supply_disclosures, *quality_disclosures]))
         periods = list(
             dict.fromkeys(
                 f"{branch.start_date.isoformat()} 至 {branch.end_date.isoformat()}"
@@ -1479,7 +1717,7 @@ class DataAnalystService:
             else ""
         )
         semantic_text = (
-            f"供应链口径：{'；'.join(semantic_disclosures)}。"
+            f"分析口径：{'；'.join(semantic_disclosures)}。"
             if semantic_disclosures
             else ""
         )
@@ -2116,7 +2354,7 @@ class DataAnalystService:
                     "status": reason_code,
                     "reasonCode": reason_code,
                     "answer": (
-                        "该供应链语义计划暂不在确定性编译器支持范围内，已停止执行，"
+                        "该分析语义计划暂不在确定性编译器支持范围内，已停止执行，"
                         "不会回退到自由 SQL。\n"
                         f"{contract['capabilityBoundary']}\n"
                         "本次 no SQL：未执行查询，也未读取分析数据。"

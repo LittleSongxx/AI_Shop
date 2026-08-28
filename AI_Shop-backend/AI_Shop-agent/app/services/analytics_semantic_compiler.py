@@ -11,6 +11,10 @@ from app.services.analytics_catalog import allowed_columns, column_contract, vie
 SUPPLY_CHAIN_COMPILER_VIEWS = frozenset(
     {"analytics_inventory_forecast", "analytics_inventory_risk"}
 )
+QUALITY_COMPILER_VIEWS = frozenset(
+    {"analytics_recommendation_quality_daily", "analytics_tool_quality_daily"}
+)
+DETERMINISTIC_COMPILER_VIEWS = SUPPLY_CHAIN_COMPILER_VIEWS | QUALITY_COMPILER_VIEWS
 
 
 class SemanticFilter(BaseModel):
@@ -95,6 +99,24 @@ def _filter_sql(view: str, item: SemanticFilter) -> str:
     return f"{item.column} {operator} {_literal(view, item.column, item.value)}"
 
 
+def _aggregate_filter_sql(view: str, item: SemanticFilter) -> str:
+    """Render a safe predicate against an additive metric after grouping."""
+    contract = column_contract(view, item.column)
+    if contract.get("aggregation") not in {"SUM", "SNAPSHOT_SUM"}:
+        raise _unsupported()
+    if item.operator == "BETWEEN":
+        if item.value is None or item.second_value is None:
+            raise _unsupported()
+        return (
+            f"SUM({item.column}) BETWEEN {_literal(view, item.column, item.value)} "
+            f"AND {_literal(view, item.column, item.second_value)}"
+        )
+    if item.operator not in {"EQ", "LT", "LTE", "GT", "GTE"} or item.value is None:
+        raise _unsupported()
+    operator = {"EQ": "=", "LT": "<", "LTE": "<=", "GT": ">", "GTE": ">="}[item.operator]
+    return f"SUM({item.column}) {operator} {_literal(view, item.column, item.value)}"
+
+
 def compile_supply_chain_sql(
     *,
     view: str,
@@ -106,8 +128,8 @@ def compile_supply_chain_sql(
     order_by: list[SemanticOrder],
     top_k: int,
 ) -> str | None:
-    """Compile validated inventory plans; return None for the other eight views."""
-    if view not in SUPPLY_CHAIN_COMPILER_VIEWS:
+    """Compile the governed inventory and quality plan subset."""
+    if view not in DETERMINISTIC_COMPILER_VIEWS:
         return None
     if start_date is None or end_date is None or end_date < start_date or not 1 <= top_k <= 200:
         raise _unsupported()
@@ -135,12 +157,18 @@ def compile_supply_chain_sql(
     )
     projections = list(selected_dimensions)
     group_by: list[str] = []
+    detail_query = False
     if risk_level_count:
         projections.append("COUNT(*) AS sku_count")
         group_by = selected_dimensions
     else:
         grain = set(str(item) for item in contract.get("grain") or ()) - {date_column}
-        detail_query = grain.issubset(selected_dimensions)
+        # Snapshot views may omit their snapshot date because it is fixed to
+        # the current snapshot.  Event-quality views, however, must aggregate
+        # across dates whenever ``date`` is not projected.
+        detail_query = grain.issubset(selected_dimensions) and (
+            view not in QUALITY_COMPILER_VIEWS or date_column in selected_dimensions
+        )
         for metric in selected_metrics:
             metric_contract = column_contract(view, metric)
             if not metric_contract or metric_contract.get("aggregation") == "DIMENSION":
@@ -170,10 +198,30 @@ def compile_supply_chain_sql(
     if not projections or len(projections) > 20:
         raise _unsupported()
     predicates = [f"{date_column} BETWEEN '{start_date.isoformat()}' AND '{end_date.isoformat()}'"]
+    metric_filters: list[SemanticFilter] = []
     for item in filters:
         if item.column == date_column:
             raise _unsupported()
-        predicates.append(_filter_sql(view, item))
+        if not detail_query and item.column in selected_metrics:
+            metric_filters.append(item)
+        else:
+            predicates.append(_filter_sql(view, item))
+
+    having: list[str] = []
+    if metric_filters:
+        if (
+            view == "analytics_recommendation_quality_daily"
+            and selected_metrics == ["negative_review_count", "support_contact_count"]
+            and len(metric_filters) == 2
+            and {item.column for item in metric_filters}
+            == {"negative_review_count", "support_contact_count"}
+            and all(item.operator == "GT" and item.value == 0 for item in metric_filters)
+        ):
+            # Both columns are non-negative event counts.  This is equivalent
+            # to the requested OR while keeping the SQL guard's OR ban intact.
+            having.append("SUM(negative_review_count) + SUM(support_contact_count) > 0")
+        else:
+            having.extend(_aggregate_filter_sql(view, item) for item in metric_filters)
 
     selectable = {*selected_dimensions, *selected_metrics}
     if risk_level_count:
@@ -183,11 +231,16 @@ def compile_supply_chain_sql(
         if item.column not in selectable:
             raise _unsupported()
         orders.append((item.column, item.direction))
-    stable_keys = (
-        ("product_id", "property_value_id_hash")
-        if view == "analytics_inventory_risk"
-        else ("product_id", "sku_key")
-    )
+    if view == "analytics_inventory_risk":
+        stable_keys = ("product_id", "property_value_id_hash")
+    elif view == "analytics_inventory_forecast":
+        stable_keys = ("product_id", "sku_key")
+    elif view == "analytics_recommendation_quality_daily":
+        stable_keys = ("product_id",)
+    elif view == "analytics_tool_quality_daily":
+        stable_keys = ("agent_id", "tool_name")
+    else:
+        stable_keys = ()
     if not orders and selected_dimensions == ["risk_level"]:
         orders.append(("risk_level", "ASC"))
     for column in stable_keys:
@@ -197,6 +250,8 @@ def compile_supply_chain_sql(
     sql = f"SELECT {', '.join(projections)} FROM {view} WHERE {' AND '.join(predicates)}"
     if group_by:
         sql += f" GROUP BY {', '.join(group_by)}"
+    if having:
+        sql += " HAVING " + " AND ".join(having)
     if orders:
         sql += " ORDER BY " + ", ".join(f"{column} {direction}" for column, direction in orders)
     return f"{sql} LIMIT {top_k}"
