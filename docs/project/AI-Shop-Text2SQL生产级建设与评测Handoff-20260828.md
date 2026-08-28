@@ -1,14 +1,152 @@
 # AI-Shop Text2SQL V0 建设与评测 Handoff
 
-> 快照日期：2026-08-28（Asia/Shanghai）
+> 快照日期：2026-08-29（Asia/Shanghai；包含 2026-08-28 原始 handoff）
 >
 > 工作区：`/home/song/code/Java/AI_Shop`
 >
 > 当前分支：`dev`
 >
-> 当前 HEAD：`4d3dd0b3c61ebace8354b791e95c89584d563073`
+> Stage B 源码检查点：`3a89ed8`（供应链确定性编译）
 >
-> 重要：本轮 Text2SQL 代码和证据大多仍是未提交工作区内容；不要用 HEAD 代表当前实现。
+> 重要：第 0 节是接手后的最新状态；与后文 2026-08-28 快照冲突时，以第 0 节为准。
+
+## 0. 2026-08-29 接手续更
+
+### 0.1 用户已确认的路线
+
+用户确认 `1A、2A、3A、4A；unseen 暂缓`，随后允许自由调用外部模型并继续推荐方案。落实为：
+
+- 先完成低风险确定性响应合同，再进入 compiler；
+- 采用 hybrid semantic compiler，LLM 只负责结构化 semantic plan；
+- 第一批 compiler 只覆盖供应链 `analytics_inventory_forecast` 和 `analytics_inventory_risk`；
+- 源码、测试、文档按检查点提交，evaluation evidence 单独保存，不混入 Git；
+- 当前 80 条继续只作已见 development regression；新 unseen 暂缓；
+- 不扩大 reader 权限、不修改十视图 DDL、不启动生产部署。
+
+已形成的 Git 检查点：
+
+```text
+eb25e7e feat(text2sql): establish governed analytics runtime
+da17e39 test(text2sql): archive V0 evaluation harness
+25d653f docs(text2sql): record V0 handoff and evidence boundaries
+d8c6c82 feat(text2sql): enforce deterministic response contracts
+3a89ed8 feat(text2sql): compile supply analytics deterministically
+```
+
+### 0.2 Stage A 和第一批 Stage B 已完成
+
+Stage A 已把 DENY、ABSTAIN、CLARIFY 和 ANSWER 的关键响应字段改为确定性合同，并修复 SQL guard 对 sqlglot `AND` 节点的识别。接受的 Stage A 基线是：
+
+```text
+AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/
+post-contract-v0-20260828-run-001
+```
+
+第一批 Stage B 在 `3a89ed8` 完成：
+
+- `DataAnalysisBranch` 增加类型化 `filters`、`order_by`、`top_k`；
+- LLM 仍生成 plan，但 10 个供应链契约由高置信槽位归一化器补齐 view、metric、grain、filter、order、topK 和当前快照日期；
+- 新增 `analytics_semantic_compiler.py`，仅编译 forecast/risk；其他八视图仍走原有受 guard 约束的 LLM SQL；
+- 已覆盖但不受支持的供应链 plan 以 `SEMANTIC_PLAN_UNSUPPORTED`、no-SQL ABSTAIN 失败关闭，禁止回退自由 SQL；
+- compiler 只接受 catalog 字段和类型化操作符，固定稳定 tie-break，拒绝 MySQL 反斜杠/控制字符文本 filter；
+- 供应链 required facts 和口径说明由 plan 确定性渲染，不让模型自由补写关键边界；
+- 显式“分别返回两张表、不做跨视图 Join”不再被 Join abstain 规则误伤；
+- query trace 增加 `sqlSource=DETERMINISTIC_COMPILER`；运行版本更新为 `v2-supply-compiler`；
+- Java 下载接口先复制只读 upstream headers，再设置 JSON content type 和 disposition，修复成功导出被 `UnsupportedOperationException` 包装成空 `data` 的问题；
+- input freeze 已纳入 compiler 和 policy 源码，最终证据能绑定实际执行实现。
+
+### 0.3 最终 80×3 development regression
+
+与最终源码对应、SHA-256 全包校验通过的主证据是：
+
+```text
+AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/
+post-compiler-v0-20260829-run-002
+```
+
+`post-compiler-v0-20260829-run-001` 是加入最后一条 MySQL 文本字面量失败关闭前的中间证据，保持不可变，但不作为最终源码主结论。
+
+相对 Stage A `post-contract-v0-20260828-run-001`，canonical trial 变化如下：
+
+| 指标 | Stage A | Stage B run-002 | 变化 |
+|---|---:|---:|---:|
+| outcome | 66/80 | 76/80 | +10 |
+| trusted request | 24/80 | 35/80 | +11 |
+| completion | 64/80 | 75/80 | +11 |
+| plan | 25/48 | 35/48 | +10 |
+| execution | 32/48 | 43/48 | +11 |
+| denotation | 19/48 | 28/48 | +9 |
+| narrative | 17/80 | 27/80 | +10 |
+| flow | 15/32 | 23/32 | +8 |
+| infrastructure failures | 8 | 2 | -6 |
+| severe security failures | 0 | 0 | 持平 |
+
+三轮合计 trusted request 从 `73/240` 提升到 `108/240`，flow 从 `42/96` 提升到 `71/96`，infrastructure failures 从 `27` 降到 `9`；这些是已见集回归数据，不是 unseen 或生产准确率。
+
+本轮目标供应链切片结果是稳定的：
+
+| 供应链 019–028，三轮合计 | Stage A | Stage B run-002 |
+|---|---:|---:|
+| trusted request | 0/30 | 30/30 |
+| outcome | 13/30 | 30/30 |
+| plan | 13/30 | 30/30 |
+| execution | 8/30 | 30/30 |
+| denotation | 8/30 | 30/30 |
+| narrative | 0/30 | 30/30 |
+| flow | 19/30 | 30/30 |
+| infrastructure / severe security | 0 / 0 | 0 / 0 |
+
+30 个请求实际产生 33 个分支（双表 case 每轮两个分支），全部记录为 `DETERMINISTIC_COMPILER`。两个供应链视图在 manifest 中也分别为 `15/15 trusted`。
+
+全量 canonical 仍只有 `35/80 trusted`，且三轮全量 trusted 为 `108/240`。非 compiler 视图仍受模型计划、自由 SQL 和叙述波动影响；例如 run-002 相对 Stage A 的 canonical trusted 有 12 例改善、1 例回退，不能把整体增量全部归因于 compiler。最终边界保持：
+
+```text
+development=true
+provisional=true
+unseen=false
+releaseGateEligible=false
+```
+
+### 0.4 最终验证与运行状态
+
+最终源码验证：
+
+- Python 相关回归：`172 passed, 2 deselected`；
+- 相关 ruff：通过；
+- Java `AgentMessageControllerDataAnalystTest`：通过；
+- 真实 MySQL 8.4.11 十视图可读、源表/写操作/跨库读取拒绝：通过；
+- run-002 `SHA256SUMS`：全部通过；
+- `git diff --check`：通过；
+- 定向外部模型诊断验证供应链 `10/10 trusted`，正式 run-002 验证三轮 `30/30 trusted`；
+- Text2SQL Agent/Admin 隔离进程和 MySQL/Redis fixture 已停止。
+
+仓库级 Python 全量测试此前仍有 7 个失败，原因仅是未提供既有私有 Search/RAG holdout：
+
+```text
+AI_Shop-backend/AI_Shop-agent/evaluation/.holdouts/
+final-holdout-20260822-ai-quality-v9.jsonl
+```
+
+unseen 已明确暂缓，不得伪造该文件或把相关测试宣称为通过。
+
+### 0.5 当前工作区边界和下一步
+
+`3a89ed8` 之后，仍应排除以下不属于本检查点的 dirty 内容：
+
+- 根目录历史中文面试文档的 tracked deletion；
+- `AI_Shop-backend/AI_Shop-agent/.privacy-exports/`；
+- `AI_Shop-backend/evaluation-evidence/`（证据独立保存，不进入 Git）；
+- 根目录 `adjudication.open.jsonl`、`answer-review.completed-a.jsonl`、`answer-review.completed-b.jsonl`。
+
+不要 reset、clean、恢复或顺手提交上述内容。
+
+下一技术阶段仍需在以下方向间选定优先级：
+
+- 推荐：继续把 `analytics_recommendation_quality_daily` 与 `analytics_tool_quality_daily` 纳入确定性 compiler；两者 run-002 canonical trusted 均为 `0`，且能复用 ratio、NULL、分组、排序等编译规则；
+- 备选：先治理非供应链 plan schema 失败和 `DATA_ANALYST_COLUMN_INVALID`，收益面更广，但仍保留自由 SQL，正确性上界较低；
+- 备选：先做 deterministic answer renderer 全视图扩展，能改善 narrative，但不会修复错误 SQL/denotation。
+
+unseen 继续暂缓；任何新视图 compiler、正式门槛、业务 DDL 或 reader 权限变化都应生成新证据目录，不得覆盖 run-002。
 
 ## 1. 新 Codex 先读什么
 
