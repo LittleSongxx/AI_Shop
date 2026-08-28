@@ -29,7 +29,7 @@ from app.services.analytics_clarification_service import analytics_clarification
 from app.services.analytics_export_service import analytics_export_service
 from app.services.analytics_result_service import AnalyticsResultError, analytics_result_service
 from app.services.badcase_service import badcase_service
-from app.services.data_analyst_service import data_analyst_service
+from app.services.data_analyst_service import analytics_no_query_contract, data_analyst_service
 from app.services.episode_query_service import episode_query_service
 from app.services.episode_review_service import episode_review_service
 from app.services.evaluation_fault_service import (
@@ -191,6 +191,14 @@ def _analytics_exception_response(
         "answer": str(exc),
         "requestId": request_id,
     }
+    if denied:
+        payload.update(
+            analytics_no_query_contract(
+                "HTTP 403",
+                "结构化 reasonCode",
+                "关联 run/request ID",
+            )
+        )
     response = error(exc.http_status, str(exc)).model_copy(update={"data": payload})
     return JSONResponse(
         status_code=exc.http_status,

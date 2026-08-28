@@ -10,6 +10,7 @@ class PolicyDecision:
     reason_code: str
     answer: str
     http_status: int
+    required_fact: str | None = None
 
 
 _DENY_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -60,7 +61,7 @@ _ABSTAIN_RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
     (
         re.compile(r"审计确认收入|结算收入|正式财务"),
         "FINANCIAL_METRIC_UNVERIFIED",
-        "净支付额是暂定运营口径，不是审计或结算收入。",
+        "当前目录只提供暂定运营金额口径，无法给出正式财务确认结论。",
     ),
     (
         re.compile(r"历史库存|(?:过去|历史).*(?:SKU|库存).*(?:快照|数量)?"),
@@ -70,7 +71,7 @@ _ABSTAIN_RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
     (
         re.compile(r"(?i)confidence.*(?:概率|缺货)|缺货.*概率"),
         "PROBABILITY_UNAVAILABLE",
-        "confidence 只是有效销售日数据覆盖度，不是缺货概率。",
+        "confidence 只是有效销售日数据覆盖度，不是概率，也不能解释为缺货风险。",
     ),
     (
         re.compile(r"(?i)\bjoin\b|售罄率"),
@@ -80,7 +81,7 @@ _ABSTAIN_RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
     (
         re.compile(r"预测.*(?:销售收入|全站收入|销售额)"),
         "FORECAST_METRIC_UNAVAILABLE",
-        "现有目录没有销售收入预测指标。",
+        "现有目录没有销售预测指标，也不能推导未来收入。",
     ),
     (
         re.compile(r"移动平均|滑动平均|窗口函数"),
@@ -93,6 +94,10 @@ _ABSTAIN_RULES: tuple[tuple[re.Pattern[str], str, str], ...] = (
         "当前履约视图按订单创建日聚合当前状态，没有发货事件时间。",
     ),
 )
+
+_ABSTAIN_REQUIRED_FACTS = {
+    "FINANCIAL_METRIC_UNVERIFIED": "净支付额是暂定运营口径，不是审计或结算收入",
+}
 
 
 def evaluate_question_policy(question: str, *, tenant_id: str | None) -> PolicyDecision | None:
@@ -120,5 +125,6 @@ def evaluate_question_policy(question: str, *, tenant_id: str | None) -> PolicyD
                 reason_code=reason_code,
                 answer=answer,
                 http_status=200,
+                required_fact=_ABSTAIN_REQUIRED_FACTS.get(reason_code, answer.rstrip("。")),
             )
     return None

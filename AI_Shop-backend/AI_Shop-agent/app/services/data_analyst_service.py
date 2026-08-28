@@ -7,8 +7,10 @@ import re
 import time
 import uuid
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from numbers import Number
 from typing import Any, Iterable, Literal
+from zoneinfo import ZoneInfo
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -19,6 +21,7 @@ from app.observability.llm_metrics import invoke_llm_with_metrics
 from app.services.analytics_catalog import (
     CATALOG,
     CATALOG_CONTENT_SHA256,
+    CATALOG_TIMEZONE,
     CATALOG_VERSION,
     allowed_plan_fields,
     catalog_prompt,
@@ -123,18 +126,500 @@ class DataNarrative(BaseModel):
 
 
 _AMBIGUOUS_SALES = re.compile(r"(销量最高|最畅销|最好卖|销售最好|卖(?:得|的)?最好)")
-_EXPLICIT_SALES_METRIC = re.compile(r"(销售额|金额|件数|数量|订单数|订单量)")
+_EXPLICIT_SALES_METRIC = re.compile(
+    r"(销售额|金额|件数|数量|订单数|订单量|paid_units|gross_item_amount|paid_order_count)"
+)
 _CAUSAL_QUESTION = re.compile(r"(为什么|原因|导致|归因|怎么下降|为何|影响因素)")
 _CAUSAL_CAUTION = "相关性不等于因果关系；以下结果只用于定位待验证假设。"
 _DEFAULT_ANALYTICS_PAGE_SIZE = 50
+
+
+def _catalog_clarification_option(
+    choice_id: str,
+    label: str,
+    answer_suffix: str,
+    *,
+    view: str,
+    fields: tuple[str, ...],
+) -> ClarificationOption:
+    if view not in CATALOG or not set(fields).issubset(allowed_plan_fields(view)):
+        raise RuntimeError(f"invalid catalog clarification option: {choice_id}")
+    return ClarificationOption(
+        choice_id=choice_id,
+        label=label,
+        answer_suffix=answer_suffix,
+    )
+
+
+def _catalog_clarification(question: str, end: date) -> DataAnalysisPlan | None:
+    """Return stable choices whose fields are all present in the governed catalog."""
+    normalized = str(question or "").strip()
+    if "（已确认：" in normalized:
+        return None
+    start_7 = end - timedelta(days=6)
+    start_28 = end - timedelta(days=27)
+    day_7 = f"{start_7.isoformat()} 至 {end.isoformat()}"
+    day_28 = f"{start_28.isoformat()} 至 {end.isoformat()}"
+
+    if _AMBIGUOUS_SALES.search(normalized) and not _EXPLICIT_SALES_METRIC.search(normalized):
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“最近”和“最好卖”分别按哪个时间范围与指标定义？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_PAID_UNITS",
+                    "最近 7 天按支付件数",
+                    f"按 {day_7} 的 paid_units 排序，返回前 10 个商品。",
+                    view="analytics_product_sales_daily",
+                    fields=("product_id", "paid_units"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_28D_PAID_UNITS",
+                    "最近 28 天按支付件数",
+                    f"按 {day_28} 的 paid_units 排序，返回前 10 个商品。",
+                    view="analytics_product_sales_daily",
+                    fields=("product_id", "paid_units"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_GROSS_ITEM_AMOUNT",
+                    "最近 7 天按商品行金额",
+                    f"按 {day_7} 的 gross_item_amount 排序，返回前 10 个商品。",
+                    view="analytics_product_sales_daily",
+                    fields=("product_id", "gross_item_amount"),
+                ),
+            ],
+            interpretation="商品销售排名的时间范围和指标存在歧义",
+        )
+
+    if re.fullmatch(r"销售最近(?:怎么样|如何|情况如何)[。！？!?]?", normalized):
+        fields = (
+            "date",
+            "paid_order_count",
+            "gross_paid_amount",
+            "completed_refund_amount",
+            "net_paid_amount",
+        )
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="你希望按哪种时间范围和粒度查看哪些销售运营指标？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_DAILY_CORE",
+                    "最近 7 天逐日核心指标",
+                    f"列出 {day_7} 每日支付订单数、支付总额、已完成退款额和净支付额。",
+                    view="analytics_sales_daily",
+                    fields=fields,
+                ),
+                _catalog_clarification_option(
+                    "LAST_28D_TOTAL_CORE",
+                    "最近 28 天核心指标汇总",
+                    f"汇总 {day_28} 的支付订单数、支付总额、已完成退款额和净支付额。",
+                    view="analytics_sales_daily",
+                    fields=fields[1:],
+                ),
+            ],
+            interpretation="销售运营指标的时间范围和粒度存在歧义",
+        )
+
+    if re.fullmatch(r"(?:看一下)?库存(?:有问题|异常|有风险)的商品[。！？!?]?", normalized):
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“库存有问题”具体指当前缺货、当前低库存，还是人工补货建议？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "CURRENT_OUT_OF_STOCK",
+                    "仅当前缺货 SKU",
+                    f"按 {end.isoformat()} 当前快照列出 stock<=0 的 SKU。",
+                    view="analytics_inventory_risk",
+                    fields=("snapshot_date", "stock", "risk_level"),
+                ),
+                _catalog_clarification_option(
+                    "CURRENT_LOW_AND_OUT",
+                    "低库存及缺货 SKU",
+                    f"按 {end.isoformat()} 当前快照列出 stock<=10 的 SKU，并区分 OUT_OF_STOCK 与 LOW_STOCK。",
+                    view="analytics_inventory_risk",
+                    fields=("snapshot_date", "stock", "risk_level"),
+                ),
+                _catalog_clarification_option(
+                    "REPLENISHMENT_SUGGESTED",
+                    "人工补货建议",
+                    f"按 {end.isoformat()} 预测快照列出 suggested_replenish_quantity>0 的 SKU，并说明它是人工建议、不是采购指令。",
+                    view="analytics_inventory_forecast",
+                    fields=("snapshot_date", "suggested_replenish_quantity"),
+                ),
+            ],
+            interpretation="库存风险与补货建议属于不同受治理口径",
+        )
+
+    if re.fullmatch(r"哪个推荐渠道(?:效果|表现)最好[。！？!?]?", normalized):
+        view = "analytics_recommendation_funnel_daily"
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“效果最好”希望按哪项 VERIFIED 事件日指标比较检索模式？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_CLICK_RATE",
+                    "最近 7 天事件日点击比率",
+                    f"按 {day_7} 汇总后的 click_through_rate 比较 retrieval_mode。",
+                    view=view,
+                    fields=("retrieval_mode", "click_through_rate"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_PAYMENT_RATE",
+                    "最近 7 天事件日支付比率",
+                    f"按 {day_7} 汇总后的 payment_rate 比较 retrieval_mode。",
+                    view=view,
+                    fields=("retrieval_mode", "payment_rate"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_PAYMENT_COUNT",
+                    "最近 7 天支付事件数",
+                    f"按 {day_7} 的 VERIFIED payment_count 比较 retrieval_mode。",
+                    view=view,
+                    fields=("retrieval_mode", "payment_count"),
+                ),
+            ],
+            interpretation="推荐渠道效果指标存在歧义",
+        )
+
+    if re.fullmatch(r"(?i)哪个\s*agent\s*(?:表现)?最差[。！？!?]?", normalized):
+        view = "analytics_agent_quality_daily"
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“表现最差”希望按哪项技术运行指标比较 Agent？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_FAILURE_COUNT",
+                    "最近 7 天失败运行数",
+                    f"按 {day_7} 的 failure_count 降序比较 Agent。",
+                    view=view,
+                    fields=("agent_id", "failure_count"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_FAILURE_RATE",
+                    "最近 7 天失败运行比率",
+                    f"按 {day_7} 的 SUM(failure_count)/SUM(run_count) 降序比较 Agent。",
+                    view=view,
+                    fields=("agent_id", "failure_count", "run_count"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_LATENCY",
+                    "最近 7 天加权平均延迟",
+                    f"按 {day_7} 以 run_count 加权的 avg_latency_ms 降序比较 Agent。",
+                    view=view,
+                    fields=("agent_id", "run_count", "avg_latency_ms"),
+                ),
+            ],
+            interpretation="Agent 技术质量指标存在歧义",
+        )
+
+    if re.fullmatch(r"(?:汇总一下|看一下|分析一下)?退款情况[。！？!?]?", normalized):
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="你希望按哪种退款口径和粒度汇总？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_COMPLETED_REFUND_TOTAL",
+                    "最近 7 天完成退款总量",
+                    f"汇总 {day_7} 按退款完成日归属的完成退款单数与金额。",
+                    view="analytics_fulfillment_after_sales_daily",
+                    fields=("refund_completed_count", "refund_completed_amount"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_REQUEST_AND_COMPLETION",
+                    "最近 7 天申请与完成流程",
+                    f"汇总 {day_7} 按视图混合日期口径的退款申请数、完成数与完成金额。",
+                    view="analytics_fulfillment_after_sales_daily",
+                    fields=(
+                        "refund_request_count",
+                        "refund_completed_count",
+                        "refund_completed_amount",
+                    ),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_PRODUCT_REFUNDED_UNITS",
+                    "最近 7 天各商品退款件数",
+                    f"按商品汇总 {day_7} 按退款完成日归属的 refunded_units。",
+                    view="analytics_product_sales_daily",
+                    fields=("product_id", "refunded_units"),
+                ),
+            ],
+            interpretation="退款日期归属和汇总粒度存在歧义",
+        )
+
+    if re.fullmatch(r"最近履约情况(?:怎么样|如何)?[。！？!?]?", normalized):
+        view = "analytics_fulfillment_after_sales_daily"
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“最近履约情况”希望看哪段期间及哪组指标？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_ORDER_STATUS",
+                    "最近 7 天订单状态计数",
+                    f"列出 {day_7} 按订单创建日归属的支付、已发货、已完成和取消订单数。",
+                    view=view,
+                    fields=(
+                        "date",
+                        "paid_order_count",
+                        "shipped_order_count",
+                        "completed_order_count",
+                        "cancelled_order_count",
+                    ),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_AFTER_SALES",
+                    "最近 7 天售后退款",
+                    f"列出 {day_7} 的退款申请数、退款完成数与退款完成金额，并披露混合日期归属。",
+                    view=view,
+                    fields=(
+                        "date",
+                        "refund_request_count",
+                        "refund_completed_count",
+                        "refund_completed_amount",
+                    ),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_FULL_VIEW",
+                    "最近 7 天履约售后全量",
+                    f"列出 {day_7} 履约售后视图的全部计数和退款完成金额。",
+                    view=view,
+                    fields=tuple(allowed_plan_fields(view)),
+                ),
+            ],
+            interpretation="履约与售后指标组存在歧义",
+        )
+
+    if re.fullmatch(r"报价最好的商品是哪个[。！？!?]?", normalized):
+        view = "analytics_offer_quality_daily"
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“报价最好”希望按哪项报价快照指标比较商品？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LOWEST_ESTIMATED_PAYABLE",
+                    "平均估算到手价最低",
+                    f"按 {day_7} 以 quote_count 加权的 avg_estimated_payable 升序比较商品。",
+                    view=view,
+                    fields=("product_id", "quote_count", "avg_estimated_payable"),
+                ),
+                _catalog_clarification_option(
+                    "MOST_COUPON_AVAILABLE",
+                    "可用优惠快照数最多",
+                    f"按 {day_7} 的 coupon_available_count 降序比较商品。",
+                    view=view,
+                    fields=("product_id", "coupon_available_count"),
+                ),
+                _catalog_clarification_option(
+                    "MOST_IN_STOCK_QUOTES",
+                    "可购买报价快照数最多",
+                    f"按 {day_7} 的 in_stock_quote_count 降序比较商品。",
+                    view=view,
+                    fields=("product_id", "in_stock_quote_count"),
+                ),
+            ],
+            interpretation="报价快照质量指标存在歧义",
+        )
+
+    if re.fullmatch(r"工具表现(?:怎么样|如何)?[。！？!?]?", normalized):
+        view = "analytics_tool_quality_daily"
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question="“工具表现”希望按哪项技术调用指标查看？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_COUNTS",
+                    "最近 7 天调用状态计数",
+                    f"汇总 {day_7} 各工具的 call_count、success_count 和 failure_count。",
+                    view=view,
+                    fields=("tool_name", "call_count", "success_count", "failure_count"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_FAILURE_RATE",
+                    "最近 7 天失败调用比率",
+                    f"按 {day_7} 的 SUM(failure_count)/SUM(call_count) 比较工具。",
+                    view=view,
+                    fields=("tool_name", "failure_count", "call_count"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_LATENCY",
+                    "最近 7 天加权平均延迟",
+                    f"按 {day_7} 以 call_count 加权的 avg_latency_ms 比较工具。",
+                    view=view,
+                    fields=("tool_name", "call_count", "avg_latency_ms"),
+                ),
+            ],
+            interpretation="工具技术质量指标存在歧义",
+        )
+
+    product_match = re.fullmatch(
+        r"商品\s*([A-Za-z0-9_-]+)\s*最近表现(?:怎么样|如何)?[。！？!?]?",
+        normalized,
+    )
+    if product_match:
+        product_id = product_match.group(1)
+        return DataAnalysisPlan(
+            status="NEEDS_CLARIFICATION",
+            clarification_question=f"“{product_id} 最近表现”希望看哪段期间和哪类表现？",
+            clarification_options=[
+                _catalog_clarification_option(
+                    "LAST_7D_PRODUCT_SALES",
+                    "最近 7 天商品销售",
+                    f"汇总商品 {product_id} 在 {day_7} 的 paid_units、gross_item_amount 和 refunded_units。",
+                    view="analytics_product_sales_daily",
+                    fields=("product_id", "paid_units", "gross_item_amount", "refunded_units"),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_RECOMMENDATION_EVENTS",
+                    "最近 7 天推荐结果事件",
+                    f"汇总商品 {product_id} 在 {day_7} 的 VERIFIED 推荐支付、退款、退货、低分评价、售后联系和复购事件。",
+                    view="analytics_recommendation_quality_daily",
+                    fields=(
+                        "product_id",
+                        "payment_count",
+                        "refund_count",
+                        "return_count",
+                        "negative_review_count",
+                        "support_contact_count",
+                        "repeat_purchase_count",
+                    ),
+                ),
+                _catalog_clarification_option(
+                    "LAST_7D_OFFER_QUALITY",
+                    "最近 7 天报价快照",
+                    f"列出商品 {product_id} 在 {day_7} 的报价快照数量、平均基础价和平均估算到手价。",
+                    view="analytics_offer_quality_daily",
+                    fields=("product_id", "quote_count", "avg_base_price", "avg_estimated_payable"),
+                ),
+            ],
+            interpretation="商品表现的指标域存在歧义",
+        )
+    return None
 
 
 def _question_dates(question: str) -> tuple[date, date]:
     match = re.search(r"最近\s*(\d+)\s*天", question)
     days = min(90, max(1, int(match.group(1) if match else 7)))
     fixed_now = str(getattr(get_settings(), "analytics_eval_fixed_now", "") or "").strip()
-    end = datetime.fromisoformat(fixed_now).date() if fixed_now else date.today()
+    end = (
+        datetime.fromisoformat(fixed_now).date()
+        if fixed_now
+        else datetime.now(ZoneInfo(CATALOG_TIMEZONE)).date()
+    )
     return end - timedelta(days=days - 1), end
+
+
+def _request_data_as_of() -> str:
+    settings = get_settings()
+    fixed_now = str(getattr(settings, "analytics_eval_fixed_now", "") or "").strip()
+    if fixed_now:
+        value = datetime.fromisoformat(fixed_now)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo(CATALOG_TIMEZONE))
+    else:
+        value = datetime.now(ZoneInfo(CATALOG_TIMEZONE))
+    return value.isoformat(timespec="seconds")
+
+
+def _capability_boundary() -> str:
+    return (
+        f"catalog/capability boundary：仅覆盖 {CATALOG_VERSION} 的十个受治理单视图；"
+        "V0 不支持跨视图 Join、窗口函数、同比环比或正式财务口径。"
+    )
+
+
+def analytics_no_query_contract(*required_facts: str) -> dict[str, Any]:
+    boundary = _capability_boundary()
+    facts = list(
+        dict.fromkeys(
+            [
+                *(str(item).strip() for item in required_facts if str(item).strip()),
+                "no SQL",
+                "catalog/capability boundary",
+                "dataAsOf",
+                "catalogVersion",
+            ]
+        )
+    )
+    return {
+        "catalogVersion": CATALOG_VERSION,
+        "catalogContentSha256": CATALOG_CONTENT_SHA256,
+        "dataAsOf": _request_data_as_of(),
+        "dataAsOfScope": "REQUEST_EVALUATED_AT_NO_QUERY",
+        "capabilityBoundary": boundary,
+        "queryExecuted": False,
+        "requiredFacts": facts,
+        "answerBoundary": {
+            "mustDisclose": facts,
+            "forbiddenClaims": [],
+        },
+        "provisional": True,
+    }
+
+
+def _response_contract_errors(result: dict[str, Any]) -> list[str]:
+    outcome = result.get("outcome")
+    if outcome not in {"ANSWER", "CLARIFY", "ABSTAIN", "DENY"}:
+        return []
+    errors: list[str] = []
+    if result.get("catalogVersion") != CATALOG_VERSION:
+        errors.append("CATALOG_VERSION_MISSING")
+    if not str(result.get("dataAsOf") or "").strip():
+        errors.append("DATA_AS_OF_MISSING")
+    if not str(result.get("answer") or "").strip():
+        errors.append("ANSWER_MISSING")
+    completion = str(result.get("completion") or "")
+    expected = {
+        "ANSWER": {"COMPLETE", "PARTIAL"},
+        "CLARIFY": {"NOT_APPLICABLE"},
+        "ABSTAIN": {"NOT_APPLICABLE"},
+        "DENY": {"NOT_APPLICABLE"},
+    }
+    if completion not in expected[outcome]:
+        errors.append("COMPLETION_INVALID")
+    if outcome == "ANSWER":
+        if "统计期间：" not in str(result.get("answer") or ""):
+            errors.append("PERIOD_MISSING")
+        boundary = result.get("answerBoundary") or {}
+        text = "\n".join(
+            [
+                str(result.get("answer") or ""),
+                *(str(item) for item in result.get("highlights") or []),
+            ]
+        )
+        for claim in boundary.get("forbiddenClaims") or []:
+            if str(claim) and str(claim) in text:
+                errors.append(f"FORBIDDEN_CLAIM:{claim}")
+    else:
+        if result.get("sql") or result.get("queries") or result.get("queryExecuted") is not False:
+            errors.append("NO_QUERY_CONTRACT_INVALID")
+        if outcome in {"ABSTAIN", "DENY"} and not result.get("reasonCode"):
+            errors.append("REASON_CODE_MISSING")
+        if outcome == "ABSTAIN" and "catalog/capability boundary" not in str(
+            result.get("capabilityBoundary") or ""
+        ):
+            errors.append("CAPABILITY_BOUNDARY_MISSING")
+        if outcome == "CLARIFY":
+            options = result.get("clarificationOptions") or []
+            choice_ids = [str(item.get("choiceId") or "") for item in options]
+            if len(options) < 2 or len(choice_ids) != len(set(choice_ids)):
+                errors.append("CLARIFICATION_OPTIONS_INVALID")
+            if not result.get("clarificationToken"):
+                errors.append("CLARIFICATION_TOKEN_MISSING")
+            if int(result.get("clarificationTokenTtlSeconds") or 0) != 900:
+                errors.append("CLARIFICATION_TTL_INVALID")
+    return errors
+
+
+def _contract_failure(result: dict[str, Any], errors: list[str]) -> dict[str, Any]:
+    return {
+        "runId": result.get("runId"),
+        "outcome": None,
+        "completion": "FAILED",
+        "status": "ANALYTICS_RESPONSE_CONTRACT_FAILED",
+        "catalogVersion": CATALOG_VERSION,
+        "dataAsOf": result.get("dataAsOf") or _request_data_as_of(),
+        "warnings": ["ANALYTICS_RESPONSE_CONTRACT_FAILED", *errors],
+    }
 
 
 def _metric_definitions(plan: DataAnalysisPlan) -> list[dict[str, str]]:
@@ -304,11 +789,15 @@ def _display_metric(plan: DataAnalysisPlan, name: str) -> str:
     return definition or name
 
 
-def _format_metric_value(value: Number) -> str:
-    number = float(value)
-    if number.is_integer():
-        return str(int(number))
-    return f"{number:.4f}".rstrip("0").rstrip(".")
+def _format_metric_value(plan: DataAnalysisPlan, metric: str, value: Number) -> str:
+    normalized, column_types = normalize_typed_rows(
+        [{metric: value}],
+        view=str(plan.semantic_view or ""),
+        columns=[metric],
+    )
+    display = str(normalized[0][metric])
+    unit = str(column_types[metric].get("unit") or "").strip()
+    return f"{display} {unit}" if unit else display
 
 
 def _deterministic_narrative(
@@ -355,27 +844,33 @@ def _deterministic_narrative(
         ]
         if not points:
             continue
-        maximum = max(points, key=lambda item: float(item[1]))
-        minimum = min(points, key=lambda item: float(item[1]))
+        maximum = max(points, key=lambda item: Decimal(str(item[1])))
+        minimum = min(points, key=lambda item: Decimal(str(item[1])))
         label = _display_metric(plan, metric)
         dimension_suffix = f"（{maximum[0]}）" if maximum[0] not in (None, "") else ""
-        if float(maximum[1]) == float(minimum[1]):
-            statement = f"{label}在返回结果中均为{_format_metric_value(maximum[1])}"
+        if Decimal(str(maximum[1])) == Decimal(str(minimum[1])):
+            statement = (
+                f"{label}在返回结果中均为{_format_metric_value(plan, metric, maximum[1])}"
+            )
         else:
             minimum_suffix = f"（{minimum[0]}）" if minimum[0] not in (None, "") else ""
             statement = (
-                f"{label}最大值为{_format_metric_value(maximum[1])}{dimension_suffix}，"
-                f"最小值为{_format_metric_value(minimum[1])}{minimum_suffix}"
+                f"{label}最大值为{_format_metric_value(plan, metric, maximum[1])}"
+                f"{dimension_suffix}，最小值为"
+                f"{_format_metric_value(plan, metric, minimum[1])}{minimum_suffix}"
             )
         statements.append(statement)
-        highlights.append(f"{label}最大值：{_format_metric_value(maximum[1])}{dimension_suffix}")
+        highlights.append(
+            f"{label}最大值：{_format_metric_value(plan, metric, maximum[1])}"
+            f"{dimension_suffix}"
+        )
 
         if dimension in {"date", "snapshot_date"} and len(points) > 1:
             ordered = sorted(points, key=lambda item: str(item[0] or ""))
             first, last = ordered[0], ordered[-1]
             statements.append(
-                f"{label}从{first[0]}的{_format_metric_value(first[1])}"
-                f"变为{last[0]}的{_format_metric_value(last[1])}"
+                f"{label}从{first[0]}的{_format_metric_value(plan, metric, first[1])}"
+                f"变为{last[0]}的{_format_metric_value(plan, metric, last[1])}"
             )
 
     if dimension in {"date", "snapshot_date"} and plan.start_date and plan.end_date:
@@ -445,30 +940,10 @@ class DataAnalystService:
         return plan
 
     async def _plan(self, question: str) -> DataAnalysisPlan:
-        if _AMBIGUOUS_SALES.search(question) and not _EXPLICIT_SALES_METRIC.search(question):
-            return DataAnalysisPlan(
-                status="NEEDS_CLARIFICATION",
-                clarification_question="你希望按销售金额、销售件数还是订单数判断“销量最高”？",
-                clarification_options=[
-                    ClarificationOption(
-                        choice_id="gross_item_amount",
-                        label="按商品行金额",
-                        answer_suffix="按商品行金额排序，最近 7 天",
-                    ),
-                    ClarificationOption(
-                        choice_id="paid_units",
-                        label="按支付件数",
-                        answer_suffix="按支付件数排序，最近 7 天",
-                    ),
-                    ClarificationOption(
-                        choice_id="paid_order_count",
-                        label="按支付订单数",
-                        answer_suffix="按支付订单数排序，最近 7 天",
-                    ),
-                ],
-                interpretation="销售排名口径存在歧义",
-            )
         start, end = _question_dates(question)
+        clarification = _catalog_clarification(question, end)
+        if clarification is not None:
+            return clarification
         messages = [
             SystemMessage(
                 content=(
@@ -681,14 +1156,29 @@ class DataAnalystService:
             f"统计期间：{'；'.join(periods) or '当前快照'}；dataAsOf={data_as_of}；"
             f"口径来源={CATALOG_VERSION}。"
         )
+        units = list(
+            dict.fromkeys(
+                f"{column}={str(contract.get('unit')).upper()}"
+                for column, contract in column_types.items()
+                if str(contract.get("unit") or "").strip()
+            )
+        )
+        if units:
+            source_text += f"单位：{'；'.join(units)}。"
         has_money = any(
             str(contract.get("unit") or "").upper() == "CNY" for contract in column_types.values()
         )
         if has_money:
             source_text += "金额为暂定口径，仅供运营核对，不作为结算或审计结论。"
+        boundary_text = (
+            f"口径边界：{'；'.join(disclosure['mustDisclose'])}。"
+            if disclosure["mustDisclose"]
+            else ""
+        )
         answer = str(result.get("answer") or "").strip()
-        if source_text not in answer:
-            answer = f"{answer}\n{source_text}".strip()
+        for line in (source_text, boundary_text):
+            if line and line not in answer:
+                answer = f"{answer}\n{line}".strip()
         branch_snapshots = list(result.get("branches") or [])
         if not branch_snapshots:
             branch_snapshots = [
@@ -1197,6 +1687,11 @@ class DataAnalystService:
         ):
             policy = evaluate_question_policy(question, tenant_id=tenant_id)
             if policy is not None:
+                contract = analytics_no_query_contract(policy.required_fact or policy.answer)
+                answer = (
+                    f"{policy.answer}\n{contract['capabilityBoundary']}\n"
+                    "本次 no SQL：未执行查询，也未读取分析数据。"
+                )
                 episode_service.record_step(
                     "DATA_ANALYST_POLICY",
                     node_name="data_analyst_policy",
@@ -1218,11 +1713,10 @@ class DataAnalystService:
                     "completion": "NOT_APPLICABLE",
                     "status": policy.reason_code,
                     "reasonCode": policy.reason_code,
-                    "answer": policy.answer,
-                    "catalogVersion": CATALOG_VERSION,
-                    "provisional": True,
+                    "answer": answer,
                     "warnings": [],
                     "_httpStatus": policy.http_status,
+                    **contract,
                 }
 
             try:
@@ -1267,6 +1761,7 @@ class DataAnalystService:
             if plan.status == "NEEDS_CLARIFICATION":
                 if not allow_clarification:
                     reason_code = "AMBIGUITY_REMAINS_AFTER_CLARIFICATION"
+                    contract = analytics_no_query_contract("一次澄清后仍存在关键歧义")
                     episode_service.finish_run(
                         "clarification_exhausted",
                         run_id=run_id,
@@ -1279,10 +1774,13 @@ class DataAnalystService:
                         "completion": "NOT_APPLICABLE",
                         "status": reason_code,
                         "reasonCode": reason_code,
-                        "answer": "一次澄清后仍存在关键歧义，当前请求不执行查询。",
-                        "catalogVersion": CATALOG_VERSION,
-                        "provisional": True,
+                        "answer": (
+                            "一次澄清后仍存在关键歧义，当前请求不执行查询。\n"
+                            f"{contract['capabilityBoundary']}\n"
+                            "本次 no SQL：未执行查询，也未读取分析数据。"
+                        ),
                         "warnings": [],
+                        **contract,
                     }
                 options = [
                     {
@@ -1323,9 +1821,12 @@ class DataAnalystService:
                     "status": "NEEDS_CLARIFICATION",
                     "clarificationQuestion": plan.clarification_question,
                     "answer": plan.clarification_question,
-                    "catalogVersion": CATALOG_VERSION,
-                    "provisional": True,
                     "warnings": [],
+                    **analytics_no_query_contract(
+                        "structuredOptions",
+                        "ownerBoundToken",
+                        "tokenTtl=900",
+                    ),
                     **clarification,
                 }
 
@@ -1539,7 +2040,7 @@ class DataAnalystService:
             else None
         )
         try:
-            return await asyncio.wait_for(
+            result = await asyncio.wait_for(
                 self._ask_foundation_within_budget(
                     question,
                     admin_id=admin_id,
@@ -1553,6 +2054,19 @@ class DataAnalystService:
                 ),
                 timeout=settings.analytics_request_timeout_seconds,
             )
+            contract_errors = _response_contract_errors(result)
+            if contract_errors:
+                episode_service.record_step(
+                    "DATA_ANALYST_RESPONSE_CONTRACT",
+                    node_name="data_analyst_response_contract",
+                    status="BLOCKED",
+                    error_code="ANALYTICS_RESPONSE_CONTRACT_FAILED",
+                    output_data={"violations": contract_errors},
+                    agent_id="data_analyst",
+                    run_id=run_id,
+                )
+                return _contract_failure(result, contract_errors)
+            return result
         except TimeoutError:
             latency_ms = round((time.perf_counter() - started) * 1000)
             episode_service.record_step(

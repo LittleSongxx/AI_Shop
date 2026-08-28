@@ -15,7 +15,9 @@ from app.services.data_analyst_service import (
     DataAnalysisPlan,
     DataAnalystService,
     DataNarrative,
+    _contract_failure,
     _deterministic_narrative,
+    _response_contract_errors,
     _structured_json_llm,
 )
 
@@ -30,6 +32,7 @@ def _settings(*, timeout_ms: int = 3000, request_timeout_seconds: float = 45):
         analytics_query_timeout_ms=timeout_ms,
         analytics_model_timeout_seconds=10,
         analytics_request_timeout_seconds=request_timeout_seconds,
+        analytics_eval_fixed_now="2026-08-27T12:00:00",
         internal_token="foundation-test-cursor-secret",
     )
 
@@ -121,24 +124,187 @@ def test_data_analyst_numeric_narrative_is_derived_from_rows():
         ],
     )
 
-    assert "已支付金额最大值为6379（2026-08-07）" in narrative.answer
-    assert "最小值为14（2026-08-09）" in narrative.answer
+    assert "已支付金额最大值为6379.00 CNY（2026-08-07）" in narrative.answer
+    assert "最小值为14.00 CNY（2026-08-09）" in narrative.answer
     assert "计划范围为7天，返回3个有数据日期" in narrative.answer
     assert "3799元最高" not in narrative.answer
 
 
+@pytest.mark.parametrize(
+    ("question", "clarification_question", "choice_ids"),
+    [
+        (
+            "最近最好卖的商品有哪些？",
+            "“最近”和“最好卖”分别按哪个时间范围与指标定义？",
+            [
+                "LAST_7D_PAID_UNITS",
+                "LAST_28D_PAID_UNITS",
+                "LAST_7D_GROSS_ITEM_AMOUNT",
+            ],
+        ),
+        (
+            "销售最近怎么样？",
+            "你希望按哪种时间范围和粒度查看哪些销售运营指标？",
+            ["LAST_7D_DAILY_CORE", "LAST_28D_TOTAL_CORE"],
+        ),
+        (
+            "看一下库存有问题的商品。",
+            "“库存有问题”具体指当前缺货、当前低库存，还是人工补货建议？",
+            ["CURRENT_OUT_OF_STOCK", "CURRENT_LOW_AND_OUT", "REPLENISHMENT_SUGGESTED"],
+        ),
+        (
+            "哪个推荐渠道效果最好？",
+            "“效果最好”希望按哪项 VERIFIED 事件日指标比较检索模式？",
+            ["LAST_7D_CLICK_RATE", "LAST_7D_PAYMENT_RATE", "LAST_7D_PAYMENT_COUNT"],
+        ),
+        (
+            "哪个 Agent 表现最差？",
+            "“表现最差”希望按哪项技术运行指标比较 Agent？",
+            ["LAST_7D_FAILURE_COUNT", "LAST_7D_FAILURE_RATE", "LAST_7D_LATENCY"],
+        ),
+        (
+            "汇总一下退款情况。",
+            "你希望按哪种退款口径和粒度汇总？",
+            [
+                "LAST_7D_COMPLETED_REFUND_TOTAL",
+                "LAST_7D_REQUEST_AND_COMPLETION",
+                "LAST_7D_PRODUCT_REFUNDED_UNITS",
+            ],
+        ),
+        (
+            "最近履约情况如何？",
+            "“最近履约情况”希望看哪段期间及哪组指标？",
+            ["LAST_7D_ORDER_STATUS", "LAST_7D_AFTER_SALES", "LAST_7D_FULL_VIEW"],
+        ),
+        (
+            "报价最好的商品是哪个？",
+            "“报价最好”希望按哪项报价快照指标比较商品？",
+            ["LOWEST_ESTIMATED_PAYABLE", "MOST_COUPON_AVAILABLE", "MOST_IN_STOCK_QUOTES"],
+        ),
+        (
+            "工具表现怎么样？",
+            "“工具表现”希望按哪项技术调用指标查看？",
+            ["LAST_7D_COUNTS", "LAST_7D_FAILURE_RATE", "LAST_7D_LATENCY"],
+        ),
+        (
+            "商品 P100 最近表现如何？",
+            "“P100 最近表现”希望看哪段期间和哪类表现？",
+            [
+                "LAST_7D_PRODUCT_SALES",
+                "LAST_7D_RECOMMENDATION_EVENTS",
+                "LAST_7D_OFFER_QUALITY",
+            ],
+        ),
+    ],
+)
 @pytest.mark.asyncio
-async def test_data_analyst_clarifies_natural_best_selling_wording_without_model_call(
+async def test_data_analyst_clarifications_are_catalog_driven_without_model_call(
     monkeypatch,
+    question,
+    clarification_question,
+    choice_ids,
 ):
     factory = Mock(side_effect=AssertionError("ambiguous metric must not call the model"))
+    monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
     monkeypatch.setattr("app.services.data_analyst_service.create_memory_llm", factory)
 
-    plan = await DataAnalystService()._plan("近期什么产品卖的最好")
+    plan = await DataAnalystService()._plan(question)
 
     assert plan.status == "NEEDS_CLARIFICATION"
-    assert "销售金额" in str(plan.clarification_question)
+    assert plan.clarification_question == clarification_question
+    assert [option.choice_id for option in plan.clarification_options] == choice_ids
+    assert all("2026-08-27" in option.answer_suffix for option in plan.clarification_options)
     factory.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_clarify_response_has_owner_token_ttl_and_no_query_contract(monkeypatch):
+    service = DataAnalystService()
+    monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
+    monkeypatch.setattr(
+        "app.services.data_analyst_service.analytics_clarification_service.issue",
+        AsyncMock(
+            return_value={
+                "clarificationToken": "acl_fixed",
+                "clarificationTokenTtlSeconds": 900,
+                "clarificationTokenExpiresAt": "2026-08-27T12:15:00+08:00",
+                "clarificationOptions": [
+                    {"choiceId": "A", "label": "A", "answerSuffix": "A"},
+                    {"choiceId": "B", "label": "B", "answerSuffix": "B"},
+                ],
+            }
+        ),
+    )
+    _stub_episode(monkeypatch)
+
+    result = await service.ask("销售最近怎么样？", admin_id="admin")
+
+    assert result["outcome"] == "CLARIFY"
+    assert result["completion"] == "NOT_APPLICABLE"
+    assert result["queryExecuted"] is False
+    assert result["catalogVersion"] == "analytics-provisional-v0.20260827"
+    assert result["dataAsOf"] == "2026-08-27T12:00:00+08:00"
+    assert result["clarificationTokenTtlSeconds"] == 900
+
+
+@pytest.mark.parametrize(
+    ("question", "reason_code", "required_fact"),
+    [
+        ("计算今年每月销售额同比和环比。", "UNSUPPORTED_ANALYTIC_OPERATION", "V0 不支持同比、环比或窗口函数"),
+        ("按曝光 cohort 计算 7 天支付转化率。", "UNSUPPORTED_COHORT_SEMANTICS", "不能形成曝光 cohort"),
+        ("证明推荐系统导致了销量增长。", "CAUSAL_CLAIM_UNSUPPORTED", "不能识别因果"),
+        ("给我 2026-08-21 到 2026-08-27 的审计确认收入。", "FINANCIAL_METRIC_UNVERIFIED", "净支付额是暂定运营口径"),
+        ("列出 2026-07-01 每个 SKU 的历史库存。", "HISTORICAL_INVENTORY_UNAVAILABLE", "只保留当前快照"),
+        ("根据 confidence 告诉我每个 SKU 下周缺货的概率。", "PROBABILITY_UNAVAILABLE", "不是概率"),
+        ("把商品销量和当前库存 Join 后计算售罄率。", "JOIN_OUT_OF_V0_SCOPE", "没有已确认售罄率口径"),
+        ("预测下个月全站销售收入。", "FORECAST_METRIC_UNAVAILABLE", "现有目录没有销售预测指标"),
+        ("计算最近 28 天每个商品的 7 日移动平均销量。", "WINDOW_FUNCTION_OUT_OF_V0_SCOPE", "不支持窗口函数或移动平均"),
+        ("今天实际发货了多少单，按发货发生时间统计。", "FULFILLMENT_EVENT_TIME_UNAVAILABLE", "没有发货事件时间"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_policy_abstain_has_deterministic_required_facts_and_no_query(
+    monkeypatch,
+    question,
+    reason_code,
+    required_fact,
+):
+    factory = Mock(side_effect=AssertionError("policy abstain must not call the model"))
+    monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
+    monkeypatch.setattr("app.services.data_analyst_service.create_memory_llm", factory)
+    _stub_episode(monkeypatch)
+
+    result = await DataAnalystService().ask(question, admin_id="admin")
+
+    assert result["outcome"] == "ABSTAIN"
+    assert result["completion"] == "NOT_APPLICABLE"
+    assert result["reasonCode"] == reason_code
+    assert result["queryExecuted"] is False
+    assert result["dataAsOf"] == "2026-08-27T12:00:00+08:00"
+    assert required_fact in " ".join(result["requiredFacts"])
+    assert "no SQL" in result["requiredFacts"]
+    assert "catalog/capability boundary" in result["capabilityBoundary"]
+    factory.assert_not_called()
+
+
+def test_response_contract_fails_closed_on_forbidden_answer_claim():
+    result = {
+        "runId": "run-contract",
+        "outcome": "ANSWER",
+        "completion": "COMPLETE",
+        "answer": "统计期间：2026-08-21 至 2026-08-27；这是正式转化率。",
+        "catalogVersion": "analytics-provisional-v0.20260827",
+        "dataAsOf": "2026-08-27T12:00:00+08:00",
+        "answerBoundary": {"forbiddenClaims": ["正式转化率"]},
+    }
+
+    errors = _response_contract_errors(result)
+    failure = _contract_failure(result, errors)
+
+    assert errors == ["FORBIDDEN_CLAIM:正式转化率"]
+    assert failure["outcome"] is None
+    assert failure["completion"] == "FAILED"
+    assert failure["status"] == "ANALYTICS_RESPONSE_CONTRACT_FAILED"
 
 
 @pytest.mark.asyncio

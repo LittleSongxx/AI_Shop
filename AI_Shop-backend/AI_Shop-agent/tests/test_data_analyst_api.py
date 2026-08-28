@@ -39,6 +39,9 @@ def test_data_analyst_rbac_denial_is_structured_http_403():
         == response.json()["data"]
     )
     assert response.json()["data"]["requestId"]
+    assert response.json()["data"]["catalogVersion"]
+    assert response.json()["data"]["dataAsOf"]
+    assert response.json()["data"]["queryExecuted"] is False
 
 
 def test_data_analyst_policy_denial_preserves_agent_run_id(monkeypatch):
