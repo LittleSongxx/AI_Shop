@@ -1519,6 +1519,44 @@ def test_quality_disclosures_report_partial_timeout_only_from_observed_branch():
     }.issubset(facts)
 
 
+@pytest.mark.parametrize(
+    ("branches", "expected_facts", "forbidden_facts"),
+    [
+        (
+            [
+                {"branchId": "tool_quality", "status": "DATABASE_UNAVAILABLE"},
+                {"branchId": "agent_quality", "status": "SUCCEEDED"},
+            ],
+            {"partial completion"},
+            {"agent branch timeout", "agent branch failure"},
+        ),
+        (
+            [
+                {"branchId": "tool_quality", "status": "SUCCEEDED"},
+                {"branchId": "agent_quality", "status": "DATABASE_UNAVAILABLE"},
+            ],
+            {"partial completion", "agent branch failure"},
+            {"agent branch timeout"},
+        ),
+    ],
+)
+def test_quality_disclosures_do_not_infer_timeout_from_other_failures(
+    branches, expected_facts, forbidden_facts
+):
+    question = (
+        "汇总 2026-08-21 到 2026-08-27 的工具调用与 Agent 运行质量；"
+        "如果 Agent 分支超时，返回工具分支并标记部分完成。"
+    )
+    plan = _normalize_supply_chain_plan(question, DataAnalysisPlan(), end=date(2026, 8, 27))
+    facts, statements = _quality_disclosures(
+        plan, result={"completion": "PARTIAL", "branches": branches}
+    )
+
+    assert expected_facts.issubset(facts)
+    assert forbidden_facts.isdisjoint(facts)
+    assert statements
+
+
 @pytest.mark.asyncio
 async def test_supply_chain_compiler_never_calls_free_sql_model(monkeypatch):
     service = DataAnalystService()

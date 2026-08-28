@@ -1399,15 +1399,54 @@ def _quality_disclosures(
         if snapshot.get("status") in {"SUCCEEDED", "EMPTY_RESULT"}:
             facts.append("tool branch succeeds")
 
-    agent_failed = any(
-        branch.semantic_view == agent_view
-        and (snapshots.get(branch.branch_id) or {}).get("status")
-        not in {None, "SUCCEEDED", "EMPTY_RESULT"}
+    status_by_branch = {
+        branch_id: str(snapshot.get("status") or "")
+        for branch_id, snapshot in snapshots.items()
+    }
+    agent_status = next(
+        (
+            status_by_branch.get(branch.branch_id, "")
+            for branch in branches
+            if branch.semantic_view == agent_view
+        ),
+        "",
+    )
+    failed_quality_branch = any(
+        status_by_branch.get(branch.branch_id, "")
+        not in {"", "SUCCEEDED", "EMPTY_RESULT"}
         for branch in branches
     )
-    if agent_failed or (result or {}).get("completion") == "PARTIAL":
+    tool_branch_succeeded = any(
+        branch.semantic_view != agent_view
+        and status_by_branch.get(branch.branch_id) in {"SUCCEEDED", "EMPTY_RESULT"}
+        for branch in branches
+    )
+    if agent_status == "QUERY_TIMEOUT":
         facts.extend(["agent branch timeout", "partial completion"])
-        statements.append("Agent 分支超时，已返回成功的工具分支并标记部分完成")
+        statements.append(
+            "Agent 分支超时，"
+            + (
+                "已返回成功的工具分支并标记部分完成"
+                if tool_branch_succeeded
+                else "结果标记为部分完成"
+            )
+        )
+    elif agent_status and agent_status not in {"SUCCEEDED", "EMPTY_RESULT"}:
+        facts.extend(["agent branch failure", "partial completion"])
+        statements.append(
+            "Agent 分支未完成，"
+            + (
+                "已返回成功的工具分支并标记部分完成"
+                if tool_branch_succeeded
+                else "结果标记为部分完成"
+            )
+        )
+    elif failed_quality_branch:
+        facts.append("partial completion")
+        statements.append("部分分析分支未完成，结果已标记为部分完成")
+    elif (result or {}).get("completion") == "PARTIAL":
+        facts.append("partial completion")
+        statements.append("结果已标记为部分完成；未将原因推断为超时")
     return list(dict.fromkeys(facts)), list(dict.fromkeys(statements))
 
 
