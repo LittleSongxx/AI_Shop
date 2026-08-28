@@ -6,10 +6,12 @@ import com.aishop.utils.DateUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "app.auto-data-task.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class AutoDataTask {
 

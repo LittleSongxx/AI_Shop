@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import asynccontextmanager
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
@@ -24,9 +25,12 @@ def _settings(*, timeout_ms: int = 3000, request_timeout_seconds: float = 45):
         data_analyst_enabled=True,
         analytics_max_days=90,
         analytics_max_rows=200,
+        analytics_max_result_bytes=1_000_000,
+        analytics_cursor_ttl_seconds=900,
         analytics_query_timeout_ms=timeout_ms,
         analytics_model_timeout_seconds=10,
         analytics_request_timeout_seconds=request_timeout_seconds,
+        internal_token="foundation-test-cursor-secret",
     )
 
 
@@ -51,6 +55,19 @@ def _sql() -> str:
 
 def _stub_episode(monkeypatch) -> list[str]:
     events: list[str] = []
+
+    @asynccontextmanager
+    async def snapshot():
+        yield SimpleNamespace(
+            cursor=object(),
+            data_as_of="2026-08-27T12:00:00.000000+08:00",
+        )
+
+    monkeypatch.setattr("app.services.data_analyst_service.acquire_analytics_snapshot", snapshot)
+    monkeypatch.setattr(
+        "app.services.data_analyst_service.analytics_result_service.freeze",
+        AsyncMock(return_value=None),
+    )
     monkeypatch.setattr(
         "app.services.data_analyst_service.episode_service.start_run",
         lambda **_kwargs: True,
@@ -165,18 +182,24 @@ async def test_data_analyst_success_is_grounded_and_traceable(monkeypatch):
     result = await service.ask("最近七天销售额和退款额趋势如何？", admin_id="admin")
 
     assert result["status"] == "SUCCEEDED"
+    assert result["outcome"] == "ANSWER"
+    assert result["completion"] == "COMPLETE"
     assert result["lineage"] == ["analytics_sales_daily"]
     assert result["chart"] == {
         "type": "line",
         "x": "date",
         "series": ["gross_paid_amount", "completed_refund_amount"],
     }
-    assert result["answer"] == "支付额上升，退款额保持为零。"
+    assert result["answer"].startswith("支付额上升，退款额保持为零。")
+    assert "dataAsOf=2026-08-27T12:00:00.000000+08:00" in result["answer"]
+    assert "暂定口径，仅供运营核对" in result["answer"]
     assert result["rows"][0] == {
         "date": "2026-08-01",
-        "gross_paid_amount": 100.25,
-        "completed_refund_amount": 0.0,
+        "gross_paid_amount": "100.25",
+        "completed_refund_amount": "0.00",
     }
+    assert result["columnTypes"]["gross_paid_amount"]["type"] == "DECIMAL"
+    assert result["warnings"] == ["RESULT_SNAPSHOT_UNAVAILABLE"]
     assert events == [
         "DATA_ANALYST_PLAN",
         "DATA_ANALYST_SQL_GUARD",
@@ -300,7 +323,7 @@ async def test_data_analyst_request_budget_cancels_workflow_and_finishes_run(mon
 
 
 @pytest.mark.asyncio
-async def test_data_analyst_does_not_expand_reader_privileges_for_explain(monkeypatch):
+async def test_data_analyst_requires_explain_without_expanding_reader_privileges(monkeypatch):
     class ExplainPrivilegeError(Exception):
         pass
 
@@ -324,8 +347,17 @@ async def test_data_analyst_does_not_expand_reader_privileges_for_explain(monkey
     result = await service.ask("最近七天销售额", admin_id="admin")
 
     assert result["status"] == "SUCCEEDED"
-    assert result["warnings"] == ["EXPLAIN_SKIPPED_VIEW_PRIVILEGE"]
-    assert result["explain"] == [{"status": "SKIPPED", "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY"}]
+    assert result["outcome"] == "ANSWER"
+    assert result["completion"] == "COMPLETE"
+    assert result["scanEstimate"] is None
+    assert result["explain"] == []
+    assert result["explainDiagnostic"] == {
+        "status": "UNAVAILABLE",
+        "reasonCode": "EXPLAIN_UNAVAILABLE_VIEW_PRIVILEGE",
+        "databaseErrorCode": 1345,
+        "attempted": True,
+    }
+    assert "EXPLAIN_UNAVAILABLE_VIEW_PRIVILEGE" in result["warnings"]
     execute.assert_awaited_once()
     assert events.count("DATA_ANALYST_EXPLAIN") == 1
 
@@ -429,7 +461,9 @@ async def test_data_analyst_plan_retries_one_invalid_structured_result(monkeypat
     ]
     invoke = AsyncMock(side_effect=responses)
     monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
-    monkeypatch.setattr("app.services.data_analyst_service._structured_json_llm", lambda _schema: object())
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._structured_json_llm", lambda _schema: object()
+    )
     monkeypatch.setattr("app.services.data_analyst_service.invoke_llm_with_metrics", invoke)
 
     plan = await service._plan("分析最近7天缺货 SKU 数量趋势")
@@ -439,12 +473,15 @@ async def test_data_analyst_plan_retries_one_invalid_structured_result(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_data_analyst_metric_tree_runs_in_stable_parallel_order(monkeypatch):
+async def test_data_analyst_metric_tree_runs_in_stable_snapshot_order(monkeypatch):
     service = DataAnalystService()
     plan = _branch_plan()
     monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
 
-    async def execute(_question, _plan, branch, *, run_id):
+    execution_order: list[str] = []
+
+    async def execute(_question, _plan, branch, *, run_id, cursor=None, access_policy=None):
+        execution_order.append(branch.branch_id)
         await asyncio.sleep(0 if branch.branch_id == "quality" else 0.01)
         return {
             "branchId": branch.branch_id,
@@ -471,6 +508,8 @@ async def test_data_analyst_metric_tree_runs_in_stable_parallel_order(monkeypatc
 
     assert [item["branchId"] for item in result["branches"]] == ["sales", "quality"]
     assert [item["branchId"] for item in result["queries"]] == ["sales", "quality"]
+    assert execution_order == ["sales", "quality"]
+    assert result["completion"] == "COMPLETE"
     assert result["causalCaution"] == "相关性不等于因果关系；以下结果只用于定位待验证假设。"
 
 
@@ -480,7 +519,7 @@ async def test_data_analyst_metric_tree_keeps_partial_success(monkeypatch):
     plan = _branch_plan()
     monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
 
-    async def execute(_question, _plan, branch, *, run_id):
+    async def execute(_question, _plan, branch, *, run_id, cursor=None, access_policy=None):
         if branch.branch_id == "quality":
             raise RuntimeError("simulated branch failure")
         return {
@@ -507,6 +546,8 @@ async def test_data_analyst_metric_tree_keeps_partial_success(monkeypatch):
     )
 
     assert result["status"] == "SUCCEEDED"
+    assert result["outcome"] == "ANSWER"
+    assert result["completion"] == "PARTIAL"
     assert "PARTIAL_METRIC_TREE" in result["warnings"]
     assert result["branches"][1]["status"] == "DATA_ANALYST_BRANCH_FAILED"
 

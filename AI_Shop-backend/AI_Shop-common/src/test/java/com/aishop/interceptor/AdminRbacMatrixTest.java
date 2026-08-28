@@ -85,6 +85,31 @@ class AdminRbacMatrixTest {
         assertEquals(401, invalid.getCode());
     }
 
+    @Test
+    void analyticsPermissionDenialCarriesStructuredOutcomeAndRequestId() throws Exception {
+        AdminPrincipalDTO principal = new AdminPrincipalDTO();
+        principal.setAdminId("admin-support");
+        principal.setAccount("support");
+        principal.setRoles(Set.of("SUPPORT_AGENT"));
+        principal.setPermissions(ROLE_PERMISSIONS.get("SUPPORT_AGENT"));
+        principal.setSessionVersion(1L);
+        Fixture fixture = fixture("valid-token", principal);
+        when(fixture.request().getHeader("X-Request-ID")).thenReturn("request-analytics-denied");
+
+        HttpBusinessException denied = assertThrows(
+                HttpBusinessException.class,
+                () -> fixture.interceptor().preHandle(
+                        fixture.request(), fixture.response(), handler("analyticsRead")));
+
+        assertEquals(403, denied.getHttpStatus());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) denied.getData();
+        assertEquals("DENY", data.get("outcome"));
+        assertEquals("NOT_APPLICABLE", data.get("completion"));
+        assertEquals("ANALYTICS_READ_REQUIRED", data.get("reasonCode"));
+        assertEquals("request-analytics-denied", data.get("requestId"));
+    }
+
     private static void assertPermission(
             String role,
             Set<String> permissions,
