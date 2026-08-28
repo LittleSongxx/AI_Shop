@@ -72,6 +72,12 @@ sealed review、adjudication、最终报告和 `SHA256SUMS`。
 
 ## 使用边界
 
+Text2SQL V0 使用独立模块 [`text2sql/README.md`](text2sql/README.md)，不加入既有
+Search/RAG/Agent `Domain` 或 lock。80 条 gold、修复前后各 80×3 基线以及 canonical 输出
+A/B/C 人工流程均已封存；最终入口是
+`../evaluation-evidence/benchmarks/text2sql/final-v0-20260828-run-002/`。修复后仍有
+51/80 个 canonical 输出被真人拒绝，固定为 `DEVELOPMENT / PROVISIONAL`，不得解释为发布就绪。
+
 - 新开发/回归 case 只新增到可见 split，并更新 lock；新 final 只能通过 holdout lifecycle 生成。
 - 新人工标签必须经历 `OPEN -> SEALED -> HUMAN_VERIFIED` 或 `HUMAN_REVIEWED_ADJUDICATED`，不能覆盖已有 JSONL。
 - 自动 verifier、引用结构校验和行为契约不能替代双盲人工答案正确性、引用语义支持与 unsafe answer 评审。
