@@ -12,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -96,6 +97,23 @@ class AgentMessageControllerDataAnalystTest {
         ResponseEntity<byte[]> actual = controller.dataAnalystExportDownload("job-1", null);
 
         assertSame(upstream, actual);
+    }
+
+    @Test
+    void exportDownloadCopiesReadOnlyUpstreamHeadersBeforeAddingDisposition() {
+        byte[] payload = "{\"resultSetId\":\"result-1\"}".getBytes(StandardCharsets.UTF_8);
+        ResponseEntity<byte[]> upstream = ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .header("X-Upstream", "preserved")
+                .body(payload);
+        when(service.callDataAnalystReport(eq("dataAnalyst/export/download"), anyMap()))
+                .thenReturn(upstream);
+
+        ResponseEntity<byte[]> actual = controller.dataAnalystExportDownload("job-1", null);
+
+        assertArrayEquals(payload, actual.getBody());
+        assertEquals("preserved", actual.getHeaders().getFirst("X-Upstream"));
+        assertEquals("job-1.json", actual.getHeaders().getContentDisposition().getFilename());
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

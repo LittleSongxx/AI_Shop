@@ -24,6 +24,8 @@ SOURCE_PATHS = (
     "AI_Shop-backend/AI_Shop-agent/app/db/analytics_pool.py",
     "AI_Shop-backend/AI_Shop-agent/app/services/analytics_catalog.py",
     "AI_Shop-backend/AI_Shop-agent/app/services/analytics_export_service.py",
+    "AI_Shop-backend/AI_Shop-agent/app/services/analytics_policy.py",
+    "AI_Shop-backend/AI_Shop-agent/app/services/analytics_semantic_compiler.py",
     "AI_Shop-backend/AI_Shop-agent/app/services/data_analyst_service.py",
     "AI_Shop-backend/AI_Shop-agent/app/services/llm_factory.py",
     "AI_Shop-backend/AI_Shop-agent/app/observability/llm_metrics.py",

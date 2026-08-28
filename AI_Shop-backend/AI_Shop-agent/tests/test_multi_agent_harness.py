@@ -2140,7 +2140,10 @@ async def test_production_harness_fans_out_joins_and_proposes_once(monkeypatch):
 async def test_data_analyst_clarifies_ambiguous_sales_ranking_without_model():
     plan = await DataAnalystService()._plan("最近七天最好卖的商品是什么？")
     assert plan.status == "NEEDS_CLARIFICATION"
-    assert "销售金额" in plan.clarification_question
+    assert any(
+        option.choice_id == "LAST_7D_GROSS_ITEM_AMOUNT"
+        for option in plan.clarification_options
+    )
 
 
 def test_sql_guard_accepts_catalog_query_and_rejects_escape_attempts():
@@ -2248,6 +2251,13 @@ def test_sql_guard_accepts_catalog_query_and_rejects_escape_attempts():
         "GROUP BY snapshot_date ORDER BY snapshot_date LIMIT 200"
     )
     assert conditional_aggregate.allowed
+
+    and_predicate = validate_sql(
+        "SELECT product_id, stock FROM analytics_inventory_risk "
+        "WHERE snapshot_date BETWEEN '2026-08-27' AND '2026-08-27' "
+        "AND stock <= 0 LIMIT 200"
+    )
+    assert and_predicate.allowed
 
     alias_must_not_hide_unknown_projection_column = validate_sql(
         "SELECT email AS paid_units FROM analytics_product_sales_daily "

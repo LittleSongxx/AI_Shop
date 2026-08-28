@@ -273,11 +273,11 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 		ContentDisposition disposition = ContentDisposition.attachment()
 				.filename(jobId.trim() + ".json")
 				.build();
-		return ResponseEntity.status(upstream.getStatusCode())
-				.headers(upstream.getHeaders())
-				.contentType(MediaType.APPLICATION_JSON)
-				.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-				.body(upstream.getBody());
+		HttpHeaders headers = new HttpHeaders();
+		headers.putAll(upstream.getHeaders());
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setContentDisposition(disposition);
+		return new ResponseEntity<>(upstream.getBody(), headers, upstream.getStatusCode());
 	}
 
 	@PostMapping("/inventoryOps/suggestions")

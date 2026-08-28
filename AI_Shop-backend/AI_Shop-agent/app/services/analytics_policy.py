@@ -119,7 +119,14 @@ def evaluate_question_policy(question: str, *, tenant_id: str | None) -> PolicyD
                 http_status=403,
             )
     for pattern, reason_code, answer in _ABSTAIN_RULES:
-        if pattern.search(normalized):
+        candidate = normalized
+        if reason_code == "JOIN_OUT_OF_V0_SCOPE":
+            candidate = re.sub(
+                r"(?i)(?:不做|无需|不要)\s*(?:跨视图\s*)?join\b",
+                "",
+                candidate,
+            )
+        if pattern.search(candidate):
             return PolicyDecision(
                 outcome="ABSTAIN",
                 reason_code=reason_code,

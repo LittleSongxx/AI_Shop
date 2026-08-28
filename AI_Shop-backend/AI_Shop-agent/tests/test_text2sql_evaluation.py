@@ -30,6 +30,7 @@ from evaluation.text2sql.dataset import (
 )
 from evaluation.text2sql.final_report import build_final_report
 from evaluation.text2sql.fixture import fingerprint, source_data_fingerprint, verify
+from evaluation.text2sql.freeze import SOURCE_PATHS
 from evaluation.text2sql.io import (
     canonical_json_bytes,
     read_json,
@@ -56,6 +57,13 @@ from evaluation.text2sql.scoring import (
     summarize,
 )
 from evaluation.text2sql.trace import _scan_estimate
+
+
+def test_input_freeze_binds_supply_compiler_and_policy_sources():
+    assert {
+        "AI_Shop-backend/AI_Shop-agent/app/services/analytics_policy.py",
+        "AI_Shop-backend/AI_Shop-agent/app/services/analytics_semantic_compiler.py",
+    } <= set(SOURCE_PATHS)
 
 
 def test_provisional_catalog_is_hashed_and_covers_exactly_ten_views():

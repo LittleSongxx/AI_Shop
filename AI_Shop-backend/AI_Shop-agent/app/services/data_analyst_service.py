@@ -34,6 +34,13 @@ from app.services.analytics_result_service import (
     analytics_result_service,
     normalize_typed_rows,
 )
+from app.services.analytics_semantic_compiler import (
+    SUPPLY_CHAIN_COMPILER_VIEWS,
+    SemanticFilter,
+    SemanticOrder,
+    SemanticPlanUnsupported,
+    compile_supply_chain_sql,
+)
 from app.services.episode_service import bind_episode, episode_service
 from app.services.llm_factory import create_memory_llm
 from app.services.sql_guard import (
@@ -44,6 +51,7 @@ from app.services.sql_guard import (
 
 _EXPLAIN_VIEW_PRIVILEGE_ERROR = 1345
 _EXPLAIN_VIEW_PRIVILEGE_REASON = "EXPLAIN_UNAVAILABLE_VIEW_PRIVILEGE"
+_DATA_ANALYST_VERSION = "v2-supply-compiler"
 
 
 class DataAnalysisBranch(BaseModel):
@@ -54,6 +62,9 @@ class DataAnalysisBranch(BaseModel):
     dimensions: list[str] = Field(default_factory=list, max_length=5)
     start_date: date | None = None
     end_date: date | None = None
+    filters: list[SemanticFilter] = Field(default_factory=list, max_length=5)
+    order_by: list[SemanticOrder] = Field(default_factory=list, max_length=4)
+    top_k: int = Field(default=200, ge=1, le=200)
 
 
 class ClarificationOption(BaseModel):
@@ -123,6 +134,190 @@ class SqlDraft(BaseModel):
 class DataNarrative(BaseModel):
     answer: str
     highlights: list[str] = Field(default_factory=list, max_length=5)
+
+
+def _compile_branch_sql(branch: DataAnalysisBranch) -> str | None:
+    return compile_supply_chain_sql(
+        view=branch.semantic_view,
+        metrics=branch.metrics,
+        dimensions=branch.dimensions,
+        start_date=branch.start_date,
+        end_date=branch.end_date,
+        filters=branch.filters,
+        order_by=branch.order_by,
+        top_k=branch.top_k,
+    )
+
+
+def _normalize_supply_chain_plan(
+    question: str,
+    plan: DataAnalysisPlan,
+    *,
+    end: date,
+) -> DataAnalysisPlan:
+    """Fill only explicit inventory slots before deterministic compilation."""
+    text = str(question or "").strip()
+
+    def branch(
+        view: str,
+        metrics: list[str],
+        dimensions: list[str],
+        *,
+        filters: list[SemanticFilter] | None = None,
+        order_by: list[SemanticOrder] | None = None,
+        top_k: int = 200,
+    ) -> DataAnalysisBranch:
+        return DataAnalysisBranch(
+            branch_id=view.removeprefix("analytics_"),
+            purpose=text,
+            semantic_view=view,
+            metrics=metrics,
+            dimensions=dimensions,
+            start_date=end,
+            end_date=end,
+            filters=filters or [],
+            order_by=order_by or [],
+            top_k=top_k,
+        )
+
+    branches: list[DataAnalysisBranch] | None = None
+    if (
+        "补货建议" in text
+        and "库存风险" in text
+        and ("两张表" in text or "分别返回" in text)
+    ):
+        branches = [
+            branch(
+                "analytics_inventory_forecast",
+                ["current_stock", "suggested_replenish_quantity", "confidence"],
+                ["product_id", "sku_key"],
+            ),
+            branch(
+                "analytics_inventory_risk",
+                ["stock"],
+                ["product_id", "property_value_id_hash", "risk_level"],
+            ),
+        ]
+    elif "库存风险等级" in text and re.search(r"(多少|分别|数量|统计)", text):
+        branches = [
+            branch(
+                "analytics_inventory_risk",
+                ["stockout_sku_count"],
+                ["risk_level"],
+            )
+        ]
+    elif "低库存" in text and re.search(r"(未缺货|不缺货)", text):
+        branches = [
+            branch(
+                "analytics_inventory_risk",
+                ["stock"],
+                ["product_id", "product_name", "property_value_id_hash", "risk_level"],
+                filters=[
+                    SemanticFilter(column="stock", operator="BETWEEN", value=1, second_value=10)
+                ],
+                order_by=[SemanticOrder(column="stock")],
+            )
+        ]
+    elif re.search(r"缺货\s*SKU.*(?:多少|几个|数量|数)", text, re.IGNORECASE):
+        branches = [
+            branch("analytics_inventory_risk", ["stockout_sku_count"], [])
+        ]
+    elif re.search(r"缺货\s*SKU", text, re.IGNORECASE):
+        branches = [
+            branch(
+                "analytics_inventory_risk",
+                ["stock"],
+                [
+                    "snapshot_date",
+                    "product_id",
+                    "product_name",
+                    "property_value_id_hash",
+                    "risk_level",
+                ],
+                filters=[SemanticFilter(column="stock", operator="LTE", value=0)],
+            )
+        ]
+    elif match := re.search(r"库存最多的?\s*(\d+)\s*个\s*SKU", text, re.IGNORECASE):
+        branches = [
+            branch(
+                "analytics_inventory_risk",
+                ["stock"],
+                ["product_id", "property_value_id_hash"],
+                order_by=[SemanticOrder(column="stock", direction="DESC")],
+                top_k=min(200, int(match.group(1))),
+            )
+        ]
+    elif "SKU" in text.upper() and "预测输入" in text and re.search(r"补货建议|建议量", text):
+        branches = [
+            branch(
+                "analytics_inventory_forecast",
+                [
+                    "current_stock",
+                    "inbound_quantity",
+                    "ewma_daily_demand",
+                    "lead_time_days",
+                    "safety_stock",
+                    "min_order_quantity",
+                    "review_period_days",
+                    "suggested_replenish_quantity",
+                ],
+                ["snapshot_date", "product_id", "product_name", "sku_key"],
+            )
+        ]
+    elif match := re.search(
+        r"(?:建议补货量|补货建议量|补货量)最高的?\s*(\d+)\s*个\s*SKU",
+        text,
+        re.IGNORECASE,
+    ):
+        branches = [
+            branch(
+                "analytics_inventory_forecast",
+                ["suggested_replenish_quantity"],
+                ["product_id", "product_name", "sku_key"],
+                order_by=[
+                    SemanticOrder(column="suggested_replenish_quantity", direction="DESC")
+                ],
+                top_k=min(200, int(match.group(1))),
+            )
+        ]
+    elif "覆盖天数" in text and re.search(r"(没有|无|不可计算|为空|NULL)", text, re.IGNORECASE):
+        branches = [
+            branch(
+                "analytics_inventory_forecast",
+                ["coverage_days", "ewma_daily_demand", "confidence"],
+                ["product_id", "product_name", "sku_key"],
+                filters=[SemanticFilter(column="coverage_days", operator="IS_NULL")],
+            )
+        ]
+    elif match := re.search(
+        r"覆盖天数(?:低于|小于)\s*(\d+(?:\.\d+)?)\s*天",
+        text,
+    ):
+        branches = [
+            branch(
+                "analytics_inventory_forecast",
+                ["coverage_days"],
+                ["product_id", "product_name", "sku_key"],
+                filters=[
+                    SemanticFilter(
+                        column="coverage_days",
+                        operator="LT",
+                        value=float(match.group(1)),
+                    )
+                ],
+                order_by=[SemanticOrder(column="coverage_days")],
+            )
+        ]
+
+    if branches is not None:
+        return DataAnalysisPlan(
+            interpretation=plan.interpretation or text,
+            branches=branches,
+        )
+    for item in plan.branches:
+        if item.semantic_view in SUPPLY_CHAIN_COMPILER_VIEWS:
+            item.filters = [entry for entry in item.filters if entry.column != "snapshot_date"]
+    return plan
 
 
 _AMBIGUOUS_SALES = re.compile(r"(销量最高|最畅销|最好卖|销售最好|卖(?:得|的)?最好)")
@@ -893,6 +1088,94 @@ def _deterministic_narrative(
     )
 
 
+def _supply_chain_disclosures(plan: DataAnalysisPlan) -> tuple[list[str], list[str]]:
+    branches = [
+        branch
+        for branch in plan.branches
+        if branch.semantic_view in SUPPLY_CHAIN_COMPILER_VIEWS
+    ]
+    if not branches:
+        return [], []
+    facts = ["current snapshot only"]
+    statements = ["库存结果仅代表当前快照"]
+    if len({branch.semantic_view for branch in branches}) > 1:
+        facts.extend(["two separate result tables", "no cross-view join"])
+        statements.append("结果按两个视图分别展示，未合并数据")
+
+    for branch in branches:
+        metrics = set(branch.metrics)
+        dimensions = set(branch.dimensions)
+        filters = {item.column: item for item in branch.filters}
+        orders = {item.column: item.direction for item in branch.order_by}
+        if branch.semantic_view == "analytics_inventory_risk":
+            stock_filter = filters.get("stock")
+            if (
+                stock_filter is not None
+                and stock_filter.operator == "LTE"
+                and stock_filter.value == 0
+            ) or ("stockout_sku_count" in metrics and "risk_level" not in dimensions):
+                facts.append("stock<=0 definition")
+                statements.append("缺货定义为 stock<=0")
+            if "property_value_id_hash" in dimensions:
+                facts.append("SKU hash")
+            if stock_filter is not None and stock_filter.operator == "BETWEEN":
+                facts.extend(
+                    [
+                        "low stock definition: 1..10",
+                        "exclude stock<=0",
+                        "stable ascending order",
+                    ]
+                )
+                statements.append("低库存定义为 1<=stock<=10，排除 stock<=0，并按库存稳定升序")
+            if branch.top_k < 200 and orders.get("stock") == "DESC":
+                facts.extend(
+                    [
+                        f"top {branch.top_k}",
+                        "tie-break: product_id then SKU hash",
+                    ]
+                )
+                statements.append(
+                    f"返回前 {branch.top_k} 项，并列时依次按 product_id、SKU 哈希排序"
+                )
+            continue
+
+        facts.extend(
+            [
+                "human planning input",
+                "data coverage boundary",
+                "not a stockout probability",
+            ]
+        )
+        statements.append("库存预测属于人工规划输入，受数据覆盖边界约束，不表示缺货概率")
+        if "suggested_replenish_quantity" in metrics:
+            facts.extend(["human replenishment suggestion", "not a purchase instruction"])
+            statements.append("suggested_replenish_quantity 是人工补货建议，不是采购指令")
+        if "ewma_daily_demand" in metrics:
+            facts.append("28-day EWMA demand input")
+        if {"lead_time_days", "safety_stock"}.issubset(metrics):
+            facts.append("lead time and safety stock")
+        if {"min_order_quantity", "review_period_days"}.issubset(metrics):
+            facts.append("MOQ and review period")
+        if "confidence" in metrics:
+            facts.extend(["confidence means data coverage", "not statistical confidence"])
+            statements.append("confidence 表示有效销售日的数据覆盖度，不是统计置信度")
+        coverage_filter = filters.get("coverage_days")
+        if coverage_filter is not None and coverage_filter.operator == "LT":
+            facts.append("exclude NULL coverage")
+            statements.append("coverage_days 不可计算的记录已排除")
+        if branch.top_k < 200 and orders.get("suggested_replenish_quantity") == "DESC":
+            facts.extend(
+                [
+                    f"top {branch.top_k}",
+                    "tie-break: product_id then sku_key",
+                ]
+            )
+            statements.append(
+                f"返回前 {branch.top_k} 项，并列时依次按 product_id、sku_key 排序"
+            )
+    return list(dict.fromkeys(facts)), list(dict.fromkeys(statements))
+
+
 class DataAnalystService:
     @staticmethod
     def _validate_plan_dates_and_contract(
@@ -920,10 +1203,25 @@ class DataAnalystService:
                 ]
             columns = allowed_plan_fields(branch.semantic_view)
             selected = [*branch.metrics, *branch.dimensions]
-            if not branch.metrics or not set(selected).issubset(columns):
+            condition_columns = [
+                *(item.column for item in branch.filters),
+                *(item.column for item in branch.order_by),
+            ]
+            if (
+                not branch.metrics
+                or not set([*selected, *condition_columns]).issubset(columns)
+                or branch.top_k > get_settings().analytics_max_rows
+            ):
                 raise ValueError("DATA_ANALYST_COLUMN_INVALID")
-            branch.start_date = branch.start_date or default_start
-            branch.end_date = branch.end_date or default_end
+            if str(CATALOG[branch.semantic_view].get("answerability") or "") in {
+                "CURRENT_SNAPSHOT_ONLY",
+                "PLANNING_INPUT_ONLY",
+            }:
+                branch.start_date = default_end
+                branch.end_date = default_end
+            else:
+                branch.start_date = branch.start_date or default_start
+                branch.end_date = branch.end_date or default_end
             if (
                 branch.end_date < branch.start_date
                 or (branch.end_date - branch.start_date).days + 1 > max_days
@@ -953,7 +1251,10 @@ class DataAnalystService:
                     " clarification_options；每项必须含 label 和可直接追加到原问题的 answer_suffix。"
                     "复杂问题拆成最多三个相互独立的指标树分支；每个分支只能选择一个语义视图，"
                     "使用唯一 branch_id，并写清该分支验证什么。每个 READY 分支的 metrics 至少一项；"
-                    "派生指标必须使用目录中的指标名。简单问题只生成一个分支。"
+                    "派生指标必须使用目录中的指标名。所有非日期条件必须写入 filters，排序写入"
+                    " order_by，前 N 写入 top_k；不能只把条件写在 purpose。日期只使用 start_date/"
+                    "end_date，不放入 filters。SKU 明细必须包含目录 grain 中的 SKU 键；缺货明细"
+                    "metrics 使用 stock，只有缺货总数才使用 stockout_sku_count。简单问题只生成一个分支。"
                     "严格只返回一个 JSON 对象，不得输出 Markdown。"
                     f"JSON Schema：{_schema_instruction(DataAnalysisPlan)}"
                 )
@@ -991,13 +1292,14 @@ class DataAnalystService:
                     SystemMessage(
                         content=(
                             "上一版计划未通过结构校验。重新生成完整 JSON；READY 状态下每个分支"
-                            "必须包含至少一个目录允许的 metrics，缺货 SKU 数量使用受治理派生指标"
-                            " stockout_sku_count。"
+                            "必须包含至少一个目录允许的 metrics，并显式给出 filters、order_by、top_k。"
+                            "缺货总数使用 stockout_sku_count；缺货明细使用 stock 并包含 SKU grain。"
                         )
                     )
                 )
         if plan is None:
             raise ValueError("DATA_ANALYST_PLAN_PARSE_FAILED")
+        plan = _normalize_supply_chain_plan(question, plan, end=end)
         if plan.status == "NEEDS_CLARIFICATION":
             return plan
         return self._validate_plan_dates_and_contract(
@@ -1145,6 +1447,7 @@ class DataAnalystService:
             warnings.append("ANALYTICS_MAX_ROWS_REACHED")
         views = [branch.semantic_view for branch in plan.branches]
         disclosure = disclosure_contract(views)
+        semantic_facts, semantic_disclosures = _supply_chain_disclosures(plan)
         periods = list(
             dict.fromkeys(
                 f"{branch.start_date.isoformat()} 至 {branch.end_date.isoformat()}"
@@ -1175,8 +1478,13 @@ class DataAnalystService:
             if disclosure["mustDisclose"]
             else ""
         )
+        semantic_text = (
+            f"供应链口径：{'；'.join(semantic_disclosures)}。"
+            if semantic_disclosures
+            else ""
+        )
         answer = str(result.get("answer") or "").strip()
-        for line in (source_text, boundary_text):
+        for line in (source_text, boundary_text, semantic_text):
             if line and line not in answer:
                 answer = f"{answer}\n{line}".strip()
         branch_snapshots = list(result.get("branches") or [])
@@ -1231,6 +1539,9 @@ class DataAnalystService:
             "dataAsOf": data_as_of,
             "provisional": True,
             "answerBoundary": disclosure,
+            "requiredFacts": list(
+                dict.fromkeys([*(result.get("requiredFacts") or []), *semantic_facts])
+            ),
             "warnings": list(dict.fromkeys(warnings)),
             "nextCursor": next_cursor,
             "page": {
@@ -1270,13 +1581,25 @@ class DataAnalystService:
         scan_estimate: dict[str, Any] | None = None
         warnings: list[str] = []
         feedback: str | None = None
-        for attempt in range(2):
+        compiled_sql = _compile_branch_sql(branch)
+        sql_source = "DETERMINISTIC_COMPILER" if compiled_sql is not None else "LLM_SQL"
+        if compiled_sql is not None:
+            episode_service.record_step(
+                "DATA_ANALYST_SQL_COMPILE",
+                node_name="semantic_sql_compiler",
+                status="OK",
+                output_data={
+                    "branchId": branch.branch_id,
+                    "semanticView": branch.semantic_view,
+                    "sqlHash": hashlib.sha256(compiled_sql.encode()).hexdigest(),
+                },
+                agent_id="data_analyst",
+                run_id=run_id,
+            )
+        for attempt in range(1 if compiled_sql is not None else 2):
             try:
-                sql = await self._draft_sql(
-                    question,
-                    branch_plan,
-                    branch=branch,
-                    feedback=feedback,
+                sql = compiled_sql or await self._draft_sql(
+                    question, branch_plan, branch=branch, feedback=feedback
                 )
             except Exception:
                 feedback = "SQL_DRAFT_FAILED"
@@ -1380,6 +1703,7 @@ class DataAnalystService:
                         "purpose": branch.purpose,
                         "status": "ANALYTICS_POOL_UNAVAILABLE",
                         "sql": sql,
+                        "sqlSource": sql_source,
                         "lineage": list(guard.tables),
                         "warnings": ["ANALYTICS_POOL_UNAVAILABLE"],
                     }
@@ -1404,6 +1728,7 @@ class DataAnalystService:
                 "purpose": branch.purpose,
                 "status": reason,
                 "sql": sql,
+                "sqlSource": sql_source,
                 "lineage": list(guard.tables if guard else ()),
                 "warnings": [reason, *warnings],
             }
@@ -1459,6 +1784,7 @@ class DataAnalystService:
             "answer": narrative.answer,
             "highlights": narrative.highlights,
             "sql": sql,
+            "sqlSource": sql_source,
             "columns": columns[:20],
             "columnTypes": column_types,
             "rows": rows,
@@ -1583,7 +1909,7 @@ class DataAnalystService:
                 "successfulBranchCount": len(successful),
                 "lineage": lineage,
                 "latencyMs": latency_ms,
-                "answerVersion": "v2-metric-tree",
+                "answerVersion": _DATA_ANALYST_VERSION,
                 "causalCaution": bool(causal_caution),
             },
             latency_ms=latency_ms,
@@ -1621,6 +1947,7 @@ class DataAnalystService:
                     "purpose": branch.get("purpose"),
                     "status": branch.get("status"),
                     "sql": branch.get("sql"),
+                    "sqlSource": branch.get("sqlSource"),
                     "explain": branch.get("explain") or [],
                     "explainDiagnostic": branch.get("explainDiagnostic"),
                     "scanEstimate": branch.get("scanEstimate"),
@@ -1676,7 +2003,7 @@ class DataAnalystService:
             queue_name="admin.data_analyst",
             force_keep=True,
             agent_id="data_analyst",
-            agent_version="v2-foundation",
+            agent_version=_DATA_ANALYST_VERSION,
             actor_type="ADMIN",
         )
         with bind_episode(
@@ -1758,6 +2085,45 @@ class DataAnalystService:
                 agent_id="data_analyst",
                 run_id=run_id,
             )
+            try:
+                for branch in plan.branches:
+                    _compile_branch_sql(branch)
+            except SemanticPlanUnsupported:
+                reason_code = "SEMANTIC_PLAN_UNSUPPORTED"
+                contract = analytics_no_query_contract(
+                    "deterministic compiler boundary",
+                    "no free SQL fallback",
+                )
+                episode_service.record_step(
+                    "DATA_ANALYST_SQL_COMPILE",
+                    node_name="semantic_sql_compiler",
+                    status="BLOCKED",
+                    error_code=reason_code,
+                    output_data={"reason": reason_code},
+                    agent_id="data_analyst",
+                    run_id=run_id,
+                )
+                episode_service.finish_run(
+                    "semantic_plan_unsupported",
+                    run_id=run_id,
+                    status="DEGRADED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": "ABSTAIN",
+                    "completion": "NOT_APPLICABLE",
+                    "status": reason_code,
+                    "reasonCode": reason_code,
+                    "answer": (
+                        "该供应链语义计划暂不在确定性编译器支持范围内，已停止执行，"
+                        "不会回退到自由 SQL。\n"
+                        f"{contract['capabilityBoundary']}\n"
+                        "本次 no SQL：未执行查询，也未读取分析数据。"
+                    ),
+                    "warnings": [],
+                    **contract,
+                }
             if plan.status == "NEEDS_CLARIFICATION":
                 if not allow_clarification:
                     reason_code = "AMBIGUITY_REMAINS_AFTER_CLARIFICATION"
@@ -1929,12 +2295,14 @@ class DataAnalystService:
                 "answer": answer,
                 "highlights": branch_result.get("highlights") or [],
                 "sql": branch_result.get("sql"),
+                "sqlSource": branch_result.get("sqlSource"),
                 "queries": [
                     {
                         "branchId": branch.branch_id,
                         "purpose": branch.purpose,
                         "status": branch_result.get("status"),
                         "sql": branch_result.get("sql"),
+                        "sqlSource": branch_result.get("sqlSource"),
                         "explain": branch_result.get("explain") or [],
                         "explainDiagnostic": branch_result.get("explainDiagnostic"),
                         "scanEstimate": branch_result.get("scanEstimate"),
@@ -1963,7 +2331,7 @@ class DataAnalystService:
                     "rowCount": len(result["rows"]),
                     "lineage": result["lineage"],
                     "latencyMs": latency_ms,
-                    "answerVersion": "v2-foundation",
+                    "answerVersion": _DATA_ANALYST_VERSION,
                 },
                 latency_ms=latency_ms,
                 agent_id="data_analyst",

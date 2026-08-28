@@ -10,15 +10,24 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.services.analytics_policy import evaluate_question_policy
+from app.services.analytics_semantic_compiler import (
+    SemanticFilter,
+    SemanticOrder,
+    SemanticPlanUnsupported,
+)
 from app.services.data_analyst_service import (
     DataAnalysisBranch,
     DataAnalysisPlan,
     DataAnalystService,
     DataNarrative,
+    _compile_branch_sql,
     _contract_failure,
     _deterministic_narrative,
+    _normalize_supply_chain_plan,
     _response_contract_errors,
     _structured_json_llm,
+    _supply_chain_disclosures,
 )
 
 
@@ -728,3 +737,596 @@ def test_data_analysis_plan_rejects_duplicate_branch_ids(monkeypatch):
             default_start=date(2026, 8, 1),
             default_end=date(2026, 8, 7),
         )
+
+
+@pytest.mark.parametrize(
+    ("branch", "expected_sql"),
+    [
+        (
+            DataAnalysisBranch(
+                branch_id="stockout-details",
+                semantic_view="analytics_inventory_risk",
+                dimensions=[
+                    "snapshot_date",
+                    "product_id",
+                    "product_name",
+                    "property_value_id_hash",
+                    "risk_level",
+                ],
+                metrics=["stock"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                filters=[SemanticFilter(column="stock", operator="LTE", value=0)],
+            ),
+            "SELECT snapshot_date, product_id, product_name, property_value_id_hash, "
+            "stock, risk_level FROM analytics_inventory_risk WHERE snapshot_date BETWEEN "
+            "'2026-08-27' AND '2026-08-27' AND stock <= 0 ORDER BY product_id ASC, "
+            "property_value_id_hash ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="stockout-count",
+                semantic_view="analytics_inventory_risk",
+                dimensions=[],
+                metrics=["stockout_sku_count"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+            ),
+            "SELECT SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END) AS stockout_sku_count "
+            "FROM analytics_inventory_risk WHERE snapshot_date BETWEEN '2026-08-27' "
+            "AND '2026-08-27' LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="risk-level-count",
+                semantic_view="analytics_inventory_risk",
+                dimensions=["risk_level"],
+                metrics=["stockout_sku_count"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+            ),
+            "SELECT risk_level, COUNT(*) AS sku_count FROM analytics_inventory_risk "
+            "WHERE snapshot_date BETWEEN '2026-08-27' AND '2026-08-27' "
+            "GROUP BY risk_level ORDER BY risk_level ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="low-stock",
+                semantic_view="analytics_inventory_risk",
+                dimensions=[
+                    "product_id",
+                    "product_name",
+                    "property_value_id_hash",
+                    "risk_level",
+                ],
+                metrics=["stock"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                filters=[
+                    SemanticFilter(column="stock", operator="BETWEEN", value=1, second_value=10)
+                ],
+                order_by=[SemanticOrder(column="stock")],
+            ),
+            "SELECT product_id, product_name, property_value_id_hash, stock, risk_level "
+            "FROM analytics_inventory_risk WHERE snapshot_date BETWEEN '2026-08-27' "
+            "AND '2026-08-27' AND stock BETWEEN 1 AND 10 ORDER BY stock ASC, product_id "
+            "ASC, property_value_id_hash ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="stock-top",
+                semantic_view="analytics_inventory_risk",
+                dimensions=["product_id", "property_value_id_hash"],
+                metrics=["stock"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                order_by=[SemanticOrder(column="stock", direction="DESC")],
+                top_k=3,
+            ),
+            "SELECT product_id, property_value_id_hash, stock FROM analytics_inventory_risk "
+            "WHERE snapshot_date BETWEEN '2026-08-27' AND '2026-08-27' ORDER BY stock DESC, "
+            "product_id ASC, property_value_id_hash ASC LIMIT 3",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="forecast-inputs",
+                semantic_view="analytics_inventory_forecast",
+                dimensions=["snapshot_date", "product_id", "product_name", "sku_key"],
+                metrics=[
+                    "current_stock",
+                    "inbound_quantity",
+                    "ewma_daily_demand",
+                    "lead_time_days",
+                    "safety_stock",
+                    "min_order_quantity",
+                    "review_period_days",
+                    "suggested_replenish_quantity",
+                ],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+            ),
+            "SELECT snapshot_date, product_id, product_name, sku_key, current_stock, "
+            "inbound_quantity, ewma_daily_demand, lead_time_days, safety_stock, "
+            "min_order_quantity, review_period_days, suggested_replenish_quantity FROM "
+            "analytics_inventory_forecast WHERE snapshot_date BETWEEN '2026-08-27' AND "
+            "'2026-08-27' ORDER BY product_id ASC, sku_key ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="replenishment-top",
+                semantic_view="analytics_inventory_forecast",
+                dimensions=["product_id", "product_name", "sku_key"],
+                metrics=["suggested_replenish_quantity"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                order_by=[SemanticOrder(column="suggested_replenish_quantity", direction="DESC")],
+                top_k=3,
+            ),
+            "SELECT product_id, product_name, sku_key, suggested_replenish_quantity "
+            "FROM analytics_inventory_forecast WHERE snapshot_date BETWEEN '2026-08-27' "
+            "AND '2026-08-27' ORDER BY suggested_replenish_quantity DESC, product_id ASC, "
+            "sku_key ASC LIMIT 3",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="low-coverage",
+                semantic_view="analytics_inventory_forecast",
+                dimensions=["product_id", "product_name", "sku_key"],
+                metrics=["coverage_days"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                filters=[SemanticFilter(column="coverage_days", operator="LT", value=7)],
+                order_by=[SemanticOrder(column="coverage_days")],
+            ),
+            "SELECT product_id, product_name, sku_key, coverage_days FROM "
+            "analytics_inventory_forecast WHERE snapshot_date BETWEEN '2026-08-27' "
+            "AND '2026-08-27' AND coverage_days < 7 ORDER BY coverage_days ASC, "
+            "product_id ASC, sku_key ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="unknown-coverage",
+                semantic_view="analytics_inventory_forecast",
+                dimensions=["product_id", "product_name", "sku_key"],
+                metrics=["coverage_days", "ewma_daily_demand", "confidence"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                filters=[SemanticFilter(column="coverage_days", operator="IS_NULL")],
+            ),
+            "SELECT product_id, product_name, sku_key, coverage_days, ewma_daily_demand, "
+            "confidence FROM analytics_inventory_forecast WHERE snapshot_date BETWEEN "
+            "'2026-08-27' AND '2026-08-27' AND coverage_days IS NULL ORDER BY "
+            "product_id ASC, sku_key ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="forecast-comparison",
+                semantic_view="analytics_inventory_forecast",
+                dimensions=["product_id", "sku_key"],
+                metrics=["current_stock", "suggested_replenish_quantity", "confidence"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+            ),
+            "SELECT product_id, sku_key, current_stock, suggested_replenish_quantity, "
+            "confidence FROM analytics_inventory_forecast WHERE snapshot_date BETWEEN "
+            "'2026-08-27' AND '2026-08-27' ORDER BY product_id ASC, sku_key ASC LIMIT 200",
+        ),
+        (
+            DataAnalysisBranch(
+                branch_id="risk-comparison",
+                semantic_view="analytics_inventory_risk",
+                dimensions=["product_id", "property_value_id_hash", "risk_level"],
+                metrics=["stock"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+            ),
+            "SELECT product_id, property_value_id_hash, stock, risk_level FROM "
+            "analytics_inventory_risk WHERE snapshot_date BETWEEN '2026-08-27' AND "
+            "'2026-08-27' ORDER BY product_id ASC, property_value_id_hash ASC LIMIT 200",
+        ),
+    ],
+)
+def test_supply_chain_semantic_compiler_is_deterministic(branch, expected_sql):
+    assert _compile_branch_sql(branch) == expected_sql
+
+
+def test_supply_chain_semantic_compiler_rejects_mysql_backslash_escape():
+    branch = DataAnalysisBranch(
+        branch_id="unsafe-text-filter",
+        semantic_view="analytics_inventory_risk",
+        dimensions=["product_id", "property_value_id_hash"],
+        metrics=["stock"],
+        start_date=date(2026, 8, 27),
+        end_date=date(2026, 8, 27),
+        filters=[
+            SemanticFilter(
+                column="risk_level",
+                operator="EQ",
+                value=r"x\' AND stock > 0",
+            )
+        ],
+    )
+
+    with pytest.raises(SemanticPlanUnsupported, match="SEMANTIC_PLAN_UNSUPPORTED"):
+        _compile_branch_sql(branch)
+
+
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        (
+            "列出 2026-08-27 当前所有缺货 SKU。",
+            [
+                (
+                    "analytics_inventory_risk",
+                    ("stock",),
+                    (
+                        "snapshot_date",
+                        "product_id",
+                        "product_name",
+                        "property_value_id_hash",
+                        "risk_level",
+                    ),
+                    (("stock", "LTE", 0, None),),
+                    (),
+                    200,
+                )
+            ],
+        ),
+        (
+            "2026-08-27 当前缺货 SKU 有多少个？",
+            [
+                (
+                    "analytics_inventory_risk",
+                    ("stockout_sku_count",),
+                    (),
+                    (),
+                    (),
+                    200,
+                )
+            ],
+        ),
+        (
+            "列出 2026-08-27 当前低库存但未缺货的 SKU，按库存从少到多排序。",
+            [
+                (
+                    "analytics_inventory_risk",
+                    ("stock",),
+                    ("product_id", "product_name", "property_value_id_hash", "risk_level"),
+                    (("stock", "BETWEEN", 1, 10),),
+                    (("stock", "ASC"),),
+                    200,
+                )
+            ],
+        ),
+        (
+            "2026-08-27 当前各库存风险等级分别有多少个 SKU？",
+            [
+                (
+                    "analytics_inventory_risk",
+                    ("stockout_sku_count",),
+                    ("risk_level",),
+                    (),
+                    (),
+                    200,
+                )
+            ],
+        ),
+        (
+            "列出 2026-08-27 当前库存最多的 3 个 SKU，并列按商品 ID 和 SKU 哈希排序。",
+            [
+                (
+                    "analytics_inventory_risk",
+                    ("stock",),
+                    ("product_id", "property_value_id_hash"),
+                    (),
+                    (("stock", "DESC"),),
+                    3,
+                )
+            ],
+        ),
+        (
+            "列出 2026-08-27 当前所有 SKU 的库存预测输入和人工补货建议量。",
+            [
+                (
+                    "analytics_inventory_forecast",
+                    (
+                        "current_stock",
+                        "inbound_quantity",
+                        "ewma_daily_demand",
+                        "lead_time_days",
+                        "safety_stock",
+                        "min_order_quantity",
+                        "review_period_days",
+                        "suggested_replenish_quantity",
+                    ),
+                    ("snapshot_date", "product_id", "product_name", "sku_key"),
+                    (),
+                    (),
+                    200,
+                )
+            ],
+        ),
+        (
+            "2026-08-27 人工建议补货量最高的 3 个 SKU 是哪些？",
+            [
+                (
+                    "analytics_inventory_forecast",
+                    ("suggested_replenish_quantity",),
+                    ("product_id", "product_name", "sku_key"),
+                    (),
+                    (("suggested_replenish_quantity", "DESC"),),
+                    3,
+                )
+            ],
+        ),
+        (
+            "列出 2026-08-27 当前预测覆盖天数低于 7 天的 SKU。",
+            [
+                (
+                    "analytics_inventory_forecast",
+                    ("coverage_days",),
+                    ("product_id", "product_name", "sku_key"),
+                    (("coverage_days", "LT", 7.0, None),),
+                    (("coverage_days", "ASC"),),
+                    200,
+                )
+            ],
+        ),
+        (
+            "列出 2026-08-27 当前没有可计算覆盖天数的 SKU，并展示日均需求和数据覆盖度。",
+            [
+                (
+                    "analytics_inventory_forecast",
+                    ("coverage_days", "ewma_daily_demand", "confidence"),
+                    ("product_id", "product_name", "sku_key"),
+                    (("coverage_days", "IS_NULL", None, None),),
+                    (),
+                    200,
+                )
+            ],
+        ),
+        (
+            "对照 2026-08-27 的人工补货建议与当前库存风险；分别返回两张表，不做跨视图 Join。",
+            [
+                (
+                    "analytics_inventory_forecast",
+                    ("current_stock", "suggested_replenish_quantity", "confidence"),
+                    ("product_id", "sku_key"),
+                    (),
+                    (),
+                    200,
+                ),
+                (
+                    "analytics_inventory_risk",
+                    ("stock",),
+                    ("product_id", "property_value_id_hash", "risk_level"),
+                    (),
+                    (),
+                    200,
+                ),
+            ],
+        ),
+    ],
+)
+def test_supply_chain_plan_normalizer_fills_explicit_slots(question, expected):
+    raw = DataAnalysisPlan(
+        interpretation="model plan",
+        branches=[
+            DataAnalysisBranch(
+                branch_id="model-branch",
+                semantic_view="analytics_inventory_risk",
+                dimensions=["product_id", "property_value_id_hash"],
+                metrics=["stock"],
+                start_date=date(2026, 8, 20),
+                end_date=date(2026, 8, 26),
+                filters=[
+                    SemanticFilter(
+                        column="snapshot_date",
+                        operator="EQ",
+                        value="2026-08-26",
+                    )
+                ],
+            )
+        ],
+    )
+
+    plan = _normalize_supply_chain_plan(question, raw, end=date(2026, 8, 27))
+    actual = [
+        (
+            branch.semantic_view,
+            tuple(branch.metrics),
+            tuple(branch.dimensions),
+            tuple(
+                (item.column, item.operator, item.value, item.second_value)
+                for item in branch.filters
+            ),
+            tuple((item.column, item.direction) for item in branch.order_by),
+            branch.top_k,
+        )
+        for branch in plan.branches
+    ]
+
+    assert actual == expected
+    assert all(branch.start_date == branch.end_date == date(2026, 8, 27) for branch in plan.branches)
+
+
+def test_supply_chain_plan_normalizer_removes_duplicate_snapshot_filter():
+    plan = DataAnalysisPlan(
+        branches=[
+            DataAnalysisBranch(
+                branch_id="risk",
+                semantic_view="analytics_inventory_risk",
+                metrics=["stock"],
+                dimensions=["product_id", "property_value_id_hash"],
+                filters=[
+                    SemanticFilter(column="snapshot_date", operator="EQ", value="2026-08-27"),
+                    SemanticFilter(column="risk_level", operator="EQ", value="NORMAL"),
+                ],
+            )
+        ]
+    )
+
+    normalized = _normalize_supply_chain_plan(
+        "列出当前 NORMAL 风险 SKU",
+        plan,
+        end=date(2026, 8, 27),
+    )
+
+    assert [item.column for item in normalized.branches[0].filters] == ["risk_level"]
+
+
+def test_question_policy_allows_explicit_no_join_multi_table_request():
+    assert (
+        evaluate_question_policy(
+            "分别返回补货建议与库存风险两张表，不做跨视图 Join。",
+            tenant_id=None,
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("question", "expected_facts"),
+    [
+        (
+            "列出 2026-08-27 当前所有缺货 SKU。",
+            {"current snapshot only", "stock<=0 definition", "SKU hash"},
+        ),
+        (
+            "列出 2026-08-27 当前低库存但未缺货的 SKU，按库存从少到多排序。",
+            {"low stock definition: 1..10", "exclude stock<=0", "stable ascending order"},
+        ),
+        (
+            "列出 2026-08-27 当前库存最多的 3 个 SKU。",
+            {"top 3", "tie-break: product_id then SKU hash"},
+        ),
+        (
+            "列出 2026-08-27 当前所有 SKU 的库存预测输入和人工补货建议量。",
+            {
+                "28-day EWMA demand input",
+                "lead time and safety stock",
+                "MOQ and review period",
+                "human replenishment suggestion",
+                "data coverage boundary",
+                "not a purchase instruction",
+            },
+        ),
+        (
+            "2026-08-27 人工建议补货量最高的 3 个 SKU 是哪些？",
+            {"top 3", "tie-break: product_id then sku_key"},
+        ),
+        (
+            "列出 2026-08-27 当前预测覆盖天数低于 7 天的 SKU。",
+            {"exclude NULL coverage", "human planning input", "not a stockout probability"},
+        ),
+        (
+            "列出当前没有可计算覆盖天数的 SKU，并展示日均需求和数据覆盖度。",
+            {"confidence means data coverage", "not statistical confidence"},
+        ),
+        (
+            "对照人工补货建议与当前库存风险；分别返回两张表，不做跨视图 Join。",
+            {"two separate result tables", "no cross-view join"},
+        ),
+    ],
+)
+def test_supply_chain_disclosures_cover_compiled_semantics(question, expected_facts):
+    raw = DataAnalysisPlan(
+        branches=[
+            DataAnalysisBranch(
+                branch_id="model",
+                semantic_view="analytics_inventory_risk",
+                metrics=["stock"],
+                dimensions=["product_id", "property_value_id_hash"],
+            )
+        ]
+    )
+    plan = _normalize_supply_chain_plan(question, raw, end=date(2026, 8, 27))
+
+    facts, statements = _supply_chain_disclosures(plan)
+
+    assert expected_facts.issubset(facts)
+    assert statements
+
+
+@pytest.mark.asyncio
+async def test_supply_chain_compiler_never_calls_free_sql_model(monkeypatch):
+    service = DataAnalystService()
+    plan = DataAnalysisPlan(
+        interpretation="当前缺货明细",
+        branches=[
+            DataAnalysisBranch(
+                branch_id="stockout-details",
+                semantic_view="analytics_inventory_risk",
+                dimensions=["product_id", "property_value_id_hash", "risk_level"],
+                metrics=["stock"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+                filters=[SemanticFilter(column="stock", operator="LTE", value=0)],
+            )
+        ],
+    )
+    draft = AsyncMock(side_effect=AssertionError("covered view must not draft SQL"))
+    monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
+    monkeypatch.setattr(service, "_plan", AsyncMock(return_value=plan))
+    monkeypatch.setattr(service, "_draft_sql", draft)
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._explain_sql", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        "app.services.data_analyst_service._execute_sql",
+        AsyncMock(
+            return_value=[
+                {
+                    "product_id": "P100",
+                    "property_value_id_hash": "SKU-P100-A",
+                    "risk_level": "OUT_OF_STOCK",
+                    "stock": 0,
+                }
+            ]
+        ),
+    )
+    events = _stub_episode(monkeypatch)
+
+    result = await service.ask("列出当前缺货 SKU", admin_id="admin")
+
+    assert result["outcome"] == "ANSWER"
+    assert result["sqlSource"] == "DETERMINISTIC_COMPILER"
+    assert "stock <= 0" in result["sql"]
+    assert "DATA_ANALYST_SQL_COMPILE" in events
+    draft.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unsupported_supply_plan_abstains_without_sql_fallback(monkeypatch):
+    service = DataAnalystService()
+    plan = DataAnalysisPlan(
+        interpretation="按商品聚合非加总预测覆盖度",
+        branches=[
+            DataAnalysisBranch(
+                branch_id="unsupported",
+                semantic_view="analytics_inventory_forecast",
+                dimensions=["product_id"],
+                metrics=["confidence"],
+                start_date=date(2026, 8, 27),
+                end_date=date(2026, 8, 27),
+            )
+        ],
+    )
+    draft = AsyncMock(side_effect=AssertionError("unsupported plan must not draft SQL"))
+    query = AsyncMock(side_effect=AssertionError("unsupported plan must not query"))
+    monkeypatch.setattr("app.services.data_analyst_service.get_settings", _settings)
+    monkeypatch.setattr(service, "_plan", AsyncMock(return_value=plan))
+    monkeypatch.setattr(service, "_draft_sql", draft)
+    monkeypatch.setattr("app.services.data_analyst_service._execute_sql", query)
+    events = _stub_episode(monkeypatch)
+
+    result = await service.ask("按商品汇总预测置信度", admin_id="admin")
+
+    assert result["outcome"] == "ABSTAIN"
+    assert result["reasonCode"] == "SEMANTIC_PLAN_UNSUPPORTED"
+    assert result["queryExecuted"] is False
+    assert "不会回退到自由 SQL" in result["answer"]
+    assert events == ["DATA_ANALYST_PLAN", "DATA_ANALYST_SQL_COMPILE"]
+    draft.assert_not_awaited()
+    query.assert_not_awaited()

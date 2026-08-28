@@ -17,6 +17,7 @@ _DANGEROUS_FUNCTIONS = frozenset(
 _ALLOWED_FUNCTIONS = frozenset(
     {
         "abs",
+        "and",
         "avg",
         "coalesce",
         "count",
