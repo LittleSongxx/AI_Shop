@@ -6,7 +6,9 @@
 >
 > 当前分支：`dev`
 >
-> Stage B 源码检查点：`3a89ed8`（供应链确定性编译）
+> Stage C 源码检查点：`2744f58`（供应链 + 推荐/工具质量确定性编译；披露误报修正）
+>
+> 上一检查点：`3a89ed8`（供应链确定性编译）
 >
 > 重要：第 0 节是接手后的最新状态；与后文 2026-08-28 快照冲突时，以第 0 节为准。
 
@@ -19,6 +21,7 @@
 - 先完成低风险确定性响应合同，再进入 compiler；
 - 采用 hybrid semantic compiler，LLM 只负责结构化 semantic plan；
 - 第一批 compiler 只覆盖供应链 `analytics_inventory_forecast` 和 `analytics_inventory_risk`；
+- 已在后续检查点把 `analytics_recommendation_quality_daily` 与 `analytics_tool_quality_daily` 纳入确定性 compiler；
 - 源码、测试、文档按检查点提交，evaluation evidence 单独保存，不混入 Git；
 - 当前 80 条继续只作已见 development regression；新 unseen 暂缓；
 - 不扩大 reader 权限、不修改十视图 DDL、不启动生产部署。
@@ -31,9 +34,11 @@ da17e39 test(text2sql): archive V0 evaluation harness
 25d653f docs(text2sql): record V0 handoff and evidence boundaries
 d8c6c82 feat(text2sql): enforce deterministic response contracts
 3a89ed8 feat(text2sql): compile supply analytics deterministically
+e2f127d feat(text2sql): compile quality analytics deterministically
+2744f58 fix(text2sql): avoid false timeout disclosures
 ```
 
-### 0.2 Stage A 和第一批 Stage B 已完成
+### 0.2 Stage A、Stage B 和 Stage C 已完成
 
 Stage A 已把 DENY、ABSTAIN、CLARIFY 和 ANSWER 的关键响应字段改为确定性合同，并修复 SQL guard 对 sqlglot `AND` 节点的识别。接受的 Stage A 基线是：
 
@@ -55,7 +60,16 @@ post-contract-v0-20260828-run-001
 - Java 下载接口先复制只读 upstream headers，再设置 JSON content type 和 disposition，修复成功导出被 `UnsupportedOperationException` 包装成空 `data` 的问题；
 - input freeze 已纳入 compiler 和 policy 源码，最终证据能绑定实际执行实现。
 
-### 0.3 最终 80×3 development regression
+Stage C 在 `e2f127d`、`2744f58` 完成：
+
+- 推荐质量视图按 VERIFIED 事件发生日编译明细、按商品聚合、稳定排序和聚合筛选；
+- 工具质量视图按技术调用状态编译明细、失败 Top 1 和工具聚合；加权平均、NULL 和金额等不受支持语义仍不会被自由 SQL 猜测；
+- 质量视图结果由确定性 renderer 补齐 event-day、VERIFIED、technical-call-status、period、dataAsOf、catalogVersion 及导出权限边界；
+- t007/t048 当前均等待真实 branch-level fault injection；现阶段只依据观测到的分支状态披露 timeout，其他错误不会被误称为 timeout；
+- 编译分支 trace 标记 `sqlSource=DETERMINISTIC_COMPILER`，运行版本为 `v3-quality-compiler`；
+- 未扩大 reader 权限、未修改十视图 DDL，未启用 unseen 或生产部署。
+
+### 0.3 Stage B 供应链 80×3 development regression
 
 与最终源码对应、SHA-256 全包校验通过的主证据是：
 
@@ -107,17 +121,69 @@ unseen=false
 releaseGateEligible=false
 ```
 
-### 0.4 最终验证与运行状态
+### 0.3.1 Stage C 质量 compiler 80×3 development regression
+
+与 `2744f58` 源码检查点对应的正式证据包为：
+
+```text
+AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/
+post-quality-compiler-v0-20260829-run-002
+```
+
+该目录由官方签字 gold
+`gold-v0-20260828/adjudicated/gold-v0.jsonl` 生成，`input-freeze` 固定
+`HEAD=2744f584e941491b6f6fb1285463d9a9ea0f5ecd`；目录内 `SHA256SUMS` 全部通过。
+模型调用存在自然波动，因此它是新版本的独立回归包，不覆盖或替代前一包
+`post-quality-compiler-v0-20260829-run-001`。
+
+run-002 canonical（trial 1）和三轮合计指标如下：
+
+| 指标 | canonical 80 条 | 三轮 240 条 |
+| --- | ---: | ---: |
+| outcome | 78/80 | 231/240 |
+| completion | 77/80 | 228/240 |
+| plan | 39/48 | 115/144 |
+| execution | 45/48 | 132/144 |
+| denotation | 36/48 | 106/144 |
+| narrative | 34/80 | 102/240 |
+| flow | 27/32 | 80/96 |
+| policy | 78/80 | 231/240 |
+| sqlPlanConsistency | 46/48 | 135/144 |
+| trusted request | 44/80 | 131/240 |
+| infrastructure failures | 1 | 6 |
+| severe security failures | 0 | 0 |
+
+canonical 延迟 P50/P95/P99 为 `4049.350/7131.833/11314.096 ms`；三轮完整决策稳定性
+为 `64/80`，outcome 稳定性为 `78/80`。这些仍是已见 development regression，不能解释为生产准确率。
+本包尚未重新进行 A/B/C 人工 answer-review；后文 `29/80 ACCEPT` 只属于旧的
+`post-foundation` 人工评审，不能套用于本 Stage C run。
+
+本阶段已实际编译并逐案验证的 7 个质量目标为 `t2s-v0-033`–`036`（推荐质量）和
+`t2s-v0-045`–`047`（工具质量）：canonical `7/7 trusted`，三轮合计 `21/21 trusted`，
+对应分支 trace 均为 `sqlSource=DETERMINISTIC_COMPILER`。两个质量视图的 canonical
+trusted 分别为推荐 `4/4`、工具 `3/4`；工具视图的第 4 个 case 是降级 case，不应从分母删除。
+
+质量切片之外的两个降级 case 需要单独看待：官方 gold 只有
+`t2s-v0-007`（fulfillment 分支）和 `t2s-v0-048`（agent_quality 分支）声明
+`flow.fault=BRANCH_2_TIMEOUT`。当前 `FlowContract.fault` 只是长度受限字符串，
+`evaluation/text2sql/runner.py` 不读取/注入该字段，scorer 对没有 flow check 的 case 返回
+`applicable=false, passed=true`，也没有 `FAULT_INJECTED` 或 production-boundary 事件。
+run-002 三轮两例均观测到 branch 2 `SUCCEEDED`、整体 `COMPLETE`，而 gold 期望
+`PARTIAL`；因此两例的 completion/execution/narrative 不通过，不能称为已完成 timeout
+演练，也不能把自然数据库错误归因于 timeout。该问题是评测 harness capability gap，
+不是业务数据或恢复能力的正面结论。
+
+### 0.4 Stage C 验证与运行状态
 
 最终源码验证：
 
-- Python 相关回归：`172 passed, 2 deselected`；
+- Python README 全定向（`-m 'not mysql'`）：`141 passed, 2 deselected`（另有 1 个 Starlette deprecation warning）；质量/compiler 两文件回归为 `122 passed, 1 skipped`；
 - 相关 ruff：通过；
 - Java `AgentMessageControllerDataAnalystTest`：通过；
 - 真实 MySQL 8.4.11 十视图可读、源表/写操作/跨库读取拒绝：通过；
-- run-002 `SHA256SUMS`：全部通过；
+- `post-quality-compiler-v0-20260829-run-002` `SHA256SUMS`：全部通过；
 - `git diff --check`：通过；
-- 定向外部模型诊断验证供应链 `10/10 trusted`，正式 run-002 验证三轮 `30/30 trusted`；
+- 定向外部模型诊断验证供应链 `10/10 trusted`；正式 Stage C 验证上述 7 个质量目标三轮 `21/21 trusted`，供应链旧切片仍为 `30/30 trusted`；
 - Text2SQL Agent/Admin 隔离进程和 MySQL/Redis fixture 已停止。
 
 仓库级 Python 全量测试此前仍有 7 个失败，原因仅是未提供既有私有 Search/RAG holdout：
@@ -131,7 +197,7 @@ unseen 已明确暂缓，不得伪造该文件或把相关测试宣称为通过�
 
 ### 0.5 当前工作区边界和下一步
 
-`3a89ed8` 之后，仍应排除以下不属于本检查点的 dirty 内容：
+`2744f58` 之后，仍应排除以下不属于本检查点的 dirty 内容：
 
 - 根目录历史中文面试文档的 tracked deletion；
 - `AI_Shop-backend/AI_Shop-agent/.privacy-exports/`；
@@ -140,13 +206,15 @@ unseen 已明确暂缓，不得伪造该文件或把相关测试宣称为通过�
 
 不要 reset、clean、恢复或顺手提交上述内容。
 
-下一技术阶段仍需在以下方向间选定优先级：
+下一步暂按低风险路线 A 保持生产链路不变：把两个 fault case 标为未闭环的 diagnostic/shadow，
+继续修复 required-facts/renderer 和非 compiler 视图的语义失败。若要正式关闭降级缺口，必须先确认以下路线：
 
-- 推荐：继续把 `analytics_recommendation_quality_daily` 与 `analytics_tool_quality_daily` 纳入确定性 compiler；两者 run-002 canonical trusted 均为 `0`，且能复用 ratio、NULL、分组、排序等编译规则；
-- 备选：先治理非供应链 plan schema 失败和 `DATA_ANALYST_COLUMN_INVALID`，收益面更广，但仍保留自由 SQL，正确性上界较低；
-- 备选：先做 deterministic answer renderer 全视图扩展，能改善 narrative，但不会修复错误 SQL/denotation。
+- **A（当前默认）**：不改生产 Java→Python 链路，只保留声明性 fault 的诚实失败和单元测试；风险最低，但 t007/t048 不能声称完成故障演练。
+- **B**：新增独立 `data-analyst-branch` HMAC capability，经 Java→Python 透传并在真实 branch-2 执行边界注入，保留 SQL/lineage/`FAULT_INJECTED` 事件；证据闭环更强，但需跨 Java、Python、runner、scorer 和安全开关审查，并重跑新 evidence。
+- **C**：新建经双盲/C 仲裁的 gold-v1 改写预期；不改运行时，但旧 HUMAN_REVIEWED gold-v0 不可覆盖，且会改变降级合同覆盖范围。
 
-unseen 继续暂缓；任何新视图 compiler、正式门槛、业务 DDL 或 reader 权限变化都应生成新证据目录，不得覆盖 run-002。
+在用户确认 B 或 C 前，不实施对应路线。unseen 继续暂缓；任何新视图 compiler、正式门槛、
+业务 DDL 或 reader 权限变化都应生成新证据目录，不得覆盖既有 run-001/run-002。
 
 ## 1. 新 Codex 先读什么
 
@@ -156,7 +224,8 @@ unseen 继续暂缓；任何新视图 compiler、正式门槛、业务 DDL 或 r
 2. `AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/final-v0-20260828-run-002/REPORT.md`。
 3. `AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/final-v0-20260828-run-002/manifest.json`。
 4. `AI_Shop-backend/AI_Shop-agent/evaluation/text2sql/README.md`。
-5. 需要历史背景时再读 `docs/project/AI-Shop-Text2SQL生产级建设与评测Handoff-20260827.md`。
+5. 本阶段主证据 `AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/post-quality-compiler-v0-20260829-run-002/manifest.json` 及 `scores.jsonl`。
+6. 需要历史背景时再读 `docs/project/AI-Shop-Text2SQL生产级建设与评测Handoff-20260827.md`。
 
 2026-08-27 handoff 中“尚无 Text2SQL 专项 gold、端到端基线和人工答案评审”的结论已经被本轮工作取代。旧文件仍有架构背景价值，但不能用来描述当前状态。
 
@@ -167,6 +236,7 @@ unseen 继续暂缓；任何新视图 compiler、正式门槛、业务 DDL 或 r
 - 建立了版本化 `PROVISIONAL` analytics catalog；
 - 实现了稳定的 `outcome/completion` 合同、Decimal 字符串、单轮澄清、冻结分页和同结果导出；
 - 单请求使用同一只读一致快照执行最多三个顺序分支；
+- 已完成供应链、推荐质量和工具质量受支持子集的 hybrid semantic compiler，并保留未支持计划的失败关闭；
 - Java、Agent、Vue 接口合同和结构化 403 已打通；
 - 建立了独立的 `evaluation/text2sql` CLI、MySQL/Redis fixture、80 条人工 gold、前后各 `80×3` 基线、自动配对比较和 canonical 输出 A/B/C 人工评审；
 - 最终证据链和 SHA-256 校验已完成，评测临时容器已停止。
@@ -175,7 +245,8 @@ unseen 继续暂缓；任何新视图 compiler、正式门槛、业务 DDL 或 r
 
 > 工程基础和证据链完成，不等于答案质量达到生产门槛。
 
-修复后 canonical 输出只有 `29/80` 获真人接受，仍有 `51/80` 被拒绝。因此最终状态固定为：
+上一 `post-foundation` 包的人工复审中，修复后 canonical 输出只有 `29/80` 获真人接受，仍有 `51/80` 被拒绝；
+Stage C 主包尚未重新进行人工 answer-review，不能把该 `29/80` 套用于质量 compiler run。因此最终状态固定为：
 
 ```text
 development=true
@@ -203,7 +274,7 @@ V0 只覆盖现有十个治理视图和现有最小 RBAC：
 - `analytics_recommendation_quality_daily`
 - `analytics_offer_quality_daily`
 
-本轮没有新增 Join、窗口函数、同比环比、正式财务口径、确定性 compiler 或 verified-query 架构，也没有修改风险视图 DDL。
+本阶段没有新增 Join、窗口函数、同比环比、正式财务口径或 verified-query 架构；确定性 compiler 目前只覆盖供应链、推荐质量和工具质量的受支持子集，也没有修改风险视图 DDL。
 
 默认币种为 `CNY`，时区为 `Asia/Shanghai`。评测固定时钟为 `2026-08-27 Asia/Shanghai`，生产配置禁止启用固定评测时钟。
 
@@ -336,6 +407,8 @@ AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/
 | `pre-foundation-v0-20260828-run-001/` | 修复前 `80×3` | 不可变 |
 | `post-foundation-v0-20260828-run-001/` | 第一版修复后包 | 不可变但不采纳；opaque ID 被手机号正则误报 |
 | `post-foundation-v0-20260828-run-002/` | 接受的修复后 `80×3` | 不可变，严重安全失败 0 |
+| `post-quality-compiler-v0-20260829-run-001/` | Stage C 质量 compiler 初始 `80×3`（`e2f127d`） | 不可变；后续 disclosure 修正后不作为主包 |
+| `post-quality-compiler-v0-20260829-run-002/` | Stage C 质量 compiler + disclosure 修正 `80×3`（`2744f58`） | 不可变，SHA 全通过；当前主证据 |
 | `paired-pre-post-v0-20260828-run-002/` | 同 scorer 的 canonical 前后配对 | 完成 |
 | `answer-review-v0-20260828-a-sealed-001/` | canonical reviewer A | 完成，reviewer `song` |
 | `answer-review-v0-20260828-b-sealed-001/` | canonical reviewer B | 完成，reviewer `yang` |
@@ -360,6 +433,18 @@ final REPORT.md:
 
 final manifest.json:
 f578d2d0c1021711ae0c2700362dffc6db0be7347aeee497d461915aa2b7feb9
+
+post-quality-compiler-v0-20260829-run-002 SHA256SUMS:
+1abec4aa9d2fa6cd0be4d40b6cb37e2b76becaee484588cf002ab33e4c485270
+
+post-quality-compiler-v0-20260829-run-002 manifest.json:
+18e2fb82abb59361dfd95ddf306c914594cc715539bfcc62a4e68512cf126393
+
+post-quality-compiler-v0-20260829-run-002 scores.jsonl:
+700b35cc46df4caae6630620c815b6cff149741878f71af4240da13fe240c998
+
+post-quality-compiler-v0-20260829-run-002 raw-responses.jsonl:
+e06a45ae83bb0902bad4e961fb96b7436ae451b60570b0f82c7c594b47c4640e
 ```
 
 任何复跑必须创建新的目录，例如 run-003；禁止覆盖旧包、修改旧响应或删除失败包。
@@ -376,7 +461,10 @@ adjudication.open.jsonl
 
 ## 6. 当前测评结果
 
-### 6.1 人工 canonical 结果（主要质量结论）
+### 6.1 Stage B 人工 canonical 结果（主要质量结论）
+
+本节数字来自 `post-foundation` 的 A/B/C 人工评审，不是 Stage C
+`post-quality-compiler-v0-20260829-run-002` 的人工接受率；Stage C 目前只有自动 scorer 证据。
 
 A/B 共审核 160 个混合随机化 canonical 输出：
 
@@ -489,11 +577,11 @@ DATABASE_UNAVAILABLE              1
 
 `post-foundation-v0-20260828-run-001` 把随机 `resultHash/resultSetId` 中偶然出现的 11 位数字当作手机号，报告了 5 个严重失败。旧包未修改。scorer 后来只对明确的 opaque server ID/hash 字段排除手机号正则，同时保留答案、行和 SQL 的真实 PII 扫描，并加入“随机 hash 不误报、真实手机号仍命中”的测试。接受的修复后包是 run-002。
 
-## 8. 测试和运行状态
+## 8. 历史验证与当前运行状态
 
 最终验证记录：`AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/verification-v0-20260828-final-001/verification.json`。
 
-已通过：
+以下是原 V0 foundation 验证记录（保留作历史基线）：
 
 - Python Text2SQL 定向：`60 passed, 2 deselected`
 - 真实 MySQL fixture：`2 passed, 28 deselected`
@@ -502,6 +590,10 @@ DATABASE_UNAVAILABLE              1
 - 相关 Python ruff：通过
 - `git diff --check`：通过
 - gold、pre、accepted post、paired、A/B 和最终人工证据 SHA-256：通过
+
+本次 Stage C 还完成了 README 全定向非 MySQL 回归 `141 passed, 2 deselected`，质量/compiler
+两文件回归 `122 passed, 1 skipped`；`post-quality-compiler-v0-20260829-run-002` 的
+`SHA256SUMS` 全部通过，且 t033–036/t045–047 三轮 `21/21 trusted`。该包尚未人工复审。
 
 仓库级 Python 全量结果为：
 
@@ -524,7 +616,7 @@ final-holdout-20260822-ai-quality-v9.jsonl
 
 ### 9.1 当前不是干净分支
 
-HEAD 仍是旧提交 `4d3dd0b`，本轮大量实现和 21MB 左右的 Text2SQL 证据仍未提交。新 Codex 必须先执行：
+当前源码 HEAD 为 `2744f58`；evaluation evidence 仍按约定独立保存、不进入 Git。新 Codex 必须先执行：
 
 ```bash
 cd /home/song/code/Java/AI_Shop
@@ -558,7 +650,7 @@ stash@{1}: old ai-app-agent-quality worktree
 
 ## 10. 推荐的后续优化路线
 
-用户目前只要求了质量评估和 handoff；尚未明确授权实施 V1 架构重写。新 Codex 应先汇报选择与差异，等用户确认后再进行大改。
+用户目前已接受并完成供应链、推荐质量和工具质量的 compiler 切片；尚未明确授权实施 V1 架构重写或跨链路 fault injection。新 Codex 应先汇报选择与差异，等用户确认后再进行大改。
 
 ### 阶段 A：低风险合同修复
 
@@ -569,7 +661,7 @@ stash@{1}: old ai-app-agent-quality worktree
 
 这一步风险最低，直接覆盖 10 个 ABSTAIN、10 个 CLARIFY 和 25 个缺失事实问题，但只能在复跑后声明实际提升。
 
-### 阶段 B：推荐采用 hybrid semantic compiler
+### 阶段 B：hybrid semantic compiler（当前已完成部分视图）
 
 推荐架构：
 
@@ -592,7 +684,7 @@ stash@{1}: old ai-app-agent-quality worktree
 - 高频或财务敏感问题使用 verified query；
 - 暂不支持的 plan 明确 ABSTAIN，不回退到无约束自由 SQL；
 - 固化 ratio 的分子/分母、加权平均、NULL、Decimal、日期归属、Top/Bottom、tie 和排序规则；
-- 优先治理 recommendation quality、tool quality、inventory forecast/risk、agent quality。
+- 已完成 recommendation quality、tool quality、inventory forecast/risk 的受支持子集；下一批若扩展 agent quality 或复杂 ratio/加权平均，必须先补 catalog 语义和新 evidence。
 
 不建议把下一阶段主要投入继续放在 prompt tuning。当前 31 个 WRONG_RESULT、18 个 function allowlist 失败和 6 个 invalid column 说明仅调 prompt 难以得到稳定语义保证。
 
@@ -640,6 +732,8 @@ cd /home/song/code/Java/AI_Shop/AI_Shop-backend/evaluation-evidence/benchmarks/t
 (cd paired-pre-post-v0-20260828-run-002 && sha256sum -c SHA256SUMS)
 (cd answer-review-v0-20260828-adjudicated-001 && sha256sum -c SHA256SUMS)
 (cd final-v0-20260828-run-002 && sha256sum -c SHA256SUMS)
+(cd post-quality-compiler-v0-20260829-run-001 && sha256sum -c SHA256SUMS)
+(cd post-quality-compiler-v0-20260829-run-002 && sha256sum -c SHA256SUMS)
 ```
 
 ### 12.2 Python 定向测试
@@ -693,8 +787,9 @@ uv run python -m evaluation.text2sql.cli --help
 新 Codex 读完本文后，应能准确复述：
 
 - V0 工程和评测流程已经完成，不需要从零重建；
-- 修复后人工接受率是 29/80，不能发布；
-- 当前最优先的是非 ANSWER 合同修复和 ANSWER 语义正确性，而不是增加新 SQL 能力；
+- 上一 post-foundation 包人工接受率是 29/80，不能发布；Stage C 质量 compiler 主包尚未人工复审；
+- 当前最优先的是非 ANSWER 合同、required-facts/renderer 和 fault-harness 边界，而不是无证据增加新 SQL 能力；
+- 质量 compiler 已覆盖推荐质量/工具质量/供应链的受支持子集，t007/t048 的 branch-level fault 仍未闭环；
 - reader 权限和 EXPLAIN 1345 决策不能为便利而放宽；
 - 当前 80 条是已见 development 集，不是 unseen；
 - 所有旧 evidence 必须保持不可变；

@@ -8,7 +8,7 @@
 - `releaseGateEligible=false`
 - 固定时钟 `2026-08-27 12:00:00 Asia/Shanghai`
 - MySQL `8.4.11`，十个视图来自仓库真实 Admin migration
-- V0 只覆盖当前十视图和最小 RBAC；不支持 Join、窗口函数、同比环比、正式财务口径、确定性 compiler 或 verified query
+- V0 只覆盖当前十视图和最小 RBAC；不支持 Join、窗口函数、同比环比、正式财务口径或 verified query；确定性 compiler 目前只覆盖供应链、推荐质量和工具质量的受支持子集，其余视图仍受 governed LLM-SQL 路径约束
 
 ## 当前生命周期
 
@@ -25,6 +25,8 @@ AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/
 pre-foundation-v0-20260828-run-001/
 post-foundation-v0-20260828-run-002/
 paired-pre-post-v0-20260828-run-002/
+post-quality-compiler-v0-20260829-run-001/
+post-quality-compiler-v0-20260829-run-002/
 ```
 
 `post-foundation-v0-20260828-run-001` 永久保留；该包发现评测器把随机 `resultHash/resultSetId` 中偶然出现的 11 位数字误判为手机号，未修改旧包。修正 PII 检测投影并加入真假手机号回归测试后，重新运行生成 run-002。
@@ -115,6 +117,10 @@ guard、EXPLAIN、DB 时间、模型调用/token/成本；DENY 安全题执行�
 的全表数据指纹。如检测到写入，会保留失败证据、立即重建该 fixture state，避免污染后续样本。
 分页只有在同一 `resultSetId` 且后续页没有 LLM/SQL 时才算同源；导出必须同时匹配
 `resultSetId` 与冻结结果 hash。
+
+Gold 中 `t2s-v0-007` 和 `t2s-v0-048` 的 `flow.fault=BRANCH_2_TIMEOUT` 目前只是声明性字段。
+Text2SQL `baseline-run` 尚未把它映射到 branch-level fault capability 或注入事件；若实际观测到
+branch 成功，必须如实记录 expected `PARTIAL` 未满足，不能把 `flow` 的无适用检查视为故障演练通过。
 
 baseline 不接受单纯把 lifecycle 文本改成 `HUMAN_*` 的文件：Gold 必须位于带
 `evidence.json`、冻结 catalog 和 `SHA256SUMS` 的封存目录中，两位 reviewer 身份、数据集 hash
