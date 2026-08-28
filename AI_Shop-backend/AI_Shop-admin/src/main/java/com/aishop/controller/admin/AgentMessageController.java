@@ -181,54 +181,103 @@ public class AgentMessageController extends com.aishop.controller.admin.ABaseCon
 
 	@PostMapping("/dataAnalyst/ask")
 	@RequireAdminPermission(AdminPermissions.ANALYTICS_READ)
-	public ResponseVO dataAnalystAsk(String question, HttpServletRequest request) {
-		if (StringTools.isEmpty(question) || question.trim().length() > 500) {
+	public ResponseEntity<ResponseVO<Object>> dataAnalystAsk(
+			String question, String cursor, Integer pageSize, String tenantId) {
+		if (StringTools.isEmpty(cursor)
+				&& (StringTools.isEmpty(question) || question.trim().length() > 500)) {
 			throw new BusinessException("问题不能为空且不能超过500字");
 		}
 		Map<String, Object> body = new HashMap<>();
-		body.put("question", question.trim());
-		// Authentication is authoritative here; browser payload never supplies adminId.
-		body.put("adminId", currentAdmin(request));
-		return getSuccessResponseVO(agentMessageService.callSupport("dataAnalyst/ask", body));
+		putIfText(body, "question", question);
+		putIfText(body, "cursor", cursor);
+		putIfText(body, "tenantId", tenantId);
+		if (pageSize != null) {
+			body.put("pageSize", pageSize);
+		}
+		return agentMessageService.callDataAnalyst("dataAnalyst/ask", body);
+	}
+
+	@PostMapping("/dataAnalyst/clarify")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_READ)
+	public ResponseEntity<ResponseVO<Object>> dataAnalystClarify(
+			String clarificationToken, String choiceId, Integer pageSize, String tenantId) {
+		if (StringTools.isEmpty(clarificationToken) || StringTools.isEmpty(choiceId)) {
+			throw new BusinessException("clarificationToken 和 choiceId 不能为空");
+		}
+		Map<String, Object> body = new HashMap<>();
+		body.put("clarificationToken", clarificationToken.trim());
+		body.put("choiceId", choiceId.trim());
+		putIfText(body, "tenantId", tenantId);
+		if (pageSize != null) {
+			body.put("pageSize", pageSize);
+		}
+		return agentMessageService.callDataAnalyst("dataAnalyst/clarify", body);
+	}
+
+	@PostMapping("/dataAnalyst/page")
+	@RequireAdminPermission(AdminPermissions.ANALYTICS_READ)
+	public ResponseEntity<ResponseVO<Object>> dataAnalystPage(
+			String cursor, Integer pageSize, String tenantId) {
+		if (StringTools.isEmpty(cursor)) {
+			throw new BusinessException("cursor 不能为空");
+		}
+		Map<String, Object> body = new HashMap<>();
+		body.put("cursor", cursor.trim());
+		putIfText(body, "tenantId", tenantId);
+		if (pageSize != null) {
+			body.put("pageSize", pageSize);
+		}
+		return agentMessageService.callDataAnalyst("dataAnalyst/page", body);
 	}
 
 	@PostMapping("/dataAnalyst/export")
 	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
-	public ResponseVO dataAnalystExport(String question, HttpServletRequest request) {
-		if (StringTools.isEmpty(question) || question.trim().length() > 500) {
-			throw new BusinessException("问题不能为空且不能超过500字");
-		}
+	public ResponseEntity<ResponseVO<Object>> dataAnalystExport(
+			String resultSetId, String question, String tenantId) {
 		Map<String, Object> body = new HashMap<>();
-		body.put("question", question.trim());
-		body.put("adminId", currentAdmin(request));
-		return getSuccessResponseVO(agentMessageService.callSupport("dataAnalyst/export", body));
+		putIfText(body, "resultSetId", resultSetId);
+		// Kept only so a legacy question-only request reaches Agent and receives
+		// the stable HTTP 400 / RESULT_SET_ID_REQUIRED contract.
+		putIfText(body, "question", question);
+		putIfText(body, "tenantId", tenantId);
+		return agentMessageService.callDataAnalyst("dataAnalyst/export", body);
 	}
 
 	@PostMapping("/dataAnalyst/export/status")
 	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
-	public ResponseVO dataAnalystExportStatus(String jobId) {
+	public ResponseEntity<ResponseVO<Object>> dataAnalystExportStatus(
+			String jobId, String tenantId) {
 		if (StringTools.isEmpty(jobId)) {
 			throw new BusinessException("jobId不能为空");
 		}
-		return getSuccessResponseVO(agentMessageService.callSupport(
-				"dataAnalyst/export/status", Map.of("jobId", jobId.trim())));
+		Map<String, Object> body = new HashMap<>();
+		body.put("jobId", jobId.trim());
+		putIfText(body, "tenantId", tenantId);
+		return agentMessageService.callDataAnalyst("dataAnalyst/export/status", body);
 	}
 
 	@PostMapping("/dataAnalyst/export/download")
 	@RequireAdminPermission(AdminPermissions.ANALYTICS_EXPORT)
-	public ResponseEntity<byte[]> dataAnalystExportDownload(String jobId) {
+	public ResponseEntity<byte[]> dataAnalystExportDownload(String jobId, String tenantId) {
 		if (StringTools.isEmpty(jobId)) {
 			throw new BusinessException("jobId不能为空");
 		}
-		byte[] content = agentMessageService.callReport(
-				"dataAnalyst/export/download", Map.of("jobId", jobId.trim()));
+		Map<String, Object> body = new HashMap<>();
+		body.put("jobId", jobId.trim());
+		putIfText(body, "tenantId", tenantId);
+		ResponseEntity<byte[]> upstream = agentMessageService.callDataAnalystReport(
+				"dataAnalyst/export/download", body);
+		if (!upstream.getStatusCode().is2xxSuccessful()) {
+			return upstream;
+		}
 		ContentDisposition disposition = ContentDisposition.attachment()
 				.filename(jobId.trim() + ".json")
 				.build();
-		return ResponseEntity.ok()
+		return ResponseEntity.status(upstream.getStatusCode())
+				.headers(upstream.getHeaders())
 				.contentType(MediaType.APPLICATION_JSON)
 				.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-				.body(content);
+				.body(upstream.getBody());
 	}
 
 	@PostMapping("/inventoryOps/suggestions")

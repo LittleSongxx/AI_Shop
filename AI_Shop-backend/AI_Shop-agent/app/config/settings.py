@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import lru_cache
 from typing import Annotated, Literal
 from urllib.parse import quote, urlparse
@@ -439,9 +440,7 @@ class Settings(BaseSettings):
     agent_budget_max_steps: int = 16
     agent_budget_deadline_seconds: float = 60.0
     agent_budget_warn_threshold: float = 0.8
-    orchestration_mode: Literal[
-        "adaptive", "workflow", "single_agent", "multi_agent"
-    ] = "adaptive"
+    orchestration_mode: Literal["adaptive", "workflow", "single_agent", "multi_agent"] = "adaptive"
 
     # Multi-Agent is available to the adaptive router, not the default for every
     # request. Deterministic reads use a workflow and ordinary open tasks use one
@@ -472,11 +471,14 @@ class Settings(BaseSettings):
     analytics_max_rows: int = 200
     analytics_max_result_bytes: int = 1_000_000
     analytics_cursor_ttl_seconds: int = 900
-    analytics_export_max_rows: int = 10_000
+    analytics_export_max_rows: int = 200
+    analytics_export_ttl_seconds: int = 24 * 60 * 60
     analytics_max_days: int = 90
     analytics_query_timeout_ms: int = 3000
     analytics_model_timeout_seconds: int = 10
     analytics_request_timeout_seconds: int = 45
+    # Evaluation-only wall clock. Production rejects any non-empty value.
+    analytics_eval_fixed_now: str = ""
     graph_checkpoint_ttl: int = 3600
     graph_checkpoint_prefix: str = "mall:agent:graph:ckpt"
 
@@ -507,18 +509,12 @@ class Settings(BaseSettings):
             raise ValueError("VECTOR_FIELD must not be empty")
         if not 1 <= self.mysql_pool_min_size <= self.mysql_pool_max_size <= 64:
             raise ValueError(
-                "MYSQL_POOL_MIN_SIZE and MYSQL_POOL_MAX_SIZE must satisfy "
-                "1 <= min <= max <= 64"
+                "MYSQL_POOL_MIN_SIZE and MYSQL_POOL_MAX_SIZE must satisfy 1 <= min <= max <= 64"
             )
         if not 60 <= self.mysql_pool_recycle_seconds <= 86_400:
-            raise ValueError(
-                "MYSQL_POOL_RECYCLE_SECONDS must be between 60 and 86400"
-            )
+            raise ValueError("MYSQL_POOL_RECYCLE_SECONDS must be between 60 and 86400")
         if not (
-            1
-            <= self.analytics_mysql_pool_min_size
-            <= self.analytics_mysql_pool_max_size
-            <= 16
+            1 <= self.analytics_mysql_pool_min_size <= self.analytics_mysql_pool_max_size <= 16
         ):
             raise ValueError(
                 "ANALYTICS_MYSQL_POOL_MIN_SIZE and ANALYTICS_MYSQL_POOL_MAX_SIZE "
@@ -540,9 +536,7 @@ class Settings(BaseSettings):
         if not 128 <= self.agent_fast_support_max_tokens <= 4096:
             raise ValueError("AGENT_FAST_SUPPORT_MAX_TOKENS must be between 128 and 4096")
         if not 5 <= self.agent_llm_call_deadline_seconds <= 120:
-            raise ValueError(
-                "AGENT_LLM_CALL_DEADLINE_SECONDS must be between 5 and 120"
-            )
+            raise ValueError("AGENT_LLM_CALL_DEADLINE_SECONDS must be between 5 and 120")
         if self.agent_llm_call_deadline_seconds >= min(
             self.agent_budget_deadline_seconds,
             float(self.agent_task_deadline_seconds),
@@ -563,17 +557,16 @@ class Settings(BaseSettings):
         if self.analytics_max_rows < 1 or self.analytics_max_rows > 200:
             raise ValueError("ANALYTICS_MAX_ROWS must be between 1 and 200")
         if not 16_384 <= self.analytics_max_result_bytes <= 10_000_000:
+            raise ValueError("ANALYTICS_MAX_RESULT_BYTES must be between 16384 and 10000000")
+        if self.analytics_cursor_ttl_seconds != 900:
+            raise ValueError("ANALYTICS_CURSOR_TTL_SECONDS must be 900 for the V0 contract")
+        if self.analytics_export_max_rows != self.analytics_max_rows:
             raise ValueError(
-                "ANALYTICS_MAX_RESULT_BYTES must be between 16384 and 10000000"
+                "ANALYTICS_EXPORT_MAX_ROWS must equal ANALYTICS_MAX_ROWS; "
+                "exports use the frozen result set"
             )
-        if not 60 <= self.analytics_cursor_ttl_seconds <= 86_400:
-            raise ValueError(
-                "ANALYTICS_CURSOR_TTL_SECONDS must be between 60 and 86400"
-            )
-        if not self.analytics_max_rows <= self.analytics_export_max_rows <= 1_000_000:
-            raise ValueError(
-                "ANALYTICS_EXPORT_MAX_ROWS must be between ANALYTICS_MAX_ROWS and 1000000"
-            )
+        if self.analytics_export_ttl_seconds != 24 * 60 * 60:
+            raise ValueError("ANALYTICS_EXPORT_TTL_SECONDS must be 86400 for the V0 contract")
         if self.analytics_max_days < 1 or self.analytics_max_days > 90:
             raise ValueError("ANALYTICS_MAX_DAYS must be between 1 and 90")
         if self.analytics_query_timeout_ms < 100 or self.analytics_query_timeout_ms > 10_000:
@@ -597,9 +590,7 @@ class Settings(BaseSettings):
         if not 15 * 60 <= self.privacy_export_ttl_seconds <= 7 * 24 * 60 * 60:
             raise ValueError("PRIVACY_EXPORT_TTL_SECONDS must be between 900 and 604800")
         if not 3 <= self.multi_agent_specialist_timeout_seconds <= 30:
-            raise ValueError(
-                "MULTI_AGENT_SPECIALIST_TIMEOUT_SECONDS must be between 3 and 30"
-            )
+            raise ValueError("MULTI_AGENT_SPECIALIST_TIMEOUT_SECONDS must be between 3 and 30")
         if not 1 <= self.shopping_mission_active_hours <= 72:
             raise ValueError("SHOPPING_MISSION_ACTIVE_HOURS must be between 1 and 72")
         if not 0 <= self.shopping_mission_max_clarifications <= 3:
@@ -609,10 +600,12 @@ class Settings(BaseSettings):
         if not 1 <= self.shopping_decision_max_results <= 6:
             raise ValueError("SHOPPING_DECISION_MAX_RESULTS must be between 1 and 6")
         if not 1 <= self.product_search_provider_timeout_seconds <= 60:
-            raise ValueError(
-                "PRODUCT_SEARCH_PROVIDER_TIMEOUT_SECONDS must be between 1 and 60"
-            )
-        if not self.product_search_provider_timeout_seconds <= self.product_search_deadline_seconds <= 120:
+            raise ValueError("PRODUCT_SEARCH_PROVIDER_TIMEOUT_SECONDS must be between 1 and 60")
+        if (
+            not self.product_search_provider_timeout_seconds
+            <= self.product_search_deadline_seconds
+            <= 120
+        ):
             raise ValueError(
                 "PRODUCT_SEARCH_DEADLINE_SECONDS must cover the provider timeout and be <= 120"
             )
@@ -635,13 +628,10 @@ class Settings(BaseSettings):
             raise ValueError("RAG_EVIDENCE_TOP_SCORE_MARGIN must be between 0 and 1")
         if not 0 <= self.rag_evidence_canonical_hint_floor <= self.rag_evidence_min_relevance:
             raise ValueError(
-                "RAG_EVIDENCE_CANONICAL_HINT_FLOOR must be between 0 and "
-                "RAG_EVIDENCE_MIN_RELEVANCE"
+                "RAG_EVIDENCE_CANONICAL_HINT_FLOOR must be between 0 and RAG_EVIDENCE_MIN_RELEVANCE"
             )
         if not 0.5 <= self.rag_query_expansion_timeout_seconds <= 10:
-            raise ValueError(
-                "RAG_QUERY_EXPANSION_TIMEOUT_SECONDS must be between 0.5 and 10"
-            )
+            raise ValueError("RAG_QUERY_EXPANSION_TIMEOUT_SECONDS must be between 0.5 and 10")
         for model, pricing in self.llm_pricing_cny_per_million_json.items():
             if not str(model).strip() or not isinstance(pricing, dict):
                 raise ValueError("LLM pricing requires a non-empty model and an object price")
@@ -687,9 +677,7 @@ class Settings(BaseSettings):
         if not 256 <= self.visual_query_max_dimension <= 4096:
             raise ValueError("VISUAL_QUERY_MAX_DIMENSION must be between 256 and 4096")
         if not 1 <= self.visual_result_size <= self.visual_rerank_candidate_size <= 40:
-            raise ValueError(
-                "visual result size must be <= rerank candidate size and at most 40"
-            )
+            raise ValueError("visual result size must be <= rerank candidate size and at most 40")
         if self.visual_provider_deadline_seconds < max(
             self.visual_grounding_timeout_seconds,
             self.visual_embedding_timeout_seconds,
@@ -743,7 +731,10 @@ class Settings(BaseSettings):
             raise ValueError("VISUAL_INDEX_CONSUMER_CONCURRENCY must be between 1 and 4")
         if self.visual_index_max_retries < 0 or self.visual_index_max_retries > 10:
             raise ValueError("VISUAL_INDEX_MAX_RETRIES must be between 0 and 10")
-        if self.visual_index_retry_backoff_seconds < 0 or self.visual_index_retry_backoff_seconds > 60:
+        if (
+            self.visual_index_retry_backoff_seconds < 0
+            or self.visual_index_retry_backoff_seconds > 60
+        ):
             raise ValueError("VISUAL_INDEX_RETRY_BACKOFF_SECONDS must be between 0 and 60")
         return self
 
@@ -763,6 +754,13 @@ class Settings(BaseSettings):
                 analytics_errors.append("ANALYTICS_MYSQL_DATABASE must be aishop_admin")
 
         if self.app_env.lower() != "production":
+            if self.analytics_eval_fixed_now:
+                try:
+                    datetime.fromisoformat(self.analytics_eval_fixed_now)
+                except ValueError as exc:
+                    raise ValueError(
+                        "ANALYTICS_EVAL_FIXED_NOW must be an ISO local datetime"
+                    ) from exc
             if analytics_errors:
                 raise ValueError(
                     "Invalid DataAnalyst configuration: " + "; ".join(analytics_errors)
@@ -772,6 +770,8 @@ class Settings(BaseSettings):
         errors: list[str] = []
         if self.ai_eval_enable_fault_injection:
             errors.append("AI_EVAL_ENABLE_FAULT_INJECTION must be false in production")
+        if self.analytics_eval_fixed_now:
+            errors.append("ANALYTICS_EVAL_FIXED_NOW must be empty in production")
         if not self.internal_token.strip() or self.internal_token == "your-token":
             errors.append("AISHOP_INTERNAL_TOKEN must be configured")
         if (
@@ -808,9 +808,7 @@ class Settings(BaseSettings):
         if self.rerank_required and not self.rerank_api_key.strip():
             errors.append("RERANK_API_KEY must be configured (RERANK_REQUIRED=true)")
         if self.visual_search_enabled and not self.visual_api_key.strip():
-            errors.append(
-                "VISUAL_API_KEY must be configured when VISUAL_SEARCH_ENABLED=true"
-            )
+            errors.append("VISUAL_API_KEY must be configured when VISUAL_SEARCH_ENABLED=true")
         errors.extend(analytics_errors)
         if errors:
             raise ValueError("Invalid production configuration: " + "; ".join(errors))
@@ -823,8 +821,7 @@ class Settings(BaseSettings):
         if ":" in host and not host.startswith("["):
             host = f"[{host}]"
         return (
-            f"mysql+aiomysql://{username}:{password}"
-            f"@{host}:{self.mysql_port}/{self.mysql_database}"
+            f"mysql+aiomysql://{username}:{password}@{host}:{self.mysql_port}/{self.mysql_database}"
         )
 
     @property

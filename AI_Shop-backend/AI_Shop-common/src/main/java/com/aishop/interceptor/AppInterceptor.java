@@ -18,6 +18,8 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.Arrays;
+import java.util.Map;
+import java.util.UUID;
 
 @Component
 @ConditionalOnProperty(name = "aishop.security.admin-interceptor", havingValue = "true")
@@ -48,7 +50,7 @@ public class AppInterceptor implements HandlerInterceptor {
         request.setAttribute(AdminSecurityContext.REQUEST_ATTRIBUTE, principal);
         AdminSecurityContext.set(principal);
         try {
-            enforcePermission((HandlerMethod) handler, principal);
+            enforcePermission((HandlerMethod) handler, principal, request);
             return true;
         } catch (RuntimeException e) {
             AdminSecurityContext.clear();
@@ -62,7 +64,8 @@ public class AppInterceptor implements HandlerInterceptor {
         AdminSecurityContext.clear();
     }
 
-    private void enforcePermission(HandlerMethod handler, AdminPrincipalDTO principal) {
+    private void enforcePermission(
+            HandlerMethod handler, AdminPrincipalDTO principal, HttpServletRequest request) {
         if (principal.hasRole(AdminPermissions.SUPER_ADMIN_ROLE)) {
             return;
         }
@@ -84,6 +87,28 @@ public class AppInterceptor implements HandlerInterceptor {
                 ? Arrays.stream(required).allMatch(principal::hasPermission)
                 : Arrays.stream(required).anyMatch(principal::hasPermission);
         if (!allowed) {
+            boolean analyticsExport = Arrays.stream(required)
+                    .anyMatch(AdminPermissions.ANALYTICS_EXPORT::equals);
+            boolean analyticsRead = Arrays.stream(required)
+                    .anyMatch(AdminPermissions.ANALYTICS_READ::equals);
+            if (analyticsExport || analyticsRead) {
+                String reasonCode = analyticsExport
+                        ? "ANALYTICS_EXPORT_REQUIRED"
+                        : "ANALYTICS_READ_REQUIRED";
+                String requestId = request.getHeader("X-Request-ID");
+                if (StringTools.isEmpty(requestId)) {
+                    requestId = UUID.randomUUID().toString().replace("-", "");
+                }
+                throw new HttpBusinessException(
+                        403,
+                        ResponseCodeEnum.CODE_403.getMsg(),
+                        Map.of(
+                                "outcome", "DENY",
+                                "completion", "NOT_APPLICABLE",
+                                "status", reasonCode,
+                                "reasonCode", reasonCode,
+                                "requestId", requestId));
+            }
             throw new HttpBusinessException(403, ResponseCodeEnum.CODE_403.getMsg());
         }
     }

@@ -1,8 +1,10 @@
 import json
+import uuid
 from datetime import datetime
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 
 from app.api.deps import TokenUserInfo, get_request_token, require_login
 from app.auth.admin_assertion import AdminAssertion, require_admin_assertion
@@ -23,7 +25,9 @@ from app.models.shopping_profile import (
 from app.observability.telemetry import get_tracer
 from app.services.action_execute_service import action_execute_service
 from app.services.agent_service import agent_orchestrator
+from app.services.analytics_clarification_service import analytics_clarification_service
 from app.services.analytics_export_service import analytics_export_service
+from app.services.analytics_result_service import AnalyticsResultError, analytics_result_service
 from app.services.badcase_service import badcase_service
 from app.services.data_analyst_service import data_analyst_service
 from app.services.episode_query_service import episode_query_service
@@ -72,6 +76,7 @@ logger = structlog.get_logger()
 # 时每个进程各算一份配额，"1/second" 实际是 "N/second"；而且下面四个接口本来就各有
 # 一次等价的 Redis 校验，留着它只是让人误以为已经限流了。
 
+
 def _form_bool(value: str | bool | None) -> bool:
 
     if value is None:
@@ -93,7 +98,10 @@ def _form_string_list(value: str | None) -> list[str] | None:
         raise ValueError("comparisonProductIds 必须是数组")
     return [str(item).strip() for item in parsed if str(item or "").strip()]
 
-def _require_internal_token(x_internal_token: str | None = Header(None, alias="X-Internal-Token")) -> str:
+
+def _require_internal_token(
+    x_internal_token: str | None = Header(None, alias="X-Internal-Token"),
+) -> str:
 
     expected = get_settings().internal_token
     if not x_internal_token or x_internal_token != expected:
@@ -109,6 +117,7 @@ async def _require_admin(
 ) -> AdminAssertion:
     return await require_admin_assertion(request)
 
+
 async def _read_admin_body(request: Request) -> dict:
 
     ct = (request.headers.get("content-type") or "").lower()
@@ -117,6 +126,7 @@ async def _read_admin_body(request: Request) -> dict:
         return data if isinstance(data, dict) else {}
     form = await request.form()
     return {k: form.get(k) for k in form.keys()}
+
 
 def _as_int(value, default: int | None = None) -> int | None:
     if value is None or value == "":
@@ -147,6 +157,62 @@ def _canonical_response(response: ResponseVO) -> ResponseVO:
     return ResponseVO.model_validate_json(payload)
 
 
+def _analytics_request_id(request: Request) -> str:
+    return str(request.headers.get("X-Request-ID") or "").strip() or uuid.uuid4().hex
+
+
+def _analytics_response(
+    result: dict,
+    *,
+    request_id: str,
+) -> JSONResponse:
+    payload = dict(result)
+    http_status = int(payload.pop("_httpStatus", 200) or 200)
+    payload.setdefault("requestId", request_id)
+    if http_status == 200:
+        response = success(payload)
+        return JSONResponse(status_code=200, content=response.model_dump(mode="json"))
+    response = error(http_status, str(payload.get("answer") or payload.get("status") or "请求失败"))
+    response = response.model_copy(update={"data": payload})
+    return JSONResponse(status_code=http_status, content=response.model_dump(mode="json"))
+
+
+def _analytics_exception_response(
+    exc: AnalyticsResultError,
+    *,
+    request_id: str,
+) -> JSONResponse:
+    denied = exc.http_status == 403
+    payload = {
+        "outcome": "DENY" if denied else None,
+        "completion": "NOT_APPLICABLE" if denied else "FAILED",
+        "status": exc.code,
+        "reasonCode": exc.code,
+        "answer": str(exc),
+        "requestId": request_id,
+    }
+    response = error(exc.http_status, str(exc)).model_copy(update={"data": payload})
+    return JSONResponse(
+        status_code=exc.http_status,
+        content=response.model_dump(mode="json"),
+    )
+
+
+def _analytics_permission_denied(
+    request: Request,
+    permission: str,
+    reason_code: str,
+) -> JSONResponse:
+    return _analytics_exception_response(
+        AnalyticsResultError(
+            reason_code,
+            403,
+            f"缺少 {permission} 权限",
+        ),
+        request_id=_analytics_request_id(request),
+    )
+
+
 def _inconclusive_response(
     reservation: IdempotencyReservation,
     message_id: int | None = None,
@@ -171,9 +237,7 @@ async def _record_idempotent_failure(
 ) -> bool:
     """Persist a replayable failure, reporting false when its ledger is unknown."""
     try:
-        await agent_request_idempotency_service.fail(
-            reservation, response.model_dump(mode="json")
-        )
+        await agent_request_idempotency_service.fail(reservation, response.model_dump(mode="json"))
     except Exception as exc:  # pragma: no cover - exercised with a live DB fault
         logger.error(
             "agent_idempotency_failure_ledger_unknown",
@@ -236,9 +300,7 @@ async def _idempotent_failure_or_unknown(
 
     if message_id is not None or lookup_unknown:
         response = _inconclusive_response(reservation, message_id)
-        await _record_idempotent_inconclusive(
-            reservation, response, message_id
-        )
+        await _record_idempotent_inconclusive(reservation, response, message_id)
         return response
 
     canonical_failure = _canonical_response(failure)
@@ -248,6 +310,7 @@ async def _idempotent_failure_or_unknown(
     response = _inconclusive_response(reservation)
     await _record_idempotent_inconclusive(reservation, response, None)
     return response
+
 
 @router.post("/loadHistoryMessage")
 async def load_history_message(
@@ -268,6 +331,7 @@ async def clear_history_message(
     except ValueError as exc:
         return error(409, str(exc))
 
+
 @router.post("/sendMessage")
 async def send_message(
     message: str = Form(""),
@@ -277,12 +341,8 @@ async def send_message(
     imageAssetId: str | None = Form(None),
     x_request_id: str | None = Header(None, alias="X-Request-ID"),
     x_idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
-    x_evaluation_trial_id: str | None = Header(
-        None, alias="X-Evaluation-Trial-ID"
-    ),
-    x_evaluation_fault_capability: str | None = Header(
-        None, alias="X-Evaluation-Fault-Capability"
-    ),
+    x_evaluation_trial_id: str | None = Header(None, alias="X-Evaluation-Trial-ID"),
+    x_evaluation_fault_capability: str | None = Header(None, alias="X-Evaluation-Fault-Capability"),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
     reservation = None
@@ -361,9 +421,7 @@ async def send_message(
         return response
     except PendingActionExpired as e:
         if reservation is not None:
-            return await _idempotent_failure_or_unknown(
-                reservation, error(410, str(e))
-            )
+            return await _idempotent_failure_or_unknown(reservation, error(410, str(e)))
         raise HTTPException(status_code=410, detail=str(e)) from e
     except AgentRequestIdempotencyConflict as e:
         return error(409, str(e))
@@ -406,9 +464,7 @@ async def list_support_cases(
     limit: int = 20,
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
-    return success(
-        await support_case_service.list_for_user(user.user_id, limit=limit)
-    )
+    return success(await support_case_service.list_for_user(user.user_id, limit=limit))
 
 
 @router.get("/supportCaseDetail")
@@ -496,6 +552,7 @@ async def select_visual_subject(
         VISUAL_SELECTION_TOTAL.labels(outcome="error").inc()
         raise
 
+
 @router.post("/cancelMessage")
 async def cancel_message(
     messageId: int = Form(...),
@@ -504,6 +561,7 @@ async def cancel_message(
 ) -> ResponseVO:
     await agent_orchestrator.cancel_message(user.user_id, messageId, assistantMessage)
     return success(None)
+
 
 @router.post("/reportClick")
 async def report_click(
@@ -545,11 +603,13 @@ async def clear_product_consult(user: TokenUserInfo = Depends(require_login)) ->
     await redis_service.clear_consult(user.user_id)
     return success(None)
 
+
 @router.post("/pauseProductConsult")
 async def pause_product_consult(user: TokenUserInfo = Depends(require_login)) -> ResponseVO:
 
     await redis_service.pause_consult(user.user_id)
     return success(None)
+
 
 @router.post("/getProductConsultContext")
 async def get_product_consult_context(
@@ -671,9 +731,7 @@ async def request_human(
     sourceMessageId: int | None = Form(None),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
-    data = await agent_orchestrator.request_human(
-        user.user_id, reason, sourceMessageId
-    )
+    data = await agent_orchestrator.request_human(user.user_id, reason, sourceMessageId)
     return success(data)
 
 
@@ -704,12 +762,11 @@ async def message_feedback(
     if rating not in (-1, 1):
         return error(600, "rating 仅支持 1 或 -1")
     try:
-        await support_service.save_feedback(
-            user.user_id, messageId, rating, reason, detail
-        )
+        await support_service.save_feedback(user.user_id, messageId, rating, reason, detail)
         return success(None)
     except ValueError as exc:
         return error(600, str(exc))
+
 
 @router.post("/confirmAction")
 async def confirm_action(
@@ -719,11 +776,13 @@ async def confirm_action(
 ) -> ResponseVO:
 
     if not await rate_limit_service.allow(user.user_id, "confirmAction", 1, 3):
-        return success({
-            "actionType": None,
-            "success": False,
-            "resultMessage": "操作过于频繁，请稍后再试",
-        })
+        return success(
+            {
+                "actionType": None,
+                "success": False,
+                "resultMessage": "操作过于频繁，请稍后再试",
+            }
+        )
     token = get_request_token(request) or user.token or ""
 
     async def executor(pending: dict) -> str:
@@ -733,19 +792,24 @@ async def confirm_action(
         action_type, ok, msg = await pending_action_service.confirm(
             user.user_id, actionToken, executor
         )
-        return success({
-            "actionType": action_type,
-            "success": ok,
-            "resultMessage": msg,
-        })
+        return success(
+            {
+                "actionType": action_type,
+                "success": ok,
+                "resultMessage": msg,
+            }
+        )
     except PendingActionExpired as e:
         raise HTTPException(status_code=410, detail=str(e)) from e
     except ValueError as e:
-        return success({
-            "actionType": None,
-            "success": False,
-            "resultMessage": str(e),
-        })
+        return success(
+            {
+                "actionType": None,
+                "success": False,
+                "resultMessage": str(e),
+            }
+        )
+
 
 @router.post("/cancelAction")
 async def cancel_action(
@@ -753,20 +817,25 @@ async def cancel_action(
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
     if not await rate_limit_service.allow(user.user_id, "cancelAction", 1, 3):
-        return success({
-            "actionType": None,
-            "success": False,
-            "resultMessage": "操作过于频繁，请稍后再试",
-        })
+        return success(
+            {
+                "actionType": None,
+                "success": False,
+                "resultMessage": "操作过于频繁，请稍后再试",
+            }
+        )
     try:
         await pending_action_service.cancel(user.user_id, actionToken)
         return success(None)
     except ValueError as e:
-        return success({
-            "actionType": None,
-            "success": False,
-            "resultMessage": str(e),
-        })
+        return success(
+            {
+                "actionType": None,
+                "success": False,
+                "resultMessage": str(e),
+            }
+        )
+
 
 @router.post("/admin/loadMessages")
 async def admin_load_messages(
@@ -783,9 +852,7 @@ async def admin_load_messages(
     biz_type = body.get("bizType") or None
     if biz_type is not None:
         biz_type = str(biz_type).strip() or None
-    data = await agent_message_service.admin_load_messages(
-        page_no, page_size, user_id, biz_type
-    )
+    data = await agent_message_service.admin_load_messages(page_no, page_size, user_id, biz_type)
     return success(data)
 
 
@@ -813,39 +880,101 @@ async def admin_trace_runs(
 async def admin_data_analyst_ask(
     request: Request,
     admin: AdminAssertion = Depends(_require_admin),
-) -> ResponseVO:
-    admin.require_any("analytics:read")
+) -> JSONResponse:
+    if "analytics:read" not in admin.permissions:
+        return _analytics_permission_denied(request, "analytics:read", "ANALYTICS_READ_REQUIRED")
     body = await _read_admin_body(request)
-    result = await data_analyst_service.ask(
-        str(body.get("question") or ""),
-        admin_id=admin.admin_id,
-        permissions=admin.permissions,
-        tenant_id=str(body.get("tenantId") or "").strip() or None,
-        cursor=str(body.get("cursor") or "").strip() or None,
-        page_size=_as_int(body.get("pageSize")),
-    )
-    return success(result)
+    request_id = _analytics_request_id(request)
+    try:
+        result = await data_analyst_service.ask(
+            str(body.get("question") or ""),
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(body.get("tenantId") or "").strip() or None,
+            cursor=str(body.get("cursor") or "").strip() or None,
+            page_size=_as_int(body.get("pageSize")),
+        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=request_id)
+    return _analytics_response(result, request_id=request_id)
+
+
+@router.post("/admin/dataAnalyst/clarify")
+async def admin_data_analyst_clarify(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> JSONResponse:
+    if "analytics:read" not in admin.permissions:
+        return _analytics_permission_denied(request, "analytics:read", "ANALYTICS_READ_REQUIRED")
+    body = await _read_admin_body(request)
+    request_id = _analytics_request_id(request)
+    tenant_id = str(body.get("tenantId") or "").strip() or None
+    try:
+        clarification = await analytics_clarification_service.consume(
+            str(body.get("clarificationToken") or ""),
+            str(body.get("choiceId") or ""),
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=tenant_id,
+        )
+        result = await data_analyst_service.ask(
+            str(clarification["resolvedQuestion"]),
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=tenant_id,
+            page_size=_as_int(body.get("pageSize")),
+            allow_clarification=False,
+        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=request_id)
+    result["clarificationParentRunId"] = clarification.get("parentRunId")
+    result["clarificationChoice"] = clarification.get("choice")
+    return _analytics_response(result, request_id=request_id)
+
+
+@router.post("/admin/dataAnalyst/page")
+async def admin_data_analyst_page(
+    request: Request,
+    admin: AdminAssertion = Depends(_require_admin),
+) -> JSONResponse:
+    if "analytics:read" not in admin.permissions:
+        return _analytics_permission_denied(request, "analytics:read", "ANALYTICS_READ_REQUIRED")
+    body = await _read_admin_body(request)
+    request_id = _analytics_request_id(request)
+    try:
+        result = await analytics_result_service.page(
+            str(body.get("cursor") or ""),
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(body.get("tenantId") or "").strip() or None,
+            page_size=_as_int(body.get("pageSize"), 50) or 50,
+        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=request_id)
+    return _analytics_response(result, request_id=request_id)
 
 
 @router.post("/admin/dataAnalyst/export")
 async def admin_data_analyst_export(
     request: Request,
     admin: AdminAssertion = Depends(_require_admin),
-) -> ResponseVO:
-    admin.require_any("analytics:export")
+) -> JSONResponse:
+    if "analytics:export" not in admin.permissions:
+        return _analytics_permission_denied(
+            request, "analytics:export", "ANALYTICS_EXPORT_REQUIRED"
+        )
     body = await _read_admin_body(request)
+    request_id = _analytics_request_id(request)
     try:
         result = await analytics_export_service.request(
-            str(body.get("question") or ""),
+            str(body.get("resultSetId") or ""),
             admin_id=admin.admin_id,
             permissions=admin.permissions,
             tenant_id=str(body.get("tenantId") or "").strip() or None,
         )
-    except PermissionError as exc:
-        return error(403, str(exc))
-    except ValueError as exc:
-        return error(600, str(exc))
-    return success(result)
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=request_id)
+    return _analytics_response(result, request_id=request_id)
 
 
 @router.get("/admin/dataAnalyst/export/{job_id}")
@@ -853,32 +982,51 @@ async def admin_data_analyst_export_status(
     job_id: str,
     request: Request,
     admin: AdminAssertion = Depends(_require_admin),
-) -> ResponseVO:
+) -> JSONResponse:
+    if "analytics:export" not in admin.permissions:
+        return _analytics_permission_denied(
+            request, "analytics:export", "ANALYTICS_EXPORT_REQUIRED"
+        )
+    request_id = _analytics_request_id(request)
     try:
-        result = await analytics_export_service.get(job_id, admin_id=admin.admin_id)
-    except LookupError as exc:
-        return error(404, str(exc))
-    except PermissionError as exc:
-        return error(403, str(exc))
-    return success(result)
+        result = await analytics_export_service.get(
+            job_id,
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(request.query_params.get("tenantId") or "").strip() or None,
+        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=request_id)
+    return _analytics_response(result, request_id=request_id)
 
 
 @router.post("/admin/dataAnalyst/export/status")
 async def admin_data_analyst_export_status_post(
     request: Request,
     admin: AdminAssertion = Depends(_require_admin),
-) -> ResponseVO:
+) -> JSONResponse:
+    if "analytics:export" not in admin.permissions:
+        return _analytics_permission_denied(
+            request, "analytics:export", "ANALYTICS_EXPORT_REQUIRED"
+        )
     body = await _read_admin_body(request)
     job_id = str(body.get("jobId") or "").strip()
     if not job_id:
-        return error(600, "jobId 不能为空")
+        return _analytics_exception_response(
+            AnalyticsResultError("EXPORT_JOB_ID_REQUIRED", 400, "jobId 不能为空"),
+            request_id=_analytics_request_id(request),
+        )
+    request_id = _analytics_request_id(request)
     try:
-        result = await analytics_export_service.get(job_id, admin_id=admin.admin_id)
-    except LookupError as exc:
-        return error(404, str(exc))
-    except PermissionError as exc:
-        return error(403, str(exc))
-    return success(result)
+        result = await analytics_export_service.get(
+            job_id,
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(body.get("tenantId") or "").strip() or None,
+        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=request_id)
+    return _analytics_response(result, request_id=request_id)
 
 
 @router.get("/admin/dataAnalyst/export/{job_id}/download")
@@ -887,26 +1035,19 @@ async def admin_data_analyst_export_download(
     request: Request,
     admin: AdminAssertion = Depends(_require_admin),
 ) -> Response:
+    if "analytics:export" not in admin.permissions:
+        return _analytics_permission_denied(
+            request, "analytics:export", "ANALYTICS_EXPORT_REQUIRED"
+        )
     try:
-        content = await analytics_export_service.download(job_id, admin_id=admin.admin_id)
-    except LookupError as exc:
-        return Response(
-            content=json.dumps({"code": 404, "info": str(exc)}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=404,
+        content = await analytics_export_service.download(
+            job_id,
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(request.query_params.get("tenantId") or "").strip() or None,
         )
-    except PermissionError as exc:
-        return Response(
-            content=json.dumps({"code": 403, "info": str(exc)}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=403,
-        )
-    except RuntimeError as exc:
-        return Response(
-            content=json.dumps({"code": 409, "info": str(exc)}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=409,
-        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=_analytics_request_id(request))
     return Response(
         content=content,
         media_type="application/json",
@@ -919,34 +1060,26 @@ async def admin_data_analyst_export_download_post(
     request: Request,
     admin: AdminAssertion = Depends(_require_admin),
 ) -> Response:
+    if "analytics:export" not in admin.permissions:
+        return _analytics_permission_denied(
+            request, "analytics:export", "ANALYTICS_EXPORT_REQUIRED"
+        )
     body = await _read_admin_body(request)
     job_id = str(body.get("jobId") or "").strip()
     if not job_id:
-        return Response(
-            content=json.dumps({"code": 600, "info": "jobId 不能为空"}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=400,
+        return _analytics_exception_response(
+            AnalyticsResultError("EXPORT_JOB_ID_REQUIRED", 400, "jobId 不能为空"),
+            request_id=_analytics_request_id(request),
         )
     try:
-        content = await analytics_export_service.download(job_id, admin_id=admin.admin_id)
-    except LookupError as exc:
-        return Response(
-            content=json.dumps({"code": 404, "info": str(exc)}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=404,
+        content = await analytics_export_service.download(
+            job_id,
+            admin_id=admin.admin_id,
+            permissions=admin.permissions,
+            tenant_id=str(body.get("tenantId") or "").strip() or None,
         )
-    except PermissionError as exc:
-        return Response(
-            content=json.dumps({"code": 403, "info": str(exc)}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=403,
-        )
-    except RuntimeError as exc:
-        return Response(
-            content=json.dumps({"code": 409, "info": str(exc)}, ensure_ascii=False),
-            media_type="application/json",
-            status_code=409,
-        )
+    except AnalyticsResultError as exc:
+        return _analytics_exception_response(exc, request_id=_analytics_request_id(request))
     return Response(
         content=content,
         media_type="application/json",
@@ -1047,9 +1180,7 @@ async def admin_support_case_claim(
     admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
-        data = await support_case_service.claim(
-            _required_text(body, "caseId"), admin.admin_id
-        )
+        data = await support_case_service.claim(_required_text(body, "caseId"), admin.admin_id)
         return success(data)
     except ValueError as exc:
         return error(600, str(exc))
@@ -1112,6 +1243,7 @@ async def admin_load_pending_actions(
     except ValueError as exc:
         return error(600, str(exc))
 
+
 @router.post("/admin/getMessage")
 async def admin_get_message(
     request: Request,
@@ -1124,6 +1256,7 @@ async def admin_get_message(
         return error(600, "messageId 不能为空")
     data = await agent_message_service.admin_get_message(message_id)
     return success(data)
+
 
 @router.post("/admin/deleteMessage")
 async def admin_delete_message(
@@ -1209,9 +1342,7 @@ async def admin_support_activate(
     admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
-        data = await support_service.activate(
-            _required_text(body, "sessionId"), admin.admin_id
-        )
+        data = await support_service.activate(_required_text(body, "sessionId"), admin.admin_id)
         return success(support_service.public_session(data))
     except ValueError as exc:
         return error(600, str(exc))
@@ -1261,9 +1392,7 @@ async def admin_support_return_ai(
     admin.require_any("support:write")
     body = await _read_admin_body(request)
     try:
-        data = await support_service.return_to_ai(
-            _required_text(body, "sessionId"), admin.admin_id
-        )
+        data = await support_service.return_to_ai(_required_text(body, "sessionId"), admin.admin_id)
         return success(support_service.public_session(data))
     except ValueError as exc:
         return error(600, str(exc))
@@ -1324,9 +1453,7 @@ async def admin_review_badcase(
             owner=str(body.get("owner") or "").strip() or None,
             fix_version=str(body.get("fixVersion") or "").strip() or None,
             regression=(
-                body.get("regression")
-                if isinstance(body.get("regression"), dict)
-                else None
+                body.get("regression") if isinstance(body.get("regression"), dict) else None
             ),
         )
         return success(data)
@@ -1357,11 +1484,7 @@ async def admin_run_regression_cases(
     admin.require_any("ai:evaluate")
     body = await _read_admin_body(request)
     try:
-        return success(
-            await regression_replay_service.run_active(
-                _as_int(body.get("caseId"))
-            )
-        )
+        return success(await regression_replay_service.run_active(_as_int(body.get("caseId"))))
     except ValueError as exc:
         return error(600, str(exc))
 
@@ -1477,11 +1600,7 @@ async def admin_pilot_participants(
     admin.require_any("ai:pilot", "audit:read")
     body = await _read_admin_body(request)
     try:
-        return success(
-            await pilot_batch_service.list_participants(
-                _required_text(body, "batchId")
-            )
-        )
+        return success(await pilot_batch_service.list_participants(_required_text(body, "batchId")))
     except ValueError as exc:
         return error(600, str(exc))
 
@@ -1520,9 +1639,7 @@ async def admin_metrics_performance(
     admin.require_any("analytics:read", "ai:evaluate")
     body = await _read_admin_body(request)
     try:
-        return success(
-            await pilot_metrics_service.performance(**_pilot_metric_filters(body))
-        )
+        return success(await pilot_metrics_service.performance(**_pilot_metric_filters(body)))
     except ValueError as exc:
         return error(600, str(exc))
 
@@ -1537,18 +1654,14 @@ async def admin_pilot_report(
     try:
         batch_id = _required_text(body, "batchId")
         output_format = str(body.get("format") or "json")
-        content, content_type = await pilot_metrics_service.export_report(
-            batch_id, output_format
-        )
+        content, content_type = await pilot_metrics_service.export_report(batch_id, output_format)
     except ValueError as exc:
         return Response(
             content=json.dumps({"code": 600, "message": str(exc)}, ensure_ascii=False),
             media_type="application/json",
             status_code=400,
         )
-    suffix = {"json": "json", "csv": "csv", "markdown": "md"}.get(
-        output_format.lower(), "bin"
-    )
+    suffix = {"json": "json", "csv": "csv", "markdown": "md"}.get(output_format.lower(), "bin")
     return Response(
         content=content,
         media_type=content_type,
@@ -1563,7 +1676,9 @@ def _required_text(body: dict, key: str) -> str:
     return value
 
 
-def _audit_admin_action(action: str, admin_id: str, session_id: str | None, extra: dict | None = None) -> None:
+def _audit_admin_action(
+    action: str, admin_id: str, session_id: str | None, extra: dict | None = None
+) -> None:
     """管理端写操作的结构化审计日志（P0-6 残留）。
 
     管理身份本身已由 Java 侧认证会话派生（/admin/agentMessage/* 的 currentAdmin），

@@ -4,8 +4,8 @@
       <h2>AI 经营分析</h2>
       <div class="heading-actions">
         <el-segmented v-model="mode" :options="modeOptions" />
-        <el-tag v-if="result" :type="statusType(result.status)" effect="plain">
-          {{ statusText(result.status) }}
+        <el-tag v-if="result" :type="statusType(result.outcome || result.status)" effect="plain">
+          {{ statusText(result.outcome || result.status) }}
         </el-tag>
       </div>
     </header>
@@ -27,6 +27,8 @@
         type="success"
         plain
         :loading="exporting"
+        :disabled="!canExportAnalyticsResult(analysisResult)"
+        :title="canExportAnalyticsResult(analysisResult) ? '导出当前冻结结果' : '当前回答没有可导出的冻结结果'"
         @click="requestExport"
       >
         异步导出
@@ -43,6 +45,20 @@
       v-if="errorMessage"
       :title="errorMessage"
       type="error"
+      show-icon
+      :closable="false"
+    />
+    <el-alert
+      v-else-if="snapshotExpired"
+      title="冻结结果已过期，请重新发起分析后再翻页或导出。"
+      type="warning"
+      show-icon
+      :closable="false"
+    />
+    <el-alert
+      v-else-if="result?.completion === 'PARTIAL'"
+      title="仅部分指标分支成功；以下内容不能计作完整可信回答。"
+      type="warning"
       show-icon
       :closable="false"
     />
@@ -135,21 +151,37 @@
     </template>
 
     <template v-else-if="result">
-      <section v-if="result.status === 'NEEDS_CLARIFICATION'" class="clarification-band">
+      <section v-if="result.outcome === 'CLARIFY' || result.status === 'NEEDS_CLARIFICATION'" class="clarification-band">
         <div>
           <span>需要确认口径</span>
           <strong>{{ result.clarificationQuestion }}</strong>
         </div>
         <div class="clarification-actions">
           <el-button
-            v-for="metric in clarificationMetrics"
-            :key="metric"
+            v-for="option in result.clarificationOptions || []"
+            :key="option.choiceId"
             size="small"
-            @click="clarify(metric)"
+            :loading="clarifying"
+            @click="clarify(option.choiceId)"
           >
-            按{{ metric }}
+            {{ option.label }}
           </el-button>
         </div>
+      </section>
+
+      <section
+        v-else-if="result.outcome === 'ABSTAIN' || result.outcome === 'DENY'"
+        class="decision-band"
+        :class="{ denied: result.outcome === 'DENY' }"
+      >
+        <div class="answer-heading">
+          <span>{{ result.outcome === 'DENY' ? '请求已拒绝' : '当前范围无法回答' }}</span>
+          <el-tag :type="result.outcome === 'DENY' ? 'danger' : 'warning'" effect="plain">
+            {{ result.reasonCode || result.status }}
+          </el-tag>
+        </div>
+        <p>{{ result.answer }}</p>
+        <small>{{ result.runId || result.requestId || '—' }}</small>
       </section>
 
       <template v-else>
@@ -176,6 +208,8 @@
           <span>Run {{ result.runId || '—' }}</span>
           <span>{{ result.latencyMs == null ? '—' : `${result.latencyMs} ms` }}</span>
           <span>{{ result.rows?.length || 0 }} 行</span>
+          <span v-if="result.catalogVersion">Catalog {{ result.catalogVersion }}</span>
+          <span v-if="result.dataAsOf">dataAsOf {{ result.dataAsOf }}</span>
           <el-tag v-for="view in result.lineage || []" :key="view" size="small" type="info">
             {{ view }}
           </el-tag>
@@ -205,10 +239,19 @@
                 min-width="150"
                 show-overflow-tooltip
               >
-                <template #default="{ row }">{{ formatValue(row[column]) }}</template>
+                <template #default="{ row }">{{ formatCell(row[column], column) }}</template>
               </el-table-column>
             </el-table>
           </div>
+          <el-button
+            v-if="result.nextCursor"
+            type="primary"
+            plain
+            :loading="loadingMore"
+            @click="loadMore"
+          >
+            加载下一页
+          </el-button>
         </section>
 
         <el-alert
@@ -295,6 +338,15 @@ import { Connection, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { reasonLabel } from '@/utils/agentDisplay.js'
+import {
+  canExportAnalyticsResult,
+  chartNumericRows,
+  formatAnalyticsCell,
+  isAnalyticsNumeric,
+  isFailedAnalyticsResult,
+  isSnapshotExpiredCode,
+  mergeFrozenPage,
+} from '@/utils/dataAnalyst.js'
 
 const { proxy } = getCurrentInstance()
 const mode = ref('analysis')
@@ -306,16 +358,18 @@ const question = ref('')
 const lastQuestion = ref('')
 const lookbackDays = ref(28)
 const loading = ref(false)
+const loadingMore = ref(false)
+const clarifying = ref(false)
 const exporting = ref(false)
 const exportJob = ref(null)
 const analysisResult = ref(null)
 const inventoryResult = ref(null)
 const result = computed(() => mode.value === 'analysis' ? analysisResult.value : inventoryResult.value)
 const errorMessage = ref('')
+const snapshotExpired = ref(false)
 const chartRef = ref(null)
 let chart
 
-const clarificationMetrics = ['销售金额', '销售件数', '订单数']
 const columnLabels = {
   stat_date: '日期', product_id: '商品 ID', product_name: '商品名称',
   paid_order_count: '已支付订单数', paid_amount: '支付金额',
@@ -349,10 +403,29 @@ const metricCards = computed(() => {
   const row = rows[rows.length - 1] || {}
   const x = result.value?.chart?.x
   return (result.value?.columns || [])
-    .filter((name) => name !== x && typeof row[name] === 'number')
+    .filter((name) => name !== x && isAnalyticsNumeric(result.value?.columnTypes, name, row[name]))
     .slice(0, 4)
     .map((name) => ({ name, value: row[name] }))
 })
+
+const captureAnalysisError = (payload) => {
+  if (!payload?.data) return false
+  analysisResult.value = payload.data
+  snapshotExpired.value = isSnapshotExpiredCode(payload.data.reasonCode || payload.data.status)
+  errorMessage.value = ''
+  return true
+}
+
+const captureSnapshotError = (payload) => {
+  const code = payload?.data?.reasonCode || payload?.data?.status
+  if (isSnapshotExpiredCode(code)) {
+    snapshotExpired.value = true
+    errorMessage.value = ''
+    return true
+  }
+  if (payload?.info) errorMessage.value = payload.info
+  return Boolean(payload?.data)
+}
 
 const ask = async () => {
   const normalized = question.value.trim()
@@ -362,19 +435,28 @@ const ask = async () => {
   }
   loading.value = true
   errorMessage.value = ''
+  snapshotExpired.value = false
   chart?.dispose()
   chart = null
   let shouldRender = false
+  let structuredError = false
   try {
     const response = await proxy.Request({
       url: proxy.Api.dataAnalystAsk,
       params: { question: normalized },
       showLoading: false,
+      showError: false,
+      errorCallback: (payload) => {
+        structuredError = captureAnalysisError(payload)
+        shouldRender = structuredError
+      },
       timeout: 55000,
     })
     if (!response?.data) {
-      analysisResult.value = null
-      errorMessage.value = '分析服务暂时不可用，请稍后重试。'
+      if (!structuredError) {
+        analysisResult.value = null
+        errorMessage.value = '分析服务暂时不可用，请稍后重试。'
+      }
       return
     }
     lastQuestion.value = normalized
@@ -390,14 +472,15 @@ const ask = async () => {
 }
 
 const requestExport = async () => {
-  const normalized = (lastQuestion.value || question.value).trim()
-  if (!normalized || exporting.value) return
+  if (!canExportAnalyticsResult(analysisResult.value) || exporting.value) return
   exporting.value = true
   try {
     const response = await proxy.Request({
       url: proxy.Api.dataAnalystExport,
-      params: { question: normalized },
+      params: { resultSetId: analysisResult.value.resultSetId },
       showLoading: false,
+      showError: false,
+      errorCallback: captureSnapshotError,
       timeout: 15000,
     })
     exportJob.value = response?.data || null
@@ -414,6 +497,8 @@ const pollExport = async (jobId) => {
       url: proxy.Api.dataAnalystExportStatus,
       params: { jobId },
       showLoading: false,
+      showError: false,
+      errorCallback: captureSnapshotError,
     })
     exportJob.value = response?.data || exportJob.value
     if (exportJob.value?.status === 'COMPLETED') {
@@ -422,6 +507,8 @@ const pollExport = async (jobId) => {
         params: { jobId },
         responseType: 'blob',
         showLoading: false,
+        showError: false,
+        errorCallback: captureSnapshotError,
       })
       if (blob) {
         const link = document.createElement('a')
@@ -433,6 +520,33 @@ const pollExport = async (jobId) => {
       return
     }
     if (exportJob.value?.status === 'FAILED') return
+  }
+}
+
+const loadMore = async () => {
+  const current = analysisResult.value
+  if (!current?.nextCursor || loadingMore.value) return
+  loadingMore.value = true
+  errorMessage.value = ''
+  try {
+    const response = await proxy.Request({
+      url: proxy.Api.dataAnalystPage,
+      params: { cursor: current.nextCursor, pageSize: 50 },
+      showLoading: false,
+      showError: false,
+      errorCallback: captureSnapshotError,
+    })
+    if (!response?.data) return
+    try {
+      analysisResult.value = mergeFrozenPage(current, response.data)
+    } catch {
+      errorMessage.value = '分页结果完整性校验失败，请重新发起分析。'
+      return
+    }
+    await nextTick()
+    renderChart()
+  } finally {
+    loadingMore.value = false
   }
 }
 
@@ -457,9 +571,36 @@ const loadInventory = async () => {
   }
 }
 
-const clarify = (metric) => {
-  question.value = `${lastQuestion.value || question.value}，按${metric}统计`
-  ask()
+const clarify = async (choiceId) => {
+  const token = analysisResult.value?.clarificationToken
+  if (!token || !choiceId || clarifying.value) return
+  clarifying.value = true
+  loading.value = true
+  errorMessage.value = ''
+  let structuredError = false
+  try {
+    const response = await proxy.Request({
+      url: proxy.Api.dataAnalystClarify,
+      params: { clarificationToken: token, choiceId },
+      showLoading: false,
+      showError: false,
+      errorCallback: (payload) => {
+        structuredError = captureAnalysisError(payload)
+      },
+      timeout: 55000,
+    })
+    if (response?.data) {
+      analysisResult.value = response.data
+    } else if (!structuredError) {
+      errorMessage.value = '澄清状态不可用，请重新发起分析。'
+      return
+    }
+  } finally {
+    clarifying.value = false
+    loading.value = false
+  }
+  await nextTick()
+  renderChart()
 }
 
 const openTrace = () => {
@@ -473,6 +614,8 @@ const renderChart = () => {
   const spec = result.value?.chart
   const rows = result.value?.rows || []
   if (!chartRef.value || !spec?.x || !spec.series?.length || !rows.length) return
+  const numericRows = chartNumericRows(rows, spec, result.value?.columnTypes)
+  chart?.dispose()
   chart = echarts.init(chartRef.value)
   chart.setOption({
     animationDuration: 260,
@@ -489,7 +632,7 @@ const renderChart = () => {
     series: spec.series.map((name) => ({
       name,
       type: spec.type === 'bar' ? 'bar' : 'line',
-      data: rows.map((row) => row[name]),
+      data: numericRows.map((row) => row[name]),
       smooth: false,
       symbolSize: 6,
       barMaxWidth: 44,
@@ -502,12 +645,20 @@ const formatValue = (value) => {
   if (typeof value !== 'number') return value
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
 }
+const formatCell = (value, column) => formatAnalyticsCell(
+  value,
+  result.value?.columnTypes?.[column],
+)
 const formatPercent = (value) => {
   if (value == null || Number.isNaN(Number(value))) return '—'
   return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(Number(value) * 100)}%`
 }
 const pretty = (value) => JSON.stringify(value || [], null, 2)
 const statusText = (status) => ({
+  ANSWER: '已回答',
+  CLARIFY: '待确认口径',
+  ABSTAIN: '超出当前范围',
+  DENY: '已拒绝',
   SUCCEEDED: '查询成功',
   EMPTY_RESULT: '暂无数据',
   PARTIAL_METRIC_TREE: '部分指标完成',
@@ -524,8 +675,10 @@ const statusText = (status) => ({
   QUERY_TIMEOUT: '查询超时',
   DATABASE_UNAVAILABLE: '分析库不可用',
   ANALYTICS_POOL_UNAVAILABLE: '分析库未就绪',
+  RESULT_SNAPSHOT_EXPIRED: '冻结结果已过期',
+  RESULT_SNAPSHOT_UNAVAILABLE: '冻结结果不可用',
 }[status] || status || '未知状态')
-const isFailureResult = (value) => !['SUCCEEDED', 'EMPTY_RESULT', 'PARTIAL_METRIC_TREE', 'NEEDS_CLARIFICATION'].includes(value?.status)
+const isFailureResult = (value) => isFailedAnalyticsResult(value)
 const failureText = (status) => {
   if (status === 'DISABLED') return 'AI 经营分析当前未启用。'
   if (status === 'DATA_ANALYST_REQUEST_TIMEOUT' || status === 'QUERY_TIMEOUT') return '本次分析超过执行预算，请缩小时间范围或问题范围后重试。'
@@ -535,8 +688,8 @@ const failureText = (status) => {
   return '本次分析未生成可信结论，请稍后重试。'
 }
 const statusType = (status) => {
-  if (status === 'SUCCEEDED') return 'success'
-  if (status === 'NEEDS_CLARIFICATION' || status === 'EMPTY_RESULT' || status === 'PARTIAL_METRIC_TREE') return 'warning'
+  if (status === 'ANSWER' || status === 'SUCCEEDED') return 'success'
+  if (['CLARIFY', 'ABSTAIN', 'NEEDS_CLARIFICATION', 'EMPTY_RESULT', 'PARTIAL_METRIC_TREE'].includes(status)) return 'warning'
   return 'danger'
 }
 const priorityType = (priority) => ({
@@ -597,7 +750,7 @@ onBeforeUnmount(() => {
 .heading-actions { display: flex; align-items: center; gap: 10px; }
 .query-bar {
   display: grid;
-  grid-template-columns: minmax(260px, 760px) 96px;
+  grid-template-columns: minmax(260px, 760px) 96px 110px;
   gap: 10px;
   align-items: start;
 }
@@ -605,6 +758,7 @@ onBeforeUnmount(() => {
 .inventory-toolbar { display: flex; align-items: center; gap: 10px; }
 .clarification-band,
 .answer-band,
+.decision-band,
 .failure-band {
   border-left: 3px solid #d97706;
   background: var(--surface2);
@@ -622,10 +776,14 @@ onBeforeUnmount(() => {
 .clarification-band strong { color: var(--text); font-size: 14px; }
 .clarification-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .answer-band { border-left-color: #0f9d73; }
+.decision-band { border-left-color: #d97706; }
+.decision-band.denied { border-left-color: #c2415d; }
 .failure-band { border-left-color: #c2415d; }
 .answer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .answer-band p,
+.decision-band p,
 .failure-band p { margin: 8px 0 0; color: var(--text); font-size: 15px; line-height: 1.7; }
+.decision-band small { display: block; margin-top: 8px; color: var(--text3); font-size: 12px; }
 .failure-band small { display: block; margin-top: 8px; color: var(--text3); font-size: 12px; overflow-wrap: anywhere; }
 .answer-band ul { margin: 10px 0 0; padding-left: 18px; color: var(--text2); }
 .answer-band li { margin: 4px 0; line-height: 1.55; }

@@ -11,6 +11,7 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -124,6 +125,34 @@ public class AgentMessageServiceImpl implements AgentMessageService {
 	}
 
 	@Override
+	public ResponseEntity<ResponseVO<Object>> callDataAnalyst(
+			String action, Map<String, Object> body) {
+		String path = "/api/agent/admin/" + action;
+		Object payload = body == null ? Map.of() : body;
+		byte[] bodyBytes;
+		try {
+			bodyBytes = objectMapper.writeValueAsBytes(payload);
+		} catch (Exception e) {
+			throw new BusinessException("Agent 请求序列化失败");
+		}
+		Map<String, String> assertionHeaders = adminAssertionSigner.sign(
+				"POST", path, bodyBytes, AdminSecurityContext.requirePrincipal());
+		ResponseEntity<ResponseVO<Object>> response = client().post()
+				.uri(path)
+				.contentType(MediaType.APPLICATION_JSON)
+				.header(InternalApiHeaders.INTERNAL_TOKEN, internalToken)
+				.headers(headers -> assertionHeaders.forEach(headers::set))
+				.body(bodyBytes)
+				.retrieve()
+				.onStatus(status -> status.isError(), (request, upstream) -> { })
+				.toEntity(new ParameterizedTypeReference<ResponseVO<Object>>() { });
+		if (response.getBody() == null) {
+			throw new BusinessException("Agent 服务无响应");
+		}
+		return response;
+	}
+
+	@Override
 	public byte[] callReport(String action, Map<String, Object> body) {
 		String path = "/api/agent/admin/" + action;
 		Object payload = body == null ? Map.of() : body;
@@ -144,6 +173,34 @@ public class AgentMessageServiceImpl implements AgentMessageService {
 				.retrieve()
 				.body(byte[].class);
 		if (response == null) {
+			throw new BusinessException("Agent 报告导出失败");
+		}
+		return response;
+	}
+
+	@Override
+	public ResponseEntity<byte[]> callDataAnalystReport(
+			String action, Map<String, Object> body) {
+		String path = "/api/agent/admin/" + action;
+		Object payload = body == null ? Map.of() : body;
+		byte[] bodyBytes;
+		try {
+			bodyBytes = objectMapper.writeValueAsBytes(payload);
+		} catch (Exception e) {
+			throw new BusinessException("Agent 请求序列化失败");
+		}
+		Map<String, String> assertionHeaders = adminAssertionSigner.sign(
+				"POST", path, bodyBytes, AdminSecurityContext.requirePrincipal());
+		ResponseEntity<byte[]> response = client().post()
+				.uri(path)
+				.contentType(MediaType.APPLICATION_JSON)
+				.header(InternalApiHeaders.INTERNAL_TOKEN, internalToken)
+				.headers(headers -> assertionHeaders.forEach(headers::set))
+				.body(bodyBytes)
+				.retrieve()
+				.onStatus(status -> status.isError(), (request, upstream) -> { })
+				.toEntity(byte[].class);
+		if (response.getBody() == null) {
 			throw new BusinessException("Agent 报告导出失败");
 		}
 		return response;

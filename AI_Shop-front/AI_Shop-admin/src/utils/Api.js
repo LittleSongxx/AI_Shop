@@ -131,6 +131,8 @@ const Api = {
     agentTraceRuns: "/agentMessage/traceRuns",
     agentTraceDetail: "/agentMessage/traceDetail",
     dataAnalystAsk: "/agentMessage/dataAnalyst/ask",
+    dataAnalystClarify: "/agentMessage/dataAnalyst/clarify",
+    dataAnalystPage: "/agentMessage/dataAnalyst/page",
     dataAnalystExport: "/agentMessage/dataAnalyst/export",
     dataAnalystExportStatus: "/agentMessage/dataAnalyst/export/status",
     dataAnalystExportDownload: "/agentMessage/dataAnalyst/export/download",

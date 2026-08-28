@@ -9,6 +9,11 @@ public class HttpBusinessException extends BusinessException {
         this.httpStatus = httpStatus;
     }
 
+    public HttpBusinessException(int httpStatus, String message, Object data) {
+        super(httpStatus, message, data);
+        this.httpStatus = httpStatus;
+    }
+
     public int getHttpStatus() {
         return httpStatus;
     }

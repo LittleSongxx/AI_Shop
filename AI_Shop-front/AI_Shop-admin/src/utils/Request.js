@@ -61,11 +61,29 @@ instance.interceptors.response.use(
             return Promise.reject({ showError: showError, msg: responseData.info });
         }
     },
-    (error) => {
+    async (error) => {
         if (error.config?.showLoading && loading) {
             loading.close();
         }
-        return Promise.reject({ showError: true, msg: "网络异常" })
+        const { errorCallback, showError = true } = error.config || {}
+        let responseData = error.response?.data
+        if (responseData instanceof Blob) {
+            try {
+                responseData = JSON.parse(await responseData.text())
+            } catch {
+                responseData = null
+            }
+        }
+        if (responseData && typeof responseData === 'object') {
+            if (errorCallback) errorCallback(responseData)
+            return Promise.reject({
+                showError,
+                msg: responseData.info || `请求失败（HTTP ${error.response?.status || '—'}）`,
+                responseData,
+                status: error.response?.status,
+            })
+        }
+        return Promise.reject({ showError, msg: "网络异常" })
     }
 );
 

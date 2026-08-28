@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
 import aiomysql
 
 from app.config.settings import get_settings
+from app.services.analytics_catalog import CATALOG
 
 _analytics_pool: aiomysql.Pool | None = None
+
+
+@dataclass(frozen=True)
+class AnalyticsSnapshot:
+    cursor: Any
+    data_as_of: str
 
 
 async def init_analytics_pool() -> None:
@@ -39,13 +49,7 @@ async def init_analytics_pool() -> None:
     try:
         async with pool.acquire() as connection:
             async with connection.cursor() as cursor:
-                for view in (
-                    "analytics_sales_daily",
-                    "analytics_product_sales_daily",
-                    "analytics_inventory_risk",
-                    "analytics_agent_quality_daily",
-                    "analytics_tool_quality_daily",
-                ):
+                for view in CATALOG:
                     await cursor.execute(f"SELECT 1 FROM `{view}` LIMIT 0")
     except Exception:
         pool.close()
@@ -68,4 +72,45 @@ async def acquire_analytics():
         raise RuntimeError("analytics DB pool not initialized")
     async with _analytics_pool.acquire() as connection:
         async with connection.cursor(aiomysql.DictCursor) as cursor:
+            fixed_now = get_settings().analytics_eval_fixed_now.strip()
+            if fixed_now:
+                await cursor.execute("SET SESSION time_zone = '+08:00'")
+                await cursor.execute("SET SESSION timestamp = UNIX_TIMESTAMP(%s)", (fixed_now,))
             yield cursor
+
+
+@asynccontextmanager
+async def acquire_analytics_snapshot():
+    """Acquire one read-only repeatable-read snapshot for the whole request.
+
+    EXPLAIN and every metric branch must use the yielded cursor sequentially.
+    The rollback in ``finally`` also runs for model/query timeouts and task
+    cancellation, so a pooled connection cannot leak a snapshot to its next
+    borrower.
+    """
+
+    if _analytics_pool is None:
+        raise RuntimeError("analytics DB pool not initialized")
+    async with _analytics_pool.acquire() as connection:
+        try:
+            await connection.rollback()
+            async with connection.cursor(aiomysql.DictCursor) as cursor:
+                settings = get_settings()
+                await cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+                await cursor.execute("SET SESSION time_zone = '+08:00'")
+                fixed_now = settings.analytics_eval_fixed_now.strip()
+                if fixed_now:
+                    await cursor.execute("SET SESSION timestamp = UNIX_TIMESTAMP(%s)", (fixed_now,))
+                else:
+                    await cursor.execute("SET SESSION timestamp = DEFAULT")
+                await cursor.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY")
+                await cursor.execute("SELECT NOW(6) AS data_as_of")
+                row = await cursor.fetchone()
+                value = (row or {}).get("data_as_of") if isinstance(row, dict) else None
+                if isinstance(value, datetime):
+                    data_as_of = value.isoformat(timespec="microseconds") + "+08:00"
+                else:
+                    data_as_of = str(value or "")
+                yield AnalyticsSnapshot(cursor=cursor, data_as_of=data_as_of)
+        finally:
+            await connection.rollback()

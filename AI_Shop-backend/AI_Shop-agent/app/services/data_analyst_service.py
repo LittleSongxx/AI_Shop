@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import binascii
 import hashlib
-import hmac
 import json
 import re
 import time
 import uuid
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from numbers import Number
 from typing import Any, Iterable, Literal
 
@@ -18,9 +14,23 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.config.settings import get_settings
-from app.db.analytics_pool import acquire_analytics
+from app.db.analytics_pool import acquire_analytics, acquire_analytics_snapshot
 from app.observability.llm_metrics import invoke_llm_with_metrics
-from app.services.analytics_catalog import CATALOG, allowed_plan_fields, catalog_prompt
+from app.services.analytics_catalog import (
+    CATALOG,
+    CATALOG_CONTENT_SHA256,
+    CATALOG_VERSION,
+    allowed_plan_fields,
+    catalog_prompt,
+    disclosure_contract,
+)
+from app.services.analytics_clarification_service import analytics_clarification_service
+from app.services.analytics_policy import evaluate_question_policy
+from app.services.analytics_result_service import (
+    AnalyticsResultError,
+    analytics_result_service,
+    normalize_typed_rows,
+)
 from app.services.episode_service import bind_episode, episode_service
 from app.services.llm_factory import create_memory_llm
 from app.services.sql_guard import (
@@ -28,6 +38,9 @@ from app.services.sql_guard import (
     SqlGuardResult,
     validate_sql,
 )
+
+_EXPLAIN_VIEW_PRIVILEGE_ERROR = 1345
+_EXPLAIN_VIEW_PRIVILEGE_REASON = "EXPLAIN_UNAVAILABLE_VIEW_PRIVILEGE"
 
 
 class DataAnalysisBranch(BaseModel):
@@ -40,6 +53,12 @@ class DataAnalysisBranch(BaseModel):
     end_date: date | None = None
 
 
+class ClarificationOption(BaseModel):
+    choice_id: str = Field(min_length=1, max_length=64)
+    label: str = Field(min_length=1, max_length=100)
+    answer_suffix: str = Field(min_length=1, max_length=200)
+
+
 class DataAnalysisPlan(BaseModel):
     status: Literal["READY", "NEEDS_CLARIFICATION"] = "READY"
     semantic_view: str | None = None
@@ -49,6 +68,7 @@ class DataAnalysisPlan(BaseModel):
     end_date: date | None = None
     interpretation: str = ""
     clarification_question: str | None = None
+    clarification_options: list[ClarificationOption] = Field(default_factory=list, max_length=8)
     branches: list[DataAnalysisBranch] = Field(default_factory=list, max_length=3)
 
     @field_validator("metrics", "dimensions", mode="before")
@@ -62,8 +82,15 @@ class DataAnalysisPlan(BaseModel):
     def normalize_single_branch(self) -> "DataAnalysisPlan":
         """Keep one canonical branch list while accepting the original shape."""
         if self.status != "READY":
+            if not str(self.clarification_question or "").strip():
+                raise ValueError("clarification_question is required")
+            choice_ids = [option.choice_id for option in self.clarification_options]
+            if len(choice_ids) < 2 or len(set(choice_ids)) != len(choice_ids):
+                raise ValueError("at least two unique clarification options are required")
             self.branches = []
             return self
+        self.clarification_question = None
+        self.clarification_options = []
         if not self.branches and self.semantic_view and self.metrics:
             self.branches = [
                 DataAnalysisBranch(
@@ -105,7 +132,8 @@ _DEFAULT_ANALYTICS_PAGE_SIZE = 50
 def _question_dates(question: str) -> tuple[date, date]:
     match = re.search(r"最近\s*(\d+)\s*天", question)
     days = min(90, max(1, int(match.group(1) if match else 7)))
-    end = date.today()
+    fixed_now = str(getattr(get_settings(), "analytics_eval_fixed_now", "") or "").strip()
+    end = datetime.fromisoformat(fixed_now).date() if fixed_now else date.today()
     return end - timedelta(days=days - 1), end
 
 
@@ -115,10 +143,7 @@ def _metric_definitions(plan: DataAnalysisPlan) -> list[dict[str, str]]:
     item = CATALOG[plan.semantic_view]
     definitions = dict(item["columns"])
     definitions.update(
-        {
-            name: spec.get("definition")
-            for name, spec in (item.get("derived_metrics") or {}).items()
-        }
+        {name: spec.get("definition") for name, spec in (item.get("derived_metrics") or {}).items()}
     )
     selected = [*plan.dimensions, *plan.metrics]
     return [
@@ -168,14 +193,22 @@ def _schema_instruction(schema: type[BaseModel]) -> str:
     return json.dumps(schema.model_json_schema(), ensure_ascii=False, separators=(",", ":"))
 
 
-async def _explain_sql(sql: str, timeout_ms: int) -> list[dict]:
+async def _explain_sql(sql: str, timeout_ms: int, cursor: Any | None = None) -> list[dict]:
+    if cursor is not None:
+        await cursor.execute("SET SESSION MAX_EXECUTION_TIME=%s", (timeout_ms,))
+        await cursor.execute("EXPLAIN " + sql)
+        return list(await cursor.fetchall())
     async with acquire_analytics() as cursor:
         await cursor.execute("SET SESSION MAX_EXECUTION_TIME=%s", (timeout_ms,))
         await cursor.execute("EXPLAIN " + sql)
         return list(await cursor.fetchall())
 
 
-async def _execute_sql(sql: str, timeout_ms: int) -> list[dict]:
+async def _execute_sql(sql: str, timeout_ms: int, cursor: Any | None = None) -> list[dict]:
+    if cursor is not None:
+        await cursor.execute("SET SESSION MAX_EXECUTION_TIME=%s", (timeout_ms,))
+        await cursor.execute(sql)
+        return list(await cursor.fetchall())
     async with acquire_analytics() as cursor:
         await cursor.execute("SET SESSION MAX_EXECUTION_TIME=%s", (timeout_ms,))
         await cursor.execute(sql)
@@ -187,20 +220,32 @@ def _database_error_code(exc: Exception) -> int | None:
     return int(args[0]) if args and isinstance(args[0], int) else None
 
 
-def _normalize_analytics_rows(rows: list[dict]) -> list[dict]:
-    """Return JSON-native values without turning numeric metrics into strings."""
-    normalized: list[dict] = []
+def _explain_scan_estimate(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    estimates: list[int] = []
+    tables: list[dict[str, Any]] = []
     for row in rows:
-        item = {}
-        for key, value in row.items():
-            if isinstance(value, Decimal):
-                item[key] = float(value)
-            elif isinstance(value, (date, datetime)):
-                item[key] = value.isoformat()
-            else:
-                item[key] = value
-        normalized.append(item)
-    return normalized
+        raw_estimate = (
+            row.get("rows") if row.get("rows") is not None else row.get("rows_examined_per_scan")
+        )
+        try:
+            estimated = max(0, int(raw_estimate or 0))
+        except (TypeError, ValueError):
+            estimated = 0
+        estimates.append(estimated)
+        tables.append(
+            {
+                "table": row.get("table") or row.get("table_name"),
+                "accessType": row.get("type") or row.get("access_type"),
+                "estimatedRows": estimated,
+                "filteredPercent": row.get("filtered"),
+            }
+        )
+    return {
+        "estimatedRows": sum(estimates),
+        "tables": tables,
+        "diagnosticOnly": True,
+        "hardThresholdApplied": False,
+    }
 
 
 def _json_size(value: object) -> int:
@@ -212,86 +257,6 @@ def _json_size(value: object) -> int:
             default=str,
         ).encode("utf-8")
     )
-
-
-def _cursor_secret(settings: object) -> bytes:
-    return str(getattr(settings, "internal_token", "aishop-development-cursor-secret")).encode(
-        "utf-8"
-    )
-
-
-def _encode_result_cursor(
-    *,
-    settings: object,
-    admin_id: str,
-    sql_hash: str,
-    offset: int,
-) -> str:
-    payload = {
-        "v": 1,
-        "owner": hashlib.sha256(admin_id.encode("utf-8")).hexdigest(),
-        "sqlHash": sql_hash,
-        "offset": max(0, int(offset)),
-        "expiresAt": int(time.time())
-        + int(getattr(settings, "analytics_cursor_ttl_seconds", 900)),
-    }
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    ).decode("ascii").rstrip("=")
-    signature = hmac.new(
-        _cursor_secret(settings), encoded.encode("ascii"), hashlib.sha256
-    ).hexdigest()
-    return f"{encoded}.{signature}"
-
-
-def _decode_result_cursor(
-    token: str,
-    *,
-    settings: object,
-    admin_id: str,
-    sql_hash: str,
-) -> tuple[int | None, str | None]:
-    encoded, separator, signature = str(token or "").partition(".")
-    if not separator or not encoded or not signature:
-        return None, "CURSOR_INVALID"
-    try:
-        expected = hmac.new(
-            _cursor_secret(settings), encoded.encode("ascii"), hashlib.sha256
-        ).hexdigest()
-    except UnicodeEncodeError:
-        return None, "CURSOR_INVALID"
-    if not hmac.compare_digest(expected, signature):
-        return None, "CURSOR_INVALID"
-    try:
-        padded = encoded + "=" * (-len(encoded) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
-    except (
-        binascii.Error,
-        UnicodeDecodeError,
-        ValueError,
-        TypeError,
-        json.JSONDecodeError,
-    ):
-        return None, "CURSOR_INVALID"
-    if not isinstance(payload, dict):
-        return None, "CURSOR_INVALID"
-    if payload.get("v") != 1:
-        return None, "CURSOR_INVALID"
-    try:
-        expires_at = int(payload.get("expiresAt") or 0)
-    except (TypeError, ValueError, OverflowError):
-        return None, "CURSOR_INVALID"
-    if expires_at < int(time.time()):
-        return None, "CURSOR_EXPIRED"
-    if payload.get("owner") != hashlib.sha256(admin_id.encode("utf-8")).hexdigest():
-        return None, "CURSOR_OWNER_MISMATCH"
-    if payload.get("sqlHash") != sql_hash:
-        return None, "CURSOR_QUERY_MISMATCH"
-    try:
-        offset = int(payload.get("offset"))
-    except (TypeError, ValueError):
-        return None, "CURSOR_INVALID"
-    return (offset if offset >= 0 else None), (None if offset >= 0 else "CURSOR_INVALID")
 
 
 def _page_result_rows(
@@ -375,8 +340,7 @@ def _deterministic_narrative(
             for name in rows[0]
             if name != dimension
             and any(
-                isinstance(row.get(name), Number)
-                and not isinstance(row.get(name), bool)
+                isinstance(row.get(name), Number) and not isinstance(row.get(name), bool)
                 for row in rows
             )
         ][:8]
@@ -387,31 +351,24 @@ def _deterministic_narrative(
         points = [
             (row.get(dimension) if dimension else None, row.get(metric))
             for row in rows
-            if isinstance(row.get(metric), Number)
-            and not isinstance(row.get(metric), bool)
+            if isinstance(row.get(metric), Number) and not isinstance(row.get(metric), bool)
         ]
         if not points:
             continue
         maximum = max(points, key=lambda item: float(item[1]))
         minimum = min(points, key=lambda item: float(item[1]))
         label = _display_metric(plan, metric)
-        dimension_suffix = (
-            f"（{maximum[0]}）" if maximum[0] not in (None, "") else ""
-        )
+        dimension_suffix = f"（{maximum[0]}）" if maximum[0] not in (None, "") else ""
         if float(maximum[1]) == float(minimum[1]):
             statement = f"{label}在返回结果中均为{_format_metric_value(maximum[1])}"
         else:
-            minimum_suffix = (
-                f"（{minimum[0]}）" if minimum[0] not in (None, "") else ""
-            )
+            minimum_suffix = f"（{minimum[0]}）" if minimum[0] not in (None, "") else ""
             statement = (
                 f"{label}最大值为{_format_metric_value(maximum[1])}{dimension_suffix}，"
                 f"最小值为{_format_metric_value(minimum[1])}{minimum_suffix}"
             )
         statements.append(statement)
-        highlights.append(
-            f"{label}最大值：{_format_metric_value(maximum[1])}{dimension_suffix}"
-        )
+        highlights.append(f"{label}最大值：{_format_metric_value(maximum[1])}{dimension_suffix}")
 
         if dimension in {"date", "snapshot_date"} and len(points) > 1:
             ordered = sorted(points, key=lambda item: str(item[0] or ""))
@@ -424,11 +381,7 @@ def _deterministic_narrative(
     if dimension in {"date", "snapshot_date"} and plan.start_date and plan.end_date:
         expected_days = (plan.end_date - plan.start_date).days + 1
         observed_days = len(
-            {
-                str(row.get(dimension))
-                for row in rows
-                if row.get(dimension) not in (None, "")
-            }
+            {str(row.get(dimension)) for row in rows if row.get(dimension) not in (None, "")}
         )
         coverage = (
             f"计划范围为{expected_days}天，返回{observed_days}个有数据日期；"
@@ -496,6 +449,23 @@ class DataAnalystService:
             return DataAnalysisPlan(
                 status="NEEDS_CLARIFICATION",
                 clarification_question="你希望按销售金额、销售件数还是订单数判断“销量最高”？",
+                clarification_options=[
+                    ClarificationOption(
+                        choice_id="gross_item_amount",
+                        label="按商品行金额",
+                        answer_suffix="按商品行金额排序，最近 7 天",
+                    ),
+                    ClarificationOption(
+                        choice_id="paid_units",
+                        label="按支付件数",
+                        answer_suffix="按支付件数排序，最近 7 天",
+                    ),
+                    ClarificationOption(
+                        choice_id="paid_order_count",
+                        label="按支付订单数",
+                        answer_suffix="按支付订单数排序，最近 7 天",
+                    ),
+                ],
                 interpretation="销售排名口径存在歧义",
             )
         start, end = _question_dates(question)
@@ -504,6 +474,8 @@ class DataAnalystService:
                 content=(
                     "你是电商经营分析规划 Agent。只选择下方语义视图、字段和受治理派生指标，"
                     "不得假设原始表。问题有业务口径歧义时返回 NEEDS_CLARIFICATION。"
+                    "NEEDS_CLARIFICATION 必须给出 clarification_question 及至少两个唯一 choice_id 的"
+                    " clarification_options；每项必须含 label 和可直接追加到原问题的 answer_suffix。"
                     "复杂问题拆成最多三个相互独立的指标树分支；每个分支只能选择一个语义视图，"
                     "使用唯一 branch_id，并写清该分支验证什么。每个 READY 分支的 metrics 至少一项；"
                     "派生指标必须使用目录中的指标名。简单问题只生成一个分支。"
@@ -513,7 +485,7 @@ class DataAnalystService:
             ),
             HumanMessage(
                 content=(
-                    f"今天={date.today().isoformat()}；默认时间范围="
+                    f"今天={end.isoformat()}；默认时间范围="
                     f"{start.isoformat()} 到 {end.isoformat()}。\n"
                     f"语义目录：\n{catalog_prompt()}\n管理员问题：{question}"
                 )
@@ -532,9 +504,7 @@ class DataAnalystService:
                     raise ValueError("DATA_ANALYST_PLAN_TIMEOUT") from exc
                 continue
             parsed = response.get("parsed") if isinstance(response, dict) else response
-            parsing_error = (
-                response.get("parsing_error") if isinstance(response, dict) else None
-            )
+            parsing_error = response.get("parsing_error") if isinstance(response, dict) else None
             if parsing_error is None:
                 try:
                     plan = DataAnalysisPlan.model_validate(parsed)
@@ -554,8 +524,6 @@ class DataAnalystService:
         if plan is None:
             raise ValueError("DATA_ANALYST_PLAN_PARSE_FAILED")
         if plan.status == "NEEDS_CLARIFICATION":
-            if not str(plan.clarification_question or "").strip():
-                plan.clarification_question = "请明确要使用的业务指标和统计口径。"
             return plan
         return self._validate_plan_dates_and_contract(
             plan,
@@ -656,9 +624,7 @@ class DataAnalystService:
         }
 
     @staticmethod
-    def _branch_plan(
-        plan: DataAnalysisPlan, branch: DataAnalysisBranch
-    ) -> DataAnalysisPlan:
+    def _branch_plan(plan: DataAnalysisPlan, branch: DataAnalysisBranch) -> DataAnalysisPlan:
         return DataAnalysisPlan(
             semantic_view=branch.semantic_view,
             metrics=list(branch.metrics),
@@ -668,6 +634,133 @@ class DataAnalystService:
             interpretation=branch.purpose or plan.interpretation,
         )
 
+    async def _finalize_answer(
+        self,
+        result: dict[str, Any],
+        plan: DataAnalysisPlan,
+        *,
+        admin_id: str,
+        permissions: Iterable[str],
+        tenant_id: str | None,
+        data_as_of: str,
+        page_size: int,
+    ) -> dict[str, Any]:
+        settings = get_settings()
+        full_rows = list(result.get("rows") or [])[: settings.analytics_max_rows]
+        columns = list(result.get("columns") or [])[:20]
+        column_types = dict(result.get("columnTypes") or {})
+        page_rows, byte_limited, row_too_large = _page_result_rows(
+            full_rows,
+            offset=0,
+            page_size=page_size,
+            max_bytes=int(settings.analytics_max_result_bytes),
+        )
+        if row_too_large:
+            return {
+                "runId": result.get("runId"),
+                "outcome": None,
+                "completion": "FAILED",
+                "status": "RESULT_TOO_LARGE",
+                "warnings": ["单行结果超过 analytics_max_result_bytes"],
+            }
+        warnings = list(result.get("warnings") or [])
+        if byte_limited:
+            warnings.append("RESULT_BYTES_TRUNCATED")
+        if len(full_rows) >= settings.analytics_max_rows and not byte_limited:
+            warnings.append("ANALYTICS_MAX_ROWS_REACHED")
+        views = [branch.semantic_view for branch in plan.branches]
+        disclosure = disclosure_contract(views)
+        periods = list(
+            dict.fromkeys(
+                f"{branch.start_date.isoformat()} 至 {branch.end_date.isoformat()}"
+                for branch in plan.branches
+                if branch.start_date and branch.end_date
+            )
+        )
+        source_text = (
+            f"统计期间：{'；'.join(periods) or '当前快照'}；dataAsOf={data_as_of}；"
+            f"口径来源={CATALOG_VERSION}。"
+        )
+        has_money = any(
+            str(contract.get("unit") or "").upper() == "CNY" for contract in column_types.values()
+        )
+        if has_money:
+            source_text += "金额为暂定口径，仅供运营核对，不作为结算或审计结论。"
+        answer = str(result.get("answer") or "").strip()
+        if source_text not in answer:
+            answer = f"{answer}\n{source_text}".strip()
+        branch_snapshots = list(result.get("branches") or [])
+        if not branch_snapshots:
+            branch_snapshots = [
+                {
+                    "branchId": plan.branches[0].branch_id,
+                    "status": result.get("status"),
+                    "columns": columns,
+                    "columnTypes": column_types,
+                    "rows": full_rows,
+                    "sql": result.get("sql"),
+                    "lineage": result.get("lineage") or [],
+                    "explain": result.get("explain") or [],
+                    "explainDiagnostic": result.get("explainDiagnostic"),
+                    "scanEstimate": result.get("scanEstimate"),
+                }
+            ]
+        snapshot = await analytics_result_service.freeze(
+            admin_id=admin_id,
+            permissions=permissions,
+            tenant_id=tenant_id,
+            data_as_of=data_as_of,
+            columns=columns,
+            column_types=column_types,
+            rows=full_rows,
+            branches=branch_snapshots,
+            lineage=list(result.get("lineage") or []),
+            queries=list(result.get("queries") or []),
+        )
+        next_cursor = None
+        if snapshot is None:
+            warnings.append("RESULT_SNAPSHOT_UNAVAILABLE")
+        elif len(page_rows) < len(full_rows):
+            next_cursor = analytics_result_service.cursor(snapshot, len(page_rows))
+        failed_branches = [
+            branch
+            for branch in branch_snapshots
+            if branch.get("status") not in {"SUCCEEDED", "EMPTY_RESULT"}
+        ]
+        completion = "PARTIAL" if failed_branches else "COMPLETE"
+        response = {
+            **result,
+            "outcome": "ANSWER",
+            "completion": completion,
+            "answer": answer,
+            "columns": columns,
+            "columnTypes": column_types,
+            "rows": page_rows,
+            "catalogVersion": CATALOG_VERSION,
+            "catalogContentSha256": CATALOG_CONTENT_SHA256,
+            "dataAsOf": data_as_of,
+            "provisional": True,
+            "answerBoundary": disclosure,
+            "warnings": list(dict.fromkeys(warnings)),
+            "nextCursor": next_cursor,
+            "page": {
+                "offset": 0,
+                "size": len(page_rows),
+                "hasMore": bool(next_cursor),
+                "totalRows": len(full_rows),
+                "maxRows": settings.analytics_max_rows,
+            },
+        }
+        if snapshot is not None:
+            response.update(
+                {
+                    "resultSetId": snapshot["resultSetId"],
+                    "resultSnapshotExpiresAt": snapshot["resultSnapshotExpiresAt"],
+                    "resultHash": snapshot["resultHash"],
+                }
+            )
+        return response
+
     async def _execute_metric_branch(
         self,
         question: str,
@@ -675,6 +768,7 @@ class DataAnalystService:
         branch: DataAnalysisBranch,
         *,
         run_id: str,
+        cursor: Any | None = None,
         access_policy: AnalyticsAccessPolicy | None = None,
     ) -> dict[str, Any]:
         settings = get_settings()
@@ -682,6 +776,8 @@ class DataAnalystService:
         sql = ""
         guard: SqlGuardResult | None = None
         explain: list[dict] = []
+        explain_diagnostic: dict[str, Any] | None = None
+        scan_estimate: dict[str, Any] | None = None
         warnings: list[str] = []
         feedback: str | None = None
         for attempt in range(2):
@@ -738,9 +834,10 @@ class DataAnalystService:
             sql = guard.sql
             try:
                 explain = await asyncio.wait_for(
-                    _explain_sql(sql, settings.analytics_query_timeout_ms),
+                    _explain_sql(sql, settings.analytics_query_timeout_ms, cursor),
                     timeout=settings.analytics_query_timeout_ms / 1000,
                 )
+                scan_estimate = _explain_scan_estimate(explain)
                 episode_service.record_step(
                     "DATA_ANALYST_EXPLAIN",
                     node_name="data_analyst_explain",
@@ -748,6 +845,7 @@ class DataAnalystService:
                     output_data={
                         "branchId": branch.branch_id,
                         "rows": explain[:10],
+                        "scanEstimate": scan_estimate,
                         "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
                     },
                     agent_id="data_analyst",
@@ -756,7 +854,36 @@ class DataAnalystService:
                 break
             except TimeoutError:
                 feedback = "SQL_EXPLAIN_TIMEOUT"
-            except RuntimeError as exc:
+            except Exception as exc:
+                if _database_error_code(exc) == _EXPLAIN_VIEW_PRIVILEGE_ERROR:
+                    # MySQL requires SELECT on a view's underlying tables for
+                    # EXPLAIN even when the definer view itself is readable.
+                    # Preserve the ten-view reader boundary and make the
+                    # unavailable estimate explicit instead of pretending the
+                    # plan scanned zero rows.
+                    explain_diagnostic = {
+                        "status": "UNAVAILABLE",
+                        "reasonCode": _EXPLAIN_VIEW_PRIVILEGE_REASON,
+                        "databaseErrorCode": _EXPLAIN_VIEW_PRIVILEGE_ERROR,
+                        "attempted": True,
+                    }
+                    warnings.append(_EXPLAIN_VIEW_PRIVILEGE_REASON)
+                    episode_service.record_step(
+                        "DATA_ANALYST_EXPLAIN",
+                        node_name="data_analyst_explain",
+                        status="DEGRADED",
+                        error_code=_EXPLAIN_VIEW_PRIVILEGE_REASON,
+                        output_data={
+                            "branchId": branch.branch_id,
+                            "rows": [],
+                            "scanEstimate": None,
+                            "explainDiagnostic": explain_diagnostic,
+                            "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
+                        },
+                        agent_id="data_analyst",
+                        run_id=run_id,
+                    )
+                    break
                 if str(exc) == "analytics DB pool not initialized":
                     return {
                         "branchId": branch.branch_id,
@@ -766,31 +893,6 @@ class DataAnalystService:
                         "lineage": list(guard.tables),
                         "warnings": ["ANALYTICS_POOL_UNAVAILABLE"],
                     }
-                feedback = "SQL_EXPLAIN_FAILED"
-            except Exception as exc:
-                if _database_error_code(exc) == 1345:
-                    warning = "EXPLAIN_SKIPPED_VIEW_PRIVILEGE"
-                    warnings.append(warning)
-                    explain = [
-                        {
-                            "status": "SKIPPED",
-                            "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY",
-                        }
-                    ]
-                    episode_service.record_step(
-                        "DATA_ANALYST_EXPLAIN",
-                        node_name="data_analyst_explain",
-                        status="DEGRADED",
-                        error_code=warning,
-                        output_data={
-                            "branchId": branch.branch_id,
-                            "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                            "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY",
-                        },
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-                    break
                 feedback = "SQL_EXPLAIN_FAILED"
             episode_service.record_step(
                 "DATA_ANALYST_EXPLAIN",
@@ -818,22 +920,24 @@ class DataAnalystService:
 
         query_started = time.perf_counter()
         try:
-            rows = _normalize_analytics_rows(
-                (
-                    await asyncio.wait_for(
-                        _execute_sql(sql, settings.analytics_query_timeout_ms),
-                        timeout=settings.analytics_query_timeout_ms / 1000,
-                    )
-                )[: settings.analytics_max_rows]
-            )
+            raw_rows = (
+                await asyncio.wait_for(
+                    _execute_sql(sql, settings.analytics_query_timeout_ms, cursor),
+                    timeout=settings.analytics_query_timeout_ms / 1000,
+                )
+            )[: settings.analytics_max_rows]
         except TimeoutError:
             status = "QUERY_TIMEOUT"
-            rows = []
+            raw_rows = []
         except Exception:
             status = "DATABASE_UNAVAILABLE"
-            rows = []
+            raw_rows = []
         else:
-            status = "SUCCEEDED" if rows else "EMPTY_RESULT"
+            status = "SUCCEEDED" if raw_rows else "EMPTY_RESULT"
+        columns = list(raw_rows[0]) if raw_rows else [*branch.dimensions, *branch.metrics]
+        rows, column_types = normalize_typed_rows(
+            raw_rows, view=branch.semantic_view, columns=columns
+        )
         episode_service.record_step(
             "DATA_ANALYST_QUERY",
             node_name="data_analyst_query",
@@ -853,10 +957,11 @@ class DataAnalystService:
                 "lineage": list(guard.tables if guard else ()),
                 "warnings": [status, *warnings],
                 "explain": explain[:10],
+                "explainDiagnostic": explain_diagnostic,
+                "scanEstimate": scan_estimate,
             }
 
-        columns = list(rows[0]) if rows else [*branch.dimensions, *branch.metrics]
-        narrative = await self._narrative(question, branch_plan, rows)
+        narrative = await self._narrative(question, branch_plan, raw_rows)
         return {
             "branchId": branch.branch_id,
             "purpose": branch.purpose,
@@ -865,12 +970,15 @@ class DataAnalystService:
             "highlights": narrative.highlights,
             "sql": sql,
             "columns": columns[:20],
+            "columnTypes": column_types,
             "rows": rows,
-            "chart": self._chart(columns, rows),
+            "chart": self._chart(columns, raw_rows),
             "metricDefinitions": _metric_definitions(branch_plan),
             "lineage": list(guard.tables if guard else ()),
             "warnings": warnings,
             "explain": explain[:10],
+            "explainDiagnostic": explain_diagnostic,
+            "scanEstimate": scan_estimate,
         }
 
     async def _ask_metric_tree(
@@ -880,17 +988,21 @@ class DataAnalystService:
         *,
         run_id: str,
         started: float,
+        cursor: Any | None = None,
+        data_as_of: str = "",
+        admin_id: str = "",
+        permissions: Iterable[str] = (),
+        tenant_id: str | None = None,
+        page_size: int = _DEFAULT_ANALYTICS_PAGE_SIZE,
         access_policy: AnalyticsAccessPolicy | None = None,
     ) -> dict[str, Any]:
         async def execute_safely(branch: DataAnalysisBranch) -> dict[str, Any]:
             """Keep one failed branch from cancelling independent diagnostics."""
             try:
-                branch_kwargs = {"run_id": run_id}
+                branch_kwargs = {"run_id": run_id, "cursor": cursor}
                 if access_policy is not None:
                     branch_kwargs["access_policy"] = access_policy
-                return await self._execute_metric_branch(
-                    question, plan, branch, **branch_kwargs
-                )
+                return await self._execute_metric_branch(question, plan, branch, **branch_kwargs)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -915,13 +1027,12 @@ class DataAnalystService:
                     "warnings": [status],
                 }
 
-        # asyncio.gather preserves input order, so replay and UI ordering stay
-        # deterministic even though independent SQL calls run in parallel.
-        branch_results = list(
-            await asyncio.gather(
-                *(execute_safely(branch) for branch in plan.branches[:3])
-            )
-        )
+        # All branches execute sequentially on the same read-only consistent
+        # snapshot.  This prevents cross-branch drift and avoids concurrent use
+        # of one aiomysql cursor.
+        branch_results = []
+        for branch in plan.branches[:3]:
+            branch_results.append(await execute_safely(branch))
         successful = [
             branch
             for branch in branch_results
@@ -941,14 +1052,14 @@ class DataAnalystService:
             )
             return {
                 "runId": run_id,
+                "outcome": None,
+                "completion": "FAILED",
                 "status": status,
                 "branches": branch_results,
                 "warnings": warnings or [status],
                 "lineage": list(
                     dict.fromkeys(
-                        view
-                        for branch in branch_results
-                        for view in branch.get("lineage") or []
+                        view for branch in branch_results for view in branch.get("lineage") or []
                     )
                 ),
             }
@@ -963,9 +1074,7 @@ class DataAnalystService:
         if causal_caution:
             answers.append(causal_caution)
         lineage = list(
-            dict.fromkeys(
-                view for branch in branch_results for view in branch.get("lineage") or []
-            )
+            dict.fromkeys(view for branch in branch_results for view in branch.get("lineage") or [])
         )
         status = (
             "SUCCEEDED"
@@ -998,14 +1107,12 @@ class DataAnalystService:
             latency_ms=latency_ms,
             force_keep=True,
         )
-        return {
+        result = {
             "runId": run_id,
             "status": status,
             "answer": "\n".join(answers),
             "highlights": [
-                item
-                for branch in successful
-                for item in branch.get("highlights") or []
+                item for branch in successful for item in branch.get("highlights") or []
             ][:8],
             "branches": branch_results,
             "diagnosisTree": [
@@ -1025,11 +1132,14 @@ class DataAnalystService:
                     "status": branch.get("status"),
                     "sql": branch.get("sql"),
                     "explain": branch.get("explain") or [],
+                    "explainDiagnostic": branch.get("explainDiagnostic"),
+                    "scanEstimate": branch.get("scanEstimate"),
                     "lineage": branch.get("lineage") or [],
                 }
                 for branch in branch_results
             ],
             "columns": first.get("columns") or [],
+            "columnTypes": first.get("columnTypes") or {},
             "rows": first.get("rows") or [],
             "chart": first.get("chart"),
             "metricDefinitions": _metric_tree_definitions(plan),
@@ -1037,9 +1147,343 @@ class DataAnalystService:
             "lineage": lineage,
             "warnings": list(dict.fromkeys(warnings)),
             "explain": first.get("explain") or [],
+            "explainDiagnostic": first.get("explainDiagnostic"),
+            "scanEstimate": first.get("scanEstimate"),
             "causalCaution": causal_caution,
             "latencyMs": latency_ms,
         }
+        return await self._finalize_answer(
+            result,
+            plan,
+            admin_id=admin_id,
+            permissions=permissions,
+            tenant_id=tenant_id,
+            data_as_of=data_as_of,
+            page_size=page_size,
+        )
+
+    async def _ask_foundation_within_budget(
+        self,
+        question: str,
+        *,
+        admin_id: str,
+        permissions: tuple[str, ...],
+        tenant_id: str | None,
+        access_policy: AnalyticsAccessPolicy | None,
+        page_size: int,
+        run_id: str,
+        started: float,
+        allow_clarification: bool,
+    ) -> dict[str, Any]:
+        """Execute one governed request against one database snapshot."""
+
+        episode_service.start_run(
+            run_id=run_id,
+            message_id=None,
+            user_id=f"admin:{admin_id}"[:32],
+            session_id=None,
+            intent="DATA_ANALYST",
+            queue_name="admin.data_analyst",
+            force_keep=True,
+            agent_id="data_analyst",
+            agent_version="v2-foundation",
+            actor_type="ADMIN",
+        )
+        with bind_episode(
+            run_id,
+            message_id=None,
+            user_id=f"admin:{admin_id}",
+            force_keep=True,
+        ):
+            policy = evaluate_question_policy(question, tenant_id=tenant_id)
+            if policy is not None:
+                episode_service.record_step(
+                    "DATA_ANALYST_POLICY",
+                    node_name="data_analyst_policy",
+                    status="BLOCKED",
+                    error_code=policy.reason_code,
+                    output_data={"outcome": policy.outcome},
+                    agent_id="data_analyst",
+                    run_id=run_id,
+                )
+                episode_service.finish_run(
+                    policy.reason_code.lower(),
+                    run_id=run_id,
+                    status="FAILED" if policy.outcome == "DENY" else "DEGRADED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": policy.outcome,
+                    "completion": "NOT_APPLICABLE",
+                    "status": policy.reason_code,
+                    "reasonCode": policy.reason_code,
+                    "answer": policy.answer,
+                    "catalogVersion": CATALOG_VERSION,
+                    "provisional": True,
+                    "warnings": [],
+                    "_httpStatus": policy.http_status,
+                }
+
+            try:
+                plan = await self._plan(question)
+            except Exception as exc:
+                code = (
+                    str(exc)
+                    if str(exc).startswith("DATA_ANALYST_")
+                    else "DATA_ANALYST_MODEL_UNAVAILABLE"
+                )
+                episode_service.record_step(
+                    "DATA_ANALYST_PLAN",
+                    node_name="data_analyst_plan",
+                    status="ERROR",
+                    error_code=code,
+                    output_data={"status": code, "errorType": type(exc).__name__},
+                    agent_id="data_analyst",
+                    run_id=run_id,
+                )
+                episode_service.finish_run(
+                    "planning_failed",
+                    run_id=run_id,
+                    status="FAILED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": None,
+                    "completion": "FAILED",
+                    "status": code,
+                    "warnings": [code],
+                }
+
+            episode_service.record_step(
+                "DATA_ANALYST_PLAN",
+                node_name="data_analyst_plan",
+                status="OK",
+                output_data=plan.model_dump(mode="json"),
+                agent_id="data_analyst",
+                run_id=run_id,
+            )
+            if plan.status == "NEEDS_CLARIFICATION":
+                if not allow_clarification:
+                    reason_code = "AMBIGUITY_REMAINS_AFTER_CLARIFICATION"
+                    episode_service.finish_run(
+                        "clarification_exhausted",
+                        run_id=run_id,
+                        status="DEGRADED",
+                        force_keep=True,
+                    )
+                    return {
+                        "runId": run_id,
+                        "outcome": "ABSTAIN",
+                        "completion": "NOT_APPLICABLE",
+                        "status": reason_code,
+                        "reasonCode": reason_code,
+                        "answer": "一次澄清后仍存在关键歧义，当前请求不执行查询。",
+                        "catalogVersion": CATALOG_VERSION,
+                        "provisional": True,
+                        "warnings": [],
+                    }
+                options = [
+                    {
+                        "choiceId": option.choice_id,
+                        "label": option.label,
+                        "answerSuffix": option.answer_suffix,
+                    }
+                    for option in plan.clarification_options
+                ]
+                try:
+                    clarification = await analytics_clarification_service.issue(
+                        question=question,
+                        clarification_question=str(plan.clarification_question or "请确认统计口径"),
+                        options=options,
+                        admin_id=admin_id,
+                        permissions=permissions,
+                        tenant_id=tenant_id,
+                        run_id=run_id,
+                    )
+                except AnalyticsResultError:
+                    episode_service.finish_run(
+                        "clarification_state_failed",
+                        run_id=run_id,
+                        status="FAILED",
+                        force_keep=True,
+                    )
+                    raise
+                episode_service.finish_run(
+                    "needs_clarification",
+                    run_id=run_id,
+                    status="DEGRADED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": "CLARIFY",
+                    "completion": "NOT_APPLICABLE",
+                    "status": "NEEDS_CLARIFICATION",
+                    "clarificationQuestion": plan.clarification_question,
+                    "answer": plan.clarification_question,
+                    "catalogVersion": CATALOG_VERSION,
+                    "provisional": True,
+                    "warnings": [],
+                    **clarification,
+                }
+
+            try:
+                async with acquire_analytics_snapshot() as snapshot:
+                    if len(plan.branches) > 1:
+                        return await self._ask_metric_tree(
+                            question,
+                            plan,
+                            run_id=run_id,
+                            started=started,
+                            cursor=snapshot.cursor,
+                            data_as_of=snapshot.data_as_of,
+                            admin_id=admin_id,
+                            permissions=permissions,
+                            tenant_id=tenant_id,
+                            page_size=page_size,
+                            access_policy=access_policy,
+                        )
+                    branch = plan.branches[0]
+                    branch_result = await self._execute_metric_branch(
+                        question,
+                        plan,
+                        branch,
+                        run_id=run_id,
+                        cursor=snapshot.cursor,
+                        access_policy=access_policy,
+                    )
+                    data_as_of = snapshot.data_as_of
+            except RuntimeError as exc:
+                status = (
+                    "ANALYTICS_POOL_UNAVAILABLE"
+                    if str(exc) == "analytics DB pool not initialized"
+                    else "DATABASE_UNAVAILABLE"
+                )
+                episode_service.finish_run(
+                    "database_unavailable",
+                    run_id=run_id,
+                    status="FAILED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": None,
+                    "completion": "FAILED",
+                    "status": status,
+                    "warnings": [status],
+                }
+            except Exception as exc:
+                episode_service.record_step(
+                    "DATA_ANALYST_QUERY",
+                    node_name="data_analyst_query",
+                    status="ERROR",
+                    error_code="DATABASE_UNAVAILABLE",
+                    output_data={"errorType": type(exc).__name__},
+                    agent_id="data_analyst",
+                    run_id=run_id,
+                )
+                episode_service.finish_run(
+                    "database_unavailable",
+                    run_id=run_id,
+                    status="FAILED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": None,
+                    "completion": "FAILED",
+                    "status": "DATABASE_UNAVAILABLE",
+                    "warnings": ["DATABASE_UNAVAILABLE"],
+                }
+
+            if branch_result.get("status") not in {"SUCCEEDED", "EMPTY_RESULT"}:
+                status = str(branch_result.get("status") or "DATA_ANALYST_BRANCH_FAILED")
+                episode_service.finish_run(
+                    "single_branch_failed",
+                    run_id=run_id,
+                    status="FAILED",
+                    force_keep=True,
+                )
+                return {
+                    "runId": run_id,
+                    "outcome": None,
+                    "completion": "FAILED",
+                    "status": status,
+                    "sql": branch_result.get("sql"),
+                    "lineage": branch_result.get("lineage") or [],
+                    "explain": branch_result.get("explain") or [],
+                    "warnings": branch_result.get("warnings") or [status],
+                }
+
+            causal_caution = _CAUSAL_CAUTION if _CAUSAL_QUESTION.search(question) else None
+            answer = str(branch_result.get("answer") or "")
+            if causal_caution and causal_caution not in answer:
+                answer = f"{answer}\n{causal_caution}".strip()
+            latency_ms = round((time.perf_counter() - started) * 1000)
+            result = {
+                "runId": run_id,
+                "status": branch_result.get("status"),
+                "answer": answer,
+                "highlights": branch_result.get("highlights") or [],
+                "sql": branch_result.get("sql"),
+                "queries": [
+                    {
+                        "branchId": branch.branch_id,
+                        "purpose": branch.purpose,
+                        "status": branch_result.get("status"),
+                        "sql": branch_result.get("sql"),
+                        "explain": branch_result.get("explain") or [],
+                        "explainDiagnostic": branch_result.get("explainDiagnostic"),
+                        "scanEstimate": branch_result.get("scanEstimate"),
+                        "lineage": branch_result.get("lineage") or [],
+                    }
+                ],
+                "columns": branch_result.get("columns") or [],
+                "columnTypes": branch_result.get("columnTypes") or {},
+                "rows": branch_result.get("rows") or [],
+                "chart": branch_result.get("chart"),
+                "metricDefinitions": branch_result.get("metricDefinitions") or [],
+                "interpretation": plan.interpretation,
+                "lineage": branch_result.get("lineage") or [],
+                "warnings": branch_result.get("warnings") or [],
+                "explain": branch_result.get("explain") or [],
+                "explainDiagnostic": branch_result.get("explainDiagnostic"),
+                "scanEstimate": branch_result.get("scanEstimate"),
+                "causalCaution": causal_caution,
+                "latencyMs": latency_ms,
+            }
+            episode_service.record_step(
+                "DATA_ANALYST_RESULT",
+                node_name="data_analyst_result",
+                status="OK",
+                output_data={
+                    "rowCount": len(result["rows"]),
+                    "lineage": result["lineage"],
+                    "latencyMs": latency_ms,
+                    "answerVersion": "v2-foundation",
+                },
+                latency_ms=latency_ms,
+                agent_id="data_analyst",
+                run_id=run_id,
+            )
+            episode_service.finish_run(
+                "ok" if result["rows"] else "empty_result",
+                run_id=run_id,
+                status="SUCCEEDED",
+                latency_ms=latency_ms,
+                force_keep=True,
+            )
+            return await self._finalize_answer(
+                result,
+                plan,
+                admin_id=admin_id,
+                permissions=permissions,
+                tenant_id=tenant_id,
+                data_as_of=data_as_of,
+                page_size=page_size,
+            )
 
     async def ask(
         self,
@@ -1050,21 +1494,17 @@ class DataAnalystService:
         tenant_id: str | None = None,
         cursor: str | None = None,
         page_size: int | None = None,
+        allow_clarification: bool = True,
     ) -> dict:
         settings = get_settings()
         if not settings.data_analyst_enabled:
-            return {"status": "DISABLED", "warnings": ["DATA_ANALYST_ENABLED=false"]}
-        question = str(question or "").strip()
-        if not question or len(question) > 500:
-            return {"status": "INVALID_QUESTION", "warnings": ["问题不能为空且不超过500字"]}
-
-        run_id = uuid.uuid4().hex
-        started = time.perf_counter()
-        access_policy = (
-            AnalyticsAccessPolicy.from_permissions(permissions, tenant_id=tenant_id)
-            if permissions is not None
-            else None
-        )
+            return {
+                "outcome": None,
+                "completion": "FAILED",
+                "status": "DISABLED",
+                "warnings": ["DATA_ANALYST_ENABLED=false"],
+            }
+        permission_tuple = tuple(str(item) for item in (permissions or ()))
         requested_page_size = page_size or _DEFAULT_ANALYTICS_PAGE_SIZE
         try:
             requested_page_size = int(requested_page_size)
@@ -1072,21 +1512,44 @@ class DataAnalystService:
             requested_page_size = _DEFAULT_ANALYTICS_PAGE_SIZE
         requested_page_size = max(
             1,
-            min(
-                requested_page_size,
-                int(getattr(settings, "analytics_max_rows", 200)),
-            ),
+            min(requested_page_size, int(getattr(settings, "analytics_max_rows", 200))),
+        )
+        if cursor:
+            return await analytics_result_service.page(
+                cursor,
+                admin_id=admin_id,
+                permissions=permission_tuple,
+                tenant_id=tenant_id,
+                page_size=requested_page_size,
+            )
+        question = str(question or "").strip()
+        if not question or len(question) > 500:
+            return {
+                "outcome": None,
+                "completion": "FAILED",
+                "status": "INVALID_QUESTION",
+                "warnings": ["问题不能为空且不超过500字"],
+            }
+
+        run_id = uuid.uuid4().hex
+        started = time.perf_counter()
+        access_policy = (
+            AnalyticsAccessPolicy.from_permissions(permission_tuple, tenant_id=tenant_id)
+            if permissions is not None
+            else None
         )
         try:
             return await asyncio.wait_for(
-                self._ask_within_budget(
+                self._ask_foundation_within_budget(
                     question,
                     admin_id=admin_id,
+                    permissions=permission_tuple,
+                    tenant_id=tenant_id,
                     access_policy=access_policy,
-                    cursor=cursor,
                     page_size=requested_page_size,
                     run_id=run_id,
                     started=started,
+                    allow_clarification=allow_clarification,
                 ),
                 timeout=settings.analytics_request_timeout_seconds,
             )
@@ -1111,409 +1574,10 @@ class DataAnalystService:
             )
             return {
                 "runId": run_id,
+                "outcome": None,
+                "completion": "FAILED",
                 "status": "DATA_ANALYST_REQUEST_TIMEOUT",
                 "warnings": ["分析超过整体超时预算，请缩小问题范围后重试"],
-            }
-
-    async def _ask_within_budget(
-        self,
-        question: str,
-        *,
-        admin_id: str,
-        access_policy: AnalyticsAccessPolicy | None = None,
-        cursor: str | None = None,
-        page_size: int = _DEFAULT_ANALYTICS_PAGE_SIZE,
-        run_id: str,
-        started: float,
-    ) -> dict:
-        settings = get_settings()
-
-        episode_service.start_run(
-            run_id=run_id,
-            message_id=None,
-            user_id=f"admin:{admin_id}"[:32],
-            session_id=None,
-            intent="DATA_ANALYST",
-            queue_name="admin.data_analyst",
-            force_keep=True,
-            agent_id="data_analyst",
-            agent_version="v1",
-            actor_type="ADMIN",
-        )
-        with bind_episode(run_id, message_id=None, user_id=f"admin:{admin_id}", force_keep=True):
-            try:
-                plan = await self._plan(question)
-                episode_service.record_step(
-                    "DATA_ANALYST_PLAN",
-                    node_name="data_analyst_plan",
-                    status="OK",
-                    output_data=plan.model_dump(mode="json"),
-                    agent_id="data_analyst",
-                    run_id=run_id,
-                )
-                if plan.status == "NEEDS_CLARIFICATION":
-                    episode_service.finish_run(
-                        "needs_clarification",
-                        run_id=run_id,
-                        status="DEGRADED",
-                        force_keep=True,
-                    )
-                    return {
-                        "runId": run_id,
-                        "status": "NEEDS_CLARIFICATION",
-                        "clarificationQuestion": plan.clarification_question,
-                        "answer": plan.clarification_question,
-                        "warnings": [],
-                    }
-                if len(plan.branches) > 1:
-                    return await self._ask_metric_tree(
-                        question,
-                        plan,
-                        run_id=run_id,
-                        started=started,
-                        access_policy=access_policy,
-                    )
-            except Exception as exc:
-                code = (
-                    str(exc)
-                    if str(exc).startswith("DATA_ANALYST_")
-                    else "DATA_ANALYST_MODEL_UNAVAILABLE"
-                )
-                episode_service.record_step(
-                    "DATA_ANALYST_PLAN",
-                    node_name="data_analyst_plan",
-                    status="ERROR",
-                    error_code=code,
-                    output_data={"status": code},
-                    agent_id="data_analyst",
-                    run_id=run_id,
-                )
-                episode_service.finish_run("planning_failed", run_id=run_id, force_keep=True)
-                return {"runId": run_id, "status": code, "warnings": [code]}
-
-            sql = ""
-            guard: SqlGuardResult | None = None
-            explain: list[dict] = []
-            warnings: list[str] = []
-            feedback: str | None = None
-            for attempt in range(2):
-                try:
-                    sql = await self._draft_sql(question, plan, feedback=feedback)
-                except Exception as exc:
-                    feedback = "SQL_DRAFT_FAILED"
-                    episode_service.record_step(
-                        "DATA_ANALYST_SQL_GUARD",
-                        node_name="sql_guard",
-                        status="ERROR",
-                        error_code=feedback,
-                        output_data={
-                            "attempt": attempt + 1,
-                            "reason": feedback,
-                            "failureType": type(exc).__name__,
-                        },
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-                    continue
-                guard = validate_sql(
-                    sql,
-                    max_days=settings.analytics_max_days,
-                    max_rows=settings.analytics_max_rows,
-                    expected_view=plan.semantic_view,
-                    expected_start_date=plan.start_date,
-                    expected_end_date=plan.end_date,
-                    access_policy=access_policy,
-                )
-                episode_service.record_step(
-                    "DATA_ANALYST_SQL_GUARD",
-                    node_name="sql_guard",
-                    status="OK" if guard.allowed else "BLOCKED",
-                    output_data={
-                        "attempt": attempt + 1,
-                        "reason": guard.reason,
-                        "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                        "sql": guard.sql if guard.allowed else None,
-                        "lineage": list(guard.tables),
-                    },
-                    agent_id="data_analyst",
-                    run_id=run_id,
-                )
-                if not guard.allowed:
-                    feedback = guard.reason
-                    continue
-                sql = guard.sql
-                try:
-                    explain = await asyncio.wait_for(
-                        _explain_sql(sql, settings.analytics_query_timeout_ms),
-                        timeout=settings.analytics_query_timeout_ms / 1000,
-                    )
-                    episode_service.record_step(
-                        "DATA_ANALYST_EXPLAIN",
-                        node_name="data_analyst_explain",
-                        status="OK",
-                        output_data={
-                            "rows": explain[:10],
-                            "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                        },
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-                    break
-                except TimeoutError:
-                    feedback = "SQL_EXPLAIN_TIMEOUT"
-                    episode_service.record_step(
-                        "DATA_ANALYST_EXPLAIN",
-                        node_name="data_analyst_explain",
-                        status="ERROR",
-                        error_code=feedback,
-                        output_data={
-                            "attempt": attempt + 1,
-                            "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                        },
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-                except RuntimeError as exc:
-                    if str(exc) == "analytics DB pool not initialized":
-                        episode_service.finish_run(
-                            "database_unavailable", run_id=run_id, force_keep=True
-                        )
-                        return {
-                            "runId": run_id,
-                            "status": "ANALYTICS_POOL_UNAVAILABLE",
-                            "sql": sql,
-                            "warnings": ["ANALYTICS_POOL_UNAVAILABLE"],
-                            "lineage": list(guard.tables),
-                        }
-                    feedback = "SQL_EXPLAIN_FAILED"
-                    episode_service.record_step(
-                        "DATA_ANALYST_EXPLAIN",
-                        node_name="data_analyst_explain",
-                        status="ERROR",
-                        error_code=feedback,
-                        output_data={
-                            "attempt": attempt + 1,
-                            "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                        },
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-                except Exception as exc:
-                    if _database_error_code(exc) == 1345:
-                        warning = "EXPLAIN_SKIPPED_VIEW_PRIVILEGE"
-                        warnings.append(warning)
-                        explain = [
-                            {
-                                "status": "SKIPPED",
-                                "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY",
-                            }
-                        ]
-                        episode_service.record_step(
-                            "DATA_ANALYST_EXPLAIN",
-                            node_name="data_analyst_explain",
-                            status="DEGRADED",
-                            error_code=warning,
-                            output_data={
-                                "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                                "reason": "VIEW_DEFINER_PRIVILEGE_BOUNDARY",
-                            },
-                            agent_id="data_analyst",
-                            run_id=run_id,
-                        )
-                        break
-                    feedback = "SQL_EXPLAIN_FAILED"
-                    episode_service.record_step(
-                        "DATA_ANALYST_EXPLAIN",
-                        node_name="data_analyst_explain",
-                        status="ERROR",
-                        error_code=feedback,
-                        output_data={
-                            "attempt": attempt + 1,
-                            "sqlHash": hashlib.sha256(sql.encode()).hexdigest(),
-                        },
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-            else:
-                reason = feedback or "SQL_REJECTED"
-                episode_service.finish_run("sql_rejected", run_id=run_id, force_keep=True)
-                return {
-                    "runId": run_id,
-                    "status": reason,
-                    "sql": sql,
-                    "warnings": [reason, *warnings],
-                    "lineage": list(guard.tables if guard else ()),
-                }
-
-            query_started = time.perf_counter()
-            try:
-                rows = _normalize_analytics_rows(
-                    (
-                        await asyncio.wait_for(
-                            _execute_sql(sql, settings.analytics_query_timeout_ms),
-                            timeout=settings.analytics_query_timeout_ms / 1000,
-                        )
-                    )[: settings.analytics_max_rows]
-                )
-            except TimeoutError:
-                episode_service.record_step(
-                    "DATA_ANALYST_QUERY",
-                    node_name="data_analyst_query",
-                    status="ERROR",
-                    error_code="QUERY_TIMEOUT",
-                    latency_ms=round((time.perf_counter() - query_started) * 1000),
-                    agent_id="data_analyst",
-                    run_id=run_id,
-                )
-                episode_service.finish_run("query_timeout", run_id=run_id, force_keep=True)
-                return {
-                    "runId": run_id,
-                    "status": "QUERY_TIMEOUT",
-                    "sql": sql,
-                    "warnings": ["查询超过超时预算", *warnings],
-                }
-            except Exception:
-                episode_service.record_step(
-                    "DATA_ANALYST_QUERY",
-                    node_name="data_analyst_query",
-                    status="ERROR",
-                    error_code="DATABASE_UNAVAILABLE",
-                    latency_ms=round((time.perf_counter() - query_started) * 1000),
-                    agent_id="data_analyst",
-                    run_id=run_id,
-                )
-                episode_service.finish_run("database_unavailable", run_id=run_id, force_keep=True)
-                return {
-                    "runId": run_id,
-                    "status": "DATABASE_UNAVAILABLE",
-                    "sql": sql,
-                    "warnings": ["分析数据库不可用", *warnings],
-                }
-
-            episode_service.record_step(
-                "DATA_ANALYST_QUERY",
-                node_name="data_analyst_query",
-                status="OK",
-                output_data={"rowCount": len(rows)},
-                latency_ms=round((time.perf_counter() - query_started) * 1000),
-                agent_id="data_analyst",
-                run_id=run_id,
-            )
-
-            sql_hash = hashlib.sha256(sql.encode()).hexdigest()
-            offset = 0
-            if cursor:
-                offset, cursor_error = _decode_result_cursor(
-                    cursor,
-                    settings=settings,
-                    admin_id=admin_id,
-                    sql_hash=sql_hash,
-                )
-                if cursor_error:
-                    episode_service.record_step(
-                        "DATA_ANALYST_RESULT",
-                        node_name="data_analyst_result",
-                        status="BLOCKED",
-                        error_code=cursor_error,
-                        output_data={"sqlHash": sql_hash},
-                        agent_id="data_analyst",
-                        run_id=run_id,
-                    )
-                    episode_service.finish_run(
-                        "invalid_cursor", run_id=run_id, status="FAILED", force_keep=True
-                    )
-                    return {
-                        "runId": run_id,
-                        "status": cursor_error,
-                        "warnings": [cursor_error],
-                    }
-            page_rows, byte_limited, row_too_large = _page_result_rows(
-                rows,
-                offset=offset or 0,
-                page_size=page_size,
-                max_bytes=int(getattr(settings, "analytics_max_result_bytes", 1_000_000)),
-            )
-            if row_too_large:
-                episode_service.finish_run(
-                    "result_too_large", run_id=run_id, status="FAILED", force_keep=True
-                )
-                return {
-                    "runId": run_id,
-                    "status": "RESULT_TOO_LARGE",
-                    "sql": sql,
-                    "warnings": ["单行结果超过 analytics_max_result_bytes"],
-                }
-            warnings = list(warnings)
-            if byte_limited:
-                warnings.append("RESULT_BYTES_TRUNCATED")
-            if len(rows) >= settings.analytics_max_rows and not byte_limited:
-                warnings.append("ANALYTICS_MAX_ROWS_REACHED")
-            next_offset = (offset or 0) + len(page_rows)
-            has_more = next_offset < len(rows)
-            next_cursor = (
-                _encode_result_cursor(
-                    settings=settings,
-                    admin_id=admin_id,
-                    sql_hash=sql_hash,
-                    offset=next_offset,
-                )
-                if has_more
-                else None
-            )
-
-            columns = list(page_rows[0]) if page_rows else [*plan.dimensions, *plan.metrics]
-            narrative = await self._narrative(question, plan, page_rows)
-            causal_caution = _CAUSAL_CAUTION if _CAUSAL_QUESTION.search(question) else None
-            answer = narrative.answer
-            if causal_caution and causal_caution not in answer:
-                answer = f"{answer}\n{causal_caution}"
-            latency_ms = round((time.perf_counter() - started) * 1000)
-            episode_service.record_step(
-                "DATA_ANALYST_RESULT",
-                node_name="data_analyst_result",
-                status="OK",
-                output_data={
-                    "rowCount": len(page_rows),
-                    "totalRowCount": len(rows),
-                    "resultBytes": _json_size(page_rows),
-                    "sqlHash": sql_hash,
-                    "lineage": list(guard.tables if guard else ()),
-                    "latencyMs": latency_ms,
-                    "answerVersion": "v1",
-                    "cursorIssued": bool(next_cursor),
-                },
-                agent_id="data_analyst",
-                run_id=run_id,
-            )
-            episode_service.finish_run(
-                "ok" if rows else "empty_result",
-                run_id=run_id,
-                status="SUCCEEDED",
-                force_keep=True,
-            )
-            return {
-                "runId": run_id,
-                "answer": answer,
-                "highlights": narrative.highlights,
-                "sql": sql,
-                "columns": columns[:20],
-                "rows": page_rows,
-                "chart": self._chart(columns, page_rows),
-                "metricDefinitions": _metric_definitions(plan),
-                "interpretation": plan.interpretation,
-                "lineage": list(guard.tables if guard else ()),
-                "warnings": list(dict.fromkeys(warnings)),
-                "status": "SUCCEEDED" if page_rows else "EMPTY_RESULT",
-                "explain": explain[:10],
-                "causalCaution": causal_caution,
-                "latencyMs": latency_ms,
-                "nextCursor": next_cursor,
-                "page": {
-                    "offset": offset or 0,
-                    "size": len(page_rows),
-                    "hasMore": bool(next_cursor),
-                    "maxRows": settings.analytics_max_rows,
-                },
             }
 
 
