@@ -9,6 +9,9 @@
 | [evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接](evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md) | v54 剩余 7 条 badcase 的修复、v55 定向回放与 v56 全量复评 | v56 A/B 118/120 一致、2 条仲裁、最终 badcase 0；仍是已见开发集 |
 | [project/AI_Shop主线与开发记录](project/AI_Shop主线与开发记录.md) | AI 主线、方法判断、关键改造、阶段性取舍和后续路线 | 源码与运行证据汇总 |
 | [project/AI-Shop-Text2SQL冻结说明](project/AI-Shop-Text2SQL冻结说明-20260829.md) | Text2SQL 状态、证据 custody、恢复条件和后续排期边界 | `FROZEN`；不列默认演示或 release gate |
+| [project/AI-Shop-E1-流式重连验证](project/AI-Shop-E1-流式重连验证-20260829.md) | stream envelope、OPEN barrier、乱序/重复处理和终态回放 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
+| [project/AI-Shop-E2-取消终态幂等验证](project/AI-Shop-E2-取消终态幂等验证-20260829.md) | 取消权威状态、迟到终态、HTTP 重试和幂等收敛 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
+| [project/AI-Shop-E3-检查点记忆恢复验证](project/AI-Shop-E3-检查点记忆恢复验证-20260829.md) | checkpoint/memory revision、CAS 和生命周期清理 | `CONTROLLED_PREPROD_ONLY`；不构成容灾证明 |
 | [project/AI-Shop-E5-身份与安全验证](project/AI-Shop-E5-身份与安全验证-20260829.md) | Agent principal、WS Origin、Cookie CSRF、token 过期、输入/帧大小和限流边界 | `CONTROLLED_PREPROD_ONLY`；单店边界 |
 | [project/AI-Shop-E6-RAG生命周期验证](project/AI-Shop-E6-RAG生命周期验证-20260829.md) | 发布快照、ACL、freshness、逻辑删除/回滚和 RAG DLQ 指标 | `CONTROLLED_PREPROD_ONLY`；`releaseGateEligible=false` |
 | [project/AI-Shop-E8-可观测背压短稳态验证](project/AI-Shop-E8-可观测背压短稳态验证-20260829.md) | 跨链路 correlation、WebSocket 慢连接边界、队列年龄/取消时延和短稳态 | `CONTROLLED_PREPROD_ONLY`；不构成生产 SLO |
