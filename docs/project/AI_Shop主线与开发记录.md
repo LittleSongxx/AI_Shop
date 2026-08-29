@@ -235,3 +235,9 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 在本地完整 Java/MySQL/Agent/Worker/MCP/RAG/Provider 栈上重新执行 v2.1 HUMAN_APPROVED_AI_ASSISTED 集合 `120/120`，并将脱敏 observation 确定性重建为只读 `customer-service-http-e57-evidence-refresh-20260829` 包；包内 `SHA256SUMS` 校验通过，`providerCallsReexecuted=false`。
 - 运行事实：行为契约 `29/29`、引用结构违规 `0`、规则预路由 intent Macro-F1 `1.0`、高风险召回 `13/13`、handoff `29/29`；Provider 调用 `11`，费用 `UNPRICED/null`，本地延迟 P50/P95/P99 `617.989/1289.224/8880.928 ms`，明确不是生产 SLO。
 - 新包仍为 `EXECUTED_PENDING_HUMAN_ANSWER_REVIEW`，不继承 v56 的人工答案分数；答案语义、unseen 泛化、线上 SLO、CSAT/FCR 和成本门禁均未由此刷新。详见 [E57 证据刷新](AI-Shop-客服E57真实运行证据刷新-20260829.md)。
+
+### 2026-08-29：E57 购物导购真实浏览器链
+
+- 在显式配置同源 origin 的本地全栈上完成 mobile Chromium `1/1`：真实推荐商品卡 → `reportClick`（`productId/requestId` 一致）→ 商品详情 → checkout 归因字段 → 加购记录（`aiRequestId/aiPosition/aiSource`）→ 清理购物车。
+- trace 原件含会话 cookie，移到工作区外受限 quarantine，SHA-256 为 `ffe489507890375048aaddb515c7d8b370ac2d6b6d32487d3f0b2cede4179483`；不入 Git。支付段默认关闭，不能据此声称下单、支付或 GMV。
+- 该用例本次走确定性 `SEARCH_PRODUCTS` 路径，不能替代 LLM 生成质量评测；客服真实 Provider 结果见 [客服 E57](AI-Shop-客服E57真实运行证据刷新-20260829.md)。

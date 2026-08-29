@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 const liveEnabled = process.env.AISHOP_LIVE_E2E === 'true';
+const paymentEnabled = process.env.AISHOP_LIVE_E2E_PAYMENT === 'true';
 const demoUserId = '9000000001';
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -343,6 +344,11 @@ test.describe('explicit local full-stack AI flow', () => {
     await unwrap(await context.request.post('/api/productCart/deleteCart', {
       form: { cartId: String(cartItem.cartId) }
     }));
+
+    // Payment credentials are intentionally external to the local AI evidence
+    // boundary. Checkout and recommendation attribution are the required flow;
+    // opt in to the real payment adapter only when its sandbox is configured.
+    if (!paymentEnabled) return;
 
     const addresses = await unwrap(await context.request.get('/api/userAddress/loadDataList'));
     const addressId = String((Array.isArray(addresses) ? addresses[0]?.addressId : '') || '');

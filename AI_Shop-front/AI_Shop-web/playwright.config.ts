@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL?.trim();
 const baseURL = externalBaseURL || 'http://127.0.0.1:6101';
+const liveOrigin = externalBaseURL ? new URL(externalBaseURL).origin : undefined;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -11,7 +12,8 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL,
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    ...(liveOrigin ? { extraHTTPHeaders: { Origin: liveOrigin } } : {})
   },
   webServer: externalBaseURL
     ? undefined
