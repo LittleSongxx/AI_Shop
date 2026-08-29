@@ -798,6 +798,19 @@ def test_supplied_query_variants_are_part_of_the_semantic_cache_key():
     assert base != expanded
 
 
+def test_fact_hints_are_part_of_the_semantic_cache_key():
+    retriever = RagRetriever()
+    settings = Settings()
+    args = ("术语库存检查与扣减", 1, 10, None, "A", settings, settings.rerank_top_n)
+
+    base = retriever._semantic_cache_key(*args)
+    routed = retriever._semantic_cache_key(
+        *args, fact_hints=["checkout.stock_deduct_and_compensate"]
+    )
+
+    assert base != routed
+
+
 @pytest.mark.asyncio
 async def test_java_catalog_is_saved_as_agent_owned_last_known_good(monkeypatch):
     retriever = RagRetriever()

@@ -85,6 +85,49 @@ def test_query_fact_hints_do_not_claim_unsupported_details():
     assert query_fact_hints("转人工时系统会附带哪些排查上下文") == ()
 
 
+@pytest.mark.parametrize(
+    ("query", "fact_id"),
+    [
+        ("术语“库存检查与扣减”的定义是什么？请按事实 ID 说明", "checkout.stock_deduct_and_compensate"),
+        ("术语“锁定、核销与释放”的边界是什么？请按事实 ID 说明", "coupon.lock_consume_release"),
+        ("术语“Smarlect 促销与抢券规则 对账与补偿”的引用在哪里？", "coupon.reconcile_and_compensate"),
+        ("请依据知识快照解释术语“发起售后申请”的边界", "aftersales.submit_idempotently"),
+        ("请依据知识快照解释术语“订单提交幂等”的边界", "checkout.idempotency_key"),
+        ("请按事实 ID checkout.stock_deduct_and_compensate 说明", "checkout.stock_deduct_and_compensate"),
+        ("订单提交幂等是什么意思？", "checkout.idempotency_key"),
+        ("什么是资格规则与 RAG 边界？", "aftersales.rule_engine_authoritative"),
+        ("请解释一下支付记录与待支付状态", "payment.pending_record"),
+    ],
+)
+def test_query_fact_hints_route_explicit_published_fact_terms(query, fact_id):
+    assert query_fact_hints(query) == (fact_id,)
+
+
+def test_query_fact_hints_do_not_route_unmarked_alias_mentions():
+    assert query_fact_hints("库存检查与扣减这段流程是否需要调整？") == ()
+    assert query_fact_hints("请解释 checkout.not_a_fact") == ()
+    assert query_fact_hints("请解释 xcheckout.stock_deduct_and_compensatex") == ()
+
+
+@pytest.mark.parametrize("separator", ("同时", "然后", "之后", "，", "；"))
+def test_explicit_fact_term_keeps_a_separate_business_proposition_hint(separator):
+    assert query_fact_hints(
+        f"术语“订单提交幂等”是什么意思{separator}购物车价格是最终成交价吗？"
+    ) == (
+        "checkout.idempotency_key",
+        "cart.price_snapshot_not_guarantee",
+    )
+
+
+def test_multiple_explicit_fact_terms_preserve_user_order():
+    assert query_fact_hints(
+        "术语“订单提交幂等”以及术语“库存检查与扣减”分别是什么？"
+    ) == (
+        "checkout.idempotency_key",
+        "checkout.stock_deduct_and_compensate",
+    )
+
+
 def test_query_fact_hints_distinguish_ai_actor_from_ai_data_deletion():
     assert query_fact_hints("AI能直接退款吗") == (
         "ai.capability_and_confirmation",

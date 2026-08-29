@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from app.rag.canonical_facts import normalize_concept_text
+from app.rag.fact_metadata import get_fact_metadata_catalog
 from app.rag.query_expander import deterministic_query_variants
 
 _DOMAIN_TERMS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -24,6 +26,11 @@ _DOMAIN_TERMS: tuple[tuple[str, tuple[str, ...]], ...] = (
 _BOUNDARY_RE = re.compile(r"(?:是否|能否|能不能|可不可以|支不支持|不支持|不允许|不能).{0,20}")
 _MULTI_STEP_RE = re.compile(r"(?:然后|之后|再|流程|步骤|进度)")
 _SPLIT_RE = re.compile(r"(?:，|；|;|并且|同时|另外|以及|还想|还要|并想)")
+_EXPLICIT_TERM_RE = re.compile(r"术语\s*[“\"「『]([^”\"」』]+)[”\"」』]", re.IGNORECASE)
+_EXPLICIT_FACT_ID_RE = re.compile(
+    r"(?<![A-Za-z0-9_.])([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)(?![A-Za-z0-9_.])",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -67,6 +74,59 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
     def add(fact_id: str) -> None:
         if fact_id not in hints:
             hints.append(fact_id)
+
+    normalized_terms = list(
+        dict.fromkeys(
+            term
+            for value in _EXPLICIT_TERM_RE.findall(str(query or ""))
+            if (term := normalize_concept_text(value))
+        )
+    )
+    explicit_fact_ids = {
+        value.casefold() for value in _EXPLICIT_FACT_ID_RE.findall(str(query or ""))
+    }
+    normalized_query = normalize_concept_text(query)
+    explicit_term_query = any(
+        marker in normalized_query
+        for marker in ("什么是", "是什么意思", "含义是什么", "定义是什么", "解释")
+    )
+    plain_term_matched = False
+    if normalized_terms or explicit_fact_ids or explicit_term_query:
+        catalog = get_fact_metadata_catalog()
+        if explicit_term_query:
+            for metadata in catalog.facts.values():
+                for alias in metadata.aliases:
+                    term = normalize_concept_text(alias)
+                    if normalized_query in (
+                        f"什么是{term}",
+                        f"{term}是什么意思",
+                        f"{term}的含义是什么",
+                        f"{term}的定义是什么",
+                        f"解释{term}",
+                        f"解释一下{term}",
+                        f"请解释{term}",
+                        f"请解释一下{term}",
+                    ):
+                        plain_term_matched = True
+                        if term not in normalized_terms:
+                            normalized_terms.append(term)
+        for fact_id in catalog.facts:
+            if fact_id.casefold() in explicit_fact_ids:
+                add(fact_id)
+        for term in normalized_terms:
+            matches = [
+                fact_id
+                for fact_id, metadata in catalog.facts.items()
+                if term in {normalize_concept_text(alias) for alias in metadata.aliases}
+            ]
+            if len(matches) == 1:
+                add(matches[0])
+        if hints:
+            if plain_term_matched:
+                return tuple(hints)
+            text = _EXPLICIT_FACT_ID_RE.sub(
+                "", _EXPLICIT_TERM_RE.sub("", str(query or ""))
+            ).casefold()
 
     price_question = any(
         term in text for term in ("价格", "成交价", "价格不同", "快照")

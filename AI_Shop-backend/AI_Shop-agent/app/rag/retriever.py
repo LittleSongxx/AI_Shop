@@ -485,6 +485,7 @@ class RagRetriever:
             settings,
             rerank_top_n,
             query_variants=query_variants,
+            fact_hints=planned_query.fact_hints,
         )
         cached = None if include_evaluation_candidates else await self._get_cache(cache_key)
         if cached:
@@ -636,6 +637,7 @@ class RagRetriever:
         settings,
         rerank_top_n: int,
         query_variants: list[str] | None = None,
+        fact_hints: tuple[str, ...] | list[str] = (),
     ) -> str:
         """语义缓存的键 = 所有会改变检索结果的配置维度的指纹。
 
@@ -653,6 +655,7 @@ class RagRetriever:
                 for value in (query_variants or [])
                 if self.normalize_query(str(value or ""))
             ],
+            "fact_hints": list(fact_hints),
             "top_k": top_k,
             "filters": category_filter or [],
             "bucket": bucket,
