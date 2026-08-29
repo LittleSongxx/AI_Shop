@@ -32,6 +32,15 @@ Text2SQL 从产品主线和默认求职演示中移除，降为内部治理实�
 
 原始包不进入 Git，不去重、不改路径。需要交接时，只提交本文件或单独的路径/SHA 指针，不提交 SQL、结果行、review 原件或响应原文。
 
+## F0 只读基线红项
+
+接手盘点基线为 `dev` 分支、`567442b`；当时相对 `origin/dev` 有 9 个待推送提交。执行
+`python scripts/check_evidence_manifest.py --require-current` 的结果保持非零，已知红项仅作为
+历史基线记录：不可变证据包仍有可写文件、`visibleRuns.development/regression` 目录缺失、评测
+资产目录/根清理状态不一致、旧 `benchmarks`/`app/evaluation` 路径残留，以及被用户决定删除的
+`AI应用开发_Java后端_真实面试题与备考报告_20260824.md` 链接和 claim 缺失。未通过 chmod、补空
+目录、改历史包或重写 manifest 来消除这些红项；本次后续提交没有新增 Text2SQL 代码或证据错误。
+
 本次清理盘点发现 22 个过期的本地 privacy export（约 37 KB）以及若干 `run/` 运行日志；盘点时本机仍有 AI_Shop 容器运行，因此这些文件暂不移动或删除。privacy export 路径已加入 `.gitignore`，待服务停机后再按可逆 quarantine 流程处理。`run/secrets/`、`run/data`、`run/backups` 和 `run/recovery` 不属于可直接清理范围。
 
 ## 后续排期
