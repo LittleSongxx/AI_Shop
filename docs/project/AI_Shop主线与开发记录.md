@@ -29,6 +29,7 @@
 - 现有离线和人工证据只支持受控预生产演示，不推导线上 SLO、CTR/CVR/GMV、CSAT/FCR 或无人值守高并发能力。
 - E1/E2/E3/E7/E4/E5/E6/E8/E9 已分别收口；E5 新增服务端 principal、WS Origin/帧限制/Redis 限流、Cookie CSRF 和 session TTL 防护；E6 收口发布目录 ACL、freshness、逻辑删除/回滚和 DLQ 可观测；E8 补齐 WebSocket 慢连接 bounded fan-out、listener liveness、队列年龄/取消时延和跨链路 correlation 指标；E9 收口 typed legacy card adapter、浏览器 token refresh、a11y/reduced-motion、Web Vitals 采集和 mock 浏览器闭环。验证仍是受控预生产证据，详见 [E5 身份与安全验证](AI-Shop-E5-身份与安全验证-20260829.md)、[E6 RAG 生命周期验证](AI-Shop-E6-RAG生命周期验证-20260829.md)、[E8 可观测背压短稳态验证](AI-Shop-E8-可观测背压短稳态验证-20260829.md) 与 [E9 前端真实闭环验证](AI-Shop-E9-前端真实闭环验证-20260829.md)。
 - E1/E2/E3 的批次证据分别见 [流式重连](AI-Shop-E1-流式重连验证-20260829.md)、[取消终态幂等](AI-Shop-E2-取消终态幂等验证-20260829.md) 和 [检查点记忆恢复](AI-Shop-E3-检查点记忆恢复验证-20260829.md)；三批均只覆盖受控回归，不升级为生产 SLO 或容灾结论。
+- 运行态清理已在服务停机后完成：日志、PID/observability、runtime 配置、Text2SQL runtime 日志和 22 个 privacy export 外置到可逆 quarantine；`run/data`、历史 observation、review workspace 和证据包保持原位，详见 [运行态清理索引](AI-Shop-运行态清理索引-20260829.md)。
 
 ## 按开发阶段的增量记录
 

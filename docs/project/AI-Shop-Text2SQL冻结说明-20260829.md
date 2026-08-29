@@ -41,7 +41,7 @@ Text2SQL 从产品主线和默认求职演示中移除，降为内部治理实�
 `AI应用开发_Java后端_真实面试题与备考报告_20260824.md` 链接和 claim 缺失。未通过 chmod、补空
 目录、改历史包或重写 manifest 来消除这些红项；本次后续提交没有新增 Text2SQL 代码或证据错误。
 
-本次清理盘点发现 22 个过期的本地 privacy export（约 37 KB）以及若干 `run/` 运行日志；盘点时本机仍有 AI_Shop 容器运行，因此这些文件暂不移动或删除。privacy export 路径已加入 `.gitignore`，待服务停机后再按可逆 quarantine 流程处理。`run/secrets/`、`run/data`、`run/backups` 和 `run/recovery` 不属于可直接清理范围。
+本次清理盘点发现 22 个过期的本地 privacy export（33,030 bytes）以及若干 `run/` 运行态文件。服务已停机后按可逆流程外置到 `/home/song/AI_Shop-runtime-quarantine-20260829/`；共 49 个、11,634,909 bytes，SHA 清单和 49/49 校验见 [运行态清理索引](AI-Shop-运行态清理索引-20260829.md)。privacy export 精确路径仍在 `.gitignore`。`run/secrets/`、`run/data`、`run/backups` 和 `run/recovery` 不属于可直接清理范围。
 
 ## 后续排期
 
