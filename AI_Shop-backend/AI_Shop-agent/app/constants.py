@@ -31,6 +31,9 @@ REDIS_AGENT_WORKER_HEARTBEAT = f"{REDIS_PREFIX}agent:worker:heartbeat"
 # deliberately stored in this separate key so the old ownership semantics stay
 # valid during rollout.
 REDIS_AGENT_WORKER_HEARTBEAT_METADATA = f"{REDIS_PREFIX}agent:worker:heartbeat:metadata"
+# Short-lived per-run sequence counters for the WebSocket delivery envelope.
+# This is ordering metadata only; chunks are never persisted for replay.
+REDIS_WS_STREAM_SEQUENCE = f"{REDIS_PREFIX}agent:ws:stream-seq:"
 REDIS_TOKEN_ADMIN = f"{REDIS_PREFIX}token:admin:"
 
 AGENT_QUEUE_HIGH = "agent.support.high"
@@ -84,6 +87,7 @@ SHOPPING_PROFILE_TTL = 7 * 24 * 60 * 60
 CONSULT_ACTIVE_TTL = 30 * 60
 PENDING_MSG_TTL = 5 * 60
 REDIS_HEARTBEAT_TTL = 6
+WS_STREAM_SEQUENCE_TTL = 15 * 60
 
 ORDER_STATUS_DELETE = -1
 PRODUCT_STATUS_ON_SALE = 1

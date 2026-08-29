@@ -36,9 +36,11 @@ from app.constants import (
     REDIS_HEARTBEAT_TTL,
     REDIS_PROMPT,
     REDIS_SENSITIVE_WORD_PAYLOAD,
+    REDIS_WS_STREAM_SEQUENCE,
     REDIS_WS_USER_HEARTBEAT,
     SHOPPING_PROFILE_TTL,
     WS_MESSAGE_TOPIC_AGENT,
+    WS_STREAM_SEQUENCE_TTL,
 )
 
 logger = structlog.get_logger()
@@ -118,6 +120,44 @@ class RedisService:
         if not self._client:
             raise RuntimeError("Redis not connected")
         return self._client
+
+    async def next_ws_stream_sequence(self, stream_key: str) -> int | None:
+        """Allocate a monotonic, short-lived sequence for one streamed message.
+
+        The counter is deliberately the only Redis state added for streaming:
+        chunks themselves remain pub/sub-only and are not replayed from Redis.
+        Returning ``None`` lets the caller use a process-local fallback when
+        Redis is unavailable (for example in unit tests or a degraded startup).
+        """
+        material = str(stream_key or "").strip()
+        if not material:
+            return None
+        # Avoid turning every unit-test/degraded-startup frame into a warning
+        # when Redis has not been connected yet.
+        if self._client is None:
+            return None
+        digest = hashlib.sha256(material.encode("utf-8")).hexdigest()
+        key = f"{REDIS_WS_STREAM_SEQUENCE}{digest}"
+        try:
+            sequence = int(await self.client.incr(key))
+        except Exception as exc:
+            logger.warning(
+                "ws_stream_sequence_unavailable",
+                error=type(exc).__name__,
+            )
+            return None
+        try:
+            # Refreshing the short TTL keeps an active stream ordered while
+            # ensuring abandoned counters do not accumulate indefinitely.
+            await self.client.expire(key, WS_STREAM_SEQUENCE_TTL)
+        except Exception as exc:
+            # An expiry failure must not make the already allocated sequence
+            # fall back to a second counter and collide with another worker.
+            logger.warning(
+                "ws_stream_sequence_ttl_unavailable",
+                error=type(exc).__name__,
+            )
+        return sequence
 
     async def set_cancel_flag(self, user_id: str, message_id: int) -> None:
 

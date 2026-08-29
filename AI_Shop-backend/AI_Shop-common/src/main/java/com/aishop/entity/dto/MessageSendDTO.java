@@ -1,6 +1,7 @@
 package com.aishop.entity.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
@@ -9,6 +10,31 @@ import java.io.Serializable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MessageSendDTO<T> implements Serializable {
     private static final long serialVersionUID = -1045752033171142417L;
+
+    /** Optional stream envelope metadata; retained additively for legacy callers. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Integer schemaVersion;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String runId;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String requestId;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String episodeId;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String eventId;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long seq;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String terminalState;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String replayCursor;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private Integer messageId;
@@ -36,6 +62,70 @@ public class MessageSendDTO<T> implements Serializable {
     private Integer outPutType = 0;
 
     private String userId;
+
+    public Integer getSchemaVersion() {
+        return schemaVersion;
+    }
+
+    public void setSchemaVersion(Integer schemaVersion) {
+        this.schemaVersion = schemaVersion;
+    }
+
+    public String getRunId() {
+        return runId;
+    }
+
+    public void setRunId(String runId) {
+        this.runId = runId;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public String getEpisodeId() {
+        return episodeId;
+    }
+
+    public void setEpisodeId(String episodeId) {
+        this.episodeId = episodeId;
+    }
+
+    public String getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(String eventId) {
+        this.eventId = eventId;
+    }
+
+    public Long getSeq() {
+        return seq;
+    }
+
+    public void setSeq(Long seq) {
+        this.seq = seq;
+    }
+
+    public String getTerminalState() {
+        return terminalState;
+    }
+
+    public void setTerminalState(String terminalState) {
+        this.terminalState = terminalState;
+    }
+
+    public String getReplayCursor() {
+        return replayCursor;
+    }
+
+    public void setReplayCursor(String replayCursor) {
+        this.replayCursor = replayCursor;
+    }
 
     public String getUserMessage() {
         return userMessage;

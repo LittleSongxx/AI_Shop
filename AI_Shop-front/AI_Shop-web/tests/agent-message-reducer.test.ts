@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  mergeHistoryMessages,
   upsertAgentHttpMessage,
   upsertAgentStreamMessage,
   type AgentHistoryMessage
@@ -110,6 +111,137 @@ describe('agent message reducer', () => {
       messageId: 50,
       assistantMessage: card,
       bizType: 'order_selection',
+      status: 2
+    });
+  });
+
+  it('orders envelope chunks by sequence and ignores duplicate delivery', () => {
+    const list: AgentHistoryMessage[] = [];
+    upsertAgentStreamMessage(list, {
+      messageId: 60,
+      runId: 'run-60',
+      eventId: 'event-2',
+      seq: 2,
+      replayCursor: 'cursor:2',
+      assistantMessage: '二段',
+      outPutType: 0
+    });
+    upsertAgentStreamMessage(list, {
+      messageId: 60,
+      runId: 'run-60',
+      eventId: 'event-1',
+      seq: 1,
+      replayCursor: 'cursor:1',
+      assistantMessage: '第一段',
+      outPutType: 0
+    });
+    upsertAgentStreamMessage(list, {
+      messageId: 60,
+      runId: 'run-60',
+      eventId: 'duplicate-event-2',
+      seq: 2,
+      assistantMessage: '重复',
+      outPutType: 0
+    });
+
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      assistantMessage: '第一段二段',
+      runId: 'run-60',
+      eventId: 'event-2',
+      seq: 2,
+      replayCursor: 'cursor:2',
+      status: 1
+    });
+  });
+
+  it('uses the terminal snapshot and ignores a late sequenced chunk', () => {
+    const list: AgentHistoryMessage[] = [];
+    upsertAgentStreamMessage(list, {
+      messageId: 70,
+      schemaVersion: 1,
+      runId: 'run-70',
+      requestId: 'request-70',
+      episodeId: 'episode-70',
+      eventId: 'event-1',
+      seq: 1,
+      assistantMessage: '部分',
+      outPutType: 0
+    });
+    upsertAgentStreamMessage(list, {
+      messageId: 70,
+      eventId: 'event-3',
+      seq: 3,
+      terminalState: 'SUCCEEDED',
+      replayCursor: 'cursor:3',
+      assistantMessage: '完整答案',
+      outPutType: 1
+    });
+    upsertAgentStreamMessage(list, {
+      messageId: 70,
+      eventId: 'event-2',
+      seq: 2,
+      assistantMessage: '迟到片段',
+      outPutType: 0
+    });
+
+    expect(list[0]).toMatchObject({
+      assistantMessage: '完整答案',
+      schemaVersion: 1,
+      runId: 'run-70',
+      requestId: 'request-70',
+      episodeId: 'episode-70',
+      eventId: 'event-3',
+      seq: 3,
+      terminalState: 'SUCCEEDED',
+      replayCursor: 'cursor:3',
+      status: 2
+    });
+  });
+
+  it('retains sequence state when history reconciliation replaces the row object', () => {
+    const list: AgentHistoryMessage[] = [];
+    upsertAgentStreamMessage(list, {
+      messageId: 80,
+      seq: 2,
+      eventId: 'event-80-2',
+      assistantMessage: '二',
+      outPutType: 0
+    });
+
+    const reconciled = mergeHistoryMessages(
+      [],
+      [{ messageId: 80, assistantMessage: '', status: 1 }]
+    );
+    const merged = mergeHistoryMessages(reconciled, list);
+    upsertAgentStreamMessage(merged, {
+      messageId: 80,
+      seq: 1,
+      eventId: 'event-80-1',
+      assistantMessage: '一',
+      outPutType: 0
+    });
+
+    expect(merged[0].assistantMessage).toBe('一二');
+  });
+
+  it('keeps a reconciled terminal history row closed to legacy late frames', () => {
+    const list: AgentHistoryMessage[] = [];
+    upsertAgentHttpMessage(list, {
+      messageId: 90,
+      assistantMessage: '已恢复的答案',
+      status: 2,
+      runId: 'run-90'
+    });
+
+    upsertAgentStreamMessage(list, {
+      messageId: 90,
+      assistantMessage: '迟到片段',
+      outPutType: 0
+    });
+
+    expect(list[0]).toMatchObject({
+      assistantMessage: '已恢复的答案',
       status: 2
     });
   });

@@ -2,6 +2,17 @@ from pydantic import BaseModel, Field
 
 
 class MessageSendDTO(BaseModel):
+    # Additive stream envelope fields.  Legacy clients ignore unknown fields,
+    # while newer clients can correlate, order and reconcile a run without a
+    # second event store.
+    schema_version: int | None = Field(None, alias="schemaVersion")
+    run_id: str | None = Field(None, alias="runId")
+    request_id: str | None = Field(None, alias="requestId")
+    episode_id: str | None = Field(None, alias="episodeId")
+    event_id: str | None = Field(None, alias="eventId")
+    seq: int | None = None
+    terminal_state: str | None = Field(None, alias="terminalState")
+    replay_cursor: str | None = Field(None, alias="replayCursor")
     message_id: int | None = Field(None, alias="messageId")
     user_id: str | None = Field(None, alias="userId")
     user_message: str | None = Field(None, alias="userMessage")

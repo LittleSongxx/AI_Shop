@@ -19,6 +19,14 @@ export interface AppWsMessage {
   content?: string;
   createTime?: string;
   sourceRefs?: AgentSourceRef[] | { sources?: AgentSourceRef[] };
+  schemaVersion?: number | string;
+  runId?: string;
+  requestId?: string;
+  episodeId?: string;
+  eventId?: string;
+  seq?: number | string;
+  terminalState?: string;
+  replayCursor?: string;
 }
 
 type UnreadRefreshHandler = () => void | Promise<void>;
@@ -33,8 +41,16 @@ const HEARTBEAT_INTERVAL = 5000;
 let needReconnect = true;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let unreadRefreshHandler: UnreadRefreshHandler | null = null;
+let openWaiters: Array<(opened: boolean) => void> = [];
 
 const wsCheckEnabled = () => import.meta.env.VITE_WS_CHECK === 'true';
+
+const settleOpenWaiters = (opened: boolean) => {
+  if (!openWaiters.length) return;
+  const waiters = openWaiters;
+  openWaiters = [];
+  waiters.forEach((resolve) => resolve(opened));
+};
 
 const isNotifyMessage = (data: AppWsMessage) =>
   data.messageType === 'notify' || Boolean(data.notificationId && data.title);
@@ -104,7 +120,10 @@ const handleReconnect = () => {
 const connectWs = () => {
   if (isConnecting || !needReconnect) return;
   const authStore = useAuthStore();
-  if (!authStore.isLoggedIn) return;
+  if (!authStore.isLoggedIn) {
+    settleOpenWaiters(false);
+    return;
+  }
 
   isConnecting = true;
   const wsUrl = resolveAgentWsUrl();
@@ -114,6 +133,7 @@ const connectWs = () => {
       isConnecting = false;
       retryCount = 0;
       startHeartbeat();
+      settleOpenWaiters(true);
     };
     ws.onmessage = (event) => {
       const raw = typeof event.data === 'string' ? event.data.trim() : '';
@@ -128,19 +148,37 @@ const connectWs = () => {
     ws.onclose = (event) => {
       isConnecting = false;
       clearHeartbeat();
-      if (event.code !== 1000) handleReconnect();
+      if (event.code !== 1000) {
+        handleReconnect();
+      } else {
+        settleOpenWaiters(false);
+      }
     };
   } catch {
+    isConnecting = false;
     handleReconnect();
   }
 };
 
-export const ensureAppWebSocket = () => {
-  if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) {
-    return;
+export const ensureAppWebSocket = (): Promise<boolean> => {
+  if (ws?.readyState === WebSocket.OPEN) return Promise.resolve(true);
+
+  const authStore = useAuthStore();
+  if (!authStore.isLoggedIn) return Promise.resolve(false);
+
+  const opened = new Promise<boolean>((resolve) => {
+    openWaiters.push(resolve);
+  });
+  if (ws?.readyState !== WebSocket.CONNECTING) {
+    needReconnect = true;
+    connectWs();
   }
-  initAppWebSocket({ force: true });
+  return opened;
 };
+
+// Explicit name for callers that want to document the OPEN barrier while the
+// legacy ensureAppWebSocket name remains source-compatible.
+export const waitForAppWebSocket = ensureAppWebSocket;
 
 export const initAppWebSocket = (options?: { force?: boolean }) => {
   if (options?.force) closeAppWebSocket();
@@ -156,6 +194,7 @@ export const initAppWebSocket = (options?: { force?: boolean }) => {
 export const closeAppWebSocket = () => {
   needReconnect = false;
   isConnecting = false;
+  settleOpenWaiters(false);
   clearHeartbeat();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);

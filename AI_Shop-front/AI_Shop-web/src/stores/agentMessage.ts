@@ -14,6 +14,14 @@ export interface AgentWsMessage {
   userId?: string;
   messageType?: string;
   sourceRefs?: AgentSourceRef[] | { sources?: AgentSourceRef[] };
+  schemaVersion?: number | string;
+  runId?: string;
+  requestId?: string;
+  episodeId?: string;
+  eventId?: string;
+  seq?: number | string;
+  terminalState?: string;
+  replayCursor?: string;
 }
 
 export const useAgentMessageStore = defineStore('agentMessage', () => {

@@ -28,7 +28,82 @@ export interface AgentHistoryMessage {
   sendTime?: string;
   sourceRefs?: AgentSourceRef[];
   messageType?: string;
+  schemaVersion?: number;
+  runId?: string;
+  requestId?: string;
+  episodeId?: string;
+  eventId?: string;
+  seq?: number;
+  terminalState?: string;
+  replayCursor?: string;
 }
+
+type StreamAccumulator = {
+  chunks: Map<number, string>;
+  seenEvents: Set<string>;
+  seenSequences: Set<number>;
+  terminal: boolean;
+};
+
+// Keep ordering/dedupe state outside the public history shape.  This avoids
+// leaking reducer bookkeeping into Vue templates or persisted history rows.
+// Key by the durable message ID rather than object identity: history merges
+// intentionally clone rows while a live stream may still be arriving.
+const streamAccumulators = new Map<number, StreamAccumulator>();
+const MAX_STREAM_ACCUMULATORS = 512;
+
+const streamAccumulatorFor = (message: AgentHistoryMessage): StreamAccumulator => {
+  let accumulator = streamAccumulators.get(message.messageId);
+  if (!accumulator) {
+    accumulator = {
+      chunks: new Map(),
+      seenEvents: new Set(),
+      seenSequences: new Set(),
+      terminal: false
+    };
+    if (streamAccumulators.size >= MAX_STREAM_ACCUMULATORS) {
+      const oldest = streamAccumulators.keys().next().value;
+      if (oldest != null) streamAccumulators.delete(oldest);
+    }
+    streamAccumulators.set(message.messageId, accumulator);
+  }
+  return accumulator;
+};
+
+const parsePositiveSequence = (value: unknown): number | undefined => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const copyStreamEnvelope = (
+  target: AgentHistoryMessage,
+  payload: AgentStreamPayload | Record<string, unknown>
+) => {
+  const source = payload as Record<string, unknown>;
+  const schemaVersion = Number(source.schemaVersion ?? source.schema_version);
+  const sequence = parsePositiveSequence(source.seq ?? source.sequence);
+  const advancesCursor = sequence == null || sequence >= Number(target.seq || 0);
+  if (Number.isFinite(schemaVersion) && schemaVersion > 0) target.schemaVersion = schemaVersion;
+  if (source.runId != null || source.run_id != null) {
+    target.runId = String(source.runId ?? source.run_id);
+  }
+  if (source.requestId != null || source.request_id != null) {
+    target.requestId = String(source.requestId ?? source.request_id);
+  }
+  if (source.episodeId != null || source.episode_id != null) {
+    target.episodeId = String(source.episodeId ?? source.episode_id);
+  }
+  if (advancesCursor && (source.eventId != null || source.event_id != null)) {
+    target.eventId = String(source.eventId ?? source.event_id);
+  }
+  if (sequence != null && advancesCursor) target.seq = sequence;
+  if (source.terminalState != null || source.terminal_state != null) {
+    target.terminalState = String(source.terminalState ?? source.terminal_state);
+  }
+  if (advancesCursor && (source.replayCursor != null || source.replay_cursor != null)) {
+    target.replayCursor = String(source.replayCursor ?? source.replay_cursor);
+  }
+};
 
 const pickField = (raw: Record<string, unknown>, ...keys: string[]) => {
   for (const key of keys) {
@@ -90,6 +165,14 @@ export const normalizeAgentHistoryMessage = (raw: Record<string, unknown>): Agen
   const statusRaw = pickField(raw, 'status');
   const sourceRefs = normalizeSourceRefs(pickField(raw, 'sourceRefs', 'source_refs'));
   const messageTypeRaw = pickField(raw, 'messageType', 'message_type');
+  const schemaVersionRaw = pickField(raw, 'schemaVersion', 'schema_version');
+  const runIdRaw = pickField(raw, 'runId', 'run_id');
+  const requestIdRaw = pickField(raw, 'requestId', 'request_id');
+  const episodeIdRaw = pickField(raw, 'episodeId', 'episode_id');
+  const eventIdRaw = pickField(raw, 'eventId', 'event_id');
+  const seqRaw = pickField(raw, 'seq', 'sequence');
+  const terminalStateRaw = pickField(raw, 'terminalState', 'terminal_state');
+  const replayCursorRaw = pickField(raw, 'replayCursor', 'replay_cursor');
   const imageAssetIdRaw = pickField(raw, 'imageAssetId', 'image_asset_id');
   const imageSnapshotRaw = pickField(raw, 'imageSnapshot', 'image_snapshot_json');
   const selectedVisualSubjectRaw = pickField(
@@ -114,7 +197,15 @@ export const normalizeAgentHistoryMessage = (raw: Record<string, unknown>): Agen
     bizData: bizDataRaw != null ? String(bizDataRaw) : null,
     sendTime: sendTimeRaw != null ? String(sendTimeRaw) : undefined,
     sourceRefs,
-    messageType: messageTypeRaw != null ? String(messageTypeRaw) : undefined
+    messageType: messageTypeRaw != null ? String(messageTypeRaw) : undefined,
+    schemaVersion: schemaVersionRaw != null ? Number(schemaVersionRaw) : undefined,
+    runId: runIdRaw != null ? String(runIdRaw) : undefined,
+    requestId: requestIdRaw != null ? String(requestIdRaw) : undefined,
+    episodeId: episodeIdRaw != null ? String(episodeIdRaw) : undefined,
+    eventId: eventIdRaw != null ? String(eventIdRaw) : undefined,
+    seq: parsePositiveSequence(seqRaw),
+    terminalState: terminalStateRaw != null ? String(terminalStateRaw) : undefined,
+    replayCursor: replayCursorRaw != null ? String(replayCursorRaw) : undefined
   };
 };
 
@@ -131,6 +222,14 @@ export interface AgentStreamPayload {
   sendTime?: string;
   sourceRefs?: AgentSourceRef[] | { sources?: AgentSourceRef[] };
   messageType?: string;
+  schemaVersion?: number | string;
+  runId?: string;
+  requestId?: string;
+  episodeId?: string;
+  eventId?: string;
+  seq?: number | string;
+  terminalState?: string;
+  replayCursor?: string;
 }
 
 export interface AgentUpsertResult {
@@ -147,7 +246,13 @@ export const upsertAgentStreamMessage = (
   if (!Number.isFinite(parsedId) || parsedId <= 0) return null;
 
   const outputType = Number(payload.outPutType ?? 0);
-  const terminal = outputType === 1 || outputType === 2;
+  const terminalState = String(payload.terminalState || '').toUpperCase();
+  const terminal =
+    outputType === 1 ||
+    outputType === 2 ||
+    ['SUCCEEDED', 'FAILED', 'CANCELLED', 'INCONCLUSIVE', 'MANUAL_REVIEW'].includes(
+      terminalState
+    );
   let message = list.find((item) => String(item.messageId) === String(parsedId));
   const created = !message;
   if (!message) {
@@ -158,6 +263,32 @@ export const upsertAgentStreamMessage = (
     };
     list.push(message);
   }
+
+  const accumulator = streamAccumulatorFor(message);
+  const sequence = parsePositiveSequence(payload.seq);
+  const eventId = payload.eventId ? String(payload.eventId) : undefined;
+  // A terminal history row is the reconciliation source of truth.  Ignore
+  // any late pub/sub frame, including legacy frames without envelope fields.
+  if (accumulator.terminal) {
+    return { message, created: false, terminal: false };
+  }
+  const hasEnvelopeOrdering = sequence != null || !!eventId;
+  if (hasEnvelopeOrdering) {
+    if (eventId && accumulator.seenEvents.has(eventId)) {
+      return { message, created: false, terminal: false };
+    }
+    if (eventId) accumulator.seenEvents.add(eventId);
+    if (sequence != null) {
+      // A sequence is unique within a run.  This also handles duplicate
+      // delivery from Redis when an event ID was not preserved by a proxy.
+      if (accumulator.seenSequences.has(sequence)) {
+        return { message, created: false, terminal: false };
+      }
+      accumulator.seenSequences.add(sequence);
+    }
+  }
+
+  copyStreamEnvelope(message, payload);
 
   if (payload.userMessage != null && payload.userMessage !== '') {
     message.userMessage = String(payload.userMessage);
@@ -177,16 +308,28 @@ export const upsertAgentStreamMessage = (
   const refs = normalizeSourceRefs(payload.sourceRefs);
   if (refs.length || payload.sourceRefs != null) message.sourceRefs = refs;
 
-  if (outputType === 2) {
+  if (outputType === 2 || terminalState === 'FAILED') {
     message.assistantMessage = payload.assistantMessage || '服务器返回错误，请联系管理员';
     message.status = 2;
-  } else if (outputType === 1) {
+    accumulator.terminal = true;
+  } else if (terminal) {
     if (payload.assistantMessage != null && payload.assistantMessage.trim() !== '') {
+      // A terminal frame is authoritative and may contain the complete
+      // response rather than the individual deltas.
       message.assistantMessage = payload.assistantMessage;
     }
     message.status = 2;
+    accumulator.terminal = true;
   } else if (message.status === 1) {
-    message.assistantMessage += payload.assistantMessage || '';
+    if (sequence != null) {
+      accumulator.chunks.set(sequence, payload.assistantMessage || '');
+      message.assistantMessage = [...accumulator.chunks.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([, chunk]) => chunk)
+        .join('');
+    } else {
+      message.assistantMessage += payload.assistantMessage || '';
+    }
   }
 
   return { message, created, terminal };
@@ -201,6 +344,9 @@ export const upsertAgentHttpMessage = (
   const existing = list.find((item) => item.messageId === incoming.messageId);
   if (!existing) {
     list.push(incoming);
+    if (incoming.status !== 1 || incoming.terminalState) {
+      streamAccumulatorFor(incoming).terminal = true;
+    }
     return incoming;
   }
   if (incoming.userMessage) existing.userMessage = incoming.userMessage;
@@ -211,6 +357,17 @@ export const upsertAgentHttpMessage = (
   if (incoming.bizData != null) existing.bizData = incoming.bizData;
   if (incoming.sendTime) existing.sendTime = incoming.sendTime;
   if (incoming.sourceRefs?.length) existing.sourceRefs = incoming.sourceRefs;
+  if (incoming.schemaVersion != null) existing.schemaVersion = incoming.schemaVersion;
+  if (incoming.runId) existing.runId = incoming.runId;
+  if (incoming.requestId) existing.requestId = incoming.requestId;
+  if (incoming.episodeId) existing.episodeId = incoming.episodeId;
+  if (incoming.eventId) existing.eventId = incoming.eventId;
+  if (incoming.seq != null) existing.seq = incoming.seq;
+  if (incoming.terminalState) existing.terminalState = incoming.terminalState;
+  if (incoming.replayCursor) existing.replayCursor = incoming.replayCursor;
+  if (incoming.status !== 1 || incoming.terminalState) {
+    streamAccumulatorFor(existing).terminal = true;
+  }
   if (existing.status === 1 && incoming.assistantMessage) {
     existing.assistantMessage = incoming.assistantMessage;
   }
