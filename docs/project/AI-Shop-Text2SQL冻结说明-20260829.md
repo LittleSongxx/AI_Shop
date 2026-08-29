@@ -32,6 +32,8 @@ Text2SQL 从产品主线和默认求职演示中移除，降为内部治理实�
 
 原始包不进入 Git，不去重、不改路径。需要交接时，只提交本文件或单独的路径/SHA 指针，不提交 SQL、结果行、review 原件或响应原文。
 
+本次清理盘点发现 22 个过期的本地 privacy export（约 37 KB）以及若干 `run/` 运行日志；盘点时本机仍有 AI_Shop 容器运行，因此这些文件暂不移动或删除。privacy export 路径已加入 `.gitignore`，待服务停机后再按可逆 quarantine 流程处理。`run/secrets/`、`run/data`、`run/backups` 和 `run/recovery` 不属于可直接清理范围。
+
 ## 后续排期
 
 求职建设只围绕两条产品闭环：

@@ -57,6 +57,9 @@ security/dependency-check-suppression.xml
 # Human-review intake inbox (canonical bytes live in evaluation-evidence/intake-archive)
 holdout/
 
+# Local analytics privacy exports (sensitive, short-lived; custody stays outside Git)
+/AI_Shop-backend/AI_Shop-agent/.privacy-exports/
+
 # Frontend local
 **/.vite/
 **/playwright-report/
