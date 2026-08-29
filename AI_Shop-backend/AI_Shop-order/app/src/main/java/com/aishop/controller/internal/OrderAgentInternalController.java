@@ -21,6 +21,7 @@ import com.aishop.entity.query.OrderItemQuery;
 import com.aishop.entity.query.SimplePage;
 import com.aishop.entity.vo.ResponseVO;
 import com.aishop.utils.StringTools;
+import com.aishop.utils.RequestFingerprint;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +46,7 @@ import java.util.stream.Collectors;
 public class OrderAgentInternalController extends ABaseController {
 
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String ACTION_SNAPSHOT_VERSION = "order-action-snapshot/v1";
 
     @Resource
     private OrderInfoService orderInfoService;
@@ -284,15 +286,16 @@ public class OrderAgentInternalController extends ABaseController {
                     "DENIED", action, orderId, orderItemId, "ORDER_NOT_FOUND"));
         }
         AgentDelegatedIdentity.requireOwner(userId, order.getUserId());
+        OrderItem item = null;
         if (!StringTools.isEmpty(orderItemId)) {
-            OrderItem item = orderItemService.getOrderItemByOrderItemId(orderItemId);
+            item = orderItemService.getOrderItemByOrderItemId(orderItemId);
             if (item == null || !orderId.equals(item.getOrderId())) {
                 return getSuccessResponseVO(capabilityResult(
                         "DENIED", action, orderId, orderItemId, "ORDER_ITEM_MISMATCH"));
             }
         }
         return getSuccessResponseVO(evaluateActionCapability(
-                action, order, orderId, orderItemId));
+                action, order, item, orderId, orderItemId));
     }
 
     @PostMapping("/coPurchaseProductIds")
@@ -414,6 +417,17 @@ public class OrderAgentInternalController extends ABaseController {
             String orderId,
             String orderItemId,
             String reasonCode) {
+        return capabilityResult(decision, action, orderId, orderItemId, reasonCode, null, null);
+    }
+
+    private static Map<String, Object> capabilityResult(
+            String decision,
+            String action,
+            String orderId,
+            String orderItemId,
+            String reasonCode,
+            OrderInfo order,
+            OrderItem item) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("decision", decision);
         result.put("action", action);
@@ -421,6 +435,15 @@ public class OrderAgentInternalController extends ABaseController {
         result.put("orderItemId", StringTools.isEmpty(orderItemId) ? null : orderItemId);
         result.put("reasonCode", reasonCode);
         result.put("capabilityVersion", "order-action-capability/v1");
+        Map<String, Object> snapshot = actionSnapshot(action, orderId, orderItemId, order, item);
+        String snapshotHash = RequestFingerprint.sha256(snapshot);
+        result.put("snapshotVersion", ACTION_SNAPSHOT_VERSION);
+        // Keep both spellings: Java clients use the HTTP-style ETag spelling,
+        // while the Python normalizer exposes the lower-camel alias.
+        result.put("snapshotEtag", "sha256:" + snapshotHash);
+        result.put("snapshotETag", "sha256:" + snapshotHash);
+        result.put("snapshotHash", snapshotHash);
+        result.put("snapshot", snapshot);
         result.put("evaluatedAt", formatDate(new Date()));
         return result;
     }
@@ -428,6 +451,7 @@ public class OrderAgentInternalController extends ABaseController {
     private static Map<String, Object> evaluateActionCapability(
             String action,
             OrderInfo order,
+            OrderItem item,
             String orderId,
             String orderItemId) {
         Integer status = order.getOrderStatus();
@@ -441,7 +465,9 @@ public class OrderAgentInternalController extends ABaseController {
                     orderItemId,
                     OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(status)
                             ? "ORDER_STATUS_CANCELLABLE"
-                            : "ORDER_STATUS_NOT_CANCELLABLE");
+                            : "ORDER_STATUS_NOT_CANCELLABLE",
+                    order,
+                    item);
             case "CONFIRM_RECEIPT" -> capabilityResult(
                     OrderStatusEnum.SHIPPED.getStatus().equals(status)
                                     || OrderStatusEnum.PARTIALLY_REFUNDED.getStatus().equals(status)
@@ -452,7 +478,9 @@ public class OrderAgentInternalController extends ABaseController {
                     OrderStatusEnum.SHIPPED.getStatus().equals(status)
                                     || OrderStatusEnum.PARTIALLY_REFUNDED.getStatus().equals(status)
                             ? "ORDER_STATUS_CONFIRMABLE"
-                            : "ORDER_STATUS_NOT_CONFIRMABLE");
+                            : "ORDER_STATUS_NOT_CONFIRMABLE",
+                    order,
+                    item);
             // These conditions intentionally mirror the command services. Do
             // not add a synthetic order-status rule here: postComment and
             // postReComment own their real eligibility via commentStatus.
@@ -464,7 +492,9 @@ public class OrderAgentInternalController extends ABaseController {
                     orderItemId,
                     OrderCommentStatusEnum.NOT_EVALUATED.getStatus().equals(commentStatus)
                             ? "COMMENT_NOT_EVALUATED"
-                            : "COMMENT_ALREADY_EVALUATED");
+                            : "COMMENT_ALREADY_EVALUATED",
+                    order,
+                    item);
             case "RECOMMENT" -> capabilityResult(
                     OrderCommentStatusEnum.EVALUATED.getStatus().equals(commentStatus)
                             ? "ALLOWED" : "DENIED",
@@ -473,10 +503,32 @@ public class OrderAgentInternalController extends ABaseController {
                     orderItemId,
                     OrderCommentStatusEnum.EVALUATED.getStatus().equals(commentStatus)
                             ? "COMMENT_RECOMMENTABLE"
-                            : "COMMENT_NOT_RECOMMENTABLE");
+                            : "COMMENT_NOT_RECOMMENTABLE",
+                    order,
+                    item);
             default -> capabilityResult(
-                    "UNAVAILABLE", action, orderId, orderItemId, "UNSUPPORTED_ACTION");
+                    "UNAVAILABLE", action, orderId, orderItemId, "UNSUPPORTED_ACTION",
+                    order,
+                    item);
         };
+    }
+
+    private static Map<String, Object> actionSnapshot(
+            String action,
+            String orderId,
+            String orderItemId,
+            OrderInfo order,
+            OrderItem item) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("schemaVersion", ACTION_SNAPSHOT_VERSION);
+        snapshot.put("action", action);
+        snapshot.put("orderId", orderId);
+        snapshot.put("orderItemId", StringTools.isEmpty(orderItemId) ? null : orderItemId);
+        snapshot.put("orderStatus", order == null ? null : order.getOrderStatus());
+        snapshot.put("commentStatus", order == null ? null : order.getCommentStatus());
+        snapshot.put("payOrderIdPresent", order != null && !StringTools.isEmpty(order.getPayOrderId()));
+        snapshot.put("orderItemStatus", item == null ? null : item.getOrderItemStatus());
+        return snapshot;
     }
 
     private static String orderStatusName(Integer status) {

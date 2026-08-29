@@ -19,4 +19,9 @@ describe('agent action uncertain states', () => {
     expect(agentActionStatusLabel(6)).toContain('核对中');
     expect(agentActionStatusLabel(7)).toContain('人工复核');
   });
+
+  it('accepts server status names used by reconciliation responses', () => {
+    expect(normalizeAgentActionStatus('INCONCLUSIVE')).toBe(AGENT_ACTION_STATUS.INCONCLUSIVE);
+    expect(normalizeAgentActionStatus('MANUAL_REVIEW')).toBe(AGENT_ACTION_STATUS.MANUAL_REVIEW);
+  });
 });

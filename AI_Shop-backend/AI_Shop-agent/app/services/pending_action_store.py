@@ -417,7 +417,7 @@ class PendingActionStore:
             except json.JSONDecodeError:
                 params = {}
         created_at = row.get("created_at")
-        return {
+        public = {
             "token": row.get("action_token"),
             "userId": row.get("user_id"),
             "actionType": row.get("action_type"),
@@ -445,6 +445,14 @@ class PendingActionStore:
             if isinstance(created_at, datetime)
             else None,
         }
+        snapshot = params.get("actionSnapshot") if isinstance(params, dict) else None
+        if isinstance(snapshot, dict):
+            public["actionSnapshot"] = {
+                key: snapshot[key]
+                for key in ("version", "etag", "hash", "capturedAt", "authority")
+                if snapshot.get(key) not in (None, "")
+            }
+        return public
 
     @staticmethod
     def _isoformat(value) -> str | None:

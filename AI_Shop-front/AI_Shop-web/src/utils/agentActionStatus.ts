@@ -10,6 +10,20 @@ export const AGENT_ACTION_STATUS = {
 } as const;
 
 export const normalizeAgentActionStatus = (value: unknown): number => {
+  if (typeof value === 'string') {
+    const named: Record<string, number> = {
+      PENDING: AGENT_ACTION_STATUS.PENDING,
+      CONFIRMED: AGENT_ACTION_STATUS.CONFIRMED,
+      CANCELLED: AGENT_ACTION_STATUS.CANCELLED,
+      EXECUTING: AGENT_ACTION_STATUS.EXECUTING,
+      FAILED: AGENT_ACTION_STATUS.FAILED,
+      EXPIRED: AGENT_ACTION_STATUS.EXPIRED,
+      INCONCLUSIVE: AGENT_ACTION_STATUS.INCONCLUSIVE,
+      MANUAL_REVIEW: AGENT_ACTION_STATUS.MANUAL_REVIEW
+    };
+    const byName = named[value.trim().toUpperCase()];
+    if (byName != null) return byName;
+  }
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 7
     ? parsed

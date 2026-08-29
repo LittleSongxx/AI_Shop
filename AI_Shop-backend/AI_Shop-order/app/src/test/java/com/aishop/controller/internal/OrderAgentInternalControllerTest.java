@@ -25,6 +25,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -226,6 +228,22 @@ class OrderAgentInternalControllerTest {
         assertEquals("CANCEL_ORDER", response.getData().get("action"));
         assertEquals("order-action-capability/v1",
                 response.getData().get("capabilityVersion"));
+        assertEquals("order-action-snapshot/v1",
+                response.getData().get("snapshotVersion"));
+        assertTrue(String.valueOf(response.getData().get("snapshotEtag"))
+                .matches("sha256:[0-9a-f]{64}"));
+        assertEquals(response.getData().get("snapshotEtag"),
+                response.getData().get("snapshotETag"));
+        assertEquals(0, ((Map<?, ?>) response.getData().get("snapshot"))
+                .get("orderStatus"));
+
+        String firstEtag = String.valueOf(response.getData().get("snapshotEtag"));
+        order.setOrderStatus(1);
+        ResponseVO<Map<String, Object>> changed = controller.actionCapability(Map.of(
+                "action", "CANCEL_ORDER",
+                "orderId", "SM202608050001"
+        ));
+        assertNotEquals(firstEtag, changed.getData().get("snapshotEtag"));
     }
 
     @Test

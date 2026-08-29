@@ -219,6 +219,31 @@ def _truncate(text: str, max_len: int = 40) -> str:
         return text
     return text[:max_len] + "…"
 
+
+def _capability_decision_payload(capability: dict) -> dict:
+    """Carry Java's bounded capability/snapshot proof into the action token."""
+
+    if not isinstance(capability, dict):
+        return {}
+    values = {
+        "decision": capability.get("decision"),
+        "reasonCode": capability.get("reason_code")
+        or capability.get("reasonCode"),
+        "capabilityVersion": capability.get("capability_version")
+        or capability.get("capabilityVersion"),
+        "evaluatedAt": capability.get("evaluated_at")
+        or capability.get("evaluatedAt"),
+        "snapshotVersion": capability.get("snapshot_version")
+        or capability.get("snapshotVersion"),
+        "snapshotEtag": capability.get("snapshot_etag")
+        or capability.get("snapshotEtag")
+        or capability.get("snapshotETag"),
+        "snapshotHash": capability.get("snapshot_hash")
+        or capability.get("snapshotHash"),
+        "snapshot": capability.get("snapshot"),
+    }
+    return {key: value for key, value in values.items() if value is not None}
+
 def _fmt_dt(value) -> str | None:
 
     if value is None:
@@ -607,15 +632,7 @@ async def propose_cancel_order(
             "orderAmount": float(order["amount"]),
             "orderStatusBefore": status,
             "payScene": order.get("pay_scene"),
-            "capabilityDecision": {
-                "decision": capability.get("decision"),
-                "reasonCode": capability.get("reason_code")
-                or capability.get("reasonCode"),
-                "capabilityVersion": capability.get("capability_version")
-                or capability.get("capabilityVersion"),
-                "evaluatedAt": capability.get("evaluated_at")
-                or capability.get("evaluatedAt"),
-            },
+            "capabilityDecision": _capability_decision_payload(capability),
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -665,15 +682,7 @@ async def propose_confirm_receipt(
             "orderId": order_id,
             "orderAmount": float(order["amount"]),
             "payScene": order.get("pay_scene"),
-            "capabilityDecision": {
-                "decision": capability.get("decision"),
-                "reasonCode": capability.get("reason_code")
-                or capability.get("reasonCode"),
-                "capabilityVersion": capability.get("capability_version")
-                or capability.get("capabilityVersion"),
-                "evaluatedAt": capability.get("evaluated_at")
-                or capability.get("evaluatedAt"),
-            },
+            "capabilityDecision": _capability_decision_payload(capability),
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -842,13 +851,7 @@ async def propose_product_review(
             "commentContent": content,
             "star": star,
             "payScene": order.get("pay_scene"),
-            "capabilityDecision": {
-                "decision": capability.get("decision"),
-                "capabilityVersion": capability.get("capability_version")
-                or capability.get("capabilityVersion"),
-                "evaluatedAt": capability.get("evaluated_at")
-                or capability.get("evaluatedAt"),
-            },
+            "capabilityDecision": _capability_decision_payload(capability),
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(
@@ -897,13 +900,7 @@ async def propose_recomment(
             "orderId": order_id,
             "reCommentContent": content,
             "payScene": order.get("pay_scene"),
-            "capabilityDecision": {
-                "decision": capability.get("decision"),
-                "capabilityVersion": capability.get("capability_version")
-                or capability.get("capabilityVersion"),
-                "evaluatedAt": capability.get("evaluated_at")
-                or capability.get("evaluatedAt"),
-            },
+            "capabilityDecision": _capability_decision_payload(capability),
             "orderItems": await _order_items_params(order_id, order),
         }
         pending = await pending_action_service.create_pending(

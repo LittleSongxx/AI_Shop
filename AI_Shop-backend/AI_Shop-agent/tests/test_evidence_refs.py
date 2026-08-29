@@ -4,6 +4,7 @@ import pytest
 
 from app.services import mcp_tools_service
 from app.services.evidence_refs import (
+    action_capability_ref,
     negative_lookup_ref,
     order_refs,
     pending_action_ref,
@@ -165,6 +166,27 @@ def test_pending_action_ref_proves_persisted_proposal_without_exposing_credentia
     assert ref["effectExecuted"] is False
     assert pending["token"] not in str(ref)
     assert pending["userId"] not in str(ref)
+
+
+def test_action_capability_ref_preserves_snapshot_proof_without_raw_payload():
+    ref = action_capability_ref(
+        {
+            "decision": "ALLOWED",
+            "action": "CANCEL_ORDER",
+            "orderId": "O1",
+            "capabilityVersion": "order-action-capability/v1",
+            "evaluatedAt": "2026-08-29T00:00:00Z",
+            "snapshotVersion": "order-action-snapshot/v1",
+            "snapshotEtag": "sha256:" + "a" * 64,
+            "snapshotHash": "a" * 64,
+            "snapshot": {"orderStatus": 0, "private": "must not leak"},
+        }
+    )
+
+    assert ref is not None
+    assert ref["snapshotVersion"] == "order-action-snapshot/v1"
+    assert ref["snapshotEtag"].startswith("sha256:")
+    assert "private" not in str(ref)
 
 
 def test_confirmation_risk_tips_do_not_assert_unverified_irreversible_outcomes():

@@ -356,12 +356,27 @@ export const agentApi = {
   feedback: (messageId: number, rating: 1 | -1, reason?: string, detail?: string) =>
     request.postForm('/agent/feedback', { messageId, rating, reason, detail }),
   confirmAction: (actionToken: string) =>
-    request.postForm<{ actionType?: string; success?: boolean; resultMessage?: string }>(
+    request.postForm<{
+      actionType?: string;
+      success?: boolean;
+      resultMessage?: string;
+      status?: number | string;
+      statusName?: string;
+      reconcileAttempts?: number;
+      reconcileDeadline?: string;
+      reviewReason?: string;
+    }>(
       '/agent/confirmAction',
       { actionToken }
     ),
   cancelAction: (actionToken: string) =>
-    request.postForm<{ actionType?: string; success?: boolean; resultMessage?: string }>(
+    request.postForm<{
+      actionType?: string;
+      success?: boolean;
+      resultMessage?: string;
+      status?: number | string;
+      statusName?: string;
+    }>(
       '/agent/cancelAction',
       { actionToken }
     )

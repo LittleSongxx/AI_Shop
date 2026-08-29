@@ -1130,6 +1130,20 @@ def action_capability_ref(
         return None
     now = captured or evaluated_at
     item_id = _text(decision.get("order_item_id") or decision.get("orderItemId"), limit=120)
+    snapshot_version = _text(
+        decision.get("snapshot_version") or decision.get("snapshotVersion"),
+        limit=120,
+    )
+    snapshot_etag = _text(
+        decision.get("snapshot_etag")
+        or decision.get("snapshotEtag")
+        or decision.get("snapshotETag"),
+        limit=160,
+    )
+    snapshot_hash = _text(
+        decision.get("snapshot_hash") or decision.get("snapshotHash"),
+        limit=128,
+    )
     ref: dict[str, Any] = {
         "type": "action_capability",
         "id": _ref_id(
@@ -1162,6 +1176,18 @@ def action_capability_ref(
             }
         ],
     }
+    # Snapshot metadata is a non-secret proof boundary: the action token and
+    # raw order payload stay out of evidence refs, while a reviewer can still
+    # match the capability declaration to the confirmation ledger.
+    if snapshot_version:
+        ref["snapshotVersion"] = snapshot_version
+        ref["claims"][0]["snapshotVersion"] = snapshot_version
+    if snapshot_etag:
+        ref["snapshotEtag"] = snapshot_etag
+        ref["claims"][0]["snapshotEtag"] = snapshot_etag
+    if snapshot_hash:
+        ref["snapshotHash"] = snapshot_hash
+        ref["claims"][0]["snapshotHash"] = snapshot_hash
     return {key: value for key, value in ref.items() if value not in (None, "")}
 
 
@@ -1235,6 +1261,34 @@ def pending_action_ref(
         "capturedAt": now,
         "claims": [claim],
     }
+    try:
+        params = pending.get("paramsJson") or pending.get("params_json") or "{}"
+        params = json.loads(params) if isinstance(params, str) else params
+    except (TypeError, json.JSONDecodeError):
+        params = {}
+    snapshot = params.get("actionSnapshot") if isinstance(params, dict) else None
+    if isinstance(snapshot, Mapping):
+        snapshot_version = _text(
+            snapshot.get("version") or snapshot.get("snapshotVersion"), limit=120
+        )
+        snapshot_etag = _text(
+            snapshot.get("etag")
+            or snapshot.get("snapshotEtag")
+            or snapshot.get("snapshotETag"),
+            limit=160,
+        )
+        snapshot_hash = _text(
+            snapshot.get("hash") or snapshot.get("snapshotHash"), limit=128
+        )
+        if snapshot_version:
+            ref["snapshotVersion"] = snapshot_version
+            claim["snapshotVersion"] = snapshot_version
+        if snapshot_etag:
+            ref["snapshotEtag"] = snapshot_etag
+            claim["snapshotEtag"] = snapshot_etag
+        if snapshot_hash:
+            ref["snapshotHash"] = snapshot_hash
+            claim["snapshotHash"] = snapshot_hash
     return {key: value for key, value in ref.items() if value is not None}
 
 

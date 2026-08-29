@@ -798,25 +798,52 @@ async def confirm_action(
     async def executor(pending: dict) -> str:
         return await action_execute_service.execute(pending, token)
 
+    async def action_state() -> dict:
+        try:
+            pending = await pending_action_service.get_by_token(actionToken)
+        except Exception:
+            # The command result remains authoritative even if the follow-up
+            # read used only to enrich the UI response is unavailable.
+            return {}
+        if not pending:
+            return {}
+        return {
+            key: pending.get(key)
+            for key in (
+                "status",
+                "statusName",
+                "reconcileAttempts",
+                "reconcileDeadline",
+                "reviewReason",
+                "resultMessage",
+                "errorMessage",
+            )
+            if pending.get(key) is not None
+        }
+
     try:
         action_type, ok, msg = await pending_action_service.confirm(
             user.user_id, actionToken, executor
         )
+        state = await action_state()
         return success(
             {
                 "actionType": action_type,
                 "success": ok,
                 "resultMessage": msg,
+                **state,
             }
         )
     except PendingActionExpired as e:
         raise HTTPException(status_code=410, detail=str(e)) from e
     except ValueError as e:
+        state = await action_state()
         return success(
             {
                 "actionType": None,
                 "success": False,
                 "resultMessage": str(e),
+                **state,
             }
         )
 
@@ -841,14 +868,22 @@ async def cancel_action(
                 "actionType": pending.get("actionType"),
                 "success": True,
                 "resultMessage": "已取消操作",
+                "status": pending.get("status"),
+                "statusName": pending.get("statusName"),
             }
         )
     except ValueError as e:
+        try:
+            pending = await pending_action_service.get_by_token(actionToken) or {}
+        except Exception:
+            pending = {}
         return success(
             {
                 "actionType": None,
                 "success": False,
                 "resultMessage": str(e),
+                "status": pending.get("status"),
+                "statusName": pending.get("statusName"),
             }
         )
 

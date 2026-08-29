@@ -745,6 +745,19 @@ def build_action_confirm_payload(pending: dict, intro: str | None = None) -> tup
         "details": _build_details(action_type, params, pending.get("summary")),
         "status": pending.get("status", 0),
     }
+    action_snapshot = params.get("actionSnapshot")
+    if isinstance(action_snapshot, dict):
+        # A reviewer-visible proof boundary; never place the action token in
+        # this metadata and keep the raw snapshot values server-bounded.
+        for card_key, snapshot_key, limit in (
+            ("snapshotVersion", "version", 120),
+            ("snapshotEtag", "etag", 160),
+            ("snapshotHash", "hash", 128),
+            ("snapshotCapturedAt", "capturedAt", 64),
+        ):
+            value = action_snapshot.get(snapshot_key)
+            if value not in (None, ""):
+                card[card_key] = str(value)[:limit]
     if params.get("orderId"):
         card["orderId"] = params["orderId"]
     if params.get("payScene"):

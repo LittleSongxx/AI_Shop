@@ -91,6 +91,11 @@ export interface ActionConfirmCardData {
   riskTip?: string;
   intro?: string;
   status?: number | string;
+  statusName?: string;
+  snapshotVersion?: string;
+  snapshotEtag?: string;
+  snapshotHash?: string;
+  snapshotCapturedAt?: string;
   orderId?: string;
   orderAmount?: number | string;
   payScene?: string | number;
@@ -200,14 +205,41 @@ const patchCard = (status: number) => {
   emit('updated', { ...props.card, status });
 };
 
+const patchServerStatus = (data: {
+  status?: number | string;
+  statusName?: string;
+}) => {
+  const statusName = String(data?.statusName || '').trim().toUpperCase();
+  const knownNames = [
+    'PENDING',
+    'CONFIRMED',
+    'CANCELLED',
+    'EXECUTING',
+    'FAILED',
+    'EXPIRED',
+    'INCONCLUSIVE',
+    'MANUAL_REVIEW'
+  ];
+  if (data?.status != null || knownNames.includes(statusName)) {
+    patchCard(normalizeAgentActionStatus(data?.status ?? statusName));
+  }
+};
+
 const onConfirm = async () => {
   if (!props.card.token || loading.value) return;
   loading.value = true;
   try {
     const res = await agentApi.confirmAction(props.card.token);
-    const data = res as { success?: boolean; resultMessage?: string; actionType?: string };
+    const data = res as {
+      success?: boolean;
+      resultMessage?: string;
+      actionType?: string;
+      status?: number | string;
+      statusName?: string;
+    };
     resultSuccess.value = !!data?.success;
     resultMessage.value = data?.resultMessage || (data?.success ? '操作成功' : '操作失败');
+    patchServerStatus(data);
     if (data?.success) {
       patchCard(AGENT_ACTION_STATUS.CONFIRMED);
       toast.success(resultMessage.value);
@@ -226,10 +258,17 @@ const onCancel = async () => {
   loading.value = true;
   try {
     const res = await agentApi.cancelAction(props.card.token);
-    const data = res as { success?: boolean; resultMessage?: string; actionType?: string } | null;
+    const data = res as {
+      success?: boolean;
+      resultMessage?: string;
+      actionType?: string;
+      status?: number | string;
+      statusName?: string;
+    } | null;
     if (data?.success !== true) {
       resultSuccess.value = false;
       resultMessage.value = data?.resultMessage || '操作未取消，请稍后重试';
+      if (data) patchServerStatus(data);
       toast.error(resultMessage.value);
       return;
     }

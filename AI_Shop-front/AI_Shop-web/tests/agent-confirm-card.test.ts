@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/vue';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AgentConfirmCard from '@/components/agent/AgentConfirmCard.vue';
@@ -20,6 +20,7 @@ vi.mock('@/utils/toast', () => ({
 
 describe('agent confirmation card', () => {
   beforeEach(() => {
+    cleanup();
     vi.mocked(agentApi.confirmAction).mockReset();
     vi.mocked(agentApi.cancelAction).mockReset();
   });
@@ -98,5 +99,29 @@ describe('agent confirmation card', () => {
     });
     expect(view.getByText('待确认')).toBeInTheDocument();
     expect(view.getByRole('button', { name: '取消' })).toBeInTheDocument();
+  });
+
+  it('renders a server reconciliation state instead of leaving the card pending', async () => {
+    vi.mocked(agentApi.confirmAction).mockResolvedValue({
+      success: false,
+      statusName: 'MANUAL_REVIEW',
+      resultMessage: '自动核对已到边界，等待人工复核'
+    });
+    const view = render(AgentConfirmCard, {
+      props: {
+        card: {
+          token: 'act_manual_review',
+          label: '取消订单',
+          status: 0
+        }
+      }
+    });
+
+    await fireEvent.click(view.getByRole('button', { name: '确认提交' }));
+
+    await waitFor(() => {
+      expect(view.getAllByText('自动核对已到边界，等待人工复核').length).toBeGreaterThan(0);
+    });
+    expect(view.queryByRole('button', { name: '确认提交' })).not.toBeInTheDocument();
   });
 });

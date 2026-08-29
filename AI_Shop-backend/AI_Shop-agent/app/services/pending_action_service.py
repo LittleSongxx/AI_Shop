@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 import uuid
 
@@ -37,6 +38,70 @@ class PendingActionService:
         "RECOMMENT": "orderId",
         "CREATE_SUPPORT_CASE": "caseDedupeKey",
     }
+    _SNAPSHOT_ETAG = re.compile(r"^sha256:[0-9a-f]{64}$", re.IGNORECASE)
+
+    @classmethod
+    def _with_action_snapshot(cls, params: dict) -> dict:
+        """Persist a bounded Java capability proof next to action arguments.
+
+        The snapshot is evidence, never authorization: confirmation still
+        reaches Java's transactionally revalidated command.  Restricting the
+        accepted shape prevents model-supplied prose from becoming a trusted
+        capability declaration.
+        """
+
+        normalized = dict(params or {})
+        decision = normalized.get("capabilityDecision")
+        if not isinstance(decision, dict):
+            return normalized
+        version = str(
+            decision.get("snapshotVersion")
+            or decision.get("snapshot_version")
+            or ""
+        ).strip()
+        etag = str(
+            decision.get("snapshotEtag")
+            or decision.get("snapshot_etag")
+            or decision.get("snapshotETag")
+            or ""
+        ).strip()
+        if not version or not cls._SNAPSHOT_ETAG.fullmatch(etag):
+            return normalized
+        raw_snapshot = decision.get("snapshot")
+        snapshot = {}
+        if isinstance(raw_snapshot, dict):
+            # Keep only the fields emitted by the Java capability endpoint.
+            for output_key, input_keys in {
+                "schemaVersion": ("schemaVersion", "schema_version"),
+                "action": ("action",),
+                "orderId": ("orderId", "order_id"),
+                "orderItemId": ("orderItemId", "order_item_id"),
+                "orderStatus": ("orderStatus", "order_status"),
+                "commentStatus": ("commentStatus", "comment_status"),
+                "payOrderIdPresent": ("payOrderIdPresent", "pay_order_id_present"),
+                "orderItemStatus": ("orderItemStatus", "order_item_status"),
+            }.items():
+                for key in input_keys:
+                    if key in raw_snapshot:
+                        snapshot[output_key] = raw_snapshot[key]
+                        break
+        normalized["actionSnapshot"] = {
+            "version": version[:120],
+            "etag": etag[:160],
+            "hash": str(
+                decision.get("snapshotHash")
+                or decision.get("snapshot_hash")
+                or etag.removeprefix("sha256:")
+            )[:128],
+            "capturedAt": str(
+                decision.get("evaluatedAt")
+                or decision.get("evaluated_at")
+                or ""
+            )[:64],
+            "authority": "JAVA_ORDER_SERVICE",
+            "snapshot": snapshot,
+        }
+        return normalized
 
     async def create_pending(
         self,
@@ -48,6 +113,7 @@ class PendingActionService:
         run_id: str | None = None,
     ) -> dict:
         await redis_service.ensure_connected()
+        params = self._with_action_snapshot(params)
         canonical_params = json.dumps(
             params,
             ensure_ascii=False,
@@ -210,6 +276,20 @@ class PendingActionService:
             if not claimed:
                 raise ValueError("操作处理中，请勿重复点击")
 
+            snapshot_error = await self._validate_action_snapshot(user_id, pending)
+            if snapshot_error:
+                logger.info(
+                    "pending_action_snapshot_changed",
+                    token=token,
+                    action_type=pending.get("actionType"),
+                    reason=snapshot_error,
+                )
+                return await self._complete(
+                    pending,
+                    pending_action_store.FAILED,
+                    error_message=snapshot_error,
+                )
+
             self._record_action_signal(
                 pending,
                 {
@@ -279,6 +359,62 @@ class PendingActionService:
             )
         finally:
             await redis_service.unlock_pending_action(token, owner)
+
+    async def _validate_action_snapshot(
+        self, user_id: str, pending: dict
+    ) -> str | None:
+        """Compare the proposal proof immediately before a remote write.
+
+        Java still performs the authoritative transactional check.  This
+        short read-only preflight closes the common stale-card case without
+        issuing a write, while legacy proposals without a snapshot remain
+        executable under the existing Java checks.
+        """
+
+        try:
+            params = json.loads(pending.get("paramsJson") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(params, dict):
+            return None
+        snapshot = params.get("actionSnapshot")
+        if not isinstance(snapshot, dict) or snapshot.get("authority") != "JAVA_ORDER_SERVICE":
+            return None
+        expected_version = str(snapshot.get("version") or "").strip()
+        expected_etag = str(snapshot.get("etag") or "").strip()
+        action = str(pending.get("actionType") or "").strip().upper()
+        order_id = str(params.get("orderId") or "").strip()
+        if not action or not order_id or not expected_version or not expected_etag:
+            return "确认快照不完整，请重新发起操作"
+        order_item_id = str(params.get("orderItemId") or "").strip() or None
+        try:
+            with delegated_user_scope(user_id):
+                current = await java_internal_client.get_order_action_capability(
+                    action,
+                    order_id,
+                    order_item_id=order_item_id,
+                )
+        except Exception as exc:
+            return f"确认快照暂时无法核验（{type(exc).__name__}），请重新发起操作"
+        current_version = str(
+            current.get("snapshot_version")
+            or current.get("snapshotVersion")
+            or ""
+        ).strip()
+        current_etag = str(
+            current.get("snapshot_etag")
+            or current.get("snapshotEtag")
+            or current.get("snapshotETag")
+            or ""
+        ).strip()
+        decision = str(current.get("decision") or "").strip().upper()
+        if (
+            expected_version != current_version
+            or expected_etag.lower() != current_etag.lower()
+            or decision != "ALLOWED"
+        ):
+            return "订单状态或操作资格已变化，请重新核验后发起操作"
+        return None
 
     async def _reconcile_rejected(
         self, pending: dict, error: RemoteActionRejected
