@@ -4,7 +4,7 @@
 >
 > 当前证据状态：manifest 中的 v9 仍是不可变 `PUBLISHED_FINAL` 历史包；客服当前已见开发集主证据为 v56 人工审批+仲裁包，两者均不是 unseen/release 证据
 >
-> 最后核验时间：2026-08-27（Asia/Shanghai）
+> 最后核验时间：2026-08-29（Asia/Shanghai）
 >
 > 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
 
