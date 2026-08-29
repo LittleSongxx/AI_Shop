@@ -241,3 +241,4 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 在显式配置同源 origin 的本地全栈上完成 mobile Chromium `1/1`：真实推荐商品卡 → `reportClick`（`productId/requestId` 一致）→ 商品详情 → checkout 归因字段 → 加购记录（`aiRequestId/aiPosition/aiSource`）→ 清理购物车。
 - trace 原件含会话 cookie，移到工作区外受限 quarantine，SHA-256 为 `ffe489507890375048aaddb515c7d8b370ac2d6b6d32487d3f0b2cede4179483`；不入 Git。支付段默认关闭，不能据此声称下单、支付或 GMV。
 - 该用例本次走确定性 `SEARCH_PRODUCTS` 路径，不能替代 LLM 生成质量评测；客服真实 Provider 结果见 [客服 E57](AI-Shop-客服E57真实运行证据刷新-20260829.md)。
+- 同日公开 regression `regression-e57-evidence-refresh-20260829` 通过 `20 Search/26 RAG/5 Agent` 全部硬门；Search recall@10 `0.958333`、nDCG@10 `0.993110`，RAG citation/grounded `1.0`，但这些仍是可见 regression 诊断，不能替代缺失的 v9 private holdout。
