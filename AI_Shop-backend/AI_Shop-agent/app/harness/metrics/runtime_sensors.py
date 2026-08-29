@@ -62,6 +62,35 @@ STREAM_TOKENS = Counter(
     "agent_stream_tokens_total",
     "deprecated：历史实现实际计数为字符数，仅保留兼容，新代码请用 agent_stream_chars_total",
 )
+STREAM_PUBLISH_TOTAL = Counter(
+    "agent_stream_publish_total",
+    "WebSocket stream frames handed to Redis Pub/Sub",
+    ["result"],
+)
+WS_DELIVERY_TOTAL = Counter(
+    "agent_ws_delivery_total",
+    "WebSocket fan-out outcomes",
+    ["surface", "result"],
+)
+WS_DELIVERY_LATENCY = Histogram(
+    "agent_ws_delivery_latency_seconds",
+    "Bounded WebSocket fan-out latency",
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+)
+WS_LISTENER_UP = Gauge(
+    "agent_ws_listener_up",
+    "Whether the Redis WebSocket topic listener is subscribed",
+)
+WS_LISTENER_FAILURE_TOTAL = Counter(
+    "agent_ws_listener_failure_total",
+    "Redis WebSocket topic listener failures",
+    ["reason"],
+)
+WS_CORRELATION_TOTAL = Counter(
+    "agent_ws_correlation_total",
+    "WebSocket agent frames with complete or missing correlation IDs",
+    ["surface", "result"],
+)
 
 AGENT_TASK_TOTAL = Counter(
     "agent_task_total",
@@ -76,6 +105,21 @@ AGENT_TASK_INFLIGHT = Gauge(
 AGENT_TASK_BACKLOG = Gauge(
     "agent_task_backlog",
     "Agent 数据库任务积压量",
+)
+AGENT_BACKPRESSURE_TOTAL = Counter(
+    "agent_backpressure_total",
+    "Requests rejected or degraded by a bounded Agent queue",
+    ["queue", "reason"],
+)
+AGENT_QUEUE_AGE = Histogram(
+    "agent_queue_age_seconds",
+    "Age of an Agent task when a worker starts consuming it",
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+)
+AGENT_CANCEL_LATENCY = Histogram(
+    "agent_cancel_latency_seconds",
+    "End-to-end cancellation request latency",
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
 )
 
 # P0-2c：checkpoint 写失败次数。写失败意味着"这次运行无法恢复"——

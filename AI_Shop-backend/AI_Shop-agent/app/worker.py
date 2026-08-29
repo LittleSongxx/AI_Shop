@@ -19,6 +19,7 @@ from app.domain.intent.classifier import record_intent_metrics, resolve_intent
 from app.domain.intent.types import IntentDecision
 from app.graph.runner import run_agent_graph
 from app.harness.metrics.runtime_sensors import (
+    AGENT_QUEUE_AGE,
     AGENT_TASK_INFLIGHT,
     AGENT_TASK_TOTAL,
     measure_agent_stage,
@@ -576,7 +577,9 @@ class AgentWorker:
             and enqueued_at_ms > 0
         ):
             enqueued_at_seconds = float(enqueued_at_ms) / 1000
-            observe_agent_stage("queue_wait", time.time() - enqueued_at_seconds)
+            queue_age = max(0.0, time.time() - enqueued_at_seconds)
+            AGENT_QUEUE_AGE.observe(queue_age)
+            observe_agent_stage("queue_wait", queue_age)
 
         AGENT_TASK_INFLIGHT.labels(queue=queue_name).inc()
         AGENT_TASK_TOTAL.labels(queue=queue_name, result="started").inc()

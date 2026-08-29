@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
@@ -8,11 +9,43 @@ from app.auth.security import Principal, websocket_origin_allowed
 from app.auth.token_service import get_admin_by_token, get_user_by_token
 from app.config.settings import get_settings
 from app.constants import WS_MESSAGE_TOPIC_ADMIN, WS_MESSAGE_TOPIC_AGENT
+from app.harness.metrics.runtime_sensors import (
+    WS_CORRELATION_TOTAL,
+    WS_DELIVERY_LATENCY,
+    WS_DELIVERY_TOTAL,
+    WS_LISTENER_FAILURE_TOTAL,
+    WS_LISTENER_UP,
+)
 from app.services.rate_limit_service import rate_limit_service
 from app.services.redis_service import redis_service
 from app.utils.ws_token import resolve_ws_credentials
 
 logger = structlog.get_logger()
+
+
+async def _send_bounded(ws: WebSocket, data: dict, *, surface: str) -> bool:
+    """Send one frame without allowing a slow socket to stall fan-out."""
+    timeout = max(0.1, min(10.0, float(getattr(get_settings(), "ws_send_timeout_seconds", 2.0))))
+    started = time.perf_counter()
+    try:
+        await asyncio.wait_for(ws.send_json(data), timeout=timeout)
+    except asyncio.TimeoutError:
+        WS_DELIVERY_TOTAL.labels(surface=surface, result="timeout").inc()
+        return False
+    except Exception:
+        WS_DELIVERY_TOTAL.labels(surface=surface, result="error").inc()
+        return False
+    WS_DELIVERY_LATENCY.observe(max(0.0, time.perf_counter() - started))
+    WS_DELIVERY_TOTAL.labels(surface=surface, result="delivered").inc()
+    return True
+
+
+def _record_correlation(surface: str, data: dict) -> None:
+    required = ("runId", "requestId", "episodeId")
+    complete = all(str(data.get(key) or "").strip() for key in required)
+    WS_CORRELATION_TOTAL.labels(
+        surface=surface, result="complete" if complete else "missing"
+    ).inc()
 
 class ConnectionManager:
 
@@ -39,16 +72,17 @@ class ConnectionManager:
                 self._connections.pop(user_id, None)
 
     async def send_json(self, user_id: str, data: dict) -> None:
-
-        conns = self._connections.get(user_id, set())
-        dead = []
-        for ws in conns:
-            try:
-                await ws.send_json(data)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(user_id, ws)
+        conns = tuple(self._connections.get(user_id, set()))
+        if not conns:
+            WS_DELIVERY_TOTAL.labels(surface="agent", result="no_connection").inc()
+            return
+        _record_correlation("agent", data)
+        results = await asyncio.gather(
+            *(_send_bounded(ws, data, surface="agent") for ws in conns)
+        )
+        for ws, delivered in zip(conns, results):
+            if not delivered:
+                self.disconnect(user_id, ws)
 
 manager = ConnectionManager()
 
@@ -68,29 +102,37 @@ class AdminConnectionManager:
         self._connections.discard(ws)
 
     async def broadcast(self, data: dict) -> None:
-        dead: list[WebSocket] = []
-        for ws in self._connections:
-            try:
-                await ws.send_json(data)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(ws)
+        conns = tuple(self._connections)
+        if not conns:
+            WS_DELIVERY_TOTAL.labels(surface="admin", result="no_connection").inc()
+            return
+        _record_correlation("admin", data)
+        results = await asyncio.gather(
+            *(_send_bounded(ws, data, surface="admin") for ws in conns)
+        )
+        for ws, delivered in zip(conns, results):
+            if not delivered:
+                self.disconnect(ws)
 
 
 admin_manager = AdminConnectionManager()
 
 _listener_task: asyncio.Task | None = None
+_listener_last_error: str | None = None
+_listener_subscribed = False
 
 async def _topic_listener(redis_client) -> None:
-
+    global _listener_last_error, _listener_subscribed
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe(WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN)
-    logger.info(
-        "ws_topic_subscribed",
-        topics=[WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN],
-    )
     try:
+        await pubsub.subscribe(WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN)
+        _listener_subscribed = True
+        WS_LISTENER_UP.set(1)
+        _listener_last_error = None
+        logger.info(
+            "ws_topic_subscribed",
+            topics=[WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN],
+        )
         async for message in pubsub.listen():
             if message["type"] != "message":
                 continue
@@ -105,13 +147,28 @@ async def _topic_listener(redis_client) -> None:
                 if user_id:
                     await manager.send_json(user_id, data)
     except asyncio.CancelledError:
-
-        await pubsub.unsubscribe(WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN)
         raise
+    except Exception as exc:
+        _listener_last_error = type(exc).__name__
+        WS_LISTENER_FAILURE_TOTAL.labels(reason=type(exc).__name__).inc()
+        logger.warning("ws_topic_listener_failed", error=type(exc).__name__)
+    finally:
+        _listener_subscribed = False
+        WS_LISTENER_UP.set(0)
+        try:
+            await pubsub.unsubscribe(WS_MESSAGE_TOPIC_AGENT, WS_MESSAGE_TOPIC_ADMIN)
+        except Exception:
+            pass
+        close = getattr(pubsub, "aclose", None)
+        if close is not None:
+            try:
+                await close()
+            except Exception:
+                pass
 
 async def stop_ws_listener() -> None:
 
-    global _listener_task
+    global _listener_task, _listener_subscribed
     if _listener_task and not _listener_task.done():
         _listener_task.cancel()
         try:
@@ -119,12 +176,23 @@ async def stop_ws_listener() -> None:
         except asyncio.CancelledError:
             pass
     _listener_task = None
+    _listener_subscribed = False
+    WS_LISTENER_UP.set(0)
 
 async def start_ws_listener(redis_client) -> None:
 
     global _listener_task
     await stop_ws_listener()
     _listener_task = asyncio.create_task(_topic_listener(redis_client))
+
+
+def ws_listener_status() -> dict[str, object]:
+    task = _listener_task
+    return {
+        "up": bool(task is not None and not task.done() and _listener_subscribed),
+        "taskState": "missing" if task is None else "done" if task.done() else "running",
+        "lastError": _listener_last_error,
+    }
 
 async def _handle_heartbeat(user_id: str, ws: WebSocket, data: str) -> bool:
 

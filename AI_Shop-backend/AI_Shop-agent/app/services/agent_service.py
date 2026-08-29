@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import structlog
 
 from app.config.settings import get_settings
@@ -14,7 +16,12 @@ from app.domain.intent.classifier import resolve_intent
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction, RequestMode
 from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
 from app.harness.guardrails.input_guard import InputGuardrail
-from app.harness.metrics.runtime_sensors import RESPONSE_VERIFIER_TOTAL, measure_agent_stage
+from app.harness.metrics.runtime_sensors import (
+    AGENT_BACKPRESSURE_TOTAL,
+    AGENT_CANCEL_LATENCY,
+    RESPONSE_VERIFIER_TOTAL,
+    measure_agent_stage,
+)
 from app.memory.session_memory_service import session_memory_service
 from app.observability.telemetry import current_trace_id, current_traceparent
 from app.rag.retriever import rag_retriever
@@ -86,6 +93,10 @@ _FORCED_CASE_INTENTS = frozenset(
         IntentKind.REFUND_STATUS.value,
     }
 )
+
+
+def _record_backpressure(queue_name: str, reason: str = "pending_limit") -> None:
+    AGENT_BACKPRESSURE_TOTAL.labels(queue=queue_name, reason=reason).inc()
 
 
 def _cancel_terminal_state(
@@ -625,6 +636,7 @@ class AgentOrchestrator:
             queue_name == AGENT_QUEUE_LOW
             and await agent_task_service.count_pending() >= settings.task_queue_max
         ):
+            _record_backpressure(queue_name)
             await agent_message_service.complete_message(
                 agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload", None
             )
@@ -799,6 +811,7 @@ class AgentOrchestrator:
             queue_name == AGENT_QUEUE_LOW
             and await agent_task_service.count_pending() >= settings.task_queue_max
         ):
+            _record_backpressure(queue_name)
             raise ValueError(AGENT_BUSY_MESSAGE)
 
         run_id = new_run_id()
@@ -935,6 +948,7 @@ class AgentOrchestrator:
             queue_name == AGENT_QUEUE_LOW
             and await agent_task_service.count_pending() >= settings.task_queue_max
         ):
+            _record_backpressure(queue_name)
             raise ValueError(AGENT_BUSY_MESSAGE)
 
         run_id = new_run_id()
@@ -1323,6 +1337,20 @@ class AgentOrchestrator:
         return support_service.public_session(session) if session else None
 
     async def cancel_message(
+        self,
+        user_id: str,
+        message_id: int,
+        partial_assistant_message: str | None = None,
+    ) -> dict:
+        started = time.perf_counter()
+        try:
+            return await self._cancel_message(
+                user_id, message_id, partial_assistant_message
+            )
+        finally:
+            AGENT_CANCEL_LATENCY.observe(max(0.0, time.perf_counter() - started))
+
+    async def _cancel_message(
         self,
         user_id: str,
         message_id: int,

@@ -4,6 +4,7 @@ import asyncio
 
 import structlog
 
+from app.api.websocket import ws_listener_status
 from app.config.settings import get_settings
 from app.db.pool import acquire
 from app.domain.tool_policy import build_tool_manifest
@@ -26,6 +27,7 @@ class HealthService:
         return {
             "otel": telemetry_status(),
             "episode": episode_service.status(),
+            "websocket": ws_listener_status(),
         }
 
     async def _check_mysql(self) -> bool:

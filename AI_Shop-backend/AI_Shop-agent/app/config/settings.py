@@ -162,6 +162,14 @@ class Settings(BaseSettings):
             "WS_RATE_LIMIT_MAX_MESSAGES", "ws_rate_limit_max_messages"
         ),
     )
+    # Outbound fan-out is bounded per socket so one stalled browser cannot
+    # block every other subscriber or the Redis listener task.
+    ws_send_timeout_seconds: float = Field(
+        default=2.0,
+        validation_alias=AliasChoices(
+            "WS_SEND_TIMEOUT_SECONDS", "ws_send_timeout_seconds"
+        ),
+    )
     # Stable HMAC identity used only to match an explicitly consented pilot
     # participant to an Agent run. It must not be rotated with the request
     # assertion key or raw user IDs would become impossible to match.
@@ -701,6 +709,8 @@ class Settings(BaseSettings):
             raise ValueError("WS_RATE_LIMIT_WINDOW_SECONDS must be between 1 and 3600")
         if not 1 <= self.ws_rate_limit_max_messages <= 10_000:
             raise ValueError("WS_RATE_LIMIT_MAX_MESSAGES must be between 1 and 10000")
+        if not 0.1 <= self.ws_send_timeout_seconds <= 10:
+            raise ValueError("WS_SEND_TIMEOUT_SECONDS must be between 0.1 and 10")
         for origin in self.websocket_allowed_origins:
             parsed_origin = urlparse(str(origin).strip())
             if (

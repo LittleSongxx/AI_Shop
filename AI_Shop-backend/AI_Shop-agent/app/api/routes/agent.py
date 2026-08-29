@@ -403,6 +403,10 @@ async def send_message(
         with tracer.start_as_current_span("agent.send_message") as span:
             span.set_attribute("agent.user_id", user.user_id)
             span.set_attribute("agent.from_product", _form_bool(fromProduct))
+            if x_request_id:
+                span.set_attribute("agent.request_id", str(x_request_id)[:128])
+            if reservation is not None:
+                span.set_attribute("agent.run_id", reservation.run_id)
             orchestration_data = await agent_orchestrator.send_message(
                 user.user_id,
                 message,
@@ -415,6 +419,11 @@ async def send_message(
                 evaluation_trial_id=x_evaluation_trial_id,
                 evaluation_fault=evaluation_fault,
             )
+            if isinstance(orchestration_data, dict):
+                for key in ("episodeId", "episode_id"):
+                    if orchestration_data.get(key):
+                        span.set_attribute("agent.episode_id", str(orchestration_data[key]))
+                        break
         response = _canonical_response(success(orchestration_data))
         if reservation is not None:
             await agent_request_idempotency_service.complete(

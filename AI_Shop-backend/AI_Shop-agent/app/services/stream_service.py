@@ -8,6 +8,7 @@ from app.constants import (
     OUTPUTTING,
     WS_MESSAGE_TYPE_AGENT,
 )
+from app.harness.metrics.runtime_sensors import STREAM_PUBLISH_TOTAL
 from app.models.message_send import MessageSendDTO
 from app.services.episode_service import current_episode
 from app.services.redis_service import redis_service
@@ -118,7 +119,12 @@ class StreamService:
             replay_cursor=replay_cursor,
             seq=seq,
         )
-        await redis_service.publish_ws(dto.to_ws_dict())
+        try:
+            await redis_service.publish_ws(dto.to_ws_dict())
+        except Exception:
+            STREAM_PUBLISH_TOTAL.labels(result="error").inc()
+            raise
+        STREAM_PUBLISH_TOTAL.labels(result="published").inc()
 
     async def push_chunk(
         self,
