@@ -15,7 +15,13 @@ import pytest
 from langchain_core.messages import AIMessage
 from prometheus_client import REGISTRY
 
-from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.observability.llm_metrics import (
+    LLMCircuitOpenError,
+    invoke_llm_with_metrics,
+    reset_run_cost,
+    snapshot_cost_summary,
+)
+from app.resilience.circuit_breaker import CircuitBreaker, CircuitState
 from app.services.agent_runtime import record_llm_usage, stream_llm_turn
 
 
@@ -236,6 +242,45 @@ async def test_failed_invocation_counts_one_error_and_no_success():
     after = _snapshot([error_call, success_call])
     assert _delta(before, after, *error_call) == 1
     assert _delta(before, after, *success_call) == 0
+
+
+@pytest.mark.asyncio
+async def test_llm_circuit_rejects_after_provider_failure_without_zero_cost_claim(
+    monkeypatch,
+):
+    breaker = CircuitBreaker("llm-test", failure_threshold=1, recovery_timeout=60)
+    monkeypatch.setattr(
+        "app.observability.llm_metrics.circuit_registry.get_or_create",
+        lambda _name, **_kwargs: breaker,
+    )
+    monkeypatch.setattr(
+        "app.observability.llm_metrics.get_settings",
+        lambda: SimpleNamespace(
+            agent_llm_call_deadline_seconds=1,
+            circuit_llm_failure_threshold=1,
+            circuit_llm_recovery_timeout=60,
+            llm_pricing_cny_per_million_json={},
+        ),
+    )
+    llm = SimpleNamespace(
+        model_name="matrix-model",
+        openai_api_base="https://provider.example/v1",
+        ainvoke=AsyncMock(side_effect=RuntimeError("provider 5xx")),
+    )
+    reset_run_cost()
+
+    with pytest.raises(RuntimeError, match="provider 5xx"):
+        await invoke_llm_with_metrics(llm, [])
+    assert breaker.state is CircuitState.OPEN
+
+    with pytest.raises(LLMCircuitOpenError) as rejected:
+        await invoke_llm_with_metrics(llm, [])
+    assert rejected.value.code == "LLM_CIRCUIT_OPEN"
+    assert llm.ainvoke.await_count == 1
+    summary = snapshot_cost_summary()
+    assert summary["missingReasons"]["circuit_open"] == 1
+    assert summary["costStatus"] == "MISSING_USAGE"
+    assert summary["costCny"] is None
 
 
 @pytest.mark.asyncio

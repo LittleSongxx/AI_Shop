@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import re
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from app.config.settings import get_settings
 from app.harness.metrics.runtime_sensors import (
     LLM_CALL_TOTAL,
+    LLM_CIRCUIT_REJECT_TOTAL,
     LLM_COST_CNY,
     LLM_LATENCY,
     LLM_TOKEN_TOTAL,
@@ -15,9 +18,66 @@ from app.harness.metrics.runtime_sensors import (
     observe_agent_stage,
 )
 from app.observability.telemetry import get_tracer
+from app.resilience.circuit_breaker import CircuitBreaker, circuit_registry
 from app.services.episode_service import episode_service
 
 tracer = get_tracer()
+
+
+class LLMCircuitOpenError(RuntimeError):
+    """The configured provider/model is temporarily protected by a circuit."""
+
+    code = "LLM_CIRCUIT_OPEN"
+
+    def __init__(self, model: str, *, fallback: bool, breaker_name: str) -> None:
+        self.model = str(model or "unknown")
+        self.fallback = bool(fallback)
+        self.breaker_name = breaker_name
+        super().__init__(f"LLM circuit open for {self.model}")
+
+
+def llm_circuit_name(llm: Any, model: str, *, fallback: bool = False) -> str:
+    """Return a bounded, credential-free breaker key for one provider route."""
+
+    endpoint = str(getattr(llm, "openai_api_base", "") or "")
+    host = (urlparse(endpoint).hostname or "default").lower()
+    safe_model = re.sub(r"[^A-Za-z0-9_.-]", "_", str(model or "unknown"))[:80]
+    return f"llm_{'fallback' if fallback else 'primary'}_{host}_{safe_model or 'unknown'}"
+
+
+def llm_circuit_breaker(
+    llm: Any,
+    model: str,
+    *,
+    fallback: bool = False,
+) -> CircuitBreaker:
+    """Get the shared breaker using the live settings without exposing secrets."""
+
+    settings = get_settings()
+    return circuit_registry.get_or_create(
+        llm_circuit_name(llm, model, fallback=fallback),
+        failure_threshold=max(1, int(getattr(settings, "circuit_llm_failure_threshold", 5))),
+        recovery_timeout=max(0, int(getattr(settings, "circuit_llm_recovery_timeout", 60))),
+    )
+
+
+def llm_failure_reason(error: BaseException | None) -> str:
+    if isinstance(error, LLMCircuitOpenError):
+        return "circuit_open"
+    if isinstance(error, TimeoutError):
+        return "call_deadline_exceeded_before_usage"
+    return "provider_error_before_usage"
+
+
+def mark_llm_metrics_recorded(error: BaseException) -> None:
+    """Let legacy stream callers avoid counting a centrally recorded failure twice."""
+
+    try:
+        setattr(error, "_aishop_llm_metrics_recorded", True)
+    except Exception:
+        # Built-in exceptions normally have a dict; a custom immutable exception
+        # is still safe because the marker is only a duplicate-count guard.
+        return
 
 # per-request 成本累计（E 工作线）：contextvar 随 worker task 隔离。
 # reset_run_cost() 在每条消息处理开头调用（意图识别之前——它也是对话路径
@@ -307,13 +367,35 @@ async def invoke_llm_with_metrics(
     started = time.perf_counter()
     usage: dict[str, Any] = {}
     error: Exception | None = None
+    breaker = llm_circuit_breaker(llm, resolved_model, fallback=fallback)
+    failure_recorded = False
     with tracer.start_as_current_span("agent.llm.invoke") as span:
         span.set_attribute("gen_ai.request.model", resolved_model)
         span.set_attribute("agent.llm.fallback", bool(fallback))
         try:
+            if not breaker.allow_request():
+                error = LLMCircuitOpenError(
+                    resolved_model,
+                    fallback=fallback,
+                    breaker_name=breaker.name,
+                )
+                LLM_CIRCUIT_REJECT_TOTAL.labels(
+                    model=resolved_model,
+                    fallback="true" if fallback else "false",
+                ).inc()
+                record_llm_failure(
+                    resolved_model,
+                    fallback=fallback,
+                    missing_reason="circuit_open",
+                )
+                failure_recorded = True
+                raise error
             async with asyncio.timeout(effective_timeout):
                 response = await llm.ainvoke(messages)
         except asyncio.CancelledError:
+            # A user cancellation is not evidence of a provider outage. Release
+            # a possible half-open probe without tripping the breaker.
+            breaker.release_probe()
             record_llm_failure(
                 resolved_model,
                 fallback=fallback,
@@ -340,18 +422,18 @@ async def invoke_llm_with_metrics(
             raise
         except Exception as exc:
             error = exc
-            record_llm_failure(
-                resolved_model,
-                fallback=fallback,
-                missing_reason=(
-                    "call_deadline_exceeded_before_usage"
-                    if isinstance(exc, TimeoutError)
-                    else "provider_error_before_usage"
-                ),
-            )
+            if not failure_recorded:
+                breaker.record_failure()
+                record_llm_failure(
+                    resolved_model,
+                    fallback=fallback,
+                    missing_reason=llm_failure_reason(exc),
+                )
+                failure_recorded = True
             span.record_exception(exc)
             raise
         else:
+            breaker.record_success()
             usage = record_llm_usage(
                 response, fallback=fallback, model=resolved_model
             )
@@ -373,11 +455,7 @@ async def invoke_llm_with_metrics(
                     output_data={
                         "usageStatus": "MISSING_USAGE",
                         "usageSource": "none",
-                        "missingReason": (
-                            "call_deadline_exceeded_before_usage"
-                            if isinstance(error, TimeoutError)
-                            else "provider_error_before_usage"
-                        ),
+                        "missingReason": llm_failure_reason(error),
                     },
                     model_name=resolved_model,
                     error_code=type(error).__name__,

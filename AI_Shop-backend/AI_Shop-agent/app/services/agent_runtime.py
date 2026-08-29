@@ -18,6 +18,7 @@ from app.harness.guardrails.product_text_guard import (
     text_promises_product_cards,
 )
 from app.harness.metrics.runtime_sensors import (
+    LLM_CIRCUIT_REJECT_TOTAL,
     LLM_LATENCY,
     RESPONSE_VERIFIER_TOTAL,
     STREAM_CHARS,
@@ -27,6 +28,10 @@ from app.harness.metrics.runtime_sensors import (
 from app.harness.observation import build_tool_result_observation
 from app.mcp.tools import build_mcp_tools
 from app.observability.llm_metrics import (
+    LLMCircuitOpenError,
+    llm_circuit_breaker,
+    llm_failure_reason,
+    mark_llm_metrics_recorded,
     record_llm_failure,
     record_llm_usage,
     resolve_llm_model,
@@ -213,15 +218,37 @@ async def stream_llm_turn(
     usage: dict = {}
     episode_status = "OK"
     episode_error: Exception | None = None
+    failure_recorded = False
+    breaker = llm_circuit_breaker(llm, resolved_model, fallback=fallback)
     span = tracer.start_span("agent.llm.stream")
     context_token = otel_context.attach(trace.set_span_in_context(span))
     span.set_attribute("gen_ai.request.model", resolved_model)
     span.set_attribute("agent.llm.fallback", bool(fallback))
     try:
+        if not breaker.allow_request():
+            episode_status = "ERROR"
+            episode_error = LLMCircuitOpenError(
+                resolved_model,
+                fallback=fallback,
+                breaker_name=breaker.name,
+            )
+            record_llm_failure(
+                resolved_model,
+                fallback=fallback,
+                missing_reason="circuit_open",
+            )
+            LLM_CIRCUIT_REJECT_TOTAL.labels(
+                model=resolved_model,
+                fallback="true" if fallback else "false",
+            ).inc()
+            failure_recorded = True
+            mark_llm_metrics_recorded(episode_error)
+            raise episode_error
         async with asyncio.timeout(effective_timeout):
             async for chunk in llm.astream(messages):
                 if await is_cancelled(user_id, message_id):
                     episode_status = "CANCELLED"
+                    breaker.release_probe()
                     record_llm_failure(
                         resolved_model,
                         fallback=fallback,
@@ -249,6 +276,7 @@ async def stream_llm_turn(
                 )
         if await is_cancelled(user_id, message_id):
             episode_status = "CANCELLED"
+            breaker.release_probe()
             record_llm_failure(
                 resolved_model,
                 fallback=fallback,
@@ -257,17 +285,30 @@ async def stream_llm_turn(
             return None
         if gathered is None:
             raise RuntimeError("LLM stream ended without a response")
+        breaker.record_success()
         usage = record_llm_usage(
             gathered, fallback=fallback, model=resolved_model
         )
         return gathered
     except asyncio.CancelledError:
         episode_status = "CANCELLED"
-        record_llm_failure(resolved_model, fallback=fallback)
+        breaker.release_probe()
+        if not failure_recorded:
+            record_llm_failure(resolved_model, fallback=fallback)
+            failure_recorded = True
         raise
     except Exception as exc:
         episode_status = "ERROR"
         episode_error = exc
+        if not failure_recorded:
+            breaker.record_failure()
+            record_llm_failure(
+                resolved_model,
+                fallback=fallback,
+                missing_reason=llm_failure_reason(exc),
+            )
+            failure_recorded = True
+            mark_llm_metrics_recorded(exc)
         span.record_exception(exc)
         raise
     finally:
@@ -288,9 +329,7 @@ async def stream_llm_turn(
                 "missingReason": (
                     "cancelled_before_usage"
                     if episode_status == "CANCELLED"
-                    else "call_deadline_exceeded_before_usage"
-                    if isinstance(episode_error, TimeoutError)
-                    else "provider_error_before_usage"
+                    else llm_failure_reason(episode_error)
                     if episode_status == "ERROR"
                     else "provider_omitted_usage"
                 ),

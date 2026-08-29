@@ -61,6 +61,8 @@ async def test_model_provider_health_is_diagnostic_only(monkeypatch):
     assert dependencies["visualSearch"] == {"state": "DISABLED"}
     assert dependencies["javaGateway"] is True
     assert dependencies["mcp"] is True
+    assert dependencies["toolManifest"]["health"] == "READY"
+    assert dependencies["toolManifest"]["timeoutSeconds"] == 20.0
 
 
 @pytest.mark.asyncio

@@ -70,6 +70,33 @@ async def test_mcp_runtime_identity_requires_an_object_contract(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_mcp_tool_manifest_reconciles_live_registry(monkeypatch):
+    client = McpStreamableClient()
+    monkeypatch.setattr(
+        client,
+        "list_tools",
+        AsyncMock(
+            return_value=[
+                {"name": "SEARCH_PRODUCTS", "description": "read"},
+                {"name": "MCP_CONTRACT", "description": "system"},
+                {"name": "DROP_TABLE_ORDERS", "description": "unknown"},
+            ]
+        ),
+    )
+
+    manifest = await client.tool_manifest()
+
+    assert manifest["health"] == "DEGRADED"
+    assert "PROPOSE_REFUND" in manifest["missingTools"]
+    assert manifest["unexpectedTools"] == ["DROP_TABLE_ORDERS"]
+    assert all(
+        {"version", "owner", "health", "entitlement", "timeoutSeconds"}
+        <= set(tool)
+        for tool in manifest["tools"]
+    )
+
+
+@pytest.mark.asyncio
 async def test_mcp_rebinds_the_verified_user_for_java_calls(monkeypatch):
     monkeypatch.setenv("AISHOP_INTERNAL_TOKEN", "secret")
     from app.config.settings import get_settings

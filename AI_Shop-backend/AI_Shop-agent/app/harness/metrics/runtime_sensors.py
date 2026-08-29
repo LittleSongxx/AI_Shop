@@ -102,6 +102,11 @@ LLM_CALL_TOTAL = Counter(
     "LLM 调用次数（按成功/失败与 fallback 标记）",
     ["model", "fallback", "result"],
 )
+LLM_CIRCUIT_REJECT_TOTAL = Counter(
+    "agent_llm_circuit_rejection_total",
+    "LLM 因熔断器打开而拒绝的调用次数",
+    ["model", "fallback"],
+)
 
 AGENT_STAGE_NAMES = frozenset(
     {"queue_wait", "intent", "rag", "first_token", "tool", "generation", "total"}

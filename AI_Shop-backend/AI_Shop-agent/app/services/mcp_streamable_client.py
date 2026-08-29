@@ -23,6 +23,7 @@ import httpx
 import structlog
 
 from app.config.settings import get_settings
+from app.domain.tool_policy import build_tool_manifest
 from app.services.evaluation_fault_service import active_mcp_fault_meta
 from app.services.mcp_trusted_context import build_trusted_turn_meta
 from app.services.tool_invoke_result import (
@@ -209,6 +210,24 @@ class McpStreamableClient:
                 }
             )
         return out
+
+    async def tool_manifest(self) -> dict[str, Any]:
+        """Report the live MCP registry against the local governance table."""
+
+        try:
+            listed = await self.list_tools()
+        except Exception as exc:
+            manifest = build_tool_manifest(
+                timeout_seconds=self._timeout,
+                registry_health="UNAVAILABLE",
+            )
+            manifest["reason"] = type(exc).__name__
+            return manifest
+        return build_tool_manifest(
+            timeout_seconds=self._timeout,
+            listed_tools=(tool.get("name") for tool in listed if tool.get("name")),
+            registry_health="READY",
+        )
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any] | None = None

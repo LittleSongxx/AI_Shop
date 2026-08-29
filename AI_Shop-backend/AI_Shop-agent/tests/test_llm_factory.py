@@ -129,6 +129,50 @@ def test_chat_llm_can_switch_to_distinct_fallback_model(monkeypatch):
         get_settings.cache_clear()
 
 
+def test_fallback_can_use_independent_provider_timeout_and_retry_budget(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "primary-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://primary.example/v1")
+    monkeypatch.setenv("LLM_MODEL", "primary-model")
+    monkeypatch.setenv("LLM_FALLBACK_API_KEY", "fallback-key")
+    monkeypatch.setenv("LLM_FALLBACK_BASE_URL", "https://fallback.example/v1")
+    monkeypatch.setenv("LLM_FALLBACK_MODEL", "fallback-model")
+    monkeypatch.setenv("LLM_TIMEOUT", "20")
+    monkeypatch.setenv("LLM_MAX_RETRIES", "2")
+    monkeypatch.setenv("LLM_FALLBACK_TIMEOUT", "7")
+    monkeypatch.setenv("LLM_FALLBACK_MAX_RETRIES", "0")
+    get_settings.cache_clear()
+    try:
+        primary = chat_llm_config()
+        fallback = chat_llm_config(fallback=True)
+        assert primary.api_key == "primary-key"
+        assert primary.base_url == "https://primary.example/v1"
+        assert primary.timeout == 20
+        assert primary.max_retries == 2
+        assert fallback.api_key == "fallback-key"
+        assert fallback.base_url == "https://fallback.example/v1"
+        assert fallback.timeout == 7
+        assert fallback.max_retries == 0
+        assert has_fallback_chat_llm() is True
+    finally:
+        get_settings.cache_clear()
+
+
+def test_fallback_empty_provider_fields_inherit_primary(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "primary-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://primary.example/v1")
+    monkeypatch.setenv("LLM_MODEL", "same-model")
+    monkeypatch.setenv("LLM_FALLBACK_MODEL", "fallback-model")
+    get_settings.cache_clear()
+    try:
+        fallback = chat_llm_config(fallback=True)
+        assert fallback.api_key == "primary-key"
+        assert fallback.base_url == "https://primary.example/v1"
+        assert fallback.timeout == get_settings().llm_timeout
+        assert fallback.max_retries == get_settings().llm_max_retries
+    finally:
+        get_settings.cache_clear()
+
+
 def test_chat_llm_retry_policy_uses_configured_default_and_explicit_zero(
     monkeypatch,
 ):
@@ -146,6 +190,18 @@ def test_chat_llm_retry_policy_uses_configured_default_and_explicit_zero(
 def test_same_model_does_not_enable_fallback(monkeypatch):
     monkeypatch.setenv("LLM_MODEL", "same-model")
     monkeypatch.setenv("LLM_FALLBACK_MODEL", "same-model")
+    get_settings.cache_clear()
+    try:
+        assert has_fallback_chat_llm() is False
+    finally:
+        get_settings.cache_clear()
+
+
+def test_fallback_retry_policy_alone_does_not_create_a_second_model(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_MODEL", "same-model")
+    monkeypatch.setenv("LLM_FALLBACK_MODEL", "same-model")
+    monkeypatch.setenv("LLM_FALLBACK_MAX_RETRIES", "0")
     get_settings.cache_clear()
     try:
         assert has_fallback_chat_llm() is False

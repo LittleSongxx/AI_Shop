@@ -110,9 +110,15 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
+    # Fallback may use a different provider.  Empty values intentionally fall
+    # back to the primary setting so existing deployments keep working.
+    llm_fallback_api_key: str = ""
+    llm_fallback_base_url: str = ""
     llm_fallback_model: str = "deepseek-chat"
     llm_timeout: int = 20
     llm_max_retries: int = 1
+    llm_fallback_timeout: OptionalInt = None
+    llm_fallback_max_retries: OptionalInt = None
     # 每百万 token 人民币单价。模型未配置时只累计 token 和 unpriced，
     # 不使用可能过时的内置价格猜测。
     llm_pricing_cny_per_million_json: dict[str, dict[str, float]] = Field(
@@ -537,6 +543,17 @@ class Settings(BaseSettings):
             raise ValueError("AGENT_FAST_SUPPORT_MAX_TOKENS must be between 128 and 4096")
         if not 5 <= self.agent_llm_call_deadline_seconds <= 120:
             raise ValueError("AGENT_LLM_CALL_DEADLINE_SECONDS must be between 5 and 120")
+        if self.llm_timeout < 1:
+            raise ValueError("LLM_TIMEOUT must be positive")
+        if self.llm_max_retries < 0:
+            raise ValueError("LLM_MAX_RETRIES must be non-negative")
+        if self.llm_fallback_timeout is not None and self.llm_fallback_timeout < 1:
+            raise ValueError("LLM_FALLBACK_TIMEOUT must be positive when configured")
+        if (
+            self.llm_fallback_max_retries is not None
+            and self.llm_fallback_max_retries < 0
+        ):
+            raise ValueError("LLM_FALLBACK_MAX_RETRIES must be non-negative when configured")
         if self.agent_llm_call_deadline_seconds >= min(
             self.agent_budget_deadline_seconds,
             float(self.agent_task_deadline_seconds),

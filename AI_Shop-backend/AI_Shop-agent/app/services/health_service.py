@@ -6,6 +6,7 @@ import structlog
 
 from app.config.settings import get_settings
 from app.db.pool import acquire
+from app.domain.tool_policy import build_tool_manifest
 from app.infra.http_client import get_client
 from app.observability.telemetry import telemetry_status
 from app.rag.index_contract import vector_index_contract
@@ -220,6 +221,13 @@ class HealthService:
             "visualSearch": visual,
             "javaGateway": java_ok,
             "mcp": mcp_ok,
+            # This is contract reachability, not proof that every business call
+            # succeeds. The deeper registry reconciliation is available through
+            # McpStreamableClient.tool_manifest().
+            "toolManifest": build_tool_manifest(
+                timeout_seconds=getattr(settings, "mcp_timeout", 20),
+                registry_health="READY" if mcp_ok else "UNAVAILABLE",
+            ),
             "observability": self._observability_status(),
         }
 

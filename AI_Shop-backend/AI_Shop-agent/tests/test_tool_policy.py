@@ -10,9 +10,12 @@ import re
 from app.domain.tool_policy import (
     ALL_ALLOWED_TOOLS,
     READ_TOOLS,
+    TOOL_MANIFEST_SCHEMA,
+    TOOL_OWNER,
     TOOL_POLICIES,
     WRITE_TOOLS,
     ToolRiskLevel,
+    build_tool_manifest,
     fallback_biz_type,
     is_allowed,
     is_write_tool,
@@ -86,3 +89,39 @@ def test_guardrail_delegates_to_the_table():
         assert guard.is_allowed(name)
         assert guard.is_write_tool(name) is policy.is_write
     assert not guard.is_allowed("DROP_TABLE_ORDERS")
+
+
+def test_tool_manifest_exposes_health_version_entitlement_and_timeout():
+    manifest = build_tool_manifest(
+        timeout_seconds=4,
+        listed_tools=set(TOOL_POLICIES) | {"MCP_CONTRACT", "MCP_RUNTIME_IDENTITY"},
+        registry_health="READY",
+    )
+    assert manifest["schemaVersion"] == TOOL_MANIFEST_SCHEMA
+    assert manifest["owner"] == TOOL_OWNER
+    assert manifest["health"] == "READY"
+    assert manifest["missingTools"] == []
+    assert manifest["unexpectedTools"] == []
+    by_name = {item["name"]: item for item in manifest["tools"]}
+    assert by_name["SEARCH_PRODUCTS"] == {
+        "name": "SEARCH_PRODUCTS",
+        "version": "aishop-tools/current",
+        "owner": TOOL_OWNER,
+        "health": "READY",
+        "entitlement": "READ_ONLY",
+        "timeoutSeconds": 4.0,
+        "requiresConfirmation": False,
+    }
+    assert by_name["PROPOSE_REFUND"]["entitlement"] == "PROPOSE_CONFIRM_REQUIRED"
+    assert by_name["PROPOSE_REFUND"]["requiresConfirmation"] is True
+
+
+def test_tool_manifest_marks_registry_drift_without_weakening_policy():
+    manifest = build_tool_manifest(
+        timeout_seconds=4,
+        listed_tools={"SEARCH_PRODUCTS", "DROP_TABLE_ORDERS"},
+        registry_health="READY",
+    )
+    assert manifest["health"] == "DEGRADED"
+    assert "PROPOSE_REFUND" in manifest["missingTools"]
+    assert manifest["unexpectedTools"] == ["DROP_TABLE_ORDERS"]

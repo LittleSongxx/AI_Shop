@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from app.constants import MSG_STATUS_NORMAL
 from app.domain.intent.types import IntentKind, NextAction, RequestMode, RiskLevel
+from app.domain.tool_policy import READ_TOOLS, WRITE_TOOLS
 from app.graph.builder import build_agent_graph
 from app.graph.nodes import (
     _rag_query_variants_for_turn,
@@ -642,6 +643,76 @@ async def test_action_proposal_disables_sdk_retry_and_suppresses_fallback(
     assert suppressed.kwargs["output_data"]["reason"] == (
         "non_idempotent_or_write_path"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_error", [TimeoutError("timeout"), RuntimeError("5xx")])
+async def test_read_only_fallback_binding_cannot_expose_write_tools(
+    monkeypatch, provider_error
+):
+    bound_options: list[dict] = []
+    calls: list[str] = []
+
+    def bind_llm(**kwargs):
+        bound_options.append(kwargs)
+        return "fallback" if kwargs.get("fallback") else "primary"
+
+    async def invoke(llm, _messages, *, model, fallback=False):
+        calls.append(f"{llm}:{model}")
+        if llm == "primary":
+            raise provider_error
+        return AIMessage(content="支持七天无理由退货。[1]")
+
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", bind_llm)
+    monkeypatch.setattr("app.graph.nodes.invoke_llm_with_metrics", invoke)
+    monkeypatch.setattr("app.graph.nodes.has_fallback_chat_llm", lambda: True)
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(
+            graph_max_react_rounds=4,
+            force_mcp_on_llm_skip=True,
+            llm_model="primary-model",
+            llm_fallback_model="fallback-model",
+            llm_fallback_max_retries=2,
+        ),
+    )
+    state = {
+        "agent_msg": {
+            "userId": "u1",
+            "messageId": 1,
+            "userMessage": "平台的七天退货政策是什么？",
+        },
+        "user_id": "u1",
+        "message_id": 1,
+        "llm_messages": [HumanMessage(content="平台的七天退货政策是什么？")],
+        "react_round": 0,
+        "card": None,
+        "message_card": None,
+        "user_text": "平台的七天退货政策是什么？",
+        "from_product": False,
+        "tools_called": [],
+        "pending_tool_calls": [],
+        "search_fallback_done": False,
+        "category_switch_search": False,
+        "intent": IntentKind.REFUND.value,
+        "intent_data": None,
+        "request_mode": RequestMode.INFORMATIONAL.value,
+        "rag_evidence_required": True,
+        "rag_evidence_state": "SUPPORTED",
+        "rag_evidence_items": [{"citation": 1, "text": "七天规则"}],
+        "rag_agentic_allowed": False,
+        "chunks": [],
+    }
+
+    result = await agent_loop_node(state)
+
+    assert result["route"] == "finalize"
+    assert calls == ["primary:primary-model", "fallback:fallback-model"]
+    assert bound_options[1]["allowed_tools"] == READ_TOOLS
+    assert bound_options[1]["allowed_tools"].isdisjoint(WRITE_TOOLS)
+    assert bound_options[1]["max_retries"] == 2
 
 
 @pytest.mark.asyncio

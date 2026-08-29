@@ -39,19 +39,41 @@ def chat_llm_config(
 ) -> ChatLLMConfig:
 
     s = get_settings()
-    _require_api_key(s.llm_api_key, "LLM_API_KEY")
-    model = s.llm_fallback_model if fallback else s.llm_model
+    if fallback:
+        api_key = (getattr(s, "llm_fallback_api_key", "") or s.llm_api_key).strip()
+        base_url = (getattr(s, "llm_fallback_base_url", "") or s.llm_base_url).strip()
+        model = s.llm_fallback_model.strip()
+        timeout = (
+            getattr(s, "llm_fallback_timeout", None)
+            if getattr(s, "llm_fallback_timeout", None) is not None
+            else s.llm_timeout
+        )
+        configured_retries = (
+            getattr(s, "llm_fallback_max_retries", None)
+            if getattr(s, "llm_fallback_max_retries", None) is not None
+            else s.llm_max_retries
+        )
+        _require_api_key(api_key, "LLM_FALLBACK_API_KEY or LLM_API_KEY")
+    else:
+        api_key = s.llm_api_key.strip()
+        base_url = s.llm_base_url.strip()
+        model = s.llm_model.strip()
+        timeout = s.llm_timeout
+        configured_retries = s.llm_max_retries
+        _require_api_key(api_key, "LLM_API_KEY")
     return ChatLLMConfig(
-        api_key=s.llm_api_key,
-        base_url=s.llm_base_url,
+        api_key=api_key,
+        base_url=base_url,
         model=model,
-        timeout=s.llm_timeout,
+        timeout=timeout,
         max_retries=(
-            s.llm_max_retries if max_retries is None else max(0, int(max_retries))
+            configured_retries
+            if max_retries is None
+            else max(0, int(max_retries))
         ),
         streaming=streaming,
         disable_thinking=disable_thinking
-        and (_is_deepseek_endpoint(s.llm_base_url) or _is_qwen_compatible_endpoint(s.llm_base_url)),
+        and (_is_deepseek_endpoint(base_url) or _is_qwen_compatible_endpoint(base_url)),
     )
 
 
@@ -76,9 +98,17 @@ def create_chat_llm(*, fallback: bool = False) -> ChatOpenAI:
 
 def has_fallback_chat_llm() -> bool:
     s = get_settings()
-    return bool(
-        s.llm_fallback_model.strip() and s.llm_fallback_model.strip() != s.llm_model.strip()
+    primary = (
+        s.llm_api_key.strip(),
+        s.llm_base_url.strip(),
+        s.llm_model.strip(),
     )
+    fallback = (
+        (getattr(s, "llm_fallback_api_key", "") or s.llm_api_key).strip(),
+        (getattr(s, "llm_fallback_base_url", "") or s.llm_base_url).strip(),
+        s.llm_fallback_model.strip(),
+    )
+    return bool(fallback[2] and fallback != primary)
 
 
 def create_memory_llm(*, disable_thinking: bool = False) -> ChatOpenAI:

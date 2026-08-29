@@ -26,6 +26,7 @@ from app.domain.intent.types import (
     RiskLevel,
 )
 from app.domain.intent.write_args import TOOL_REQUIRED_INTENTS
+from app.domain.tool_policy import READ_TOOLS
 from app.graph.forced_tools import (
     forced_named_product_comparison,
     forced_order_list,
@@ -1403,7 +1404,9 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         # A4：失败的调用也计入 LLM_CALL_TOTAL（成功/失败都要可观测，
         # 只看成功数算不出失败率）。已部分流式输出的不算 fallback 机会，
         # 但那次调用本身已经失败，照记。
-        if not non_stream_turn:
+        if not non_stream_turn and not getattr(
+            primary_error, "_aishop_llm_metrics_recorded", False
+        ):
             rt.record_llm_failure(
                 settings.llm_model,
                 fallback=False,
@@ -1420,9 +1423,19 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             retry_fallback=can_retry,
         )
         if can_retry:
+            configured_fallback_retries = getattr(
+                settings, "llm_fallback_max_retries", None
+            )
+            fallback_retry_budget = (
+                0
+                if configured_fallback_retries is None
+                else max(0, int(configured_fallback_retries))
+            )
             try:
                 fallback_llm = rt.bind_agent_llm(
-                    fallback=True, **{**llm_options, "max_retries": 0}
+                    fallback=True,
+                    allowed_tools=READ_TOOLS,
+                    **{**llm_options, "max_retries": fallback_retry_budget},
                 )
                 if non_stream_turn:
                     response = await invoke_llm_with_metrics(
@@ -1447,7 +1460,9 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                     fallback_model=settings.llm_fallback_model,
                 )
             except Exception as fallback_error:
-                if not non_stream_turn:
+                if not non_stream_turn and not getattr(
+                    fallback_error, "_aishop_llm_metrics_recorded", False
+                ):
                     rt.record_llm_failure(
                         settings.llm_fallback_model,
                         fallback=True,

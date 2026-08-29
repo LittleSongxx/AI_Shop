@@ -24,6 +24,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Iterable
+
+from app.services.tool_invoke_result import MCP_TOOL_CONTRACT
+
+TOOL_MANIFEST_SCHEMA = "aishop-tool-manifest/v1"
+TOOL_OWNER = "AI_Shop-agent"
+_MCP_SYSTEM_TOOLS = frozenset({"MCP_CONTRACT", "MCP_RUNTIME_IDENTITY"})
 
 
 class ToolRiskLevel(str, Enum):
@@ -113,3 +120,58 @@ def is_write_tool(tool_name: str) -> bool:
 def fallback_biz_type(tool_name: str) -> str | None:
     policy = TOOL_POLICIES.get(tool_name)
     return policy.biz_type if policy else None
+
+
+def build_tool_manifest(
+    *,
+    timeout_seconds: float,
+    listed_tools: Iterable[str] | None = None,
+    registry_health: str = "UNKNOWN",
+) -> dict:
+    """Build a deterministic, credential-free manifest for governed tools."""
+
+    timeout = float(timeout_seconds)
+    if timeout <= 0:
+        raise ValueError("tool timeout_seconds must be positive")
+    listed = None if listed_tools is None else {str(name) for name in listed_tools}
+    missing = sorted(set(TOOL_POLICIES) - listed) if listed is not None else []
+    unexpected = (
+        sorted(listed - set(TOOL_POLICIES) - _MCP_SYSTEM_TOOLS)
+        if listed is not None
+        else []
+    )
+    overall_health = str(registry_health or "UNKNOWN").upper()
+    if listed is not None and (missing or unexpected):
+        overall_health = "DEGRADED"
+    tools = []
+    for name, policy in sorted(TOOL_POLICIES.items()):
+        health = (
+            overall_health
+            if listed is None
+            else "READY"
+            if name in listed
+            else "MISSING"
+        )
+        tools.append(
+            {
+                "name": name,
+                "version": MCP_TOOL_CONTRACT,
+                "owner": TOOL_OWNER,
+                "health": health,
+                "entitlement": (
+                    "PROPOSE_CONFIRM_REQUIRED" if policy.is_write else "READ_ONLY"
+                ),
+                "timeoutSeconds": timeout,
+                "requiresConfirmation": policy.is_write,
+            }
+        )
+    return {
+        "schemaVersion": TOOL_MANIFEST_SCHEMA,
+        "contractVersion": MCP_TOOL_CONTRACT,
+        "owner": TOOL_OWNER,
+        "health": overall_health,
+        "timeoutSeconds": timeout,
+        "missingTools": missing,
+        "unexpectedTools": unexpected,
+        "tools": tools,
+    }
