@@ -242,3 +242,8 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - trace 原件含会话 cookie，移到工作区外受限 quarantine，SHA-256 为 `ffe489507890375048aaddb515c7d8b370ac2d6b6d32487d3f0b2cede4179483`；不入 Git。支付段默认关闭，不能据此声称下单、支付或 GMV。
 - 该用例本次走确定性 `SEARCH_PRODUCTS` 路径，不能替代 LLM 生成质量评测；客服真实 Provider 结果见 [客服 E57](AI-Shop-客服E57真实运行证据刷新-20260829.md)。
 - 同日公开 regression `regression-e57-evidence-refresh-20260829` 通过 `20 Search/26 RAG/5 Agent` 全部硬门；Search recall@10 `0.958333`、nDCG@10 `0.993110`，RAG citation/grounded `1.0`，但这些仍是可见 regression 诊断，不能替代缺失的 v9 private holdout。
+
+### 2026-08-29：E57 客服真实浏览器提案与选择链
+
+- 在同一真实本地全栈上补跑退款提案与售后候选选择两条 mobile Chromium 用例，`2/2` 通过：退款请求停在 `ACTION_CONFIRM/REFUND`，售后选择停在 `CREATE_SUPPORT_CASE` 提案；重复选择返回相同 `messageId`，冲突选择返回 `409`。
+- 两条用例均未确认退款或创建工单；trace 含会话 cookie，已移至工作区外受限 quarantine，哈希和边界见 [客服真实浏览器 E57 证据](AI-Shop-客服真实浏览器E57证据-20260829.md)。该结果补强浏览器/状态机证据，不刷新人工答案质量、CSAT/FCR、unseen 或生产 SLO。

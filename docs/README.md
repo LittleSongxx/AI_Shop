@@ -8,6 +8,7 @@
 | [evaluation/AI-Shop-v43-Badcase修复与v54复评交接](evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.md) | 15 条 v43 badcase 的根因/修复/v54 执行映射，以及 v54 最终人工复评 | v54 答案 116/120、联合 113/120，7 条 badcase；`HUMAN_APPROVED_AI_ASSISTED` |
 | [evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接](evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md) | v54 剩余 7 条 badcase 的修复、v55 定向回放与 v56 全量复评 | v56 A/B 118/120 一致、2 条仲裁、最终 badcase 0；仍是已见开发集 |
 | [project/AI-Shop-客服E57真实运行证据刷新](project/AI-Shop-客服E57真实运行证据刷新-20260829.md) | E57 真实 HTTP/LLM 全链路执行、行为契约与费用/延迟边界 | 120/120 执行、29/29 契约；答案仍待独立人工盲审，非 unseen/生产 SLO |
+| [project/AI-Shop-客服真实浏览器E57证据](project/AI-Shop-客服真实浏览器E57证据-20260829.md) | 真实客服退款提案、售后候选选择/冲突幂等和订单事实浏览器链 | `2/2 passed`；只走提案，非写入/CSAT/FCR/SLO |
 | [project/AI_Shop主线与开发记录](project/AI_Shop主线与开发记录.md) | AI 主线、方法判断、关键改造、阶段性取舍和后续路线 | 源码与运行证据汇总 |
 | [project/AI-Shop-Text2SQL冻结说明](project/AI-Shop-Text2SQL冻结说明-20260829.md) | Text2SQL 状态、证据 custody、恢复条件和后续排期边界 | `FROZEN`；不列默认演示或 release gate |
 | [project/AI-Shop-E1-流式重连验证](project/AI-Shop-E1-流式重连验证-20260829.md) | stream envelope、OPEN barrier、乱序/重复处理和终态回放 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
