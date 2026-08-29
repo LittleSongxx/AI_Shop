@@ -90,6 +90,26 @@ def chunk_text(content: object) -> str:
 async def is_cancelled(user_id: str, message_id: int) -> bool:
     return await redis_service.is_cancelled(user_id, message_id)
 
+
+async def _terminal_cancelled(user_id: str, message_id: int) -> bool:
+    """Prefer the durable message state while retaining the fast Redis flag."""
+
+    try:
+        if await agent_message_service.is_execution_cancelled(user_id, message_id):
+            return True
+        return await is_cancelled(user_id, message_id)
+    except Exception as exc:
+        # A cancellation check must not turn a normal answer into a server
+        # error when Redis is briefly unavailable; the database CAS below is
+        # still authoritative and will reject a cancelled row.
+        logger.warning(
+            "agent_terminal_cancellation_check_failed",
+            user_id=user_id,
+            message_id=message_id,
+            error=type(exc).__name__,
+        )
+        return False
+
 async def resolve_action_confirm(
     full_text: str, messages: list, user_id: str
 ) -> tuple[str, str, str, dict] | None:
@@ -827,13 +847,27 @@ async def finalize_agent_response(
                 error=type(exc).__name__,
             )
 
-    await agent_message_service.complete_message(
+    if await _terminal_cancelled(user_id, int(message_id)):
+        logger.info(
+            "agent_terminal_completion_skipped_cancelled",
+            user_id=user_id,
+            message_id=message_id,
+        )
+        return
+    completed = await agent_message_service.try_complete_message(
         message_id,
         assistant,
         biz_type,
         biz_data,
         source_refs,
     )
+    if completed is False:
+        logger.info(
+            "agent_terminal_completion_skipped_non_active",
+            user_id=user_id,
+            message_id=message_id,
+        )
+        return
     await stream_service.push_done(
         user_id,
         message_id,
@@ -841,6 +875,9 @@ async def finalize_agent_response(
         biz_type,
         agent_msg.get("userMessage"),
         source_refs,
+        run_id=agent_msg.get("runId"),
+        request_id=agent_msg.get("requestId"),
+        episode_id=agent_msg.get("episodeId"),
     )
     judge_service.enqueue(
         run_id=agent_msg.get("runId"),
@@ -857,10 +894,22 @@ async def finalize_agent_response(
 async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") -> None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
-    await agent_message_service.complete_message(
+    if await _terminal_cancelled(user_id, int(message_id)):
+        return
+    completed = await agent_message_service.try_complete_message(
         message_id, partial or "服务异常", prompt_type, None
     )
-    await stream_service.push_error(user_id, message_id, "服务暂时不可用，请稍后重试", prompt_type)
+    if completed is False:
+        return
+    await stream_service.push_error(
+        user_id,
+        message_id,
+        "服务暂时不可用，请稍后重试",
+        prompt_type,
+        run_id=agent_msg.get("runId"),
+        request_id=agent_msg.get("requestId"),
+        episode_id=agent_msg.get("episodeId"),
+    )
 
 
 async def push_budget_error(agent_msg: dict) -> None:
@@ -868,10 +917,22 @@ async def push_budget_error(agent_msg: dict) -> None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
     message = "本次请求已达到安全执行上限，请缩小问题范围后重试。"
-    await agent_message_service.complete_message(
+    if await _terminal_cancelled(user_id, int(message_id)):
+        return
+    completed = await agent_message_service.try_complete_message(
         message_id, message, "agent_budget", None
     )
-    await stream_service.push_error(user_id, message_id, message, "agent_budget")
+    if completed is False:
+        return
+    await stream_service.push_error(
+        user_id,
+        message_id,
+        message,
+        "agent_budget",
+        run_id=agent_msg.get("runId"),
+        request_id=agent_msg.get("requestId"),
+        episode_id=agent_msg.get("episodeId"),
+    )
 
 
 @lru_cache(maxsize=32)

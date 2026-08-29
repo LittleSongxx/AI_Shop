@@ -75,4 +75,28 @@ describe('agent confirmation card', () => {
     expect(expired.getByText('已过期，请重新发起')).toBeInTheDocument();
     expect(expired.queryByRole('button', { name: '确认提交' })).not.toBeInTheDocument();
   });
+
+  it('does not mark an action cancelled when the server returns success=false', async () => {
+    vi.mocked(agentApi.cancelAction).mockResolvedValue({
+      success: false,
+      resultMessage: '操作处理中，请稍后再试'
+    });
+    const view = render(AgentConfirmCard, {
+      props: {
+        card: {
+          token: 'act_cancel_race',
+          label: '取消订单',
+          status: 0
+        }
+      }
+    });
+
+    await fireEvent.click(view.getByRole('button', { name: '取消' }));
+
+    await waitFor(() => {
+      expect(view.getByText('操作处理中，请稍后再试')).toBeInTheDocument();
+    });
+    expect(view.getByText('待确认')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: '取消' })).toBeInTheDocument();
+  });
 });

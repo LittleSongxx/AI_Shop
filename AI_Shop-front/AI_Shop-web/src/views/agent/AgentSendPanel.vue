@@ -451,9 +451,16 @@ const dispatchSend = async (text: string, options?: { comparisonProductIds?: str
     return false;
   }
 
-  ensureAppWebSocket();
-
   try {
+    // The HTTP enqueue response is not enough to render a live answer.  The
+    // websocket manager resolves only after OPEN (or returns false after its
+    // bounded retry budget), so we never create a request that cannot be
+    // delivered to the current browser.
+    const wsReady = await ensureAppWebSocket();
+    if (wsReady === false) {
+      toast.error('实时连接不可用，请稍后重试');
+      return false;
+    }
     const path = window.location.pathname;
     const isProductPage = /^\/product\/\d+$/.test(path);
     const fromProduct = pendingProduct.value !== null || isProductPage;
@@ -534,7 +541,7 @@ const dismissProductConsult = async () => {
   }
 };
 
-const stop = async () => {
+const stop = () => {
   const id = messageId.value;
   if (id == null) {
     toast.error('无法取消，请刷新页面后重试');
@@ -542,8 +549,6 @@ const stop = async () => {
   }
 
   mitter.emit('cancelMessage', { messageId: id });
-  answering.value = false;
-  messageId.value = null;
 };
 
 const onAnswering = (val: unknown) => {

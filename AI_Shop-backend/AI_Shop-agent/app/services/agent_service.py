@@ -3,7 +3,13 @@ from __future__ import annotations
 import structlog
 
 from app.config.settings import get_settings
-from app.constants import AGENT_QUEUE_LOW
+from app.constants import (
+    AGENT_QUEUE_LOW,
+    MSG_STATUS_CANCEL,
+    MSG_STATUS_COMPLETE,
+    MSG_STATUS_INTERRUPTED,
+    MSG_STATUS_NORMAL,
+)
 from app.domain.intent.classifier import resolve_intent
 from app.domain.intent.types import IntentDecision, IntentKind, NextAction, RequestMode
 from app.harness.agents.contracts import VerifiedImageContext, VisualSubject
@@ -80,6 +86,38 @@ _FORCED_CASE_INTENTS = frozenset(
         IntentKind.REFUND_STATUS.value,
     }
 )
+
+
+def _cancel_terminal_state(
+    message_status: int | None,
+    task_status: str | None,
+) -> str:
+    """Map the two durable projections to one client-facing terminal state."""
+
+    if message_status == MSG_STATUS_CANCEL:
+        return "CANCELLED"
+    if message_status == MSG_STATUS_INTERRUPTED:
+        return "INTERRUPTED"
+    # The message row is the user-visible terminal projection.  A task can
+    # still be PROCESSING when its message CAS already completed; never let a
+    # later task cancellation rewrite that outcome.
+    if message_status == MSG_STATUS_COMPLETE:
+        return "SUCCEEDED"
+    normalized_task = str(task_status or "").upper()
+    if normalized_task == "CANCELLED":
+        return "CANCELLED"
+    if normalized_task in {"DEAD", "FAILED"}:
+        return "FAILED"
+    if normalized_task == "COMPLETED":
+        return "SUCCEEDED"
+    if message_status == MSG_STATUS_NORMAL or normalized_task in {
+        "PENDING",
+        "DISPATCHING",
+        "QUEUED",
+        "PROCESSING",
+    }:
+        return "RUNNING"
+    return "NOT_FOUND"
 
 
 class AgentOrchestrator:
@@ -248,7 +286,14 @@ class AgentOrchestrator:
                     agent_msg["messageId"], _repeat_msg, "intent_repeat", None
                 )
                 await stream_service.push_done(
-                    user_id, agent_msg["messageId"], _repeat_msg, "intent_repeat", safe_message
+                    user_id,
+                    agent_msg["messageId"],
+                    _repeat_msg,
+                    "intent_repeat",
+                    safe_message,
+                    run_id=agent_msg.get("runId") or _repeat_run_id,
+                    request_id=agent_msg.get("requestId") or request_id,
+                    episode_id=agent_msg.get("episodeId") or episode_id,
                 )
                 agent_msg["deliveryState"] = "INTENT_REPEAT"
                 agent_msg["assistantMessage"] = _repeat_msg
@@ -386,6 +431,9 @@ class AgentOrchestrator:
                 "",
                 "human_support",
                 safe_message,
+                run_id=agent_msg.get("runId") or run_id,
+                request_id=agent_msg.get("requestId") or request_id,
+                episode_id=agent_msg.get("episodeId") or episode_id,
             )
             agent_msg["supportSession"] = support_service.public_session(active_support)
             agent_msg["deliveryState"] = "HUMAN_SUPPORT"
@@ -417,7 +465,14 @@ class AgentOrchestrator:
                     agent_msg["messageId"], answer, "faq", None
                 )
                 await stream_service.push_done(
-                    user_id, agent_msg["messageId"], answer, "faq", safe_message
+                    user_id,
+                    agent_msg["messageId"],
+                    answer,
+                    "faq",
+                    safe_message,
+                    run_id=agent_msg.get("runId") or run_id,
+                    request_id=agent_msg.get("requestId") or request_id,
+                    episode_id=agent_msg.get("episodeId") or episode_id,
                 )
                 agent_msg["deliveryState"] = "FAQ_FAST_PATH"
                 agent_msg["assistantMessage"] = answer
@@ -430,7 +485,14 @@ class AgentOrchestrator:
                 agent_msg["messageId"], _budget_msg, "budget_exceeded", None
             )
             await stream_service.push_done(
-                user_id, agent_msg["messageId"], _budget_msg, "budget_exceeded", safe_message
+                user_id,
+                agent_msg["messageId"],
+                _budget_msg,
+                "budget_exceeded",
+                safe_message,
+                run_id=agent_msg.get("runId") or run_id,
+                request_id=agent_msg.get("requestId") or request_id,
+                episode_id=agent_msg.get("episodeId") or episode_id,
             )
             agent_msg["deliveryState"] = "BUDGET_EXCEEDED"
             agent_msg["assistantMessage"] = _budget_msg
@@ -530,6 +592,9 @@ class AgentOrchestrator:
                     "faq",
                     safe_message,
                     source_refs,
+                    run_id=agent_msg.get("runId") or run_id,
+                    request_id=agent_msg.get("requestId") or request_id,
+                    episode_id=agent_msg.get("episodeId") or episode_id,
                 )
                 agent_msg["deliveryState"] = "FAQ_FAST_PATH"
                 agent_msg["assistantMessage"] = answer
@@ -564,7 +629,13 @@ class AgentOrchestrator:
                 agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload", None
             )
             await stream_service.push_error(
-                user_id, agent_msg["messageId"], AGENT_BUSY_MESSAGE, "overload"
+                user_id,
+                agent_msg["messageId"],
+                AGENT_BUSY_MESSAGE,
+                "overload",
+                run_id=agent_msg.get("runId") or run_id,
+                request_id=agent_msg.get("requestId") or request_id,
+                episode_id=agent_msg.get("episodeId") or episode_id,
             )
             await agent_message_service.reset_unresolved_count(
                 agent_msg["messageId"]
@@ -1090,6 +1161,9 @@ class AgentOrchestrator:
             SUPPORT_TRANSFER_MESSAGE,
             "human_support",
             safe_message,
+            run_id=agent_msg.get("runId"),
+            request_id=agent_msg.get("requestId"),
+            episode_id=agent_msg.get("episodeId"),
         )
         agent_msg["sessionId"] = session["session_id"]
         agent_msg["supportSession"] = support_service.public_session(session)
@@ -1253,19 +1327,77 @@ class AgentOrchestrator:
         user_id: str,
         message_id: int,
         partial_assistant_message: str | None = None,
-    ) -> None:
+    ) -> dict:
         if not await rate_limit_service.allow(user_id, "cancelMessage", 1, 1):
             raise ValueError("取消消息过于频繁，请稍后再试")
 
-        await redis_service.set_cancel_flag(user_id, message_id)
-        if partial_assistant_message:
+        message_id = int(message_id)
+        partial = str(partial_assistant_message or "").strip()
+        # Redis is only a fast interrupt signal.  Persisted message/task CAS
+        # remains authoritative, so a transient Redis outage must not turn a
+        # user cancellation into a reported failure.
+        try:
+            await redis_service.set_cancel_flag(user_id, message_id)
+        except Exception as exc:
+            logger.warning(
+                "agent_cancel_fast_flag_unavailable",
+                user_id=user_id,
+                message_id=message_id,
+                error=type(exc).__name__,
+            )
+        if partial:
             changed = await agent_message_service.interrupt_message(
-                user_id, message_id, partial_assistant_message
+                user_id, message_id, partial
             )
         else:
             changed = await agent_message_service.cancel_message(user_id, message_id)
-        if changed:
-            await agent_task_service.cancel(message_id, user_id)
+        # A successful CAS already gives us the authoritative state without a
+        # second read.  Re-read only the no-change path so a repeated cancel or
+        # a completion/cancel race is reflected to the caller instead of being
+        # reported as an unconditional success.
+        state = None
+        if not changed:
+            state = await agent_message_service.get_owned_state(user_id, message_id)
+        state_status = int(state.get("status")) if state and state.get("status") is not None else None
+        # Avoid cancelling a task that belongs to an already completed message.
+        # For a repeated cancel, probing the owned cancelled row is still safe
+        # and lets us clean up a task left behind by an earlier race.
+        task_changed = False
+        if changed or state_status in {
+            MSG_STATUS_NORMAL,
+            MSG_STATUS_CANCEL,
+            MSG_STATUS_INTERRUPTED,
+        }:
+            task_changed = await agent_task_service.cancel(message_id, user_id)
+        message_status = (
+            state_status
+            if state_status is not None
+            else (MSG_STATUS_INTERRUPTED if partial else MSG_STATUS_CANCEL)
+            if changed
+            else None
+        )
+        task_state = None
+        if task_changed:
+            task_state = "CANCELLED"
+        elif not changed and state is not None:
+            task = await agent_task_service.get(message_id)
+            task_state = str(task.get("status")) if task else None
+
+        terminal_state = _cancel_terminal_state(message_status, task_state)
+        idempotent = bool(
+            not changed
+            and terminal_state
+            == ("INTERRUPTED" if partial else "CANCELLED")
+        )
+        return {
+            "success": bool(changed or idempotent),
+            "changed": bool(changed),
+            "messageId": message_id,
+            "messageStatus": message_status,
+            "taskStatus": task_state,
+            "terminalState": terminal_state,
+            "idempotent": idempotent,
+        }
 
     async def get_consult_context(self, user_id: str) -> dict | None:
         snapshot = await redis_service.get_consult_product(user_id)

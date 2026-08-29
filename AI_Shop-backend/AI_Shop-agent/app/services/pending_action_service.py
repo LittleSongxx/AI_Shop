@@ -574,7 +574,7 @@ class PendingActionService:
                 await redis_service.unlock_pending_action(token, owner)
         return reconciled
 
-    async def cancel(self, user_id: str, token: str) -> None:
+    async def cancel(self, user_id: str, token: str) -> dict:
         await redis_service.ensure_connected()
         owner = uuid.uuid4().hex
         if not await redis_service.try_lock_pending_action(token, owner, ttl_seconds=30):
@@ -590,6 +590,7 @@ class PendingActionService:
             if pending.get("status") != self.STATUS_CANCELLED:
                 raise ValueError("该操作已处理或已过期")
             await redis_service.save_pending_action(token, pending)
+            return pending
         finally:
             await redis_service.unlock_pending_action(token, owner)
 

@@ -119,7 +119,7 @@ const effectiveStatus = computed(() => {
 
 const isPending = computed(() => effectiveStatus.value === AGENT_ACTION_STATUS.PENDING);
 
-const showActions = computed(() => isPending.value && !resultMessage.value);
+const showActions = computed(() => isPending.value && (!resultMessage.value || !resultSuccess.value));
 
 const statusClass = computed(() => agentActionStatusClass(effectiveStatus.value));
 
@@ -225,9 +225,16 @@ const onCancel = async () => {
   if (!props.card.token || loading.value) return;
   loading.value = true;
   try {
-    await agentApi.cancelAction(props.card.token);
+    const res = await agentApi.cancelAction(props.card.token);
+    const data = res as { success?: boolean; resultMessage?: string; actionType?: string } | null;
+    if (data?.success !== true) {
+      resultSuccess.value = false;
+      resultMessage.value = data?.resultMessage || '操作未取消，请稍后重试';
+      toast.error(resultMessage.value);
+      return;
+    }
     patchCard(AGENT_ACTION_STATUS.CANCELLED);
-    resultMessage.value = '已取消操作';
+    resultMessage.value = data.resultMessage || '已取消操作';
     resultSuccess.value = false;
   } catch {
     toast.error('取消失败，请稍后重试');

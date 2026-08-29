@@ -567,8 +567,10 @@ async def cancel_message(
     assistantMessage: str | None = Form(None),
     user: TokenUserInfo = Depends(require_login),
 ) -> ResponseVO:
-    await agent_orchestrator.cancel_message(user.user_id, messageId, assistantMessage)
-    return success(None)
+    data = await agent_orchestrator.cancel_message(
+        user.user_id, messageId, assistantMessage
+    )
+    return success(data)
 
 
 @router.post("/reportClick")
@@ -833,8 +835,14 @@ async def cancel_action(
             }
         )
     try:
-        await pending_action_service.cancel(user.user_id, actionToken)
-        return success(None)
+        pending = await pending_action_service.cancel(user.user_id, actionToken) or {}
+        return success(
+            {
+                "actionType": pending.get("actionType"),
+                "success": True,
+                "resultMessage": "已取消操作",
+            }
+        )
     except ValueError as e:
         return success(
             {

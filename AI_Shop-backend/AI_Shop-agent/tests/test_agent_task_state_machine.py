@@ -575,6 +575,139 @@ async def test_cancel_api_transitions_message_before_cancelling_owned_task():
 
 
 @pytest.mark.asyncio
+async def test_cancel_api_returns_authoritative_interrupted_state():
+    orchestrator = AgentOrchestrator()
+    with (
+        patch(
+            "app.services.agent_service.rate_limit_service.allow",
+            AsyncMock(return_value=True),
+        ),
+        patch("app.services.agent_service.redis_service.set_cancel_flag", AsyncMock()),
+        patch(
+            "app.services.agent_service.agent_message_service.interrupt_message",
+            AsyncMock(return_value=True),
+        ),
+        patch(
+            "app.services.agent_service.agent_task_service.cancel",
+            AsyncMock(return_value=True),
+        ),
+    ):
+        result = await orchestrator.cancel_message("u1", 14, "已生成的一半")
+
+    assert result == {
+        "success": True,
+        "changed": True,
+        "messageId": 14,
+        "messageStatus": 3,
+        "taskStatus": "CANCELLED",
+        "terminalState": "INTERRUPTED",
+        "idempotent": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cancel_api_reports_completed_race_as_false_without_leaking_task_state():
+    orchestrator = AgentOrchestrator()
+    task_get = AsyncMock(return_value={"status": "COMPLETED"})
+    with (
+        patch(
+            "app.services.agent_service.rate_limit_service.allow",
+            AsyncMock(return_value=True),
+        ),
+        patch("app.services.agent_service.redis_service.set_cancel_flag", AsyncMock()),
+        patch(
+            "app.services.agent_service.agent_message_service.cancel_message",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.agent_service.agent_task_service.cancel",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.agent_service.agent_message_service.get_owned_state",
+            AsyncMock(return_value={"message_id": 15, "user_id": "u1", "status": 2}),
+        ),
+        patch("app.services.agent_service.agent_task_service.get", task_get),
+    ):
+        result = await orchestrator.cancel_message("u1", 15)
+
+    assert result["success"] is False
+    assert result["changed"] is False
+    assert result["messageStatus"] == 2
+    assert result["taskStatus"] == "COMPLETED"
+    assert result["terminalState"] == "SUCCEEDED"
+    assert result["idempotent"] is False
+
+
+@pytest.mark.asyncio
+async def test_cancel_api_does_not_turn_completed_message_into_cancelled_task():
+    orchestrator = AgentOrchestrator()
+    cancel_task = AsyncMock()
+    with (
+        patch(
+            "app.services.agent_service.rate_limit_service.allow",
+            AsyncMock(return_value=True),
+        ),
+        patch(
+            "app.services.agent_service.redis_service.set_cancel_flag",
+            AsyncMock(side_effect=ConnectionError("redis down")),
+        ),
+        patch(
+            "app.services.agent_service.agent_message_service.cancel_message",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.agent_service.agent_message_service.get_owned_state",
+            AsyncMock(return_value={"message_id": 16, "status": MSG_STATUS_COMPLETE}),
+        ),
+        patch(
+            "app.services.agent_service.agent_task_service.cancel",
+            cancel_task,
+        ),
+        patch(
+            "app.services.agent_service.agent_task_service.get",
+            AsyncMock(return_value={"status": "COMPLETED"}),
+        ),
+    ):
+        result = await orchestrator.cancel_message("u1", 16)
+
+    assert result["success"] is False
+    assert result["terminalState"] == "SUCCEEDED"
+    cancel_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cancel_api_does_not_probe_another_users_task():
+    orchestrator = AgentOrchestrator()
+    task_get = AsyncMock()
+    with (
+        patch(
+            "app.services.agent_service.rate_limit_service.allow",
+            AsyncMock(return_value=True),
+        ),
+        patch("app.services.agent_service.redis_service.set_cancel_flag", AsyncMock()),
+        patch(
+            "app.services.agent_service.agent_message_service.cancel_message",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.agent_service.agent_task_service.cancel",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.agent_service.agent_message_service.get_owned_state",
+            AsyncMock(return_value=None),
+        ),
+        patch("app.services.agent_service.agent_task_service.get", task_get),
+    ):
+        result = await orchestrator.cancel_message("u1", 99)
+
+    assert result["success"] is False
+    assert result["terminalState"] == "NOT_FOUND"
+    task_get.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_complete_message_never_overwrites_cancelled_or_interrupted_status():
     cursor = _SequencedCursor([0, 1])
     with patch("app.services.message_service.acquire", _acquire_for(cursor)):

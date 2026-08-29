@@ -1,6 +1,7 @@
 import request from './http';
 import { withCache } from '@/utils/apiCache';
 import type { RecommendationAttribution } from '@/utils/recommendationAttribution';
+import { clearIdempotencyKey, getOrCreateIdempotencyKey } from '@/utils/idempotency';
 
 export { locationApi } from './location';
 export type { LocationPayload, LocationWeatherPayload } from './location';
@@ -246,6 +247,16 @@ export interface RecommendationRequestV1 {
   idempotencyKey?: string;
 }
 
+export interface AgentCancelMessageResult {
+  success: boolean;
+  changed: boolean;
+  messageId: number;
+  messageStatus?: number | null;
+  taskStatus?: string | null;
+  terminalState?: string;
+  idempotent?: boolean;
+}
+
 export const agentV1Api = {
   recommend: (payload: RecommendationRequestV1) =>
     request.post('/agent/v1/recommendations', payload),
@@ -273,9 +284,11 @@ export const agentApi = {
     options?: {
       imageAssetId?: string;
       comparisonProductIds?: string[];
+      requestId?: string;
+      idempotencyKey?: string;
     }
-  ) =>
-    request.postForm('/agent/sendMessage', {
+  ) => {
+    const payload = {
       message,
       fromProduct,
       consultProductId,
@@ -283,7 +296,28 @@ export const agentApi = {
       comparisonProductIds: options?.comparisonProductIds?.length
         ? JSON.stringify(options.comparisonProductIds)
         : undefined
-    }),
+    };
+    const idempotencyKey = options?.idempotencyKey
+      || getOrCreateIdempotencyKey('agent.send', payload);
+    const requestId = options?.requestId || `agent-${idempotencyKey}`.slice(0, 64);
+    return request.postForm('/agent/sendMessage', payload, {
+      headers: {
+        'X-Request-ID': requestId,
+        'Idempotency-Key': idempotencyKey
+      }
+    }).then((result) => {
+      // Keep the browser key while the server only reports an in-progress
+      // reservation.  Clearing it there would make a retry enqueue a second
+      // message after a response-loss/network race.
+      if (
+        !options?.idempotencyKey
+        && Number((result as { messageId?: unknown })?.messageId) > 0
+      ) {
+        clearIdempotencyKey('agent.send', payload);
+      }
+      return result;
+    });
+  },
   getShoppingProfile: () => request.get<ShoppingProfile>('/agent/shoppingProfile'),
   updateShoppingProfile: (expectedRevision: number, profile: Partial<ShoppingProfile>) =>
     request.post<ShoppingProfile>('/agent/shoppingProfile/update', { expectedRevision, profile }),
@@ -303,7 +337,10 @@ export const agentApi = {
   selectVisualSubject: (selectionId: string, subjectId: string) =>
     request.postForm('/agent/selectVisualSubject', { selectionId, subjectId }),
   cancelMessage: (messageId: number, assistantMessage?: string) =>
-    request.postForm('/agent/cancelMessage', { messageId, assistantMessage }),
+    request.postForm<AgentCancelMessageResult>('/agent/cancelMessage', {
+      messageId,
+      assistantMessage
+    }),
   reportClick: reportAgentProductClick,
   clearProductConsult: () => request.postForm('/agent/clearProductConsult', {}),
   pauseProductConsult: () => request.postForm('/agent/pauseProductConsult', {}),
@@ -323,7 +360,11 @@ export const agentApi = {
       '/agent/confirmAction',
       { actionToken }
     ),
-  cancelAction: (actionToken: string) => request.postForm('/agent/cancelAction', { actionToken })
+  cancelAction: (actionToken: string) =>
+    request.postForm<{ actionType?: string; success?: boolean; resultMessage?: string }>(
+      '/agent/cancelAction',
+      { actionToken }
+    )
 };
 
 export const signApi = {

@@ -61,7 +61,7 @@
 import { Delete } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import { inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { agentApi } from '@/api/modules';
+import { agentApi, type AgentCancelMessageResult } from '@/api/modules';
 import { agentComposerEmbeddedKey } from '@/composables/agentEmbed';
 import AgentChatItem from '@/components/agent/AgentChatItem.vue';
 import AgentUserBubble from '@/components/agent/AgentUserBubble.vue';
@@ -281,20 +281,32 @@ const onCancelMessage = async (payload?: unknown) => {
   if (!target || id == null) return;
 
   const partial = (target.assistantMessage || '').trim();
-  if (partial) {
-    target.status = 3;
-  } else {
-    target.status = 0;
-    target.assistantMessage = '';
-    target.bizType = undefined;
-  }
-  answering.value = false;
-  streamWaiting.value = false;
-  mitter.emit('answering', false);
-  if (currentMessage.value === target) currentMessage.value = null;
-
   try {
-    await agentApi.cancelMessage(id, partial || undefined);
+    const result = await agentApi.cancelMessage(id, partial || undefined) as AgentCancelMessageResult | null;
+    const status = Number(result?.messageStatus);
+    if (Number.isInteger(status) && status >= 0) {
+      target.status = status;
+      if (status === 0 && !partial) {
+        target.assistantMessage = '';
+        target.bizType = undefined;
+      }
+    }
+
+    const terminalState = String(result?.terminalState || '').toUpperCase();
+    const terminal = status !== 1 && (
+      result?.success === true ||
+      ['CANCELLED', 'INTERRUPTED', 'SUCCEEDED', 'FAILED', 'INCONCLUSIVE', 'MANUAL_REVIEW', 'NOT_FOUND']
+        .includes(terminalState)
+    );
+    if (terminal) {
+      streamWaiting.value = false;
+      answering.value = false;
+      mitter.emit('answering', false);
+      if (currentMessage.value === target) currentMessage.value = null;
+    }
+    if (result?.success !== true && !terminal) {
+      toast.warning('当前回复已完成或仍在处理中，请稍后刷新状态');
+    }
   } catch {
     toast.error('停止失败，请重试');
   }

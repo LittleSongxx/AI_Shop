@@ -648,6 +648,23 @@ class AgentWorker:
                     lease_owner,
                 )
                 return
+            if await self._cancel_requested(user_id, message_id):
+                terminal_written = await agent_task_service.mark_terminal(
+                    message_id,
+                    "用户取消",
+                    lease_owner,
+                    status="CANCELLED",
+                )
+                if not terminal_written:
+                    raise LeaseLostError(
+                        f"task {message_id} lost before cancellation terminal write"
+                    )
+                AGENT_TASK_TOTAL.labels(
+                    queue=queue_name, result="cancelled"
+                ).inc()
+                episode_service.finish_run("cancelled")
+                await message.ack()
+                return
             if outcome not in {"ok", "handoff", "human_support"}:
                 # 图内部已经把错误文案推给了用户（P0-1）。这一轮不能记成功，
                 # 也不自动重试——重试会向用户重复推送错误消息。
@@ -959,17 +976,43 @@ class AgentWorker:
     ) -> None:
         message_id = int(payload["messageId"])
         user_id = str(payload["userId"])
-        await stream_service.push_error(user_id, message_id, TERMINAL_ERROR, "agent")
-        await agent_message_service.reset_unresolved_count(message_id)
-        await agent_message_service.complete_message(
+        completed = await agent_message_service.try_complete_message(
             message_id, TERMINAL_ERROR, "agent", None
         )
+        if completed is not False:
+            await stream_service.push_error(
+                user_id,
+                message_id,
+                TERMINAL_ERROR,
+                "agent",
+                run_id=payload.get("runId"),
+                request_id=payload.get("requestId"),
+                episode_id=payload.get("episodeId"),
+            )
+            await agent_message_service.reset_unresolved_count(message_id)
         await message.reject(requeue=False)
 
     @staticmethod
     def _deadline_expired(payload: dict) -> bool:
         remaining = AgentWorker._remaining_deadline_seconds(payload)
         return remaining is not None and remaining <= 0
+
+    @staticmethod
+    async def _cancel_requested(user_id: str, message_id: int) -> bool:
+        if await agent_message_service.is_execution_cancelled(user_id, message_id):
+            return True
+        try:
+            return await redis_service.is_cancelled(user_id, message_id)
+        except Exception as exc:
+            # The message-row CAS remains authoritative when Redis is briefly
+            # unavailable.  Do not turn a completed answer into a retry solely
+            # because the fast cancellation flag could not be read.
+            logger.warning(
+                "agent_cancel_flag_check_failed",
+                message_id=message_id,
+                error=type(exc).__name__,
+            )
+            return False
 
     @staticmethod
     def _remaining_deadline_seconds(payload: dict) -> float | None:

@@ -192,6 +192,69 @@ class AgentMessageService:
                     ),
                 )
 
+    async def try_complete_message(
+        self,
+        message_id: int,
+        assistant_message: str,
+        biz_type: str | None = None,
+        biz_data: str | None = None,
+        source_refs: list[dict] | dict | None = None,
+        latency_ms: int | None = None,
+    ) -> bool:
+        """Atomically publish a terminal response exactly once.
+
+        The legacy ``complete_message`` method keeps its replay-compatible
+        behaviour for older callers.  Worker/finalize paths use this CAS
+        variant so a cancelled or already-terminal row cannot be overwritten
+        and a late stream frame cannot be emitted as a second terminal result.
+        """
+
+        trimmed = trim_assistant(assistant_message)
+        source_refs_json = (
+            json.dumps(source_refs, ensure_ascii=False)
+            if source_refs is not None
+            else None
+        )
+        async with acquire() as cur:
+            rows = await cur.execute(
+                """
+                UPDATE agent_message
+                SET assistant_message=%s, biz_type=%s, biz_data=%s,
+                    source_refs=%s,
+                    latency_ms=COALESCE(
+                        %s, TIMESTAMPDIFF(MICROSECOND, send_time, NOW()) DIV 1000
+                    ),
+                    status=%s
+                WHERE message_id=%s AND status=%s
+                """,
+                (
+                    trimmed,
+                    biz_type,
+                    biz_data,
+                    source_refs_json,
+                    latency_ms,
+                    MSG_STATUS_COMPLETE,
+                    message_id,
+                    MSG_STATUS_NORMAL,
+                ),
+            )
+        return rows == 1
+
+    async def get_owned_state(self, user_id: str, message_id: int) -> dict | None:
+        """Return the minimal cancellation projection for an owned message."""
+
+        async with acquire() as cur:
+            await cur.execute(
+                """
+                SELECT message_id, user_id, status, run_id
+                FROM agent_message
+                WHERE user_id=%s AND message_id=%s
+                """,
+                (user_id, int(message_id)),
+            )
+            row = await cur.fetchone()
+        return dict(row) if row else None
+
     async def cancel_message(self, user_id: str, message_id: int) -> bool:
 
         async with acquire() as cur:

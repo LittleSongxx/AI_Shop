@@ -23,7 +23,7 @@ async def test_valid_order_cards_beat_an_earlier_failed_write_attempt():
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -57,7 +57,7 @@ async def test_order_selection_is_persisted_as_the_terminal_payload():
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -98,7 +98,7 @@ async def test_server_action_card_is_authoritative_without_model_token_echo():
     }
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -138,7 +138,7 @@ async def test_product_comparison_card_is_the_terminal_payload():
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -165,7 +165,7 @@ async def test_consult_turn_drops_unrelated_product_cards_and_asks_for_identity(
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -194,7 +194,7 @@ async def test_consult_turn_drops_unrelated_product_cards_and_asks_for_identity(
 async def test_consult_without_card_asks_attribute_specific_identity_question():
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -221,7 +221,7 @@ async def test_bounded_technology_explanation_is_not_replaced_by_identity_questi
     explanation = "OLED 是像素自发光；Mini LED 是带分区背光的 LCD。"
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -252,7 +252,7 @@ async def test_named_comparison_search_clarification_is_not_replaced():
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -299,7 +299,7 @@ async def test_support_case_cards_are_terminal_and_preserve_structured_payload(
     cards = json.dumps(payload, ensure_ascii=False)
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -322,7 +322,7 @@ async def test_failed_rag_repair_draft_is_replaced_by_verifier_fallback():
     unsafe_draft = "平台支持七天无理由退货。"
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -356,7 +356,7 @@ async def test_deterministic_payment_clarification_bypasses_policy_evidence_gate
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
@@ -395,7 +395,7 @@ async def test_deterministic_invoice_target_clarification_bypasses_policy_eviden
     )
     with (
         patch(
-            "app.services.agent_runtime.agent_message_service.complete_message",
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
             AsyncMock(),
         ) as complete,
         patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
