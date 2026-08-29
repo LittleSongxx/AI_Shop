@@ -14,8 +14,10 @@ import { scheduleBootSplashDismiss, BOOT_SPLASH_MAX_MS } from './utils/bootSplas
 import { createHomeSplashPaintGate, prepareHomeForSplash } from './utils/homeBootstrap';
 import { isStandaloneDisplay } from './utils/standalone';
 import { useAuthStore } from './stores/auth';
+import { installWebVitalsObserver } from './utils/webVitals';
 
 ensureLiquidGlassFilters();
+installWebVitalsObserver();
 
 const pinia = createPinia();
 const deviceStore = useDeviceStore(pinia);

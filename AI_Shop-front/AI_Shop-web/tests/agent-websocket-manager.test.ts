@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const authStore = { isLoggedIn: true };
+const authStore = {
+  isLoggedIn: true,
+  logout: vi.fn(async () => undefined),
+  ensureSession: vi.fn(async () => true)
+};
 const messageStore = { onMessage: vi.fn() };
 
 vi.mock('@/stores/auth', () => ({
@@ -27,7 +31,7 @@ class MockWebSocket {
   readonly url: string;
   readyState = MockWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
-  onclose: ((event: { code: number }) => void) | null = null;
+  onclose: ((event: { code: number; reason?: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
 
@@ -50,6 +54,8 @@ describe('agent websocket OPEN barrier', () => {
   beforeEach(() => {
     vi.resetModules();
     authStore.isLoggedIn = true;
+    authStore.logout.mockClear();
+    authStore.ensureSession.mockClear();
     MockWebSocket.last = null;
     Object.defineProperty(globalThis, 'WebSocket', {
       configurable: true,
@@ -84,5 +90,16 @@ describe('agent websocket OPEN barrier', () => {
     socket!.readyState = MockWebSocket.OPEN;
     socket!.onopen?.();
     await expect(opened).resolves.toBe(true);
+  });
+
+  it('refreshes the cookie-backed session after a token rejection', async () => {
+    const { initAppWebSocket } = await import('@/utils/websocket/manager');
+    initAppWebSocket();
+    const socket = MockWebSocket.last;
+    socket!.onclose?.({ code: 1008, reason: 'invalid token' });
+
+    await vi.waitFor(() => expect(authStore.logout).toHaveBeenCalledWith(true));
+    await vi.waitFor(() => expect(authStore.ensureSession).toHaveBeenCalled());
+    expect(MockWebSocket.last).not.toBe(socket);
   });
 });

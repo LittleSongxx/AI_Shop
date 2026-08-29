@@ -313,6 +313,9 @@ const canSubmitMessage = computed(() => {
 const resetComposerIdle = () => {
   answering.value = false;
   messageId.value = null;
+  if (isDesktop.value) {
+    void nextTick(() => textareaRef.value?.focus());
+  }
 };
 
 let composerResizeObserver: ResizeObserver | null = null;

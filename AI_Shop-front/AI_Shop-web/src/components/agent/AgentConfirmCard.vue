@@ -1,5 +1,5 @@
 <template>
-  <div class="action-confirm-card" :class="statusClass">
+  <section class="action-confirm-card" :class="statusClass" aria-label="待确认操作">
     <header class="card-head">
       <p class="card-title">{{ card.label || '待确认操作' }}</p>
       <span v-if="isPending" class="card-badge">待确认</span>
@@ -39,7 +39,13 @@
 
     <p v-if="card.riskTip" class="risk-tip">{{ card.riskTip }}</p>
 
-    <p v-if="resultMessage" class="result-msg" :class="{ success: resultSuccess, error: !resultSuccess }">
+    <p
+      v-if="resultMessage"
+      class="result-msg"
+      :class="{ success: resultSuccess, error: !resultSuccess }"
+      role="status"
+      aria-live="polite"
+    >
       {{ resultMessage }}
     </p>
 
@@ -50,7 +56,7 @@
       </button>
     </footer>
     <p v-else-if="statusLabel" class="status-label">{{ statusLabel }}</p>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -65,43 +71,10 @@ import {
   normalizeAgentActionStatus
 } from '@/utils/agentActionStatus';
 import { toast } from '@/utils/toast';
-
-export interface ActionConfirmDetailRow {
-  label: string;
-  value: string;
-}
-
-export interface ActionConfirmOrderItem {
-  orderItemId?: string;
-  productId?: string;
-  productName?: string;
-  cover?: string;
-  propertyInfo?: string;
-  itemAmount?: number | string;
-  buyCount?: number | string;
-}
-
-export interface ActionConfirmCardData {
-  type?: string;
-  token?: string;
-  actionType?: string;
-  label?: string;
-  summary?: string;
-  confirmText?: string;
-  riskTip?: string;
-  intro?: string;
-  status?: number | string;
-  statusName?: string;
-  snapshotVersion?: string;
-  snapshotEtag?: string;
-  snapshotHash?: string;
-  snapshotCapturedAt?: string;
-  orderId?: string;
-  orderAmount?: number | string;
-  payScene?: string | number;
-  items?: ActionConfirmOrderItem[];
-  details?: ActionConfirmDetailRow[];
-}
+import type {
+  ActionConfirmCardData,
+  ActionConfirmOrderItem
+} from '@/utils/agentCardAdapter';
 
 const props = defineProps<{
   card: ActionConfirmCardData;

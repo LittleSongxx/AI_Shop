@@ -3,8 +3,11 @@
     ref="listRef"
     class="chat-scroll"
     :class="{ 'is-embedded-composer': composerEmbedded }"
+    role="log"
+    aria-label="智能客服对话"
     @scroll="onListScroll"
   >
+    <p class="sr-only" role="status" aria-live="polite">{{ liveAnnouncement }}</p>
     <div v-if="messageList.length" class="history-toolbar">
       <el-tooltip content="清除当前会话记录" placement="bottom">
         <button
@@ -90,6 +93,7 @@ const clearingHistory = ref(false);
 const answering = ref(false);
 const streamWaiting = ref(false);
 const currentMessage = ref<AgentHistoryMessage | null>(null);
+const liveAnnouncement = ref('');
 
 const messageList = ref<AgentHistoryMessage[]>([]);
 const pageNo = ref(0);
@@ -171,6 +175,14 @@ watch(
     const result = upsertAgentStreamMessage(messageList.value, newVal);
     if (!result) return;
     if (result.terminal) {
+      const terminalState = String(result.message.terminalState || '').toUpperCase();
+      liveAnnouncement.value = terminalState === 'CANCELLED' || Number(result.message.status) === 0
+        ? '回复已取消'
+        : terminalState === 'INTERRUPTED' || Number(result.message.status) === 3
+          ? '回复已中断'
+          : terminalState === 'FAILED'
+            ? '回复失败'
+            : '回复完成';
       finishAnswering(result.message);
       if (result.created) void scrollBottom();
       return;
@@ -193,6 +205,7 @@ const onSendMessage = (payload?: unknown) => {
   const target = upsertAgentHttpMessage(messageList.value, message);
   if (!target) return;
   currentMessage.value = target.status === 1 ? target : null;
+  liveAnnouncement.value = target.status === 1 ? '正在生成回复' : '已收到回复';
 
   answering.value = target.status === 1;
   streamWaiting.value = target.status === 1;
@@ -458,6 +471,24 @@ onUnmounted(() => {
 
   &.is-embedded-composer {
     padding-bottom: 12px;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-scroll {
+    scroll-behavior: auto;
   }
 }
 

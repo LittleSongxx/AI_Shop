@@ -113,6 +113,7 @@ AI_Shop/
 - **受控写操作**：模型只能生成 `PROPOSE_*` 提案；用户确认后 Java 重新校验身份、归属、状态与幂等键，未知远端结果进入 `INCONCLUSIVE`，核对到边界后转 `MANUAL_REVIEW`
 - **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用、有界 repair，以及发布快照 ACL/freshness/逻辑删除回滚（受控预生产，详见 [E6 验证记录](docs/project/AI-Shop-E6-RAG生命周期验证-20260829.md)）
 - **可观测 Agent 运行时**：HTTP/MQ/Worker/Java/MCP 共用 run/request/episode correlation；流式发布、WebSocket 慢连接、listener liveness、队列年龄、取消时延和 bounded backpressure 均有低基数指标（详见 [E8 验证记录](docs/project/AI-Shop-E8-可观测背压短稳态验证-20260829.md)）。短稳态证据不等于线上 SLO 或容量证明。
+- **前端真实闭环**：typed legacy support/action adapter、OPEN barrier/重连/终态与取消、token 过期恢复、对话区 a11y、reduced-motion 和原生 Web Vitals 采集；mock Playwright 已覆盖 WS 重连与权威取消结果（详见 [E9 验证记录](docs/project/AI-Shop-E9-前端真实闭环验证-20260829.md)）。
 - **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
 - **输入防护**：NFKC 归一化 + 两级规则（硬阻断 / 可疑累积）+ Propose→用户确认→Java 执行，防 Prompt 注入
 - **强制工具回退**：模型跳过必要工具时，框架层自动补全并路由至 finalize，避免幻觉回复

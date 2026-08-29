@@ -1,5 +1,5 @@
 <template>
-  <section class="support-card" :aria-label="isDetail ? '工单详情' : '工单列表'">
+  <section class="support-card" :aria-label="isDetail ? '工单详情' : '工单列表'" role="region">
     <header class="support-head">
       <div>
         <p class="support-kicker">售后服务</p>
@@ -38,12 +38,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import type { SupportCase as SupportCaseModel } from '@/api/modules';
+import type { SupportCaseCardData } from '@/utils/agentCardAdapter';
 
-const props = defineProps<{ card: Record<string, any> }>();
+const props = defineProps<{ card: SupportCaseCardData }>();
 const router = useRouter();
 const isDetail = computed(() => props.card?.type === 'SUPPORT_CASE_DETAIL');
-const detailCase = computed(() => (props.card?.case && typeof props.card.case === 'object' ? props.card.case : null));
-const cases = computed(() => (Array.isArray(props.card?.cases) ? props.card.cases : []) as Record<string, any>[]);
+const detailCase = computed<SupportCaseModel | null>(() => props.card.case || null);
+const cases = computed<SupportCaseModel[]>(() => props.card.cases);
 
 const statusText = (status: unknown) => ({
   OPEN: '待处理',
@@ -53,39 +55,47 @@ const statusText = (status: unknown) => ({
 }[String(status || '').toUpperCase()] || '待处理');
 const statusClass = (status: unknown) => `status-${String(status || 'OPEN').toLowerCase()}`;
 const openCases = () => void router.push('/support-cases');
-const openCase = (item: Record<string, any>) => {
+const openCase = (item: SupportCaseModel) => {
   const id = item?.caseNo || item?.caseId;
   if (id != null && id !== '') void router.push({ path: '/support-cases', query: { caseId: String(id) } });
 };
 </script>
 
 <script lang="ts">
-import { defineComponent, h } from 'vue';
+import { defineComponent, h, type PropType } from 'vue';
+import type { SupportCase } from '@/api/modules';
 import { resolveImageUrl } from '@/utils/image';
 
+const SUPPORT_STATUS_LABELS: Record<string, string> = {
+  OPEN: '待处理', IN_PROGRESS: '处理中', RESOLVED: '已解决', CANCELLED: '已取消'
+};
+
 const CaseSummary = defineComponent({
-  props: { item: { type: Object, required: true } },
+  props: { item: { type: Object as PropType<SupportCase>, required: true } },
   setup(props) {
+    const item = props.item;
     return () => h('div', { class: 'case-summary' }, [
       h('div', { class: 'summary-line' }, [
-        h('span', { class: ['status', `status-${String((props.item as any).status || 'OPEN').toLowerCase()}`] },
-          ({ OPEN: '待处理', IN_PROGRESS: '处理中', RESOLVED: '已解决', CANCELLED: '已取消' } as any)[String((props.item as any).status || '').toUpperCase()] || '待处理'),
-        h('small', {}, (props.item as any).caseNo || (props.item as any).caseId || '')
+        h('span', {
+          class: ['status', `status-${String(item.status || 'OPEN').toLowerCase()}`]
+        }, SUPPORT_STATUS_LABELS[String(item.status || '').toUpperCase()] || '待处理'),
+        h('small', {}, item.caseNo || item.caseId || '')
       ]),
-      h('p', { class: 'case-description' }, (props.item as any).description || '暂无描述'),
+      h('p', { class: 'case-description' }, item.description || '暂无描述'),
       h('p', { class: 'case-meta' }, [
-        (props.item as any).categoryLabel || (props.item as any).category || '其他',
-        (props.item as any).orderId ? ` · 订单 ${(props.item as any).orderId}` : ''
+        item.categoryLabel || item.category || '其他',
+        item.orderId ? ` · 订单 ${item.orderId}` : ''
       ])
     ]);
   }
 });
 
 const Evidence = defineComponent({
-  props: { item: { type: Object, required: true } },
+  props: { item: { type: Object as PropType<SupportCase>, required: true } },
   setup(props) {
     return () => {
-      const evidence = ((props.item as any).evidence || {}) as Record<string, any>;
+      const item = props.item;
+      const evidence = item.evidence || {};
       const path = evidence.path ? resolveImageUrl(evidence.path, { useThumbnail: true }) : '';
       if (!path && !evidence.vlmDescription && !evidence.moderationStatus) return null;
       return h('div', { class: 'evidence' }, [

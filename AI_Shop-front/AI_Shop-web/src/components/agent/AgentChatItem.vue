@@ -1,5 +1,11 @@
 <template>
-  <div v-if="showAi" class="bubble-row ai">
+  <div
+    v-if="showAi"
+    class="bubble-row ai"
+    role="article"
+    aria-label="智能客服回复"
+    :aria-busy="isStreaming || waiting"
+  >
     <div class="ai-avatar-mini">
       <el-icon :size="16"><Service /></el-icon>
     </div>
@@ -123,7 +129,7 @@ import AgentProductList from '@/components/agent/AgentProductList.vue';
 import AgentProductComparison from '@/components/agent/AgentProductComparison.vue';
 import AgentSupportCaseCard from '@/components/agent/AgentSupportCaseCard.vue';
 import AgentOrderList from '@/components/agent/AgentOrderList.vue';
-import AgentConfirmCard, { type ActionConfirmCardData } from '@/components/agent/AgentConfirmCard.vue';
+import AgentConfirmCard from '@/components/agent/AgentConfirmCard.vue';
 import AgentOrderSelectionCard, {
   type OrderSelectionCardData
 } from '@/components/agent/AgentOrderSelectionCard.vue';
@@ -133,10 +139,16 @@ import AgentVisualSubjectSelectionCard, {
 import { agentApi } from '@/api/modules';
 import { cleanAgentActionStreamText, containsAgentTable, stripEmbeddedProductJson } from '@/utils/agentMessageRender';
 import { toast } from '@/utils/toast';
-import { normalizeSourceRefs, type AgentSourceRef } from '@/utils/agentHistory';
+import {
+  normalizeActionConfirmCard,
+  normalizeSupportCaseCard,
+  type ActionConfirmCardData,
+  type SupportCaseCardData
+} from '@/utils/agentCardAdapter';
+import { normalizeSourceRefs, type AgentHistoryMessage, type AgentSourceRef } from '@/utils/agentHistory';
 
 const props = defineProps<{
-  data: Record<string, any>;
+  data: AgentHistoryMessage;
   waiting?: boolean;
 }>();
 
@@ -261,11 +273,8 @@ const comparisonCard = computed<Record<string, any> | null>(() => {
   return card?.type === 'PRODUCT_COMPARISON' && Array.isArray(card.products) ? card : null;
 });
 
-const supportCaseCard = computed<Record<string, any> | null>(() => {
-  const card = structuredCard.value;
-  if (card?.type === 'SUPPORT_CASE_LIST' && Array.isArray(card.cases)) return card;
-  if (card?.type === 'SUPPORT_CASE_DETAIL' && card.case && typeof card.case === 'object') return card;
-  return null;
+const supportCaseCard = computed<SupportCaseCardData | null>(() => {
+  return normalizeSupportCaseCard(structuredCard.value);
 });
 
 const shoppingClarificationCard = computed<{
@@ -288,10 +297,11 @@ const syncActionConfirmCard = () => {
     return;
   }
   const parsed = parseJsonObject(props.data.assistantMessage);
-  if (parsed?.type === 'ACTION_CONFIRM') {
+  const normalized = normalizeActionConfirmCard(parsed);
+  if (normalized) {
     actionConfirmCard.value = {
-      ...(parsed as ActionConfirmCardData),
-      status: Number((parsed as ActionConfirmCardData).status ?? 0)
+      ...normalized,
+      status: normalized.status ?? 0
     };
     return;
   }

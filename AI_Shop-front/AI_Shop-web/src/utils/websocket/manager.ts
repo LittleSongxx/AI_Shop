@@ -42,6 +42,7 @@ let needReconnect = true;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let unreadRefreshHandler: UnreadRefreshHandler | null = null;
 let openWaiters: Array<(opened: boolean) => void> = [];
+let sessionRecoveryPromise: Promise<void> | null = null;
 
 const wsCheckEnabled = () => import.meta.env.VITE_WS_CHECK === 'true';
 
@@ -117,6 +118,38 @@ const handleReconnect = () => {
   reconnectTimer = setTimeout(connectWs, delay);
 };
 
+const recoverExpiredSession = () => {
+  if (sessionRecoveryPromise) return sessionRecoveryPromise;
+  sessionRecoveryPromise = (async () => {
+    const authStore = useAuthStore();
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    try {
+      // A 1008 token rejection can happen while the in-memory auth store still
+      // considers the session valid. Clear that stale projection first so the
+      // cookie-backed auto-login path gets a chance to refresh it.
+      await authStore.logout(true);
+      const restored = await authStore.ensureSession();
+      if (restored) {
+        retryCount = 0;
+        needReconnect = true;
+        connectWs();
+        return;
+      }
+    } catch {
+      // Fall through to the single user-facing auth failure below.
+    }
+    needReconnect = false;
+    settleOpenWaiters(false);
+    if (wsCheckEnabled()) toast.warning('登录状态已失效，请重新登录');
+  })().finally(() => {
+    sessionRecoveryPromise = null;
+  });
+  return sessionRecoveryPromise;
+};
+
 const connectWs = () => {
   if (isConnecting || !needReconnect) return;
   const authStore = useAuthStore();
@@ -148,6 +181,13 @@ const connectWs = () => {
     ws.onclose = (event) => {
       isConnecting = false;
       clearHeartbeat();
+      const authRejected =
+        event.code === 4401 ||
+        (event.code === 1008 && /(token|auth|expired|invalid)/i.test(event.reason || ''));
+      if (authRejected) {
+        void recoverExpiredSession();
+        return;
+      }
       if (event.code !== 1000) {
         handleReconnect();
       } else {
