@@ -103,7 +103,18 @@ class CompressService:
             )
             memory.summary = new_summary
             memory.summary_last_message_id = int(to_compress[-1]["message_id"])
-            await session_memory_service.save(memory, redis_service.client)
+            saved = await session_memory_service.save(memory, redis_service.client)
+            if saved is False:
+                # A foreground turn won the memory CAS while compression was
+                # running.  Keep the newer turn and retry compression later;
+                # do not report the stale summary as successfully persisted.
+                COMPRESS_TOTAL.labels(result="conflict").inc()
+                logger.warning(
+                    "session_compress_revision_conflict",
+                    user_id=user_id,
+                    expected_revision=memory.revision,
+                )
+                return
             COMPRESS_TOTAL.labels(result="ok").inc()
             logger.info(
                 "session_compressed",

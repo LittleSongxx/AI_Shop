@@ -46,6 +46,12 @@ class RedisCheckpointSaver(BaseCheckpointSaver[str]):
     def persist_failures(self) -> int:
         return self._persist_failures
 
+    @property
+    def ttl_seconds(self) -> int:
+        """Configured retention window for resumable graph checkpoints."""
+
+        return self._ttl
+
     def _record_persist_failure(self, thread_id: str, operation: str, error: str) -> None:
         self._persist_failures += 1
         CHECKPOINT_PERSIST_FAILURES.inc()

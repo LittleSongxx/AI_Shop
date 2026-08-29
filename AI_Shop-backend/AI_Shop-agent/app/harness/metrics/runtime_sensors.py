@@ -251,7 +251,8 @@ REGRESSION_REPLAY_TOTAL = Counter(
     ["result"],
 )
 
-# 会话压缩结果监控：ok = 成功压缩；timeout = Memory LLM 超时；error = 其他异常。
+# 会话压缩结果监控：ok = 成功压缩；timeout = Memory LLM 超时；error = 其他异常；
+# conflict = CAS 发现前台 turn 已更新，丢弃本次旧摘要并等待下一轮重试。
 # timeout 连续出现意味着 token 无法被压缩，会话 context 将持续膨胀直到 OOM。
 COMPRESS_TOTAL = Counter(
     "agent_session_compress_total",

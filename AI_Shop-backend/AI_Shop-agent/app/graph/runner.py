@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 import structlog
@@ -26,6 +27,18 @@ from app.services.redis_service import redis_service
 logger = structlog.get_logger()
 tracer = get_tracer()
 _SUCCESS_OUTCOMES = frozenset({"ok", "handoff", "human_support"})
+_CHECKPOINT_CLEANUP_OUTCOMES = _SUCCESS_OUTCOMES | {"cancelled"}
+
+
+def _should_cleanup_checkpoint(outcome: str | None) -> bool:
+    """Only terminal outcomes that cannot benefit from recovery may be deleted.
+
+    A missing/unknown outcome is deliberately retained.  This covers worker
+    cancellation and exceptions where the graph may have written a usable
+    checkpoint immediately before it stopped.
+    """
+
+    return outcome in _CHECKPOINT_CLEANUP_OUTCOMES
 
 
 def _runtime_budget_config() -> BudgetConfig | None:
@@ -106,6 +119,8 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
     budget_context_token = bind_budget_guard(budget_guard)
 
     started = time.perf_counter()
+    outcome: str | None = None
+    outcome_known = False
     with tracer.start_as_current_span("agent.graph") as span:
         span.set_attribute("agent.message_id", int(message_id))
         span.set_attribute("agent.run_id", str(agent_msg.get("runId") or ""))
@@ -134,7 +149,12 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
                 logger.info("graph_invoke", thread_id=thread_id, message_id=message_id)
                 result = await graph.ainvoke(state, config)
 
-            outcome = str(result.get("outcome") or "ok")
+            raw_outcome = result.get("outcome")
+            outcome = str(raw_outcome or "ok")
+            # Keep the legacy return value for a graph that omitted its
+            # outcome, but treat that omission as unknown for checkpoint
+            # cleanup so recovery is never discarded on an ambiguous result.
+            outcome_known = bool(raw_outcome)
             elapsed_ms = round((time.perf_counter() - started) * 1_000)
 
             # Token 消耗累计：将本次图运行消耗的真实 token 累加到用户的会话和每日配额。
@@ -207,11 +227,19 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             episode_service.finish_run(
                 outcome,
                 latency_ms=elapsed_ms,
-                force_keep=True if outcome != "ok" else None,
+                force_keep=True if (outcome != "ok" or not outcome_known) else None,
             )
             return outcome
+        except asyncio.CancelledError:
+            # User cancellation is a terminal decision: do not leave a
+            # resumable checkpoint that could execute after cancellation.
+            outcome = "cancelled"
+            outcome_known = True
+            raise
         except BudgetExceededError as budget_exc:
             # 预算超限错误
+            outcome = "budget_exceeded"
+            outcome_known = True
             elapsed_ms = round((time.perf_counter() - started) * 1_000)
             logger.warning(
                 "budget_exceeded",
@@ -240,6 +268,8 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             return "budget_exceeded"
         except Exception as exc:
             elapsed_ms = round((time.perf_counter() - started) * 1_000)
+            outcome = "graph_exception"
+            outcome_known = True
             span.record_exception(exc)
             episode_service.record_step(
                 "GRAPH_ERROR",
@@ -257,12 +287,24 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             )
             raise
         finally:
-            try:
-                await checkpointer.adelete_thread(thread_id)
-            except Exception as e:
-                logger.warning(
-                    "graph_checkpoint_cleanup_failed",
+            cleanup_outcome = outcome if outcome_known else None
+            if _should_cleanup_checkpoint(cleanup_outcome):
+                try:
+                    await checkpointer.adelete_thread(thread_id)
+                except Exception as e:
+                    logger.warning(
+                        "graph_checkpoint_cleanup_failed",
+                        thread_id=thread_id,
+                        error=str(e),
+                    )
+            else:
+                # Keep the Redis checkpoint until its configured TTL.  A
+                # retry/recovery worker can then resume from the last durable
+                # node instead of silently starting a fresh graph.
+                logger.info(
+                    "graph_checkpoint_retained_for_recovery",
                     thread_id=thread_id,
-                    error=str(e),
+                    outcome=cleanup_outcome or "unknown",
+                    ttl_seconds=getattr(checkpointer, "ttl_seconds", None),
                 )
             reset_budget_guard(budget_context_token)
