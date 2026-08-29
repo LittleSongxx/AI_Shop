@@ -229,3 +229,9 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 当前容量曲线只证明本地短时只读诊断可运行；固定独占环境的 warm-up、steady-state、stress/soak 和 Provider 分层完成前，不新增生产 SLO 结论。
 - 当前真实账单价格和 endpoint 合同仍未核验；目录价估算仅用于面试中的成本量级说明，不能写成实际单请求成本。
 - 真实曝光/点击/购买、授权/合规数据到位前，不新增 CTR/CVR/GMV、CSAT/FCR 或单位经济性结论；v56 的全通过仅支持当前已见回放的可信性，不支持绝对安全或未来输出泛化主张。
+
+### 2026-08-29：E57 客服真实 HTTP/LLM 证据刷新
+
+- 在本地完整 Java/MySQL/Agent/Worker/MCP/RAG/Provider 栈上重新执行 v2.1 HUMAN_APPROVED_AI_ASSISTED 集合 `120/120`，并将脱敏 observation 确定性重建为只读 `customer-service-http-e57-evidence-refresh-20260829` 包；包内 `SHA256SUMS` 校验通过，`providerCallsReexecuted=false`。
+- 运行事实：行为契约 `29/29`、引用结构违规 `0`、规则预路由 intent Macro-F1 `1.0`、高风险召回 `13/13`、handoff `29/29`；Provider 调用 `11`，费用 `UNPRICED/null`，本地延迟 P50/P95/P99 `617.989/1289.224/8880.928 ms`，明确不是生产 SLO。
+- 新包仍为 `EXECUTED_PENDING_HUMAN_ANSWER_REVIEW`，不继承 v56 的人工答案分数；答案语义、unseen 泛化、线上 SLO、CSAT/FCR 和成本门禁均未由此刷新。详见 [E57 证据刷新](AI-Shop-客服E57真实运行证据刷新-20260829.md)。
