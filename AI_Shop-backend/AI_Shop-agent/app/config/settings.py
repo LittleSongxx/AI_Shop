@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from functools import lru_cache
 from typing import Annotated, Literal
@@ -24,6 +25,32 @@ def _blank_to_none(value: object) -> object:
 
 OptionalInt = Annotated[int | None, BeforeValidator(_blank_to_none)]
 OptionalFloat = Annotated[float | None, BeforeValidator(_blank_to_none)]
+
+
+def _parse_origins(value: object) -> object:
+    """Accept either Settings' JSON list or a comma-separated env value."""
+
+    if value is None or isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError("WS_ALLOWED_ORIGINS must be a JSON array") from exc
+            if not isinstance(parsed, list):
+                raise ValueError("WS_ALLOWED_ORIGINS must be a JSON array")
+            return parsed
+        return [item.strip() for item in raw.split(",") if item.strip()]
+    return value
+
+
+Origins = Annotated[list[str], BeforeValidator(_parse_origins)]
 
 
 class Settings(BaseSettings):
@@ -99,6 +126,42 @@ class Settings(BaseSettings):
     admin_assertion_previous_key_id: str = "previous"
     admin_assertion_max_age_seconds: int = 300
     admin_assertion_nonce_ttl_seconds: int = 600
+    # Browser sessions use HttpOnly cookies, so the Agent checks this exact
+    # allowlist on WebSocket handshakes and unsafe cookie-authenticated HTTP.
+    # Empty means same-origin against the request Host (use an explicit list
+    # behind a reverse proxy whose internal Host differs from the browser Host).
+    websocket_allowed_origins: Origins = Field(
+        default_factory=list,
+        validation_alias=AliasChoices(
+            "WS_ALLOWED_ORIGINS",
+            "WEBSOCKET_ALLOWED_ORIGINS",
+            "websocket_allowed_origins",
+        ),
+    )
+    csrf_protection_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("CSRF_PROTECTION_ENABLED", "csrf_protection_enabled"),
+    )
+    http_max_request_bytes: int = Field(
+        default=256 * 1024,
+        validation_alias=AliasChoices("HTTP_MAX_REQUEST_BYTES", "http_max_request_bytes"),
+    )
+    ws_max_frame_bytes: int = Field(
+        default=64 * 1024,
+        validation_alias=AliasChoices("WS_MAX_FRAME_BYTES", "ws_max_frame_bytes"),
+    )
+    ws_rate_limit_window_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "WS_RATE_LIMIT_WINDOW_SECONDS", "ws_rate_limit_window_seconds"
+        ),
+    )
+    ws_rate_limit_max_messages: int = Field(
+        default=120,
+        validation_alias=AliasChoices(
+            "WS_RATE_LIMIT_MAX_MESSAGES", "ws_rate_limit_max_messages"
+        ),
+    )
     # Stable HMAC identity used only to match an explicitly consented pilot
     # participant to an Agent run. It must not be rotated with the request
     # assertion key or raw user IDs would become impossible to match.
@@ -630,6 +693,24 @@ class Settings(BaseSettings):
             raise ValueError("COMMERCE_OUTCOME_RETENTION_DAYS must be between 30 and 730")
         if self.max_input_chars < 128 or self.max_input_chars > 32_000:
             raise ValueError("MAX_INPUT_CHARS must be between 128 and 32000")
+        if not 16_384 <= self.http_max_request_bytes <= 10 * 1024 * 1024:
+            raise ValueError("HTTP_MAX_REQUEST_BYTES must be between 16384 and 10485760")
+        if not 1024 <= self.ws_max_frame_bytes <= 1024 * 1024:
+            raise ValueError("WS_MAX_FRAME_BYTES must be between 1024 and 1048576")
+        if not 1 <= self.ws_rate_limit_window_seconds <= 3600:
+            raise ValueError("WS_RATE_LIMIT_WINDOW_SECONDS must be between 1 and 3600")
+        if not 1 <= self.ws_rate_limit_max_messages <= 10_000:
+            raise ValueError("WS_RATE_LIMIT_MAX_MESSAGES must be between 1 and 10000")
+        for origin in self.websocket_allowed_origins:
+            parsed_origin = urlparse(str(origin).strip())
+            if (
+                parsed_origin.scheme not in {"http", "https"}
+                or not parsed_origin.netloc
+                or parsed_origin.path not in {"", "/"}
+                or parsed_origin.query
+                or parsed_origin.fragment
+            ):
+                raise ValueError("WS_ALLOWED_ORIGINS entries must be bare HTTP(S) origins")
         if self.min_input_chars < 0 or self.min_input_chars > 20:
             raise ValueError("MIN_INPUT_CHARS must be between 0 and 20")
         if self.per_session_token_budget < 0:
@@ -802,6 +883,8 @@ class Settings(BaseSettings):
             errors.append("PRIVACY_EXPORT_SIGNING_SECRET must be configured")
         if not self.llm_api_key.strip():
             errors.append("LLM_API_KEY must be configured")
+        if self.csrf_protection_enabled and not self.websocket_allowed_origins:
+            errors.append("WS_ALLOWED_ORIGINS must be configured in production")
         if self.embedding_provider != "openai":
             errors.append("EMBEDDING_PROVIDER must be openai in production")
         if not self.embedding_api_key.strip():

@@ -123,6 +123,7 @@ AI_Shop/
 - **统一可信评测**：Search、RAG、Agent 共用一个 fail-closed suite；适配器分别调用生产 ProductService、RAG retriever/generation contract 和 Agent HTTP + 持久化 Episode，冻结后 final 只能 claim/执行一次，任何域失败都会阻断发布门禁
 - **熔断降级**：外部 Provider 使用 CLOSED/OPEN/HALF_OPEN 熔断与受控 fallback；未知写结果不会被通用重试自动重放
 - **速率限制**：用户级别双窗口限流，防止滥用
+- **身份与浏览器边界**：服务端 principal 绑定用户/管理员会话；WS 精确 Origin、帧大小和 Redis 入站限流，Cookie 变更请求执行 Origin-based CSRF，session TTL 过期即拒绝（单店受控预生产，详见 [E5 验证记录](docs/project/AI-Shop-E5-身份与安全验证-20260829.md)）
 
 ### 治理与用户闭环
 
@@ -232,6 +233,9 @@ cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
 | `APP_ENV` / `AISHOP_PRODUCTION_READY` | 生产环境分别设为 `production` / `true`，触发 Python Agent 与 Java 服务的安全校验 |
 | `AISHOP_DEV_LOGIN_BYPASS` | 本地调试开关，**禁止生产开启** |
 | `ALLOW_DEVELOPMENT_AUTH_BYPASS` | Python Agent 的开发认证绕过开关，**禁止生产开启** |
+| `WS_ALLOWED_ORIGINS` / `CSRF_PROTECTION_ENABLED` | 浏览器 WS/unsafe Cookie 请求的精确来源白名单与 CSRF 开关；生产需配置对外 Origin |
+| `HTTP_MAX_REQUEST_BYTES` / `WS_MAX_FRAME_BYTES` | Agent HTTP body 与单帧 UTF-8 字节上限 |
+| `WS_RATE_LIMIT_WINDOW_SECONDS` / `WS_RATE_LIMIT_MAX_MESSAGES` | 每用户/管理员 WebSocket 入站帧 Redis 固定窗口 |
 | `LLM_BASE_URL` | LLM API 基础地址（OpenAI 兼容） |
 | `LLM_API_KEY` | LLM API Key |
 | `LLM_MODEL` | 模型名称；当前示例为 `deepseek-chat`，也可填写兼容的其他模型 |

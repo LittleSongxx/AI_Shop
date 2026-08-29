@@ -132,7 +132,7 @@ public class SentinelGatewayConfig {
 
         for (String routeId : new String[]{
                 "user", "product", "cart", "order", "pay", "coupon",
-                "search", "stock", "admin", "agent-http"
+                "search", "stock", "admin", "agent-http", "agent-ws"
         }) {
             rules.add(new GatewayFlowRule(routeId).setCount(defaultQps).setIntervalSec(1));
         }

@@ -83,7 +83,9 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
                     });
         }
 
-        if (path.startsWith("/api/") || path.startsWith("/ws/")) {
+        // Keep the exact /ws endpoint under the same session gate as /ws/.
+        // A Path=/ws/** route does not match the no-slash form.
+        if (path.startsWith("/api/") || "/ws".equals(path) || path.startsWith("/ws/")) {
             if (path.startsWith("/api/") && matchAny(path, authProperties.getWebExcludePaths())) {
                 return chain.filter(sanitizedExchange);
             }

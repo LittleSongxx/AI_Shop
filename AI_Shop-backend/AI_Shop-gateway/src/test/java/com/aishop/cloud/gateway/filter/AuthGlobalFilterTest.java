@@ -62,6 +62,23 @@ class AuthGlobalFilterTest {
     }
 
     @Test
+    void exactWebSocketPathIsStillSessionAuthenticated() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("mall:token:web:valid-token"))
+                .thenReturn(Mono.just("{\"userId\":\"trusted-user\"}"));
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/ws")
+                        .header("token", "valid-token")
+                        .build());
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+
+        filter.filter(exchange, capture(forwarded)).block();
+
+        assertEquals("trusted-user", forwarded.get().getRequest().getHeaders().getFirst("X-User-Id"));
+        assertEquals(List.of("1"), forwarded.get().getRequest().getHeaders().get("X-User-Token-Verified"));
+    }
+
+    @Test
     void publicEndpointStillDropsClientSuppliedIdentityHeaders() {
         properties.setWebExcludePaths(List.of("/api/public/**"));
         MockServerWebExchange exchange = MockServerWebExchange.from(

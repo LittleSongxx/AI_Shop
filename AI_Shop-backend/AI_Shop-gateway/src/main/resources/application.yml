@@ -93,7 +93,7 @@ spring:
             - id: agent-ws
               uri: ws://${AGENT_HOST:127.0.0.1}:${AGENT_PORT:7050}
               predicates:
-                - Path=/ws/**
+                - Path=/ws,/ws/**
             - id: internal-order
               uri: lb://aishop-order
               predicates:

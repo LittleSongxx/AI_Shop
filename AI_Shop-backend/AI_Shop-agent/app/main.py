@@ -1,9 +1,11 @@
 import asyncio
+import hmac
 from contextlib import asynccontextmanager
 
 import structlog
 import uvicorn
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 
 from app.api.exception_handlers import business_exception_handler
@@ -14,6 +16,7 @@ from app.api.websocket import (
     stop_ws_listener,
     websocket_endpoint,
 )
+from app.auth.security import content_length_exceeds, csrf_origin_allowed
 from app.config.settings import get_settings
 from app.db.analytics_pool import close_analytics_pool, init_analytics_pool
 from app.db.migrations import run_migrations
@@ -134,6 +137,69 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="EShop Agent Python", lifespan=lifespan)
 configure_telemetry(app)
+
+
+@app.middleware("http")
+async def trust_boundary_guard(request: Request, call_next):
+    """Bound Agent request bodies and protect cookie-authenticated mutations."""
+
+    settings = get_settings()
+    path = request.url.path
+    if path.startswith("/api/") or path.startswith("/admin-api/"):
+        if content_length_exceeds(request.headers, settings.http_max_request_bytes):
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "status": "error",
+                    "code": 413,
+                    "info": "请求体超过允许大小",
+                    "data": None,
+                },
+            )
+
+        if settings.csrf_protection_enabled and request.method.upper() in {
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        }:
+            admin_surface = path.startswith("/admin-api/")
+            cookie_name = "adminToken" if admin_surface else "token"
+            header_name = cookie_name
+            cookie_token = request.cookies.get(cookie_name)
+            header_token = request.headers.get(header_name)
+            # A custom token header is not automatically attached by a
+            # cross-site form. Cookie-only mutations therefore require an
+            # exact same-origin Origin; mismatched dual credentials fail closed.
+            if cookie_token and header_token and not hmac.compare_digest(
+                cookie_token.strip(), header_token.strip()
+            ):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "status": "error",
+                        "code": 403,
+                        "info": "认证凭证不一致",
+                        "data": None,
+                    },
+                )
+            if cookie_token and not header_token:
+                if not csrf_origin_allowed(
+                    request.headers.get("origin"),
+                    allowed_origins=settings.websocket_allowed_origins,
+                    request_host=request.headers.get("host"),
+                    forwarded_proto=request.headers.get("x-forwarded-proto"),
+                ):
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "status": "error",
+                            "code": 403,
+                            "info": "请求来源未通过 CSRF 校验",
+                            "data": None,
+                        },
+                    )
+    return await call_next(request)
 
 # 接口限流有两层，都不在这里：
 #   1. 网关 Sentinel 按路由做 QPS 流控（agent-http / agent-ws），是对外的第一道；

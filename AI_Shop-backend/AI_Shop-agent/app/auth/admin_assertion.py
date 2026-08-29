@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
 
+from app.auth.security import Principal
 from app.config.settings import get_settings
 from app.services.redis_service import redis_service
 
@@ -18,6 +19,10 @@ class AdminAssertion:
     roles: frozenset[str]
     permissions: frozenset[str]
     key_id: str
+
+    @property
+    def principal(self) -> Principal:
+        return Principal(self.admin_id, "ADMIN", "header")
 
     def require_any(self, *permissions: str) -> "AdminAssertion":
         if not permissions or self.permissions.intersection(permissions):
