@@ -248,3 +248,10 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 
 - 在同一真实本地全栈上补跑退款提案与售后候选选择两条 mobile Chromium 用例，`2/2` 通过：退款请求停在 `ACTION_CONFIRM/REFUND`，售后选择停在 `CREATE_SUPPORT_CASE` 提案；重复选择返回相同 `messageId`，冲突选择返回 `409`。
 - 两条用例均未确认退款或创建工单；trace 含会话 cookie，已移至工作区外受限 quarantine，哈希和边界见 [客服真实浏览器 E57 证据](AI-Shop-客服真实浏览器E57证据-20260829.md)。该结果补强浏览器/状态机证据，不刷新人工答案质量、CSAT/FCR、unseen 或生产 SLO。
+
+### 2026-08-30：A1 发布事实 Alias 路由与探索评测
+
+- 在生产 query planner 中复用发布版 fact metadata，将明确术语 alias/完整 fact ID 路由到既有 `factHints`；歧义和普通未标记提及 fail-closed，混合意图与语义缓存维度已补回归。实现提交为 `db26d43`，Text2SQL 和正式 unseen 均未改动。
+- 真实外部模型 v4 完整执行 Search 50 / RAG 50 / Agent 25（Agent 200 trials），总门仍 `FAILED`。RAG case pass `29/50 → 31/50`、source coverage `0.586207 → 0.965517`，但 NDCG@5 `0.910388 → 0.858217`，generation/claim/citation 仅 `0.62`，不能概括为全面质量提升。
+- 生命周期源码暴露门拒绝了与回归测试完整重合的 `agent-unseen-116`；没有绕过。探索副本只改写该条措辞并标记不可同题比较，RAG 50 条不变。正式资产五个哨兵 SHA 前后完全一致。
+- 外置 evidence、candidate 与 runtime quarantine 的路径、SHA、逐 case 差异和后续边界见 [A1 事实 Alias 路由与探索评测](AI-Shop-A1事实Alias路由与探索评测-20260830.md)。

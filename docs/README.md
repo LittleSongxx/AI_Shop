@@ -17,6 +17,7 @@
 | [project/AI-Shop-E3-检查点记忆恢复验证](project/AI-Shop-E3-检查点记忆恢复验证-20260829.md) | checkpoint/memory revision、CAS 和生命周期清理 | `CONTROLLED_PREPROD_ONLY`；不构成容灾证明 |
 | [project/AI-Shop-E5-身份与安全验证](project/AI-Shop-E5-身份与安全验证-20260829.md) | Agent principal、WS Origin、Cookie CSRF、token 过期、输入/帧大小和限流边界 | `CONTROLLED_PREPROD_ONLY`；单店边界 |
 | [project/AI-Shop-E6-RAG生命周期验证](project/AI-Shop-E6-RAG生命周期验证-20260829.md) | 发布快照、ACL、freshness、逻辑删除/回滚和 RAG DLQ 指标 | `CONTROLLED_PREPROD_ONLY`；`releaseGateEligible=false` |
+| [project/AI-Shop-A1事实Alias路由与探索评测](project/AI-Shop-A1事实Alias路由与探索评测-20260830.md) | 发布版 fact metadata alias → `factHints` 路由、回归与隔离外部模型 v4 结果 | RAG 31/50、source coverage 0.965517；探索性、非 unseen/release gate |
 | [project/AI-Shop-E8-可观测背压短稳态验证](project/AI-Shop-E8-可观测背压短稳态验证-20260829.md) | 跨链路 correlation、WebSocket 慢连接边界、队列年龄/取消时延和短稳态 | `CONTROLLED_PREPROD_ONLY`；不构成生产 SLO |
 | [project/AI-Shop-E9-前端真实闭环验证](project/AI-Shop-E9-前端真实闭环验证-20260829.md) | typed legacy adapter、WS token refresh、终态/取消、a11y、reduced-motion、Web Vitals 与 mock 浏览器 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
 | [project/AI-Shop-购物导购真实浏览器E57证据](project/AI-Shop-购物导购真实浏览器E57证据-20260829.md) | 真实推荐→点击归因→商品页→checkout→加购归因链及 trace custody | `1/1 passed`；支付、CTR/CVR/GMV 和线上 SLO 均未声明 |
