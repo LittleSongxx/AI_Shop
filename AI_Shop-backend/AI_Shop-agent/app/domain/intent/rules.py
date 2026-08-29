@@ -8,6 +8,7 @@ from app.domain.category_terms import has_bare_bag_category
 # 商品咨询分支拦截它：用户在咨询一款商品时要求转人工，不能被 PRODUCT_CONSULT 吃掉。
 HUMAN_HINTS = (
     "转人工",
+    "转交人工",
     "转个人",
     "人工客服",
     "找客服",

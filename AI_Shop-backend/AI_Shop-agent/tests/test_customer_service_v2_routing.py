@@ -52,7 +52,7 @@ async def test_conditional_handoff_retains_business_intent_and_hands_off():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("text", ["找真人客服帮我处理", "找真人处理"])
+@pytest.mark.parametrize("text", ["找真人客服帮我处理", "找真人处理", "请把这个高风险请求转交人工，并保留已核验上下文"])
 async def test_generic_human_request_does_not_invent_business_risk(text):
     decision = await resolve_intent(
         "u-v2", text, allow_llm=False, record_metrics=False
@@ -61,6 +61,19 @@ async def test_generic_human_request_does_not_invent_business_risk(text):
     assert decision.intent == IntentKind.HUMAN_REQUEST
     assert decision.risk_level == RiskLevel.LOW
     assert decision.next_action == NextAction.HANDOFF
+
+
+@pytest.mark.asyncio
+async def test_negated_human_handoff_synonym_keeps_business_request():
+    decision = await resolve_intent(
+        "u-v2",
+        "退款政策有哪些，暂时不要转交人工",
+        allow_llm=False,
+        record_metrics=False,
+    )
+
+    assert decision.intent == IntentKind.REFUND
+    assert decision.next_action != NextAction.HANDOFF
 
 
 @pytest.mark.asyncio
