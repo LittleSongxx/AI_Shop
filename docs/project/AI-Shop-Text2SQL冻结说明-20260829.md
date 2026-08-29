@@ -28,7 +28,7 @@ Text2SQL 从产品主线和默认求职演示中移除，降为内部治理实�
 
 `AI_Shop-backend/evaluation-evidence/benchmarks/text2sql/`
 
-该目录目前为本机未跟踪材料：17 个顶层包、493 个文件、48,561,657 bytes；包内均标记为 development/provisional，`unseen=false`、`releaseGateEligible=false`。最新阶段为 `post-quality-compiler-v0-20260829-run-002`；最终验证仍为 `EXTERNAL_PRIVATE_HOLDOUT_MISSING`。
+该目录目前为本机未跟踪材料：17 个评测包，另有 1 个仅含 `verification.json`/`SHA256SUMS` 的验证记录目录（目录合计 18 个），共 493 个文件、48,561,657 bytes；包内均标记为 development/provisional，`unseen=false`、`releaseGateEligible=false`。最新阶段为 `post-quality-compiler-v0-20260829-run-002`；最终验证仍为 `EXTERNAL_PRIVATE_HOLDOUT_MISSING`。
 
 原始包不进入 Git，不去重、不改路径。需要交接时，只提交本文件或单独的路径/SHA 指针，不提交 SQL、结果行、review 原件或响应原文。
 
