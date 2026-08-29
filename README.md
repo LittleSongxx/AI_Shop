@@ -19,9 +19,9 @@
 
 - **主叙述：AI 后端 / Agent 开发**——Agent 边界、RAG/Tool/MCP、可靠执行、真实 badcase、评测和 Trace 闭环。
 - **第二入口：Java 电商后端**——订单/库存/支付事务、Redis、RabbitMQ、一致性、幂等和故障恢复。
-- **视觉搜索**属于推荐主线；**Text2SQL**目前只是带权限、扫描预算、分页、导出审计的治理实验，未达门槛前不包装为第三主线。
+- **视觉搜索**属于推荐主线；**Text2SQL**已战略冻结为内部治理实验，不列为第三主线、默认演示或后续排期，详见 [冻结说明](docs/project/AI-Shop-Text2SQL冻结说明-20260829.md)。
 
-面试可陈述的功能闭环、真实样本和未采集边界见 [AI_Shop 主线与开发记录](docs/project/AI_Shop主线与开发记录.md)。
+面试可陈述的功能闭环、真实样本和未采集边界见 [AI_Shop 主线与开发记录](docs/project/AI_Shop主线与开发记录.md)；Text2SQL 状态以[冻结说明](docs/project/AI-Shop-Text2SQL冻结说明-20260829.md)为准。
 
 ---
 

@@ -8,6 +8,7 @@
 | [evaluation/AI-Shop-v43-Badcase修复与v54复评交接](evaluation/AI-Shop-v43-Badcase修复与v54复评交接-20260827.md) | 15 条 v43 badcase 的根因/修复/v54 执行映射，以及 v54 最终人工复评 | v54 答案 116/120、联合 113/120，7 条 badcase；`HUMAN_APPROVED_AI_ASSISTED` |
 | [evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接](evaluation/AI-Shop-v54剩余Badcase修复与v56复评交接-20260827.md) | v54 剩余 7 条 badcase 的修复、v55 定向回放与 v56 全量复评 | v56 A/B 118/120 一致、2 条仲裁、最终 badcase 0；仍是已见开发集 |
 | [project/AI_Shop主线与开发记录](project/AI_Shop主线与开发记录.md) | AI 主线、方法判断、关键改造、阶段性取舍和后续路线 | 源码与运行证据汇总 |
+| [project/AI-Shop-Text2SQL冻结说明](project/AI-Shop-Text2SQL冻结说明-20260829.md) | Text2SQL 状态、证据 custody、恢复条件和后续排期边界 | `FROZEN`；不列默认演示或 release gate |
 | [project/AI-Shop Text2SQL V0 建设与评测 Handoff](project/AI-Shop-Text2SQL生产级建设与评测Handoff-20260828.md) | 管理端 Text2SQL V0 的实现、证据边界、人工结果和后续优化路线 | V0 工程与证据链完成；修复后人工接受 29/80，仍为 DEVELOPMENT / PROVISIONAL |
 | [evaluation/AI-Shop评测体系全面审计与执行结果](evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md) | Git 主线、v2 标签/来源有效性、v43 生产路径和评测设计 | 2026-08-26 设计审计；待人审状态已由 2026-08-27 结果替代 |
 | [evaluation/评测资产与证据归档索引](evaluation/评测资产与证据归档索引-20260826.md) | 数据/契约文件、证据包、badcase、文档、工作区和根目录归档的统一导航 | 引用安全索引；同名 JSON 逐项绑定路径、大小和 SHA-256 |
