@@ -29,6 +29,14 @@ from app.rag.grounding import (
     GroundingEnvelope,
     QueryPlan,
 )
+from app.rag.lifecycle import (
+    LifecycleFilterResult,
+    elastic_filter,
+    filter_documents,
+    freshness_reason,
+    is_authorized,
+    normalize_principal,
+)
 from app.rag.policy import runtime_rag_policy
 from app.rag.query_expander import deterministic_query_variants, expand_query
 from app.rag.query_planner import PlannedRagQuery, plan_rag_query
@@ -308,8 +316,16 @@ class RagRetriever:
         except Exception as exc:
             logger.warning("faq_cache_warmup_skipped", error=str(exc))
 
-    async def search_faq(self, query: str, top_k: int | None = None, category_filter: list[str] | None = None) -> str:
-        result = await self.search_faq_with_trace(query, top_k, category_filter=category_filter)
+    async def search_faq(
+        self,
+        query: str,
+        top_k: int | None = None,
+        category_filter: list[str] | None = None,
+        principal: Any = None,
+    ) -> str:
+        result = await self.search_faq_with_trace(
+            query, top_k, category_filter=category_filter, principal=principal
+        )
         return str(result.get("text") or "")
 
     async def search_faq_with_trace(
@@ -321,6 +337,7 @@ class RagRetriever:
         include_evaluation_candidates: bool = False,
         query_variants: list[str] | None = None,
         security_flags: list[str] | tuple[str, ...] | None = None,
+        principal: Any = None,
     ) -> dict[str, Any]:
         policy = runtime_rag_policy()
         runtime_trace = RagRuntimeTrace(policy_fingerprint=policy.fingerprint())
@@ -333,6 +350,7 @@ class RagRetriever:
                 include_evaluation_candidates=include_evaluation_candidates,
                 query_variants=query_variants,
                 security_flags=security_flags,
+                principal=principal,
             )
         trace = result.setdefault("trace", {})
         trace["runtime"] = runtime_trace.public()
@@ -347,6 +365,7 @@ class RagRetriever:
         include_evaluation_candidates: bool = False,
         query_variants: list[str] | None = None,
         security_flags: list[str] | tuple[str, ...] | None = None,
+        principal: Any = None,
     ) -> dict[str, Any]:
         """Search FAQ/knowledge and retain bounded evidence for observability.
 
@@ -357,6 +376,7 @@ class RagRetriever:
         """
         started = time.perf_counter()
         settings = get_settings()
+        rag_principal = normalize_principal(principal)
         policy = runtime_rag_policy()
         overrides = get_rag_overrides(bucket)
         effective_top_k = int(overrides.get("rag_top_k") or top_k or settings.rag_top_k)
@@ -437,12 +457,14 @@ class RagRetriever:
             runtime_trace.observe("exactFaq", (time.perf_counter() - exact_started) * 1000)
         if exact:
             docs = [self._faq_row_to_doc(exact, score=1.0)]
-            self._observe_search(started, True, "exact")
+            lifecycle = self._apply_lifecycle(docs, rag_principal)
+            docs = lifecycle.documents
+            self._observe_search(started, bool(docs), "exact")
             return self._trace_result(
                 cleaned,
                 version,
                 "exact",
-                True,
+                bool(docs),
                 docs,
                 started,
                 bucket=bucket,
@@ -467,7 +489,10 @@ class RagRetriever:
         cached = None if include_evaluation_candidates else await self._get_cache(cache_key)
         if cached:
             # 缓存里的 FAQ 可能已过期（发布后新版本号才会换 key），读出来再滤一遍。
-            cached = self._filter_catalog(self._filter_expired(cached), catalog)
+            cached = self._filter_catalog(
+                self._filter_expired(cached), catalog, rag_principal
+            )
+            cached = self._apply_lifecycle(cached, rag_principal).documents
             cached = self._filter_evidence_docs(
                 cached,
                 preferred_fact_ids=planned_query.fact_hints,
@@ -522,9 +547,12 @@ class RagRetriever:
             knowledge_enabled=bool(catalog),
             queries=query_variants,
             planned_query=planned_query,
+            principal=rag_principal,
         )
         if catalog is not None:
-            candidates = self._filter_catalog(candidates, catalog)
+            candidates = self._filter_catalog(candidates, catalog, rag_principal)
+        lifecycle = self._apply_lifecycle(candidates, rag_principal)
+        candidates = lifecycle.documents
         docs = self._filter_evidence_docs(
             candidates,
             preferred_fact_ids=planned_query.fact_hints,
@@ -822,6 +850,7 @@ class RagRetriever:
         knowledge_enabled: bool = True,
         queries: list[str] | None = None,
         planned_query: PlannedRagQuery | None = None,
+        principal: Any = None,
     ) -> list[dict]:
         with tracer.start_as_current_span("rag.hybrid_search") as span:
             span.set_attribute("rag.query_length", len(query))
@@ -858,6 +887,8 @@ class RagRetriever:
             # bump 后新旧切片共存；归档靠「删切片 + bump 后状态变更」保证不可见。
             # metadata.version 是数值类型（ES 动态映射），range 用数值直配。
             effective_filters = list(extra_filters or [])
+            if knowledge_enabled:
+                effective_filters.append(elastic_filter(principal))
             if knowledge_enabled and version_filter is not None:
                 active_ids = [str(value) for value in (active_document_ids or []) if str(value)]
                 # An empty active set is a valid catalog state, but using an
@@ -1666,6 +1697,11 @@ class RagRetriever:
                     ).strip().lower(),
                     "version": int(value.get("version") or 0),
                     "domain": str(value.get("domain") or "GENERAL").strip().upper(),
+                    "access_policy": str(
+                        value.get("access_policy")
+                        or value.get("accessPolicy")
+                        or "PUBLIC"
+                    ).strip(),
                     "chunk_count": int(
                         value.get("chunk_count") or value.get("chunkCount") or 0
                     ),
@@ -1706,10 +1742,29 @@ class RagRetriever:
             )
         return version
 
+    def _apply_lifecycle(
+        self, docs: list[dict], principal: Any
+    ) -> LifecycleFilterResult:
+        """Apply the local ACL/freshness/status backstop after every source."""
+
+        result = filter_documents(docs, principal)
+        runtime_trace = active_rag_runtime_trace()
+        if runtime_trace is not None:
+            identity = normalize_principal(principal)
+            runtime_trace.observations["lifecycle"] = {
+                "principalKind": identity.kind,
+                "authenticated": identity.authenticated,
+                "inputCount": len(docs),
+                "acceptedCount": len(result.documents),
+                "rejected": dict(sorted(result.rejected.items())),
+            }
+        return result
+
     def _filter_catalog(
         self,
         docs: list[dict],
         catalog: dict[str, Any] | None,
+        principal: Any = None,
     ) -> list[dict]:
         """Apply the same release/catalog gate to semantic-cache hits."""
         active_ids = set(str(value) for value in (catalog or {}).get("active_document_ids", []))
@@ -1718,6 +1773,11 @@ class RagRetriever:
             str(item.get("document_id") or ""): str(
                 item.get("domain") or "GENERAL"
             ).upper()
+            for item in (catalog or {}).get("documents", [])
+            if isinstance(item, dict) and item.get("document_id")
+        }
+        catalog_policies = {
+            str(item.get("document_id") or ""): item.get("access_policy")
             for item in (catalog or {}).get("documents", [])
             if isinstance(item, dict) and item.get("document_id")
         }
@@ -1738,6 +1798,11 @@ class RagRetriever:
             expected_domain = catalog_domains.get(document_id)
             actual_domain = str(metadata.get("domain") or "").upper()
             if expected_domain is not None and actual_domain != expected_domain:
+                continue
+            expected_policy = catalog_policies.get(document_id)
+            if expected_policy is not None and not is_authorized(
+                {"accessPolicy": expected_policy}, principal
+            ):
                 continue
             try:
                 document_version = int(metadata.get("version"))
@@ -1923,6 +1988,11 @@ class RagRetriever:
                 else candidate_count,
                 "quarantineCount": len(contamination),
                 "contamination": contamination,
+                "lifecycle": (
+                    runtime_trace.observations.get("lifecycle", {})
+                    if runtime_trace is not None
+                    else {}
+                ),
                 "topScore": max(
                     (float(doc.get("score") or 0) for doc in docs),
                     default=0.0,
@@ -2062,6 +2132,10 @@ class RagRetriever:
                 "category": row.get("category"),
                 "source": row.get("source") or "FAQ",
                 "owner": row.get("owner"),
+                "status": row.get("publish_status") or row.get("publishStatus") or "PUBLISHED",
+                "effectiveStart": row.get("effective_start") or row.get("effectiveStart"),
+                "effectiveEnd": row.get("effective_end") or row.get("effectiveEnd"),
+                "accessPolicy": row.get("access_policy") or row.get("accessPolicy") or "PUBLIC",
             },
             "score": score,
             "source": "exact_faq",
@@ -2156,25 +2230,23 @@ class RagRetriever:
         return [*preferred_accepted, *accepted]
 
     def _filter_expired(self, docs: list[dict]) -> list[dict]:
-        """过滤 FAQ 时效窗口之外的文档。
+        """Filter candidates outside an optional freshness window.
 
-        只有 ``dataType == "faq"`` 的文档携带时效约束；knowledge / product chunk
-        原样透传。时间戳由 Java 侧入库时写入（epoch ms，B-1 fix）。缺少某个边界视为
-        永久有效（两端都不填 = 常驻，只填 effectiveStart = 生效后永远有效，以此类推）。
+        Missing boundaries mean permanently effective.  The shared parser accepts
+        epoch seconds/milliseconds and ISO timestamps so cached and live Java rows
+        use the same fail-closed rule.
         """
-        now_ms = int(time.time() * 1000)
         result = []
         for doc in docs:
             metadata = doc.get("metadata") or {}
-            if metadata.get("dataType") == "faq":
-                eff_end = metadata.get("effectiveEnd")
-                if eff_end is not None and int(eff_end) < now_ms:
-                    logger.debug("faq_doc_expired_filtered", doc_id=doc.get("id"))
-                    continue
-                eff_start = metadata.get("effectiveStart")
-                if eff_start is not None and int(eff_start) > now_ms:
-                    logger.debug("faq_doc_not_yet_active_filtered", doc_id=doc.get("id"))
-                    continue
+            reason = freshness_reason(metadata)
+            if reason is not None:
+                logger.debug(
+                    "rag_doc_freshness_filtered",
+                    doc_id=doc.get("id"),
+                    reason=reason,
+                )
+                continue
             result.append(doc)
         return result
 

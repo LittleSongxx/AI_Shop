@@ -27,7 +27,7 @@
 - Text2SQL 降级为内部治理实验，状态为 `FROZEN`；其 DataAnalyst/InventoryOps 共享代码继续保留，避免兼容性回归。
 - 后续工程按“真实流式/重连 → 取消终态/幂等 → Action 快照/对账 → checkpoint/记忆 → 模型工具成本 → 身份安全 → RAG 生命周期 → 可观测背压 → 前端真链路/a11y/perf”推进。
 - 现有离线和人工证据只支持受控预生产演示，不推导线上 SLO、CTR/CVR/GMV、CSAT/FCR 或无人值守高并发能力。
-- E1/E2/E3/E7/E4 已分别收口；E5 新增服务端 principal、WS Origin/帧限制/Redis 限流、Cookie CSRF 和 session TTL 防护。验证仍是受控预生产证据，详见 [E5 身份与安全验证](AI-Shop-E5-身份与安全验证-20260829.md)。
+- E1/E2/E3/E7/E4/E5 已分别收口；E5 新增服务端 principal、WS Origin/帧限制/Redis 限流、Cookie CSRF 和 session TTL 防护；E6 收口发布目录 ACL、freshness、逻辑删除/回滚和 DLQ 可观测。验证仍是受控预生产证据，详见 [E5 身份与安全验证](AI-Shop-E5-身份与安全验证-20260829.md) 与 [E6 RAG 生命周期验证](AI-Shop-E6-RAG生命周期验证-20260829.md)。
 
 ## 按开发阶段的增量记录
 

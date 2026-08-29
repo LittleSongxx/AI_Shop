@@ -30,6 +30,11 @@ RAG_CHANNEL_CONTAMINATED = Counter(
     "知识库片段命中注入话术被检疫的次数（按命中规则聚合，告警信号）",
     ["rules"],
 )
+RAG_LIFECYCLE_FILTER_TOTAL = Counter(
+    "agent_rag_lifecycle_filter_total",
+    "RAG 候选因发布状态、ACL 或 freshness 门禁被过滤的次数",
+    ["reason"],
+)
 
 LLM_LATENCY = Histogram(
     "agent_llm_latency_seconds",

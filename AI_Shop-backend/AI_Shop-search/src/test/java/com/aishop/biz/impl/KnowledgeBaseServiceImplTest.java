@@ -74,6 +74,42 @@ class KnowledgeBaseServiceImplTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void deletedDocumentCannotBePublished() {
+        when(jdbcTemplate.query(
+                argThat(sql -> sql.contains("knowledge_document") && sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(document(42L, "DELETED")));
+
+        assertThrows(BusinessException.class, () -> service.publish(42L, "owner"));
+
+        verify(vectorStore, never()).add(anyList());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void logicalDeleteIsIdempotentAndRetainsHistoricalVectors() {
+        when(jdbcTemplate.query(
+                argThat(sql -> sql.contains("knowledge_document") && sql.contains("FOR UPDATE")),
+                any(RowMapper.class),
+                eq(42L)))
+                .thenReturn(List.of(document(42L, "DELETED")));
+        when(jdbcTemplate.queryForObject(
+                argThat(sql -> sql.contains("current_version")),
+                eq(Long.class)))
+                .thenReturn(9L);
+
+        Map<String, Object> result = service.delete(42L, "owner");
+
+        assertEquals("DELETED", result.get("status"));
+        assertEquals(true, result.get("deleted"));
+        assertEquals(9L, result.get("releaseVersion"));
+        assertEquals(true, result.get("vectorsRetainedForHistoricalRelease"));
+        verify(vectorStore, never()).delete(anyList());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void archiveRetainsVectorsAndCreatesANewImmutableSnapshot() {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(jdbcTemplate.query(
@@ -409,6 +445,9 @@ class KnowledgeBaseServiceImplTest {
         assertTrue(source.contains("WHERE release_key='global' AND current_version=?"));
         assertTrue(source.contains("opsForValue().set(RELEASE_KEY, String.valueOf(version))"));
         assertTrue(source.contains("transactionalMqSender.sendAfterCommit("));
+        assertTrue(source.contains("access_policy"));
+        assertTrue(source.contains("UPDATE knowledge_document SET status='DELETED'"));
+        assertTrue(source.contains("vectorsRetainedForHistoricalRelease"));
     }
 
     private static Map<String, Object> document(long documentId, String status) {

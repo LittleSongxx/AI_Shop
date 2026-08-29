@@ -144,6 +144,9 @@ public class RabbitMQRagListenerComponent {
         metaData.put("version", ragQuestion.getVersion());
         metaData.put("source", ragQuestion.getSource());
         metaData.put("owner", ragQuestion.getOwner());
+        // FAQ remains public in the single-store boundary; knowledge documents
+        // may carry an explicit accessPolicy.
+        metaData.put("accessPolicy", "PUBLIC");
         // 时效性字段（epoch ms），供检索侧过滤过期 FAQ，与精确 SQL 路径行为保持一致
         if (ragQuestion.getEffectiveStart() != null) {
             metaData.put("effectiveStart", ragQuestion.getEffectiveStart().getTime());

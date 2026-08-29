@@ -111,7 +111,7 @@ AI_Shop/
 - **自然语言订单定位**：根据订单号、相对时间、金额和商品描述筛选权威订单；零候选、多候选、无可操作项和依赖失败分别处理，歧义上下文可跨轮持久化
 - **自适应编排**：简单权威查询或参数完整提案走 Workflow，开放/单域 RAG 走单 Agent，订单事实与政策等跨域复合请求才走 bounded multi-agent；四种配置可用于配对消融，但正式 live 配对结果仍未采集
 - **受控写操作**：模型只能生成 `PROPOSE_*` 提案；用户确认后 Java 重新校验身份、归属、状态与幂等键，未知远端结果进入 `INCONCLUSIVE`，核对到边界后转 `MANUAL_REVIEW`
-- **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用和有界 repair
+- **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用、有界 repair，以及发布快照 ACL/freshness/逻辑删除回滚（受控预生产，详见 [E6 验证记录](docs/project/AI-Shop-E6-RAG生命周期验证-20260829.md)）
 - **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
 - **输入防护**：NFKC 归一化 + 两级规则（硬阻断 / 可疑累积）+ Propose→用户确认→Java 执行，防 Prompt 注入
 - **强制工具回退**：模型跳过必要工具时，框架层自动补全并路由至 finalize，避免幻觉回复

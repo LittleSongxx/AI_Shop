@@ -76,11 +76,13 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> upload(
-            MultipartFile file, String title, String owner, String domain) {
+            MultipartFile file, String title, String owner, String domain,
+            String accessPolicy) {
         ParsedDocument parsed = documentParser.parse(file);
         String resolvedTitle = text(title).isBlank()
                 ? stripExtension(parsed.sourceName()) : text(title);
         String resolvedDomain = normalizeDomain(domain);
+        String resolvedAccessPolicy = normalizeAccessPolicy(accessPolicy);
         String hash = sha256(parsed.normalizedText());
         List<Map<String, Object>> existing = jdbcTemplate.queryForList(
                 "SELECT document_id FROM knowledge_document WHERE content_hash=? LIMIT 1", hash);
@@ -89,7 +91,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         }
 
         long documentId = insertDocument(
-                resolvedTitle, parsed, hash, owner, resolvedDomain);
+                resolvedTitle, parsed, hash, owner, resolvedDomain, resolvedAccessPolicy);
         long jobId = insertJob(documentId, "RUNNING", "CHUNK", 30);
         try {
             // 入库时预扫描：检测切片内容中是否含有注入话术。
@@ -129,6 +131,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         Map<String, Object> document = requireDocumentForUpdate(documentId);
         if ("ARCHIVED".equals(document.get("status"))) {
             throw new BusinessException("归档文档不能发布");
+        }
+        if ("DELETED".equals(document.get("status"))) {
+            throw new BusinessException("逻辑删除文档不能发布，请先从历史快照恢复");
         }
         if ("PUBLISHED".equals(document.get("status"))) {
             // 当前模型没有“编辑后生成新文档版本”的入口。允许重复发布只会
@@ -459,6 +464,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> archive(long documentId) {
         Map<String, Object> document = requireDocumentForUpdate(documentId);
+        if ("DELETED".equals(document.get("status"))) {
+            throw new BusinessException("逻辑删除文档不能再次归档");
+        }
         if ("ARCHIVED".equals(document.get("status"))) {
             Map<String, Object> result = new LinkedHashMap<>(document);
             result.put("releaseVersion", releaseVersion());
@@ -490,6 +498,50 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> delete(long documentId, String owner) {
+        Map<String, Object> document = requireDocumentForUpdate(documentId);
+        String status = text(document.get("status")).toUpperCase(Locale.ROOT);
+        if ("DELETED".equals(status)) {
+            Map<String, Object> result = new LinkedHashMap<>(document);
+            result.put("deleted", true);
+            result.put("releaseVersion", releaseVersion());
+            result.put("vectorsRetainedForHistoricalRelease", true);
+            return result;
+        }
+
+        boolean wasPublished = "PUBLISHED".equals(status);
+        long releaseVersion = releaseVersion();
+        if (wasPublished) {
+            releaseVersion = advanceReleaseVersion(lockReleaseVersion());
+        }
+        // Logical deletion keeps the immutable release's chunks available for a
+        // deliberate rollback while removing the document from the live catalog.
+        jdbcTemplate.update(
+                "UPDATE knowledge_document SET status='DELETED', owner=COALESCE(NULLIF(?, ''), owner), "
+                        + "updated_at=NOW() WHERE document_id=?",
+                text(owner), documentId);
+        jdbcTemplate.update(
+                "UPDATE knowledge_chunk SET status='DELETED', updated_at=NOW() WHERE document_id=?",
+                documentId);
+        if (wasPublished) {
+            snapshotCurrentRelease(
+                    releaseVersion,
+                    "delete-document-" + documentId,
+                    owner,
+                    null);
+            long publishedVersion = releaseVersion;
+            registerAfterCommit(() -> publishVersionBestEffort(publishedVersion, "知识逻辑删除"));
+        }
+        Map<String, Object> result = new LinkedHashMap<>(document);
+        result.put("status", "DELETED");
+        result.put("deleted", true);
+        result.put("releaseVersion", releaseVersion);
+        result.put("vectorsRetainedForHistoricalRelease", true);
+        return result;
+    }
+
+    @Override
     public Map<String, Object> listDocuments(
             int pageNo, int pageSize, String status) {
         int safePage = Math.max(1, pageNo);
@@ -509,7 +561,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         List<Map<String, Object>> rows = jdbcTemplate.query(
                 """
                 SELECT document_id, title, file_type, source_name, content_hash, status,
-                       version, owner, domain, index_schema_version, effective_start,
+                       version, owner, domain, access_policy, index_schema_version, effective_start,
                        effective_end, error_message,
                        created_at, updated_at
                 FROM knowledge_document
@@ -885,15 +937,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             ParsedDocument parsed,
             String hash,
             String owner,
-            String domain) {
+            String domain,
+            String accessPolicy) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
                     """
                     INSERT INTO knowledge_document
                         (title, file_type, source_name, content_hash, normalized_text,
-                         status, version, owner, domain, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, 'PARSING', 1, ?, ?, NOW(), NOW())
+                         status, version, owner, domain, access_policy,
+                         created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'PARSING', 1, ?, ?, ?, NOW(), NOW())
                     """,
                     Statement.RETURN_GENERATED_KEYS);
             statement.setString(1, title);
@@ -903,6 +957,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             statement.setString(5, parsed.normalizedText());
             statement.setString(6, text(owner));
             statement.setString(7, domain);
+            statement.setString(8, accessPolicy);
             return statement;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -999,7 +1054,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         List<Map<String, Object>> rows = jdbcTemplate.query(
                 """
                 SELECT document_id, title, file_type, source_name, content_hash, status,
-                       version, owner, domain, index_schema_version, effective_start,
+                       version, owner, domain, access_policy, index_schema_version, effective_start,
                        effective_end, error_message,
                        created_at, updated_at
                 FROM knowledge_document WHERE document_id=?
@@ -1021,7 +1076,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         List<Map<String, Object>> rows = jdbcTemplate.query(
                 """
                 SELECT document_id, title, file_type, source_name, content_hash, status,
-                       version, owner, domain, index_schema_version, effective_start,
+                       version, owner, domain, access_policy, index_schema_version, effective_start,
                        effective_end, error_message,
                        created_at, updated_at
                 FROM knowledge_document WHERE document_id=? FOR UPDATE
@@ -1046,6 +1101,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             row.put("version", rs.getInt("version"));
             row.put("owner", rs.getString("owner"));
             row.put("domain", rs.getString("domain"));
+            row.put("accessPolicy", rs.getString("access_policy"));
             row.put("indexSchemaVersion", rs.getInt("index_schema_version"));
             row.put("effectiveStart", time(rs.getObject("effective_start", LocalDateTime.class)));
             row.put("effectiveEnd", time(rs.getObject("effective_end", LocalDateTime.class)));
@@ -1099,12 +1155,20 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("dataType", "knowledge");
         metadata.put("documentId", String.valueOf(document.get("documentId")));
-        metadata.put("title", document.get("title"));
-        metadata.put("heading", chunk.get("heading"));
-        metadata.put("source", document.get("sourceName"));
-        metadata.put("domain", document.get("domain"));
+        metadata.put("title", text(document.get("title")));
+        metadata.put("heading", text(chunk.get("heading")));
+        metadata.put("source", text(document.get("sourceName")));
+        metadata.put("domain", text(document.get("domain")).isBlank()
+                ? "GENERAL" : text(document.get("domain")));
+        metadata.put("accessPolicy", normalizeAccessPolicy(text(document.get("accessPolicy"))));
         metadata.put("version", releaseVersion);
         metadata.put("status", "PUBLISHED");
+        if (document.get("effectiveStart") != null) {
+            metadata.put("effectiveStart", document.get("effectiveStart"));
+        }
+        if (document.get("effectiveEnd") != null) {
+            metadata.put("effectiveEnd", document.get("effectiveEnd"));
+        }
         metadata.put("originalContent", originalContent);
         metadata.put("contextEnriched", false);
         metadata.put("indexSchemaVersion", INDEX_SCHEMA_VERSION);
@@ -1176,7 +1240,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         return jdbcTemplate.queryForList(
                 """
                 SELECT d.document_id, d.source_name, d.content_hash, d.version,
-                       d.domain, d.index_schema_version,
+                       d.domain, d.access_policy, d.index_schema_version,
                        COUNT(c.chunk_id) AS chunk_count
                 FROM knowledge_document d
                 LEFT JOIN knowledge_chunk c
@@ -1185,7 +1249,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                  AND c.status='PUBLISHED'
                 WHERE d.status='PUBLISHED'
                 GROUP BY d.document_id, d.source_name, d.content_hash, d.version,
-                         d.domain, d.index_schema_version
+                         d.domain, d.access_policy, d.index_schema_version
                 ORDER BY d.document_id
                 """);
     }
@@ -1194,7 +1258,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         return jdbcTemplate.queryForList(
                 """
                 SELECT document_id, source_name, content_hash,
-                       document_version AS version, domain, index_schema_version,
+                       document_version AS version, domain, access_policy,
+                       index_schema_version,
                        chunk_count
                 FROM knowledge_release_document
                 WHERE release_version=?
@@ -1210,17 +1275,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         return jdbcTemplate.queryForList(
                 """
                 SELECT d.document_id, d.source_name, d.content_hash, d.version,
-                       d.domain, d.index_schema_version,
+                       d.domain, d.access_policy, d.index_schema_version,
                        COUNT(c.chunk_id) AS chunk_count
                 FROM knowledge_document d
                 JOIN knowledge_chunk c
                   ON c.document_id=d.document_id
                  AND c.version=d.version
-                 AND c.status IN ('PUBLISHED','ARCHIVED')
+                 AND c.status IN ('PUBLISHED','ARCHIVED','DELETED')
                 WHERE d.document_id IN (%s)
                   AND d.index_schema_version > 0
                 GROUP BY d.document_id, d.source_name, d.content_hash, d.version,
-                         d.domain, d.index_schema_version
+                         d.domain, d.access_policy, d.index_schema_version
                 HAVING COUNT(c.chunk_id) > 0
                 ORDER BY d.document_id
                 """.formatted(placeholders),
@@ -1319,6 +1384,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                     text(document.get("source_name")),
                     text(document.get("content_hash")),
                     text(document.get("domain")),
+                    normalizeAccessPolicy(text(document.get("access_policy"))),
                     number(document.get("index_schema_version"), 0),
                     number(document.get("chunk_count"), 0),
                     releaseVersion
@@ -1328,8 +1394,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 """
                 INSERT INTO knowledge_release_document
                     (document_id, document_version, source_name, content_hash,
-                     domain, index_schema_version, chunk_count, release_version)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     domain, access_policy, index_schema_version, chunk_count,
+                     release_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows);
     }
@@ -1342,6 +1409,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                     .append(document.get("source_name")).append('|')
                     .append(document.get("content_hash")).append('|')
                     .append(document.get("domain")).append('|')
+                    .append(normalizeAccessPolicy(text(document.get("access_policy")))).append('|')
                     .append(document.get("index_schema_version")).append('|')
                     .append(document.get("chunk_count")).append('\n');
         }
@@ -1468,6 +1536,38 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             throw new BusinessException("知识领域只能包含大写字母、数字和下划线");
         }
         return domain;
+    }
+
+    private String normalizeAccessPolicy(String value) {
+        String raw = text(value);
+        if (raw.isBlank()) {
+            return "PUBLIC";
+        }
+        LinkedHashSet<String> policies = new LinkedHashSet<>();
+        for (String token : raw.replace(';', ',').split(",")) {
+            String candidate = text(token);
+            if (candidate.isBlank()) {
+                throw new BusinessException("accessPolicy包含空策略");
+            }
+            String upper = candidate.toUpperCase(Locale.ROOT);
+            if (Set.of("PUBLIC", "AUTHENTICATED", "ADMIN", "ROLE:USER", "ROLE:ADMIN")
+                    .contains(upper)) {
+                policies.add(upper);
+                continue;
+            }
+            if (upper.startsWith("USER:") && candidate.length() > 5
+                    && candidate.length() <= 133 && !candidate.contains("*")) {
+                policies.add("USER:" + candidate.substring(5));
+                continue;
+            }
+            throw new BusinessException("accessPolicy仅支持PUBLIC、AUTHENTICATED、ADMIN、ROLE或USER策略");
+        }
+        if (policies.contains("PUBLIC") && policies.size() > 1) {
+            // PUBLIC already grants the entire single-store audience; keeping a
+            // canonical one-token value avoids ambiguous hashes and ACLs.
+            return "PUBLIC";
+        }
+        return String.join(",", policies);
     }
 
     private int number(Object value, int fallback) {

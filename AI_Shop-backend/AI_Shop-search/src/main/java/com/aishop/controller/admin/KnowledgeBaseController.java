@@ -30,9 +30,10 @@ public class KnowledgeBaseController extends com.aishop.controller.admin.ABaseCo
     public ResponseVO upload(
             @RequestParam("file") MultipartFile file,
             String title,
-            String domain) {
+            String domain,
+            String accessPolicy) {
         return getSuccessResponseVO(knowledgeBaseService.upload(
-                file, title, currentAdmin(), domain));
+                file, title, currentAdmin(), domain, accessPolicy));
     }
 
     @PostMapping("/publish")
@@ -58,7 +59,19 @@ public class KnowledgeBaseController extends com.aishop.controller.admin.ABaseCo
     @PostMapping("/archive")
     @RequireAdminPermission(AdminPermissions.AI_CONFIG)
     public ResponseVO archive(Long documentId) {
+        if (documentId == null) {
+            throw new BusinessException("documentId不能为空");
+        }
         return getSuccessResponseVO(knowledgeBaseService.archive(documentId));
+    }
+
+    @PostMapping("/delete")
+    @RequireAdminPermission(AdminPermissions.AI_CONFIG)
+    public ResponseVO delete(Long documentId) {
+        if (documentId == null) {
+            throw new BusinessException("documentId不能为空");
+        }
+        return getSuccessResponseVO(knowledgeBaseService.delete(documentId, currentAdmin()));
     }
 
     @PostMapping("/activateRelease")

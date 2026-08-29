@@ -51,6 +51,7 @@ create table if not exists knowledge_document
     version int default 1 not null,
     owner varchar(100) null,
     domain varchar(64) default 'GENERAL' not null,
+    access_policy varchar(256) default 'PUBLIC' not null,
     index_schema_version int default 0 not null,
     effective_start datetime null,
     effective_end datetime null,
@@ -141,11 +142,39 @@ create table if not exists knowledge_release_document
     source_name varchar(255) not null,
     content_hash char(64) not null,
     domain varchar(64) not null,
+    access_policy varchar(256) default 'PUBLIC' not null,
     index_schema_version int not null,
     chunk_count int not null,
     primary key (release_version, document_id),
     key idx_knowledge_release_document_id (document_id, release_version)
 ) comment '知识发布快照的精确文档集合' collate = utf8mb4_general_ci;
+
+-- Backfill the single-store ACL column on installations created before E6.
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'knowledge_document'
+          AND column_name = 'access_policy'
+    ),
+    'SELECT 1',
+    'ALTER TABLE knowledge_document ADD COLUMN access_policy varchar(256) DEFAULT ''PUBLIC'' NOT NULL AFTER domain'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+    EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'knowledge_release_document'
+          AND column_name = 'access_policy'
+    ),
+    'SELECT 1',
+    'ALTER TABLE knowledge_release_document ADD COLUMN access_policy varchar(256) DEFAULT ''PUBLIC'' NOT NULL AFTER domain'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Existing installations predate immutable snapshots. Preserve their current
 -- published set once; repeatable migrations must never rewrite that snapshot.
@@ -163,13 +192,14 @@ where release_key = 'global';
 
 insert ignore into knowledge_release_document
     (release_version, document_id, document_version, source_name, content_hash,
-     domain, index_schema_version, chunk_count)
+     domain, access_policy, index_schema_version, chunk_count)
 select r.current_version,
        d.document_id,
        d.version,
        coalesce(d.source_name, concat('document-', d.document_id)),
        d.content_hash,
        d.domain,
+       d.access_policy,
        d.index_schema_version,
        count(c.chunk_id)
 from knowledge_release r
@@ -180,7 +210,7 @@ left join knowledge_chunk c
  and c.status = 'PUBLISHED'
 where r.release_key = 'global'
 group by r.current_version, d.document_id, d.version, d.source_name,
-         d.content_hash, d.domain, d.index_schema_version;
+         d.content_hash, d.domain, d.access_policy, d.index_schema_version;
 
 create table if not exists local_message_outbox
 (

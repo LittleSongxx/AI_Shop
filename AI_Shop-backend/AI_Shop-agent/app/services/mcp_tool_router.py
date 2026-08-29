@@ -318,6 +318,7 @@ class McpToolRouter:
                 query,
                 category_filter=category_filter,
                 bucket=get_bucket(user_id),
+                principal={"subject": user_id, "kind": "USER"},
             )
             text = str(result.get("text") or "")
             source_refs = list(result.get("source_refs") or [])

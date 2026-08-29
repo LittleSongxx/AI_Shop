@@ -7,8 +7,14 @@ import java.util.Map;
 
 public interface KnowledgeBaseService {
 
+    default Map<String, Object> upload(
+            MultipartFile file, String title, String owner, String domain) {
+        return upload(file, title, owner, domain, "PUBLIC");
+    }
+
     Map<String, Object> upload(
-            MultipartFile file, String title, String owner, String domain);
+            MultipartFile file, String title, String owner, String domain,
+            String accessPolicy);
 
     Map<String, Object> publish(long documentId, String owner);
 
@@ -17,6 +23,8 @@ public interface KnowledgeBaseService {
     Map<String, Object> rebuildAllPublishedVectors();
 
     Map<String, Object> archive(long documentId);
+
+    Map<String, Object> delete(long documentId, String owner);
 
     Map<String, Object> listDocuments(int pageNo, int pageSize, String status);
 

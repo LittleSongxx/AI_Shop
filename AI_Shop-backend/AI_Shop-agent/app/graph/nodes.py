@@ -616,6 +616,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
                     query_variants=_rag_query_variants_for_turn(
                         user_text, rag_query
                     ),
+                    principal={"subject": user_id, "kind": "USER"},
                     security_flags=list(
                         (state.get("agent_msg") or {}).get("inputSecurityFlags") or []
                     ),
