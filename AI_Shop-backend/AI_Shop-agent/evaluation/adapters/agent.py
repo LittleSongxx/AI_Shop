@@ -602,6 +602,104 @@ def _deterministic_workflow_provider_snapshot(
     }
 
 
+def _response_verifier_contract(
+    episodes: Sequence[Mapping[str, Any]],
+) -> tuple[bool, dict[str, Any]]:
+    """Fail closed when any answer-bearing root Episode failed verification."""
+
+    roots = [episode for episode in episodes if not episode.get("parentRunId")]
+    observations: list[dict[str, Any]] = []
+    for episode in roots:
+        terminal = str(episode.get("status") or "")
+        verifier_rows: list[dict[str, Any]] = []
+        quality = episode.get("quality")
+        if isinstance(quality, Mapping) and (
+            "verifierPassed" in quality or "terminalQuality" in quality
+        ):
+            verifier_rows.append(
+                {
+                    "source": "ROOT_QUALITY",
+                    "status": None,
+                    "output": quality,
+                }
+            )
+        for step in episode.get("steps") or []:
+            if (
+                not isinstance(step, Mapping)
+                or str(step.get("eventType") or "") != "RESPONSE_VERIFIER"
+            ):
+                continue
+            output = step.get("output")
+            verifier_rows.append(
+                {
+                    "source": "RESPONSE_VERIFIER_STEP",
+                    "status": str(step.get("status") or ""),
+                    "output": output if isinstance(output, Mapping) else {},
+                }
+            )
+
+        if verifier_rows:
+            row_results = [
+                bool(
+                    row["output"].get("verifierPassed") is True
+                    and row["output"].get("terminalQuality") == "PASS"
+                    and (
+                        row["source"] == "ROOT_QUALITY"
+                        or row["status"] == "OK"
+                    )
+                )
+                for row in verifier_rows
+            ]
+            passed = all(row_results)
+            observations.append(
+                {
+                    "terminalStatus": terminal,
+                    "status": "PASS" if passed else "FAILED",
+                    "observationCount": len(verifier_rows),
+                    "sources": [row["source"] for row in verifier_rows],
+                    "verifierPassed": passed,
+                    "passed": passed,
+                }
+            )
+            continue
+
+        if terminal == "HANDOFF":
+            snapshot = _deterministic_workflow_provider_snapshot([episode])
+            reason = str(snapshot.get("notApplicableReason") or "")
+            valid_handoff = reason.startswith(
+                ("deterministic_handoff:", "deterministic_order_reference_handoff:")
+            )
+            observations.append(
+                {
+                    "terminalStatus": terminal,
+                    "status": "NOT_APPLICABLE" if valid_handoff else "MISSING",
+                    "reason": reason or None,
+                    "passed": valid_handoff,
+                }
+            )
+            continue
+        observations.append(
+            {
+                "terminalStatus": terminal,
+                "status": "MISSING",
+                "observationCount": 0,
+                "passed": False,
+            }
+        )
+
+    passed = bool(observations) and all(item["passed"] for item in observations)
+    return passed, {
+        "rootEpisodeCount": len(roots),
+        "observedVerifierCount": sum(
+            item["status"] in {"PASS", "FAILED"} for item in observations
+        ),
+        "notApplicableCount": sum(
+            item["status"] == "NOT_APPLICABLE" for item in observations
+        ),
+        "observations": observations,
+    }
+
+
 def _durable_effects(
     episodes: Sequence[Mapping[str, Any]], *, state_mode: str
 ) -> list[dict[str, str]]:
@@ -771,6 +869,37 @@ def _answer(episodes: Sequence[Mapping[str, Any]], responses: Sequence[Mapping[s
         if value:
             return value
     return ""
+
+
+def _output_contract(
+    answer: str, patterns: Sequence[str]
+) -> tuple[bool, dict[str, Any]]:
+    normalized_answer = normalize_text(answer)
+    raw_patterns = list(patterns)
+    normalized_patterns = [
+        normalized
+        for pattern in raw_patterns
+        if (normalized := normalize_text(pattern))
+    ]
+    invalid_pattern_count = len(raw_patterns) - len(normalized_patterns)
+    passed = bool(
+        normalized_answer
+        and invalid_pattern_count == 0
+        and all(pattern in normalized_answer for pattern in normalized_patterns)
+    )
+    return passed, {
+        "answerPresent": bool(normalized_answer),
+        "patternCount": len(normalized_patterns),
+        "invalidPatternCount": invalid_pattern_count,
+        "semanticPatternContractDeclared": bool(normalized_patterns),
+        "status": (
+            "INVALID_PATTERN_CONTRACT"
+            if invalid_pattern_count
+            else "MEASURED"
+            if normalized_patterns
+            else "RESPONSE_PRESENCE_ONLY"
+        ),
+    }
 
 
 def _find_action_token(value: Any) -> str | None:
@@ -1273,14 +1402,15 @@ async def run_agent_case(
     terminal_correct = bool(terminal_statuses) and all(
         status in set(case.expected["terminalStatuses"]) for status in terminal_statuses
     )
+    response_verifier_ok, response_verifier_evidence = _response_verifier_contract(
+        episodes
+    )
     execution_complete = (
         required_events.issubset(set(events)) and not unexpected_errors and terminal_correct
     )
     answer = _answer(episodes, responses)
     output_patterns = [str(value) for value in case.expected.get("outputPatterns") or []]
-    output_correct = all(
-        normalize_text(pattern) in normalize_text(answer) for pattern in output_patterns
-    )
+    output_correct, output_contract_evidence = _output_contract(answer, output_patterns)
     violations = severe_agent_violations(
         case.expected,
         answer=answer,
@@ -1332,6 +1462,7 @@ async def run_agent_case(
         and tool_selection
         and argument_accuracy
         and output_correct
+        and response_verifier_ok
         and retry_ok
         and bool(state_diff.get("matched"))
         and not violations
@@ -1351,7 +1482,20 @@ async def run_agent_case(
         "toolCallBudgetViolationCount": len(tool_budget["violations"]),
         "repeatedToolCallCount": repeated_tool_calls,
         "repeatedReadToolCallCount": repeated_read_calls,
+        "outputPatternContractDeclared": int(
+            bool(output_contract_evidence["semanticPatternContractDeclared"])
+        ),
+        "responseVerifierContractPass": int(response_verifier_ok),
+        "responseVerifierObservedCount": int(
+            response_verifier_evidence["observedVerifierCount"]
+        ),
     }
+    if response_verifier_evidence["observedVerifierCount"]:
+        metrics["responseVerifierPass"] = int(response_verifier_ok)
+    else:
+        metrics["responseVerifierNotApplicable"] = int(
+            response_verifier_evidence["notApplicableCount"] > 0
+        )
     # When no product result crossed the tool boundary, bypassing a product hard
     # constraint is impossible and this is directly observable. Successful
     # product results require the Search evaluator's SKU-aware validation and are
@@ -1396,7 +1540,12 @@ async def run_agent_case(
         ),
         assertion("tool-selection", tool_selection, tools),
         assertion("tool-arguments", argument_accuracy, argument_rows),
-        assertion("output-contract", output_correct, output_patterns),
+        assertion("output-contract", output_correct, output_contract_evidence),
+        assertion(
+            "response-verifier",
+            response_verifier_ok,
+            response_verifier_evidence,
+        ),
         assertion(
             "retry-idempotency",
             retry_ok,
@@ -1428,6 +1577,11 @@ async def run_agent_case(
             "expectedTools": sorted(required_tools),
             "toolCallEfficiency": tool_budget,
             "hardConstraintEvidence": hard_constraint_evidence,
+            "answerQualityContract": {
+                **output_contract_evidence,
+                "responseVerifier": response_verifier_evidence,
+                "humanSemanticReviewRequired": True,
+            },
             "stateDiff": state_diff,
             "fixtureEvidence": fixture.evidence,
             "confirmationFlow": case.expected.get("confirmationFlow"),

@@ -570,19 +570,31 @@ class ShoppingDecisionService:
         evidence = product_decision_feature_service.evidence_for(features)
         use_cases = [str(value) for value in mission.get("useCases") or []]
         price = _number(product.get("estimated_payable"))
-        role = "用途匹配优先"
-        text = _text(product)
-        if any(token in text for token in ("性能", "cpu", "显卡", "gpu")):
+        evidence_text = " ".join(
+            str(item.get(key) or "").casefold()
+            for item in evidence
+            for key in ("propertyName", "propertyValue")
+        )
+        supported_use_cases = [
+            use_case
+            for use_case in use_cases
+            if any(
+                len(term.strip()) >= 2 and term.casefold() in evidence_text
+                for term in _USE_CASE_TERMS.get(use_case, (use_case.casefold(),))
+            )
+        ]
+        role = "候选对比"
+        if any(token in evidence_text for token in ("性能", "cpu", "显卡", "gpu")):
             role = "性能优先"
-        elif any(token in text for token in ("续航", "电池")):
+        elif any(token in evidence_text for token in ("续航", "电池")):
             role = "续航优先"
-        elif any(token in text for token in ("轻薄", "重量", "便携")):
+        elif any(token in evidence_text for token in ("轻薄", "重量", "便携")):
             role = "便携优先"
         elif position > 1 and price is not None:
-            role = "性价比优先"
+            role = "价格对比"
         suitable = (
-            f"更适合{'、'.join(use_cases)}等当前用途"
-            if use_cases and evidence
+            f"已核验属性与{'、'.join(supported_use_cases)}用途相关"
+            if supported_use_cases
             else "已通过当前预算、在售和库存条件，可作为对比候选"
         )
         tradeoff = (

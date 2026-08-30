@@ -1,3 +1,5 @@
+import pytest
+
 from app.constants import ORDER_STATUS_NAMES
 from app.rag.fact_metadata import get_fact_metadata_catalog
 from app.rag.prompt_builder import (
@@ -2576,6 +2578,87 @@ def test_grounding_repair_accepts_complete_memory_storage_and_external_service_p
     assert reason is None
 
 
+def _aftersales_policy_evidence() -> list[dict]:
+    return [
+        {
+            "citation": 1,
+            "factIds": ["aftersales.request_and_refund_boundary"],
+            "text": (
+                "用户应在订单详情中发起售后申请，并保持商品、附件和包装完整。"
+                "平台会根据商品类型、订单状态和实际情况审核。"
+                "退款原路返回的时间取决于支付渠道。"
+                "本地演示环境不执行真实资金操作。"
+            ),
+        }
+    ]
+
+
+def test_grounding_repair_rejects_missing_natural_query_atomic_claims():
+    reason = grounding_repair_reason(
+        "用户应在订单详情中发起售后申请，并保持商品、附件和包装完整。[1]"
+        "退款原路返回的时间取决于支付渠道。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="请完整说明退货申请与退款的全部适用边界",
+        evidence_items=_aftersales_policy_evidence(),
+    )
+
+    assert reason is not None
+    assert "发布版原子事实" in reason
+
+
+def test_grounding_repair_accepts_complete_natural_query_atomic_claims():
+    answer = "".join(
+        f"{claim}[1]。"
+        for claim in (
+            "用户应在订单详情中发起售后申请，并保持商品、附件和包装完整",
+            "平台会根据商品类型、订单状态和实际情况审核",
+            "退款原路返回的时间取决于支付渠道",
+            "本地演示环境不执行真实资金操作",
+        )
+    )
+    reason = grounding_repair_reason(
+        answer,
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="请完整说明退货申请与退款的全部适用边界",
+        evidence_items=_aftersales_policy_evidence(),
+    )
+
+    assert reason is None
+
+
+def test_grounding_repair_scopes_ordinary_natural_query_to_requested_fact():
+    reason = grounding_repair_reason(
+        "用户应在订单详情中发起售后申请，并保持商品、附件和包装完整。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="退货申请从哪里发起？",
+        evidence_items=_aftersales_policy_evidence(),
+    )
+
+    assert reason is None
+
+
+def test_grounding_repair_full_request_requires_planned_fact_evidence():
+    reason = grounding_repair_reason(
+        "证据不足时系统应明确说明并建议联系人工客服。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query="请完整说明退货申请与退款的全部适用边界",
+        evidence_items=[
+            {
+                "citation": 1,
+                "factIds": ["rag.retrieval_and_abstention"],
+                "text": "证据不足时系统应明确说明并建议联系人工客服。",
+            }
+        ],
+    )
+
+    assert reason is not None
+    assert "缺少对应的已发布证据" in reason
+
+
 def test_recommendation_hard_constraints_are_deterministic():
     result = response_verifier.verify(
         assistant="为你找到了两款",
@@ -2623,6 +2706,81 @@ def test_recommendation_budget_range_and_required_brand_are_checked():
     assert result.issues[0].code == "RECOMMENDATION_CONSTRAINT_VIOLATION"
 
 
+def _product_property_ref(product_id: str, value: str = "支持") -> dict:
+    return {
+        "type": "product",
+        "source": "JAVA_GATEWAY",
+        "productId": product_id,
+        "claims": [
+            {
+                "claimType": "PRODUCT_PROPERTY",
+                "subjectType": "product",
+                "subjectId": product_id,
+                "sourceType": "JAVA_GATEWAY",
+                "sourceId": product_id,
+                "factPath": "product.property.降噪",
+                "propertyName": "降噪",
+                "value": value,
+            }
+        ],
+    }
+
+
+def _recommendation_candidate(product_id: str, value: str = "支持") -> dict:
+    return {
+        "productId": product_id,
+        "recommendation": {
+            "evidence": [
+                {
+                    "type": "product_property",
+                    "productId": product_id,
+                    "propertyName": "降噪",
+                    "propertyValue": value,
+                }
+            ]
+        },
+    }
+
+
+def test_recommendation_evidence_binds_current_same_product_claim():
+    result = response_verifier.verify(
+        assistant="已找到候选",
+        biz_type="product_search",
+        tools_called=["SEARCH_PRODUCTS"],
+        source_refs={
+            "ragSources": [],
+            "businessSources": [_product_property_ref("p1")],
+        },
+        has_pending_action=False,
+        recommendation_candidates=[_recommendation_candidate("p1")],
+    )
+
+    assert result.passed is True
+
+
+@pytest.mark.parametrize(
+    ("candidate", "source_ref"),
+    [
+        (_recommendation_candidate("p1", "历史值"), _product_property_ref("p1")),
+        (_recommendation_candidate("p2"), _product_property_ref("p1")),
+    ],
+)
+def test_recommendation_evidence_rejects_stale_or_cross_product_claim(
+    candidate, source_ref
+):
+    result = response_verifier.verify(
+        assistant="已找到候选",
+        biz_type="product_search",
+        tools_called=["SEARCH_PRODUCTS"],
+        source_refs={"ragSources": [], "businessSources": [source_ref]},
+        has_pending_action=False,
+        recommendation_candidates=[candidate],
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code == "RECOMMENDATION_EVIDENCE_WITHOUT_CLAIM"
+
+
 def test_generic_refund_timing_fallback_stays_within_published_boundary():
     refs = [
         {
@@ -2658,6 +2816,92 @@ def test_generic_refund_timing_fallback_stays_within_published_boundary():
         rag_evidence_state="SUPPORTED",
     )
     assert checked.passed is True
+
+
+def test_cited_generic_coupon_policy_is_not_treated_as_user_coupon_state():
+    refs = [
+        {
+            "id": "coupon-policy",
+            "factIds": ["coupon.single_per_order_and_revalidate"],
+            "snippet": "每笔订单只能使用一张优惠券，提交订单时会再次校验。",
+        }
+    ]
+    result = response_verifier.verify(
+        assistant="优惠券可用状态需要在提交订单时再次校验 [1]。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert result.passed is True
+
+
+def test_cited_user_coupon_state_still_requires_java_authority():
+    refs = [
+        {
+            "id": "coupon-policy",
+            "factIds": ["coupon.single_per_order_and_revalidate"],
+            "snippet": "每笔订单只能使用一张优惠券，提交订单时会再次校验。",
+        }
+    ]
+    result = response_verifier.verify(
+        assistant="你当前的优惠券状态为可用 [1]。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code in {
+        "DYNAMIC_FACT_WITHOUT_TOOL",
+        "DYNAMIC_FACT_WITHOUT_CLAIM",
+    }
+
+
+@pytest.mark.parametrize(
+    "assistant",
+    [
+        "你当前优惠券每笔订单只能使用一张且已过期 [1]。",
+        "你当前优惠券提交订单时会再次校验且状态为可用 [1]。",
+        "优惠券提交订单时会再次校验且状态为可用 [1]。",
+        "优惠券每笔订单只能使用一张且当前已过期 [1]。",
+    ],
+)
+def test_generic_coupon_policy_cannot_launder_user_specific_state(assistant):
+    refs = [
+        {
+            "id": "coupon-policy",
+            "factIds": ["coupon.single_per_order_and_revalidate"],
+            "snippet": "每笔订单只能使用一张优惠券，提交订单时会再次校验。",
+        }
+    ]
+    result = response_verifier.verify(
+        assistant=assistant,
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert result.passed is False
+    assert result.issues[0].code in {
+        "DYNAMIC_FACT_WITHOUT_TOOL",
+        "DYNAMIC_FACT_WITHOUT_CLAIM",
+    }
 
 
 def test_recommendation_excluded_terms_trigger_clarification():

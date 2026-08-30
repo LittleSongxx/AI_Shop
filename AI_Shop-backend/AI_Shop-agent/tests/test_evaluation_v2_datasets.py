@@ -85,3 +85,16 @@ def test_rag_pattern_groups_are_validated_as_non_empty_alias_sets():
     raw["expected"]["requiredClaims"][0]["patternGroups"] = [[]]
     with pytest.raises(ValidationError, match="patternGroups"):
         parse_case(raw, expected_split=Split.REGRESSION)
+
+
+@pytest.mark.parametrize("patterns", ["确认", ["   "]])
+def test_agent_output_patterns_require_a_non_empty_string_array(patterns):
+    raw = next(
+        case
+        for case in load_split(Split.DEVELOPMENT)
+        if case.domain.value == "agent"
+    ).public()
+    raw["expected"]["outputPatterns"] = patterns
+
+    with pytest.raises(ValidationError, match="outputPatterns"):
+        parse_case(raw, expected_split=Split.DEVELOPMENT)

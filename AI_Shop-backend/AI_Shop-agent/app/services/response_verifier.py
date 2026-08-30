@@ -194,7 +194,14 @@ _POLICY_ADVERSATIVE_RE = re.compile(r"(?:但|但是|不过|然而|可是|仍然|
 _RAG_CITATION_RE = re.compile(r"\[(\d+)]")
 _GENERIC_POLICY_STATUS_RE = re.compile(
     r"(?:待付款订单|已发货通常|进入发货流程|取决于当前履约状态|"
-    r"售后申请应从本人订单详情|退款申请应根据订单详情)"
+    r"售后申请应从本人订单详情|退款申请应根据订单详情|"
+    r"优惠券.{0,20}(?:(?:每笔订单.{0,12})?(?:只能使用一张|不支持多张券叠加))|"
+    r"优惠券.{0,24}(?:下单|提交订单).{0,12}(?:重新|再次)校验)"
+)
+_CASE_SPECIFIC_POLICY_RE = re.compile(
+    r"(?:你当前|你的|我的|我这张|这张|该券|本券|账户(?:中|里)?的|持有的)"
+    r".{0,12}(?:优惠券|券)|"
+    r"(?:优惠券|券).{0,12}(?:你当前|你的|我的|这张|该券|本券|已过期|状态为)"
 )
 _FALLBACKS = {
     "WRITE_WITHOUT_PENDING_ACTION": (
@@ -213,6 +220,9 @@ _FALLBACKS = {
     ),
     "RECOMMENDATION_CONSTRAINT_VIOLATION": (
         "当前候选没有完整满足你的硬性条件。请确认最重要的一项要求，我再重新筛选。"
+    ),
+    "RECOMMENDATION_EVIDENCE_WITHOUT_CLAIM": (
+        "当前候选的推荐依据无法由本次商品快照核验。请先查看商品详情后再决定。"
     ),
     "INVALID_SUPPORT_CASE": (
         "工单信息尚不完整，暂不能提交。请补充订单与问题描述，或回复“转人工”。"
@@ -403,7 +413,9 @@ class ResponseVerifier:
 
         unsupported_order_fact = _unsupported_order_fact(text, business_refs)
         unsupported_dynamic_fact = _unsupported_dynamic_business_fact(
-            text, business_refs
+            text,
+            business_refs,
+            rag_source_count=source_count if rag_citation_required else 0,
         )
         if unsupported_order_fact or unsupported_dynamic_fact:
             issues.append(
@@ -468,6 +480,16 @@ class ResponseVerifier:
                         "至少一个候选违反预算、必需特征或排除品牌",
                     )
                 )
+        unsupported_recommendation = _unsupported_recommendation_evidence(
+            recommendation_candidates or [], business_refs
+        )
+        if unsupported_recommendation:
+            issues.append(
+                VerificationIssue(
+                    "RECOMMENDATION_EVIDENCE_WITHOUT_CLAIM",
+                    unsupported_recommendation,
+                )
+            )
 
         if support_case is not None and not _valid_support_case(support_case):
             issues.append(
@@ -1139,7 +1161,10 @@ def _ref_claim_values(
 
 
 def _unsupported_dynamic_business_fact(
-    text: str, source_refs: list[dict] | dict | None
+    text: str,
+    source_refs: list[dict] | dict | None,
+    *,
+    rag_source_count: int = 0,
 ) -> str | None:
     """Bind each non-order dynamic assertion to its Java-owned ref and value."""
 
@@ -1155,6 +1180,38 @@ def _unsupported_dynamic_business_fact(
     for clause in _assertion_clauses(text):
         if not clause:
             continue
+        citations = [int(value) for value in _RAG_CITATION_RE.findall(clause)]
+        generic_policy_match = _GENERIC_POLICY_STATUS_RE.search(clause)
+        generic_policy_remainder = ""
+        if generic_policy_match is not None:
+            generic_policy_remainder = (
+                clause[: generic_policy_match.start()]
+                + clause[generic_policy_match.end() :]
+            )
+            generic_policy_remainder = _RAG_CITATION_RE.sub(
+                "", generic_policy_remainder
+            )
+            generic_policy_remainder = re.sub(
+                r"^(?:一般(?:来说)?|通常|政策(?:规定)?|平台(?:规则)?)[，,\s]*",
+                "",
+                generic_policy_remainder,
+            ).strip(" ，,。；;、且和及")
+        generic_policy_clause = bool(
+            citations
+            and all(0 < value <= rag_source_count for value in citations)
+            and generic_policy_match
+            and not generic_policy_remainder
+            and not _CASE_SPECIFIC_POLICY_RE.search(clause)
+            and not any(
+                (
+                    _text_order_ids(clause),
+                    _text_order_item_ids(clause),
+                    _text_product_ids(clause),
+                    _text_coupon_ids(clause),
+                    _text_support_case_ids(clause),
+                )
+            )
+        )
         negated_value = bool(_NEGATED_VALUE_RE.search(clause))
         logistics_statuses = _dynamic_status_assertions(
             clause, r"物流|快递|包裹"
@@ -1330,10 +1387,13 @@ def _unsupported_dynamic_business_fact(
             negated_value and prior_coupon_expiry and _DATE_VALUE_RE.search(clause)
         )
         if (
-            coupon_statuses
-            or _COUPON_FACT_RE.search(clause)
-            or inherited_coupon_amount
-            or inherited_coupon_expiry
+            not generic_policy_clause
+            and (
+                coupon_statuses
+                or _COUPON_FACT_RE.search(clause)
+                or inherited_coupon_amount
+                or inherited_coupon_expiry
+            )
         ):
             refs = _trusted_business_refs(
                 source_refs,
@@ -2043,6 +2103,68 @@ def _recommendations_satisfy(constraints: dict, candidates: list[dict]) -> bool:
         if required and not required.issubset({term for term in required if term in searchable}):
             return False
     return True
+
+
+def _unsupported_recommendation_evidence(
+    candidates: list[dict], source_refs: list[dict[str, Any]]
+) -> str | None:
+    claims_by_product: dict[str, set[tuple[str, str]]] = {}
+    for ref in source_refs:
+        if (
+            str(ref.get("type") or "").lower() != "product"
+            or str(ref.get("source") or "")
+            not in {"JAVA_GATEWAY", "JAVA_PRODUCT_SERVICE"}
+            or ref.get("matched", True) is False
+            or ref.get("authoritative", True) is False
+        ):
+            continue
+        product_id = str(ref.get("productId") or ref.get("id") or "").strip()
+        if not product_id:
+            continue
+        for claim in ref.get("claims") or []:
+            if (
+                not isinstance(claim, dict)
+                or claim.get("claimType") != "PRODUCT_PROPERTY"
+                or claim.get("subjectType") != "product"
+                or str(claim.get("subjectId") or "") != product_id
+                or str(claim.get("sourceId") or "") != product_id
+                or str(claim.get("sourceType") or "") != str(ref.get("source") or "")
+                or not str(claim.get("factPath") or "").startswith("product.property.")
+            ):
+                continue
+            name = _normalized_scalar(claim.get("propertyName"))
+            value = _normalized_scalar(claim.get("value"))
+            if name and value:
+                claims_by_product.setdefault(product_id, set()).add((name, value))
+
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        product_id = str(
+            candidate.get("productId") or candidate.get("product_id") or candidate.get("id") or ""
+        ).strip()
+        recommendation = candidate.get("recommendation")
+        evidence = (
+            recommendation.get("evidence")
+            if isinstance(recommendation, dict)
+            else []
+        )
+        for item in evidence or []:
+            if not isinstance(item, dict):
+                return "推荐依据不是结构化的当前商品属性证据"
+            evidence_product_id = str(item.get("productId") or "").strip()
+            name = _normalized_scalar(item.get("propertyName"))
+            value = _normalized_scalar(item.get("propertyValue"))
+            if (
+                not product_id
+                or item.get("type") != "product_property"
+                or evidence_product_id != product_id
+                or not name
+                or not value
+                or (name, value) not in claims_by_product.get(product_id, set())
+            ):
+                return "推荐依据未绑定同一商品的当前 Java PRODUCT_PROPERTY claim"
+    return None
 
 
 def _valid_support_case(case: dict) -> bool:

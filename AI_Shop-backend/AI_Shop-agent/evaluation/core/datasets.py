@@ -192,6 +192,15 @@ def _validate_agent(case_id: str, value: dict[str, Any]) -> None:
         field=f"{case_id}.expected.requiredTools",
         allow_empty=True,
     )
+    if "outputPatterns" in expected:
+        patterns = expected.get("outputPatterns")
+        if (
+            not isinstance(patterns, list)
+            or any(not isinstance(item, str) or not item.strip() for item in patterns)
+        ):
+            raise ValidationError(
+                f"{case_id}.expected.outputPatterns must be an array of non-empty strings"
+            )
 
 
 def _optional_object(value: Any, *, field: str) -> dict[str, Any] | None:

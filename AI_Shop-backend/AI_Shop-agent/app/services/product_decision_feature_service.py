@@ -268,28 +268,23 @@ class ProductDecisionFeatureService:
         prepared = [dict(raw) for raw in products]
         direct_by_id: dict[str, list[dict[str, Any]]] = {}
         persist_rows: list[tuple[str, str, str, dict[str, Any]]] = []
-        product_ids: list[str] = []
         for product in prepared:
             product_id = str(product.get("product_id") or product.get("productId") or "").strip()
             if not product_id:
                 continue
-            product_ids.append(product_id)
             pairs = structured_feature_pairs(product)
             direct_by_id[product_id] = self._direct_features(pairs)
             persist_rows.extend(
                 (product_id, key, value, evidence) for key, value, evidence in pairs
             )
 
-        # One upsert and one read serve the whole candidate set.  If the audit
-        # table is temporarily unavailable, direct Java snapshot attributes are
-        # still safe to use for this request.
+        # Persist for later audit, but serve only the current Java snapshot.
+        # Historical VERIFIED rows are not proof that an attribute is still
+        # present in this request's product representation.
         await self._persist_structured_features_batch(persist_rows)
-        persisted_by_id = await self.verified_features_batch(product_ids)
         for product in prepared:
             product_id = str(product.get("product_id") or product.get("productId") or "").strip()
-            product["decisionFeatures"] = persisted_by_id.get(product_id) or direct_by_id.get(
-                product_id, []
-            )
+            product["decisionFeatures"] = direct_by_id.get(product_id, [])
         return prepared
 
     @staticmethod

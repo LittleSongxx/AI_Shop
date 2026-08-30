@@ -38,21 +38,8 @@ class _BatchCursor:
 
 
 @pytest.mark.asyncio
-async def test_decision_features_use_one_batch_write_and_one_batch_read():
+async def test_decision_features_serve_current_snapshot_after_one_batch_write():
     write_cursor = _BatchCursor()
-    read_cursor = _BatchCursor(
-        rows=[
-            {
-                "product_id": "p1",
-                "feature_key": "brand",
-                "feature_value": "Sony",
-                "source_type": "STRUCTURED_ATTRIBUTE",
-                "evidence_json": json.dumps({"productId": "p1"}),
-                "confidence": 1,
-            }
-        ]
-    )
-    cursors = iter((write_cursor, read_cursor))
     service = ProductDecisionFeatureService()
     products = [
         {
@@ -67,17 +54,35 @@ async def test_decision_features_use_one_batch_write_and_one_batch_read():
         },
     ]
 
-    def acquire():
-        return _acquire_for(next(cursors))()
-
-    with patch("app.services.product_decision_feature_service.acquire", side_effect=acquire):
+    stale = AsyncMock(
+        return_value={
+            "p1": [
+                {
+                    "key": "battery",
+                    "value": "过期属性",
+                    "reviewStatus": "VERIFIED",
+                }
+            ]
+        }
+    )
+    with (
+        patch(
+            "app.services.product_decision_feature_service.acquire",
+            side_effect=lambda: _acquire_for(write_cursor)(),
+        ),
+        patch.object(service, "verified_features_batch", stale),
+    ):
         annotated = await service.annotate_candidates(products)
 
     assert len(write_cursor.executemany_calls) == 1
     assert len(write_cursor.executemany_calls[0][1]) == 4
     assert len(write_cursor.execute_calls) == 0
-    assert len(read_cursor.execute_calls) == 1
+    stale.assert_not_awaited()
     assert annotated[0]["decisionFeatures"][0]["value"] == "Sony"
+    assert all(
+        feature["value"] != "过期属性"
+        for feature in annotated[0]["decisionFeatures"]
+    )
     assert annotated[1]["decisionFeatures"]
 
 

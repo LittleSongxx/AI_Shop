@@ -736,6 +736,16 @@ async def finalize_agent_response(
     if "SEARCH_PRODUCTS" in called and is_product_cards_json(assistant_cards):
         try:
             parsed_candidates = json.loads(assistant_cards or "[]")
+            recommendation_candidates = (
+                parsed_candidates if isinstance(parsed_candidates, list) else None
+            )
+        except (TypeError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "recommendation_verifier_cards_failed",
+                user_id=user_id,
+                error=type(exc).__name__,
+            )
+        try:
             effective_profile = await shopping_profile_service.get_effective_profile(
                 user_id
             )
@@ -750,9 +760,6 @@ async def finalize_agent_response(
                     else []
                 ),
             }
-            recommendation_candidates = (
-                parsed_candidates if isinstance(parsed_candidates, list) else None
-            )
         except Exception as exc:
             logger.warning(
                 "recommendation_verifier_context_failed",

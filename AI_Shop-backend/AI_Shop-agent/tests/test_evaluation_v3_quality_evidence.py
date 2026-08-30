@@ -19,9 +19,11 @@ from evaluation.adapters.agent import (
     _find_action_token,
     _find_owned_pending_action_token,
     _observable_fixture_subset,
+    _output_contract,
     _public_payload_without_secrets_or_untrusted_costs,
     _render_fixture_message,
     _repeated_non_durable_tool_calls,
+    _response_verifier_contract,
     _tool_call_budget,
 )
 from evaluation.adapters.common import provider_complete
@@ -195,6 +197,162 @@ def test_direct_handoff_does_not_hide_llm_call_or_orchestration_fallback() -> No
             }
         ]
     ) == {}
+
+
+def test_empty_output_patterns_require_a_nonempty_answer_and_stay_unmeasured() -> None:
+    missing, missing_evidence = _output_contract("", [])
+    present, present_evidence = _output_contract("已提供安全回答", [])
+    matched, matched_evidence = _output_contract("订单需要确认", ["需要确认"])
+    mismatched, _ = _output_contract("订单需要确认", ["已经完成"])
+    invalid, invalid_evidence = _output_contract("订单需要确认", ["   "])
+
+    assert missing is False
+    assert missing_evidence["status"] == "RESPONSE_PRESENCE_ONLY"
+    assert present is True
+    assert present_evidence["semanticPatternContractDeclared"] is False
+    assert matched is True
+    assert matched_evidence["status"] == "MEASURED"
+    assert mismatched is False
+    assert invalid is False
+    assert invalid_evidence["status"] == "INVALID_PATTERN_CONTRACT"
+    assert invalid_evidence["semanticPatternContractDeclared"] is False
+
+
+def test_response_verifier_contract_fails_closed_across_root_episodes() -> None:
+    passed_episode = {
+        "status": "SUCCEEDED",
+        "steps": [
+            {
+                "eventType": "RESPONSE_VERIFIER",
+                "status": "OK",
+                "output": {
+                    "verifierPassed": True,
+                    "terminalQuality": "PASS",
+                    "safeFallbackApplied": False,
+                },
+            }
+        ],
+    }
+    blocked_episode = {
+        "status": "SUCCEEDED",
+        "steps": [
+            {
+                "eventType": "RESPONSE_VERIFIER",
+                "status": "BLOCKED",
+                "output": {
+                    "verifierPassed": False,
+                    "terminalQuality": "SAFE_DEGRADED",
+                    "safeFallbackApplied": True,
+                },
+            }
+        ],
+    }
+
+    passed, evidence = _response_verifier_contract([passed_episode])
+    blocked, blocked_evidence = _response_verifier_contract([blocked_episode])
+    multi_turn, _ = _response_verifier_contract([blocked_episode, passed_episode])
+    missing, missing_evidence = _response_verifier_contract(
+        [{"status": "SUCCEEDED", "steps": []}]
+    )
+
+    assert passed is True
+    assert evidence["observedVerifierCount"] == 1
+    assert blocked is False
+    assert blocked_evidence["observations"][0]["status"] == "FAILED"
+    assert multi_turn is False
+    assert missing is False
+    assert missing_evidence["observations"][0]["status"] == "MISSING"
+
+
+def test_response_verifier_contract_rejects_conflicts_and_failure_masking() -> None:
+    passed = {
+        "eventType": "RESPONSE_VERIFIER",
+        "status": "OK",
+        "output": {"verifierPassed": True, "terminalQuality": "PASS"},
+    }
+    blocked = {
+        "eventType": "RESPONSE_VERIFIER",
+        "status": "BLOCKED",
+        "output": {
+            "verifierPassed": False,
+            "terminalQuality": "SAFE_DEGRADED",
+        },
+    }
+    conflict, _ = _response_verifier_contract(
+        [
+            {
+                "status": "SUCCEEDED",
+                "quality": {
+                    "verifierPassed": False,
+                    "terminalQuality": "DEGRADED_UNVERIFIED",
+                },
+                "steps": [passed],
+            }
+        ]
+    )
+    masked, _ = _response_verifier_contract(
+        [{"status": "SUCCEEDED", "steps": [blocked, passed]}]
+    )
+    missing_terminal_quality, _ = _response_verifier_contract(
+        [
+            {
+                "status": "SUCCEEDED",
+                "steps": [
+                    {
+                        "eventType": "RESPONSE_VERIFIER",
+                        "status": "OK",
+                        "output": {"verifierPassed": True},
+                    }
+                ],
+            }
+        ]
+    )
+    handoff_masked, _ = _response_verifier_contract(
+        [
+            {
+                "status": "HANDOFF",
+                "steps": [
+                    blocked,
+                    {
+                        "eventType": "INTENT_DECISION",
+                        "status": "OK",
+                        "output": {"intent": "COMPLAINT", "nextAction": "HANDOFF"},
+                    },
+                    {"eventType": "HANDOFF", "status": "OK", "output": {}},
+                ],
+            }
+        ]
+    )
+
+    assert conflict is False
+    assert masked is False
+    assert missing_terminal_quality is False
+    assert handoff_masked is False
+
+
+def test_response_verifier_contract_accepts_proven_direct_handoff_as_na() -> None:
+    passed, evidence = _response_verifier_contract(
+        [
+            {
+                "status": "HANDOFF",
+                "steps": [
+                    {
+                        "eventType": "INTENT_DECISION",
+                        "status": "OK",
+                        "output": {
+                            "intent": "COMPLAINT",
+                            "nextAction": "HANDOFF",
+                        },
+                    },
+                    {"eventType": "HANDOFF", "status": "OK", "output": {}},
+                ],
+            }
+        ]
+    )
+
+    assert passed is True
+    assert evidence["observedVerifierCount"] == 0
+    assert evidence["notApplicableCount"] == 1
 
 
 def test_post_resolution_order_handoff_proves_llm_not_applicable() -> None:

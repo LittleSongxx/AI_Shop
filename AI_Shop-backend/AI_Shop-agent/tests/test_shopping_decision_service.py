@@ -253,3 +253,64 @@ def test_rank_reports_real_slate_diversity_instead_of_recall_rank_prior():
     assert ranked[1]["product_id"] == "c"
     assert ranked[1]["ranking"]["diversityScore"] == 1.0
     assert ranked[-1]["ranking"]["diversityScore"] == 0.0
+
+
+def test_explanation_does_not_claim_use_case_from_unrelated_evidence():
+    product = {
+        **_offer_product("p1"),
+        "decisionFeatures": [
+            {
+                "key": "brand",
+                "value": "示例品牌",
+                "reviewStatus": "VERIFIED",
+                "evidence": {
+                    "type": "product_property",
+                    "productId": "p1",
+                    "propertyName": "品牌",
+                    "propertyValue": "示例品牌",
+                },
+            }
+        ],
+    }
+
+    explanation = ShoppingDecisionService()._explanation(
+        product, {"useCases": ["通勤降噪"]}, 1
+    )
+
+    assert "通勤降噪" not in explanation["bestFor"]
+    assert explanation["role"] == "候选对比"
+
+
+def test_explanation_binds_use_case_to_displayed_current_evidence():
+    product = {
+        **_offer_product("p1"),
+        "decisionFeatures": [
+            {
+                "key": "noise_cancellation",
+                "value": "支持主动降噪",
+                "reviewStatus": "VERIFIED",
+                "evidence": {
+                    "type": "product_property",
+                    "productId": "p1",
+                    "propertyName": "降噪",
+                    "propertyValue": "支持主动降噪",
+                },
+            }
+        ],
+    }
+
+    explanation = ShoppingDecisionService()._explanation(
+        product, {"useCases": ["通勤降噪"]}, 1
+    )
+
+    assert "通勤降噪" in explanation["bestFor"]
+    assert explanation["evidence"] == [product["decisionFeatures"][0]["evidence"]]
+
+
+def test_explanation_does_not_call_price_only_candidate_value_for_money():
+    explanation = ShoppingDecisionService()._explanation(
+        _offer_product("p2"), {"useCases": []}, 2
+    )
+
+    assert explanation["role"] == "价格对比"
+    assert "性价比" not in explanation["summary"]

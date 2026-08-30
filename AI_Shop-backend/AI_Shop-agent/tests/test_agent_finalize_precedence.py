@@ -403,6 +403,84 @@ async def test_unverified_rag_generation_is_accounted_as_degraded_with_order_aut
 
 
 @pytest.mark.asyncio
+async def test_product_evidence_is_checked_when_profile_lookup_fails():
+    recorded = []
+    cards = json.dumps(
+        [
+            {
+                "productId": "p1",
+                "productName": "降噪耳机",
+                "recommendation": {
+                    "evidence": [
+                        {
+                            "type": "product_property",
+                            "productId": "p1",
+                            "propertyName": "降噪",
+                            "propertyValue": "历史值",
+                        }
+                    ]
+                },
+            }
+        ],
+        ensure_ascii=False,
+    )
+    refs = [
+        {
+            "type": "product",
+            "source": "JAVA_GATEWAY",
+            "productId": "p1",
+            "claims": [
+                {
+                    "claimType": "PRODUCT_PROPERTY",
+                    "subjectType": "product",
+                    "subjectId": "p1",
+                    "sourceType": "JAVA_GATEWAY",
+                    "sourceId": "p1",
+                    "factPath": "product.property.降噪",
+                    "propertyName": "降噪",
+                    "value": "支持",
+                }
+            ],
+        }
+    ]
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+        patch("app.services.agent_runtime.badcase_service.add_candidate", AsyncMock()),
+        patch("app.services.agent_runtime.judge_service.enqueue"),
+        patch(
+            "app.services.agent_runtime.shopping_profile_service.get_effective_profile",
+            AsyncMock(side_effect=RuntimeError("profile unavailable")),
+        ),
+        patch(
+            "app.services.agent_runtime.episode_service.record_step",
+            side_effect=lambda event, **kwargs: recorded.append((event, kwargs)),
+        ),
+    ):
+        await finalize_agent_response(
+            {"userId": "u1", "messageId": 35, "userMessage": "推荐耳机"},
+            ["为你找到了候选"],
+            [],
+            assistant_cards=cards,
+            tools_called=["SEARCH_PRODUCTS"],
+            source_refs={"ragSources": [], "businessSources": refs},
+            user_text="推荐耳机",
+        )
+
+    verifier = next(kwargs for event, kwargs in recorded if event == "RESPONSE_VERIFIER")
+    assert verifier["status"] == "BLOCKED"
+    assert verifier["output_data"]["verifierIssues"][0]["code"] == (
+        "RECOMMENDATION_EVIDENCE_WITHOUT_CLAIM"
+    )
+    assert complete.await_args.args[1] == (
+        "当前候选的推荐依据无法由本次商品快照核验。请先查看商品详情后再决定。"
+    )
+
+
+@pytest.mark.asyncio
 async def test_deterministic_payment_clarification_bypasses_policy_evidence_gate():
     guidance = (
         "根据你的描述，本次支付失败且没有扣款。请先检查支付方式和页面提示，再自行重新发起支付；"

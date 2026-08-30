@@ -21,6 +21,10 @@ from app.utils.prompt_boundary import escape_xml, isolate_user_message
 RAG_REFUSAL_TEXT = "根据当前知识库，我无法确认该信息。请联系人工客服核实。"
 GROUNDING_POLICY_FACT_ID = "rag.retrieval_and_abstention"
 _GROUNDING_POLICY_QUERY_MARKERS = ("grounding", "检索不足", "证据不足")
+_FULL_FACT_COVERAGE_RE = re.compile(
+    r"(?:完整|全部|所有|逐项).{0,12}(?:规则|事实|边界|说明)|"
+    r"(?:规则|事实|适用边界).{0,12}(?:完整|全部|所有)"
+)
 _CITATION_RE = re.compile(r"\[(\d+)]")
 _CONDITIONAL_EVIDENCE_RE = re.compile(
     r"^(?:(?:很|非常)?抱歉[，,\s]*)?(?:当|若|如果|在)?(?:根据(?:当前知识库|现有证据|当前证据)[，,\s]*)?"
@@ -173,10 +177,12 @@ def _atomic_claims_from_item(
 def _explicit_atomic_claim_bindings(
     query: str,
     evidence_items: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None,
+    *,
+    fact_hints: tuple[str, ...] | None = None,
 ) -> tuple[list[tuple[str, str, tuple[int, ...]]], bool]:
     """Bind explicit published facts to claims present in selected evidence."""
 
-    fact_hints = explicit_query_fact_hints(query)
+    fact_hints = fact_hints or explicit_query_fact_hints(query)
     if not fact_hints:
         return [], True
     try:
@@ -316,19 +322,23 @@ def _coverage_requirements(
             ]
         )
 
-    if (
-        "aftersales.request_and_refund_boundary" in fact_ids
-        and any(term in text for term in ("退款", "退货"))
-        and any(term in text for term in ("订单详情", "入口", "发起", "申请"))
+    if "aftersales.request_and_refund_boundary" in fact_ids and any(
+        term in text for term in ("退款", "退货")
     ):
-        requirements.extend(
-            [
+        if any(term in text for term in ("订单详情", "入口", "发起", "申请")):
+            requirements.extend(
+                [
                 ("售后申请入口", ("订单详情",)),
                 ("售后申请动作", ("售后申请", "发起售后")),
+                ]
+            )
+        if any(term in text for term in ("到账", "支付渠道", "原路", "多久")):
+            requirements.extend(
+                [
                 ("退款返回渠道", ("支付渠道",)),
                 ("退款原路返回", ("原路返回",)),
-            ]
-        )
+                ]
+            )
 
     if (
         "address.order_snapshot" in fact_ids
@@ -713,6 +723,43 @@ def grounding_repair_reason(
                 "显式术语回答未完整保留发布版原子事实："
                 + "；".join(missing_claims)
             )
+        planned_hints = plan_rag_query(query).fact_hints
+        explicit_hints = explicit_query_fact_hints(query)
+        available_fact_ids = {
+            fact_id
+            for item in evidence_items or ()
+            if isinstance(item, dict)
+            for fact_id in _fact_ids_from_item(item)
+        }
+        applicable_planned_hints = tuple(
+            fact_id for fact_id in planned_hints if fact_id in available_fact_ids
+        )
+        full_fact_coverage_requested = bool(_FULL_FACT_COVERAGE_RE.search(query))
+        if full_fact_coverage_requested and set(planned_hints) - available_fact_ids:
+            reasons.append("完整事实请求缺少对应的已发布证据")
+        if (
+            applicable_planned_hints
+            and planned_hints != explicit_hints
+            and not _is_pure_grounding_policy_query(query)
+            and full_fact_coverage_requested
+        ):
+            planned_bindings, planned_complete = _explicit_atomic_claim_bindings(
+                query,
+                evidence_items,
+                fact_hints=applicable_planned_hints,
+            )
+            missing_planned_claims = [
+                claim
+                for _, claim, citations in planned_bindings
+                if not _canonical_claim_has_citation(text, claim, citations)
+            ]
+            if not planned_complete:
+                reasons.append("问题对应的发布版原子事实未被完整证据支持")
+            if missing_planned_claims:
+                reasons.append(
+                    "回答未完整覆盖问题对应的发布版原子事实："
+                    + "；".join(missing_planned_claims)
+                )
         missing_groups = [
             label
             for label, alternatives in _coverage_requirements(query, evidence_items)
