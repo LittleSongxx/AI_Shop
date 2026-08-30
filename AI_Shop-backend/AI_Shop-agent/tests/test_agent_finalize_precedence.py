@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.services.agent_runtime import finalize_agent_response
+from app.services.evidence_refs import order_refs
 
 
 @pytest.mark.asyncio
@@ -21,6 +22,9 @@ async def test_valid_order_cards_beat_an_earlier_failed_write_attempt():
         ],
         ensure_ascii=False,
     )
+    business_refs = order_refs(
+        json.loads(cards), captured="2026-08-30T00:00:00+00:00"
+    )
     with (
         patch(
             "app.services.agent_runtime.agent_message_service.try_complete_message",
@@ -35,6 +39,8 @@ async def test_valid_order_cards_beat_an_earlier_failed_write_attempt():
             assistant_cards=cards,
             tools_called=["PROPOSE_REFUND", "QUERY_ORDERS"],
             user_text="耳机退款",
+            source_refs={"ragSources": [], "businessSources": business_refs},
+            order_resolution="RESOLVED",
         )
 
     assert complete.await_args.args[1] == cards
@@ -346,6 +352,54 @@ async def test_failed_rag_repair_draft_is_replaced_by_verifier_fallback():
     persisted = complete.await_args.args[1]
     assert persisted != unsafe_draft
     assert persisted == "本次回答的知识引用不完整或无效。请稍后重试，或回复“转人工”。"
+
+
+@pytest.mark.asyncio
+async def test_unverified_rag_generation_is_accounted_as_degraded_with_order_authority():
+    recorded = []
+    unsafe_cards = '[{"productId":"p1","productName":"未经验证候选"}]'
+    business_refs = order_refs(
+        [{"order_id": "SM1", "order_status": 2, "order_status_name": "已发货"}],
+        captured="2026-08-30T00:00:00+00:00",
+    )
+    with (
+        patch(
+            "app.services.agent_runtime.agent_message_service.try_complete_message",
+            AsyncMock(),
+        ) as complete,
+        patch("app.services.agent_runtime.stream_service.push_done", AsyncMock()),
+        patch("app.services.agent_runtime.badcase_service.add_candidate", AsyncMock()),
+        patch("app.services.agent_runtime.judge_service.enqueue"),
+        patch(
+            "app.services.agent_runtime.episode_service.record_step",
+            side_effect=lambda event, **kwargs: recorded.append((event, kwargs)),
+        ),
+    ):
+        finalized = await finalize_agent_response(
+            {"userId": "u1", "messageId": 34, "userMessage": "订单与退款政策"},
+            ["本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"],
+            [],
+            biz_type="query_order",
+            assistant_cards=unsafe_cards,
+            tools_called=["QUERY_ORDERS"],
+            source_refs={
+                "ragSources": [{"type": "knowledge", "id": "policy-1"}],
+                "businessSources": business_refs,
+            },
+            user_text="订单与退款政策",
+            order_resolution="RESOLVED",
+            rag_evidence_required=True,
+            rag_evidence_state="SUPPORTED",
+            rag_generation_verified=False,
+        )
+
+    verifier_event = next(kwargs for event, kwargs in recorded if event == "RESPONSE_VERIFIER")
+    assert verifier_event["status"] == "BLOCKED"
+    assert verifier_event["output_data"]["terminalQuality"] == "DEGRADED_UNVERIFIED"
+    assert complete.await_args.args[1] == (
+        "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"
+    )
+    assert finalized == (complete.await_args.args[1], None)
 
 
 @pytest.mark.asyncio

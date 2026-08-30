@@ -26,6 +26,8 @@ def _state(*, queries=None, count=0, allowed=True, pending=None):
         "rag_agentic_allowed": allowed,
         "rag_source_refs": [],
         "rag_trace": None,
+        "user_text": "根问题",
+        "rag_safe_business_query": "根问题",
     }
 
 
@@ -154,7 +156,7 @@ async def test_rag_rules_do_not_interrupt_openai_tool_message_sequence(monkeypat
                 retrieval_trace={"hit": True, "knowledgeVersion": 3},
                 grounding={
                     "evidenceState": "SUPPORTED",
-                    "queryPlan": {"safeBusinessQuery": "退款规则"},
+                    "queryPlan": {"safeBusinessQuery": "退款条件"},
                     "evidenceItems": [{"citation": 1, "text": "证据一", "ref": {"id": "c1"}}],
                 },
             ),
@@ -164,8 +166,8 @@ async def test_rag_rules_do_not_interrupt_openai_tool_message_sequence(monkeypat
                 retrieval_trace={"hit": True, "knowledgeVersion": 3},
                 grounding={
                     "evidenceState": "SUPPORTED",
-                    "queryPlan": {"safeBusinessQuery": "退款规则"},
-                    "evidenceItems": [{"citation": 2, "text": "证据二", "ref": {"id": "c2"}}],
+                    "queryPlan": {"safeBusinessQuery": "退货运费"},
+                    "evidenceItems": [{"citation": 1, "text": "证据二", "ref": {"id": "c2"}}],
                 },
             ),
         ]
@@ -178,6 +180,8 @@ async def test_rag_rules_do_not_interrupt_openai_tool_message_sequence(monkeypat
             {"id": "call-2", "name": "SEARCH_KNOWLEDGE", "args": {"query": "退款运费"}},
         ]
     )
+    state["user_text"] = "退款条件和退货运费"
+    state["rag_safe_business_query"] = "退款条件和退货运费"
     state["llm_messages"] = [
         AIMessage(
             content="",
@@ -202,3 +206,11 @@ async def test_rag_rules_do_not_interrupt_openai_tool_message_sequence(monkeypat
     assert all(
         isinstance(message, ToolMessage) for message in messages[response_index + 1 :]
     )
+    tool_messages = [
+        message for message in messages if isinstance(message, ToolMessage)
+    ]
+    assert "[1]" in tool_messages[0].content
+    assert "[2]" in tool_messages[1].content
+    assert "[1]" not in tool_messages[1].content
+    assert [item["citation"] for item in result["rag_evidence_items"]] == [1, 2]
+    assert result["rag_safe_business_query"] == "退款条件和退货运费"

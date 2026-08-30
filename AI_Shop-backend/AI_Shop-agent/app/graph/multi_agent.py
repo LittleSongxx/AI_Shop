@@ -31,6 +31,12 @@ from app.harness.agents.registry import AGENT_SPECS
 from app.harness.guardrails.output_guard import strip_emojis
 from app.harness.observation import build_tool_result_observation
 from app.observability.llm_metrics import invoke_llm_with_metrics
+from app.rag.fact_metadata import get_fact_metadata_catalog
+from app.rag.prompt_builder import (
+    canonical_claim_clauses,
+    canonical_claim_key,
+    canonical_evidence_claim_keys,
+)
 from app.rag.query_rewriter import normalize_policy_query
 from app.services import agent_runtime as rt
 from app.services.episode_service import bind_episode, episode_service
@@ -226,9 +232,12 @@ _TOOL_PROTOCOL_MARKERS = (
 )
 _POLICY_FALLBACK_LINE_RE = re.compile(
     r"政策|平台规则|售后规则|(?:退款|退货|换货)(?:条件|资格)|"
-    r"(?:可以|能够|不能|不可|支持|不支持).{0,10}(?:退款|退货|换货)|"
+    r"(?:\d+|七|十五|三十)天.{0,12}(?:退款|退货|换货)|"
+    r"(?:可|可以|能够|不能|不可|支持|不支持).{0,10}(?:退款|退货|换货)|"
     r"(?:符合|满足|具备|不符合|不满足).{0,10}(?:退款|退货|换货)"
 )
+_CITATION_INDEX_RE = re.compile(r"\[(\d+)]")
+_CITATION_TRAILING_RE = re.compile(r"([。！？!?；;])\s*(\[\d+])")
 
 
 def _contains(text: str, *terms: str) -> bool:
@@ -284,6 +293,167 @@ def _partition_source_refs(
     return rag, business
 
 
+def _source_ref_key(item: dict[str, Any]) -> tuple[str, str, str, str]:
+    identity_key, identity = next(
+        (
+            (key, str(item[key]))
+            for key in (
+                "chunkId",
+                "questionId",
+                "id",
+                "documentId",
+                "productId",
+                "orderItemId",
+                "orderId",
+                "caseId",
+                "decisionId",
+                "policyId",
+            )
+            if item.get(key) not in (None, "")
+        ),
+        ("", ""),
+    )
+    version = str(item.get("knowledgeVersion") or item.get("version") or "")
+    return str(item.get("type") or "").lower(), identity_key, identity, version
+
+
+def _dedupe_refs(source_candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    source_refs: list[dict[str, Any]] = []
+    source_keys: set[tuple[str, str, str, str]] = set()
+    for evidence in source_candidates:
+        if not isinstance(evidence, dict):
+            continue
+        key = _source_ref_key(evidence)
+        if not key[2] or key in source_keys:
+            continue
+        source_keys.add(key)
+        source_refs.append(evidence)
+    return source_refs
+
+
+def _reject_artifact_citations(artifact: AgentArtifact, warning: str) -> AgentArtifact:
+    clone = artifact.model_copy(deep=True)
+    clone.status = "DEGRADED"
+    clone.draft_answer = ""
+    clone.facts = []
+    clone.evidence = [item for item in clone.evidence if not _is_rag_source_ref(item)]
+    clone.confidence = 0.0
+    clone.next_step = "FALLBACK"
+    clone.warnings = list(dict.fromkeys([*clone.warnings, warning]))
+    return clone
+
+
+def _validate_local_artifact_citations(artifact: AgentArtifact) -> AgentArtifact:
+    local_refs = [item for item in artifact.evidence if _is_rag_source_ref(item)]
+    if not local_refs:
+        return artifact
+    text = "\n".join([artifact.draft_answer, *artifact.facts]).strip()
+    sentence_text = _CITATION_TRAILING_RE.sub(r"\2\1", text)
+    clauses = [
+        clause.strip()
+        for clause in re.split(r"(?<=[。！？!?；;\n])", sentence_text)
+        if clause.strip()
+    ]
+    citations = [int(value) for value in _CITATION_INDEX_RE.findall(text)]
+    local_keys = [_source_ref_key(item) for item in local_refs]
+    if not citations or any(not _CITATION_INDEX_RE.search(clause) for clause in clauses):
+        return _reject_artifact_citations(artifact, "SPECIALIST_CITATION_MISSING")
+    if (
+        any(not key[2] for key in local_keys)
+        or len(set(local_keys)) != len(local_keys)
+        or any(value < 1 or value > len(local_refs) for value in citations)
+    ):
+        return _reject_artifact_citations(artifact, "SPECIALIST_CITATION_UNMAPPED")
+    try:
+        catalog = get_fact_metadata_catalog()
+    except Exception:
+        catalog = None
+    for clause in clauses:
+        claim_key = canonical_claim_key(_CITATION_INDEX_RE.sub("", clause))
+        supported = False
+        for citation in {int(value) for value in _CITATION_INDEX_RE.findall(clause)}:
+            ref = local_refs[citation - 1]
+            snippet_claims = canonical_evidence_claim_keys(ref.get("snippet") or "")
+            if claim_key and claim_key in snippet_claims:
+                supported = True
+                break
+            fact_ids = ref.get("factIds") or ref.get("fact_ids") or []
+            if isinstance(fact_ids, str):
+                fact_ids = [fact_ids]
+            if catalog and any(
+                claim_key == canonical_claim_key(canonical_clause)
+                for fact_id in fact_ids
+                if (metadata := catalog.facts.get(str(fact_id))) is not None
+                for raw_claim in metadata.atomic_claims
+                for canonical_clause in canonical_claim_clauses(raw_claim)
+            ):
+                supported = True
+                break
+        if not supported:
+            return _reject_artifact_citations(
+                artifact, "SPECIALIST_CLAIM_UNSUPPORTED"
+            )
+    return artifact
+
+
+def _remap_artifact_citations(
+    artifact: AgentArtifact, global_rag_refs: list[dict[str, Any]]
+) -> AgentArtifact:
+    """Translate one specialist's local RAG citations to root source indexes."""
+
+    local_refs = [item for item in artifact.evidence if _is_rag_source_ref(item)]
+    clone = artifact.model_copy(deep=True)
+    if not local_refs:
+        return clone
+    global_positions = {
+        _source_ref_key(item): index
+        for index, item in enumerate(global_rag_refs, start=1)
+    }
+    mapping = {
+        local_index: global_positions[key]
+        for local_index, item in enumerate(local_refs, start=1)
+        if (key := _source_ref_key(item)) in global_positions
+    }
+    invalid = False
+
+    def rewrite(value: str) -> str:
+        def replace(match: re.Match[str]) -> str:
+            nonlocal invalid
+            if mapped := mapping.get(int(match.group(1))):
+                return f"[{mapped}]"
+            invalid = True
+            return ""
+
+        return _CITATION_INDEX_RE.sub(replace, value)
+
+    clone.draft_answer = rewrite(clone.draft_answer)
+    clone.facts = [rewrite(value) for value in clone.facts]
+    if invalid:
+        return _reject_artifact_citations(clone, "SPECIALIST_CITATION_UNMAPPED")
+    return clone
+
+
+def _artifact_claims(text: str) -> set[str]:
+    normalized = _CITATION_TRAILING_RE.sub(r"\2\1", str(text or ""))
+    return {
+        "".join(clause.split())
+        for clause in re.split(r"(?<=[。！？!?；;\n])", normalized)
+        if clause.strip()
+    }
+
+
+def _preserves_artifact_claims(answer: str, artifacts: list[AgentArtifact]) -> bool:
+    allowed = set().union(
+        *(
+            _artifact_claims("\n".join([artifact.draft_answer, *artifact.facts]))
+            for artifact in artifacts
+            if artifact.draft_answer or artifact.facts
+        )
+    )
+    actual = _artifact_claims(answer)
+    return bool(allowed and actual) and actual == allowed
+
+
 def _has_verified_evidence(evidence: list[dict[str, Any]]) -> bool:
     tool_results = [item for item in evidence if item.get("type") == "tool_result"]
     if any(item.get("success") is True for item in tool_results):
@@ -294,13 +464,7 @@ def _has_verified_evidence(evidence: list[dict[str, Any]]) -> bool:
 
 
 def _has_policy_evidence(evidence: list[dict[str, Any]]) -> bool:
-    policy_refs = [
-        item
-        for item in evidence
-        if _is_trusted_evidence_ref(item)
-        and str(item.get("type") or "").strip().lower()
-        in {"knowledge", "knowledge_chunk", "faq", "rag", "policy"}
-    ]
+    policy_refs = [item for item in evidence if _is_rag_source_ref(item)]
     if not policy_refs:
         return False
     knowledge_results = [
@@ -311,7 +475,11 @@ def _has_policy_evidence(evidence: list[dict[str, Any]]) -> bool:
     # If the specialist used the knowledge tool, a policy ref is valid only
     # when that specific call succeeded. A successful order lookup must not
     # launder a failed policy lookup into a policy conclusion.
-    return any(item.get("success") is True for item in knowledge_results)
+    return any(
+        item.get("success") is True
+        and str(item.get("evidenceState") or "").upper() == "SUPPORTED"
+        for item in knowledge_results
+    )
 
 
 def _has_eligibility_evidence(evidence: list[dict[str, Any]]) -> bool:
@@ -1007,6 +1175,8 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                 f"本任务获准的只读工具：{', '.join(sorted(task.tool_scope)) or '无'}。\n"
                 "不得执行写操作，不得编造订单或政策事实。最终只返回内部事实摘要，"
                 "不得使用 markdown 表格，不得输出用户确认卡片。"
+                "使用 SEARCH_KNOWLEDGE 证据时，每个非空事实句都必须从对应证据逐句原样摘录，"
+                "并保留对应 [n]。"
             )
         ),
         HumanMessage(
@@ -1068,18 +1238,22 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                     _record_eligibility_trace(
                         task=task, result=required_result, run_id=child_run_id
                     )
-                evidence.append(
-                    {
-                        "type": "tool_result",
-                        "tool": required_tool,
-                        "success": required_usable,
-                        "errorCode": (
-                            "TOOL_RESULT_QUARANTINED"
-                            if required_observation.contaminated
-                            else required_result.error_code
-                        ),
-                    }
-                )
+                tool_result_marker = {
+                    "type": "tool_result",
+                    "tool": required_tool,
+                    "success": required_usable,
+                    "errorCode": (
+                        "TOOL_RESULT_QUARANTINED"
+                        if required_observation.contaminated
+                        else required_result.error_code
+                    ),
+                }
+                if required_tool == "SEARCH_KNOWLEDGE":
+                    tool_result_marker["evidenceState"] = str(
+                        (required_result.grounding or {}).get("evidenceState")
+                        or "INSUFFICIENT"
+                    ).upper()
+                evidence.append(tool_result_marker)
                 if required_usable and required_result.source_refs:
                     evidence.extend(required_result.source_refs)
                 if required_usable and required_tool in _ORDER_CONTEXT_TOOLS:
@@ -1245,18 +1419,22 @@ async def _execute_specialist_task(task: SpecialistTask) -> dict[str, Any]:
                         _record_eligibility_trace(
                             task=task, result=result, run_id=child_run_id
                         )
-                    evidence.append(
-                        {
-                            "type": "tool_result",
-                            "tool": name,
-                            "success": result_usable,
-                            "errorCode": (
-                                "TOOL_RESULT_QUARANTINED"
-                                if observation.contaminated
-                                else result.error_code
-                            ),
-                        }
-                    )
+                    tool_result_marker = {
+                        "type": "tool_result",
+                        "tool": name,
+                        "success": result_usable,
+                        "errorCode": (
+                            "TOOL_RESULT_QUARANTINED"
+                            if observation.contaminated
+                            else result.error_code
+                        ),
+                    }
+                    if name == "SEARCH_KNOWLEDGE":
+                        tool_result_marker["evidenceState"] = str(
+                            (result.grounding or {}).get("evidenceState")
+                            or "INSUFFICIENT"
+                        ).upper()
+                    evidence.append(tool_result_marker)
                     if result_usable and result.source_refs:
                         evidence.extend(result.source_refs)
                     if result_usable and name in _ORDER_CONTEXT_TOOLS:
@@ -1509,10 +1687,20 @@ def _validate_artifact(raw: dict[str, Any]) -> AgentArtifact:
         if item.get("type") == "tool_result":
             tool_name = str(item.get("tool") or "")
             if tool_name in spec.tool_allowlist and isinstance(item.get("success"), bool):
-                artifact.evidence.append(item)
+                accepted = dict(item)
+                if (
+                    tool_name == "SEARCH_KNOWLEDGE"
+                    and accepted["success"] is True
+                    and str(accepted.get("evidenceState") or "").upper()
+                    != "SUPPORTED"
+                ):
+                    accepted["success"] = False
+                    accepted["errorCode"] = "RAG_EVIDENCE_INSUFFICIENT"
+                    warnings.append("RAG_EVIDENCE_INSUFFICIENT")
+                artifact.evidence.append(accepted)
                 saw_tool_result = True
                 last_tool_name = tool_name
-                last_tool_succeeded = item["success"] is True
+                last_tool_succeeded = accepted["success"] is True
             else:
                 warnings.append("UNTRUSTED_EVIDENCE_DROPPED")
             continue
@@ -1827,6 +2015,23 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             handoff_id=raw_handoff_id,
             run_id=(state.get("agent_msg") or {}).get("runId"),
         )
+    artifacts = [_validate_local_artifact_citations(artifact) for artifact in artifacts]
+    raw_source_candidates = [
+        *(state.get("rag_source_refs") or []),
+        *(state.get("tool_source_refs") or []),
+        *[
+            evidence
+            for artifact in artifacts
+            for evidence in artifact.evidence
+            if evidence.get("type") != "tool_result"
+        ],
+    ]
+    rag_candidates, business_candidates = _partition_source_refs(raw_source_candidates)
+    rag_source_refs = _dedupe_refs(rag_candidates)
+    tool_source_refs = _dedupe_refs(business_candidates)
+    artifacts = [
+        _remap_artifact_citations(artifact, rag_source_refs) for artifact in artifacts
+    ]
     degraded_artifacts = [
         item
         for item in artifacts
@@ -1864,6 +2069,9 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             run_id=(state.get("agent_msg") or {}).get("runId"),
         )
     artifact_payload = [item.model_dump(mode="json") for item in artifacts]
+    policy_evidence_available = any(
+        _has_policy_evidence(item.evidence) for item in artifacts
+    )
     policy_evidence_missing = any(
         item.agent_id == "after_sales_policy_specialist"
         and not _has_policy_evidence(item.evidence)
@@ -1880,6 +2088,10 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             "question": state.get("user_text"),
             "plan": plan.model_dump(mode="json"),
             "artifacts": artifact_payload,
+            "ragSources": [
+                {"citation": index, **ref}
+                for index, ref in enumerate(rag_source_refs, start=1)
+            ],
         },
         ensure_ascii=False,
     )
@@ -1899,6 +2111,9 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                             "你是电商 Supervisor。根据已验证的内部专家 artifact 回答用户。"
                             "不得补造 artifact 中不存在的事实；冲突时明确说明并建议人工。"
                             f"{policy_instruction}"
+                            "artifact 中的 [n] 已映射到 ragSources 的全局编号；"
+                            "存在 ragSources 时，必须逐句原样输出所有非空 artifact.draft_answer 和 facts；"
+                            "不得省略、添加、改写或自造编号，仅可调整句序。"
                             "购物报价时间戳不得换算、截断或改成日期；正文只说明报价短期有效，"
                             "具体截止时间以结构化商品卡片为准。"
                             "只返回最终面向用户的简洁中文答复，不要输出内部规划或 SQL。"
@@ -1911,9 +2126,20 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         )
         answer = strip_emojis(rt.chunk_text(getattr(response, "content", "") or ""))
     except Exception:
-        answer = "；".join(item.draft_answer for item in artifacts if item.draft_answer)[:4000]
+        answer = "\n".join(
+            claim
+            for item in artifacts
+            for claim in [item.draft_answer, *item.facts]
+            if claim
+        )[:4000]
     if not answer:
         answer = "暂时没有足够的已验证信息，请补充订单信息或转人工处理。"
+    citation_contract_failed = bool(rag_source_refs) and not _preserves_artifact_claims(
+        answer, artifacts
+    )
+    if citation_contract_failed:
+        answer = "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"
+        rag_source_refs = []
     if any(
         artifact.biz_type == "shopping_decision_v2" and artifact.assistant_cards
         for artifact in artifacts
@@ -1935,42 +2161,6 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
                 merged_tool_biz[key] = list(
                     dict.fromkeys([*(merged_tool_biz.get(key) or []), *values])
                 )[:50]
-    raw_source_candidates = [
-        *(state.get("rag_source_refs") or []),
-        *(state.get("tool_source_refs") or []),
-        *[
-            evidence
-            for artifact in artifacts
-            for evidence in artifact.evidence
-            if evidence.get("type") != "tool_result"
-        ],
-    ]
-    rag_candidates, business_candidates = _partition_source_refs(raw_source_candidates)
-
-    def _dedupe_refs(source_candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        source_refs: list[dict[str, Any]] = []
-        source_keys: set[tuple[str, str]] = set()
-        for evidence in source_candidates:
-            if not isinstance(evidence, dict):
-                continue
-            identity = str(
-                evidence.get("chunkId")
-                or evidence.get("documentId")
-                or evidence.get("questionId")
-                or evidence.get("productId")
-                or evidence.get("orderId")
-                or evidence.get("id")
-                or ""
-            )
-            key = (str(evidence.get("type") or ""), identity)
-            if not identity or key in source_keys:
-                continue
-            source_keys.add(key)
-            source_refs.append(evidence)
-        return source_refs[:30]
-
-    rag_source_refs = _dedupe_refs(rag_candidates)
-    tool_source_refs = _dedupe_refs(business_candidates)
     artifact_with_cards = next(
         (artifact for artifact in artifacts if artifact.assistant_cards), None
     )
@@ -1995,6 +2185,18 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         ),
         "rag_source_refs": rag_source_refs,
         "tool_source_refs": tool_source_refs,
+        "rag_evidence_state": (
+            "SUPPORTED"
+            if rag_source_refs
+            and (
+                str(state.get("rag_evidence_state") or "").upper() == "SUPPORTED"
+                or policy_evidence_available
+            )
+            else "INSUFFICIENT"
+            if citation_contract_failed
+            else str(state.get("rag_evidence_state") or "INSUFFICIENT")
+        ),
+        "rag_generation_verified": not citation_contract_failed,
         "rag_trace": (
             {"ragMode": state.get("rag_mode"), "retrievals": rag_traces}
             if rag_traces
@@ -2029,7 +2231,11 @@ async def supervisor_synthesis_node(state: dict[str, Any]) -> dict[str, Any]:
             for evidence in artifact.evidence
             if evidence.get("type") != "tool_result"
         ][:20]
-        evidence_failure = _action_evidence_failure(plan, artifacts)
+        evidence_failure = (
+            "RAG_GENERATION_UNVERIFIED"
+            if citation_contract_failed
+            else _action_evidence_failure(plan, artifacts)
+        )
         if evidence_failure:
             proposal_contract = ActionProposal(
                 tool=plan.action_type,

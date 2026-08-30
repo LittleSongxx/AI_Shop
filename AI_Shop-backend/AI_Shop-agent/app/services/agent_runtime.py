@@ -514,10 +514,11 @@ async def finalize_agent_response(
     order_resolution: str | None = None,
     rag_evidence_required: bool = False,
     rag_evidence_state: str = "INSUFFICIENT",
+    rag_generation_verified: bool = True,
     deterministic_clarification: bool = False,
     deterministic_consult_resolution: bool = False,
     verifier_fallback: str | None = None,
-) -> None:
+) -> tuple[str, str | None] | None:
     user_id = agent_msg["userId"]
     message_id = agent_msg["messageId"]
     full_text = "".join(chunks)
@@ -664,20 +665,21 @@ async def finalize_agent_response(
                             {"keyword": keyword},
                             user_id,
                         )
-                        called.append("SEARCH_PRODUCTS")
-                        observation = build_tool_result_observation(result)
-                        if observation.contaminated:
-                            cards_json = None
-                            forced_biz = "product_search"
-                            search_tool_hint = None
-                        else:
-                            cards_json = result.assistant_cards
-                            forced_biz = result.biz_type or "product_search"
-                            search_tool_hint = observation.text
-                            biz_data = result.biz_data or biz_data
-                            tool_biz_update = result.to_biz_dict()
-                            if tool_biz_update:
-                                tool_biz = {**tool_biz, **tool_biz_update}
+                        if result.success:
+                            called.append("SEARCH_PRODUCTS")
+                            observation = build_tool_result_observation(result)
+                            if observation.contaminated:
+                                cards_json = None
+                                forced_biz = "product_search"
+                                search_tool_hint = None
+                            else:
+                                cards_json = result.assistant_cards
+                                forced_biz = result.biz_type or "product_search"
+                                search_tool_hint = observation.text
+                                biz_data = result.biz_data or biz_data
+                                tool_biz_update = result.to_biz_dict()
+                                if tool_biz_update:
+                                    tool_biz = {**tool_biz, **tool_biz_update}
                 if cards_json and is_product_cards_json(cards_json):
                     intro = compact_product_search_intro(full_text, search_tool_hint)
                     if text_promises_product_cards(intro) and cards_json == "[]":
@@ -819,6 +821,7 @@ async def finalize_agent_response(
         policy_evidence_required=policy_gate_required,
         rag_citation_required=rag_gate_required,
         rag_evidence_state=rag_evidence_state,
+        rag_generation_verified=rag_generation_verified,
         rag_source_refs=rag_sources,
         safe_fallback=verifier_fallback,
     )
@@ -859,6 +862,7 @@ async def finalize_agent_response(
     )
     if not verification.passed:
         assistant = verification.assistant
+        assistant_cards = None
         biz_type = "agent"
         biz_data = None
         try:
@@ -929,6 +933,7 @@ async def finalize_agent_response(
         source_refs=source_refs,
         verifier_passed=verification.passed,
     )
+    return assistant, assistant_cards
 
 async def push_chat_error(agent_msg: dict, prompt_type: str, partial: str = "") -> None:
     user_id = agent_msg["userId"]

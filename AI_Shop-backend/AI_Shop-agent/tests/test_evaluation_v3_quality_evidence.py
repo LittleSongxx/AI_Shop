@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.rag.fact_metadata import get_fact_metadata_catalog
 from app.rag.prompt_builder import RAG_REFUSAL_TEXT
 from evaluation.adapters import rag as rag_adapter
 from evaluation.adapters.agent import (
@@ -614,16 +615,26 @@ def test_rag_generation_has_no_gold_contract_input_and_records_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _RetryingLLM()
+    prompt_queries: list[str] = []
+
+    def build_prompt(query: str, **_kwargs: object) -> _Prompt:
+        prompt_queries.append(query)
+        return _Prompt()
+
     monkeypatch.setenv("AI_EVAL_RAG_LLM_RETRIES", "1")
     monkeypatch.setenv("AI_EVAL_RAG_LLM_RETRY_BACKOFF_SECONDS", "0")
     monkeypatch.setattr(rag_adapter, "_evaluation_llm", lambda **_kwargs: llm)
-    monkeypatch.setattr(rag_adapter, "build_grounding_prompt", lambda *_args, **_kwargs: _Prompt())
+    monkeypatch.setattr(rag_adapter, "build_grounding_prompt", build_prompt)
     monkeypatch.setattr(rag_adapter, "grounding_repair_reason", lambda *_args, **_kwargs: None)
 
     answer, facts = asyncio.run(
         rag_adapter._generate(
             "测试问题",
-            {"evidenceState": "INSUFFICIENT", "evidenceItems": []},
+            {
+                "evidenceState": "INSUFFICIENT",
+                "evidenceItems": [],
+                "queryPlan": {"safeBusinessQuery": "已剥离攻击后缀的安全问题"},
+            },
         )
     )
 
@@ -636,6 +647,7 @@ def test_rag_generation_has_no_gold_contract_input_and_records_retry(
     assert facts["usage"]["providerCalls"] == 2
     assert facts["usage"]["retryCount"] == 1
     assert facts["usage"]["costStatus"] == "MISSING_USAGE"
+    assert prompt_queries == ["已剥离攻击后缀的安全问题"]
     complete, decisions = provider_complete(["llm"], {"llm": facts})
     assert complete == 1
     assert decisions["llm"]["facts"]["failureAttempts"][0]["retryable"] is True
@@ -684,6 +696,39 @@ def test_rag_grounding_policy_fallback_is_evidence_bound_and_not_an_llm_call(
     assert facts["deterministicFallback"]["factId"] == "rag.retrieval_and_abstention"
     assert llm.calls == 2
     assert facts["usage"]["providerCalls"] == 2
+
+
+def test_rag_explicit_fact_fallback_preserves_provider_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    llm = _InvalidGroundingLLM()
+    fact_id = "checkout.idempotency_key"
+    claims = get_fact_metadata_catalog().facts[fact_id].atomic_claims
+    monkeypatch.setenv("AI_EVAL_RAG_LLM_RETRIES", "0")
+    monkeypatch.setattr(rag_adapter, "_evaluation_llm", lambda **_kwargs: llm)
+
+    answer, facts = asyncio.run(
+        rag_adapter._generate(
+            "订单提交幂等是什么意思？",
+            {
+                "evidenceState": "SUPPORTED",
+                "evidenceItems": [
+                    {
+                        "citation": 1,
+                        "factIds": [fact_id],
+                        "text": "。".join(claims),
+                    }
+                ],
+                "queryPlan": {"safeBusinessQuery": "订单提交幂等是什么意思？"},
+            },
+        )
+    )
+
+    assert all(f"{claim} [1]" in answer for claim in claims)
+    assert facts["boundedRepairAttempted"] is True
+    assert facts["deterministicFallback"]["factIds"] == [fact_id]
+    assert facts["usage"]["providerCalls"] == 2
+    assert llm.calls == 2
 
 
 class _RepairFailureGroundingLLM:

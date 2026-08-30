@@ -28,6 +28,7 @@ from app.domain.intent.types import (
 from app.domain.intent.write_args import TOOL_REQUIRED_INTENTS
 from app.domain.tool_policy import READ_TOOLS
 from app.graph.forced_tools import (
+    _merge_source_refs,
     forced_named_product_comparison,
     forced_order_list,
     forced_product_search,
@@ -38,9 +39,11 @@ from app.graph.orchestration_policy import fast_support_eligible, select_orchest
 from app.graph.order_reference_flow import resolve_order_reference_turn
 from app.graph.state import AgentGraphState
 from app.harness.guardrails.output_guard import OutputGuardrail, strip_emojis
+from app.harness.guardrails.query_security import separate_explicit_attack_suffix
 from app.harness.metrics.runtime_sensors import measure_agent_stage
 from app.harness.observation import (
     CONTAMINATED_CONTENT_PLACEHOLDER,
+    build_tool_observation,
     build_tool_result_observation,
 )
 from app.memory.context_builder import context_builder
@@ -52,8 +55,10 @@ from app.rag.ab_test import get_bucket
 from app.rag.prompt_builder import (
     RAG_REFUSAL_TEXT,
     build_grounding_prompt,
+    deterministic_explicit_fact_fallback,
     deterministic_grounding_policy_fallback,
     deterministic_policy_evidence_fallback,
+    format_grounding_evidence,
     grounding_repair_reason,
 )
 from app.rag.query_rewriter import rewrite_for_rag
@@ -94,6 +99,9 @@ logger = structlog.get_logger()
 # A3：HANDOFF_SUGGESTED（REPEATED_INTENT / 低置信）时追加在回答末尾的
 # 建议转人工文案。只是建议，不强制；用户可继续提问或直接说"转人工"。
 _HANDOFF_SUGGEST_TEXT = "\n\n如仍未解决，可以回复“转人工”，由人工客服继续协助。"
+_RAG_GENERATION_UNVERIFIED_TEXT = (
+    "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"
+)
 output_guard = OutputGuardrail()
 _WRITE_PROPOSAL_TOOLS = frozenset(
     {
@@ -584,7 +592,7 @@ async def build_context_node(state: AgentGraphState) -> dict:
     rag_trace: dict | None = None
     rag_evidence_state = "INSUFFICIENT"
     rag_evidence_items: list[dict] = []
-    rag_safe_business_query = user_text
+    rag_safe_business_query = separate_explicit_attack_suffix(user_text).safe_query
     grounding_system_messages: list[SystemMessage] = []
     rag_queries: list[str] = []
     rag_retrieval_count = 0
@@ -1572,7 +1580,11 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
     repair_reason = None
     repair_failed = False
     deterministic_fallback: dict | None = None
+    rag_generation_verified = True
     if grounded_answer_turn and not repair_attempted:
+        safe_grounding_query = str(
+            state.get("rag_safe_business_query") or user_text
+        )
         initial_text = strip_emojis(
             rt.chunk_text(getattr(response, "content", "") or "")
         )
@@ -1582,11 +1594,12 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
             evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
             evidence_count=len(evidence_items),
             evidence_items=evidence_items,
+            query=safe_grounding_query,
         )
         if repair_reason:
             repair_attempted = True
             repair_prompt = build_grounding_prompt(
-                str(state.get("rag_safe_business_query") or user_text),
+                safe_grounding_query,
                 evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
                 evidence_items=evidence_items,
                 repair_reason=repair_reason,
@@ -1612,6 +1625,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                     ),
                     evidence_count=len(evidence_items),
                     evidence_items=evidence_items,
+                    query=safe_grounding_query,
                 )
                 if repaired_text and not remaining:
                     response = repaired
@@ -1649,11 +1663,20 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                 )
 
         if repair_failed:
-            deterministic_fallback = deterministic_grounding_policy_fallback(
-                str(state.get("rag_safe_business_query") or user_text),
-                evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
-                evidence_items=evidence_items,
-            )
+            if int(state.get("rag_retrieval_count") or 0) == 1:
+                deterministic_fallback = deterministic_explicit_fact_fallback(
+                    safe_grounding_query,
+                    evidence_state=str(
+                        state.get("rag_evidence_state") or "INSUFFICIENT"
+                    ),
+                    evidence_items=evidence_items,
+                ) or deterministic_grounding_policy_fallback(
+                    safe_grounding_query,
+                    evidence_state=str(
+                        state.get("rag_evidence_state") or "INSUFFICIENT"
+                    ),
+                    evidence_items=evidence_items,
+                )
             if deterministic_fallback:
                 fallback_text = str(deterministic_fallback["answer"])
                 response = AIMessage(content=fallback_text)
@@ -1667,21 +1690,28 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
                     node_name="agent_loop",
                     status="OK",
                     input_data={
-                        "query": str(
-                            state.get("rag_safe_business_query") or user_text
-                        ),
+                        "query": safe_grounding_query,
                         "evidenceState": str(
                             state.get("rag_evidence_state") or "INSUFFICIENT"
                         ),
                         "evidenceCount": len(evidence_items),
                         "factId": deterministic_fallback["factId"],
+                        "factIds": deterministic_fallback.get("factIds")
+                        or [deterministic_fallback["factId"]],
                     },
                     output_data={
                         "answer": fallback_text,
                         "citation": deterministic_fallback["citation"],
+                        "citations": deterministic_fallback.get("citations")
+                        or [deterministic_fallback["citation"]],
+                        "reason": deterministic_fallback.get("reason"),
                         "usageAdded": False,
                     },
                 )
+            else:
+                response = AIMessage(content=_RAG_GENERATION_UNVERIFIED_TEXT)
+                turn_chunks = [_RAG_GENERATION_UNVERIFIED_TEXT]
+                rag_generation_verified = False
 
     messages.append(response)
     if not turn_chunks:
@@ -1695,6 +1725,7 @@ async def agent_loop_node(state: AgentGraphState) -> dict:
         "route": "finalize",
         "rag_repair_attempted": repair_attempted,
         "rag_repair_reason": repair_reason,
+        "rag_generation_verified": rag_generation_verified,
     }
 
 
@@ -1955,26 +1986,63 @@ def _rag_rejection_code(
     return None
 
 
+def _rag_source_key(item: dict) -> tuple[str, str]:
+    ref = item.get("ref") if isinstance(item.get("ref"), dict) else item
+    identity = str(
+        ref.get("chunkId")
+        or ref.get("documentId")
+        or ref.get("questionId")
+        or ref.get("id")
+        or ref.get("source")
+        or ""
+    )
+    version = str(ref.get("knowledgeVersion") or ref.get("version") or "")
+    return identity, version
+
+
 def _merge_rag_sources(existing: list[dict], incoming: list[dict]) -> list[dict]:
     merged: list[dict] = []
     seen: set[tuple[str, str]] = set()
     for item in [*existing, *incoming]:
         if not isinstance(item, dict):
             continue
-        identity = str(
-            item.get("chunkId")
-            or item.get("documentId")
-            or item.get("questionId")
-            or item.get("id")
-            or item.get("source")
-            or ""
-        )
-        version = str(item.get("knowledgeVersion") or item.get("version") or "")
-        key = (identity, version)
+        key = _rag_source_key(item)
+        identity, _ = key
         if not identity or key in seen:
             continue
         seen.add(key)
         merged.append(item)
+    return merged
+
+
+def _merge_rag_evidence_items(
+    existing: list[dict], incoming: list[dict], source_refs: list[dict]
+) -> list[dict]:
+    """Merge evidence and remap each local citation to the global source list."""
+
+    source_keys = [_rag_source_key(item) for item in source_refs]
+    merged: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for item in [*existing, *incoming]:
+        if not isinstance(item, dict):
+            continue
+        key = _rag_source_key(item)
+        identity, version = key
+        if not identity or key in seen:
+            continue
+        matches = [
+            index
+            for index, source_key in enumerate(source_keys, start=1)
+            if source_key == key
+            or (
+                source_key[0] == identity
+                and (not version or not source_key[1])
+            )
+        ]
+        if len(matches) != 1:
+            continue
+        seen.add(key)
+        merged.append({**item, "citation": matches[0]})
     return merged
 
 
@@ -2228,17 +2296,26 @@ async def tools_node(state: AgentGraphState) -> dict:
             verified_image_context=verified_image_context,
             source_message_id=source_message_id,
         )
+        result_success = getattr(result, "success", True) is not False
         # Legacy integrations and test doubles may not expose the optional
         # structured evidence fields.  Missing fields mean no evidence, not a
         # failed agent turn; production ToolInvokeResult objects expose them.
-        result_source_refs = list(getattr(result, "source_refs", None) or [])
-        result_retrieval_trace = getattr(result, "retrieval_trace", None)
-        result_grounding = getattr(result, "grounding", None)
-        called.append(tc["name"])
+        result_source_refs = (
+            list(getattr(result, "source_refs", None) or [])
+            if result_success
+            else []
+        )
+        result_retrieval_trace = (
+            getattr(result, "retrieval_trace", None) if result_success else None
+        )
+        result_grounding = getattr(result, "grounding", None) if result_success else None
+        if result_success:
+            called.append(tc["name"])
         # Observation 层：工具结果进上下文前统一脱敏/裁剪/污染扫描，
         # 治理痕迹进 trace（A2：命中注入话术时 contaminated 标记）。
         obs = build_tool_result_observation(result)
         messages.append(ToolMessage(content=obs.text, tool_call_id=tc["id"]))
+        tool_message_index = len(messages) - 1
         if obs.redacted_count or obs.truncated or obs.contaminated:
             episode_service.record_step(
                 "TOOL_OBSERVED",
@@ -2295,6 +2372,7 @@ async def tools_node(state: AgentGraphState) -> dict:
                 source_count=len(rag_source_refs),
             )
             grounding = result_grounding or {}
+            incoming_evidence_items = list(grounding.get("evidenceItems") or [])
             incoming_state = str(grounding.get("evidenceState") or "INSUFFICIENT")
             if incoming_state == "SUPPORTED":
                 rag_evidence_state = "SUPPORTED"
@@ -2303,7 +2381,7 @@ async def tools_node(state: AgentGraphState) -> dict:
             grounding_prompt = build_grounding_prompt(
                 str((grounding.get("queryPlan") or {}).get("safeBusinessQuery") or ""),
                 evidence_state=incoming_state,
-                evidence_items=list(grounding.get("evidenceItems") or []),
+                evidence_items=incoming_evidence_items,
             )
             # A ToolMessage is untrusted by definition; the shared behavioral
             # contract must still be a true system-role message. It cannot be
@@ -2312,30 +2390,22 @@ async def tools_node(state: AgentGraphState) -> dict:
             pending_grounding_rules.append(
                 grounding_prompt.production_system_messages()[0]
             )
-            for item in grounding.get("evidenceItems") or []:
-                if not isinstance(item, dict):
-                    continue
-                identity = str(
-                    (item.get("ref") or {}).get("id")
-                    or (item.get("ref") or {}).get("chunkId")
-                    or (item.get("ref") or {}).get("questionId")
-                    or ""
-                )
-                existing_ids = {
-                    str(
-                        (row.get("ref") or {}).get("id")
-                        or (row.get("ref") or {}).get("chunkId")
-                        or (row.get("ref") or {}).get("questionId")
-                        or ""
+            remapped_incoming = _merge_rag_evidence_items(
+                [], incoming_evidence_items, rag_source_refs
+            )
+            rag_evidence_items = _merge_rag_evidence_items(
+                rag_evidence_items,
+                incoming_evidence_items,
+                rag_source_refs,
+            )
+            messages[tool_message_index] = ToolMessage(
+                content=build_tool_observation(
+                    format_grounding_evidence(
+                        evidence_state=incoming_state,
+                        evidence_items=remapped_incoming,
                     )
-                    for row in rag_evidence_items
-                    if isinstance(row, dict)
-                }
-                if identity and identity not in existing_ids:
-                    rag_evidence_items.append(item)
-            rag_safe_business_query = str(
-                (grounding.get("queryPlan") or {}).get("safeBusinessQuery")
-                or rag_safe_business_query
+                ).text,
+                tool_call_id=tc["id"],
             )
             episode_service.record_step(
                 "RAG_RETRIEVAL",
@@ -2351,22 +2421,22 @@ async def tools_node(state: AgentGraphState) -> dict:
             # Business evidence is carried separately from RAG evidence. This
             # prevents an order/offer snapshot from being mistaken for policy
             # grounding while still making the final HTTP envelope auditable.
-            tool_source_refs = _merge_rag_sources(tool_source_refs, result_source_refs)
+            tool_source_refs = _merge_source_refs(tool_source_refs, result_source_refs)
 
-        biz_dict = result.to_biz_dict()
+        biz_dict = result.to_biz_dict() if result_success else None
         if biz_dict:
             tool_biz.update(biz_dict)
-        if result.assistant_cards:
+        if result_success and result.assistant_cards:
             assistant_cards = result.assistant_cards
             biz_type = result.biz_type or biz_type
             biz_data = result.biz_data or biz_data
-        if tc["name"] == "QUERY_ORDERS":
+        if result_success and tc["name"] == "QUERY_ORDERS":
             biz_type = result.biz_type or biz_type or "query_order"
             if not result.assistant_cards:
                 logger.warning("query_orders_missing_cards_in_tools_node", user_id=user_id)
-        if tc["name"] == "SEARCH_PRODUCTS":
+        if result_success and tc["name"] == "SEARCH_PRODUCTS":
             search_tool_hint = obs.text
-        if tc["name"] == "GET_PRODUCT_DETAIL":
+        if result_success and tc["name"] == "GET_PRODUCT_DETAIL":
             product_id = (tc.get("args") or {}).get("productId") or (tc.get("args") or {}).get("product_id")
             if product_id:
                 await product_snapshot_service.ensure_consult_snapshot(user_id, str(product_id))
@@ -2453,6 +2523,17 @@ async def tools_node(state: AgentGraphState) -> dict:
     if next_route == "finalize" and quarantined_result:
         update["chunks"] = [CONTAMINATED_CONTENT_PLACEHOLDER]
     return update
+
+def _rag_generation_verified_for_finalize(state: dict) -> bool:
+    raw = state.get("rag_generation_verified")
+    if raw is not None:
+        return raw is True
+    return not (
+        bool(state.get("rag_evidence_required"))
+        and str(state.get("rag_evidence_state") or "").upper() == "SUPPORTED"
+        and bool(state.get("rag_source_refs") or state.get("rag_evidence_items"))
+    )
+
 
 async def finalize_node(state: AgentGraphState) -> dict:
     agent_msg = state["agent_msg"]
@@ -2559,7 +2640,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
                     },
                 )
 
-        await rt.finalize_agent_response(
+        finalized = await rt.finalize_agent_response(
             agent_msg,
             chunks,
             messages,
@@ -2588,6 +2669,7 @@ async def finalize_node(state: AgentGraphState) -> dict:
             order_resolution=state.get("order_resolution"),
             rag_evidence_required=bool(state.get("rag_evidence_required")),
             rag_evidence_state=str(state.get("rag_evidence_state") or "INSUFFICIENT"),
+            rag_generation_verified=_rag_generation_verified_for_finalize(state),
             deterministic_clarification=bool(
                 state.get("deterministic_clarification")
             ),
@@ -2607,7 +2689,14 @@ async def finalize_node(state: AgentGraphState) -> dict:
     finally:
         await redis_service.clear_bound_message_id(user_id)
 
-    return {"finished": True, "route": "post_turn", "outcome": "ok"}
+    final_assistant_text, final_assistant_cards = finalized or (None, None)
+    return {
+        "finished": True,
+        "route": "post_turn",
+        "outcome": "ok",
+        "final_assistant_text": final_assistant_text,
+        "final_assistant_cards": final_assistant_cards,
+    }
 
 async def post_turn_node(state: AgentGraphState) -> dict:
     if state.get("cancelled"):
@@ -2617,7 +2706,17 @@ async def post_turn_node(state: AgentGraphState) -> dict:
     message_id = state["message_id"]
     user_text = state["user_text"]
     card = state.get("card")
-    assistant_text = "".join(state.get("chunks") or []) or (state.get("assistant_cards") or "")
+    if "final_assistant_text" in state:
+        assistant_text = str(state.get("final_assistant_text") or "")
+        assistant_cards = state.get("final_assistant_cards")
+        if not assistant_text:
+            return {"finished": True}
+    else:
+        # Compatibility for checkpoints created before final_assistant_text.
+        assistant_text = "".join(state.get("chunks") or []) or str(
+            state.get("assistant_cards") or ""
+        )
+        assistant_cards = state.get("assistant_cards")
 
     try:
         await post_turn_service.run(
@@ -2625,7 +2724,7 @@ async def post_turn_node(state: AgentGraphState) -> dict:
             message_id=message_id,
             user_text=user_text,
             assistant_text=assistant_text,
-            assistant_cards=state.get("assistant_cards"),
+            assistant_cards=assistant_cards,
             tools_called=state.get("tools_called") or [],
             tool_biz=state.get("tool_biz"),
             card=card,

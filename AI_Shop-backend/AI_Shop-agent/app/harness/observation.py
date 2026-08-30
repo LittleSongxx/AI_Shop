@@ -172,6 +172,8 @@ def build_tool_result_observation(
         getattr(result, "product_names", None),
         getattr(result, "source_refs", None),
         getattr(result, "retrieval_trace", None),
+        getattr(result, "grounding", None),
+        getattr(result, "contract_data", None),
     )
     matched = list(observation.matched_rules)
     contaminated = observation.contaminated

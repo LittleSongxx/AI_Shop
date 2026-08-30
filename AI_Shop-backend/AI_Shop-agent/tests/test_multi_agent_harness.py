@@ -13,11 +13,13 @@ from langgraph.graph import END, StateGraph
 from typing_extensions import TypedDict
 
 from app.graph.multi_agent import (
+    _preserves_artifact_claims,
     _sanitize_offer_time_claims,
     _structured_supervisor_plan,
     _task_tools_for_specialist,
     _tool_args,
     _validate_artifact,
+    _validate_local_artifact_citations,
     build_supervisor_plan,
     prepare_specialist_sends,
     specialist_runner_node,
@@ -599,6 +601,29 @@ def test_failed_tool_cannot_make_following_policy_ref_verified():
     assert "POLICY_EVIDENCE_MISSING" in artifact.warnings
 
 
+def test_insufficient_knowledge_result_cannot_make_policy_ref_verified():
+    artifact = _validate_artifact(
+        AgentArtifact(
+            status="SUCCESS",
+            agent_id="after_sales_policy_specialist",
+            draft_answer="符合退款政策。[1]",
+            evidence=[
+                {
+                    "type": "tool_result",
+                    "tool": "SEARCH_KNOWLEDGE",
+                    "success": True,
+                    "evidenceState": "INSUFFICIENT",
+                },
+                {"type": "knowledge", "documentId": "weak-policy"},
+            ],
+        ).model_dump(mode="json")
+    )
+
+    assert not any(item["type"] == "knowledge" for item in artifact.evidence)
+    assert "RAG_EVIDENCE_INSUFFICIENT" in artifact.warnings
+    assert "POLICY_EVIDENCE_MISSING" in artifact.warnings
+
+
 def test_policy_artifact_without_knowledge_source_is_human_handoff():
     artifact = _validate_artifact(
         AgentArtifact(
@@ -743,6 +768,7 @@ async def test_specialist_timeout_after_required_tool_preserves_verified_evidenc
         return ToolInvokeResult(
             content="【知识证据】退款申请需要核对订单状态。",
             source_refs=[{"type": "knowledge", "documentId": "policy-1"}],
+            grounding={"evidenceState": "SUPPORTED"},
         )
 
     monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
@@ -784,6 +810,7 @@ async def test_specialist_timeout_after_required_tool_preserves_verified_evidenc
             "tool": "SEARCH_KNOWLEDGE",
             "success": True,
             "errorCode": None,
+            "evidenceState": "SUPPORTED",
         },
         {"type": "knowledge", "documentId": "policy-1"},
     ]
@@ -845,9 +872,10 @@ async def test_specialist_quarantines_poisoned_required_tool_result(monkeypatch)
         {
             "type": "tool_result",
             "tool": "SEARCH_KNOWLEDGE",
-            "success": False,
-            "errorCode": "TOOL_RESULT_QUARANTINED",
-        }
+                "success": False,
+                "errorCode": "TOOL_RESULT_QUARANTINED",
+                "evidenceState": "INSUFFICIENT",
+            }
     ]
     assert any(
         isinstance(message, ToolMessage)
@@ -871,6 +899,7 @@ async def test_specialist_sanitizes_protocol_after_required_tools_succeed(monkey
         return ToolInvokeResult(
             content="【知识证据】退款申请需在订单详情发起。",
             source_refs=[{"type": "knowledge", "documentId": "policy-1"}],
+            grounding={"evidenceState": "SUPPORTED"},
         )
 
     monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
@@ -935,6 +964,7 @@ async def test_specialist_uses_verified_summary_when_local_chat_model_is_unconfi
         return ToolInvokeResult(
             content="【知识证据】待发货订单可以提交退款申请。",
             source_refs=[{"type": "knowledge", "documentId": "policy-local"}],
+            grounding={"evidenceState": "SUPPORTED"},
         )
 
     monkeypatch.setattr(
@@ -1455,7 +1485,7 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
     calls: list[tuple[str, dict, str]] = []
 
     async def fake_llm(*_args, **_kwargs):
-        return AIMessage(content="订单与政策已经核对，可以发起退款确认。")
+        return AIMessage(content="订单属于用户且状态允许申请\n政策要求用户确认后提交。[1]")
 
     async def fake_tool(name, args, user_id, **_kwargs):
         calls.append((name, args, user_id))
@@ -1499,7 +1529,7 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
             AgentArtifact(
                 status="SUCCESS",
                 agent_id="after_sales_policy_specialist",
-                draft_answer="政策要求用户确认后提交",
+                draft_answer="政策要求用户确认后提交。[1]",
                 evidence=[
                     {
                         "type": "tool_result",
@@ -1515,8 +1545,13 @@ async def test_supervisor_is_the_only_serial_action_proposer(monkeypatch):
                         "type": "tool_result",
                         "tool": "SEARCH_KNOWLEDGE",
                         "success": True,
+                        "evidenceState": "SUPPORTED",
                     },
-                    {"type": "knowledge", "id": "policy-1"},
+                    {
+                        "type": "knowledge",
+                        "id": "policy-1",
+                        "snippet": "政策要求用户确认后提交。",
+                    },
                 ],
                 tool_calls=["CHECK_AFTER_SALES_ELIGIBILITY", "SEARCH_KNOWLEDGE"],
                 biz_type="after_sales_eligibility",
@@ -1545,7 +1580,14 @@ async def test_supervisor_synthesis_orders_artifacts_by_plan_not_completion(monk
     async def capture_synthesis(_llm, messages, **_kwargs):
         payload = json.loads(messages[1].content)
         artifact_orders.append([item["agent_id"] for item in payload["artifacts"]])
-        return AIMessage(content="已按计划汇总。")
+        return AIMessage(
+            content="\n".join(
+                claim
+                for item in payload["artifacts"]
+                for claim in [item["draft_answer"], *item["facts"]]
+                if claim
+            )
+        )
 
     monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
     monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", capture_synthesis)
@@ -1573,10 +1615,15 @@ async def test_supervisor_synthesis_orders_artifacts_by_plan_not_completion(monk
                             "type": "tool_result",
                             "tool": "SEARCH_KNOWLEDGE",
                             "success": True,
+                            "evidenceState": "SUPPORTED",
                         },
-                        {"type": "knowledge", "documentId": "policy-1"},
+                        {
+                            "type": "knowledge",
+                            "documentId": "policy-1",
+                            "snippet": "政策证据。",
+                        },
                     ],
-                    draft_answer="政策证据",
+                    draft_answer="政策证据。[1]",
                 ).model_dump(mode="json"),
                 AgentArtifact(
                     status="SUCCESS",
@@ -1594,6 +1641,404 @@ async def test_supervisor_synthesis_orders_artifacts_by_plan_not_completion(monk
     assert artifact_orders == [planned]
     assert [item["type"] for item in result["rag_source_refs"]] == ["knowledge"]
     assert [item["type"] for item in result["tool_source_refs"]] == ["order"]
+
+
+@pytest.mark.asyncio
+async def test_supervisor_remaps_specialist_citation_to_versioned_global_source(
+    monkeypatch,
+):
+    captured: dict = {}
+
+    async def capture_synthesis(_llm, messages, **_kwargs):
+        captured.update(json.loads(messages[1].content))
+        return AIMessage(content=captured["artifacts"][0]["draft_answer"])
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", capture_synthesis)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-citation-remap"},
+            "user_text": "退款条件是什么？",
+            "rag_source_refs": [
+                {
+                    "type": "knowledge",
+                    "chunkId": "shared-chunk",
+                    "knowledgeVersion": 1,
+                }
+            ],
+            "supervisor_plan": SupervisorPlan(
+                specialists=["after_sales_policy_specialist"]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="after_sales_policy_specialist",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_KNOWLEDGE",
+                            "success": True,
+                            "evidenceState": "SUPPORTED",
+                        },
+                        {
+                            "type": "knowledge",
+                            "chunkId": "shared-chunk",
+                            "knowledgeVersion": 2,
+                            "snippet": "退款规则以已发布版本为准。",
+                        },
+                    ],
+                    draft_answer="退款规则以已发布版本为准。[1]",
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    assert [ref["knowledgeVersion"] for ref in result["rag_source_refs"]] == [1, 2]
+    assert captured["artifacts"][0]["draft_answer"].endswith("[2]")
+    assert [ref["citation"] for ref in captured["ragSources"]] == [1, 2]
+    assert result["chunks"][0].endswith("[2]")
+
+
+@pytest.mark.asyncio
+async def test_supervisor_keeps_distinct_chunk_ids_from_same_document(monkeypatch):
+    async def preserve_policy(_llm, messages, **_kwargs):
+        payload = json.loads(messages[1].content)
+        return AIMessage(content=payload["artifacts"][0]["draft_answer"])
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", preserve_policy)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-distinct-chunks"},
+            "user_text": "对比两条政策",
+            "rag_evidence_state": "INSUFFICIENT",
+            "supervisor_plan": SupervisorPlan(
+                specialists=["after_sales_policy_specialist"]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="after_sales_policy_specialist",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_KNOWLEDGE",
+                            "success": True,
+                            "evidenceState": "SUPPORTED",
+                        },
+                            {
+                                "type": "knowledge",
+                                "id": "chunk-a",
+                                "documentId": "doc-1",
+                                "version": "v1",
+                                "snippet": "政策甲支持退货。",
+                            },
+                            {
+                                "type": "knowledge",
+                                "id": "chunk-b",
+                                "documentId": "doc-1",
+                                "version": "v1",
+                                "snippet": "政策乙不支持换货。",
+                            },
+                    ],
+                    draft_answer="政策甲支持退货。[1]\n政策乙不支持换货。[2]",
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    assert [ref["id"] for ref in result["rag_source_refs"]] == ["chunk-a", "chunk-b"]
+    assert result["chunks"][0].endswith("[2]")
+    assert result["rag_evidence_state"] == "SUPPORTED"
+
+
+@pytest.mark.asyncio
+async def test_supervisor_rejects_ambiguous_document_only_citations(monkeypatch):
+    captured: dict = {}
+
+    async def capture(_llm, messages, **_kwargs):
+        captured.update(json.loads(messages[1].content))
+        return AIMessage(content="政策甲。[1]\n政策乙。[2]")
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", capture)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-ambiguous-document"},
+            "user_text": "对比两条政策",
+            "supervisor_plan": SupervisorPlan(
+                specialists=["after_sales_policy_specialist"]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="after_sales_policy_specialist",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_KNOWLEDGE",
+                            "success": True,
+                            "evidenceState": "SUPPORTED",
+                        },
+                        {"type": "knowledge", "documentId": "doc-1", "version": "v1"},
+                        {"type": "knowledge", "documentId": "doc-1", "version": "v1"},
+                    ],
+                    draft_answer="政策甲。[1]\n政策乙。[2]",
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    artifact = captured["artifacts"][0]
+    assert artifact["status"] == "DEGRADED"
+    assert "SPECIALIST_CITATION_UNMAPPED" in artifact["warnings"]
+    assert result["rag_source_refs"] == []
+
+
+@pytest.mark.asyncio
+async def test_supervisor_drops_policy_artifact_without_local_citation(monkeypatch):
+    captured: dict = {}
+
+    async def capture(_llm, messages, **_kwargs):
+        captured.update(json.loads(messages[1].content))
+        return AIMessage(content="该政策允许退款。")
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", capture)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-missing-local-citation"},
+            "user_text": "是否允许退款",
+            "supervisor_plan": SupervisorPlan(
+                specialists=["after_sales_policy_specialist"]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="after_sales_policy_specialist",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_KNOWLEDGE",
+                            "success": True,
+                            "evidenceState": "SUPPORTED",
+                        },
+                        {"type": "knowledge", "id": "policy-1"},
+                    ],
+                    draft_answer="该政策允许退款。",
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    artifact = captured["artifacts"][0]
+    assert artifact["status"] == "DEGRADED"
+    assert "SPECIALIST_CITATION_MISSING" in artifact["warnings"]
+    assert not any(item["type"] == "knowledge" for item in artifact["evidence"])
+    assert result["rag_source_refs"] == []
+    assert result["rag_evidence_state"] == "INSUFFICIENT"
+
+
+@pytest.mark.asyncio
+async def test_supervisor_does_not_strip_non_rag_bracket_text(monkeypatch):
+    async def echo(_llm, messages, **_kwargs):
+        payload = json.loads(messages[1].content)
+        return AIMessage(content=payload["artifacts"][0]["draft_answer"])
+
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", echo)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-business-brackets"},
+            "user_text": "查看第一个商品",
+            "supervisor_plan": SupervisorPlan(
+                specialists=["shopping_advisor"]
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="shopping_advisor",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_PRODUCTS",
+                            "success": True,
+                        },
+                        {"type": "product", "productId": "p1"},
+                    ],
+                    draft_answer="第[1]件商品已核验。",
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    assert result["chunks"] == ["第[1]件商品已核验。"]
+
+
+def test_supervisor_claim_contract_includes_draft_and_facts():
+    artifact = AgentArtifact(
+        status="SUCCESS",
+        agent_id="after_sales_policy_specialist",
+        draft_answer="支持退货。[1]",
+        facts=["仅限未拆封商品。[2]"],
+    )
+
+    assert not _preserves_artifact_claims("支持退货。[1]", [artifact])
+    assert _preserves_artifact_claims(
+        "支持退货。[1]\n仅限未拆封商品。[2]", [artifact]
+    )
+
+
+@pytest.mark.parametrize(
+    "source_ref",
+    [
+        {"type": "knowledge", "id": "policy-1"},
+        {
+            "type": "knowledge",
+            "id": "policy-1",
+            "snippet": "本政策不支持退款。",
+        },
+    ],
+)
+def test_policy_claim_must_bind_to_the_cited_source_text(source_ref):
+    artifact = _validate_artifact(
+        AgentArtifact(
+            status="SUCCESS",
+            agent_id="after_sales_policy_specialist",
+            draft_answer="任意商品都支持退款。[1]",
+            evidence=[
+                {
+                    "type": "tool_result",
+                    "tool": "SEARCH_KNOWLEDGE",
+                    "success": True,
+                    "evidenceState": "SUPPORTED",
+                },
+                source_ref,
+            ],
+            tool_calls=["SEARCH_KNOWLEDGE"],
+        ).model_dump(mode="json")
+    )
+
+    validated = _validate_local_artifact_citations(artifact)
+
+    assert validated.status == "DEGRADED"
+    assert "SPECIALIST_CLAIM_UNSUPPORTED" in validated.warnings
+    assert validated.draft_answer == ""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("artifact_draft", "synthesized"),
+    [
+        (
+            "政策甲支持退货。[1]\n政策乙不支持换货。[2]",
+            "政策甲支持退货。[2]\n政策乙不支持换货。[1]",
+        ),
+        ("政策甲支持退货。[1]\n政策乙不支持换货。[2]", "政策甲支持退货。[1]"),
+        ("政策甲支持退货。[1]", "政策甲支持退货。[1]\n商品签收七日内可退货。"),
+    ],
+)
+async def test_supervisor_rejects_unstable_policy_citations(
+    monkeypatch, artifact_draft, synthesized
+):
+    async def swap(_llm, _messages, **_kwargs):
+        return AIMessage(content=synthesized)
+
+    action = AsyncMock(side_effect=AssertionError("citation failure must block action"))
+    monkeypatch.setattr("app.graph.multi_agent.rt.bind_agent_llm", lambda **_kwargs: object())
+    monkeypatch.setattr("app.graph.multi_agent.invoke_llm_with_metrics", swap)
+    monkeypatch.setattr("app.graph.multi_agent.mcp_tool_router.invoke", action)
+    monkeypatch.setattr(
+        "app.graph.multi_agent.episode_service.record_step", lambda *args, **kwargs: None
+    )
+    result = await supervisor_synthesis_node(
+        {
+            "agent_msg": {"runId": "root-swapped-citations"},
+            "user_id": "u1",
+            "user_text": "对比两条政策",
+            "verified_order_context": {"orderId": "o1", "orderItemId": "i1"},
+            "supervisor_plan": SupervisorPlan(
+                intent="REFUND",
+                specialists=[
+                    "order_fulfillment_specialist",
+                    "after_sales_policy_specialist",
+                ],
+                requires_action=True,
+                action_type="PROPOSE_REFUND",
+            ).model_dump(mode="json"),
+            "specialist_artifacts": [
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="order_fulfillment_specialist",
+                    evidence=[
+                        {"type": "tool_result", "tool": "QUERY_ORDERS", "success": True},
+                        {"type": "order", "orderId": "o1"},
+                    ],
+                    draft_answer="订单已核验。",
+                    tool_calls=["QUERY_ORDERS"],
+                ).model_dump(mode="json"),
+                AgentArtifact(
+                    status="SUCCESS",
+                    agent_id="after_sales_policy_specialist",
+                    evidence=[
+                        {
+                            "type": "tool_result",
+                            "tool": "CHECK_AFTER_SALES_ELIGIBILITY",
+                            "success": True,
+                        },
+                        {
+                            "type": "policy",
+                            "policyId": "refund-policy",
+                            "decisionId": "decision-1",
+                        },
+                        {
+                            "type": "tool_result",
+                            "tool": "SEARCH_KNOWLEDGE",
+                            "success": True,
+                            "evidenceState": "SUPPORTED",
+                        },
+                        {
+                            "type": "knowledge",
+                            "id": "policy-a",
+                            "snippet": "政策甲支持退货。",
+                        },
+                        {
+                            "type": "knowledge",
+                            "id": "policy-b",
+                            "snippet": "政策乙不支持换货。",
+                        },
+                    ],
+                    draft_answer=artifact_draft,
+                    tool_calls=["CHECK_AFTER_SALES_ELIGIBILITY", "SEARCH_KNOWLEDGE"],
+                    biz_type="after_sales_eligibility",
+                    biz_data=json.dumps({"decision": "ELIGIBLE"}),
+                ).model_dump(mode="json")
+            ],
+        }
+    )
+
+    action.assert_not_awaited()
+    assert "未通过证据完整性校验" in result["chunks"][0]
+    assert result["rag_source_refs"] == []
+    assert result["rag_evidence_state"] == "INSUFFICIENT"
+    assert result["rag_generation_verified"] is False
+    assert result["action_proposal"]["success"] is False
+    assert result["action_proposal"]["reason"] == "RAG_GENERATION_UNVERIFIED"
 
 
 @pytest.mark.asyncio
@@ -2007,9 +2452,14 @@ async def test_production_harness_fans_out_joins_and_proposes_once(monkeypatch):
                         }
                     ],
                 )
-            return AIMessage(content="退款资格需按政策核验，并由用户确认后提交。")
+            return AIMessage(content="退款资格需按政策核验，并由用户确认后提交。[1]")
         assert "电商 Supervisor" in system
-        return AIMessage(content="物流和退款政策均已核验，请确认是否提交退款申请。")
+        return AIMessage(
+            content=(
+                "订单物流状态已核验，当前存在延迟。\n"
+                "退款资格需按政策核验，并由用户确认后提交。[1]"
+            )
+        )
 
     async def fake_tool(name, args, user_id, **_kwargs):
         tool_calls.append((name, args, user_id))
@@ -2026,7 +2476,14 @@ async def test_production_harness_fans_out_joins_and_proposes_once(monkeypatch):
         if name == "SEARCH_KNOWLEDGE":
             return ToolInvokeResult(
                 content="命中退款政策",
-                source_refs=[{"type": "knowledge", "documentId": "policy-1"}],
+                source_refs=[
+                    {
+                        "type": "knowledge",
+                        "documentId": "policy-1",
+                        "snippet": "退款资格需按政策核验，并由用户确认后提交。",
+                    }
+                ],
+                grounding={"evidenceState": "SUPPORTED"},
             )
         if name == "CHECK_AFTER_SALES_ELIGIBILITY":
             decision = {
@@ -2133,7 +2590,10 @@ async def test_production_harness_fans_out_joins_and_proposes_once(monkeypatch):
     assert proposal["reason"] is None
     assert trace_events.count("SPECIALIST_STARTED") == 2
     assert "AFTER_SALES_ELIGIBILITY_DECISION" in trace_events
-    assert result["chunks"] == ["物流和退款政策均已核验，请确认是否提交退款申请。"]
+    assert result["chunks"] == [
+        "订单物流状态已核验，当前存在延迟。\n"
+        "退款资格需按政策核验，并由用户确认后提交。[1]"
+    ]
 
 
 @pytest.mark.asyncio

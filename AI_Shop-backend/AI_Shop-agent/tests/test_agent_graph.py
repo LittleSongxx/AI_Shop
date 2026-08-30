@@ -11,9 +11,11 @@ from app.domain.intent.types import IntentKind, NextAction, RequestMode, RiskLev
 from app.domain.tool_policy import READ_TOOLS, WRITE_TOOLS
 from app.graph.builder import build_agent_graph
 from app.graph.nodes import (
+    _rag_generation_verified_for_finalize,
     _rag_query_variants_for_turn,
     agent_loop_node,
     dynamic_handoff_node,
+    post_turn_node,
     requires_rag_evidence,
     should_open_agentic_rag,
     should_prefetch_rag,
@@ -21,6 +23,8 @@ from app.graph.nodes import (
 )
 from app.graph.runner import _should_resume, run_agent_graph
 from app.graph.state import initial_state, thread_id_for
+from app.rag.prompt_builder import grounding_repair_reason as verify_grounded_answer
+from app.services.tool_invoke_result import ToolInvokeResult
 
 
 def test_graph_compiles():
@@ -39,6 +43,67 @@ def test_initial_state_shape():
     assert state["react_round"] == 0
     assert state["deterministic_clarification"] is False
     assert state["dynamic_handoff_reason"] is None
+
+
+def test_old_grounded_checkpoint_defaults_generation_contract_to_fail_closed():
+    old_grounded = {
+        "rag_evidence_required": True,
+        "rag_evidence_state": "SUPPORTED",
+        "rag_source_refs": [{"id": "policy-1"}],
+    }
+
+    assert _rag_generation_verified_for_finalize(old_grounded) is False
+    assert _rag_generation_verified_for_finalize(
+        {**old_grounded, "rag_generation_verified": True}
+    ) is True
+    assert _rag_generation_verified_for_finalize({}) is True
+
+
+@pytest.mark.asyncio
+async def test_post_turn_uses_only_the_finalized_response(monkeypatch):
+    run = AsyncMock()
+    monkeypatch.setattr("app.graph.nodes.post_turn_service.run", run)
+    monkeypatch.setattr(
+        "app.graph.nodes.episode_service.record_step", lambda *args, **kwargs: None
+    )
+
+    await post_turn_node(
+        {
+            "user_id": "u1",
+            "message_id": 1,
+            "user_text": "退款政策",
+            "chunks": ["未经验证的政策 claim"],
+            "assistant_cards": '[{"productId":"unsafe"}]',
+            "final_assistant_text": "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。",
+            "final_assistant_cards": None,
+            "tools_called": [],
+        }
+    )
+
+    assert run.await_args.kwargs["assistant_text"] == (
+        "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"
+    )
+    assert run.await_args.kwargs["assistant_cards"] is None
+
+
+@pytest.mark.asyncio
+async def test_post_turn_skips_memory_when_terminal_write_did_not_win(monkeypatch):
+    run = AsyncMock()
+    monkeypatch.setattr("app.graph.nodes.post_turn_service.run", run)
+
+    result = await post_turn_node(
+        {
+            "user_id": "u1",
+            "message_id": 1,
+            "user_text": "退款政策",
+            "chunks": ["不应写入的旧 draft"],
+            "final_assistant_text": None,
+            "final_assistant_cards": None,
+        }
+    )
+
+    assert result == {"finished": True}
+    run.assert_not_awaited()
 
 
 def test_auto_receipt_policy_turn_adds_bounded_retrieval_variants():
@@ -93,6 +158,105 @@ async def test_read_query_blocks_model_selected_write_proposal(monkeypatch):
         call for call in recorded.call_args_list if call.args[0] == "TOOL_POLICY_DENIED"
     )
     assert denied.kwargs["output_data"]["sideEffectAllowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_failed_tool_does_not_publish_authority_or_business_payload(monkeypatch):
+    result = ToolInvokeResult(
+        content="查询失败",
+        success=False,
+        error_code="TOOL_ERROR",
+        biz_type="query_logistics",
+        biz_data='{"forged":true}',
+        assistant_cards='{"type":"FORGED"}',
+        source_refs=[
+            {
+                "type": "logistics",
+                "id": "O1",
+                "orderId": "O1",
+                "matched": True,
+                "source": "JAVA_LOGISTICS_SERVICE",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.graph.nodes.mcp_tool_router.invoke", AsyncMock(return_value=result)
+    )
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(rag_mode="conditional", graph_max_react_rounds=4),
+    )
+
+    update = await tools_node(
+        {
+            "agent_msg": {"runId": "run-1"},
+            "user_id": "u1",
+            "message_id": 1,
+            "user_text": "查询订单 O1 的物流",
+            "pending_tool_calls": [
+                {"id": "call-1", "name": "QUERY_LOGISTICS", "args": {"orderId": "O1"}}
+            ],
+            "llm_messages": [],
+            "tools_called": [],
+            "react_round": 1,
+        }
+    )
+
+    assert update["tools_called"] == []
+    assert update["tool_source_refs"] == []
+    assert update["tool_biz"] is None
+    assert update["assistant_cards"] is None
+    assert update["biz_data"] is None
+
+
+@pytest.mark.asyncio
+async def test_business_sources_with_same_id_keep_their_own_types(monkeypatch):
+    monkeypatch.setattr(
+        "app.graph.nodes.mcp_tool_router.invoke",
+        AsyncMock(
+            side_effect=[
+                ToolInvokeResult(
+                    content="订单已核验",
+                    source_refs=[{"type": "order", "id": "O1", "orderId": "O1"}],
+                ),
+                ToolInvokeResult(
+                    content="物流已核验",
+                    source_refs=[
+                        {"type": "logistics", "id": "O1", "orderId": "O1"}
+                    ],
+                ),
+            ]
+        ),
+    )
+    monkeypatch.setattr("app.graph.nodes.rt.is_cancelled", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.graph.nodes.episode_service.record_step", MagicMock())
+    monkeypatch.setattr(
+        "app.graph.nodes.get_settings",
+        lambda: SimpleNamespace(rag_mode="conditional", graph_max_react_rounds=4),
+    )
+
+    update = await tools_node(
+        {
+            "agent_msg": {"runId": "run-1"},
+            "user_id": "u1",
+            "message_id": 1,
+            "user_text": "查询订单 O1 及物流",
+            "pending_tool_calls": [
+                {"id": "call-1", "name": "QUERY_ORDERS", "args": {"orderId": "O1"}},
+                {"id": "call-2", "name": "QUERY_LOGISTICS", "args": {"orderId": "O1"}},
+            ],
+            "llm_messages": [],
+            "tools_called": [],
+            "react_round": 1,
+        }
+    )
+
+    assert [ref["type"] for ref in update["tool_source_refs"]] == [
+        "order",
+        "logistics",
+    ]
 
 
 def _agent_loop_state(
@@ -724,6 +888,11 @@ async def test_grounded_policy_answer_uses_one_bounded_repair(monkeypatch):
         ]
     )
     recorded = MagicMock()
+    verified_queries: list[str | None] = []
+
+    def verify(*args, **kwargs):
+        verified_queries.append(kwargs.get("query"))
+        return verify_grounded_answer(*args, **kwargs)
 
     async def invoke(_llm, _messages, *, model):
         assert model == "test-model"
@@ -733,6 +902,7 @@ async def test_grounded_policy_answer_uses_one_bounded_repair(monkeypatch):
     monkeypatch.setattr("app.graph.nodes.rt.bind_agent_llm", lambda **_kwargs: object())
     monkeypatch.setattr("app.graph.nodes.invoke_llm_with_metrics", invoke)
     monkeypatch.setattr("app.graph.nodes.episode_service.record_step", recorded)
+    monkeypatch.setattr("app.graph.nodes.grounding_repair_reason", verify)
     monkeypatch.setattr(
         "app.graph.nodes.get_settings",
         lambda: SimpleNamespace(
@@ -779,6 +949,10 @@ async def test_grounded_policy_answer_uses_one_bounded_repair(monkeypatch):
     )
     assert repair_call.kwargs["status"] == "OK"
     assert repair_call.kwargs["output_data"]["repairedAnswer"] == result["chunks"][0]
+    assert verified_queries == [
+        "平台的七天退货政策是什么？",
+        "平台的七天退货政策是什么？",
+    ]
 
 
 @pytest.mark.asyncio
@@ -836,7 +1010,10 @@ async def test_grounded_policy_repair_failure_is_explicit(monkeypatch):
 
     result = await agent_loop_node(state)
 
-    assert result["chunks"] == ["支持七天无理由退货。"]
+    assert result["chunks"] == [
+        "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"
+    ]
+    assert result["rag_generation_verified"] is False
     repair_call = next(
         call for call in recorded.call_args_list if call.args[0] == "RAG_GENERATION_REPAIR"
     )
@@ -850,6 +1027,8 @@ async def test_grounded_policy_uses_deterministic_fallback_only_for_grounding_ev
 ):
     responses = iter(
         [
+            AIMessage(content="根据当前知识库，我无法确认该信息。请联系人工客服核实。"),
+            AIMessage(content="根据当前知识库，我无法确认该信息。请联系人工客服核实。"),
             AIMessage(content="根据当前知识库，我无法确认该信息。请联系人工客服核实。"),
             AIMessage(content="根据当前知识库，我无法确认该信息。请联系人工客服核实。"),
         ]
@@ -898,6 +1077,7 @@ async def test_grounded_policy_uses_deterministic_fallback_only_for_grounding_ev
             }
         ],
         "rag_safe_business_query": "RAG检索不足时的grounding含义是什么？",
+        "rag_retrieval_count": 1,
         "rag_agentic_allowed": False,
         "chunks": [],
     }
@@ -907,6 +1087,7 @@ async def test_grounded_policy_uses_deterministic_fallback_only_for_grounding_ev
     assert result["chunks"] == [
         "Grounding 表示回答必须以检索到的证据为依据。[1] 当证据不足时，系统会明确说明当前证据不足，并建议联系人工客服。[1]"
     ]
+    assert result["rag_generation_verified"] is True
     assert getattr(result["llm_messages"][-1], "content") == result["chunks"][0]
     fallback_call = next(
         call
@@ -914,6 +1095,19 @@ async def test_grounded_policy_uses_deterministic_fallback_only_for_grounding_ev
         if call.args[0] == "RAG_GENERATION_DETERMINISTIC_FALLBACK"
     )
     assert fallback_call.kwargs["output_data"]["usageAdded"] is False
+
+    multi_result = await agent_loop_node({**state, "rag_retrieval_count": 2})
+
+    assert multi_result["chunks"] == [
+        "本次回答未通过证据完整性校验，请稍后重试或回复“转人工”。"
+    ]
+    assert multi_result["rag_generation_verified"] is False
+    fallback_calls = [
+        call
+        for call in recorded.call_args_list
+        if call.args[0] == "RAG_GENERATION_DETERMINISTIC_FALLBACK"
+    ]
+    assert len(fallback_calls) == 1
 
 
 @pytest.mark.asyncio

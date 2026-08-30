@@ -75,6 +75,7 @@ class AgentGraphState(TypedDict, total=False):
     rag_safe_business_query: str
     rag_repair_attempted: bool
     rag_repair_reason: str | None
+    rag_generation_verified: bool
     rag_mode: str
     rag_queries: list[str]
     rag_retrieval_count: int
@@ -96,6 +97,8 @@ class AgentGraphState(TypedDict, total=False):
     specialist_artifacts: Annotated[list[dict], operator.add]
     action_proposal: dict | None
     verifier_fallback: str | None
+    final_assistant_text: str | None
+    final_assistant_cards: str | None
     orchestration_mode: str | None
     orchestration_reason: str | None
     resolved_order_tool: dict | None
@@ -161,6 +164,7 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "rag_safe_business_query": user_text,
         "rag_repair_attempted": False,
         "rag_repair_reason": None,
+        "rag_generation_verified": True,
         "rag_mode": "conditional",
         "rag_queries": [],
         "rag_retrieval_count": 0,
@@ -177,6 +181,8 @@ def initial_state(agent_msg: dict, card: dict | None, user_text: str) -> AgentGr
         "specialist_artifacts": [],
         "action_proposal": None,
         "verifier_fallback": None,
+        "final_assistant_text": None,
+        "final_assistant_cards": None,
         "orchestration_mode": None,
         "orchestration_reason": None,
         "resolved_order_tool": None,

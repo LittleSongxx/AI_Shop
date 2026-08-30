@@ -10,6 +10,7 @@ from app.config.settings import get_settings
 from app.rag.embedding import embedding_evaluation_scope
 from app.rag.prompt_builder import (
     build_grounding_prompt,
+    deterministic_explicit_fact_fallback,
     deterministic_grounding_policy_fallback,
     grounding_repair_reason,
 )
@@ -170,8 +171,13 @@ async def _generate(
     llm = _evaluation_llm()
     evidence_items = list(retrieval.get("evidenceItems") or [])
     evidence_state = str(retrieval.get("evidenceState") or "INSUFFICIENT")
+    query_plan = retrieval.get("queryPlan")
+    safe_query = str(
+        (query_plan.get("safeBusinessQuery") if isinstance(query_plan, Mapping) else "")
+        or query
+    )
     prompt = build_grounding_prompt(
-        query,
+        safe_query,
         evidence_state=evidence_state,
         evidence_items=evidence_items,
     )
@@ -237,12 +243,12 @@ async def _generate(
         evidence_state=evidence_state,
         evidence_count=len(evidence_items),
         evidence_items=evidence_items,
-        query=query,
+        query=safe_query,
     )
     if reason:
         repair_attempted = True
         repair = build_grounding_prompt(
-            query,
+            safe_query,
             evidence_state=evidence_state,
             evidence_items=evidence_items,
             repair_reason=reason,
@@ -260,14 +266,19 @@ async def _generate(
                 evidence_state=evidence_state,
                 evidence_count=len(evidence_items),
                 evidence_items=evidence_items,
-                query=query,
+                query=safe_query,
             )
-            answer = repaired
+            if not remaining:
+                answer = repaired
             repair_remaining = remaining
             reason = f"{reason}; remaining={remaining}" if remaining else reason
         if repair_remaining:
-            deterministic_fallback = deterministic_grounding_policy_fallback(
-                query,
+            deterministic_fallback = deterministic_explicit_fact_fallback(
+                safe_query,
+                evidence_state=evidence_state,
+                evidence_items=evidence_items,
+            ) or deterministic_grounding_policy_fallback(
+                safe_query,
                 evidence_state=evidence_state,
                 evidence_items=evidence_items,
             )

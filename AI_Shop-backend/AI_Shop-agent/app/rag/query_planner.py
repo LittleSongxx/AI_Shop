@@ -65,10 +65,9 @@ def query_domains(query: str) -> tuple[str, ...]:
     )
 
 
-def query_fact_hints(query: str) -> tuple[str, ...]:
-    """Map explicit business propositions to canonical facts without eval labels."""
+def explicit_query_fact_hints(query: str) -> tuple[str, ...]:
+    """Resolve only explicit published terms or fact IDs to canonical facts."""
 
-    text = str(query or "").casefold()
     hints: list[str] = []
 
     def add(fact_id: str) -> None:
@@ -82,15 +81,17 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
             if (term := normalize_concept_text(value))
         )
     )
-    explicit_fact_ids = {
-        value.casefold() for value in _EXPLICIT_FACT_ID_RE.findall(str(query or ""))
-    }
+    explicit_fact_ids = list(
+        dict.fromkeys(
+            value.casefold()
+            for value in _EXPLICIT_FACT_ID_RE.findall(str(query or ""))
+        )
+    )
     normalized_query = normalize_concept_text(query)
     explicit_term_query = any(
         marker in normalized_query
         for marker in ("什么是", "是什么意思", "含义是什么", "定义是什么", "解释")
     )
-    plain_term_matched = False
     if normalized_terms or explicit_fact_ids or explicit_term_query:
         catalog = get_fact_metadata_catalog()
         if explicit_term_query:
@@ -107,11 +108,13 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
                         f"请解释{term}",
                         f"请解释一下{term}",
                     ):
-                        plain_term_matched = True
                         if term not in normalized_terms:
                             normalized_terms.append(term)
-        for fact_id in catalog.facts:
-            if fact_id.casefold() in explicit_fact_ids:
+        catalog_fact_ids = {
+            fact_id.casefold(): fact_id for fact_id in catalog.facts
+        }
+        for value in explicit_fact_ids:
+            if fact_id := catalog_fact_ids.get(value):
                 add(fact_id)
         for term in normalized_terms:
             matches = [
@@ -121,12 +124,74 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
             ]
             if len(matches) == 1:
                 add(matches[0])
-        if hints:
-            if plain_term_matched:
-                return tuple(hints)
-            text = _EXPLICIT_FACT_ID_RE.sub(
-                "", _EXPLICIT_TERM_RE.sub("", str(query or ""))
-            ).casefold()
+    return tuple(hints)
+
+
+def is_pure_explicit_fact_query(query: str) -> bool:
+    """Return whether the whole request is an explicit fact explanation."""
+
+    raw_query = str(query or "")
+    hints = explicit_query_fact_hints(raw_query)
+    if not hints:
+        return False
+    quoted_terms = _EXPLICIT_TERM_RE.findall(raw_query)
+    explicit_ids = _EXPLICIT_FACT_ID_RE.findall(raw_query)
+    if not quoted_terms and not explicit_ids:
+        return True
+    known_hints = {hint.casefold() for hint in hints}
+    if any(
+        not explicit_query_fact_hints(f'术语“{term}”') for term in quoted_terms
+    ) or any(value.casefold() not in known_hints for value in explicit_ids):
+        return False
+    residual = normalize_concept_text(
+        _EXPLICIT_FACT_ID_RE.sub("", _EXPLICIT_TERM_RE.sub("", raw_query))
+    )
+    for filler in (
+        "请仅依据当前知识快照",
+        "请依据当前知识快照",
+        "请按事实ID",
+        "并给出可引用依据",
+        "定义边界和引用位置是什么",
+        "定义边界与引用位置是什么",
+        "在快照中的",
+        "的适用边界",
+        "的定义",
+        "的边界",
+        "的含义",
+        "引用在哪里",
+        "是什么意思",
+        "分别是什么",
+        "请解释一下",
+        "请解释",
+        "解释",
+        "说明",
+        "以及",
+        "并且",
+        "和",
+    ):
+        residual = residual.replace(normalize_concept_text(filler), "")
+    return not residual
+
+
+def query_fact_hints(query: str) -> tuple[str, ...]:
+    """Map explicit business propositions to canonical facts without eval labels."""
+
+    raw_query = str(query or "")
+    text = raw_query.casefold()
+    hints = list(explicit_query_fact_hints(raw_query))
+
+    def add(fact_id: str) -> None:
+        if fact_id not in hints:
+            hints.append(fact_id)
+
+    if hints:
+        if not _EXPLICIT_TERM_RE.search(raw_query) and not _EXPLICIT_FACT_ID_RE.search(
+            raw_query
+        ):
+            return tuple(hints)
+        text = _EXPLICIT_FACT_ID_RE.sub(
+            "", _EXPLICIT_TERM_RE.sub("", raw_query)
+        ).casefold()
 
     price_question = any(
         term in text for term in ("价格", "成交价", "价格不同", "快照")

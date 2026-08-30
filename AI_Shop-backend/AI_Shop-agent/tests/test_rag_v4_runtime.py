@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.rag.evidence_selector import select_minimal_evidence
-from app.rag.query_planner import plan_rag_query, query_fact_hints
+from app.rag.query_planner import (
+    explicit_query_fact_hints,
+    is_pure_explicit_fact_query,
+    plan_rag_query,
+    query_fact_hints,
+)
 from app.rag.retriever import (
     RagRetriever,
     _promote_canonical_hint_docs,
@@ -80,6 +85,22 @@ def test_query_fact_hints_are_runtime_business_rules_not_eval_labels():
     )
 
 
+def test_explicit_fact_hints_exclude_ordinary_business_heuristics():
+    assert explicit_query_fact_hints("订单提交幂等是什么意思？") == (
+        "checkout.idempotency_key",
+    )
+    assert explicit_query_fact_hints("加购价是否保证最终成交价") == ()
+
+
+def test_pure_explicit_fact_query_rejects_uncovered_mixed_intent():
+    assert is_pure_explicit_fact_query(
+        "请仅依据当前知识快照，术语“订单提交幂等”在快照中的定义、边界和引用位置是什么？"
+    )
+    assert not is_pure_explicit_fact_query(
+        "请解释术语“默认地址”，另外连续签到中断后连续天数怎么算？"
+    )
+
+
 def test_query_fact_hints_do_not_claim_unsupported_details():
     assert query_fact_hints("连续签到中断后连续天数怎样计算") == ()
     assert query_fact_hints("转人工时系统会附带哪些排查上下文") == ()
@@ -126,6 +147,12 @@ def test_multiple_explicit_fact_terms_preserve_user_order():
         "checkout.idempotency_key",
         "checkout.stock_deduct_and_compensate",
     )
+
+
+def test_multiple_explicit_fact_ids_preserve_user_order():
+    assert explicit_query_fact_hints(
+        "请按事实 ID checkout.idempotency_key 和 address.crud 说明"
+    ) == ("checkout.idempotency_key", "address.crud")
 
 
 def test_query_fact_hints_distinguish_ai_actor_from_ai_data_deletion():
