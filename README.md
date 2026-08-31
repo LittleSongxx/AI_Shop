@@ -1,348 +1,147 @@
-# AI_Shop — AI 驱动的微服务电商平台
+# AI-Shop — 受控电商 Agent
 
-> 内容状态：当前有效
->
-> 当前证据状态：manifest 中的 v9 仍是不可变 `PUBLISHED_FINAL` 历史包；客服当前已见开发集主证据为 v56 人工审批+仲裁包，两者均不是 unseen/release 证据
->
-> 最后核验时间：2026-08-29（Asia/Shanghai）
->
-> 适用环境：本地演示、开发与 CI；不代表生产容量、业务收益或线上 SLO 证明
+> Java 权威交易底座 + Python 受控电商 Agent（AI 导购 + AI 客服）+ RAG/MCP
 
-基于 Spring Cloud Alibaba + Python LangGraph 构建的全栈微服务电商项目，当前主线收敛为：
+AI-Shop 把大模型放在电商业务的解释与提案层：Python 负责理解需求、检索知识和调用工具，Java 始终持有商品、SKU、价格、库存、订单、支付及最终写入真相。模型不能直接修改业务库。
 
-1. **Java 电商底座 → 文本/视觉 AI 推荐导购 → Java 权威价格/库存 → 点击/加购/支付归因**；
-2. **AI 客服 → 发布版政策 RAG → Java 订单权威事实 → 用户确认 → 幂等执行 / `INCONCLUSIVE` / `MANUAL_REVIEW`**。
+当前定位是可复现的本地求职项目，不代表生产容量、真人用户、CSAT、GMV、正式 unseen 或线上 SLO。
 
-模型只负责受约束的检索、解释和提案；商品、库存、订单、支付和最终写入仍由 Java 领域服务负责。
+## 两条闭环
 
-### 秋招定位
+### AI 导购
 
-- **主叙述：AI 后端 / Agent 开发**——Agent 边界、RAG/Tool/MCP、可靠执行、真实 badcase、评测和 Trace 闭环。
-- **第二入口：Java 电商后端**——订单/库存/支付事务、Redis、RabbitMQ、一致性、幂等和故障恢复。
-- **视觉搜索**属于推荐主线；**Text2SQL**已战略冻结为内部治理实验，不列为第三主线、默认演示或后续排期，详见 [冻结说明](docs/project/AI-Shop-Text2SQL冻结说明-20260829.md)。
+```text
+自然语言需求
+  → BM25 / Vector 并行召回
+  → RRF + Rerank
+  → Java 商品、SKU、价格、库存快照
+  → 推荐卡与理由
+  → 点击 / 加购 / 结算归因
+  → Java 创建 WAIT_PAYMENT 订单
+```
 
-面试可陈述的功能闭环、真实样本和未采集边界见 [AI_Shop 主线与开发记录](docs/project/AI_Shop主线与开发记录.md)，可直接复述的 STAR 案例见[关键问题优化与面试叙事](docs/project/AI-Shop-关键问题优化与面试叙事-20260831.md)；Text2SQL 状态以[冻结说明](docs/project/AI-Shop-Text2SQL冻结说明-20260829.md)为准。
+- 预算、品牌、型号、排除词等硬约束由程序校验。
+- 推荐结果只能引用 Java 返回的在售商品和当前 SKU。
+- 点击、加购和订单项保留同一 `requestId/productId/position/source` 归因链。
+- 结算时重新校验权威 SKU、价格和库存，不信任客户端 SKU hash。
 
----
+### AI 客服
+
+```text
+用户问题
+  → 意图与风险判断
+  → 发布版政策 RAG + Java 订单事实
+  → 只读回答 / PROPOSE_* 写操作提案
+  → 用户确认
+  → Java 重新鉴权、校验状态与幂等执行
+  → SUCCEEDED / INCONCLUSIVE / MANUAL_REVIEW
+```
+
+- RAG 支持 TXT、Markdown、可抽取文本 PDF/DOCX；扫描件明确拒绝。
+- Tool/MCP 只表达调用意图，Java 下游重新验证用户、资源和业务状态。
+- 未确认提案不产生副作用；重复确认不重复执行。
+- 未授权扣款、账号风险和无法安全收敛的结果转人工。
+
+## 责任边界
+
+| 责任 | 权威组件 |
+|---|---|
+| 身份、用户、商品、SKU、库存、订单、支付、物流 | Java / MySQL |
+| 需求理解、Workflow/Single-Agent 编排、Context | Python / LangGraph |
+| 企业政策检索、引用和拒答 | RAG / Elasticsearch |
+| 工具协议与调用候选 | MCP |
+| 写入确认、幂等、未知结果与人工复核 | Java + Python 状态机 |
+| Trace、Token、成本状态、Bad Case | Episode / OTel / Prometheus |
+
+Multi-Agent 与 Text2SQL 默认关闭，只保留为实验代码；视觉找同款是可选能力，不属于主验收。
 
 ## 技术栈
 
-### 后端 · Java 微服务
-
-| 层面 | 技术选型 |
-|------|---------|
-| 框架 | Spring Boot 3 · Spring Cloud Alibaba |
-| 注册/配置 | Nacos |
-| 网关 | Spring Cloud Gateway |
-| 分布式事务 | Seata（AT 模式 + `@GlobalTransactional`） |
-| 消息队列 | RabbitMQ + 本地事务消息表 + 补偿任务 |
-| 缓存 | Redis（Lua 原子操作、分布式锁、Bitmap 签到） |
-| 持久层 | MyBatis（自定义泛型 Mapper 基类） |
-| 搜索 | Elasticsearch（IK 分词） |
-| 熔断限流 | Sentinel |
-| 支付 | 支付宝沙箱（PC 网页支付） |
-
-### AI 服务 · Python
-
-| 层面 | 技术选型 |
-|------|---------|
-| 框架 | FastAPI + LangGraph（ReAct Agent） |
-| LLM | OpenAI 兼容接口（可接任意模型） |
-| RAG | Elasticsearch 向量检索 + BM25 + RRF/rerank 混合 |
-| 工具调用 | MCP（Model Context Protocol）双向通信 |
-| 会话记忆 | Redis 短期 + MySQL 长期持久化 |
-| 可观测 | OpenTelemetry（OTLP）+ Prometheus 指标 |
-| 评测与测试 | pytest + `aishop-evaluation/v3`；Conda `shop` 环境、quality scorecard（Search 主指标 + badcase）、development/regression 数据锁、一次性 final 和哈希证据包 |
-
-### 前端
-
-| 模块 | 技术选型 |
-|------|---------|
-| 用户端 | Vue 3 + Vite + Element Plus |
-| 管理后台 | Vue 3 + Vite + Element Plus |
-
-### 基础设施
-
-Docker Compose：MySQL 8.4.11 · Redis 7.4.7 · RabbitMQ 4.2.9 · Nacos 2.5.3 ·
-Elasticsearch 8.19.19（IK）· Sentinel 1.8.8 · Seata 2.5.0
-
----
-
-## 项目结构
-
-```
-AI_Shop/
-├── AI_Shop-backend/              # Java 微服务
-│   ├── AI_Shop-gateway/          # 统一入口：路由、鉴权、内部 Token 校验
-│   ├── AI_Shop-common/           # 公共组件：Redis 工具、事务消息、异常体系
-│   ├── AI_Shop-user/             # 用户：注册登录、签到、会员等级、地址
-│   ├── AI_Shop-product/          # 商品：分类、SKU、属性、图片
-│   ├── AI_Shop-stock/            # 库存：悲观锁扣减、超卖防护
-│   ├── AI_Shop-cart/             # 购物车
-│   ├── AI_Shop-order/            # 订单：普通下单 + 优惠券秒杀下单
-│   ├── AI_Shop-pay/              # 支付：支付宝 PC 网页支付、回调验签
-│   ├── AI_Shop-coupon/           # 优惠券：发放、抢购、用券
-│   ├── AI_Shop-search/           # 搜索：ES 全文检索、热词统计
-│   ├── AI_Shop-admin/            # 管理后台 API
-│   └── AI_Shop-agent/            # Python AI 服务（LangGraph ReAct Agent）
-├── AI_Shop-front/
-│   ├── AI_Shop-web/              # 用户端 Vue 3
-│   └── AI_Shop-admin/            # 管理后台 Vue 3
-├── deploy/                       # Docker Compose、Nginx 示例、上线清单
-└── sql/                          # 初始化 DDL
-```
-
----
-
-## 核心功能
-
-### 业务底座
-
-- **完整下单链路**：浏览 → 加购 → 创建订单（Seata 全局事务）→ 支付宝支付 → 回调核销 → 发货 → 签收 → 评价
-- **优惠券秒杀**：Redis Lua 原子预占 + DB 库存双重校验，`CouponRushOrderService` 管理完整生命周期
-- **消息可靠性**：本地消息表 + `TransactionalMqSender`（事务提交后发送）+ MQ 补偿扫描，三层保障
-- **支付生命周期锁**：Redis 互斥锁确保支付回调、超时关单、迟到退款三路并发只有一路生效
-- **退款 Saga 人工复核闭环**：重试耗尽进入 MANUAL_REVIEW 后由管理端审批——通过则按原阶段恢复、对账定时器自动续跑，驳回则本次申请作废、用户可重开；审批用客户端幂等键 + CAS 保证并发单次生效，台账落账，恢复前重新校验冻结字段（金额/数量/属性）防人工窗口期数据漂移
-- **签到系统**：Bitmap 月度记录 + Hash 计数器 + Lua 原子操作，补签次数按累计天数兑换
-- **敏感词过滤**：DFA 算法，支持管理员动态维护词库
-
-### AI 购物导购与客服
-
-- **自然语言订单定位**：根据订单号、相对时间、金额和商品描述筛选权威订单；零候选、多候选、无可操作项和依赖失败分别处理，歧义上下文可跨轮持久化
-- **自适应编排**：简单权威查询或参数完整提案走 Workflow，开放/单域 RAG 走单 Agent，订单事实与政策等跨域复合请求才走 bounded multi-agent；四种配置可用于配对消融，但正式 live 配对结果仍未采集
-- **受控写操作**：模型只能生成 `PROPOSE_*` 提案；用户确认后 Java 重新校验身份、归属、状态与幂等键，未知远端结果进入 `INCONCLUSIVE`，核对到边界后转 `MANUAL_REVIEW`
-- **RAG 知识库**：12 份项目级业务文档、75 个 chunk、6 个 FAQ；Exact FAQ、自适应 BM25/Vector、RRF、Rerank、最小充分证据、逐事实句引用、有界 repair，以及发布快照 ACL/freshness/逻辑删除回滚（受控预生产，详见 [E6 验证记录](docs/project/AI-Shop-E6-RAG生命周期验证-20260829.md)）
-- **可观测 Agent 运行时**：HTTP/MQ/Worker/Java/MCP 共用 run/request/episode correlation；流式发布、WebSocket 慢连接、listener liveness、队列年龄、取消时延和 bounded backpressure 均有低基数指标（详见 [E8 验证记录](docs/project/AI-Shop-E8-可观测背压短稳态验证-20260829.md)）。短稳态证据不等于线上 SLO 或容量证明。
-- **前端真实闭环**：typed legacy support/action adapter、OPEN barrier/重连/终态与取消、token 过期恢复、对话区 a11y、reduced-motion 和原生 Web Vitals 采集；mock Playwright 已覆盖 WS 重连与权威取消结果（详见 [E9 验证记录](docs/project/AI-Shop-E9-前端真实闭环验证-20260829.md)）。
-- **MCP 工具链**：结构化工具调用（查询订单/物流/券/商品），结果以卡片形式渲染至前端
-- **输入防护**：NFKC 归一化 + 两级规则（硬阻断 / 可疑累积）+ Propose→用户确认→Java 执行，防 Prompt 注入
-- **强制工具回退**：模型跳过必要工具时，框架层自动补全并路由至 finalize，避免幻觉回复
-- **工具结果 Observation 层**：所有进上下文的工具输出统一脱敏（手机号/邮箱/身份证）、长度裁剪，被省略部分写入 trace
-- **通道污染检疫**：与输入防护共用规则表；RAG 片段在组装点逐条剔除，工具结果命中注入话术即替换为隔离占位符，污染项计数入指标，隔离不等于整链拒绝
-- **Prompt 单一事实源**：fragment 注册表统一管理全部提示词片段（redis 覆盖可观测），每轮对话记录 selectedFragments 到决策 trace
-- **逐运行预算**：ContextVar 隔离 token、人民币成本、节点步数与 monotonic deadline，80% 预警，超限进入明确受控终态；异步任务与对话互不污染
-- **委托身份信道**：`X-Agent-User-Id` 系统信道头为权威（模型不可见），body userId 仅作参考；缺失 401、不一致 403、归属不符 403，fail-closed
-- **统一可信评测**：Search、RAG、Agent 共用一个 fail-closed suite；适配器分别调用生产 ProductService、RAG retriever/generation contract 和 Agent HTTP + 持久化 Episode，冻结后 final 只能 claim/执行一次，任何域失败都会阻断发布门禁
-- **熔断降级**：外部 Provider 使用 CLOSED/OPEN/HALF_OPEN 熔断与受控 fallback；未知写结果不会被通用重试自动重放
-- **速率限制**：用户级别双窗口限流，防止滥用
-- **身份与浏览器边界**：服务端 principal 绑定用户/管理员会话；WS 精确 Origin、帧大小和 Redis 入站限流，Cookie 变更请求执行 Origin-based CSRF，session TTL 过期即拒绝（单店受控预生产，详见 [E5 验证记录](docs/project/AI-Shop-E5-身份与安全验证-20260829.md)）
-
-### 治理与用户闭环
-
-- **管理员 RBAC**：`SUPER_ADMIN`、`AI_OPERATOR`、`SUPPORT_AGENT`、`DATA_ANALYST`、`AUDITOR` 五角色，Redis 会话绑定主体版本，Controller 和 Python 管理接口均执行权限校验
-- **内部管理员断言**：Java → Python 使用 HMAC-SHA256，覆盖 method、path、body hash、管理员、角色、权限、时间戳和 nonce，支持 current/previous 密钥轮换与重放拒绝
-- **试用与指标**：批次、参与者、`SYNTHETIC`/`LOCAL_PILOT`/`REAL_USER` 来源、verified success、FCR、TTFT、token、成本和匿名 JSON/CSV/Markdown 报告
-- **隐私中心**：用户可异步导出或彻底删除 AI 数据，支持密码二次确认、`Idempotency-Key`、分步骤恢复和短期下载；订单/支付保留数据解除 AI 关联并匿名化
-- **分层 CI 与供应链**：PR 校验评测契约/数据锁并运行 Java unit/IT、Python、双前端、Playwright 和 SBOM；配置真实 Provider 的工作流缺任何依赖都会失败，不以 skip 伪装成功
-
----
+- Java 17、Spring Boot、Spring Cloud Alibaba、MyBatis、Seata
+- MySQL、Redis、RabbitMQ、Elasticsearch、Sentinel、Nacos
+- Python 3.11–3.13、FastAPI、LangGraph、MCP
+- Vue 3、TypeScript、Vite、Vitest、Playwright
+- OpenTelemetry、Prometheus、Grafana、Loki、Tempo
 
 ## 快速启动
 
-### 前置依赖
-
-- JDK 17+、Maven 3.9+
-- Python 3.11–3.13
-- Docker & Docker Compose
-
-### 0. 一键起停（推荐）
+要求：JDK 17、Maven 3.9、Python 3.11–3.13、Node.js 22、Docker Compose。
 
 ```bash
-./start.sh --build          # 首次：构建 + 中间件 + 可观测栈 + Java 微服务 + Agent
-./start.sh                  # 后续：复用最新 JAR；源码较新时自动串行重建
-./start.sh --middleware-only  # 只起 Docker 中间件
-./stop.sh                   # 停 Java + Agent（中间件保留）
-./stop.sh --middleware      # 一并停中间件
+./start.sh --build
+python scripts/bootstrap_demo.py
 ```
 
-`start.sh` 会自动将业务与可观测组件的冲突端口向后顺延，实际端口写入
-`run/runtime.env`；随后等待
-MySQL / Nacos / Seata 就绪，再串行拉起 Java 服务以控制 WSL 峰值内存。非
-`--middleware-only` 启动还会预检 Agent `.env`：填写 `RERANK_API_KEY` 后，必须同时把
-`RERANK_BASE_URL` 中的 `YOUR_WORKSPACE_ID` 换成真实百炼业务空间 ID。PID 和日志落在
-`run/`，Agent 使用 conda 环境 `shop`。下面 1–5 步是拆开的手工流程，排查问题时用。
+启动脚本会写出 `run/runtime.env`，并依次启动中间件、Java 服务、MCP、Worker、Agent API 和双前端。
 
-### 1. 启动中间件
+访问地址以 `run/runtime.env` 为准，默认用户端为 `http://127.0.0.1:6001`。
+
+停止服务：
 
 ```bash
-./start.sh --middleware-only
+./stop.sh
+./stop.sh --middleware
 ```
 
-等待 Nacos（8848）、MySQL（3306）、Redis（**6380**）、RabbitMQ（**5673**）、ES（9200）全部就绪。
+详细操作见 [演示指南](docs/demo.md) 和 [架构说明](docs/architecture.md)。
 
-> Redis / RabbitMQ / Seata 的宿主机端口是 +1 偏移（6380 / 5673 / 8092），避免和本机已装的同类服务冲突。
-> Seata 2.5 还要求注册地址不能是 `127.0.0.1`，因此不要绕过启动脚本直接执行裸 Compose；
-> 跨主机部署时显式设置可达且受防火墙保护的 `SEATA_IP`。详见
-> [deploy/本地中间件启动指南.md](deploy/本地中间件启动指南.md)。
-
-### 2. 初始化数据库
-
-```bash
-bash deploy/init-mysql-meta.sh
-```
-
-该脚本初始化数据库、Nacos/Seata 元数据和 undo_log；业务表由各 Java 服务的
-`R__current_schema.sql` 在启动时幂等迁移，Agent 表由 Alembic 迁移。
-
-### 3. 构建 Java 微服务
+## 验证
 
 ```bash
 cd AI_Shop-backend
-mvn -DskipTests package
+mvn --batch-mode --no-transfer-progress verify
+mvn --batch-mode --no-transfer-progress -Pintegration \
+  -pl AI_Shop-common,AI_Shop-order/app -am verify
+
+cd AI_Shop-agent
+pytest -q
+ruff check app tests evaluation
+
+cd ../../AI_Shop-front/AI_Shop-web
+npm run lint && npm test && npm run build && npm run test:e2e
+
+cd ../AI_Shop-admin
+npm run lint && npm test && npm run build
 ```
 
-按顺序启动各模块，详见 [deploy/start-hint.sh](deploy/start-hint.sh)。
-
-### 4. 启动 AI Agent 服务
+私有 holdout 不属于默认 CI；只有外部恢复后才单独运行：
 
 ```bash
-cd AI_Shop-backend/AI_Shop-agent
-
-conda activate shop
-pip install -e ".[dev]"
-
-cp .env.example .env   # 填入 LLM API Key、DB 连接、内部 Token
-
-uvicorn app.main:app --host 0.0.0.0 --port 7050   # API 服务
-python -m app.worker                               # 异步 Worker（另一个终端）
+pytest -q -m private_holdout
 ```
 
-### 5. 启动前端
+当前公开指标、样本量和声明边界见 [评测说明](docs/evaluation.md) 与 [证据清单](docs/evidence/manifest.json)。
+
+## 外部 AI 黑盒试用
+
+Codex、Claude Code、Qwen、DeepSeek 等具备浏览器能力的外部 AI 可以只凭网站和任务卡参加 `SYNTHETIC` 黑盒试用：
 
 ```bash
-cd AI_Shop-front/AI_Shop-web   && npm install && npm run dev   # 用户端
-cd AI_Shop-front/AI_Shop-admin && npm install && npm run dev   # 管理后台
+python scripts/blackbox_pilot.py prepare --actor-label <模型> --session 1
+python scripts/blackbox_pilot.py finalize --session-id <会话ID>
+python scripts/blackbox_pilot.py aggregate --root run/blackbox-pilot
 ```
 
----
+外部 AI 不得读取仓库、接口、数据库或预期答案。该结果不是真人试用或 CSAT。
 
-## 关键环境变量
+## 仓库结构
 
-| 变量名 | 说明 |
-|--------|------|
-| `AISHOP_INTERNAL_TOKEN` | 服务间调用 `/internal/**` 的共享密钥（全服务一致） |
-| `AISHOP_INTERNAL_OPS_TOKEN` | Outbox 人工重放等高风险运维接口的独立密钥 |
-| `AISHOP_ADMIN_ASSERTION_CURRENT_SECRET` | Java 管理端到 Python Agent 的管理员断言签名密钥 |
-| `PILOT_IDENTITY_HMAC_SECRET` | 试用参与者稳定伪名匹配密钥，不随请求签名密钥轮换 |
-| `PRIVACY_EXPORT_SIGNING_SECRET` | AI 数据删除后保留事实匿名化使用的独立密钥 |
-| `ADMIN_PASSWORD` | 管理后台初始管理员密码；生产环境必须替换默认值 |
-| `MYSQL_ROOT_PASSWORD` / `MYSQL_USER` / `MYSQL_PASSWORD` | root 仅用于本地引导；业务服务使用只有 DML 权限的非 root 运行账号 |
-| `FLYWAY_USER` / `FLYWAY_PASSWORD` | Java Flyway 与 Agent Alembic 共用的独立迁移身份，不得与业务运行账号复用 |
-| `NACOS_MYSQL_*` / `SEATA_MYSQL_*` | Nacos、Seata 各自的 schema 级数据库账号；一键脚本自动生成并持久化 |
-| `RABBIT_PASSWORD` / `REDIS_PASSWORD` | RabbitMQ 与 Redis 凭据；`start.sh` 会为本地 Redis 生成并持久化随机密码 |
-| `SEATA_SECURITY_SECRET_KEY` | Seata TC Token 签名密钥 |
-| `GRAFANA_ADMIN_PASSWORD` | 可选；一键脚本未收到显式值时自动生成并保存到 `run/secrets/grafana.env` |
-| `APP_ENV` / `AISHOP_PRODUCTION_READY` | 生产环境分别设为 `production` / `true`，触发 Python Agent 与 Java 服务的安全校验 |
-| `AISHOP_DEV_LOGIN_BYPASS` | 本地调试开关，**禁止生产开启** |
-| `ALLOW_DEVELOPMENT_AUTH_BYPASS` | Python Agent 的开发认证绕过开关，**禁止生产开启** |
-| `WS_ALLOWED_ORIGINS` / `CSRF_PROTECTION_ENABLED` | 浏览器 WS/unsafe Cookie 请求的精确来源白名单与 CSRF 开关；生产需配置对外 Origin |
-| `HTTP_MAX_REQUEST_BYTES` / `WS_MAX_FRAME_BYTES` | Agent HTTP body 与单帧 UTF-8 字节上限 |
-| `WS_RATE_LIMIT_WINDOW_SECONDS` / `WS_RATE_LIMIT_MAX_MESSAGES` | 每用户/管理员 WebSocket 入站帧 Redis 固定窗口 |
-| `LLM_BASE_URL` | LLM API 基础地址（OpenAI 兼容） |
-| `LLM_API_KEY` | LLM API Key |
-| `LLM_MODEL` | 模型名称；当前示例为 `deepseek-chat`，也可填写兼容的其他模型 |
-| `EMBEDDING_API_KEY` | 向量检索和知识库索引的 Embedding Key |
-| `RERANK_API_KEY` / `RERANK_BASE_URL` | Qwen3 Rerank Key 与百炼业务空间地址；未配置时回退 RRF |
-| `MEMORY_LLM_API_KEY` | 可选记忆摘要模型 Key，留空复用 `LLM_API_KEY` |
-| `VLM_ENABLED` / `VLM_API_KEY` | 可选视觉模型开关与 Key；视觉找同款走推荐 v1 契约，正式 live 评测禁止 fallback |
-| `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 可选 DirectMail 邮箱验证码凭据 |
-| `ALIPAY_*` | 真实支付和回调验签凭据 |
-| `AMAP_KEY` | 可选高德逆地理编码 Key |
-| `BAIDU_AIP_API_KEY/SECRET_KEY` | 可选百度图片审核凭据 |
+```text
+AI_Shop-backend/   Java 交易服务与 Python Agent
+AI_Shop-front/     用户端与管理端
+deploy/            本地中间件、观测和故障演练
+docs/              架构、演示、评测、所有权与紧凑证据
+scripts/           启动验收与黑盒试用工具
+```
 
-完整清单见 [AI_Shop-backend/AI_Shop-agent/.env.example](AI_Shop-backend/AI_Shop-agent/.env.example) 和 [deploy/env.production.example](deploy/env.production.example)。
+完整历史评测包和人工回传不再放在当前展示树，可通过本地归档标签 `archive/pre-career-mainline-20260831` 恢复。
 
----
+## 已知限制
 
-## 数据与指标口径
+- 没有真人用户、生产流量、线上 SLO 或支付合规证明。
+- WebSocket 断线后可恢复权威终态，但不重放断线期间的 token chunk。
+- 当前是单店用户级授权，不是多租户 SaaS。
+- PDF/DOCX 只支持可抽取文本，不做 OCR、表格坐标和页码级引用。
+- Multi-Agent 未证明优于 Workflow/Single-Agent，因此默认关闭。
 
-人工阅读入口为 [AI_Shop 主线与开发记录](docs/project/AI_Shop主线与开发记录.md)，质量主指标、95% CI 和指标级 badcase 见
-[AI质量评测与Badcase](docs/evaluation/AI质量评测与Badcase.md)，机器 scorecard 见
-[AI质量评测与Badcase.json](docs/evaluation/AI质量评测与Badcase.json)，机器总索引为
-[evidence-manifest.json](docs/evidence-manifest.json)。运行 `python scripts/check_evidence_manifest.py` 会交叉校验 suite、
-development/regression 数据锁、文件 SHA、case 数、域分布、集合互斥、失败 final 和文档边界。
-本轮评测器审计、联网依据、定向修复和剩余缺口见
-[质量缺口审计与优化](docs/evaluation/质量缺口审计与优化-20260825.md)。2026-08-26 对 Git 主线、v2 标签/来源、v43 生产路径和所有可声明边界的当前结论见
-[AI-Shop 评测体系全面审计与执行结果](docs/evaluation/AI-Shop评测体系全面审计与执行结果-20260826.md)；2026-08-27 完成的人工作业、最终指标与 badcase 见
-[AI-Shop 人工审批评测最终结果](docs/evaluation/AI-Shop人工审批评测最终结果与Badcase分析-20260827.md)。
-
-客服 intent/风险/slot/handoff 的 60 条双人盲标+第三人仲裁证据见
-[客服金标评测](docs/evaluation/customer-service/客服金标评测.md)；本轮核心排错、阶段指标、外部调研和后续优先级已合并到
-[主线与开发记录](docs/project/AI_Shop主线与开发记录.md)；新版面试题入口为
-[AI应用开发_Java后端_真实面试题与备考报告_20260824.md](AI应用开发_Java后端_真实面试题与备考报告_20260824.md)。
-
-当前评测协议为 `aishop-evaluation/v3`，Python 命令必须使用 Conda `shop` 环境
-`/home/song/miniconda3/envs/shop/bin/python`。结果、数据集、人工审查生命周期和提交边界的稳定入口见
-[结果与数据集索引](docs/evaluation/结果与数据集索引.md)；不可变 package 内文件只通过 `SHA256SUMS` 校验，不在原地整理。
-development 锁定 `43` 条（Search/RAG/Agent = `18/18/7`），
-regression 锁定 `51` 条（`20/26/5`）；可见真实 Provider run 分别为
-`development-20260822-ai-quality-v9` 和 `regression-20260822-ai-quality-v9`，源码指纹均为
-`e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69`。
-
-机器 manifest 当前唯一已发布历史结果是 `release-20260822-ai-quality-v9` / `final-20260822-ai-quality-v9`。源码暴露审计发现
-125 条 final 中 120 条可从当前源码恢复，共 220 个定位、21 个来源文件；因此 v9 不再支持未见 holdout 或泛化主张。
-历史包没有被删除、覆盖或重算，其当时报告的 Search
-`Recall@10 macro/query=0.962121`、补充的 `Recall@10 micro/qrel=52/56=0.928571`、`MRR@10=0.937500`、
-`NDCG@10=0.920521` 仅作历史追溯。当前 NDCG 已修正为使用同一 graded gains 的理想降序且不再用上限裁剪掩盖错误，
-所以旧 NDCG 不与新公式结果直接混比；scorecard 列出 3 个漏召回 query、4 个漏召回商品和每个排序 badcase。RAG 只保留最小事实安全证据，
-Agent 只保留工具契约/延迟诊断；客服 v1 60 条是历史暴露回归金标。当前 v2 120 条虽有可验证 hash/label chain，但来源独立性与 25 条 taxonomy/slot 一致性重仲裁尚未通过，只能作 development diagnostic，不能晋升 release/final。
-
-RAG answerable retrieval Recall@5 为 `29/29=1.000`，lexical grounded faithfulness/citation/no-answer 均为 `50/50=1.000`；
-Search/RAG/Agent 本地完整链路 P50/P95/P99 分别为 `269.6/797.3/940.6 ms`、`1825.4/4246.7/4525.3 ms`、
-`1362.5/17077.8/20943.0 ms`。样本小且只作本地诊断，RAG lexical/semantic shadow 也不等于人工语义准确率。
-
-客服规则预路由的 Intent/Slot 数字仅是同一 60 条 gold 的确定性回放诊断，不作为最终答案质量或主质量指标：历史 Intent Macro-F1 `0.955299` -> 当前回放 `1.000000`，完整 schema slot F1 `0.907652` -> `0.996364`，EM `0.558824` -> `0.911765`。这些数字不是新 holdout 泛化结果；HTTP Episode 槽位经脱敏，不能据此声称端到端 slot 质量。高风险 intent Recall `1.000`（10/10）、
-完整人工 schema 的 slot micro F1 `0.996364=822/825`（3 个 strict-format badcase，95% CI `[0.995061,0.997636]`）、slot EM `0.911765`（31/34）、
-handoff Recall `1.000`（14/14）、严重漏转人工率 `0/6`。
-同一 60 条人工 gold 的 paired replay 为 Span F1 `0.907652 -> 0.996364`、EM `0.558824 -> 0.911765`，修复 12 case、回归 0；只剩 `009/020/058` 的金额原始格式差异。该结果是同集优化证据，不是新 holdout。
-这些是离线规则预路由质量，不是线上客服成功率；`releaseGateEligible=false` 保持 fail-closed。
-
-历史 HTTP v1 的同一 60 条 gold 已经正式 Agent/Java/RAG/LLM 路径执行 `60/60`，转人工混淆矩阵为 `TP=14,TN=46,FP=0,FN=0`，引用结构违规 `0`。
-Episode 槽位经脱敏，因此 HTTP Slot F1/EM 不可测。答案质量已完成双人盲审与 `8` 条独立第三人仲裁：冻结 60 条回放的答案正确率为
-`51/60=85.0%`（Wilson 95% CI `73.9%–91.9%`），但可计分引用的语义支持率仅 `6/30=20.0%`（`9.5%–37.3%`），联合质量通过率
-`32/60=53.3%`。转人工适当率为 `60/60`，unsafe-answer 为 `0/60`；后两项的小样本区间不能写成“绝对安全”。双人 `52/60` 完全一致和
-`8` 条仲裁是标注可靠性，不能当模型准确率。该 HTTP 观察包 `releaseGateEligible=false`，不是 CSAT/FCR、线上成功率或历史 final 的追溯门禁；
-引用支持缺口是当前客服主线的最高优先级质量问题。
-当前 v2.1 successor 共 120 条，dataset SHA-256 为 `02a6dacc6a2aadb88c6dfb60bf7a74e2f083fcba0f9a6e82fef38c4dfa82caf3`；25 条标签政策复核中 A/B 一致 20 条、5 条已仲裁、19 条相对 v2 变化。来源独立性仍未完成，因此 intent/slot/handoff 只作开发诊断。v43 在该集合对应的冻结运行上生产执行 `120/120`、行为契约 `22/22`，答案 120 条人工审批与 3 条仲裁已经完成。
-
-修复后已完成一轮新的真实 HTTP observation：`customer-service-http-v13-20260824`。它在同一冻结 60 条上完整终态 `60/60`、HTTP error `0`、行为契约 `10/10`，Provider usage 为 `18` 次调用、输入/输出 token `78,470/5,486`、`costCny=null` / `UNPRICED`；本地 P50/P95/P99 为 `1015.049/11372.651/22858.230 ms`，仅作本机诊断。`60/60`、Intent/slot 指标和行为契约都不是人工最终答案质量。API、Worker、MCP 已增加相同源码 fingerprint 的 readiness/preflight 检查，避免独立 MCP 进程仍加载旧代码。
-
-原始 Provider observation 已作为只读 [pre-evaluator-fix 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-pre-evaluator-fix-20260824/) 保存；其中四条“不能据此断言平台无货”被旧纯正则错误判为“平台无货”断言。正式 [v13 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-20260824/) 仅对同一 observation 做免责声明感知的确定性离线重算，未重跑 Provider。该评测器修复使行为契约从误报恢复，不能表述为模型质量提升。v13 源 report 内的原始字段仍为 `PENDING_HUMAN_REVIEW`，但外部人工答案评审已完成双人封存和 `11` 条独立第三人仲裁，生命周期为 `HUMAN_REVIEWED_ADJUDICATED`。案件级双评一致 `49/60=81.67%` 只反映标注可靠性；冻结 60 条回放的最终答案正确率为 `59/60=98.33%`（Wilson `91.14%–99.71%`）、可计分引用语义支持 `20/34=58.82%`（`42.22%–73.63%`）、转人工适当 `59/60=98.33%`、unsafe-answer `0/60`、联合质量 `46/60=76.67%`（`64.56%–85.56%`）。完整 [v13 最终人工证据包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-adjudicated-20260824/) 与只读 [pending 父包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v13-answer-review-pending-adjudication-20260824/) 都保留 `SHA256SUMS`、sealed 原件、仲裁和逐 case badcase。引用 badcase 的主因是订单项/商品名、资格规则、写工具能力或操作后果未被同一行 `sourceRefs` 覆盖；`012` 还暴露出“待发货即不能取消”的过度确定结论。v13 与历史 v1 的答案、证据传播和可计分引用分母不同，不能称严格 A/B 或把评测器修复包装为质量提升；它也不能外推为 CSAT、FCR 或线上客服成功率。
-
-历史 [v20 HTTP 包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v20-20260825/) 在源码指纹 `736cad91...a26` 下真实执行 `60/60`；其双盲+第三人仲裁结果（答案 `57/60`、引用 `25/36`、unsafe `1/60`）仅作为历史回归素材，不能与 v13/v27 不同冻结输出包装成严格因果 A/B。
-
-当前客服语义主证据是 [v56 最终人工证据包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v56-v3-knowledge-answer-review-human-approved-ai-assisted-20260827/)：120 条冻结输出，A/B 案件级一致 `118/120`，2 条已由第三人仲裁；答案正确 `120/120`、引用支持 `67/67`、转人工适当 `120/120`、联合质量 `120/120`、unsafe `0/120`。人工拥有最终决策权，AI 仅辅助文字与落盘；证据等级为 `HUMAN_APPROVED_AI_ASSISTED`，不宣称纯人工无 AI。它是已见开发集的同集修复证据，`normalQualityDenominatorExcluded=true`、`releaseGateEligible=false`，不是 unseen、线上准确率或 CSAT/FCR；v43/v54 继续作为不可变历史基线。
-
-针对 v20 的已知缺口，当前代码已删除无证据的不可逆退款后果文案，补齐提案、订单、售后资格和商品证据，并用请求绑定的隐藏 MCP context 保留原始 Android/排除约束。单例 [v24 约束探针](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v24-cs043-context-bound-probe-20260825/) 为 HTTP/verifier `1/1`、硬约束违规 `0`；[v25 十条定向执行包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-20260825/) 为 HTTP/verifier `10/10`、硬约束违规 `0`，但行为契约只执行 `019/055` 两条，整体为 `PARTIAL_NOT_EXECUTED`。执行包中 `answerQuality=PENDING_HUMAN_REVIEW` 是生成时不可变状态；之后完成的[外部双评一致包](AI_Shop-backend/AI_Shop-agent/evaluation-evidence/benchmarks/customer-service/customer-service-http-v25-targeted-quality-fixes-answer-review-agreed-20260825/)显示案件级完全一致 `10/10`、分歧 `0`，因此没有第三人仲裁。冻结输出的答案正确、引用语义支持、转人工适当和联合质量均为 `10/10=100%`（Wilson 95% CI `[72.25%,100%]`），unsafe 为 `0/10`（`[0%,27.75%]`）。该 10 条结果明确 `normalQualityDenominatorExcluded=true`、`releaseGateEligible=false`；它不能替代完整 60 条新输出回放和双评，也不能外推为新 holdout、线上客服能力或泛化提升。
-
-另保留一对只读运行版本诊断：v11 在旧 MCP 进程仍加载旧源码时，于同一 10 条定向集出现 `6/10` 行为契约违例；完整重启后的 v12 为 `0/10`。二者由 manifest 成对校验相同数据哈希、状态、违例数和 `SHA256SUMS`，仅证明版本一致性修复有效，不构成答案质量分数。已被 v13 覆盖的 v5/v10 60 条中间运行与未完成 v3 盲审草稿已清理。
-
-Search 已针对比较查询、候选 union、跨类目/组合目标、预算/排除/型号/库存硬约束和商品证据完成修复。10 条 v9 已知难例的 v4 paired replay 为 Recall@10 `0.833333 -> 0.966667`、micro Recall `0.777778 -> 0.944444`、MRR@10 `0.725 -> 0.775`、正确公式 NDCG@10 `0.650292 -> 0.759759`，硬约束违规 `0`，本地 P50/P95 `439.359/643.470 ms`。该 replay 只证明同集定向回归改善，不替代新 final，也不声称新分布泛化。
-
-`50/50`、`25/25`、`pass^8=1.0`、终态/state diff 和重复副作用为必须满足的发布/可靠性门禁，不是优展示指标；门禁通过不等于
-客服意图准确率或线上推荐收益。规则/门禁全通过数字不作为主质量指标。Final semantic judge `50/50` 可追溯，但始终是 shadow 信号，不是人工真值、人工准确率或人工一致性。
-
-质量报告不隐藏诊断信号：final 有 `3` 次 query-expansion provider failure，均走安全 deterministic fallback；
-regression 有 `1` 次同类诊断和 `1` 次 semantic judge unavailable。它们不会被改写为零，也不会进入不适用的正常质量分母。
-独立故障矩阵共 `12` 个场景，其中生产边界 HARD `11/11`、harness boundary SHADOW `1/1`，全部 recovery contract 通过；
-它不计入 final 正常质量分母，且 final summary 的 `resilienceMetrics` 仍明确为 `NOT_RUN`。真实隔离 MySQL benchmark 在候选规模
-`1/10/50/100` 下验证 batch offer/decision feature 为一次 round trip，而 N+1 随候选数线性增长；100 候选时 batch offer/decision
-P50 为 `23.864/2.405 ms`，N+1 为 `89.805/70.501 ms`。Token 只采用 Provider usage；缺 usage 标为
-`MISSING_USAGE`，没有可信单价时 `costCny=null`，不写成零成本。官方目录价估算另存为
-`ESTIMATED_LIST_PRICE`，带来源 URL、抓取时间、模型 fingerprint 和页面 SHA-256，不能改写运行时状态或启用费用门禁。
-所有延迟都是本地完整链路的描述性数据，不是生产 SLO。
-
-只读容量诊断固定 4 条 HUMAN_VERIFIED case，warm-up `4` 次不进分母，正式并发 `1/2/4/8`、每档 `20` 请求；当前 v5 为 `80/80`，QPS `0.396/0.641/0.965/1.353`，c8 混合 P50/P95/P99 `1.052/10.505/12.033s`，LLM 路径 P95 `10.211/9.852/10.574/12.013s`。v5 比 v4 样本更大，但仍受共享本机和外部 Provider 影响。新增单次 LLM hard deadline `45s`，总 Agent/Worker deadline `120s`。纯社交审计探针 `5/5`、P95 `716.1 ms`、Provider calls/token `0`，并在 trace 中确认 `deterministicSocialReply=true`。样本仍只用于瓶颈诊断，不是持续容量或生产 SLO。
-
-新增 open-arrival v2 本地观察固定 `2 QPS × 24`：24/24 发起、完成并安全成功，dropped/timeout/429/late start 均为 `0`，peak inflight `6`，queue P95 `0.106 ms`，端到端 P50/P95/P99 `563.150/8600.528/9105.007 ms`。完成吞吐 `1.374781 QPS` 以含尾部 drain 的总 wall time 计算，不能直接解释为队列饱和；当前长尾主要位于 LLM 路径。报告记录 50 ms polling 和 20 ms settle，结果仍只是共享本机短时观察，不是生产 SLO。
-
-历史 `final-20260820-ai-quality-v2` 保留为只读 archive，`v3` 至 `v8` 是只读失败 final archive；它们不代表当前结果，
-也不会被删除后重新计算。项目没有 CTR/CVR/GMV、工业级个性化推荐、生产容量或支付合规证据。逐 case、切片、故障、
-usage、状态 diff、生命周期和 SHA-256 入口见 [质量评测与 Badcase](docs/evaluation/AI质量评测与Badcase.md)、
-[主线与开发记录](docs/project/AI_Shop主线与开发记录.md) 和 [机器清单](docs/evidence-manifest.json)。
-
----
-
-## 许可证
-
-见 [LICENSE.md](LICENSE.md)
+项目来源与 AI Coding 边界见 [所有权说明](docs/ownership.md)。许可证见 [LICENSE.md](LICENSE.md)。

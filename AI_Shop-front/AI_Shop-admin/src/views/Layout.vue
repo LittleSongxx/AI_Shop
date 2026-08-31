@@ -143,7 +143,6 @@ const menuList = ref([
     opened: false,
     children: [
       { name: '统计明细', path: '/data/statistics' },
-      { name: 'AI经营分析', path: '/data/dataAnalyst' },
       { name: 'AI证据与试用', path: '/data/aiEvidence' },
       { name: 'MQ补偿审查', path: '/data/mqCompensationLog' },
       { name: 'RAG同步失败', path: '/data/ragSyncFailure' },

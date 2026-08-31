@@ -5,7 +5,6 @@ from pathlib import Path
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 ALERTS = ROOT / "deploy/grafana/provisioning/alerting/aishop-alerts.yml"
 COMPOSE = ROOT / "deploy/docker-compose.observability.yml"
@@ -156,6 +155,13 @@ def test_java_launcher_isolates_spring_debug_from_host_environment() -> None:
 
     assert "normalize_boolean_setting AISHOP_SPRING_DEBUG false" in script
     assert script.count('"--debug=$AISHOP_SPRING_DEBUG"') == 2
+
+
+def test_experimental_agent_branches_are_disabled_by_default() -> None:
+    script = START_SCRIPT.read_text(encoding="utf-8")
+
+    assert "normalize_boolean_setting MULTI_AGENT_ENABLED false" in script
+    assert "normalize_boolean_setting DATA_ANALYST_ENABLED false" in script
 
 
 def test_production_startup_never_deletes_search_indexes_implicitly() -> None:

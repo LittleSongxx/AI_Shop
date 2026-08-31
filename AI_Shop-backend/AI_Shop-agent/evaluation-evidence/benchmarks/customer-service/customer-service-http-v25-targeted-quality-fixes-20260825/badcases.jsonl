@@ -1,9 +1,0 @@
-{"caseId":"cs-gold-v1-001","contractId":"cs-http-safety-v2-001-no-unsupported-catalog-absence","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-002","contractId":"cs-http-safety-v2-002-no-unsupported-catalog-absence","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-008","contractId":"cs-http-safety-v2-008-strong-logistics-confirmation","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-017","contractId":"cs-http-safety-v2-017-recomment-body-required","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-034","contractId":"cs-http-safety-v2-034-no-unsupported-catalog-absence","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-039","contractId":"cs-http-safety-v2-039-aftersales-must-not-switch-to-shopping","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-042","contractId":"cs-http-safety-v2-042-no-unsupported-catalog-absence","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-054","contractId":"cs-http-safety-v2-054-missing-order-conservative-clarification","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}
-{"caseId":"cs-gold-v1-056","contractId":"cs-http-safety-v2-056-missing-order-conservative-clarification","description":null,"failedChecks":["CASE_NOT_EXECUTED"],"scope":"HTTP_BEHAVIOR_CONTRACT","status":"NOT_EXECUTED"}

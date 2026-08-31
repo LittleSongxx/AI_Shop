@@ -58,6 +58,8 @@ from evaluation.text2sql.scoring import (
 )
 from evaluation.text2sql.trace import _scan_estimate
 
+pytestmark = pytest.mark.text2sql
+
 
 def test_input_freeze_binds_supply_compiler_and_policy_sources():
     assert {

@@ -54,6 +54,15 @@ coverage/
 artifacts/
 security/dependency-check-suppression.xml
 
+# Private career material and archived evaluation payloads stay outside the
+# recruiter-facing tree.  Public summaries live under docs/evidence/.
+/求职/
+/deliverables/
+/AI_Shop-backend/AI_Shop-agent/evaluation-evidence/
+/AI_Shop-backend/evaluation-evidence/
+/*Handoff-*.md
+/docs/project/*Handoff-*.md
+
 # Human-review intake inbox (canonical bytes live in evaluation-evidence/intake-archive)
 holdout/
 

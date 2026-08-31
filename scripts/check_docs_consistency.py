@@ -1,69 +1,58 @@
 #!/usr/bin/env python3
-"""Check current evidence claims and links across the project's public documents."""
+"""Check links and claim-boundary tokens in the public portfolio documents."""
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import Any
+import re
 
-from check_evidence_manifest import DEFAULT_MANIFEST, REPO_ROOT, validate_repository
+from check_evidence_manifest import ROOT, validate_manifest
+
+PUBLIC_DOCS = (
+    ROOT / "README.md",
+    ROOT / "docs/README.md",
+    ROOT / "docs/architecture.md",
+    ROOT / "docs/demo.md",
+    ROOT / "docs/evaluation.md",
+    ROOT / "docs/ownership.md",
+)
+LINK_RE = re.compile(r"\[[^]]+]\(([^)]+)\)")
+REQUIRED_BOUNDARY_TOKENS = (
+    "不代表生产容量",
+    "没有真人用户",
+    "不是真人试用",
+)
 
 
-def _load_object(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise TypeError(f"{path} must contain a JSON object")
-    return payload
-
-
-def validate_documentation(payload: dict[str, Any]) -> list[str]:
-    errors = validate_repository(DEFAULT_MANIFEST, require_current=False)
-    expectations = payload.get("documentationConsistency")
-    if not isinstance(expectations, list) or not expectations:
-        return [*errors, "documentationConsistency must be a non-empty array"]
-
-    for index, expectation in enumerate(expectations):
-        label = f"documentationConsistency[{index}]"
-        if not isinstance(expectation, dict):
-            errors.append(f"{label} must be an object")
-            continue
-        relative = expectation.get("path")
-        if not isinstance(relative, str) or not relative:
-            errors.append(f"{label}.path is required")
-            continue
-        path = (REPO_ROOT / relative).resolve()
-        try:
-            path.relative_to(REPO_ROOT.resolve())
-        except ValueError:
-            errors.append(f"{label}.path escapes repository: {relative}")
-            continue
+def validate_documentation() -> list[str]:
+    errors = validate_manifest()
+    for path in PUBLIC_DOCS:
         if not path.is_file():
-            errors.append(f"documentation file missing: {relative}")
+            errors.append(f"documentation file missing: {path.relative_to(ROOT)}")
             continue
         text = path.read_text(encoding="utf-8")
-        for token in expectation.get("requiredTokens") or []:
-            if not isinstance(token, str) or not token:
-                errors.append(f"{label}.requiredTokens must contain non-empty strings")
-            elif token not in text:
-                errors.append(f"missing current evidence token in {relative}: {token}")
-        for token in expectation.get("forbiddenTokens") or []:
-            if not isinstance(token, str) or not token:
-                errors.append(f"{label}.forbiddenTokens must contain non-empty strings")
-            elif token in text:
-                errors.append(f"stale current evidence token in {relative}: {token}")
+        for raw_target in LINK_RE.findall(text):
+            target = raw_target.split("#", 1)[0].strip()
+            if not target or target.startswith(("http://", "https://", "mailto:")):
+                continue
+            resolved = (path.parent / target).resolve()
+            if not resolved.is_relative_to(ROOT.resolve()) or not resolved.exists():
+                errors.append(
+                    f"broken local link in {path.relative_to(ROOT)}: {raw_target}"
+                )
+    combined = "\n".join(
+        path.read_text(encoding="utf-8") for path in PUBLIC_DOCS if path.is_file()
+    )
+    for token in REQUIRED_BOUNDARY_TOKENS:
+        if token not in combined:
+            errors.append(f"missing public claim boundary: {token}")
     return errors
 
 
 def main() -> None:
-    payload = _load_object(DEFAULT_MANIFEST)
-    errors = validate_documentation(payload)
+    errors = validate_documentation()
     if errors:
         raise SystemExit("documentation consistency check failed:\n- " + "\n- ".join(errors))
-    print(
-        "documentation consistency valid: "
-        f"{len(payload['documentationConsistency'])} documents"
-    )
+    print(f"Documentation consistency OK ({len(PUBLIC_DOCS)} files)")
 
 
 if __name__ == "__main__":

@@ -830,8 +830,8 @@ prepare_environment() {
   # Developer shells commonly use DEBUG for unrelated tools, so isolate the
   # Java services behind a project-specific boolean and pass it explicitly.
   normalize_boolean_setting AISHOP_SPRING_DEBUG false
-  normalize_boolean_setting MULTI_AGENT_ENABLED true
-  normalize_boolean_setting DATA_ANALYST_ENABLED true
+  normalize_boolean_setting MULTI_AGENT_ENABLED false
+  normalize_boolean_setting DATA_ANALYST_ENABLED false
   normalize_boolean_setting SHOPPING_DECISION_V2_ENABLED true
   normalize_boolean_setting OUTCOME_LEDGER_ENABLED true
   normalize_boolean_setting AFTER_SALES_POLICY_ENGINE_ENABLED true
