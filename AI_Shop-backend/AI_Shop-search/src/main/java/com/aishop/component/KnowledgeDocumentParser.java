@@ -5,6 +5,8 @@ import org.apache.tika.exception.EncryptedDocumentException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.ocr.TesseractOCRConfig;
+import org.apache.tika.parser.pdf.PDFParserConfig;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,6 +57,12 @@ public class KnowledgeDocumentParser {
             Metadata metadata = new Metadata();
             // P3-2: collect embedded images for VLM description when enabled.
             ParseContext context = new ParseContext();
+            TesseractOCRConfig ocrConfig = new TesseractOCRConfig();
+            ocrConfig.setSkipOcr(true);
+            context.set(TesseractOCRConfig.class, ocrConfig);
+            PDFParserConfig pdfConfig = new PDFParserConfig();
+            pdfConfig.setOcrStrategy(PDFParserConfig.OCR_STRATEGY.NO_OCR);
+            context.set(PDFParserConfig.class, pdfConfig);
             EmbeddedImageCollector imageCollector = new EmbeddedImageCollector();
             if (imageVlmDescriber.isEnabled()) {
                 context.set(EmbeddedDocumentExtractor.class, imageCollector);
