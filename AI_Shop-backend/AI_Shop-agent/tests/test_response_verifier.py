@@ -2818,6 +2818,40 @@ def test_generic_refund_timing_fallback_stays_within_published_boundary():
     assert checked.passed is True
 
 
+def test_cited_generic_refund_policy_cannot_launder_live_refund_state():
+    refs = [{"id": "refund-policy"}]
+
+    def check(assistant):
+        return response_verifier.verify(
+            assistant=assistant,
+            biz_type="agent",
+            tools_called=[],
+            source_refs={"ragSources": refs, "businessSources": []},
+            rag_source_refs=refs,
+            has_pending_action=False,
+            policy_evidence_required=True,
+            rag_citation_required=True,
+            rag_evidence_state="SUPPORTED",
+        )
+
+    for assistant in (
+        "退款申请会根据商品类型、订单状态和实际情况审核 [1]。",
+        "退款状态可以在订单详情中查看 [1]。",
+    ):
+        assert check(assistant).passed is True
+
+    for assistant in (
+        "我的退款状态为处理中 [1]。",
+        "订单 O1 的退款状态为处理中 [1]。",
+        "我的退款状态为处理中且退款申请会根据商品类型、订单状态和实际情况审核 [1]。",
+    ):
+        result = check(assistant)
+        assert result.passed is False
+        assert any(
+            issue.code == "DYNAMIC_FACT_WITHOUT_CLAIM" for issue in result.issues
+        )
+
+
 def test_cited_generic_coupon_policy_is_not_treated_as_user_coupon_state():
     refs = [
         {

@@ -9,7 +9,9 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from evaluation.core.config import load_suite
 from evaluation.core.contracts import CaseResult, Domain, EvaluationCase
+from evaluation.core.metrics import estimate_metric
 from evaluation.core.quality_metrics import pass_power_k
 from evaluation.core.usage import merge_usage
 
@@ -79,6 +81,47 @@ def _duplicate_effects(result: CaseResult) -> int:
     if result.state_diff is None:
         return 0
     return int(result.state_diff.get("duplicateSideEffectCount") or 0)
+
+
+def _rate_interval(
+    name: str,
+    values: Sequence[bool | int],
+    *,
+    sampling_unit: str,
+    bootstrap: bool,
+    statistical_policy: dict[str, Any],
+) -> dict[str, Any]:
+    rows = [float(value) for value in values]
+    estimate = estimate_metric(
+        name,
+        rows,
+        kind="continuous" if bootstrap else "binary",
+        aggregation="mean",
+        bootstrap_samples=int(statistical_policy["bootstrapSamples"]),
+        bootstrap_seed=int(statistical_policy["bootstrapSeed"]),
+        p99_minimum=int(statistical_policy["p99MinimumSampleCount"]),
+    )
+    interval = estimate.public()["interval"] or {}
+    notes = list(estimate.notes)
+    if bootstrap and len(rows) == 1:
+        notes.append("DEGENERATE_CASE_BOOTSTRAP_SINGLE_CASE")
+    return {
+        "status": "AVAILABLE" if rows else "UNAVAILABLE",
+        "method": interval.get("method")
+        or ("percentile-bootstrap" if bootstrap else "wilson"),
+        "confidenceLevel": interval.get("confidenceLevel", 0.95),
+        "lower": interval.get("lower"),
+        "upper": interval.get("upper"),
+        "numerator": int(sum(rows)),
+        "denominator": len(rows),
+        "samplingUnit": sampling_unit,
+        **(
+            {"bootstrapSamples": int(statistical_policy["bootstrapSamples"])}
+            if bootstrap
+            else {}
+        ),
+        "notes": notes,
+    }
 
 
 def summarize_repeated_agent(
@@ -157,6 +200,55 @@ def summarize_repeated_agent(
         for result in results
         if "retryIdempotency" in result.metrics
     ]
+    statistical_policy = load_suite()["statisticalPolicy"]
+    pass_key = f"pass^{k}"
+    pass_outcomes = [all(row) for row in outcomes]
+    critical_pass_outcomes = [all(row) for row in critical_outcomes]
+    confidence_intervals = {
+        pass_key: _rate_interval(
+            pass_key,
+            pass_outcomes,
+            sampling_unit="case",
+            bootstrap=True,
+            statistical_policy=statistical_policy,
+        ),
+        "criticalWorkflowPassPower": _rate_interval(
+            "criticalWorkflowPassPower",
+            critical_pass_outcomes,
+            sampling_unit="case",
+            bootstrap=True,
+            statistical_policy=statistical_policy,
+        ),
+        "trialExecutionRate": _rate_interval(
+            "trialExecutionRate",
+            [True] * min(len(results), expected_trials)
+            + [False] * max(0, expected_trials - len(results)),
+            sampling_unit="expected_trial",
+            bootstrap=False,
+            statistical_policy=statistical_policy,
+        ),
+        "terminalStateCorrectness": _rate_interval(
+            "terminalStateCorrectness",
+            [_terminal_state_correct(result) for result in results],
+            sampling_unit="executed_trial",
+            bootstrap=False,
+            statistical_policy=statistical_policy,
+        ),
+        "stateDiffMatchRate": _rate_interval(
+            "stateDiffMatchRate",
+            [_state_diff_matches(result) for result in results],
+            sampling_unit="executed_trial",
+            bootstrap=False,
+            statistical_policy=statistical_policy,
+        ),
+        "retryRecoveryRate": _rate_interval(
+            "retryRecoveryRate",
+            retry_rows,
+            sampling_unit="eligible_executed_trial",
+            bootstrap=False,
+            statistical_policy=statistical_policy,
+        ),
+    }
     return {
         "k": k,
         "caseCount": len(expected),
@@ -165,7 +257,7 @@ def summarize_repeated_agent(
         "expectedTrialCount": expected_trials,
         "executedTrialCount": len(results),
         "trialExecutionRate": len(results) / expected_trials if expected_trials else 0.0,
-        f"pass^{k}": pass_power_k(outcomes) if outcomes else 0.0,
+        pass_key: pass_power_k(outcomes) if outcomes else 0.0,
         "criticalWorkflowPassPower": critical_pass,
         "terminalStateCorrectness": terminal_correct / len(results) if results else 0.0,
         "stateDiffMatchRate": state_matches / len(results) if results else 0.0,
@@ -173,6 +265,7 @@ def summarize_repeated_agent(
         "retryRecoveryRate": sum(retry_rows) / len(retry_rows) if retry_rows else 0.0,
         "runtimeErrorCount": runtime_errors,
         "severeSafetyViolationCount": severe,
+        "confidenceIntervals95": confidence_intervals,
         "toolRoutingConfusionMatrix": {
             expected_label: dict(sorted(counts.items()))
             for expected_label, counts in sorted(tool_confusion.items())

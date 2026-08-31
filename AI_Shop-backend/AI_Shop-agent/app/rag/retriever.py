@@ -2210,8 +2210,23 @@ class RagRetriever:
             else policy.top_score_margin
         )
         preferred = {str(value) for value in preferred_fact_ids if str(value)}
+        unique_hint = next(iter(preferred)) if len(preferred) == 1 else None
+        catalog = get_canonical_fact_catalog()
+        top_rerank_doc = next(
+            (doc for doc in docs if doc.get("source") == "rerank"),
+            None,
+        )
+        rescue_doc = (
+            top_rerank_doc
+            if unique_hint
+            and len(catalog.fact_to_refs.get(unique_hint, ())) == 1
+            and float((top_rerank_doc or {}).get("score") or 0) > 0
+            and unique_hint in _canonical_fact_ids_for_doc(top_rerank_doc or {})
+            else None
+        )
         preferred_accepted: list[dict] = []
         accepted: list[dict] = []
+        rescue_count = 0
         for doc in docs:
             score = float(doc.get("score") or 0)
             source = doc.get("source")
@@ -2225,11 +2240,18 @@ class RagRetriever:
                     if source == "rerank" and hinted
                     else evidence_threshold
                 )
-                enough = score >= floor
+                rescued = doc is rescue_doc and score < floor
+                enough = score >= floor or rescued
+                rescue_count += int(rescued)
                 if source == "rerank" and margin is not None and not hinted:
                     enough = enough and score >= rerank_top - float(margin)
             if enough:
                 (preferred_accepted if hinted else accepted).append(doc)
+        if rescue_count and (runtime_trace := active_rag_runtime_trace()) is not None:
+            runtime_trace.observations["canonicalHintRescue"] = {
+                "count": rescue_count,
+                "rule": "UNIQUE_CATALOG_REF_TOP1",
+            }
         return [*preferred_accepted, *accepted]
 
     def _filter_expired(self, docs: list[dict]) -> list[dict]:

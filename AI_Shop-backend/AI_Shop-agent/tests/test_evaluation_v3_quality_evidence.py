@@ -53,6 +53,7 @@ from evaluation.core.fault_injection import (
     fault_point,
     parse_fault_scenario,
 )
+from evaluation.core.metrics import wilson_interval
 from evaluation.core.semantic_judge import (
     build_judge_prompt,
     parse_judge_payload,
@@ -1821,3 +1822,81 @@ def test_repeated_agent_summary_uses_all_cases_when_critical_labels_are_empty() 
     )
     assert summary["criticalWorkflowPassPower"] == 1.0
     assert summary["hardGate"]["passed"] is True
+
+
+def test_repeated_agent_summary_reports_deterministic_case_and_trial_intervals() -> None:
+    cases = [
+        EvaluationCase(
+            case_id="agent-repeat-critical",
+            split=Split.REGRESSION,
+            domain=Domain.AGENT,
+            input={"turns": [{"message": "critical"}]},
+            expected={"terminalStatuses": ["SUCCEEDED"]},
+            required_providers=("agent-runtime",),
+            tags=("critical",),
+        ),
+        EvaluationCase(
+            case_id="agent-repeat-ordinary",
+            split=Split.REGRESSION,
+            domain=Domain.AGENT,
+            input={"turns": [{"message": "ordinary"}]},
+            expected={"terminalStatuses": ["SUCCEEDED"]},
+            required_providers=("agent-runtime",),
+        ),
+    ]
+    results = []
+    for index, (case_id, passed, terminal, matched, retry) in enumerate(
+        (
+            (cases[0].case_id, True, 1, True, 1),
+            (cases[0].case_id, True, 1, True, 1),
+            (cases[1].case_id, True, 1, False, 0),
+            (cases[1].case_id, False, 0, False, None),
+        ),
+        1,
+    ):
+        metrics = {"terminalStateCorrectness": terminal}
+        if retry is not None:
+            metrics["retryIdempotency"] = retry
+        results.append(
+            CaseResult(
+                case_id=case_id,
+                domain=Domain.AGENT,
+                status=CaseStatus.PASSED if passed else CaseStatus.FAILED,
+                metrics=metrics,
+                latency_ms=1,
+                output={},
+                providers={},
+                assertions=[],
+                trial_id=f"trial-{index}",
+                state_diff={"matched": matched, "duplicateSideEffectCount": 0},
+                usage=normalize_usage(None),
+            )
+        )
+
+    first = summarize_repeated_agent(cases, results, k=2)
+    second = summarize_repeated_agent(cases, results, k=2)
+    intervals = first["confidenceIntervals95"]
+
+    assert intervals == second["confidenceIntervals95"]
+    assert intervals["pass^2"] == {
+        "status": "AVAILABLE",
+        "method": "percentile-bootstrap",
+        "confidenceLevel": 0.95,
+        "lower": 0.0,
+        "upper": 1.0,
+        "numerator": 1,
+        "denominator": 2,
+        "samplingUnit": "case",
+        "bootstrapSamples": 2000,
+        "notes": [],
+    }
+    terminal_interval = intervals["terminalStateCorrectness"]
+    expected_lower, expected_upper = wilson_interval(3, 4)
+    assert terminal_interval["lower"] == round(expected_lower, 6)
+    assert terminal_interval["upper"] == round(expected_upper, 6)
+    assert terminal_interval["numerator"] == 3
+    assert terminal_interval["denominator"] == 4
+    assert intervals["stateDiffMatchRate"]["numerator"] == 2
+    assert intervals["stateDiffMatchRate"]["denominator"] == 4
+    assert intervals["retryRecoveryRate"]["numerator"] == 2
+    assert intervals["retryRecoveryRate"]["denominator"] == 3

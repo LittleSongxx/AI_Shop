@@ -195,6 +195,8 @@ _RAG_CITATION_RE = re.compile(r"\[(\d+)]")
 _GENERIC_POLICY_STATUS_RE = re.compile(
     r"(?:待付款订单|已发货通常|进入发货流程|取决于当前履约状态|"
     r"售后申请应从本人订单详情|退款申请应根据订单详情|"
+    r"退款申请(?:会|应|需|需要)?根据商品类型、订单状态(?:和|及)实际情况(?:进行)?审核|"
+    r"退款状态(?:可|可以|能|能够)(?:在|从)(?:本人)?订单详情(?:中)?(?:查看|查询|核对)|"
     r"优惠券.{0,20}(?:(?:每笔订单.{0,12})?(?:只能使用一张|不支持多张券叠加))|"
     r"优惠券.{0,24}(?:下单|提交订单).{0,12}(?:重新|再次)校验)"
 )
@@ -1253,7 +1255,9 @@ def _unsupported_dynamic_business_fact(
         )
         if inherited_refund:
             return "回答后句否定了已核验的退款状态"
-        if refund_statuses or _REFUND_STATUS_FACT_RE.search(clause):
+        if not generic_policy_clause and (
+            refund_statuses or _REFUND_STATUS_FACT_RE.search(clause)
+        ):
             refs = _trusted_business_refs(
                 source_refs,
                 ref_type="refund",

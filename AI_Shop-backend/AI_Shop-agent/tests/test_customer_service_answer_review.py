@@ -9,6 +9,7 @@ import pytest
 from evaluation.core.io import atomic_write_json, atomic_write_jsonl, load_json, load_jsonl
 from evaluation.customer_service_answer_review import (
     ANSWER_REVIEW_ADJUDICATION_SCHEMA,
+    ANSWER_REVIEW_ANSWER_PROJECTION_USER_VISIBLE,
     ANSWER_REVIEW_MESSAGE_PROJECTION_RUNTIME_FIXTURE,
     ANSWER_REVIEW_MESSAGE_PROJECTION_SOURCE,
     ANSWER_REVIEW_REPORT_SCHEMA,
@@ -255,6 +256,29 @@ def test_answer_review_projects_sensitive_runtime_fields_and_rejects_reviewer_le
     raw["cases"][0]["http"]["answer"] = (
         f'{{"type":"ACTION_CONFIRM","actionToken":"{action_token}"}}'
     )
+    raw["cases"][1]["http"]["answer"] = json.dumps(
+        {
+            "type": "ACTION_CONFIRM",
+            "actionToken": action_token,
+            "label": "退款确认",
+            "summary": "申请退款",
+            "riskTip": "确认后将提交退款",
+            "details": [{"label": "退款金额", "value": "88 元"}],
+        },
+        ensure_ascii=False,
+    )
+    raw["cases"][1]["http"]["responses"] = [
+        {
+            "confirmation": True,
+            "payload": {
+                "data": {
+                    "success": True,
+                    "statusName": "CONFIRMED",
+                    "resultMessage": "退款已处理",
+                }
+            },
+        }
+    ]
     raw["cases"][0]["http"]["sourceRefs"][0]["userId"] = "real-user-42"
     atomic_write_json(report, raw, overwrite=True)
 
@@ -264,9 +288,14 @@ def test_answer_review_projects_sensitive_runtime_fields_and_rejects_reviewer_le
     rendered = json.dumps(rows, ensure_ascii=False)
 
     assert manifest["presentationRedaction"]["projection"] == "REDACTED_REVIEW_SAFE_FIELDS"
+    assert manifest["answerProjection"] == ANSWER_REVIEW_ANSWER_PROJECTION_USER_VISIBLE
     assert action_token not in rendered
-    assert "[REDACTED_ACTION_TOKEN]" in rendered
+    assert "[REDACTED_ACTION_TOKEN]" not in rendered
     assert "real-user-42" not in rendered
+    by_case = {row["caseId"]: row for row in rows}
+    assert "状态：待确认，尚未执行。" in by_case["case-1"]["answer"]
+    assert "执行结果：退款已处理" in by_case["case-2"]["answer"]
+    assert "ACTION_CONFIRM" not in by_case["case-1"]["answer"]
     assert rows[0]["sourceReportSha256"] == hashlib.sha256(report.read_bytes()).hexdigest()
 
     _fill_sheet(open_sheet, {f"case-{index}": _labels() for index in range(1, 4)})
@@ -291,6 +320,7 @@ def test_answer_review_legacy_v2_sheet_without_new_marker_remains_readable(
     manifest = load_json(manifest_path)
     manifest.pop("presentationRedaction")
     manifest.pop("messageProjection")
+    manifest.pop("answerProjection")
     atomic_write_json(manifest_path, manifest, overwrite=True)
 
     assert validate_answer_review_sheet(report, open_sheet)["lifecycle"] == "OPEN"

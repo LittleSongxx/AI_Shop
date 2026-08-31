@@ -18,6 +18,7 @@ from app.rag.retriever import (
     rerank_evaluation_scope,
 )
 from app.rag.rrf import rrf_score_at_rank
+from app.rag.runtime_trace import rag_runtime_trace_scope
 from app.services.java_internal_client import java_internal_client
 
 
@@ -435,6 +436,61 @@ def test_canonical_fact_hint_recovers_and_prioritizes_direct_evidence():
     )
 
     assert [doc["id"] for doc in accepted] == ["direct-boundary", "topic-only"]
+
+
+def test_unique_canonical_hint_rescue_is_narrow_and_auditable():
+    unique_fact_id = "checkout.stock_deduct_and_compensate"
+    unique_doc = {
+        "id": "unique",
+        "metadata": {
+            "dataType": "knowledge",
+            "source": "05-cart-and-checkout.md",
+            "heading": "库存检查与扣减",
+        },
+        "score": 0.03,
+        "source": "rerank",
+    }
+    with rag_runtime_trace_scope() as trace:
+        accepted = RagRetriever()._filter_evidence_docs(
+            [unique_doc],
+            preferred_fact_ids=[unique_fact_id],
+        )
+
+    assert [doc["id"] for doc in accepted] == ["unique"]
+    assert trace.observations["canonicalHintRescue"] == {
+        "count": 1,
+        "rule": "UNIQUE_CATALOG_REF_TOP1",
+    }
+
+    rejected = [
+        (
+            [{"id": "other", "score": 0.04, "source": "rerank"}, unique_doc],
+            unique_fact_id,
+        ),
+        (
+            [
+                {
+                    "id": "multi-ref",
+                    "metadata": {
+                        "dataType": "knowledge",
+                        "source": "12-privacy-data-and-ai-boundaries.md",
+                        "heading": "转人工与写操作确认",
+                    },
+                    "score": 0.03,
+                    "source": "rerank",
+                }
+            ],
+            "ai.capability_and_confirmation",
+        ),
+        ([{**unique_doc, "score": 0.0}], unique_fact_id),
+    ]
+    for docs, fact_id in rejected:
+        with rag_runtime_trace_scope() as rejected_trace:
+            assert not RagRetriever()._filter_evidence_docs(
+                docs,
+                preferred_fact_ids=[fact_id],
+            )
+        assert "canonicalHintRescue" not in rejected_trace.observations
 
 
 def test_evaluation_scope_overrides_evidence_gate_without_changing_settings(monkeypatch):

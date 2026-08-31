@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.config.settings import get_settings
 from app.services.java_internal_client import java_internal_client
 from app.services.product_search_pipeline import (
     ProductSearchResult,
@@ -14,8 +15,16 @@ from app.services.product_service import (
     filter_known_available_products,
     format_search_tool_message,
 )
+from app.services.recommendation_attribution_service import (
+    recommendation_attribution_service,
+)
 from app.services.search_recommend_service import search_recommend_service
-from app.services.shopping_profile_service import shopping_profile_service
+from app.services.shopping_decision_service import (
+    ShoppingDecisionResult,
+    shopping_decision_service,
+)
+from app.services.shopping_mission_service import empty_shopping_mission
+from app.services.shopping_profile_service import empty_profile, shopping_profile_service
 from app.utils.biz_payload import build_order_payload, build_product_payload
 
 
@@ -160,6 +169,72 @@ def test_comparison_incomplete_message_never_presents_a_one_sided_result():
     assert "对比不完整" in message
     assert "单边对比" in message
     assert "找到" not in message
+
+
+@pytest.mark.asyncio
+async def test_zero_mission_clarifications_keeps_shopping_decision_v2(monkeypatch):
+    monkeypatch.setenv("SHOPPING_MISSION_MAX_CLARIFICATIONS", "0")
+    monkeypatch.setenv("SHOPPING_DECISION_V2_ENABLED", "true")
+    get_settings.cache_clear()
+    service = ProductService()
+    profile = empty_profile()
+    mission = empty_shopping_mission({**profile, "category": "手机"})
+    products = [
+        {
+            "product_id": f"p{index}",
+            "product_name": f"样例手机{index}",
+            "status": 1,
+            "total_stock": 2,
+            "min_price": 1000 + index,
+            "max_price": 1000 + index,
+        }
+        for index in (1, 2)
+    ]
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "get_effective_profile",
+        AsyncMock(return_value=profile),
+    )
+    monkeypatch.setattr(service, "_mission_for_request", AsyncMock(return_value=mission))
+    pipeline = AsyncMock(
+        return_value=ProductSearchResult(
+            products,
+            [product["product_id"] for product in products],
+            ProductSearchTrace(query_plan={}, result_source="hybrid"),
+        )
+    )
+    monkeypatch.setattr(product_search_pipeline, "search", pipeline)
+    decide = AsyncMock(
+        return_value=ShoppingDecisionResult(
+            products=products,
+            source="shopping_decision_v2",
+            request_id="synthetic-request",
+        )
+    )
+    monkeypatch.setattr(shopping_decision_service, "decide", decide)
+    monkeypatch.setattr(
+        recommendation_attribution_service,
+        "record_impression",
+        AsyncMock(),
+    )
+
+    _assistant, _biz, biz_type, result, source = await service.search_products(
+        "synthetic-user",
+        "推荐手机",
+        user_text="推荐手机",
+        request_id="synthetic-request",
+    )
+
+    assert shopping_profile_service.should_clarify(
+        "推荐手机", "推荐手机", profile, None
+    )
+    assert get_settings().shopping_mission_max_clarifications == 0
+    assert get_settings().shopping_decision_v2_enabled is True
+    assert biz_type == "shopping_decision_v2"
+    assert source == "shopping_decision_v2"
+    assert len(result) == 2
+    pipeline.assert_awaited_once()
+    decide.assert_awaited_once()
 
 
 @pytest.mark.asyncio
