@@ -2456,6 +2456,38 @@ def test_explicit_fact_fallback_is_evidence_bound_and_canonical():
     assert "未被完整证据支持" in partial_reason
 
 
+def test_checkout_revalidation_has_query_conditioned_repair_and_fallback():
+    fact_id = "checkout.current_product_revalidation"
+    claims = get_fact_metadata_catalog().facts[fact_id].atomic_claims
+    evidence = [{"citation": 1, "factIds": [fact_id], "text": "。".join(claims)}]
+    query = "结算时会重新检查商品价格库存吗？"
+
+    reason = grounding_repair_reason(
+        "结算时会重新检查商品价格和库存。[1]",
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query=query,
+        evidence_items=evidence,
+    )
+    fallback = deterministic_explicit_fact_fallback(
+        query,
+        evidence_state="SUPPORTED",
+        evidence_items=evidence,
+    )
+
+    assert "当前 SKU 价格" in (reason or "")
+    assert fallback is not None
+    assert fallback["event"] == "RAG_QUERY_CONDITIONED_DETERMINISTIC_FALLBACK"
+    assert "当前 SKU 价格" in fallback["answer"]
+    assert grounding_repair_reason(
+        fallback["answer"],
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query=query,
+        evidence_items=evidence,
+    ) is None
+
+
 def test_every_catalog_fact_can_render_a_self_verified_explicit_fallback():
     for fact_id, metadata in get_fact_metadata_catalog().facts.items():
         result = deterministic_explicit_fact_fallback(

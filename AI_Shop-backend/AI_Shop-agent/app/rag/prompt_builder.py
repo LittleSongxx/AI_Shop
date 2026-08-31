@@ -253,13 +253,28 @@ def deterministic_explicit_fact_fallback(
     if EvidenceState(str(evidence_state)) is not EvidenceState.SUPPORTED:
         return None
     explicit_hints = explicit_query_fact_hints(query)
-    if (
-        not explicit_hints
-        or not is_pure_explicit_fact_query(query)
-        or plan_rag_query(query).fact_hints != explicit_hints
-    ):
-        return None
-    bindings, complete = _explicit_atomic_claim_bindings(query, evidence_items)
+    planned_hints = plan_rag_query(query).fact_hints
+    query_conditioned_hints = tuple(
+        fact_id
+        for fact_id in planned_hints
+        if fact_id == "checkout.current_product_revalidation"
+    )
+    if explicit_hints:
+        if (
+            not is_pure_explicit_fact_query(query)
+            or planned_hints != explicit_hints
+        ):
+            return None
+        fallback_hints = explicit_hints
+    else:
+        if not query_conditioned_hints or not _coverage_requirements(
+            query, evidence_items
+        ):
+            return None
+        fallback_hints = query_conditioned_hints
+    bindings, complete = _explicit_atomic_claim_bindings(
+        query, evidence_items, fact_hints=fallback_hints
+    )
     if not complete or not bindings:
         return None
     answer = "".join(f"{claim} [{citations[0]}]。" for _, claim, citations in bindings)
@@ -273,8 +288,16 @@ def deterministic_explicit_fact_fallback(
         "citations": citations,
         "factId": fact_ids[0],
         "factIds": fact_ids,
-        "event": "RAG_EXPLICIT_FACT_DETERMINISTIC_FALLBACK",
-        "reason": "supported_explicit_fact_query_model_and_repair_failed",
+        "event": (
+            "RAG_EXPLICIT_FACT_DETERMINISTIC_FALLBACK"
+            if explicit_hints
+            else "RAG_QUERY_CONDITIONED_DETERMINISTIC_FALLBACK"
+        ),
+        "reason": (
+            "supported_explicit_fact_query_model_and_repair_failed"
+            if explicit_hints
+            else "supported_query_conditioned_fact_model_and_repair_failed"
+        ),
     }
     if grounding_repair_reason(
         answer,
@@ -308,6 +331,25 @@ def _coverage_requirements(
         for fact_id in _fact_ids_from_item(item)
     }
     requirements: list[tuple[str, tuple[str, ...]]] = []
+
+    if (
+        "checkout.current_product_revalidation" in fact_ids
+        and any(term in text for term in ("价格", "成交价"))
+        and any(term in text for term in ("结算", "下单", "提交订单"))
+    ):
+        requirements.extend(
+            [
+                ("结算重新读取商品", ("重新读取", "重新校验", "重新检查", "再次读取")),
+                ("结算使用当前 SKU 价格", ("当前 SKU 价格", "当前SKU价格", "当前价格", "最新价格")),
+            ]
+        )
+        if any(term in text for term in ("库存", "余量", "有货")):
+            requirements.append(
+                (
+                    "结算校验可售与数量",
+                    ("库存", "是否在售", "规格是否存在", "购买数量", "有货"),
+                )
+            )
 
     if (
         "checkout.price_and_stock_revalidation" in fact_ids
