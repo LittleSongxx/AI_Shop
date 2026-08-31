@@ -1558,7 +1558,15 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		if (payChannelEnum == null) {
 			return;
 		}
-		payFeignSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
+		try {
+			payFeignSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
+		} catch (RuntimeException ex) {
+			if ("支付宝支付未配置".equals(ex.getMessage())) {
+				log.info("支付渠道未启用，跳过不存在的外部交易关单, payOrderId={}", orderInfo.getPayOrderId());
+				return;
+			}
+			throw ex;
+		}
 	}
 
 	private List<ProductItem> copyItemsWithSignedBuyCount(List<ProductItem> source, boolean negate) {

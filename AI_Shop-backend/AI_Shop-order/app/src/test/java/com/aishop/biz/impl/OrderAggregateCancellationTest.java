@@ -14,6 +14,7 @@ import com.aishop.entity.po.ProductItem;
 import com.aishop.entity.query.OrderCouponRelQuery;
 import com.aishop.entity.query.OrderInfoQuery;
 import com.aishop.entity.query.OrderItemQuery;
+import com.aishop.exception.BusinessException;
 import com.aishop.integration.CommerceOutcomeClient;
 import com.aishop.mappers.OrderCouponRelMapper;
 import com.aishop.mappers.OrderInfoMapper;
@@ -34,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -99,6 +101,37 @@ class OrderAggregateCancellationTest {
         assertEquals(2, itemsCaptor.getValue().size());
         verify(payFeignSupport).markClosed("pay-1");
     }
+
+	@Test
+	void unconfiguredAlipayDoesNotBlockCancellationOfAnUnpaidOrder() {
+		OrderInfo order = order("order-1", "pay-1", OrderStatusEnum.WAIT_PAYMENT);
+		order.setPayChannel("alipay_wap");
+		when(orderInfoMapper.selectByOrderId("order-1")).thenReturn(order);
+		when(orderInfoMapper.selectList(any(OrderInfoQuery.class))).thenReturn(List.of(order));
+		when(orderInfoMapper.updateByParam(any(OrderInfo.class), any(OrderInfoQuery.class))).thenReturn(1);
+		when(orderItemMapper.selectList(any(OrderItemQuery.class))).thenReturn(List.of(item("order-1", "p1")));
+		when(orderCouponRelMapper.selectList(any(OrderCouponRelQuery.class))).thenReturn(List.of());
+		doThrow(new BusinessException("支付宝支付未配置"))
+				.when(payFeignSupport).closeOrder("pay-1", "alipay_wap");
+
+		service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT);
+
+		verify(stockFeignSupport).restoreOrderStock(anyString(), any());
+	}
+
+	@Test
+	void otherChannelCloseFailuresStillFailCancellation() {
+		OrderInfo order = order("order-1", "pay-1", OrderStatusEnum.WAIT_PAYMENT);
+		order.setPayChannel("alipay_wap");
+		when(orderInfoMapper.selectByOrderId("order-1")).thenReturn(order);
+		when(orderInfoMapper.selectList(any(OrderInfoQuery.class))).thenReturn(List.of(order));
+		when(orderInfoMapper.updateByParam(any(OrderInfo.class), any(OrderInfoQuery.class))).thenReturn(1);
+		doThrow(new BusinessException("渠道关单超时"))
+				.when(payFeignSupport).closeOrder("pay-1", "alipay_wap");
+
+		assertThrows(BusinessException.class,
+				() -> service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT));
+	}
 
     @Test
     void repeatedCancellationOfClosedAggregateIsANoOp() {
