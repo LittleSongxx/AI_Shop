@@ -317,14 +317,8 @@ class ResponseVerifier:
             else _legacy_rag_sources(source_refs)
         )
         source_count = _source_count(effective_rag_refs)
-        dynamic_clauses = [
-            clause
-            for clause in _assertion_clauses(text)
-            if _DYNAMIC_FACT_RE.search(clause)
-        ]
-        cited_write_policy_only = bool(dynamic_clauses) and all(
-            _is_cited_write_confirmation_policy(clause, effective_rag_refs)
-            for clause in dynamic_clauses
+        cited_write_policy_only = _is_cited_write_confirmation_policy(
+            text, effective_rag_refs
         )
         verified_action_card = (
             str(biz_type or "") == "action_confirm" and has_pending_action
@@ -439,6 +433,7 @@ class ResponseVerifier:
             business_refs,
             rag_source_count=source_count if rag_citation_required else 0,
             rag_source_refs=effective_rag_refs if rag_citation_required else [],
+            cited_write_policy_answer=cited_write_policy_only,
         )
         if unsupported_order_fact or unsupported_dynamic_fact:
             issues.append(
@@ -1205,6 +1200,7 @@ def _unsupported_dynamic_business_fact(
     *,
     rag_source_count: int = 0,
     rag_source_refs: list[dict] | None = None,
+    cited_write_policy_answer: bool = False,
 ) -> str | None:
     """Bind each non-order dynamic assertion to its Java-owned ref and value."""
 
@@ -1252,8 +1248,10 @@ def _unsupported_dynamic_business_fact(
                 )
             )
         )
-        generic_policy_clause = generic_policy_clause or _is_cited_write_confirmation_policy(
-            clause, rag_source_refs or []
+        generic_policy_clause = (
+            generic_policy_clause
+            or cited_write_policy_answer
+            or _is_cited_write_confirmation_policy(clause, rag_source_refs or [])
         )
         negated_value = bool(_NEGATED_VALUE_RE.search(clause))
         logistics_statuses = _dynamic_status_assertions(
@@ -1553,6 +1551,11 @@ def _is_cited_write_confirmation_policy(
         )
         and re.search(r"确认|待确认", clause)
         and re.search(r"AI|助手|系统|写操作|退款|取消|下单|订单", clause)
+        and re.search(
+            r"确认.{0,24}(?:后|才).{0,24}(?:执行|生效|提交|发起)|"
+            r"(?:执行|生效|提交|发起).{0,24}(?:前|需|必须).{0,24}确认",
+            clause,
+        )
         and not re.search(
             r"你当前|你的|我的|该订单|当前订单|本订单|这笔订单|订单号|订单项",
             clause,

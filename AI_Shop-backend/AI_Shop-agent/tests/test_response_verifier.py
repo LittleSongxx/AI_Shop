@@ -2799,7 +2799,10 @@ def test_cited_write_confirmation_policy_is_not_live_refund_state():
         }
     ]
     policy = response_verifier.verify(
-        assistant="AI 执行退款等写操作前必须由用户确认后才会执行成功 [1]。",
+        assistant=(
+            "AI 会先生成待确认提案 [1]。"
+            "退款等写操作必须由用户确认后才会执行成功 [1]。"
+        ),
         biz_type="agent",
         tools_called=[],
         source_refs={"ragSources": refs, "businessSources": []},
