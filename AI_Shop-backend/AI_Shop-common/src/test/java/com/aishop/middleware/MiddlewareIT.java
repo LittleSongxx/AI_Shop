@@ -637,16 +637,21 @@ class MiddlewareIT {
         if (root == null) {
             throw new IOException("Unable to locate the AI_Shop backend root");
         }
-        try (var paths = Files.walk(root)) {
-            return paths
-                    .filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString()
-                            .equals("R__current_schema.sql"))
-                    .filter(path -> path.toString().contains(
-                            "src/main/resources/db/migration"))
-                    .sorted()
-                    .toList();
-        }
+        List<String> serviceMigrations = List.of(
+                "AI_Shop-admin/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-cart/app/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-coupon/app/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-order/app/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-pay/app/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-product/app/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-search/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-stock/app/src/main/resources/db/migration/R__current_schema.sql",
+                "AI_Shop-user/app/src/main/resources/db/migration/R__current_schema.sql");
+        Path backendRoot = root;
+        return serviceMigrations.stream()
+                .map(backendRoot::resolve)
+                .filter(Files::isRegularFile)
+                .toList();
     }
 
     private static final class RedisWire implements AutoCloseable {
