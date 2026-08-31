@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -413,9 +414,12 @@ class ResponseVerifier:
                 )
             )
 
-        unsupported_order_fact = _unsupported_order_fact(text, business_refs)
+        fact_text = (
+            _action_card_fact_text(text) if verified_action_card else None
+        ) or text
+        unsupported_order_fact = _unsupported_order_fact(fact_text, business_refs)
         unsupported_dynamic_fact = _unsupported_dynamic_business_fact(
-            text,
+            fact_text,
             business_refs,
             rag_source_count=source_count if rag_citation_required else 0,
         )
@@ -1695,6 +1699,46 @@ def _assertion_clauses(text: str) -> list[str]:
         for clause in _ASSERTION_BOUNDARY_RE.split(text or "")
         if clause.strip()
     ]
+
+
+def _action_card_fact_text(text: str) -> str | None:
+    """Give server-built action-card values an explicit order/item scope."""
+
+    try:
+        card = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(card, dict) or card.get("type") != "ACTION_CONFIRM":
+        return None
+    order_id = str(card.get("orderId") or "").strip()
+    items = [item for item in card.get("items") or [] if isinstance(item, dict)]
+    facts: list[str] = []
+    if order_id and card.get("orderAmount") is not None:
+        facts.append(f"订单 {order_id} 订单金额 {card['orderAmount']} 元")
+    if order_id and card.get("payScene"):
+        facts.append(f"订单 {order_id} 支付场景为 {card['payScene']}")
+    for item in items:
+        item_id = str(item.get("orderItemId") or "").strip()
+        if not item_id:
+            continue
+        for label, key, suffix in (
+            ("商品名称为", "productName", ""),
+            ("商品规格为", "propertyInfo", ""),
+            ("订单项金额", "itemAmount", " 元"),
+            ("商品数量", "buyCount", " 件"),
+        ):
+            if item.get(key) not in (None, ""):
+                facts.append(f"订单项 {item_id} {label} {item[key]}{suffix}")
+    for detail in card.get("details") or []:
+        if not isinstance(detail, dict) or detail.get("value") in (None, ""):
+            continue
+        label = str(detail.get("label") or "").strip()
+        value = str(detail["value"]).strip()
+        if label == "退款金额" and len(items) == 1 and items[0].get("orderItemId"):
+            facts.append(f"订单项 {items[0]['orderItemId']} 订单项金额 {value}")
+        elif order_id:
+            facts.append(f"订单 {order_id} {label} {value}")
+    return "。".join(facts) or None
 
 
 def _capability_case_specific(clause: str) -> bool:

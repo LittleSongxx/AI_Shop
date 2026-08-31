@@ -2142,6 +2142,75 @@ def test_verified_action_card_does_not_require_prose_rag_citations():
     assert result.passed is True
 
 
+def test_refund_action_card_scopes_refund_amount_to_selected_order_item():
+    import json
+
+    business_sources = [
+        *order_refs(
+            [
+                {
+                    "order_id": "O1",
+                    "order_status": 1,
+                    "order_status_name": "已付款,待发货",
+                    "amount": 3799,
+                    "items": [
+                        {
+                            "order_id": "O1",
+                            "order_item_id": "I1",
+                            "product_name": "示例耳机",
+                            "property_info": "铂金银",
+                            "item_amount": 3999,
+                            "buy_count": 1,
+                        }
+                    ],
+                }
+            ],
+            captured="2026-08-25T00:00:00+00:00",
+        ),
+        _after_sales_evidence(
+            "ELIGIBLE", action="REFUND", order_id="O1", order_item_id="I1"
+        ),
+    ]
+    card = {
+        "type": "ACTION_CONFIRM",
+        "actionType": "REFUND",
+        "orderId": "O1",
+        "summary": "退款：订单项 I1（示例耳机），金额 3999 元",
+        "details": [{"label": "退款金额", "value": "3999 元"}],
+        "items": [
+            {
+                "orderItemId": "I1",
+                "productName": "示例耳机",
+                "propertyInfo": "铂金银",
+                "itemAmount": 3999,
+                "buyCount": 1,
+            }
+        ],
+    }
+
+    valid = response_verifier.verify(
+        assistant=json.dumps(card, ensure_ascii=False),
+        biz_type="action_confirm",
+        tools_called=["PROPOSE_REFUND"],
+        source_refs={"businessSources": business_sources},
+        order_resolution="RESOLVED",
+        has_pending_action=True,
+    )
+    card["details"][0]["value"] = "4999 元"
+    tampered = response_verifier.verify(
+        assistant=json.dumps(card, ensure_ascii=False),
+        biz_type="action_confirm",
+        tools_called=["PROPOSE_REFUND"],
+        source_refs={"businessSources": business_sources},
+        order_resolution="RESOLVED",
+        has_pending_action=True,
+    )
+
+    assert valid.passed is True
+    assert tampered.passed is False
+    assert any(issue.code == "DYNAMIC_FACT_WITHOUT_CLAIM" for issue in tampered.issues)
+
+
 def test_rag_citation_is_checked_per_factual_sentence():
     result = response_verifier.verify(
         assistant="每个订单只能使用一张优惠券。[1] 支付失败后优惠券会释放。",
