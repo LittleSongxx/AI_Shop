@@ -251,7 +251,7 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 
 ### 2026-08-30：A1 发布事实 Alias 路由与探索评测
 
-- 在生产 query planner 中复用发布版 fact metadata，将明确术语 alias/完整 fact ID 路由到既有 `factHints`；歧义和普通未标记提及 fail-closed，混合意图与语义缓存维度已补回归。实现提交为 `db26d43`，Text2SQL 和正式 unseen 均未改动。
+- 在生产 query planner 中复用发布版 fact metadata，将明确术语 alias/完整 fact ID 路由到既有 `factHints`；歧义 alias 不扩张 hints，普通未标记提及继续走原有语义规划，混合意图与语义缓存维度已补回归。实现提交为 `db26d43`，Text2SQL 和正式 unseen 均未改动。
 - 真实外部模型 v4 完整执行 Search 50 / RAG 50 / Agent 25（Agent 200 trials），总门仍 `FAILED`。RAG case pass `29/50 → 31/50`、source coverage `0.586207 → 0.965517`，但 NDCG@5 `0.910388 → 0.858217`，generation/claim/citation 仅 `0.62`，不能概括为全面质量提升。
 - 生命周期源码暴露门拒绝了与回归测试完整重合的 `agent-unseen-116`；没有绕过。探索副本只改写该条措辞并标记不可同题比较，RAG 50 条不变。正式资产五个哨兵 SHA 前后完全一致。
 - 外置 evidence、candidate 与 runtime quarantine 的路径、SHA、逐 case 差异和后续边界见 [A1 事实 Alias 路由与探索评测](AI-Shop-A1事实Alias路由与探索评测-20260830.md)。
@@ -263,4 +263,4 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 最新同设计 k=3 探索运行完整执行 75/75、exit 0；strict `49/75 → 61/75`、pass³ `16/25 → 20/25`，增益来自 handoff/safety `0/12 → 12/12`。shopping `24/24`、确认写 `18/18`，RAG-policy 仍为 `7/21`；因此只声称安全/评测合同改善，不声称模型答案能力全面提升。
 - 当前代码验证为 handoff 指定八文件 `331 passed`、Python 全量 `1963 passed, 9 skipped, 1 warning`；两个历史基线仍仅因既有 private holdout 缺失而 `7 failed / 5 passed`。正式五个哨兵未变化，Text2SQL 继续冻结。
 - 根目录六组人工回传已 33/33 字节级进入外置 custody 并完成 final；早期 `reviewer-A/B` 目录名与逻辑 reviewer 对调，后续一律以 manifest `reviewerId` 为准。经用户授权和 final SHA 复核后，六组根目录冗余副本已删除。数据生命周期、权威路径和待决托管项见 [数据资产与人工标注归档索引](AI-Shop-数据资产与人工标注归档索引-20260831.md)，面试叙事见 [关键问题优化与面试叙事](AI-Shop-关键问题优化与面试叙事-20260831.md)。
-- `caa311e` 新输出的 A/B 25 条已回传并 seal：案件级一致 14/25，11 条进入第三人仲裁；citationSupport 分歧 11、handoffAppropriate 6、answerCorrect 1、unsafeAnswer 0。当前只保留 immutable pending evidence，不生成最终人工指标。根目录小写 `reviewer-a/b` 映射正确，归档 `returned/` 后已按固定流程删除并建立 cleanup receipt。
+- `caa311e` 新输出完成 A/B 与 11 条第三人仲裁：答案/联合 `10/25=40%`、引用 `16/20=80%`、handoff `18/25=72%`、unsafe `6/25=24%`。六个 unsafe 全在 confirmation/idempotency/write 切片，而自动 trial 为 `18/18`；因此自动 gate 的改善没有转化为人工答案提升，下一轮必须先诊断确认流程输出/呈现语义，不能继续宣称 Agent 质量已经提高。custody owner 已确认仲裁 JSON alias 与声明身份属于同一人，versioned binding receipt 与 final SHA 均已封存；根目录 A/B/仲裁副本已按固定流程清理。
