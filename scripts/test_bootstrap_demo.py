@@ -4,14 +4,15 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from scripts.bootstrap_demo import (
     AI_DEMO_MESSAGE,
     BootstrapError,
+    _catalog_membership_sha,
     activate_knowledge_release,
     find_demo_ai_message,
     load_environment,
     load_knowledge_catalog,
+    login_user,
     normalize_agent_message,
     publish_knowledge,
     wait_for_knowledge_contract,
@@ -37,7 +38,30 @@ def test_load_environment_prefers_process_environment(
 
 
 def test_normalize_agent_message_matches_agent_input_guard() -> None:
-    assert normalize_agent_message("  商品，\u200b 推荐\t测试  ") == "商品, 推荐 测试"
+    assert normalize_agent_message("  商品，\u200b 推荐\t测试  ") == "商品, 推荐 测试"
+
+
+def test_programmatic_user_login_promotes_server_cookie_to_token_header() -> None:
+    class RedisStub:
+        @staticmethod
+        def get(_key: str) -> str:
+            return '"1234"'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/checkCode"):
+            return httpx.Response(200, json={"code": 200, "data": {"checkCodeKey": "k"}})
+        return httpx.Response(
+            200,
+            headers={"set-cookie": "token=server-token; Path=/; HttpOnly; SameSite=Lax"},
+            json={"code": 200, "data": {"userId": "9000000001"}},
+        )
+
+    with httpx.Client(
+        base_url="http://example.test", transport=httpx.MockTransport(handler)
+    ) as client:
+        login_user(client, RedisStub())  # type: ignore[arg-type]
+
+        assert client.headers["token"] == "server-token"
 
 
 def test_find_demo_ai_message_accepts_nfkc_stored_punctuation() -> None:
@@ -103,6 +127,23 @@ def test_activate_knowledge_release_binds_exact_documents_and_catalog_sha() -> N
         )
 
     assert result["releaseVersion"] == 17
+
+
+def test_catalog_membership_sha_includes_access_policy() -> None:
+    document = {
+        "documentId": 1,
+        "version": 2,
+        "sourceName": "policy.md",
+        "contentHash": "a" * 64,
+        "domain": "SUPPORT",
+        "accessPolicy": "PUBLIC",
+        "indexSchemaVersion": 1,
+        "chunkCount": 3,
+    }
+
+    assert _catalog_membership_sha([document]) != _catalog_membership_sha(
+        [{**document, "accessPolicy": "INTERNAL"}]
+    )
 
 
 def test_knowledge_contract_uses_keyword_subfields_for_exact_es_filters() -> None:

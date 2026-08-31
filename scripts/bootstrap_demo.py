@@ -170,8 +170,13 @@ def login_user(client: httpx.Client, redis_client: redis.Redis) -> None:
         ),
         "演示用户登录",
     )
-    if not client.cookies.get("token"):
+    token = client.cookies.get("token")
+    if not token:
         raise BootstrapError("演示用户登录成功但未收到 token Cookie")
+    # Programmatic demo clients have no browser Origin header. Reuse the
+    # server-issued cookie value through the supported header path so CSRF
+    # protection remains strict for cookie-authenticated browser requests.
+    client.headers["token"] = token
 
 
 def configure_rewards(client: httpx.Client) -> None:
@@ -260,6 +265,7 @@ def _catalog_membership_sha(documents: list[dict[str, Any]]) -> str:
                 ("sourceName", "source_name"),
                 ("contentHash", "content_hash"),
                 ("domain", "domain"),
+                ("accessPolicy", "access_policy"),
                 ("indexSchemaVersion", "index_schema_version"),
                 ("chunkCount", "chunk_count"),
             )
