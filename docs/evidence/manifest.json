@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "aishop-portfolio-evidence/v1",
+  "evaluatedCommit": "609e3cca7f76d7c53b0553536ce58cf2d9881c13",
+  "bindingMode": "EVIDENCE_ONLY_CHILD_COMMIT",
+  "worktreeDirty": false,
+  "generatedAt": "2026-08-31T17:52:04Z",
+  "artifacts": [
+    {
+      "path": "docs/evidence/scorecard.json",
+      "role": "current visible evaluation and validation scorecard",
+      "bytes": 4625,
+      "sha256": "f5584f9577617f3f56318842ed9e477ea9d6e56196a67ae12abf8670e25b670f"
+    },
+    {
+      "path": "docs/evidence/badcases.jsonl",
+      "role": "selected visible-run badcase ledger",
+      "bytes": 267,
+      "sha256": "4f64ace2217a7e88251e0f1302987a790335433b27068653cc7fbb4f2c284a86"
+    },
+    {
+      "path": "docs/evidence/guide-trace.json",
+      "role": "local shopping-guide to WAIT_PAYMENT browser trace summary",
+      "bytes": 938,
+      "sha256": "d896338a13edae3307e5183868b71c54f66f981bb1b7988ff2daf5bd3e2025aa"
+    },
+    {
+      "path": "docs/evidence/support-trace.json",
+      "role": "local controlled customer-support confirmation trace summary",
+      "bytes": 985,
+      "sha256": "3f547979879a72e39ac083bbb04ede28f002fd4087c8884b781fec90c1415dff"
+    },
+    {
+      "path": "docs/evidence/synthetic-blackbox-report.json",
+      "role": "external AI blackbox execution status and declared thresholds",
+      "bytes": 1187,
+      "sha256": "d0c6fb8ae86f7dcfa0964245872679f977d5bf432a176279f8cf29e60dffc399"
+    },
+    {
+      "path": "docs/evidence/SHA256SUMS",
+      "role": "artifact checksum inventory",
+      "bytes": 427,
+      "sha256": "3df354fb9e7fceca164c1ea7c391b2fb4cdd84439b9e685f8e3a06d6900fbd5b"
+    }
+  ],
+  "boundaries": {
+    "realUser": false,
+    "productionSlo": false,
+    "finalUnseen": false,
+    "multiTenant": false
+  },
+  "disclosure": {
+    "evidenceSource": "LOCAL_FULL_STACK_AND_SYNTHETIC_PROTOCOL",
+    "realUserStatus": "NOT_COLLECTED",
+    "externalAiBlackboxStatus": "NOT_RUN",
+    "costStatus": "MISSING_USAGE",
+    "costCny": null
+  }
+}

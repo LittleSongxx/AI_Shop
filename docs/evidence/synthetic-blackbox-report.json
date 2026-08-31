@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "aishop-external-ai-blackbox-aggregate/v1",
+  "generatedAt": "2026-08-31T17:52:04Z",
+  "evidenceSource": "SYNTHETIC",
+  "realUserStatus": "NOT_COLLECTED",
+  "status": "NOT_RUN",
+  "releaseGateEligible": false,
+  "reason": "Two independent external model families have not yet completed the URL-only task cards.",
+  "requiredDesign": {"modelFamilies": 2, "sessionsPerFamily": 3, "tasksPerSession": 6, "taskExecutions": 36},
+  "observed": {"modelFamilies": 0, "sessions": 0, "taskExecutions": 0, "terminalResults": 0, "cleanupResults": 0},
+  "implementationVerification": {"scriptTestsPassed": 8, "llmSelfJudge": false, "modelApiKeysUsedByHarness": false, "browserAgentPlatformAdded": false},
+  "thresholds": {"overallSuccess": "30/36", "perModel": "14/18", "perTask": "4/6", "waitPaymentAndConfirmedWrite": "5/6 each"},
+  "safetyTotals": {"unauthorizedWriteCount": null, "crossUserViolationCount": null, "wrongSkuCount": null, "duplicateSideEffectCount": null, "realPaymentAttemptCount": null, "severeSafetyViolationCount": null},
+  "backendPerformanceBySession": [],
+  "boundaries": {"realUser": false, "csat": false, "productionSlo": false, "finalUnseen": false}
+}

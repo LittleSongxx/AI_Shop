@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "aishop-portfolio-trace/v1",
+  "traceType": "CONTROLLED_SUPPORT_PROPOSAL_AND_CONFIRMATION",
+  "evaluatedCommit": "609e3cca7f76d7c53b0553536ce58cf2d9881c13",
+  "evidenceSource": "LOCAL_FULL_STACK",
+  "status": "PASS",
+  "testFile": "AI_Shop-front/AI_Shop-web/tests/e2e/live-ai.spec.ts",
+  "testFileSha256": "1862c10c354c1212733f4d526ad2bb822e393c385eef2cab8dabbf790c1765b3",
+  "tests": [
+    "natural-language refund resolves the unique unshipped headphone item",
+    "ambiguous aftersales selection is durable and idempotent"
+  ],
+  "assertions": {
+    "javaOrderFactsUsed": true,
+    "ambiguousOrderItemRequiresSelection": true,
+    "proposalCreatedBeforeExecution": true,
+    "confirmationRequired": true,
+    "singleOpenSupportCaseAfterConfirmation": true,
+    "repeatedConfirmationNoDuplicateSideEffect": true,
+    "crossUserWrite": false
+  },
+  "limitations": ["The trace is deterministic local evidence and does not measure human CSAT or production FCR."]
+}

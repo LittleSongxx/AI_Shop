@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "aishop-portfolio-trace/v1",
+  "traceType": "SHOPPING_GUIDE_TO_WAIT_PAYMENT",
+  "evaluatedCommit": "609e3cca7f76d7c53b0553536ce58cf2d9881c13",
+  "evidenceSource": "LOCAL_FULL_STACK",
+  "status": "PASS",
+  "test": "real recommendation exposure validates a click and reaches checkout",
+  "testFile": "AI_Shop-front/AI_Shop-web/tests/e2e/live-ai.spec.ts",
+  "testFileSha256": "1862c10c354c1212733f4d526ad2bb822e393c385eef2cab8dabbf790c1765b3",
+  "assertions": {
+    "realCatalogProductReturned": true,
+    "impressionToClickAttribution": true,
+    "checkoutAttributionPreserved": true,
+    "clientForgedSkuHashIgnored": true,
+    "authoritativeSkuPersisted": true,
+    "waitPaymentOrderCreated": true,
+    "oneLogisticsRowForOrder": true,
+    "realPaymentExecuted": false,
+    "cleanupCompleted": true
+  },
+  "limitations": ["The trace is a local controlled browser run, not production traffic or a real-user study."]
+}
