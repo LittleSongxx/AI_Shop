@@ -4,11 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from evaluation.core.contracts import Split
-from evaluation.core.datasets import parse_case
-from evaluation.core.io import EVIDENCE_ROOT, load_jsonl
+from evaluation.core.catalog import load_catalog_fixture
+from evaluation.core.contracts import Domain, EvaluationCase, Split
+from evaluation.core.io import EVIDENCE_ROOT, atomic_write_jsonl
 from evaluation.search_paired_replay import (
-    DEFAULT_V9_HOLDOUT,
     SearchPairedReplayError,
     build_paired_replay_report,
     load_replay_cases,
@@ -17,13 +16,28 @@ from evaluation.search_paired_replay import (
 )
 
 
-def _case():
-    row = next(
-        row
-        for row in load_jsonl(DEFAULT_V9_HOLDOUT)
-        if row["id"] == "search-fin-v9-23-snack-100"
+def _case(
+    case_id: str = "search-synthetic-snack",
+    qrels: dict[str, int] | None = None,
+) -> EvaluationCase:
+    return EvaluationCase(
+        case_id=case_id,
+        split=Split.FINAL,
+        domain=Domain.SEARCH,
+        input={"query": "办公室零食"},
+        expected={
+            "catalogSha256": load_catalog_fixture()["canonicalSha256"],
+            "judgmentMode": "EXHAUSTIVE_CATALOG",
+            "noResult": False,
+            "qrels": qrels
+            or {
+                "065293686460191": 3,
+                "303019597302892": 2,
+                "438316828084252": 2,
+            },
+        },
+        required_providers=("embedding",),
     )
-    return parse_case(row, expected_split=Split.FINAL)
 
 
 def _row(case, ranking, *, status="PASSED", violations=0):
@@ -108,16 +122,21 @@ def test_paired_replay_fails_closed_when_query_or_case_set_differs():
         )
 
 
-def test_v9_replay_loader_selects_only_declared_search_cases():
-    all_cases, selected = load_replay_cases(
-        DEFAULT_V9_HOLDOUT,
-        case_ids=["search-fin-v9-23-snack-100", "search-fin-v9-47-compare-xm"],
+def test_replay_loader_selects_only_declared_search_cases(tmp_path: Path):
+    holdout = tmp_path / "synthetic-holdout.jsonl"
+    atomic_write_jsonl(
+        holdout,
+        [
+            _case("search-synthetic-one", {"065293686460191": 3}).public(),
+            _case("search-synthetic-two", {"303019597302892": 3}).public(),
+        ],
     )
-    assert len(all_cases) == 125
-    assert [case.case_id for case in selected] == [
-        "search-fin-v9-23-snack-100",
-        "search-fin-v9-47-compare-xm",
-    ]
+    all_cases, selected = load_replay_cases(
+        holdout,
+        case_ids=["search-synthetic-two"],
+    )
+    assert len(all_cases) == 2
+    assert [case.case_id for case in selected] == ["search-synthetic-two"]
 
 
 def test_paired_replay_evidence_is_write_once_hashed_and_read_only(tmp_path: Path):

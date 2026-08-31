@@ -54,12 +54,13 @@ dev = [
 packages = ["app"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra -m 'not private_holdout'"
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "mysql: tests that require a real MySQL server",
+  "private_holdout: tests that require externally restored private evaluation data",
 ]
 
 [tool.ruff]

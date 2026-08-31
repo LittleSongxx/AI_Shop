@@ -109,6 +109,7 @@ def test_build_scorecard_fails_closed_without_search_holdout() -> None:
         build_scorecard(evidence, holdout_path=evidence / "missing-holdout.jsonl")
 
 
+@pytest.mark.private_holdout
 def test_scorecard_uses_repo_relative_paths_for_tracked_evidence() -> None:
     evidence = Path(__file__).parents[1] / "evaluation-evidence" / "current"
     scorecard = build_scorecard(evidence)

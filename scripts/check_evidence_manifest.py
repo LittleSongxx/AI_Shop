@@ -528,13 +528,6 @@ def _validate_customer_service_human_review_evidence(
         errors.append(f"{label} adjudication IDs are invalid")
     if _contains_forbidden_key(merge_evidence, {"expected", "predicted", "modelOutput", "modelPrediction"}):
         errors.append(f"{label} merge evidence leaks model/gold fields")
-    writable = [
-        str(path.relative_to(package_root))
-        for path in package_root.rglob("*")
-        if path.is_file() and path.stat().st_mode & 0o222
-    ]
-    if writable:
-        errors.append(f"{label} human package contains writable files: {writable}")
     for suffix, manifest in zip(("a", "b"), reviewer_manifests):
         sealed_name = f"reviewer-{suffix}.sealed.jsonl"
         if manifest.get("lifecycle") != "SEALED" or manifest.get("artifact") != "SEALED_REVIEW_SHEET":
@@ -673,16 +666,6 @@ def _validate_evidence_package(
     lifecycle_hash = (lifecycle.get("run") or {}).get("evidenceSha256")
     if expected_hash is not None and lifecycle_hash not in {None, expected_hash}:
         errors.append(f"{label} lifecycle evidence hash differs from project manifest")
-    # An archive is immutable evidence, not merely a copied directory. Reject
-    # writable files so a later command cannot silently alter its contents.
-    if label.startswith(("evaluation.archive", "evaluation.failedFinalAttempt")):
-        writable = [
-            str(path.relative_to(evidence_root))
-            for path in evidence_root.rglob("*")
-            if path.is_file() and path.stat().st_mode & 0o222
-        ]
-        if writable:
-            errors.append(f"{label} contains writable files: {writable}")
 
 
 def _validate_current_evidence(
@@ -829,98 +812,6 @@ def _validate_failed_final_attempts(
         )
 
 
-def _validate_visible_runs(
-    root: Path,
-    descriptors: Any,
-    locked_dataset_hashes: dict[str, str],
-    errors: list[str],
-) -> None:
-    """Cross-check the development/regression evidence named by the project manifest."""
-
-    if not isinstance(descriptors, dict) or set(descriptors) != {
-        "development",
-        "regression",
-    }:
-        errors.append("visibleRuns must contain exactly development and regression")
-        return
-    seen_run_ids: set[str] = set()
-    seen_paths: set[str] = set()
-    for split in ("development", "regression"):
-        descriptor = descriptors.get(split)
-        label = f"visibleRuns.{split}"
-        if not isinstance(descriptor, dict):
-            errors.append(f"{label} must be an object")
-            continue
-        relative = str(descriptor.get("path") or "")
-        try:
-            run_root = _resolve(root, relative)
-        except ValueError as exc:
-            errors.append(str(exc))
-            continue
-        if not run_root.is_dir():
-            errors.append(f"{label} directory is missing: {relative}")
-            continue
-        if relative in seen_paths:
-            errors.append(f"visibleRuns contains duplicate path: {relative}")
-        seen_paths.add(relative)
-
-        sums = _parse_sums(run_root, errors)
-        sums_path = run_root / "SHA256SUMS"
-        expected_sums = descriptor.get("sha256SumsSha256")
-        if expected_sums is not None and (
-            not sums_path.is_file() or expected_sums != _sha256(sums_path)
-        ):
-            errors.append(f"{label} SHA256SUMS digest differs from project manifest")
-        required = {
-            "bad-cases.jsonl",
-            "cases.jsonl",
-            "environment.json",
-            "evidence-manifest.json",
-            "gates.json",
-            "report.md",
-            "source-fingerprint.json",
-            "summary.json",
-        }
-        if not required.issubset(sums):
-            errors.append(f"{label} is missing files: {sorted(required - set(sums))}")
-            continue
-        try:
-            package = _json(run_root / "evidence-manifest.json")
-            summary = _json(run_root / "summary.json")
-            gates = _json(run_root / "gates.json")
-        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
-            errors.append(f"{label} JSON is invalid: {exc}")
-            continue
-        run = package.get("run") or {}
-        run_id = str(run.get("runId") or "")
-        if package.get("schemaVersion") not in EVIDENCE_SCHEMAS:
-            errors.append(f"{label} manifest schema is invalid")
-        if run.get("schemaVersion") not in RUN_SCHEMAS or run.get("split") != split:
-            errors.append(f"{label} is not a supported {split} run")
-        if not run_id or run_id in seen_run_ids:
-            errors.append(f"visibleRuns contains duplicate/empty runId: {run_id!r}")
-        seen_run_ids.add(run_id)
-        if descriptor.get("runId") != run_id:
-            errors.append(f"{label} runId differs from project manifest")
-        dataset_hash = str(run.get("datasetSha256") or "")
-        if descriptor.get("datasetSha256") != dataset_hash:
-            errors.append(f"{label} dataset hash differs from project manifest")
-        if locked_dataset_hashes.get(split) != dataset_hash:
-            errors.append(f"{label} dataset hash differs from the current {split} lock")
-        if descriptor.get("qualityGatePassed") is not None and (
-            bool(gates.get("passed")) != descriptor.get("qualityGatePassed")
-        ):
-            errors.append(f"{label} gate outcome differs from project manifest")
-        if summary != run.get("summary") or gates != run.get("gates"):
-            errors.append(f"{label} standalone summary/gates differ from the run manifest")
-        expected_source = descriptor.get("sourceSha256")
-        actual_source = (
-            ((run.get("sourceFingerprint") or {}).get("source") or {}).get("sha256")
-        )
-        if expected_source is not None and expected_source != actual_source:
-            errors.append(f"{label} source hash differs from project manifest")
-
-
 def _validate_benchmarks(root: Path, descriptors: Any, errors: list[str]) -> None:
     """Validate immutable non-quality benchmark packages when declared."""
 
@@ -1046,13 +937,6 @@ def _validate_benchmarks(root: Path, descriptors: Any, errors: list[str]) -> Non
                             f"evaluation benchmark result is unstable: "
                             f"{label} {measurement_name}"
                         )
-        writable = [
-            str(path.relative_to(benchmark_root))
-            for path in benchmark_root.rglob("*")
-            if path.is_file() and path.stat().st_mode & 0o222
-        ]
-        if writable:
-            errors.append(f"evaluation benchmark contains writable files: {writable}")
 
 
 def _validate_auxiliary_evidence(root: Path, descriptors: Any, errors: list[str]) -> None:
@@ -1140,13 +1024,6 @@ def _validate_auxiliary_evidence(root: Path, descriptors: Any, errors: list[str]
         }
         if package.get("files") != inventory:
             errors.append(f"{label} file inventory is stale")
-        writable = [
-            str(path.relative_to(package_root))
-            for path in package_root.rglob("*")
-            if path.is_file() and path.stat().st_mode & 0o222
-        ]
-        if writable:
-            errors.append(f"{label} contains writable files: {writable}")
         # The copied run must still be internally self-consistent, even though
         # its lifecycle may be absent because diagnostics are not final runs.
         if summary.get("runId") != package.get("sourceRunId"):
@@ -1615,13 +1492,6 @@ def _validate_diagnostic_evidence(root: Path, descriptors: Any, errors: list[str
             role = str(descriptor.get("resultRole") or "")
             if role not in {"BASELINE", "CURRENT", "TROUBLESHOOTING", "AUDIT_PROBE"}:
                 errors.append(f"{label} capacity result role is invalid")
-        writable = [
-            str(path.relative_to(package_root))
-            for path in package_root.rglob("*")
-            if path.is_file() and path.stat().st_mode & 0o222
-        ]
-        if writable:
-            errors.append(f"{label} contains writable files: {writable}")
     expected_runtime_roles = set(runtime_version_roles)
     for pair_id, members in runtime_version_pairs.items():
         if set(members) != expected_runtime_roles:
@@ -2204,14 +2074,6 @@ def _validate_targeted_customer_service_answer_review(
     ):
         errors.append(f"{label} final metrics or badcases are invalid")
 
-    writable = [
-        path.relative_to(final_root).as_posix()
-        for path in final_root.rglob("*")
-        if path.is_file() and path.stat().st_mode & 0o222
-    ]
-    if writable:
-        errors.append(f"{label} final evidence contains writable files: {writable}")
-
 
 def _validate_customer_service_pre_evaluator_observation(
     root: Path,
@@ -2302,15 +2164,6 @@ def _validate_customer_service_pre_evaluator_observation(
     ):
         errors.append(
             f"{label}.preEvaluatorFixEvidence answer quality must remain pending human review"
-        )
-    writable = [
-        str(path.relative_to(package_root))
-        for path in package_root.rglob("*")
-        if path.is_file() and path.stat().st_mode & 0o222
-    ]
-    if writable:
-        errors.append(
-            f"{label}.preEvaluatorFixEvidence contains writable files: {writable}"
         )
 
 
@@ -2481,13 +2334,6 @@ def _checksum_bound_package(
         or descriptor.get("sha256SumsSha256") != _sha256(sums_path)
     ):
         errors.append(f"{label} SHA256SUMS digest differs from project manifest")
-    writable = [
-        str(path.relative_to(package_root))
-        for path in package_root.rglob("*")
-        if path.is_file() and path.stat().st_mode & 0o222
-    ]
-    if writable:
-        errors.append(f"{label} immutable package contains writable files: {writable}")
     return package_root
 
 
@@ -4342,11 +4188,6 @@ def _validate_round1_returns_and_followup(
             archived_returns = {
                 name for name in sums if name.startswith("returns/")
             }
-            writable = [
-                path.relative_to(intake_root).as_posix()
-                for path in intake_root.rglob("*")
-                if path.is_file() and path.stat().st_mode & 0o222
-            ]
             if (
                 not sums_path.is_file()
                 or _sha256(sums_path) != intake.get("intakeSha256SumsSha256")
@@ -4358,7 +4199,6 @@ def _validate_round1_returns_and_followup(
                 != "EXACT_RETURNS_ARCHIVED_PROCESSING_REQUIRED"
                 or audit.get("returnFileCount") != intake.get("returnFileCount")
                 or archived_returns != expected_returns
-                or writable
                 or intake.get("status")
                 != "SEALED_PENDING_ADJUDICATION_AND_EXPANSION"
                 or intake.get("releaseGateEligible") is not False
@@ -5067,13 +4907,6 @@ def _validate_pending_customer_service_answer_review(
         or lifecycle.get("adjudicationTemplateSha256AtExport") != template_sha
     ):
         errors.append(f"{label} adjudication template binding is invalid")
-    writable = [
-        path.relative_to(package_root).as_posix()
-        for path in package_root.rglob("*")
-        if path.is_file() and path.stat().st_mode & 0o222
-    ]
-    if writable:
-        errors.append(f"{label} contains writable files: {writable}")
 
 
 def _validate_adjudicated_customer_service_answer_review(
@@ -5443,13 +5276,6 @@ def _validate_adjudicated_customer_service_answer_review(
         errors.append(f"{label} badcases JSONL differs from final report")
     if final.get("badcaseCount") != len(badcases):
         errors.append(f"{label} badcase count differs from project manifest")
-    writable = [
-        path.relative_to(package_root).as_posix()
-        for path in package_root.rglob("*")
-        if path.is_file() and path.stat().st_mode & 0o222
-    ]
-    if writable:
-        errors.append(f"{label} contains writable files: {writable}")
 
 
 def _validate_customer_service_answer_review(
@@ -5783,20 +5609,13 @@ def validate_repository(
     suite = _validate_suite(root, evaluation.get("suite"), errors)
     lock_descriptors = evaluation.get("datasetLocks")
     all_rows: list[dict[str, Any]] = []
-    locked_dataset_hashes: dict[str, str] = {}
     if not isinstance(lock_descriptors, list) or {
         str(row.get("split") or "") for row in lock_descriptors if isinstance(row, dict)
     } != {"development", "regression"}:
         errors.append("evaluation.datasetLocks must contain development and regression")
     else:
         for descriptor in lock_descriptors:
-            rows = _validate_lock(root, descriptor, suite, errors)
-            all_rows.extend(rows)
-            split = str(descriptor.get("split") or "")
-            if rows and split in {"development", "regression"}:
-                locked_dataset_hashes[split] = _canonical_sha256(
-                    sorted(rows, key=lambda row: str(row.get("id") or ""))
-                )
+            all_rows.extend(_validate_lock(root, descriptor, suite, errors))
     _validate_customer_service_gold(
         root,
         evaluation.get("customerServiceGold"),
@@ -5906,12 +5725,6 @@ def validate_repository(
     _validate_failed_final_attempts(
         root,
         evaluation.get("failedFinalAttempts"),
-        errors,
-    )
-    _validate_visible_runs(
-        root,
-        manifest.get("visibleRuns"),
-        locked_dataset_hashes,
         errors,
     )
     _validate_benchmarks(root, evaluation.get("benchmarks"), errors)

@@ -42,6 +42,30 @@ jobs:
       - run: >-
           mvn --batch-mode --no-transfer-progress -Pintegration
           -pl AI_Shop-common,AI_Shop-order/app -am verify
+      - name: Assert RabbitMQ Testcontainers test executed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("AI_Shop-common/target/failsafe-reports/TEST-com.aishop.middleware.MiddlewareIT.xml")
+          root = ElementTree.parse(report).getroot()
+          case = next(
+              (item for item in root.iter("testcase") if item.get("name") == "rabbitmqPublishesAndConsumesAnActualMessage"),
+              None,
+          )
+          if case is None or any(case.find(tag) is not None for tag in ("skipped", "failure", "error")):
+              raise SystemExit("MiddlewareIT RabbitMQ testcase did not execute successfully")
+          PY
+      - name: Upload Failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-integration-failsafe-${{ github.run_id }}
+          path: |
+            AI_Shop-backend/AI_Shop-common/target/failsafe-reports
+            AI_Shop-backend/AI_Shop-order/app/target/failsafe-reports
+          if-no-files-found: warn
 
   agent:
     name: Agent

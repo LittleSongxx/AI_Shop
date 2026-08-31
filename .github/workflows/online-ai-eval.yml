@@ -1,8 +1,6 @@
 name: Live AI development and regression evaluation
 
 on:
-  schedule:
-    - cron: "45 18 * * *"
   workflow_dispatch:
     inputs:
       split:
@@ -34,7 +32,10 @@ jobs:
     env:
       APP_ENV: development
       APP_PORT: "7050"
+      AGENT_AUTO_MIGRATE: "false"
+      DATA_ANALYST_ENABLED: "false"
       AI_EVAL_AGENT_URL: http://127.0.0.1:7050
+      MCP_SERVER_URL: http://127.0.0.1:7060
       JAVA_WEB_URL: ${{ vars.AI_EVAL_JAVA_WEB_URL }}
       AISHOP_INTERNAL_TOKEN: ${{ secrets.AI_EVAL_INTERNAL_TOKEN }}
       MYSQL_HOST: ${{ vars.AI_EVAL_MYSQL_HOST }}
@@ -100,11 +101,12 @@ jobs:
         run: python -m evaluation.cli validate
       - name: Migrate evaluation database
         run: alembic upgrade head
-      - name: Start API and worker
+      - name: Start MCP, worker, and API
         run: |
           mkdir -p .eval-logs
-          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 7050 > .eval-logs/api.log 2>&1 &
+          nohup python -m app.mcp_server > .eval-logs/mcp.log 2>&1 &
           nohup python -m app.worker > .eval-logs/worker.log 2>&1 &
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 7050 > .eval-logs/api.log 2>&1 &
           ready=false
           for attempt in {1..60}; do
             if curl --fail --silent http://127.0.0.1:7050/health/ready > /dev/null; then
@@ -120,11 +122,7 @@ jobs:
       - name: Select visible split and immutable run ID
         id: eval-ids
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            eval_split="development"
-          else
-            eval_split="${{ inputs.split }}"
-          fi
+          eval_split="${{ inputs.split }}"
           run_id="online-${eval_split}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           repeat_run_id="${run_id}-repeat-k5"
           fault_run_id="${run_id}-fault-matrix"

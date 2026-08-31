@@ -1277,26 +1277,6 @@
     ]
   },
   "claimBoundary": "The manifest's only PUBLISHED_FINAL remains immutable v9, but its inputs are source-exposed and it is historical regression evidence rather than an unseen generalization result. Historical v1/v13/v20/v25/v27 customer-service answer reviews remain bound to their distinct frozen outputs and are non-gating. The v2.1 label-policy decisions and v43/v54/v56 answer reviews are human-approved with AI-assisted editing. v43 is the immutable pre-fix baseline at 105/120 joint passes; v54 completed 120/120 production-path cases, 23/23 behavior contracts, 120/120 human reviews and 8 adjudications, yielding 113/120 joint passes and 7 badcases. The v55 targeted replay passed 7/7 applicable regression contracts. v56 completed 120/120 production-path cases with 29/29 contracts; A/B agreed exactly on 118/120 and a third human adjudicated 2 cases, yielding answer 120/120, citation 67/67, handoff 120/120, unsafe 0/120, joint 120/120 and zero labeled badcases. v56 is the latest fully adjudicated same-set customer-service result, but all customer-service sets remain developer-visible development diagnostics, not unseen release evidence. Same-set improvements support regression fixes only, not unseen generalization. Local latency/capacity and unpriced usage remain diagnostics, not a production SLO or unit cost. No result establishes CSAT, FCR, CTR, CVR, GMV, payment compliance, absolute safety, industrial personalization, or future-output generalization; releaseGateEligible and finalUnseenEligible remain false.",
-  "visibleRuns": {
-    "development": {
-      "runId": "development-20260822-ai-quality-v9",
-      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/.runs/development-20260822-ai-quality-v9",
-      "split": "development",
-      "sha256SumsSha256": "1e8ca6a8e1cfc87ec6b17552b9b57eb923040299700817a6b1a4f28a6f75b882",
-      "qualityGatePassed": true,
-      "datasetSha256": "01cbf2996f9d0ba7b47503dc748b6dcc18374d7cdcb7404c5df22006b67ffa50",
-      "sourceSha256": "e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69"
-    },
-    "regression": {
-      "runId": "regression-20260822-ai-quality-v9",
-      "path": "AI_Shop-backend/AI_Shop-agent/evaluation/.runs/regression-20260822-ai-quality-v9",
-      "split": "regression",
-      "sha256SumsSha256": "fe88d5f93d3e8a03c3c47f48502960a320e0ea4c460c67a1c2f85700e3301a85",
-      "qualityGatePassed": true,
-      "datasetSha256": "a102ed7a7e6225ad52da9a60c05c25f8c9f22a2ed5f036395b00c906e802eeb2",
-      "sourceSha256": "e8a2769a3a6a04edfc6978e55d9af935fb43900dcd1afa468f94391f6454ea69"
-    }
-  },
   "claimDocuments": [
     "README.md",
     "docs/README.md",

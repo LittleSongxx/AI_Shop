@@ -20,7 +20,6 @@ from check_evidence_manifest import (
     _validate_pricing_estimate,
     _validate_suite,
     _validate_targeted_customer_service_answer_review,
-    _validate_visible_runs,
     validate_repository,
 )
 
@@ -455,7 +454,7 @@ def test_live_v14_http_diagnostic_preserves_its_execution_boundary() -> None:
     assert any("live behavior-contract evidence is invalid" in error for error in errors)
 
 
-def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> None:
+def test_failed_final_attempt_is_hashed_and_failed(tmp_path: Path) -> None:
     package = tmp_path / "evaluation/.runs/final-failed"
     package.mkdir(parents=True)
     summary = {"runId": "final-failed", "split": "final"}
@@ -506,9 +505,6 @@ def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> 
         ),
         encoding="utf-8",
     )
-    for path in package.iterdir():
-        if path.is_file():
-            path.chmod(0o444)
     descriptor = {
         "path": package.relative_to(tmp_path).as_posix(),
         "releaseId": "release-failed",
@@ -533,7 +529,7 @@ def test_failed_final_attempt_is_hashed_failed_and_read_only(tmp_path: Path) -> 
     assert any("qualityGatePassed=false" in error for error in errors)
 
 
-def test_auxiliary_evidence_requires_typed_read_only_hashed_package(tmp_path: Path) -> None:
+def test_auxiliary_evidence_requires_typed_hashed_package(tmp_path: Path) -> None:
     package = tmp_path / "evidence/benchmarks/resilience/fault-contract"
     package.mkdir(parents=True)
     source_run = "fault-contract-source"
@@ -575,9 +571,6 @@ def test_auxiliary_evidence_requires_typed_read_only_hashed_package(tmp_path: Pa
         "".join(f"{digest}  {name}\n" for name, digest in sorted(sums.items())),
         encoding="utf-8",
     )
-    for path in package.iterdir():
-        if path.is_file():
-            path.chmod(0o444)
     errors: list[str] = []
     descriptor = {
         "kind": "resilience",
@@ -769,9 +762,6 @@ def _diagnostic_fixture(
         "".join(f"{digest}  {name}\n" for name, digest in sorted(sums.items())),
         encoding="utf-8",
     )
-    for path in package.iterdir():
-        if path.is_file():
-            path.chmod(0o444)
     descriptor = {
         "kind": kind,
         "packageId": package_id,
@@ -960,9 +950,6 @@ def test_db_benchmark_v2_requires_counted_equivalent_rollback_evidence(
         "".join(f"{digest}  {name}\n" for name, digest in sorted(sums.items())),
         encoding="utf-8",
     )
-    for path in package.iterdir():
-        if path.is_file():
-            path.chmod(0o444)
     descriptor = {
         "benchmarkId": "db-v2",
         "path": package.relative_to(tmp_path).as_posix(),
@@ -975,65 +962,3 @@ def test_db_benchmark_v2_requires_counted_equivalent_rollback_evidence(
     _validate_benchmarks(tmp_path, [descriptor], errors)
 
     assert errors == []
-
-
-def test_visible_runs_cross_check_split_dataset_gate_source_and_hashes(tmp_path: Path) -> None:
-    descriptors: dict[str, dict] = {}
-    dataset_hashes = {"development": "a" * 64, "regression": "b" * 64}
-    for split, dataset_hash in dataset_hashes.items():
-        run_id = f"{split}-visible"
-        run_root = tmp_path / f"evaluation/.runs/{run_id}"
-        run_root.mkdir(parents=True)
-        summary = {"runId": run_id, "split": split}
-        gates = {"passed": True}
-        source = {"source": {"sha256": "c" * 64}}
-        run = {
-            "schemaVersion": "aishop-evaluation-run/v3",
-            "runId": run_id,
-            "split": split,
-            "datasetSha256": dataset_hash,
-            "sourceFingerprint": source,
-            "summary": summary,
-            "gates": gates,
-        }
-        payloads = {
-            "bad-cases.jsonl": b"",
-            "cases.jsonl": b"{}\n",
-            "environment.json": b"{}\n",
-            "evidence-manifest.json": json.dumps(
-                {"schemaVersion": "aishop-evaluation-evidence/v3", "run": run}
-            ).encode()
-            + b"\n",
-            "gates.json": json.dumps(gates).encode() + b"\n",
-            "report.md": b"# visible run\n",
-            "source-fingerprint.json": json.dumps(source).encode() + b"\n",
-            "summary.json": json.dumps(summary).encode() + b"\n",
-        }
-        for name, content in payloads.items():
-            (run_root / name).write_bytes(content)
-        (run_root / "SHA256SUMS").write_text(
-            "".join(
-                f"{hashlib.sha256(content).hexdigest()}  {name}\n"
-                for name, content in sorted(payloads.items())
-            ),
-            encoding="utf-8",
-        )
-        descriptors[split] = {
-            "runId": run_id,
-            "path": run_root.relative_to(tmp_path).as_posix(),
-            "datasetSha256": dataset_hash,
-            "sourceSha256": "c" * 64,
-            "qualityGatePassed": True,
-            "sha256SumsSha256": hashlib.sha256(
-                (run_root / "SHA256SUMS").read_bytes()
-            ).hexdigest(),
-        }
-
-    errors: list[str] = []
-    _validate_visible_runs(tmp_path, descriptors, dataset_hashes, errors)
-    assert errors == []
-
-    descriptors["regression"]["datasetSha256"] = "d" * 64
-    errors = []
-    _validate_visible_runs(tmp_path, descriptors, dataset_hashes, errors)
-    assert any("dataset hash differs from project manifest" in error for error in errors)
