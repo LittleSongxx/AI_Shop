@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).with_name("blackbox_pilot.py")
@@ -9,6 +10,19 @@ SPEC = importlib.util.spec_from_file_location("blackbox_pilot", MODULE_PATH)
 assert SPEC and SPEC.loader
 pilot = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pilot)
+
+
+def test_mysql_runner_selects_a_default_database(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=b"1\n", stderr=b"")
+
+    monkeypatch.setattr(pilot.subprocess, "run", run)
+
+    assert pilot._mysql("SELECT 1") == "1"
+    assert commands[0][-1].endswith(' aishop_agent')
 
 
 def _report(actor: str, passed: int) -> dict:

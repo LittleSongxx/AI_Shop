@@ -124,7 +124,7 @@ def _mysql(sql: str) -> str:
             "aishop-mysql",
             "sh",
             "-lc",
-            'exec mysql --batch --raw --skip-column-names -uroot -p"$MYSQL_ROOT_PASSWORD"',
+            'exec mysql --batch --raw --skip-column-names -uroot -p"$MYSQL_ROOT_PASSWORD" aishop_agent',
         ],
         input=sql.encode("utf-8"),
         capture_output=True,
