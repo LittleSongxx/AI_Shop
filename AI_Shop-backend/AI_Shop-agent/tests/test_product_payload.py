@@ -238,6 +238,42 @@ async def test_zero_mission_clarifications_keeps_shopping_decision_v2(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_specific_winter_jacket_query_searches_without_clarification(monkeypatch):
+    service = ProductService()
+    profile = empty_profile()
+    mission = empty_shopping_mission({**profile, "category": "外套"})
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "get_effective_profile",
+        AsyncMock(return_value=profile),
+    )
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "should_clarify",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(service, "_mission_for_request", AsyncMock(return_value=mission))
+    pipeline = AsyncMock(
+        return_value=ProductSearchResult(
+            [],
+            [],
+            ProductSearchTrace(query_plan={}, result_source="none"),
+        )
+    )
+    monkeypatch.setattr(product_search_pipeline, "search", pipeline)
+
+    _assistant, _biz, _biz_type, products, source = await service.search_products(
+        "synthetic-user",
+        "男士冬季加绒加厚外套",
+        user_text="男士冬季加绒加厚外套",
+    )
+
+    assert products == []
+    assert source == "none"
+    pipeline.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_comparison_incomplete_blocks_browse_and_hot_sale_fallback(monkeypatch):
     service = ProductService()
     monkeypatch.setattr(

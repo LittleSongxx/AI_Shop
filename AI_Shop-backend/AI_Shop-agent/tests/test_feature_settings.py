@@ -53,15 +53,15 @@ def test_mysql_dsn_encodes_credentials_and_ipv6():
     )
 
 
-def test_multi_agent_and_data_analyst_are_enabled_by_default(monkeypatch):
+def test_multi_agent_and_data_analyst_are_disabled_by_default(monkeypatch):
     monkeypatch.delenv("MULTI_AGENT_ENABLED", raising=False)
     monkeypatch.delenv("DATA_ANALYST_ENABLED", raising=False)
 
     settings = Settings(_env_file=None)
 
-    assert settings.multi_agent_enabled is True
+    assert settings.multi_agent_enabled is False
     assert settings.orchestration_mode == "adaptive"
-    assert settings.data_analyst_enabled is True
+    assert settings.data_analyst_enabled is False
     assert settings.multi_agent_specialist_timeout_seconds == 12
     assert settings.llm_timeout == 20
     assert settings.llm_max_retries == 1

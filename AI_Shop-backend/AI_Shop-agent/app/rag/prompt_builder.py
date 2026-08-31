@@ -395,6 +395,81 @@ def _coverage_requirements(
                 ),
             ]
         )
+
+    if (
+        "checkout.idempotency_key" in fact_ids
+        and any(term in text for term in ("订单", "下单"))
+        and any(
+            term in text
+            for term in (
+                "重复提交",
+                "重复创建",
+                "重复建单",
+                "创建两个订单",
+                "创建多个订单",
+            )
+        )
+    ):
+        requirements.extend(
+            [
+                ("订单幂等键", ("Idempotency-Key", "幂等键")),
+                (
+                    "重复提交不重复建单",
+                    (
+                        "不重复创建订单",
+                        "不会重复创建订单",
+                        "不会创建两个订单",
+                        "返回已保存结果",
+                        "返回已保存的结果",
+                    ),
+                ),
+            ]
+        )
+
+    if (
+        "rag.retrieval_and_abstention" in fact_ids
+        and any(
+            term in text
+            for term in (
+                "证据不足",
+                "证据不够",
+                "检索不足",
+                "找不到充分依据",
+                "没有充分依据",
+                "证据矛盾",
+                "互相矛盾",
+                "grounding",
+            )
+        )
+    ):
+        requirements.extend(
+            [
+                ("证据不足条件", ("证据不足", "没有足够证据", "检索不足")),
+                (
+                    "明确说明证据不足",
+                    ("明确说明", "清楚说明", "拒绝给出确定结论"),
+                ),
+                ("建议人工核实", ("联系人工客服", "转人工", "人工客服核实")),
+            ]
+        )
+
+    if (
+        "ai.capability_and_confirmation" in fact_ids
+        and any(term in text for term in ("ai", "助手"))
+        and any(
+            term in text
+            for term in ("写操作", "加购", "下单", "订单", "取消", "退款", "删除", "执行")
+        )
+    ):
+        requirements.extend(
+            [
+                ("写操作待确认", ("待确认操作", "待确认", "确认卡")),
+                (
+                    "用户确认后执行",
+                    ("用户确认后才执行", "确认后才执行", "用户确认后执行"),
+                ),
+            ]
+        )
     return requirements
 
 

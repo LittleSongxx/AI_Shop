@@ -522,8 +522,8 @@ class Settings(BaseSettings):
     # Multi-Agent is available to the adaptive router, not the default for every
     # request. Deterministic reads use a workflow and ordinary open tasks use one
     # agent; bounded specialists are reserved for cross-domain requests.
-    multi_agent_enabled: bool = True
-    data_analyst_enabled: bool = True
+    multi_agent_enabled: bool = False
+    data_analyst_enabled: bool = False
     # Agentic Commerce v2 is deliberately a single serving path. These switches
     # exist for an operational kill switch, not to keep a second recommendation
     # implementation alive indefinitely.

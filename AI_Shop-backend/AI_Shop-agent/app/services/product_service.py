@@ -295,12 +295,18 @@ class ProductService:
             profile,
             consult_product,
         )
+        concrete_query = self._has_concrete_query(
+            query_plan.raw_query, consult_product
+        )
+        specific_query = concrete_query and len(query_plan.retrieval_variants) > 1
         if (
             clarification
             and should_ask_clarification
             and not (
-                clarification.get("slot") == "category"
-                and self._has_concrete_query(query_plan.raw_query, consult_product)
+                concrete_query
+                and (
+                    clarification.get("slot") == "category" or specific_query
+                )
             )
         ):
             episode_service.record_step(

@@ -206,7 +206,23 @@ def summarize_pilot_metrics(
 
 def summarize_performance(runs: list[dict[str, Any]]) -> dict[str, Any]:
     successes = [run for run in runs if _verified_success(run)]
-    total_cost = round(sum(float(run.get("cost_cny") or 0) for run in runs), 6)
+    statuses = [
+        str(_decode_object(_decode_object(run.get("quality_json")).get("costSummary")).get("costStatus") or "MISSING_USAGE").upper()
+        for run in runs
+    ]
+    if not statuses or all(status == "NOT_APPLICABLE" for status in statuses):
+        cost_status = "NOT_APPLICABLE"
+    elif any(status not in {"PRICED", "UNPRICED", "NOT_APPLICABLE"} for status in statuses):
+        cost_status = "MISSING_USAGE"
+    elif "UNPRICED" in statuses:
+        cost_status = "UNPRICED"
+    else:
+        cost_status = "PRICED"
+    total_cost = (
+        round(sum(float(run.get("cost_cny") or 0) for run in runs), 6)
+        if cost_status == "PRICED"
+        else None
+    )
     return {
         "runCount": len(runs),
         "latencyMs": _distribution(
@@ -228,10 +244,13 @@ def summarize_performance(runs: list[dict[str, Any]]) -> dict[str, Any]:
             "input": int(sum(int(run.get("input_tokens") or 0) for run in runs)),
             "output": int(sum(int(run.get("output_tokens") or 0) for run in runs)),
         },
+        "costStatus": cost_status,
         "costCny": total_cost,
         "verifiedSuccessCount": len(successes),
         "costPerVerifiedSuccessCny": (
-            round(total_cost / len(successes), 6) if successes else None
+            round(total_cost / len(successes), 6)
+            if total_cost is not None and successes
+            else None
         ),
     }
 
@@ -484,6 +503,7 @@ class PilotMetricsService:
                 f"{tasks['verifiedSuccess']['denominator']}",
                 f"- FCR (24h): {tasks['fcr24h']['numerator']} / "
                 f"{tasks['fcr24h']['denominator']}",
+                f"- Cost status: {performance['costStatus']}",
                 f"- Cost (CNY): {performance['costCny']}",
                 f"- REAL_USER: {report['realUserStatus']}",
                 "- Raw conversation exported: no",

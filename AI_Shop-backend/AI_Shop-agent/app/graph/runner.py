@@ -182,6 +182,7 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
                 }
                 if result.get("rag_trace")
                 else None,
+                quality={"costSummary": cost_summary},
             )
             episode_service.record_step(
                 "GRAPH_END",
@@ -235,6 +236,9 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             # resumable checkpoint that could execute after cancellation.
             outcome = "cancelled"
             outcome_known = True
+            episode_service.update_run(
+                quality={"costSummary": snapshot_cost_summary()}
+            )
             raise
         except BudgetExceededError as budget_exc:
             # 预算超限错误
@@ -249,6 +253,7 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             )
             span.record_exception(budget_exc)
             await rt.push_budget_error(agent_msg)
+            cost_summary = snapshot_cost_summary()
             episode_service.record_step(
                 "BUDGET_EXCEEDED",
                 node_name="graph",
@@ -257,11 +262,12 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
                 error_message=str(budget_exc),
                 latency_ms=elapsed_ms,
                 output_data={
-                    "costSummary": snapshot_cost_summary(),
+                    "costSummary": cost_summary,
                     "budgetSummary": budget_guard.summary() if budget_guard else {},
                     "reason": budget_exc.as_dict(),
                 },
             )
+            episode_service.update_run(quality={"costSummary": cost_summary})
             episode_service.finish_run(
                 "budget_exceeded", latency_ms=elapsed_ms, force_keep=True
             )
@@ -271,6 +277,7 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
             outcome = "graph_exception"
             outcome_known = True
             span.record_exception(exc)
+            cost_summary = snapshot_cost_summary()
             episode_service.record_step(
                 "GRAPH_ERROR",
                 node_name="graph",
@@ -280,8 +287,9 @@ async def run_agent_graph(agent_msg: dict, budget_config: BudgetConfig | None = 
                 latency_ms=elapsed_ms,
                 # 异常路径同样补成本快照：已累计的 LLM 成本随异常结束不应丢失
                 # per-request 摘要（E 工作线"每条消息"口径的异常兜底）。
-                output_data={"costSummary": snapshot_cost_summary()},
+                output_data={"costSummary": cost_summary},
             )
+            episode_service.update_run(quality={"costSummary": cost_summary})
             episode_service.finish_run(
                 "graph_exception", latency_ms=elapsed_ms, force_keep=True
             )

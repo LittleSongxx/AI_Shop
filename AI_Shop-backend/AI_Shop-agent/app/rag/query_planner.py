@@ -317,6 +317,17 @@ def query_fact_hints(query: str) -> tuple[str, ...]:
         )
     ):
         add("aftersales.request_and_refund_boundary")
+    if any(term in text for term in ("订单", "下单")) and any(
+        term in text
+        for term in (
+            "重复提交",
+            "重复创建",
+            "重复建单",
+            "创建两个订单",
+            "创建多个订单",
+        )
+    ):
+        add("checkout.idempotency_key")
     if "幂等键" in text and any(
         term in text for term in ("结算内容", "请求内容", "换了", "冲突")
     ):

@@ -258,6 +258,12 @@ def test_query_fact_hints_cover_runtime_business_propositions():
     assert query_fact_hints("同一幂等键换了结算内容会怎样处理") == (
         "checkout.idempotency_key",
     )
+    assert query_fact_hints("重复提交同一笔订单会不会创建两个订单？") == (
+        "checkout.idempotency_key",
+    )
+    assert query_fact_hints("重复创建订单时如何避免重复建单？") == (
+        "checkout.idempotency_key",
+    )
     assert query_fact_hints("物流长时间不更新时应提供哪些信息给客服") == (
         "logistics.delayed_event_support",
     )

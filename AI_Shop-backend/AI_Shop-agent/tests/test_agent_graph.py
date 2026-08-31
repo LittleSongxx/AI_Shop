@@ -1173,7 +1173,8 @@ async def test_graph_end_exposes_deterministic_path_and_llm_call_outcomes(monkey
         },
     )
     monkeypatch.setattr("app.graph.runner.episode_service.record_step", recorded)
-    monkeypatch.setattr("app.graph.runner.episode_service.update_run", MagicMock())
+    updated = MagicMock()
+    monkeypatch.setattr("app.graph.runner.episode_service.update_run", updated)
     monkeypatch.setattr("app.graph.runner.episode_service.finish_run", MagicMock())
 
     outcome = await run_agent_graph(
@@ -1197,3 +1198,6 @@ async def test_graph_end_exposes_deterministic_path_and_llm_call_outcomes(monkey
     assert output["llmCallCount"] == 1
     assert output["successfulLlmCallCount"] == 0
     assert output["failedLlmCallCount"] == 1
+    assert updated.call_args.kwargs["quality"]["costSummary"]["costStatus"] == (
+        "MISSING_USAGE"
+    )

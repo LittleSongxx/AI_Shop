@@ -14,13 +14,17 @@ def _run(
     verified: bool = False,
     confirmed: bool = False,
     completed_at: datetime | None = None,
+    cost_status: str = "PRICED",
 ) -> dict:
     completed = completed_at or datetime(2026, 8, 1, 8, tzinfo=timezone.utc)
     return {
         "run_id": f"run-{user_id}",
         "user_id": user_id,
         "status": "SUCCEEDED",
-        "quality_json": {"verifierPassed": verified},
+        "quality_json": {
+            "verifierPassed": verified,
+            "costSummary": {"costStatus": cost_status},
+        },
         "reward_signals_json": {"userConfirmedSuccess": confirmed},
         "started_at": completed - timedelta(seconds=1),
         "completed_at": completed,
@@ -125,7 +129,17 @@ def test_performance_discloses_sample_size_and_suppresses_tiny_p99():
     assert result["latencyMs"]["p50"] == 1000
     assert result["latencyMs"]["p99"] is None
     assert result["latencyMs"]["p99Status"] == "样本少于 100，未报告"
+    assert result["costStatus"] == "PRICED"
     assert result["costPerVerifiedSuccessCny"] == 0.02
+
+
+def test_unknown_or_unpriced_cost_is_never_reported_as_zero():
+    for status in ("MISSING_USAGE", "UNPRICED"):
+        result = summarize_performance([_run(status, verified=True, cost_status=status)])
+
+        assert result["costStatus"] == status
+        assert result["costCny"] is None
+        assert result["costPerVerifiedSuccessCny"] is None
 
 
 def test_no_real_user_sample_is_reported_as_not_collected():

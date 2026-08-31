@@ -2578,6 +2578,58 @@ def test_grounding_repair_accepts_complete_memory_storage_and_external_service_p
     assert reason is None
 
 
+@pytest.mark.parametrize(
+    ("query", "fact_id", "evidence", "partial_answer", "missing_label", "complete_answer"),
+    (
+        (
+            "重复提交同一笔订单会不会创建两个订单？",
+            "checkout.idempotency_key",
+            "普通下单要求 `Idempotency-Key`。同一请求重试会返回已保存结果，不重复创建订单。",
+            "普通下单要求 `Idempotency-Key`。[1]",
+            "重复提交不重复建单",
+            "普通下单要求 `Idempotency-Key`，同一请求重试会返回已保存结果，不重复创建订单。[1]",
+        ),
+        (
+            "知识库证据不够时助手应该怎样回答？",
+            "rag.retrieval_and_abstention",
+            "若知识库没有足够证据，助手应明确说明并建议联系人工客服。",
+            "知识库证据不足时，助手会明确说明。[1]",
+            "建议人工核实",
+            "知识库证据不足时，助手会明确说明并建议联系人工客服。[1]",
+        ),
+        (
+            "AI可以不经我确认直接取消订单吗？",
+            "ai.capability_and_confirmation",
+            "涉及订单等业务动作时，系统应展示待确认操作，用户确认后才执行。",
+            "AI 不会直接执行取消订单。[1]",
+            "写操作待确认",
+            "AI 会展示待确认操作，用户确认后才执行取消订单。[1]",
+        ),
+    ),
+)
+def test_grounding_repair_checks_query_conditioned_operational_completeness(
+    query, fact_id, evidence, partial_answer, missing_label, complete_answer
+):
+    evidence_items = [{"citation": 1, "factIds": [fact_id], "text": evidence}]
+
+    reason = grounding_repair_reason(
+        partial_answer,
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query=query,
+        evidence_items=evidence_items,
+    )
+
+    assert missing_label in (reason or "")
+    assert grounding_repair_reason(
+        complete_answer,
+        evidence_state="SUPPORTED",
+        evidence_count=1,
+        query=query,
+        evidence_items=evidence_items,
+    ) is None
+
+
 def _aftersales_policy_evidence() -> list[dict]:
     return [
         {
