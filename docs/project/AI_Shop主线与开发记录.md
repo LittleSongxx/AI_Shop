@@ -255,3 +255,11 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 真实外部模型 v4 完整执行 Search 50 / RAG 50 / Agent 25（Agent 200 trials），总门仍 `FAILED`。RAG case pass `29/50 → 31/50`、source coverage `0.586207 → 0.965517`，但 NDCG@5 `0.910388 → 0.858217`，generation/claim/citation 仅 `0.62`，不能概括为全面质量提升。
 - 生命周期源码暴露门拒绝了与回归测试完整重合的 `agent-unseen-116`；没有绕过。探索副本只改写该条措辞并标记不可同题比较，RAG 50 条不变。正式资产五个哨兵 SHA 前后完全一致。
 - 外置 evidence、candidate 与 runtime quarantine 的路径、SHA、逐 case 差异和后续边界见 [A1 事实 Alias 路由与探索评测](AI-Shop-A1事实Alias路由与探索评测-20260830.md)。
+
+### 2026-08-31：A2 人工基线纠偏、Agent safety/handoff 收口与数据索引
+
+- A2 先在共享 verifier 根路径完成动态事实的 clause/object/field/value 绑定、失败工具去 authority、跨订单隔离和相反后句 fail-closed；核心提交为 `bacbe5e`。随后完整 Agent 人工基线只有答案及联合 `14/25`、引用 `13/23`，暴露出自动通过且人工失败 11 条、自动失败且人工通过 4 条，证明 task gate 不能代替最终答案质量。
+- `d07fda0` 将根 Episode response verifier、非空输出、同商品当前快照、通用政策/动态状态边界纳入任务成功；`caa311e` 继续修复 same-root handoff、真实 runtime terminal、精确 pre-execution safety reject、current-run action token 和高置信复合输入防护。两轮独立审查均为 `P0=0/P1=0`。
+- 最新同设计 k=3 探索运行完整执行 75/75、exit 0；strict `49/75 → 61/75`、pass³ `16/25 → 20/25`，增益来自 handoff/safety `0/12 → 12/12`。shopping `24/24`、确认写 `18/18`，RAG-policy 仍为 `7/21`；因此只声称安全/评测合同改善，不声称模型答案能力全面提升。
+- 当前代码验证为 handoff 指定八文件 `331 passed`、Python 全量 `1963 passed, 9 skipped, 1 warning`；两个历史基线仍仅因既有 private holdout 缺失而 `7 failed / 5 passed`。正式五个哨兵未变化，Text2SQL 继续冻结。
+- 根目录六组人工回传已 33/33 字节级进入外置 custody 并完成 final；早期 `reviewer-A/B` 目录名与逻辑 reviewer 对调，后续一律以 manifest `reviewerId` 为准。经用户授权和 final SHA 复核后，六组根目录冗余副本已删除。数据生命周期、权威路径和待决托管项见 [数据资产与人工标注归档索引](AI-Shop-数据资产与人工标注归档索引-20260831.md)，面试叙事见 [关键问题优化与面试叙事](AI-Shop-关键问题优化与面试叙事-20260831.md)。

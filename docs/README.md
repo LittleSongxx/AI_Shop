@@ -11,6 +11,8 @@
 | [project/AI-Shop-客服真实浏览器E57证据](project/AI-Shop-客服真实浏览器E57证据-20260829.md) | 真实客服退款提案、售后候选选择/冲突幂等和订单事实浏览器链 | `2/2 passed`；只走提案，非写入/CSAT/FCR/SLO |
 | [project/AI-Shop-运行态清理索引](project/AI-Shop-运行态清理索引-20260829.md) | 日志、runtime 配置、privacy export 的可逆外置和 SHA custody | 49 个、11,634,909 bytes；保留历史证据与数据目录 |
 | [project/AI_Shop主线与开发记录](project/AI_Shop主线与开发记录.md) | AI 主线、方法判断、关键改造、阶段性取舍和后续路线 | 源码与运行证据汇总 |
+| [project/AI-Shop-数据资产与人工标注归档索引](project/AI-Shop-数据资产与人工标注归档索引-20260831.md) | datasets、evidence、外置 custody、人工回传和生命周期的权威路径 | 根目录 33 个冗余 intake 已验证后删除；私有正文不入索引 |
+| [project/AI-Shop-关键问题优化与面试叙事](project/AI-Shop-关键问题优化与面试叙事-20260831.md) | 动态事实防幻觉、自动/人工纠偏、handoff/safety、RAG 与 evidence governance 的 STAR 素材 | 聚合指标有边界；非 unseen、非生产 SLO |
 | [project/AI-Shop-Text2SQL冻结说明](project/AI-Shop-Text2SQL冻结说明-20260829.md) | Text2SQL 状态、证据 custody、恢复条件和后续排期边界 | `FROZEN`；不列默认演示或 release gate |
 | [project/AI-Shop-E1-流式重连验证](project/AI-Shop-E1-流式重连验证-20260829.md) | stream envelope、OPEN barrier、乱序/重复处理和终态回放 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
 | [project/AI-Shop-E2-取消终态幂等验证](project/AI-Shop-E2-取消终态幂等验证-20260829.md) | 取消权威状态、迟到终态、HTTP 重试和幂等收敛 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
@@ -18,6 +20,7 @@
 | [project/AI-Shop-E5-身份与安全验证](project/AI-Shop-E5-身份与安全验证-20260829.md) | Agent principal、WS Origin、Cookie CSRF、token 过期、输入/帧大小和限流边界 | `CONTROLLED_PREPROD_ONLY`；单店边界 |
 | [project/AI-Shop-E6-RAG生命周期验证](project/AI-Shop-E6-RAG生命周期验证-20260829.md) | 发布快照、ACL、freshness、逻辑删除/回滚和 RAG DLQ 指标 | `CONTROLLED_PREPROD_ONLY`；`releaseGateEligible=false` |
 | [project/AI-Shop-A1事实Alias路由与探索评测](project/AI-Shop-A1事实Alias路由与探索评测-20260830.md) | 发布版 fact metadata alias → `factHints` 路由、回归与隔离外部模型 v4 结果 | RAG 31/50、source coverage 0.965517；探索性、非 unseen/release gate |
+| [project/AI-Shop-A2生成与Claim稳定性探索评测](project/AI-Shop-A2生成与Claim稳定性探索评测-20260830.md) | clause/object/value 证据绑定、生成 fallback、外部模型 v5 与 custody | RAG 49/50；探索性、非 unseen/release gate；后续 Agent 纠偏见主线记录 |
 | [project/AI-Shop-E8-可观测背压短稳态验证](project/AI-Shop-E8-可观测背压短稳态验证-20260829.md) | 跨链路 correlation、WebSocket 慢连接边界、队列年龄/取消时延和短稳态 | `CONTROLLED_PREPROD_ONLY`；不构成生产 SLO |
 | [project/AI-Shop-E9-前端真实闭环验证](project/AI-Shop-E9-前端真实闭环验证-20260829.md) | typed legacy adapter、WS token refresh、终态/取消、a11y、reduced-motion、Web Vitals 与 mock 浏览器 | `CONTROLLED_PREPROD_ONLY`；不构成线上 SLO |
 | [project/AI-Shop-购物导购真实浏览器E57证据](project/AI-Shop-购物导购真实浏览器E57证据-20260829.md) | 真实推荐→点击归因→商品页→checkout→加购归因链及 trace custody | `1/1 passed`；支付、CTR/CVR/GMV 和线上 SLO 均未声明 |
