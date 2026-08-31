@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type BrowserContext } from '@playwright/test';
 
 const liveEnabled = process.env.AISHOP_LIVE_E2E === 'true';
 const orderEnabled = process.env.AISHOP_LIVE_E2E_ORDER === 'true';
 const paymentEnabled = process.env.AISHOP_LIVE_E2E_PAYMENT === 'true';
 const demoUserId = '9000000001';
+const browserOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:6101').origin;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -30,7 +31,9 @@ const unwrap = async (response: Awaited<ReturnType<APIRequestContext['get']>>) =
   return body.data;
 };
 
-const loginDemoUser = async (request: APIRequestContext) => {
+const loginDemoUser = async (context: BrowserContext) => {
+  await context.setExtraHTTPHeaders({ Origin: browserOrigin });
+  const request = context.request;
   const captcha = await unwrap(await request.get('/api/account/checkCode'));
   const key = String(captcha?.checkCodeKey || '');
   expect(key).toMatch(/^[0-9a-f-]{36}$/i);
@@ -79,7 +82,7 @@ test.describe('explicit local full-stack AI flow', () => {
   }, testInfo) => {
     testInfo.setTimeout(150_000);
     test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
-    await loginDemoUser(context.request);
+    await loginDemoUser(context);
     resetIntentRepeatCounter('REFUND');
 
     const query = '没发货的耳机我要退款';
@@ -138,7 +141,7 @@ test.describe('explicit local full-stack AI flow', () => {
   }, testInfo) => {
     testInfo.setTimeout(150_000);
     test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
-    await loginDemoUser(context.request);
+    await loginDemoUser(context);
     resetIntentRepeatCounter('DAMAGED_OR_WRONG_ITEM');
 
     const query = '我收到的东西坏了';
@@ -245,7 +248,7 @@ test.describe('explicit local full-stack AI flow', () => {
   }, testInfo) => {
     testInfo.setTimeout(150_000);
     test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
-    await loginDemoUser(context.request);
+    await loginDemoUser(context);
     const existingCart = await unwrap(await context.request.post('/api/productCart/loadProductCart', {
       form: { pageNo: '1' }
     }));
@@ -418,7 +421,7 @@ test.describe('explicit local full-stack AI flow', () => {
   }, testInfo) => {
     testInfo.setTimeout(150_000);
     test.skip(testInfo.project.name !== 'mobile', 'the live flow runs once on the mobile UI');
-    await loginDemoUser(context.request);
+    await loginDemoUser(context);
 
     const profileBefore = await unwrap(
       await context.request.get('/api/agent/shoppingProfile')
