@@ -2790,6 +2790,41 @@ def test_grounding_repair_checks_query_conditioned_operational_completeness(
     ) is None
 
 
+def test_cited_write_confirmation_policy_is_not_live_refund_state():
+    refs = [
+        {
+            "id": "confirmation-policy",
+            "factIds": ["ai.capability_and_confirmation"],
+            "snippet": "涉及订单的写操作需展示待确认操作，用户确认后才执行。",
+        }
+    ]
+    policy = response_verifier.verify(
+        assistant="AI 执行退款等写操作前必须由用户确认后才会执行成功 [1]。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+    live_state = response_verifier.verify(
+        assistant="我的退款状态已完成且确认后才执行 [1]。",
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+
+    assert policy.passed is True
+    assert live_state.passed is False
+
+
 def _aftersales_policy_evidence() -> list[dict]:
     return [
         {

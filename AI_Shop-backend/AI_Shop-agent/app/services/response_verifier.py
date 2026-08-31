@@ -317,6 +317,15 @@ class ResponseVerifier:
             else _legacy_rag_sources(source_refs)
         )
         source_count = _source_count(effective_rag_refs)
+        dynamic_clauses = [
+            clause
+            for clause in _assertion_clauses(text)
+            if _DYNAMIC_FACT_RE.search(clause)
+        ]
+        cited_write_policy_only = bool(dynamic_clauses) and all(
+            _is_cited_write_confirmation_policy(clause, effective_rag_refs)
+            for clause in dynamic_clauses
+        )
         verified_action_card = (
             str(biz_type or "") == "action_confirm" and has_pending_action
         )
@@ -402,6 +411,7 @@ class ResponseVerifier:
             _DYNAMIC_FACT_RE.search(text)
             and not called.intersection(set().union(*_DYNAMIC_BIZ_TOOLS.values()))
             and not verified_order_context
+            and not cited_write_policy_only
             and not (
                 # A cited, generic policy sentence may mention lifecycle
                 # states (for example "待付款/已发货") without claiming the
@@ -428,6 +438,7 @@ class ResponseVerifier:
             fact_text,
             business_refs,
             rag_source_count=source_count if rag_citation_required else 0,
+            rag_source_refs=effective_rag_refs if rag_citation_required else [],
         )
         if unsupported_order_fact or unsupported_dynamic_fact:
             issues.append(
@@ -1193,6 +1204,7 @@ def _unsupported_dynamic_business_fact(
     source_refs: list[dict] | dict | None,
     *,
     rag_source_count: int = 0,
+    rag_source_refs: list[dict] | None = None,
 ) -> str | None:
     """Bind each non-order dynamic assertion to its Java-owned ref and value."""
 
@@ -1239,6 +1251,9 @@ def _unsupported_dynamic_business_fact(
                     _text_support_case_ids(clause),
                 )
             )
+        )
+        generic_policy_clause = generic_policy_clause or _is_cited_write_confirmation_policy(
+            clause, rag_source_refs or []
         )
         negated_value = bool(_NEGATED_VALUE_RE.search(clause))
         logistics_statuses = _dynamic_status_assertions(
@@ -1515,6 +1530,34 @@ def _unsupported_dynamic_business_fact(
             if comment_statuses and not negated_value:
                 prior_comment_status = comment_statuses
     return None
+
+
+def _is_cited_write_confirmation_policy(
+    clause: str, rag_source_refs: list[dict]
+) -> bool:
+    citations = [int(value) for value in _RAG_CITATION_RE.findall(clause)]
+    fact_ids = {
+        str(fact_id)
+        for citation in citations
+        if 0 < citation <= len(rag_source_refs)
+        for fact_id in rag_source_refs[citation - 1].get("factIds") or []
+    }
+    return bool(
+        citations
+        and fact_ids.intersection(
+            {
+                "ai.capability_and_confirmation",
+                "privacy.handoff_and_write_confirmation",
+                "review.ai_write_boundary",
+            }
+        )
+        and re.search(r"确认|待确认", clause)
+        and re.search(r"AI|助手|系统|写操作|退款|取消|下单|订单", clause)
+        and not re.search(
+            r"你当前|你的|我的|该订单|当前订单|本订单|这笔订单|订单号|订单项",
+            clause,
+        )
+    )
 
 
 def has_dynamic_order_authority(source_refs: list[dict] | dict | None) -> bool:
