@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from urllib.parse import quote, urlparse
 
 from pydantic import AliasChoices, BeforeValidator, Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 def _blank_to_none(value: object) -> object:
@@ -50,7 +50,7 @@ def _parse_origins(value: object) -> object:
     return value
 
 
-Origins = Annotated[list[str], BeforeValidator(_parse_origins)]
+Origins = Annotated[list[str], NoDecode, BeforeValidator(_parse_origins)]
 
 
 class Settings(BaseSettings):

@@ -73,6 +73,20 @@ def test_multi_agent_and_data_analyst_are_disabled_by_default(monkeypatch):
     assert settings.graph_max_react_rounds == 3
 
 
+def test_origin_allowlist_accepts_comma_separated_environment(monkeypatch):
+    monkeypatch.setenv(
+        "WS_ALLOWED_ORIGINS",
+        "http://127.0.0.1:6001,http://localhost:6001",
+    )
+
+    settings = Settings(_env_file=None)
+
+    assert settings.websocket_allowed_origins == [
+        "http://127.0.0.1:6001",
+        "http://localhost:6001",
+    ]
+
+
 @pytest.mark.parametrize("deadline", [4, 121])
 def test_agent_llm_call_deadline_is_bounded(deadline):
     with pytest.raises(ValueError, match="AGENT_LLM_CALL_DEADLINE_SECONDS"):
