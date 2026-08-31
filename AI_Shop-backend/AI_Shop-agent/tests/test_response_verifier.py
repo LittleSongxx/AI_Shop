@@ -2211,6 +2211,97 @@ def test_refund_action_card_scopes_refund_amount_to_selected_order_item():
     assert any(issue.code == "DYNAMIC_FACT_WITHOUT_CLAIM" for issue in tampered.issues)
 
 
+def test_order_selection_card_verifies_each_candidate_against_its_order_ref():
+    import json
+
+    refs = order_refs(
+        [
+            {
+                "order_id": "O1",
+                "order_status": 2,
+                "order_status_name": "已发货",
+                "amount": 100,
+                "pay_scene": "alipay_pc",
+                "order_time": "2026-08-25 10:00:00",
+                "items": [
+                    {
+                        "order_id": "O1",
+                        "order_item_id": "I1",
+                        "product_name": "耳机",
+                        "property_info": "黑色",
+                        "item_amount": 100,
+                    }
+                ],
+            },
+            {
+                "order_id": "O2",
+                "order_status": 3,
+                "order_status_name": "已完成",
+                "amount": 200,
+                "pay_scene": "alipay_pc",
+                "order_time": "2026-08-26 10:00:00",
+                "items": [
+                    {
+                        "order_id": "O2",
+                        "order_item_id": "I2",
+                        "product_name": "音箱",
+                        "property_info": "白色",
+                        "item_amount": 200,
+                    }
+                ],
+            },
+        ],
+        captured="2026-08-26T11:00:00+00:00",
+    )
+    card = {
+        "type": "ORDER_SELECTION",
+        "selectionId": "sel-1",
+        "candidates": [
+            {
+                "orderId": "O1",
+                "orderItemId": "I1",
+                "orderStatusName": "已发货",
+                "payScene": "alipay_pc",
+                "orderTime": "2026-08-25 10:00:00",
+                "productName": "耳机",
+                "propertyInfo": "黑色",
+                "amount": 100,
+            },
+            {
+                "orderId": "O2",
+                "orderItemId": "I2",
+                "orderStatusName": "已完成",
+                "payScene": "alipay_pc",
+                "orderTime": "2026-08-26 10:00:00",
+                "productName": "音箱",
+                "propertyInfo": "白色",
+                "amount": 200,
+            },
+        ],
+    }
+
+    valid = response_verifier.verify(
+        assistant=json.dumps(card, ensure_ascii=False),
+        biz_type="order_selection",
+        tools_called=[],
+        source_refs={"businessSources": refs},
+        order_resolution="AMBIGUOUS",
+        has_pending_action=False,
+    )
+    card["candidates"][1]["amount"] = 999
+    tampered = response_verifier.verify(
+        assistant=json.dumps(card, ensure_ascii=False),
+        biz_type="order_selection",
+        tools_called=[],
+        source_refs={"businessSources": refs},
+        order_resolution="AMBIGUOUS",
+        has_pending_action=False,
+    )
+
+    assert valid.passed is True
+    assert tampered.passed is False
+
+
 def test_rag_citation_is_checked_per_factual_sentence():
     result = response_verifier.verify(
         assistant="每个订单只能使用一张优惠券。[1] 支付失败后优惠券会释放。",

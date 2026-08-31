@@ -320,6 +320,12 @@ class ResponseVerifier:
         verified_action_card = (
             str(biz_type or "") == "action_confirm" and has_pending_action
         )
+        selection_fact_text = (
+            _order_selection_fact_text(text)
+            if str(biz_type or "") == "order_selection"
+            else None
+        )
+        verified_selection_card = bool(selection_fact_text)
 
         if (
             str(rag_evidence_state or "").upper() == "SUPPORTED"
@@ -382,7 +388,7 @@ class ResponseVerifier:
         # still support their claimed status, but never an eligibility result
         # unless a separate capability decision is present below.
         verified_order_context = (
-            order_outcome in {"RESOLVED", "NO_ELIGIBLE"}
+            (order_outcome in {"RESOLVED", "NO_ELIGIBLE"} or verified_selection_card)
             and has_dynamic_order_authority(business_refs)
         )
         if required and not called.intersection(required) and not verified_order_context:
@@ -416,7 +422,7 @@ class ResponseVerifier:
 
         fact_text = (
             _action_card_fact_text(text) if verified_action_card else None
-        ) or text
+        ) or selection_fact_text or text
         unsupported_order_fact = _unsupported_order_fact(fact_text, business_refs)
         unsupported_dynamic_fact = _unsupported_dynamic_business_fact(
             fact_text,
@@ -644,7 +650,8 @@ def _trusted_order_refs_for_text(
     """
 
     order_ids = _text_order_ids(text)
-    if len(order_ids) > 1 or len(_text_order_item_ids(text)) > 1:
+    item_ids = _text_order_item_ids(text)
+    if len(order_ids) > 1 or len(item_ids) > 1:
         return []
     refs = [
         ref
@@ -657,6 +664,21 @@ def _trusted_order_refs_for_text(
             for ref in refs
             if str(ref.get("orderId") or ref.get("id") or "").strip()
             in order_ids
+        ]
+        return matched if len(matched) == 1 else []
+    if item_ids:
+        matched = [
+            ref
+            for ref in refs
+            if item_ids.intersection(
+                {
+                    str(claim.get("subjectId") or "")
+                    for claim in ref.get("claims") or []
+                    if isinstance(claim, dict)
+                    and claim.get("subjectType") == "order_item"
+                    and claim.get("factPath") == "order_item.orderItemId"
+                }
+            )
         ]
         return matched if len(matched) == 1 else []
     # A deterministic order-reference response may omit the id in a short
@@ -1738,6 +1760,45 @@ def _action_card_fact_text(text: str) -> str | None:
             facts.append(f"订单项 {items[0]['orderItemId']} 订单项金额 {value}")
         elif order_id:
             facts.append(f"订单 {order_id} {label} {value}")
+    return "。".join(facts) or None
+
+
+def _order_selection_fact_text(text: str) -> str | None:
+    """Expand each stored selection candidate into independently scoped facts."""
+
+    try:
+        card = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(card, dict) or card.get("type") != "ORDER_SELECTION":
+        return None
+    facts: list[str] = []
+    for candidate in card.get("candidates") or []:
+        if not isinstance(candidate, dict):
+            continue
+        order_id = str(candidate.get("orderId") or "").strip()
+        item_id = str(candidate.get("orderItemId") or "").strip()
+        if not order_id:
+            continue
+        for label, key in (
+            ("订单状态为", "orderStatusName"),
+            ("支付场景为", "payScene"),
+            ("下单时间为", "orderTime"),
+        ):
+            if candidate.get(key) not in (None, ""):
+                facts.append(f"订单 {order_id} {label} {candidate[key]}")
+        if item_id:
+            for label, key, suffix in (
+                ("商品名称为", "productName", ""),
+                ("商品规格为", "propertyInfo", ""),
+                ("订单项金额", "amount", " 元"),
+            ):
+                if candidate.get(key) not in (None, ""):
+                    facts.append(
+                        f"订单项 {item_id} {label} {candidate[key]}{suffix}"
+                    )
+        elif candidate.get("amount") is not None:
+            facts.append(f"订单 {order_id} 订单金额 {candidate['amount']} 元")
     return "。".join(facts) or None
 
 
