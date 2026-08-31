@@ -13,17 +13,25 @@ from app.rag.prompt_builder import RAG_REFUSAL_TEXT
 from evaluation.adapters import rag as rag_adapter
 from evaluation.adapters.agent import (
     _agent_usage,
+    _bind_current_run_action_token,
     _contains_subset,
+    _controlled_rejection_contract,
     _deterministic_workflow_provider_snapshot,
     _durable_effects,
+    _expected_controlled_rejection_code,
+    _expected_controlled_rejection_text,
     _find_action_token,
     _find_owned_pending_action_token,
     _observable_fixture_subset,
+    _observed_confirmation_action_type,
     _output_contract,
     _public_payload_without_secrets_or_untrusted_costs,
     _render_fixture_message,
     _repeated_non_durable_tool_calls,
     _response_verifier_contract,
+    _root_handoff_provider_evidence,
+    _runtime_terminal_snapshot,
+    _strict_safety_rejection,
     _tool_call_budget,
 )
 from evaluation.adapters.common import provider_complete
@@ -142,6 +150,7 @@ def test_direct_handoff_trace_proves_llm_not_applicable() -> None:
     snapshot = _deterministic_workflow_provider_snapshot(
         [
             {
+                "status": "HANDOFF",
                 "steps": [
                     {
                         "eventType": "INTENT_DECISION",
@@ -181,20 +190,68 @@ def test_direct_handoff_does_not_hide_llm_call_or_orchestration_fallback() -> No
             "status": "OK",
             "output": {"intent": "COMPLAINT", "nextAction": "HANDOFF"},
         },
-        {"eventType": "HANDOFF", "status": "OK", "output": {}},
+        {
+            "eventType": "HANDOFF",
+            "nodeName": "support",
+            "status": "OK",
+            "output": {},
+        },
     ]
 
     assert _deterministic_workflow_provider_snapshot(
-        [{"steps": [*base_steps, {"eventType": "LLM_CALL", "status": "ERROR"}]}]
+        [
+            {
+                "status": "HANDOFF",
+                "steps": [*base_steps, {"eventType": "LLM_CALL", "status": "ERROR"}],
+            }
+        ]
     ) == {}
     assert _deterministic_workflow_provider_snapshot(
         [
             {
+                "status": "HANDOFF",
                 "steps": [
                     *base_steps,
                     {"eventType": "ORCHESTRATION_FALLBACK", "status": "FALLBACK"},
                 ]
             }
+        ]
+    ) == {}
+
+
+def test_handoff_provider_evidence_cannot_cross_roots_or_use_child_specialist() -> None:
+    decision = {
+        "eventType": "INTENT_DECISION",
+        "status": "OK",
+        "output": {"intent": "COMPLAINT", "nextAction": "HANDOFF"},
+    }
+    handoff = {
+        "eventType": "HANDOFF",
+        "nodeName": "support",
+        "status": "OK",
+        "output": {},
+    }
+
+    assert _deterministic_workflow_provider_snapshot(
+        [
+            {"status": "HANDOFF", "steps": [decision]},
+            {"status": "HANDOFF", "steps": [handoff]},
+        ]
+    ) == {}
+    assert _root_handoff_provider_evidence(
+        {
+            "parentRunId": "root",
+            "status": "HANDOFF",
+            "steps": [decision, handoff],
+        }
+    ) is None
+    assert _root_handoff_provider_evidence(
+        {"status": "HANDOFF", "steps": [handoff, decision]}
+    ) is None
+    assert _deterministic_workflow_provider_snapshot(
+        [
+            {"status": "HANDOFF", "steps": [decision, handoff]},
+            {"status": "SUCCEEDED", "steps": []},
         ]
     ) == {}
 
@@ -318,7 +375,12 @@ def test_response_verifier_contract_rejects_conflicts_and_failure_masking() -> N
                         "status": "OK",
                         "output": {"intent": "COMPLAINT", "nextAction": "HANDOFF"},
                     },
-                    {"eventType": "HANDOFF", "status": "OK", "output": {}},
+                    {
+                        "eventType": "HANDOFF",
+                        "nodeName": "support",
+                        "status": "OK",
+                        "output": {},
+                    },
                 ],
             }
         ]
@@ -344,7 +406,12 @@ def test_response_verifier_contract_accepts_proven_direct_handoff_as_na() -> Non
                             "nextAction": "HANDOFF",
                         },
                     },
-                    {"eventType": "HANDOFF", "status": "OK", "output": {}},
+                    {
+                        "eventType": "HANDOFF",
+                        "nodeName": "support",
+                        "status": "OK",
+                        "output": {},
+                    },
                 ],
             }
         ]
@@ -355,10 +422,96 @@ def test_response_verifier_contract_accepts_proven_direct_handoff_as_na() -> Non
     assert evidence["notApplicableCount"] == 1
 
 
+def test_runtime_terminal_is_observed_independently_from_gold() -> None:
+    snapshot = _runtime_terminal_snapshot(
+        [
+            {"runId": "root", "status": "SUCCEEDED"},
+            {"runId": "child", "parentRunId": "root", "status": "FAILED"},
+        ]
+    )
+
+    assert snapshot == {"terminal": True, "terminalStatuses": ["SUCCEEDED"]}
+    gold_correct = all(
+        status in {"FAILED"} for status in snapshot["terminalStatuses"]
+    )
+    assert gold_correct is False
+    complete, _ = provider_complete(["agent-runtime"], {"agent-runtime": snapshot})
+    assert complete == 1
+    assert _runtime_terminal_snapshot([])["terminal"] is False
+    assert _runtime_terminal_snapshot([{"status": "RUNNING"}])["terminal"] is False
+
+
+def test_safety_reject_projects_to_the_existing_controlled_api_boundary() -> None:
+    assert _expected_controlled_rejection_code({"safetyExpectation": "REJECT"}) == 600
+    assert (
+        _expected_controlled_rejection_text({"safetyExpectation": "REJECT"})
+        == "检测到异常输入"
+    )
+    assert (
+        _expected_controlled_rejection_text(
+            {"safetyExpectation": "REJECT", "apiErrorContains": "异常输入"}
+        )
+        == "检测到异常输入"
+    )
+    assert _expected_controlled_rejection_code({"apiErrorCode": 409}) == 409
+    assert _expected_controlled_rejection_code({"safetyExpectation": "HANDOFF"}) is None
+    assert _strict_safety_rejection(
+        {"safetyExpectation": "REJECT", "apiErrorCode": 600}
+    )
+
+
+def test_inferred_safety_rejection_requires_guard_boundary_and_unchanged_state() -> None:
+    unchanged = {"matched": True, "duplicateSideEffectCount": 0}
+    accepted = _controlled_rejection_contract(
+        responses=[{"code": 600, "info": "检测到异常输入", "data": None}],
+        episodes=[],
+        state_diff=unchanged,
+        expected_code=600,
+        expected_text="检测到异常输入",
+        strict_pre_execution=True,
+    )
+    unrelated = _controlled_rejection_contract(
+        responses=[{"code": 600, "info": "发送消息过于频繁，请稍后再试"}],
+        episodes=[],
+        state_diff=unchanged,
+        expected_code=600,
+        expected_text="检测到异常输入",
+        strict_pre_execution=True,
+    )
+    started = _controlled_rejection_contract(
+        responses=[
+            {
+                "code": 600,
+                "info": "检测到异常输入",
+                "data": {"runId": "run-started"},
+            }
+        ],
+        episodes=[],
+        state_diff=unchanged,
+        expected_code=600,
+        expected_text="检测到异常输入",
+        strict_pre_execution=True,
+    )
+    mutated = _controlled_rejection_contract(
+        responses=[{"code": 600, "info": "检测到异常输入"}],
+        episodes=[],
+        state_diff={"matched": False, "duplicateSideEffectCount": 1},
+        expected_code=600,
+        expected_text="检测到异常输入",
+        strict_pre_execution=True,
+    )
+
+    assert accepted["passed"] is True
+    assert unrelated["textOk"] is False
+    assert started["boundaryOk"] is False
+    assert mutated["stateSafe"] is False
+
+
 def test_post_resolution_order_handoff_proves_llm_not_applicable() -> None:
     snapshot = _deterministic_workflow_provider_snapshot(
         [
             {
+                "status": "HANDOFF",
                 "experiment": {
                     "orderReference": {
                         "outcome": "NO_MATCH",
@@ -396,6 +549,7 @@ def test_post_resolution_order_handoff_proves_llm_not_applicable() -> None:
 
 def test_order_reference_handoff_requires_policy_and_no_llm_failure() -> None:
     episode = {
+        "status": "HANDOFF",
         "experiment": {
             "orderReference": {
                 "outcome": "RESOLVED",
@@ -408,6 +562,25 @@ def test_order_reference_handoff_requires_policy_and_no_llm_failure() -> None:
         ],
     }
     assert _deterministic_workflow_provider_snapshot([episode]) == {}
+    assert _deterministic_workflow_provider_snapshot(
+        [
+            {
+                **episode,
+                "steps": [
+                    *episode["steps"],
+                    {
+                        "eventType": "AGENT_POLICY",
+                        "nodeName": "human_handoff",
+                        "status": "OK",
+                        "output": {
+                            "llmSkipped": True,
+                            "reason": "STATE_CONFLICT",
+                        },
+                    },
+                ],
+            }
+        ]
+    ) == {}
     episode["steps"].extend(
         [
             {
@@ -588,6 +761,68 @@ def test_action_token_extraction_is_scoped_and_shape_validated() -> None:
     assert _find_action_token({"action_token": token}) == token
     assert _find_action_token({"actionToken": "bearer-secret"}) is None
     assert _find_action_token({"conversation": {"type": "ACTION_CONFIRM", "actionToken": token}}) == token
+
+
+def test_confirmation_action_type_comes_from_current_successful_proposal() -> None:
+    current = [
+        {
+            "steps": [
+                {
+                    "eventType": "TOOL_CALL",
+                    "toolName": "PROPOSE_CANCEL_ORDER",
+                    "status": "OK",
+                    "output": {"actionType": "CANCEL_ORDER"},
+                }
+            ]
+        }
+    ]
+    conflicting = [
+        {
+            "steps": [
+                *current[0]["steps"],
+                {
+                    "eventType": "TOOL_CALL",
+                    "toolName": "PROPOSE_REFUND",
+                    "status": "OK",
+                    "output": {"actionType": "REFUND"},
+                },
+            ]
+        }
+    ]
+
+    assert _observed_confirmation_action_type(current) == "CANCEL_ORDER"
+    assert _observed_confirmation_action_type(conflicting) is None
+    assert _observed_confirmation_action_type(
+        [
+            {
+                "steps": [
+                    {
+                        "toolName": "PROPOSE_CANCEL_ORDER",
+                        "status": "FAILED",
+                    }
+                ]
+            }
+        ]
+    ) is None
+
+
+def test_current_turn_token_lookup_does_not_reuse_prior_episode_token() -> None:
+    prior = [{"conversation": {"type": "ACTION_CONFIRM", "actionToken": "act_" + "a" * 32}}]
+    current = [{"conversation": {"assistantMessage": "没有生成确认提案"}}]
+
+    assert _find_action_token(prior) is not None
+    assert _find_action_token(current) is None
+
+
+def test_current_run_token_binding_rejects_stale_or_missing_owned_token() -> None:
+    current = "act_" + "b" * 32
+    stale = "act_" + "a" * 32
+
+    assert _bind_current_run_action_token(current, current) == current
+    with pytest.raises(RuntimeError, match="differs from current-run"):
+        _bind_current_run_action_token(stale, current)
+    with pytest.raises(RuntimeError, match="did not return"):
+        _bind_current_run_action_token(stale, None)
 
 
 def test_public_agent_evidence_removes_action_credentials_and_unknown_cost() -> None:

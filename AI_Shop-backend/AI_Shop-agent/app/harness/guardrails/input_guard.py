@@ -86,6 +86,75 @@ _PROMPT_EXFILTRATION_REVERSE_ZH = re.compile(
     r"(?:输出|打印|回显|复述|展示|泄露)",
     re.I,
 )
+_INTERNAL_ASSET_EXFILTRATION = re.compile(
+    r"(?:^|[。！？；;\n]\s*)"
+    r"(?=[^。；;\n]{0,96}(?:输出|打印|列出|枚举|展示|显示|导出|泄露|复制|"
+    r"发送|返回|提供|贴出|告诉|dump|print|list|show|reveal|output|export|copy|"
+    r"send|return|provide|tell))"
+    r"(?:"
+    r"(?=[^。；;\n]{0,96}(?:内部|未公开|隐藏|后台|internal|hidden|private|"
+    r"non[- ]?public))"
+    r"(?=[^。；;\n]{0,96}(?:工具|函数|接口|tool|function|api))"
+    r"(?=[^。；;\n]{0,96}(?:定义|清单|列表|schema|参数|签名|协议|definition|"
+    r"spec|signature))"
+    r"|(?=[^。；;\n]{0,96}(?:未公开|隐藏|私有|管理员|开发者|hidden|private|"
+    r"admin|developer|non[- ]?public))"
+    r"(?=[^。；;\n]{0,96}(?:指令|命令|要求|规则|提示|instruction|command|"
+    r"request|rule|prompt))"
+    r"|(?=[^。；;\n]{0,96}(?:其他用户|全部用户|全量用户|私有用户|未公开用户|"
+    r"other users?|all users?|private\s+(?:customer|user)|"
+    r"protected\s+(?:customer|user)|admin\s+user))"
+    r"(?=[^。；;\n]{0,96}(?:数据|记录|订单|地址|联系方式|日志|对话|记忆|data|"
+    r"records?|orders?|addresses?|contacts?|logs?|conversations?|memory)))"
+    r"[^。；;\n]{1,112}",
+    re.I,
+)
+_CONFIRMATION_BYPASS_WRITE = re.compile(
+    r"(?:^|[。！？；\n]\s*|(?:请|帮我|替我|给我|现在|立即|马上|务必|怎么|"
+    r"please|now|immediately|how\s+to)\s*)"
+    r"(?:"
+    r"(?:(?:跳过|绕过|省略|免去|无需|不经|skip|bypass|without|no|do\s+not)"
+    r"[^。；\n]{0,8}(?:用户|人工|user)?\s*(?:的)?(?:确认|confirm(?:ation)?)"
+    r"|不要(?:再)?\s*(?:用户|人工)?(?:的)?确认)"
+    r"[^。；\n]{0,24}(?:直接|立即|马上|directly|immediately)?\s*"
+    r"(?:执行|提交|写入|退款|退货|取消订单|确认收货|发布评价|修改|删除|"
+    r"使用优惠券|创建工单|关闭工单|下单|支付|execute|submit|write|refund|return|"
+    r"cancel|modify|delete|redeem|create|close|purchase|pay)"
+    r"|(?:直接|立即|马上|directly|immediately)\s*"
+    r"(?:执行|提交|写入|退款|退货|取消订单|确认收货|发布评价|修改|删除|"
+    r"使用优惠券|创建工单|关闭工单|下单|支付|execute|submit|write|refund|return|"
+    r"cancel|modify|delete|redeem|create|close|purchase|pay)"
+    r"[^。；\n]{0,24}"
+    r"(?:(?:跳过|绕过|省略|免去|无需|不经|skip|bypass|without|no|do\s+not)"
+    r"[^。；\n]{0,8}(?:用户|人工|user)?\s*(?:的)?(?:确认|confirm(?:ation)?)"
+    r"|不要(?:再)?\s*(?:用户|人工)?(?:的)?确认)"
+    r")",
+    re.I,
+)
+_IMPERATIVE_TOOL_INVOCATION = re.compile(
+    r"(?:^|[。！？；;\n]\s*)"
+    r"(?=[^。；;\n]{0,72}(?:请|帮我|替我|给我|要求|命令|please|tell|instruct|ask))"
+    r"(?=[^。；;\n]{0,72}(?:不要|勿|禁止|跳过|绕过|强制|指定|"
+    r"do\s+not|must\s+not|never|skip|bypass|force|specified))"
+    r"(?=[^。；;\n]{0,72}(?:调用|执行|运行|invoke|\bcall\b|execute|\brun\b))"
+    r"(?=[^。；;\n]{0,72}(?:工具|函数|接口|tool|function|api|endpoint))"
+    r"[^。；;\n]{1,96}",
+    re.I,
+)
+_DIRECT_HUMAN_WRITE = re.compile(
+    r"(?:^|[。！？；;\n]\s*)"
+    r"(?=[^。；;\n]{0,80}(?:请|帮我|替我|给我|让|要求|指示|命令|叫|"
+    r"please|tell|instruct|ask))"
+    r"(?=[^。；;\n]{0,80}(?:指令|命令|要求|instruction|command))"
+    r"(?=[^。；;\n]{0,80}(?:人工|客服|human|agent|support))"
+    r"(?=[^。；;\n]{0,80}(?:确认|confirm(?:ation)?|approve|approval))"
+    r"(?=[^。；;\n]{0,80}(?:直接|立即|马上|强制|directly|immediately|force))"
+    r"(?=[^。；;\n]{0,80}(?:退款|退货|取消|确认收货|评价|修改|删除|优惠券|工单|"
+    r"下单|支付|提交|写入|refund|return|cancel|review|modify|delete|coupon|ticket|"
+    r"purchase|pay|submit|write))"
+    r"[^。；;\n]{1,112}",
+    re.I,
+)
 
 # 命中即拒。购物咨询场景里这些写法没有正常语义，误伤风险可以忽略。
 _BLOCKING_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -97,6 +166,10 @@ _BLOCKING_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("override_hidden_context_zh", _OVERRIDE_HIDDEN_CONTEXT_ZH),
     ("jailbreak_bypass_zh", _JAILBREAK_BYPASS_ZH),
     ("prompt_exfiltration_reverse_zh", _PROMPT_EXFILTRATION_REVERSE_ZH),
+    ("internal_asset_exfiltration", _INTERNAL_ASSET_EXFILTRATION),
+    ("confirmation_bypass_write", _CONFIRMATION_BYPASS_WRITE),
+    ("imperative_tool_invocation", _IMPERATIVE_TOOL_INVOCATION),
+    ("direct_human_write", _DIRECT_HUMAN_WRITE),
     # 只保留"指令类"宾语。原来把 message/context 也算进来会误伤正常的重置说法
     # （"ignore my previous message, show me white ones"），那是改需求不是攻击。
     (
@@ -228,10 +301,62 @@ _SUSPICIOUS_BLOCK_THRESHOLD = 2
 # 规则本身仍保留对“请绕过风控”这类祈使句的拦截；在统一扫描函数中按命中
 # 位置检查前缀，避免用一个脆弱的超长正则吞掉正常知识事实。
 _NEGATED_BYPASS_PREFIX = re.compile(
-    r"(?:不能够|不能|不可|无法|不应|不得|禁止|严禁|不允许|不可以)"
+    r"(?:不能够|不能|不可|无法|不应|不得|不要|请勿|禁止|严禁|不允许|不可以|"
+    r"do\s+not|must\s+not|never)"
     r"[^。；\n]{0,12}$"
 )
 _BYPASS_REQUEST_PREFIX = re.compile(r"(?:请|帮|替|告诉|教|如何|怎么|方法|步骤)")
+_NEGATION = re.compile(
+    r"(?:不能够|不能|不可|无法|不应|不得|不要|请勿|禁止|严禁|不允许|不可以|"
+    r"do\s+not|must\s+not|never)",
+    re.I,
+)
+_SENSITIVE_ACTION = re.compile(
+    r"输出|打印|展示|显示|导出|泄露|返回|提供|告诉|发送|发我|调用|执行|运行|"
+    r"改用|指定|直接|立即|print|show|reveal|output|export|return|provide|tell|send|invoke|"
+    r"\bcall\b|execute|\brun\b|directly|immediately",
+    re.I,
+)
+_NEGATION_SCOPE_BREAK = re.compile(
+    r"[，,；;]|但|但是|却|不过|然后|随后|接着|请|帮|把|将|怎么|如何|方法|"
+    r"步骤|改用|指定|but|however|then|please|help|how\s+to",
+    re.I,
+)
+_NORMATIVE_CONFIRMATION_POLICY = re.compile(
+    r"(?:不能够|不能|不可|不应|不得|禁止|严禁|不允许|不可以|"
+    r"cannot|must\s+not|never)"
+    r"[^，,。；;\n]{0,8}(?:跳过|绕过|省略|无需|不经|skip|bypass|without)"
+    r"[^，,。；;\n]{0,8}(?:用户|人工|user)?\s*(?:的)?(?:确认|confirm(?:ation)?)",
+    re.I,
+)
+_COMPLIANT_HUMAN_CONFIRMATION = re.compile(
+    r"按(?:平台|退款|售后|业务流程|服务流程|公开政策|平台政策|订单页面)要求"
+    r"[^。；;\n]{0,40}(?:人工|客服|human|agent|support)"
+    r"[^。；;\n]{0,20}(?:确认|confirm(?:ation)?|approve|approval)",
+    re.I,
+)
+
+
+def _all_sensitive_actions_are_negated(text: str) -> bool:
+    actions = list(_SENSITIVE_ACTION.finditer(text))
+    negations = list(_NEGATION.finditer(text))
+    if not actions or not negations:
+        return False
+    negation_index = 0
+    latest_negation: re.Match[str] | None = None
+    for action in actions:
+        while (
+            negation_index < len(negations)
+            and negations[negation_index].end() <= action.start()
+        ):
+            latest_negation = negations[negation_index]
+            negation_index += 1
+        if latest_negation is None:
+            return False
+        between = text[latest_negation.end() : action.start()]
+        if len(between) > 24 or _NEGATION_SCOPE_BREAK.search(between):
+            return False
+    return True
 
 
 def scan_guardrail_rules(text: str) -> tuple[list[str], list[str]]:
@@ -254,6 +379,34 @@ def scan_guardrail_rules(text: str) -> tuple[list[str], list[str]]:
                     prefix[negated.start() :] if negated else prefix
                 )
                 if not negated or request_like:
+                    retained.append(match)
+            matches = retained
+        elif name == "confirmation_bypass_write":
+            retained = []
+            for match in matches:
+                context = text[max(0, match.start() - 20) : match.end()]
+                policy = _NORMATIVE_CONFIRMATION_POLICY.search(context)
+                if not policy or not _all_sensitive_actions_are_negated(context):
+                    retained.append(match)
+            matches = retained
+        elif name in {
+            "internal_asset_exfiltration",
+            "imperative_tool_invocation",
+            "direct_human_write",
+        }:
+            retained = []
+            for match in matches:
+                context = text[
+                    max(0, match.start() - 20) : min(len(text), match.end() + 80)
+                ]
+                compliant_human_flow = (
+                    name == "direct_human_write"
+                    and _COMPLIANT_HUMAN_CONFIRMATION.search(context)
+                )
+                if (
+                    not compliant_human_flow
+                    and not _all_sensitive_actions_are_negated(context)
+                ):
                     retained.append(match)
             matches = retained
         if matches:
