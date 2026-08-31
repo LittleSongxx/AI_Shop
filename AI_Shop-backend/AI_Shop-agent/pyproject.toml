@@ -54,14 +54,13 @@ dev = [
 packages = ["app"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -m 'not private_holdout and not text2sql'"
+addopts = "-ra -m 'not private_holdout'"
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "mysql: tests that require a real MySQL server",
   "private_holdout: tests that require externally restored private evaluation data",
-  "text2sql: frozen experimental Text2SQL tests excluded from default CI",
 ]
 
 [tool.ruff]
