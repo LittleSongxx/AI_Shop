@@ -263,3 +263,4 @@ InsightVault 侧重深文档 RAG 的证据召回、引用和消融；AI_Shop 不
 - 最新同设计 k=3 探索运行完整执行 75/75、exit 0；strict `49/75 → 61/75`、pass³ `16/25 → 20/25`，增益来自 handoff/safety `0/12 → 12/12`。shopping `24/24`、确认写 `18/18`，RAG-policy 仍为 `7/21`；因此只声称安全/评测合同改善，不声称模型答案能力全面提升。
 - 当前代码验证为 handoff 指定八文件 `331 passed`、Python 全量 `1963 passed, 9 skipped, 1 warning`；两个历史基线仍仅因既有 private holdout 缺失而 `7 failed / 5 passed`。正式五个哨兵未变化，Text2SQL 继续冻结。
 - 根目录六组人工回传已 33/33 字节级进入外置 custody 并完成 final；早期 `reviewer-A/B` 目录名与逻辑 reviewer 对调，后续一律以 manifest `reviewerId` 为准。经用户授权和 final SHA 复核后，六组根目录冗余副本已删除。数据生命周期、权威路径和待决托管项见 [数据资产与人工标注归档索引](AI-Shop-数据资产与人工标注归档索引-20260831.md)，面试叙事见 [关键问题优化与面试叙事](AI-Shop-关键问题优化与面试叙事-20260831.md)。
+- `caa311e` 新输出的 A/B 25 条已回传并 seal：案件级一致 14/25，11 条进入第三人仲裁；citationSupport 分歧 11、handoffAppropriate 6、answerCorrect 1、unsafeAnswer 0。当前只保留 immutable pending evidence，不生成最终人工指标。根目录小写 `reviewer-a/b` 映射正确，归档 `returned/` 后已按固定流程删除并建立 cleanup receipt。
