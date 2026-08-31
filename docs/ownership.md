@@ -1,10 +1,10 @@
 # 项目所有权与 AI Coding 边界
 
-## 来源
+## 作者来源声明
 
-Simlect 是作者本人早期完成的电商项目，随后演进并更名为 AI-Shop。Git 历史中的 Audreator、song、Song、EdisonChen 和 LittleSongxx 是作者在不同时期使用的账号或别名，不代表引入了第三方项目模板。
+以下是作者对项目来源的公开声明：Simlect 是作者本人早期完成的电商项目，随后演进并更名为 AI-Shop。Git 历史中的 Audreator、song、Song、EdisonChen 和 LittleSongxx 是作者在不同时期使用的账号或别名，不代表引入了第三方项目模板。Git 本身只记录 author/email，不能独立验证现实身份。
 
-项目使用的 Spring、LangGraph、MCP、Vue 等依赖遵循各自许可证；商品演示数据和图片只用于已获授权的本地演示。
+项目使用的 Spring、LangGraph、MCP、Vue 等依赖遵循各自许可证；商品图片的来源 URL、本地路径与 SHA256 记录在 [SOURCE_MANIFEST.json](../AI_Shop-backend/data/simlect-assets/SOURCE_MANIFEST.json)。其中的授权字段仍是部署者声明，不等同于独立法务审计。
 
 ## 作者负责范围
 

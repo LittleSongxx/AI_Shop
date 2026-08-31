@@ -985,8 +985,11 @@ prepare_environment() {
 
 resolve_python() {
   local conda_base=""
+  local project_python="$BACKEND/AI_Shop-agent/.venv/bin/python"
   if [[ -n "${AISHOP_PYTHON:-}" ]]; then
     PYTHON="$AISHOP_PYTHON"
+  elif [[ -x "$project_python" ]]; then
+    PYTHON="$project_python"
   else
     if command -v conda >/dev/null 2>&1; then
       conda_base=$(conda info --base 2>/dev/null || true)
@@ -998,7 +1001,7 @@ resolve_python() {
     fi
   fi
   [[ -n "$PYTHON" && -x "$PYTHON" ]] \
-    || die "未找到 Conda shop 环境；请先创建该环境，或用 AISHOP_PYTHON 显式指定解释器"
+    || die "未找到 Agent .venv 或 Conda shop 环境；请先安装依赖，或用 AISHOP_PYTHON 指定解释器"
   export AISHOP_PYTHON="$PYTHON"
   info "Agent Python: $PYTHON"
 }

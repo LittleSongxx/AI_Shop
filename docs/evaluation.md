@@ -1,6 +1,6 @@
 # 评测协议与声明边界
 
-## 默认公开门禁
+## 公开评测协议
 
 - Search：候选真实性、硬约束、Recall/MRR/nDCG、无结果正确性。
 - RAG：检索、事实完整性、引用支持、拒答和注入防护。
@@ -8,7 +8,7 @@
 - Java：订单、库存、支付、Outbox/MQ 和补偿测试。
 - Web：单元测试、Mock Playwright 和显式启用的本地全栈 E2E。
 
-公开 CI 不读取私有 holdout。私有材料缺失不会伪装成通过，也不会阻断普通代码测试。
+默认 CI 执行公开数据的单元/回归测试与数据契约校验；需要真实 provider 的 Search/RAG/Agent 在线门禁仅手动触发。两者都不读取私有 holdout；私有材料缺失不会伪装成通过。
 
 ## 外部 AI 黑盒口径
 
@@ -27,7 +27,7 @@
 
 - Provider 返回 usage 时记录真实 input/output token。
 - 配置了可信单价才标记 `PRICED`。
-- `UNPRICED` 或 `MISSING_USAGE` 时，`costCny` 与单位成功成本必须为 `null`，不能记成零成本。
+- `UNPRICED` 或 `MISSING_USAGE` 时，Pilot/证据报告中的 `costCny` 与单位成功成本必须为 `null`，不能记成零成本；底层累加列需结合 `quality_json.costSummary` 解读。
 
 ## 禁止外推
 

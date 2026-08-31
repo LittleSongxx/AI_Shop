@@ -4,9 +4,10 @@
 
 ```mermaid
 flowchart LR
-    UI[Vue 用户端] --> GW[Spring Cloud Gateway]
+    UI[Vue 用户端] --> INGRESS[本地 Vite Proxy / 部署入口]
+    INGRESS --> GW[Spring Cloud Gateway]
+    INGRESS --> API[FastAPI Agent]
     GW --> JAVA[Java 交易服务]
-    GW --> API[FastAPI Agent]
     API --> GRAPH[Workflow / Single-Agent]
     GRAPH --> RAG[发布版 RAG]
     GRAPH --> MCP[MCP Tool Gateway]
@@ -16,6 +17,8 @@ flowchart LR
     RAG --> ES[(Elasticsearch)]
     GRAPH --> EP[Episode / Trace / Eval]
 ```
+
+本地开发时 `/api/agent` 与 `/ws` 由 Vite 直代 Agent；部署时可改由统一入口路由。Java 交易事实不因入口差异而改变。
 
 ## 不变量
 

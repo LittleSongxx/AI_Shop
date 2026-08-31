@@ -162,6 +162,7 @@ def test_experimental_agent_branches_are_disabled_by_default() -> None:
 
     assert "normalize_boolean_setting MULTI_AGENT_ENABLED false" in script
     assert "normalize_boolean_setting DATA_ANALYST_ENABLED false" in script
+    assert 'project_python="$BACKEND/AI_Shop-agent/.venv/bin/python"' in script
 
 
 def test_production_startup_never_deletes_search_indexes_implicitly() -> None:

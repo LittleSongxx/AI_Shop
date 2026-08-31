@@ -65,11 +65,13 @@ Multi-Agent 与 Text2SQL 默认关闭，只保留为实验代码；视觉找同�
 
 ## 快速启动
 
-要求：JDK 17、Maven 3.9、Python 3.11–3.13、Node.js 22、Docker Compose。
+要求：JDK 17、Maven 3.9、Python 3.11–3.13、uv、Node.js 22、Docker Compose。
 
 ```bash
+cd AI_Shop-backend/AI_Shop-agent && uv sync --frozen --extra dev && cd ../..
+cd AI_Shop-front/AI_Shop-web && npm ci && cd ../AI_Shop-admin && npm ci && cd ../..
 ./start.sh --build
-python scripts/bootstrap_demo.py
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/bootstrap_demo.py
 ```
 
 启动脚本会写出 `run/runtime.env`，并依次启动中间件、Java 服务、MCP、Worker、Agent API 和双前端。
@@ -110,16 +112,16 @@ npm run lint && npm test && npm run build
 pytest -q -m private_holdout
 ```
 
-当前公开指标、样本量和声明边界见 [评测说明](docs/evaluation.md) 与 [证据清单](docs/evidence/manifest.json)。
+当前验证状态、样本量和声明边界见 [评测说明](docs/evaluation.md) 与 [证据清单](docs/evidence/manifest.json)。
 
 ## 外部 AI 黑盒试用
 
 Codex、Claude Code、Qwen、DeepSeek 等具备浏览器能力的外部 AI 可以只凭网站和任务卡参加 `SYNTHETIC` 黑盒试用：
 
 ```bash
-python scripts/blackbox_pilot.py prepare --actor-label <模型> --session 1
-python scripts/blackbox_pilot.py finalize --session-id <会话ID>
-python scripts/blackbox_pilot.py aggregate --root run/blackbox-pilot
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py prepare --actor-label <模型> --session 1
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py finalize --session-id <会话ID>
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py aggregate --root run/blackbox-pilot
 ```
 
 外部 AI 不得读取仓库、接口、数据库或预期答案。该结果不是真人试用或 CSAT。
@@ -134,7 +136,7 @@ docs/              架构、演示、评测、所有权与紧凑证据
 scripts/           启动验收与黑盒试用工具
 ```
 
-完整历史评测包和人工回传不再放在当前展示树，可通过本地归档标签 `archive/pre-career-mainline-20260831` 恢复。
+完整历史评测包和人工回传不再放在当前展示树，可通过本地归档标签 `archive/pre-career-mainline-20260831` 恢复；公开发布时需同步推送该标签。
 
 ## 已知限制
 
