@@ -27,11 +27,11 @@ from evaluation.customer_service_http import (
 AGENT_ROOT = Path(__file__).resolve().parents[1]
 HUMAN_DATASET = (
     AGENT_ROOT
-    / "evaluation-evidence"
-    / "benchmarks"
-    / "customer-service"
-    / "customer-service-human-v1-20260823"
-    / "customer-service-human-v1.jsonl"
+    / "evaluation"
+    / "datasets"
+    / "customer_service"
+    / "adjudicated"
+    / "gold-v1-human-adjudicated.jsonl"
 )
 V2_HUMAN_DATASET = (
     AGENT_ROOT
@@ -941,6 +941,7 @@ def test_initial_handoff_label_is_separate_from_post_resolution_support_transfer
     assert report["humanSupportTransfer"]["caseIds"] == [row["id"]]
 
 
+@pytest.mark.archived_evidence
 def test_report_binds_fail_closed_label_and_provenance_validity():
     row = load_gold_dataset(V2_HUMAN_DATASET)[0]
     report = build_http_report(
@@ -967,6 +968,7 @@ def test_report_binds_fail_closed_label_and_provenance_validity():
     ] == "CONFOUNDED_BY_TAXONOMY_COLLISION"
 
 
+@pytest.mark.archived_evidence
 def test_human_approved_ai_assisted_successor_is_valid_exposed_diagnostic():
     rows = load_gold_dataset(V21_HUMAN_DATASET)
     predictions = {row["id"]: _perfect_rule(row) for row in rows}

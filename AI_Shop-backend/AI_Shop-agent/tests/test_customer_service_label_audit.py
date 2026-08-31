@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from evaluation.core.io import load_json
 from evaluation.customer_service_gold import apply_label_evidence_validity
 from evaluation.customer_service_label_audit import (
@@ -7,6 +9,8 @@ from evaluation.customer_service_label_audit import (
     build_label_audit_package,
     verify_label_audit_package,
 )
+
+pytestmark = pytest.mark.archived_evidence
 
 ROOT = Path(__file__).resolve().parents[1]
 V2_PACKAGE = (

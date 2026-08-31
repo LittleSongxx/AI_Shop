@@ -54,13 +54,14 @@ dev = [
 packages = ["app"]
 
 [tool.pytest.ini_options]
-addopts = "-ra -m 'not private_holdout'"
+addopts = "-ra -m 'not private_holdout and not archived_evidence'"
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "mysql: tests that require a real MySQL server",
   "private_holdout: tests that require externally restored private evaluation data",
+  "archived_evidence: tests that require evidence packages removed from the recruiter-facing tree",
 ]
 
 [tool.ruff]

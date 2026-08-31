@@ -25,6 +25,14 @@ DATASET = (
     / "customer_service"
     / "gold-v1.jsonl"
 )
+BASE_HUMAN_DATASET = (
+    Path(__file__).parents[1]
+    / "evaluation"
+    / "datasets"
+    / "customer_service"
+    / "adjudicated"
+    / "gold-v1-human-adjudicated.jsonl"
+)
 
 
 def _labels(row):
@@ -305,14 +313,7 @@ def test_adjudication_cannot_override_agreement(tmp_path: Path):
 def _make_v2_additions_fixture(tmp_path: Path) -> tuple[Path, Path]:
     """Create a reviewed additions copy and its minimal merge evidence."""
 
-    base_path = (
-        Path(__file__).parents[1]
-        / "evaluation-evidence"
-        / "benchmarks"
-        / "customer-service"
-        / "customer-service-human-v1-20260823"
-        / "customer-service-human-v1.jsonl"
-    )
+    base_path = BASE_HUMAN_DATASET
     rows = load_jsonl(base_path)
     additions = []
     for index, row in enumerate(rows, 1):
@@ -342,14 +343,7 @@ def _make_v2_additions_fixture(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_combine_v2_requires_reviewed_additions_and_binds_all_hashes(tmp_path: Path):
-    base_path = (
-        Path(__file__).parents[1]
-        / "evaluation-evidence"
-        / "benchmarks"
-        / "customer-service"
-        / "customer-service-human-v1-20260823"
-        / "customer-service-human-v1.jsonl"
-    )
+    base_path = BASE_HUMAN_DATASET
     base_manifest = (
         Path(__file__).parents[1]
         / "evaluation"
@@ -385,14 +379,7 @@ def test_combine_v2_requires_reviewed_additions_and_binds_all_hashes(tmp_path: P
 
 
 def test_combine_v2_rejects_draft_or_mismatched_evidence_before_writing(tmp_path: Path):
-    base_path = (
-        Path(__file__).parents[1]
-        / "evaluation-evidence"
-        / "benchmarks"
-        / "customer-service"
-        / "customer-service-human-v1-20260823"
-        / "customer-service-human-v1.jsonl"
-    )
+    base_path = BASE_HUMAN_DATASET
     base_manifest = (
         Path(__file__).parents[1]
         / "evaluation"
@@ -435,14 +422,7 @@ def test_combine_v2_rejects_draft_or_mismatched_evidence_before_writing(tmp_path
 
 
 def test_combine_v2_rejects_duplicate_ids(tmp_path: Path):
-    base_path = (
-        Path(__file__).parents[1]
-        / "evaluation-evidence"
-        / "benchmarks"
-        / "customer-service"
-        / "customer-service-human-v1-20260823"
-        / "customer-service-human-v1.jsonl"
-    )
+    base_path = BASE_HUMAN_DATASET
     base_manifest = (
         Path(__file__).parents[1]
         / "evaluation"

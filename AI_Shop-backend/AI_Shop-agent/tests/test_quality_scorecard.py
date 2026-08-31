@@ -105,7 +105,7 @@ def test_scorecard_recomputes_ranking_badcase_instead_of_trusting_published_metr
 
 def test_build_scorecard_fails_closed_without_search_holdout() -> None:
     evidence = Path(__file__).parents[1] / "evaluation-evidence" / "current"
-    with pytest.raises(ScorecardError, match="holdout"):
+    with pytest.raises(ScorecardError, match="evidence directory|holdout"):
         build_scorecard(evidence, holdout_path=evidence / "missing-holdout.jsonl")
 
 

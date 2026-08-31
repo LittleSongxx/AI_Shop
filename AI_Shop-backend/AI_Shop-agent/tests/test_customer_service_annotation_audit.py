@@ -1,7 +1,11 @@
+import pytest
+
 from evaluation.customer_service_annotation_audit import (
     _load_intent_agreement,
     build_annotation_audit,
 )
+
+pytestmark = pytest.mark.archived_evidence
 
 
 def test_intent_audit_distinguishes_case_and_field_agreement():

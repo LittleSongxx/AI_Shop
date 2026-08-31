@@ -42,6 +42,7 @@ def test_changed_human_gold_is_rejected(tmp_path):
         load_human_adjudicated_gold(target, manifest_path=manifest)
 
 
+@pytest.mark.archived_evidence
 def test_answer_labels_require_exact_frozen_source_and_answer_hashes():
     labels = load_adjudicated_answer_labels()
     assert len(labels) == 60
@@ -65,6 +66,7 @@ def test_changed_answer_labels_are_rejected(tmp_path):
         )
 
 
+@pytest.mark.archived_evidence
 def test_changed_source_report_is_rejected(tmp_path):
     labels_path, labels_manifest = _copy_with_manifest(
         ANSWER_LABELS_PATH, ANSWER_LABELS_MANIFEST_PATH, tmp_path
@@ -78,6 +80,7 @@ def test_changed_source_report_is_rejected(tmp_path):
         )
 
 
+@pytest.mark.archived_evidence
 def test_duplicate_case_id_is_rejected_after_hash_manifest_is_updated(tmp_path):
     labels_path, labels_manifest = _copy_with_manifest(
         ANSWER_LABELS_PATH, ANSWER_LABELS_MANIFEST_PATH, tmp_path

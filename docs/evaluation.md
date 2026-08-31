@@ -9,6 +9,7 @@
 - Web：单元测试、Mock Playwright 和显式启用的本地全栈 E2E。
 
 默认 CI 执行公开数据的单元/回归测试与数据契约校验；需要真实 provider 的 Search/RAG/Agent 在线门禁仅手动触发。两者都不读取私有 holdout；私有材料缺失不会伪装成通过。
+依赖已移出展示树的历史人审/paired 包的测试标记为 `archived_evidence`，不进入默认 CI；这些结果不作为当前质量结论。
 
 ## 外部 AI 黑盒口径
 

@@ -1,10 +1,14 @@
 from pathlib import Path
 
+import pytest
+
 from evaluation.customer_service_paired import (
     build_paired_evidence_package,
     compare_customer_service_reports,
     verify_paired_evidence_package,
 )
+
+pytestmark = pytest.mark.archived_evidence
 
 ROOT = Path(__file__).resolve().parents[1]
 BEFORE = (
