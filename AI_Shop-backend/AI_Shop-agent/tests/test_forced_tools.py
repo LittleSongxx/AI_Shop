@@ -28,6 +28,27 @@ def record_invoke(monkeypatch):
     return calls, result_box
 
 
+def test_source_merge_prefers_fresh_tool_snapshot_for_same_order():
+    merged = forced_tools._merge_source_refs(
+        [{"type": "order", "id": "O1", "claims": [{"factPath": "order.orderId"}]}],
+        [
+            {
+                "type": "order",
+                "id": "O1",
+                "claims": [
+                    {"factPath": "order.orderId"},
+                    {"factPath": "order_item.buyCount", "value": 1},
+                ],
+            }
+        ],
+    )
+
+    assert [claim["factPath"] for claim in merged[0]["claims"]] == [
+        "order.orderId",
+        "order_item.buyCount",
+    ]
+
+
 async def test_similar_search_excludes_current_product(record_invoke):
     calls, _ = record_invoke
 

@@ -47,7 +47,7 @@ def _merge_source_refs(
     """Keep resolver evidence when a follow-up deterministic tool has none."""
 
     merged: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    positions: dict[tuple[str, str], int] = {}
     for ref in [*(existing or []), *(incoming or [])]:
         if not isinstance(ref, dict):
             continue
@@ -60,10 +60,15 @@ def _merge_source_refs(
             or ""
         ).strip()
         key = (str(ref.get("type") or ""), identity)
-        if not identity or key in seen:
+        if not identity:
             continue
-        seen.add(key)
-        merged.append(dict(ref))
+        if key in positions:
+            # The tool refresh is authoritative and normally richer than the
+            # resolver's display projection (for example it adds buyCount).
+            merged[positions[key]] = dict(ref)
+        else:
+            positions[key] = len(merged)
+            merged.append(dict(ref))
     return merged[:30]
 
 
