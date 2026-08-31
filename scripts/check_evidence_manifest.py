@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -90,12 +91,48 @@ def validate_manifest(path: Path = DEFAULT_MANIFEST) -> list[str]:
     return errors
 
 
+def validate_current_binding(path: Path = DEFAULT_MANIFEST) -> list[str]:
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    evaluated = str(manifest.get("evaluatedCommit") or "")
+    if not COMMIT_RE.fullmatch(evaluated):
+        return ["cannot verify an invalid evaluatedCommit"]
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(ROOT), *args],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+
+    head_result = git("rev-parse", "HEAD")
+    if head_result.returncode:
+        return ["cannot resolve repository HEAD"]
+    head = head_result.stdout.strip()
+    if evaluated != head:
+        ancestry = git("merge-base", "--is-ancestor", evaluated, head)
+        changed = git("diff", "--name-only", evaluated, head)
+        paths = [line.strip() for line in changed.stdout.splitlines() if line.strip()]
+        if ancestry.returncode or changed.returncode or not paths:
+            return ["evaluatedCommit is not the current source ancestor"]
+        outside = [path for path in paths if not path.startswith("docs/evidence/")]
+        if outside:
+            return [f"HEAD contains unevaluated source changes: {outside[0]}"]
+    status = git("status", "--porcelain", "--untracked-files=normal")
+    if status.returncode or status.stdout.strip():
+        return ["worktree is dirty while evidence claims worktreeDirty=false"]
+    return []
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--require-current", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    errors = validate_manifest(args.manifest.resolve())
+    manifest_path = args.manifest.resolve()
+    errors = validate_manifest(manifest_path)
+    if not errors and args.require_current:
+        errors.extend(validate_current_binding(manifest_path))
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
