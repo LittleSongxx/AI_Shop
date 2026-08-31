@@ -34,6 +34,7 @@ jobs:
       APP_PORT: "7050"
       AGENT_AUTO_MIGRATE: "false"
       DATA_ANALYST_ENABLED: "false"
+      AI_EVAL_ENABLE_WRITE_FIXTURES: "true"
       AI_EVAL_AGENT_URL: http://127.0.0.1:7050
       MCP_SERVER_URL: http://127.0.0.1:7060
       JAVA_WEB_URL: ${{ vars.AI_EVAL_JAVA_WEB_URL }}
