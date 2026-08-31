@@ -237,7 +237,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		// 购物车列表
 		List<CartDeleteItemDTO> productCartList = new ArrayList<>();
 		// 物流信息
-		OrderLogisticsInfo orderLogisticsInfo = new OrderLogisticsInfo();
+		List<OrderLogisticsInfo> orderLogisticsInfoList = new ArrayList<>();
+		LogisticsSendDTO logisticsSendDTO = redisComponent.getLogisticsInfo();
 		String unifiedPayOrderId = StringTools.createPayOrderId();
 		for (ProductItem productItem : orderList) {
 			// 根据productId获取productInfoMap中的productInfo
@@ -269,9 +270,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				throw new BusinessException("单件商品购买数量为 1~" + Constants.ORDER_MAX_BUY_COUNT_PER_SKU + " 件");
 			}
 			// 判断库存（真相源：aishop_stock）
-			if (StringTools.isEmpty(productItem.getPropertyValueIdHash())) {
-				productItem.setPropertyValueIdHash(productSku.getPropertyValueIdHash());
-			}
+			productItem.setPropertyValueIdHash(productSku.getPropertyValueIdHash());
 			int available = stockFeignSupport.getAvailable(productItem.getProductId(), productItem.getPropertyValueIdHash());
 			if (available < productItem.getBuyCount()) {
 				throw new BusinessException("商品【" + productInfo.getProductName() + "】库存不足");
@@ -298,6 +297,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				orderInfo.setPayOrderId(unifiedPayOrderId);
 				orderInfo.setOrderItemList(new ArrayList<>());
 				// 记录地址信息
+				OrderLogisticsInfo orderLogisticsInfo = new OrderLogisticsInfo();
 				orderLogisticsInfo.setOrderId(orderInfo.getOrderId());
 				orderLogisticsInfo.setUserId(userId);
 				orderLogisticsInfo.setReceiverName(userAddress.getAddressee());
@@ -305,13 +305,12 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				orderLogisticsInfo.setReceiverAddress(userAddress.getAddress());
 				orderLogisticsInfo.setLogisticsStatus(LogisticsStatusEnum.PENDING_SHIPMENT.getStatus());
 				// 设置默认发货信息:发货人、发货电话、发货地
-				// 从redis中取出发货信息
-				LogisticsSendDTO logisticsSendDTO = redisComponent.getLogisticsInfo();
 				if (logisticsSendDTO != null) {
 					orderLogisticsInfo.setSenderName(logisticsSendDTO.getSenderName());
 					orderLogisticsInfo.setSenderPhone(logisticsSendDTO.getSenderPhone());
 					orderLogisticsInfo.setSenderAddress(logisticsSendDTO.getSenderAddress());
 				}
+				orderLogisticsInfoList.add(orderLogisticsInfo);
 				// 将orderInfo加入到Map
 				productIdOrderInfoMap.put(productItem.getProductId(), orderInfo);
 			} else {
@@ -423,7 +422,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			// 插入数据库
 			orderInfoMapper.insertBatch(orderInfoList);
 			orderItemMapper.insertBatch(orderItemList);
-			orderLogisticsInfoMapper.insert(orderLogisticsInfo);
+			orderLogisticsInfoMapper.insertBatch(orderLogisticsInfoList);
 			// 远程扣减库存（与本地订单事务分离；后续步骤失败时补偿回补）
 			List<ProductItem> deductList = copyItemsWithSignedBuyCount(newList, true);
 			stockFeignSupport.changeStockBatch(deductList);

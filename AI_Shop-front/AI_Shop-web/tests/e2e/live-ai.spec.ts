@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 const liveEnabled = process.env.AISHOP_LIVE_E2E === 'true';
+const orderEnabled = process.env.AISHOP_LIVE_E2E_ORDER === 'true';
 const paymentEnabled = process.env.AISHOP_LIVE_E2E_PAYMENT === 'true';
 const demoUserId = '9000000001';
 
@@ -316,8 +317,10 @@ test.describe('explicit local full-stack AI flow', () => {
     });
 
     const propertyValueIds = String(item?.propertyValueIds || '');
+    const authoritativeSkuHash = String(item?.propertyValueIdHash || '');
     const position = Number(clickBody.data.position);
     expect(propertyValueIds).not.toBe('');
+    expect(authoritativeSkuHash).not.toBe('');
 
     await unwrap(await context.request.post('/api/productCart/add2Cart', {
       form: {
@@ -345,10 +348,9 @@ test.describe('explicit local full-stack AI flow', () => {
       form: { cartId: String(cartItem.cartId) }
     }));
 
-    // Payment credentials are intentionally external to the local AI evidence
-    // boundary. Checkout and recommendation attribution are the required flow;
-    // opt in to the real payment adapter only when its sandbox is configured.
-    if (!paymentEnabled) return;
+    // Order persistence is opt-in because it mutates the local demo data. The
+    // external payment form remains a separate optional sandbox assertion.
+    if (!orderEnabled) return;
 
     const addresses = await unwrap(await context.request.get('/api/userAddress/loadDataList'));
     const addressId = String((Array.isArray(addresses) ? addresses[0]?.addressId : '') || '');
@@ -362,6 +364,7 @@ test.describe('explicit local full-stack AI flow', () => {
         orderList: [{
           productId,
           propertyValueIds,
+          propertyValueIdHash: `forged-live-e2e-${Date.now()}`,
           buyCount: 1,
           remark: 'AI recommendation attribution E2E',
           aiRequestId: requestId,
@@ -371,6 +374,7 @@ test.describe('explicit local full-stack AI flow', () => {
     }));
     const payOrderId = String(payInfo?.payOrderId || '');
     expect(payOrderId).not.toBe('');
+    if (paymentEnabled) expect(String(payInfo?.payInfo || '')).not.toBe('');
     const order = await unwrap(await context.request.post('/api/order/getOrderInfo', {
       form: { payOrderId }
     }));
@@ -379,15 +383,22 @@ test.describe('explicit local full-stack AI flow', () => {
     const detail = await unwrap(await context.request.post('/api/order/getMyOrderDetail', {
       form: { orderId }
     }));
+    expect(detail.orderStatus).toBe(0);
     const orderItem = (Array.isArray(detail?.orderItemList) ? detail.orderItemList : []).find(
       (row: Record<string, unknown>) => String(row.productId) === productId
     );
     expect(orderItem).toMatchObject({
       productId,
+      propertyValueIdHash: authoritativeSkuHash,
       aiRequestId: requestId,
       aiPosition: position,
       aiSource: clickBody.data.source
     });
+    const logistics = await unwrap(await context.request.post('/api/order/getLogistics', {
+      form: { orderId }
+    }));
+    expect(logistics).toMatchObject({ orderId, logisticsStatus: 0 });
+    expect(String(logistics.receiverAddress || '')).not.toBe('');
 
     await unwrap(await context.request.post('/api/order/cancelOrder', {
       form: { orderId }
