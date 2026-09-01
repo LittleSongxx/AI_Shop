@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextvars import Context
 
 import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -75,7 +76,10 @@ def schedule_assistant_condense(user_id: str, message_id: int, text: str | None)
     if key in _pending_condense:
         return
     _pending_condense.add(key)
-    asyncio.create_task(_run_assistant_condense(key, user_id, message_id, stripped))
+    asyncio.create_task(
+        _run_assistant_condense(key, user_id, message_id, stripped),
+        context=Context(),
+    )
 
 async def _run_assistant_condense(key: str, user_id: str, message_id: int, text: str) -> None:
     # 异步调度任务与对话路径的成本累计隔离（同 compress）。

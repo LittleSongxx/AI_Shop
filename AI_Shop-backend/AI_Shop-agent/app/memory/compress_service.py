@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextvars import Context
 
 import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -63,7 +64,8 @@ class CompressService:
             return
 
         asyncio.create_task(
-            self._compress_async(user_id, memory.summary_last_message_id, working_oldest_id)
+            self._compress_async(user_id, memory.summary_last_message_id, working_oldest_id),
+            context=Context(),
         )
 
     async def _compress_async(
