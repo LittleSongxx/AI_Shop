@@ -1,15 +1,15 @@
 {
   "schemaVersion": "aishop-portfolio-evidence/v1",
-  "evaluatedCommit": "b312b0177f03cfff3e2800e2b8c004dbd3cc8bb1",
+  "evaluatedCommit": "2644d54f5d781ffc69403c86d322c6a72d1870bb",
   "bindingMode": "EVIDENCE_ONLY_CHILD_COMMIT",
   "worktreeDirty": false,
-  "generatedAt": "2026-09-01T07:47:05Z",
+  "generatedAt": "2026-09-01T08:40:08Z",
   "artifacts": [
     {
       "path": "docs/evidence/scorecard.json",
       "role": "current visible evaluation and validation scorecard",
-      "bytes": 4658,
-      "sha256": "25a1633d9635c48716d9aeeffe5cd2db4400116b3a2bb78e29d26fd35fc9a7e9"
+      "bytes": 4692,
+      "sha256": "b0c86fc6af46cd34bbd767f2f9e8fab67926f70b5fc6d4021833f7748067f88e"
     },
     {
       "path": "docs/evidence/badcases.jsonl",
@@ -21,25 +21,25 @@
       "path": "docs/evidence/guide-trace.json",
       "role": "local shopping-guide to WAIT_PAYMENT browser trace summary",
       "bytes": 938,
-      "sha256": "a87a6a692e9c37605f19b9a5e654ff89ff003d3fe7480a003cd5bb247aed5d3d"
+      "sha256": "e59dd60dfcbb9288e357475e3fb2290c944c50795b857a1a0a442b880265d89e"
     },
     {
       "path": "docs/evidence/support-trace.json",
       "role": "local controlled customer-support confirmation trace summary",
       "bytes": 985,
-      "sha256": "e98de3b5210cc2d84ec0dde080dc3ce5625968737e4756a035119ee0763f05c3"
+      "sha256": "be8232599914321023db74890e75a2b56daca9edd9dcf07720bb1a648b0421a0"
     },
     {
       "path": "docs/evidence/synthetic-blackbox-report.json",
       "role": "external AI blackbox execution status and declared thresholds",
-      "bytes": 1187,
-      "sha256": "e5c216d343d667811fb92f7f51eed0c005586278dd17e91babcbff5d8944f469"
+      "bytes": 2251,
+      "sha256": "540bba695223c0ab139466b8a237b47229b4adb1bbbb3fd5c012f9713939fdbd"
     },
     {
       "path": "docs/evidence/SHA256SUMS",
       "role": "artifact checksum inventory",
       "bytes": 427,
-      "sha256": "ab272a798e4c3f927e4b38a7ec359139af6f35835b7fb52df55b948bd55acfdb"
+      "sha256": "f9ab71d7a34fa1bf3e6db37fe6fcef545517afff8b18952625b24cb66333effe"
     }
   ],
   "boundaries": {
@@ -51,7 +51,7 @@
   "disclosure": {
     "evidenceSource": "LOCAL_FULL_STACK_AND_SYNTHETIC_PROTOCOL",
     "realUserStatus": "NOT_COLLECTED",
-    "externalAiBlackboxStatus": "NOT_RUN",
+    "externalAiBlackboxStatus": "NOT_RUN_ONE_INVALID_CALIBRATION_DISCLOSED",
     "costStatus": "MISSING_USAGE",
     "costCny": null
   }

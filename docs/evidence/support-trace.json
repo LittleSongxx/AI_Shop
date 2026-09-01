@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aishop-portfolio-trace/v1",
   "traceType": "CONTROLLED_SUPPORT_PROPOSAL_AND_CONFIRMATION",
-  "evaluatedCommit": "b312b0177f03cfff3e2800e2b8c004dbd3cc8bb1",
+  "evaluatedCommit": "2644d54f5d781ffc69403c86d322c6a72d1870bb",
   "evidenceSource": "LOCAL_FULL_STACK",
   "status": "PASS",
   "testFile": "AI_Shop-front/AI_Shop-web/tests/e2e/live-ai.spec.ts",
