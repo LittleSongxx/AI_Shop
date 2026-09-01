@@ -240,6 +240,14 @@ def looks_like_new_product_search(user_text: str) -> bool:
         )
     ):
         return False
+    lower = t.casefold()
+    if (
+        "wps" in lower
+        and "会员" in t
+        and any(marker in lower for marker in ("有wps", "有没有", "想买", "要买", "购买", "找", "推荐"))
+        and not any(marker in t for marker in ("已经买", "买了", "购买了", "没到账", "打不开", "怎么用", "什么功能"))
+    ):
+        return True
     # Do not widen a concrete attribute question into an arbitrary shelf
     # search. The current-product form covers "这款耳机支持蓝牙 5.4 吗";
     # the second form covers short colloquial wording such as

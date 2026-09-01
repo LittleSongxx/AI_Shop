@@ -2177,7 +2177,7 @@ async def test_shopping_handoff_only_contains_redacted_mission_context(monkeypat
     task = SpecialistTask.model_validate(result["specialist_tasks"][0])
     assert (
         task.session_summary
-        == "品类:手机 | 用途:日常办公 | 预算:*-3000元 | 偏好:华为,续航"
+        == "品类:手机 | 用途:日常办公 | 预算:3000元以内 | 偏好:华为,续航"
     )
     assert task.shopping_mission == {
         "missionId": "shop-safe-context",

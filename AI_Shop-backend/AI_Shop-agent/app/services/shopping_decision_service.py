@@ -19,6 +19,7 @@ from app.services.final_offer_snapshot_service import (
 )
 from app.services.product_constraint_evidence import evaluate_excluded_terms
 from app.services.product_decision_feature_service import product_decision_feature_service
+from app.services.product_search_query import category_surface_terms
 from app.services.shopping_mission_service import mission_summary, schema_for
 from app.services.shopping_profile_service import shopping_profile_service
 
@@ -98,7 +99,7 @@ def _category_matches(product: dict[str, Any], category: str | None) -> bool:
         ).casefold().strip()
     if not fields:
         return True
-    aliases = {target}
+    aliases = {target, *(term.casefold() for term in category_surface_terms(target))}
     if target in {"电脑", "计算机"}:
         aliases.update({"笔记本", "台式机", "台式电脑", "电脑"})
     elif target in {"家电", "电器"}:
@@ -198,6 +199,19 @@ def _number(value: Any) -> float | None:
         return None
 
 
+def _rank_category_hot_sale(products: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def sales(product: dict[str, Any]) -> int:
+        try:
+            return int(product.get("total_sale") or product.get("totalSale") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    ranked = sorted(products, key=sales, reverse=True)
+    for product in ranked:
+        product.setdefault("ranking", {})["hotSaleCount"] = sales(product)
+    return ranked
+
+
 def _future_timestamp(value: Any) -> bool:
     if not value:
         return False
@@ -293,7 +307,11 @@ class ShoppingDecisionService:
             return ShoppingDecisionResult([], "constraint_miss", request_id, decision_id)
 
         ranked = self._rank(eligible, mission)
-        ranked = self._apply_operational_governance(ranked, mission, user_text)
+        ranked = (
+            _rank_category_hot_sale(ranked)
+            if source == "category_hot_sale"
+            else self._apply_operational_governance(ranked, mission, user_text)
+        )
         max_results = get_settings().shopping_decision_max_results
         ranked = ranked[:max_results]
         for position, product in enumerate(ranked, start=1):

@@ -214,7 +214,7 @@ _FALLBACKS = {
         "暂时无法从业务系统核实这项实时信息。请稍后重试，或回复“转人工”。"
     ),
     "DYNAMIC_FACT_WITHOUT_CLAIM": (
-        "订单事实的字段证据不完整，暂时不能确认这项具体信息。"
+        "业务实时事实的字段证据不完整，暂时不能确认这项具体信息。"
         "请稍后重试，或回复“转人工”。"
     ),
     "POLICY_WITHOUT_CITATION": (
@@ -1319,12 +1319,21 @@ def _unsupported_dynamic_business_fact(
         inventory_statuses = re.findall(
             r"有货|充足|无货|缺货|售罄", clause
         )
+        inventory_abstention = bool(
+            re.search(
+                r"(?:不能|无法|不足以).{0,12}(?:断言|确认|证明).{0,12}"
+                r"(?:有货|无货|库存)",
+                clause,
+            )
+        )
         inherited_inventory = bool(
             negated_value and _values_mentioned(prior_inventory_status, clause)
         )
         if inherited_inventory:
             return "回答后句否定了已核验的库存状态"
-        if inventory_statuses or _INVENTORY_FACT_RE.search(clause):
+        if not inventory_abstention and (
+            inventory_statuses or _INVENTORY_FACT_RE.search(clause)
+        ):
             refs = _trusted_business_refs(
                 source_refs,
                 ref_type="product",

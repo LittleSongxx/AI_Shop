@@ -29,6 +29,8 @@ from app.services.product_search_pipeline import (
 )
 from app.services.product_search_query import (
     build_product_query_scope,
+    infer_product_category,
+    is_vague_search_keyword,
     normalize_product_search_query,
 )
 from app.services.recommendation_attribution_service import (
@@ -37,7 +39,6 @@ from app.services.recommendation_attribution_service import (
 from app.services.search_recommend_service import search_recommend_service
 from app.services.shopping_decision_service import shopping_decision_service
 from app.services.shopping_mission_service import (
-    apply_explicit_turn,
     empty_shopping_mission,
     mission_is_active,
     mission_summary,
@@ -49,18 +50,8 @@ from app.utils.biz_payload import build_product_payload, first_cover
 
 logger = structlog.get_logger()
 
-_VAGUE_MARKERS = ("什么", "类似", "同款", "推荐", "有没有", "哪些", "哪个", "吗", "呢", "怎么")
-
 _NOISE_RE = re.compile(r"[\d]+g|[\*×x]\d|装|规格|分享装", re.I)
 
-def is_vague_search_keyword(text: str | None) -> bool:
-
-    t = (text or "").strip()
-    if not t or len(t) < 2:
-        return True
-    if any(m in t for m in _VAGUE_MARKERS) and len(t) <= 16:
-        return True
-    return False
 
 _SIMILAR_HINTS = ("类似", "同款", "相近", "同类型", "同款式", "别的款", "其他款")
 
@@ -284,6 +275,10 @@ class ProductService:
             constraint_query=user_text or query,
         )
         query_parse_ms = round((time.perf_counter() - query_plan_started) * 1000, 4)
+        global_hot_sale_request = bool(
+            looks_like_hot_sale_recommend(user_text)
+            and infer_product_category(user_text) is None
+        )
 
         # A concrete keyword is already enough to identify a shelf.  Otherwise
         # choose exactly one high-impact decision slot before spending model or
@@ -348,7 +343,10 @@ class ProductService:
         fallback_blocked = False
         search_result = None
 
-        if query.startswith("category:"):
+        if global_hot_sale_request:
+            products = await search_recommend_service.load_hot_sale(8)
+            source = "hot_sale_explicit" if products else "none"
+        elif query.startswith("category:"):
 
             category_id = query.split(":", 1)[1]
             products = await search_recommend_service.load_by_category(category_id, 12)
@@ -438,13 +436,6 @@ class ProductService:
             if products:
                 source = "browse"
 
-        # Hot-sale is a valid explicit request, never an undisclosed fallback
-        # for a failed query or a constrained shopping mission.
-        if not products and not fallback_blocked and looks_like_hot_sale_recommend(user_text):
-            products = await search_recommend_service.load_hot_sale(8)
-            if products:
-                source = "hot_sale_explicit"
-
         candidates_before_stock_filter = len(products)
         products = filter_known_available_products(products)
         if candidates_before_stock_filter and not products:
@@ -466,7 +457,12 @@ class ProductService:
             assistant, biz_data = build_product_payload(products, request_id=request_id)
             return assistant, biz_data, "product_search", products, source
 
-        recall_source = source
+        category_hot_sale_request = bool(
+            source == "hybrid"
+            and looks_like_hot_sale_recommend(user_text)
+            and not global_hot_sale_request
+        )
+        recall_source = "category_hot_sale" if category_hot_sale_request else source
         decision_started = time.perf_counter()
         decision_mission = merge_runtime_constraints(
             mission, query_plan.constraints.public()
@@ -530,7 +526,13 @@ class ProductService:
             source=recall_source,
             request_id=decision.request_id,
         )
-        return assistant, biz_data, "shopping_decision_v2", products, decision.source
+        result_source = (
+            recall_source
+            if recall_source
+            in {"browse", "hot_sale", "hot_sale_explicit", "category_hot_sale"}
+            else decision.source
+        )
+        return assistant, biz_data, "shopping_decision_v2", products, result_source
 
     async def _mission_for_request(
         self,
@@ -542,16 +544,15 @@ class ProductService:
     ) -> dict:
         """Resolve the single active shopping state without reviving ShoppingNeed.
 
-        Normal requests have already persisted a mission at API ingress.  The
-        small ephemeral fallback keeps direct MCP calls governed as well, while
-        intentionally avoiding a second online state store.
+        API-ingress turns reuse their source digest without a second write.
+        Worker-refined and direct MCP product turns persist through the same
+        mission service so a new topic cannot revive stale constraints.
         """
-        mission = await shopping_mission_service.load(user_id)
-        derived = apply_explicit_turn(
-            mission if mission_is_active(mission) else None,
-            profile=profile,
-            user_text=user_text,
-            message_id=0,
+        derived = await shopping_mission_service.capture_user_turn(
+            user_id,
+            0,
+            user_text,
+            profile,
         )
         resolved = derived if mission_is_active(derived) else empty_shopping_mission(profile)
         return merge_runtime_constraints(resolved, runtime_constraints)
@@ -756,7 +757,7 @@ def format_search_tool_message(
 
     consult_name = (consult or {}).get("productName") or (consult or {}).get("product_name") or "当前商品"
     similar_intent = _similar_intent(keyword, consult)
-    alternative_sources = {"browse", "hot_sale", "hot_sale_explicit"}
+    alternative_sources = {"browse", "hot_sale", "hot_sale_explicit", "category_hot_sale"}
     kw = (keyword or "").strip()
     query_scope = build_product_query_scope(constraint_query or kw)
     requested_models = [
@@ -854,7 +855,11 @@ def format_search_tool_message(
     # Keyword search missed → hot-sale / browse backfill: never label as「搜索结果找到」.
     if products and source in alternative_sources:
         intentional_alt = looks_like_hot_sale_recommend(kw) or looks_like_browse_recommend(kw)
-        if intentional_alt and source in {"hot_sale", "hot_sale_explicit"}:
+        if intentional_alt and source in {
+            "hot_sale",
+            "hot_sale_explicit",
+            "category_hot_sale",
+        }:
             return f"【热销推荐】为您推荐 {len(products)} 个热销商品（请查看下方卡片）。"
         if intentional_alt and source == "browse":
             return f"【浏览推荐】根据你的浏览为你推荐 {len(products)} 个商品（请查看下方卡片）。"

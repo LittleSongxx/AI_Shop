@@ -28,7 +28,11 @@ from app.domain.intent.types import (
     RiskLevel,
     SentimentKind,
 )
-from app.services.agent_service import AgentOrchestrator
+from app.services.agent_service import (
+    _INTENT_REPEAT_SKIP,
+    _SHOPPING_MEMORY_INTENTS,
+    AgentOrchestrator,
+)
 
 
 @pytest.mark.parametrize(
@@ -37,6 +41,26 @@ from app.services.agent_service import AgentOrchestrator
         ("退款政策是什么", IntentKind.REFUND, RequestMode.INFORMATIONAL),
         ("退款需要什么条件", IntentKind.REFUND, RequestMode.INFORMATIONAL),
         ("退款怎么申请", IntentKind.CHAT, RequestMode.INFORMATIONAL),
+        ("如何申请退款", IntentKind.REFUND, RequestMode.INFORMATIONAL),
+        ("如何直接申请退款", IntentKind.REFUND, RequestMode.INFORMATIONAL),
+        ("怎么立即申请退款", IntentKind.REFUND, RequestMode.INFORMATIONAL),
+        ("申请退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
+        ("请立即退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
+        (
+            "帮我退款，并告诉我多久到账",
+            IntentKind.REFUND,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "麻烦帮我退款，并告诉我多久到账",
+            IntentKind.REFUND,
+            RequestMode.ACTION_PROPOSAL,
+        ),
+        (
+            "帮我取消订单，告诉我是否成功",
+            IntentKind.CANCEL_ORDER,
+            RequestMode.ACTION_PROPOSAL,
+        ),
         ("我要退款", IntentKind.REFUND, RequestMode.ACTION_PROPOSAL),
         (
             "请为订单 SM202608050002 发起退款申请。",
@@ -131,6 +155,16 @@ def test_cancel_policy_question_is_not_promoted_to_write_proposal():
 
 def test_rule_chat_returns_none_without_keywords():
     assert classify_intent_by_rules("你好呀") is None
+
+
+def test_chat_and_shopping_intents_do_not_enter_repeat_complaint_fast_path():
+    assert {
+        IntentKind.CHAT,
+        IntentKind.PRODUCT_SEARCH,
+        IntentKind.PRODUCT_CONSULT,
+        IntentKind.VISUAL_PRODUCT_SEARCH,
+    }.issubset(_INTENT_REPEAT_SKIP)
+    assert IntentKind.PRODUCT_CONSULT not in _SHOPPING_MEMORY_INTENTS
 
 
 @pytest.mark.parametrize(
@@ -283,6 +317,16 @@ async def test_generic_refund_policy_keeps_refund_taxonomy():
 
 
 @pytest.mark.asyncio
+async def test_refund_how_to_stays_read_only_end_to_end():
+    decision = await resolve_intent(
+        "u1", "如何直接申请退款", allow_llm=False, record_metrics=False
+    )
+
+    assert decision.intent == IntentKind.REFUND
+    assert decision.request_mode == RequestMode.INFORMATIONAL
+
+
+@pytest.mark.asyncio
 async def test_short_damage_statement_is_after_sales_intent():
     decision = await resolve_intent(
         "u1", "收到商品是坏的", allow_llm=False, record_metrics=False
@@ -373,6 +417,23 @@ def test_bulk_snack_procurement_routes_to_product_search(text):
 )
 def test_category_selection_routes_to_product_search_without_buy_verb(text):
     assert classify_intent_by_rules(text) == IntentKind.PRODUCT_SEARCH
+
+
+def test_wps_membership_routes_to_product_search_without_llm():
+    assert classify_intent_by_rules("有WPS会员吗") == IntentKind.PRODUCT_SEARCH
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "WPS打不开怎么办",
+        "WPS会员怎么用",
+        "WPS有什么功能",
+        "我已经买了WPS会员但没到账",
+    ],
+)
+def test_wps_support_questions_are_not_product_search(text):
+    assert classify_intent_by_rules(text) != IntentKind.PRODUCT_SEARCH
 
 
 def test_bag_budget_revision_continues_product_search():
@@ -869,6 +930,20 @@ async def test_repeated_intent_handoff_does_not_trigger_on_second_turn():
     )
 
     assert decision.intent == IntentKind.QUERY_LOGISTICS
+    assert decision.next_action == NextAction.TOOL
+    assert decision.handoff_reason is None
+
+
+@pytest.mark.asyncio
+async def test_repeated_product_search_never_suggests_handoff():
+    decision = await resolve_intent(
+        "u1",
+        "有WPS会员吗",
+        allow_llm=False,
+        recent_intents=["PRODUCT_SEARCH", "PRODUCT_SEARCH"],
+    )
+
+    assert decision.intent == IntentKind.PRODUCT_SEARCH
     assert decision.next_action == NextAction.TOOL
     assert decision.handoff_reason is None
 

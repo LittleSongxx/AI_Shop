@@ -1,4 +1,8 @@
-from app.services.shopping_decision_service import ShoppingDecisionService, _category_matches
+from app.services.shopping_decision_service import (
+    ShoppingDecisionService,
+    _category_matches,
+    _rank_category_hot_sale,
+)
 
 
 def test_hard_filter_resolves_brand_from_verified_product_name():
@@ -35,6 +39,35 @@ def test_hard_filter_resolves_brand_from_verified_product_name():
     assert rejected == [
         {"productId": "other-headphones", "reason": "BRAND_REQUIRED"}
     ]
+
+
+def test_membership_service_matches_verified_wps_product_title():
+    assert _category_matches(
+        {"product_name": "WPS Office学生专享超级会员2年卡"},
+        "会员服务",
+    )
+
+
+def test_category_hot_sale_overrides_conflicting_soft_preference_order():
+    mission = {
+        "category": "耳机",
+        "useCases": [],
+        "hardConstraints": {},
+        "softPreferences": {"brands": ["华为"], "features": []},
+        "exclusions": {"brands": [], "terms": []},
+    }
+    ranked = ShoppingDecisionService()._rank(
+        [
+            {"product_id": "sony", "product_name": "索尼耳机", "brand": "索尼", "total_sale": 1000},
+            {"product_id": "huawei", "product_name": "华为耳机", "brand": "华为", "total_sale": 10},
+        ],
+        mission,
+    )
+
+    hot = _rank_category_hot_sale(ranked)
+
+    assert [product["product_id"] for product in hot] == ["sony", "huawei"]
+    assert [product["ranking"]["hotSaleCount"] for product in hot] == [1000, 10]
 
 
 def test_current_mission_hard_constraints_override_negative_profile_signal():

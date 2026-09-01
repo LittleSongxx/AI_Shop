@@ -75,9 +75,11 @@ _EPISODE_FULL_INTENTS = frozenset(
 _SHOPPING_MEMORY_INTENTS = frozenset(
     {
         IntentKind.PRODUCT_SEARCH,
-        IntentKind.PRODUCT_CONSULT,
         IntentKind.VISUAL_PRODUCT_SEARCH,
     }
+)
+_INTENT_REPEAT_SKIP = frozenset(
+    {IntentKind.CHAT, IntentKind.PRODUCT_CONSULT, *_SHOPPING_MEMORY_INTENTS}
 )
 _IMAGE_AFTER_SALES_MARKERS = (
     "退款", "退货", "售后", "破损", "损坏", "坏了", "碎了", "错发", "漏发",
@@ -265,10 +267,7 @@ class AgentOrchestrator:
         # 跳过 LLM 直接提示用户转人工。节约 Token，同时给出明确的行动路径。
         # 购物类意图（PRODUCT_SEARCH/PRODUCT_CONSULT）和闲聊不参与计数——用户连续搜索商品是
         # 正常行为，不应被当做重复投诉处理。
-        _INTENT_REPEAT_SKIP = frozenset(
-            {"CHITCHAT", "UNKNOWN", "PRODUCT_SEARCH", "PRODUCT_CONSULT", "VISUAL_PRODUCT_SEARCH"}
-        )
-        if decision.intent.value not in _INTENT_REPEAT_SKIP:
+        if decision.intent not in _INTENT_REPEAT_SKIP:
             intent_count = await rate_limit_service.record_intent(
                 user_id, decision.intent.value, window_seconds=600
             )

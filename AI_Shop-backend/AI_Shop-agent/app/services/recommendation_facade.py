@@ -175,7 +175,13 @@ class RecommendationFacade:
             products=products,
             status="COMPLETED" if products else "NO_RESULT",
             degradation=("检索没有返回满足当前约束且可购买的商品" if not products else None),
-            fallback_used=source in {"rrf_fallback", "category", "browse", "hot_sale_explicit"},
+            fallback_used=source in {
+                "rrf_fallback",
+                "category",
+                "browse",
+                "hot_sale_explicit",
+                "category_hot_sale",
+            },
             trace={"source": source},
             message=assistant if not products else None,
         )

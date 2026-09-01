@@ -14,6 +14,34 @@ _TAXONOMY_PATH = Path(__file__).resolve().parents[1] / "config" / "search_taxono
 _RUNTIME_TAXONOMY_PATH = (
     Path(__file__).resolve().parents[1] / "config" / "search_runtime_taxonomy.yml"
 )
+_VAGUE_QUERY_SHELL = (
+    "有什么类似的", "有没有类似的", "怎么样", "怎么选", "推荐一下",
+    "有没有", "还有", "类似", "同款", "推荐", "哪些", "哪个", "什么",
+    "这一款", "这款", "这个", "另一款", "另一个", "其他款", "别的",
+    "帮我", "给我", "找找", "看看", "换个", "换一个", "再来", "再",
+    "更好", "一下", "一个", "一款", "商品", "产品", "东西",
+    "怎么", "有", "的", "啥", "下", "吗", "么", "嘛", "呢", "啊",
+)
+
+
+def is_vague_search_keyword(text: str | None) -> bool:
+    """Whether a query contains only a request/reference shell, not a topic."""
+
+    value = str(text or "").strip()
+    if not value or len(value) < 2:
+        return True
+    remainder = re.sub(r"[\s，。！？、,.;:!?~～]+", "", value).casefold()
+    for shell in _VAGUE_QUERY_SHELL:
+        remainder = remainder.replace(shell, "")
+    return not re.sub(r"[^0-9a-z\u4e00-\u9fff]", "", remainder)
+
+
+def is_literal_availability_query(text: str | None) -> bool:
+    value = str(text or "").strip()
+    return not is_vague_search_keyword(value) and bool(
+        value.startswith("有没有")
+        or re.fullmatch(r"有.+(?:吗|么|嘛|[?？])", value)
+    )
 
 
 @lru_cache(maxsize=1)
@@ -153,6 +181,24 @@ def runtime_surface_contracts(query: str | None) -> list[dict[str, list[str] | s
             }
         )
     return contracts
+
+
+def category_surface_terms(category: str | None) -> tuple[str, ...]:
+    """Return configured title/category terms for one managed runtime category."""
+
+    target = str(category or "").strip().casefold()
+    values: list[str] = []
+    for topic in [*_runtime_topics(), *_topics()]:
+        topic_category = str(
+            topic.get("runtimeCategory") or topic.get("canonical") or ""
+        ).strip()
+        if topic_category.casefold() != target:
+            continue
+        for raw in topic.get("surfaceTerms") or _topic_aliases(topic):
+            value = str(raw or "").strip()
+            if value and value.casefold() not in {item.casefold() for item in values}:
+                values.append(value)
+    return tuple(values)
 
 
 def verified_qualifier_contracts(query: str | None) -> list[dict[str, list[str] | str]]:
@@ -610,11 +656,14 @@ def primary_product_request(text: str | None) -> str:
 
 
 def _clean_query(value: str) -> str:
+    availability_question = bool(re.search(r"(?:吗|么|嘛|[?？])\s*$", value))
     fillers = [re.escape(str(item)) for item in _taxonomy().get("fillers") or [] if item]
     cleaned = re.sub("|".join(fillers), "", value) if fillers else value
     punctuation = str(_taxonomy().get("punctuation") or "")
     if punctuation:
         cleaned = re.sub(f"[{re.escape(punctuation)}\\s]+", "", cleaned)
+    if availability_question:
+        cleaned = re.sub(r"^有", "", cleaned)
     return cleaned.strip()
 
 
@@ -667,6 +716,10 @@ def match_terms_for_query(query: str | None) -> list[str]:
     normalized_query = normalize_product_search_query(value)
     add(normalized_query)
     add(value)
+    for token in re.findall(
+        r"[a-z][a-z0-9_-]{1,}|[\u4e00-\u9fff]{2,}", normalized_query.casefold()
+    ):
+        add(token)
     lowered = value.lower()
     for topic in _topics():
         aliases = _topic_aliases(topic)

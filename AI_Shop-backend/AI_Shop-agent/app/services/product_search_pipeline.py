@@ -19,6 +19,7 @@ from app.services.product_search_query import (
     filter_products_by_query_relevance,
     infer_product_category,
     is_comparison_query,
+    is_literal_availability_query,
     is_managed_search_keyword,
     normalize_product_search_query,
     primary_product_request,
@@ -718,6 +719,7 @@ def filter_products_for_query_plan(
         )
         candidates = matched
 
+    managed_category = infer_product_category(constraint_text)
     type_contracts = runtime_surface_contracts(constraint_text)
     if type_contracts and candidates:
         matched = []
@@ -787,6 +789,24 @@ def filter_products_for_query_plan(
                     }
                 )
         candidates = matched
+    if (
+        candidates
+        and not managed_category
+        and not type_contracts
+        and not plan.constraints.comparison_required
+        and is_literal_availability_query(constraint_text)
+    ):
+        matched = filter_products_by_query_relevance(candidates, constraint_text)
+        matched_ids = {id(product) for product in matched}
+        surface_rejected.extend(
+            {
+                "productId": _product_id(product),
+                "reason": "UNKNOWN_TOPIC_SURFACE_MISMATCH",
+            }
+            for product in candidates
+            if id(product) not in matched_ids
+        )
+        candidates = matched
     hard_terms = tuple(
         term for term in plan.constraints.must_terms if str(term or "").strip()
     )
@@ -820,7 +840,6 @@ def filter_products_for_query_plan(
             if id(product) not in matched_ids
         )
         candidates = matched
-    managed_category = infer_product_category(constraint_text)
     if managed_category and candidates and not type_contracts:
         # A Java offer snapshot may intentionally omit human-readable category
         # fields.  In that case absence of the category word in a title is not

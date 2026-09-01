@@ -93,6 +93,7 @@ def _capability_decision(
         "退款需要满足哪些条件",
         "退款政策一般多久到账",
         "退款多久到账呀",
+        "如何申请退款",
     ],
 )
 async def test_generic_refund_policy_bypasses_order_resolution(user_text: str) -> None:

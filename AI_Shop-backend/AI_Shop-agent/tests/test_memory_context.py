@@ -174,6 +174,10 @@ def test_build_context_block_hides_last_search_names():
 
 def test_is_vague_similar_intent():
     assert is_vague_search_keyword("有没有类似的")
+    assert is_vague_search_keyword("有什么类似的吗")
+    assert not is_vague_search_keyword("有WPS会员吗")
+    assert not is_vague_search_keyword("帮我推荐热销商品")
+    assert not is_vague_search_keyword("有伞吗")
 
 
 def test_is_similar_or_recommend_request():

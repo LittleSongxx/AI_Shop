@@ -843,8 +843,12 @@ def classify_request_mode(user_text: str, intent: IntentKind) -> RequestMode:
     proposal_requested = intent in _PROPOSAL_INTENTS and any(
         marker in text for marker in _PROPOSAL_MARKERS
     )
-    explicitly_delegates = any(
-        marker in text for marker in ("帮我", "给我", "直接", "立即", "提交", "申请")
+    explicitly_delegates = bool(
+        re.search(
+            r"(?:^|[，,。；;])\s*(?:麻烦)?(?:我想)?(?:请你|请)?"
+            r"(?:帮我|给我|为我|替我)",
+            text,
+        )
     )
     direct_order_action = _is_direct_order_action(text, intent, asks_information)
     if intent == IntentKind.CANCEL_ORDER and _has_explicit_cancel_proposal(text):
@@ -1134,6 +1138,10 @@ def classify_intent_by_rules(
         return IntentKind.QUERY_FULFILLMENT
     if any(marker in text for marker in ("出库", "预售商品")) and any(
         marker in text for marker in ("何时", "什么时候", "几天", "发货", "还没", "承诺")
+    ):
+        return IntentKind.QUERY_FULFILLMENT
+    if "没到账" in text and any(
+        marker in text for marker in ("已经买", "买了", "购买了")
     ):
         return IntentKind.QUERY_FULFILLMENT
 
@@ -2425,6 +2433,12 @@ def _apply_handoff_policy(
         and len(recent_intents) >= 2
         and all(i == decision.intent.value for i in recent_intents[:2])
         and decision.next_action == NextAction.TOOL
+        and decision.intent
+        not in {
+            IntentKind.PRODUCT_SEARCH,
+            IntentKind.PRODUCT_CONSULT,
+            IntentKind.VISUAL_PRODUCT_SEARCH,
+        }
         and not looks_like_intent_continuation(user_text, decision.intent.value)
         and not looks_like_ack_or_greeting(user_text)
     )

@@ -94,6 +94,7 @@ _CATEGORY_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("鞋子", ("鞋子", "运动鞋", "跑鞋")),
     ("美妆", ("美妆", "护肤", "化妆品")),
     ("外套", ("外套", "夹克")),
+    ("会员服务", ("wps会员", "wps超级会员", "wps office会员", "wps office超级会员")),
 )
 
 _SCENARIO_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (

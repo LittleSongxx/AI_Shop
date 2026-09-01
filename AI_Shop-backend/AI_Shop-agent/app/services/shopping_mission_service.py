@@ -9,17 +9,27 @@ into a price, brand, or suitability promise.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 
 import structlog
 
 from app.config.settings import get_settings
 from app.db.pool import acquire
+from app.domain.intent.rules import (
+    looks_like_hot_sale_recommend,
+    looks_like_new_product_search,
+)
 from app.memory.session_memory_service import session_memory_service
+from app.services.product_search_query import (
+    infer_product_category,
+    is_vague_search_keyword,
+)
 from app.services.redis_service import redis_service
 from app.services.shopping_profile_service import _has_signal, extract_profile
 
@@ -35,6 +45,38 @@ _DECLINE_CLARIFICATION_HINTS = (
     "不要再问",
     "直接推荐",
     "随便推荐",
+)
+_MISSION_CONTINUATION_HINTS = (
+    "继续",
+    "再推荐",
+    "再来",
+    "换一",
+    "换个",
+    "其他",
+    "别的",
+    "类似",
+    "同款",
+    "刚才",
+    "按这个预算",
+    "同预算",
+    "按刚才",
+    "接着",
+    "换成",
+    "改成",
+    "上面",
+    "预算提高",
+    "预算提升",
+    "预算调整",
+    "预算改",
+    "放宽预算",
+)
+_MISSION_FRESH_REQUEST_HINTS = (
+    "我想买",
+    "我要买",
+    "想买个",
+    "想买一",
+    "新需求",
+    "从头推荐",
 )
 
 
@@ -300,6 +342,19 @@ def schema_for(category: str | None) -> dict[str, Any]:
     return schema
 
 
+def _mission_seed_profile(profile: dict[str, Any] | None) -> dict[str, Any]:
+    """Carry only durable safety/privacy choices into a new purchase mission."""
+
+    profile = profile or {}
+    return {
+        "brands": list(profile.get("brands") or []),
+        "excludedBrands": list(profile.get("excludedBrands") or []),
+        "excludedTerms": list(profile.get("excludedTerms") or []),
+        "personalizationEnabled": profile.get("personalizationEnabled", True),
+        "implicitSignals": list(profile.get("implicitSignals") or []),
+    }
+
+
 def empty_shopping_mission(profile: dict[str, Any] | None = None) -> dict[str, Any]:
     settings = get_settings()
     profile = profile or {}
@@ -453,15 +508,67 @@ def apply_explicit_turn(
     """Merge only regex/structured explicit signals into the active mission."""
     timestamp = now or _utc_now()
     incoming = extract_profile(user_text)
-    if not _has_signal(incoming) and not mission_is_active(current, now=timestamp):
+    hot_sale_request = looks_like_hot_sale_recommend(user_text)
+    standalone_request = not is_vague_search_keyword(user_text)
+    if (
+        not _has_signal(incoming)
+        and not mission_is_active(current, now=timestamp)
+        and not hot_sale_request
+        and not standalone_request
+    ):
         return None
-    mission = deepcopy(current) if mission_is_active(current, now=timestamp) else empty_shopping_mission(profile)
+    current_is_active = mission_is_active(current, now=timestamp)
+    incoming_category = str(
+        incoming.get("category") or infer_product_category(user_text) or ""
+    )
+    previous_category = str((current or {}).get("category") or "")
+    turn_sha256 = hashlib.sha256(user_text.strip().encode("utf-8")).hexdigest()
+    already_applied = bool(
+        current_is_active
+        and message_id == 0
+        and str((current or {}).get("sourceTurnSha256") or "") == turn_sha256
+    )
+    continues_current = any(
+        marker in user_text for marker in _MISSION_CONTINUATION_HINTS
+    )
+    fresh_request = bool(
+        hot_sale_request
+        or any(marker in user_text for marker in _MISSION_FRESH_REQUEST_HINTS)
+        or (
+            not current_is_active
+            and (looks_like_new_product_search(user_text) or standalone_request)
+            and not continues_current
+        )
+        or (
+            current_is_active
+            and not incoming_category
+            and standalone_request
+            and not continues_current
+        )
+    )
+    starts_new_mission = bool(
+        not already_applied
+        and (
+            fresh_request
+            or (
+                current_is_active
+                and incoming_category
+                and incoming_category != previous_category
+            )
+        )
+    )
+    mission = (
+        empty_shopping_mission(_mission_seed_profile(profile))
+        if starts_new_mission
+        else deepcopy(current)
+        if current_is_active
+        else empty_shopping_mission(profile)
+    )
     previous_category = str(mission.get("category") or "")
-    incoming_category = str(incoming.get("category") or "")
     if incoming_category and previous_category and incoming_category != previous_category:
         # A new shelf is a new decision. Stable exclusions remain useful, but
         # old budget/use-case candidates must not silently constrain it.
-        mission = empty_shopping_mission(profile)
+        mission = empty_shopping_mission(_mission_seed_profile(profile))
         mission["category"] = incoming_category
         mission["sourceMessageIds"] = {"category": message_id} if message_id > 0 else {}
 
@@ -528,6 +635,9 @@ def apply_explicit_turn(
     )
     mission["status"] = "ACTIVE"
     mission["version"] = MISSION_VERSION
+    mission["sourceTurnSha256"] = turn_sha256
+    if message_id > 0:
+        mission["sourceTurnMessageId"] = message_id
     return mission
 
 
@@ -573,14 +683,24 @@ def mission_summary(mission: dict[str, Any] | None) -> str:
     assert mission is not None
     hard = mission.get("hardConstraints") or {}
     soft = mission.get("softPreferences") or {}
+    budget_min = hard.get("budgetMin")
+    budget_max = hard.get("budgetMax")
+
+    def format_amount(value: Any) -> str:
+        return format(Decimal(str(value)).normalize(), "f")
+    budget = (
+        f"预算:{format_amount(budget_min)}-{format_amount(budget_max)}元"
+        if budget_min is not None and budget_max is not None
+        else f"预算:{format_amount(budget_max)}元以内"
+        if budget_max is not None
+        else f"预算:{format_amount(budget_min)}元以上"
+        if budget_min is not None
+        else ""
+    )
     values = [
         f"品类:{mission.get('category')}" if mission.get("category") else "",
         "用途:" + ",".join(mission.get("useCases") or []) if mission.get("useCases") else "",
-        (
-            f"预算:{hard.get('budgetMin') or '*'}-{hard.get('budgetMax') or '*'}元"
-            if hard.get("budgetMin") is not None or hard.get("budgetMax") is not None
-            else ""
-        ),
+        budget,
         "偏好:" + ",".join(_unique(soft.get("brands")) + _unique(soft.get("features")))
         if soft.get("brands") or soft.get("features")
         else "",
@@ -597,6 +717,13 @@ class ShoppingMissionService:
         durable_profile: dict[str, Any],
     ) -> dict[str, Any] | None:
         current = await self.load(user_id)
+        turn_sha256 = hashlib.sha256(user_text.strip().encode("utf-8")).hexdigest()
+        if (
+            message_id == 0
+            and mission_is_active(current)
+            and str((current or {}).get("sourceTurnSha256") or "") == turn_sha256
+        ):
+            return current
         updated = apply_explicit_turn(
             current,
             profile=durable_profile,
@@ -605,7 +732,11 @@ class ShoppingMissionService:
         )
         if updated is None:
             return None
-        await self._save(user_id, updated, source_message_id=message_id)
+        await self._save(
+            user_id,
+            updated,
+            source_message_id=message_id if message_id > 0 else None,
+        )
         return updated
 
     async def load(self, user_id: str) -> dict[str, Any] | None:

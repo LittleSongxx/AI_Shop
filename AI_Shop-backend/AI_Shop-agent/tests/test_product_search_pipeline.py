@@ -73,6 +73,24 @@ def test_runtime_constraints_do_not_use_dataset_gold_fields():
     assert "constraints" not in plan.public()
 
 
+def test_unknown_topic_surface_filter_rejects_semantic_drift():
+    plan = build_product_query_plan("有SolidWorks激活码吗", {})
+    products = [
+        {"product_id": "headphones", "product_name": "索尼无线降噪耳机"},
+        {
+            "product_id": "solidworks",
+            "product_name": "SW SolidWorks软件正版激活码服务",
+        },
+    ]
+
+    eligible, rejected = filter_products_for_query_plan(products, plan)
+
+    assert eligible == [products[1]]
+    assert rejected == [
+        {"productId": "headphones", "reason": "UNKNOWN_TOPIC_SURFACE_MISMATCH"}
+    ]
+
+
 def test_query_plan_upgrades_broad_mission_category_from_managed_raw_query():
     plan = build_product_query_plan(
         "预算1500元以内的咖啡机",

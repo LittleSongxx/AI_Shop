@@ -1163,7 +1163,13 @@ async def tool_search_products(
             if products
             else "NO_RESULT"
         ),
-        fallback_used=source in {"rrf_fallback", "category", "browse", "hot_sale_explicit"},
+        fallback_used=source in {
+            "rrf_fallback",
+            "category",
+            "browse",
+            "hot_sale_explicit",
+            "category_hot_sale",
+        },
         trace={
             "source": source,
             "constraintEvidence": constraint_evidence,

@@ -82,6 +82,10 @@ topics:
   - canonical: 平板电脑
     aliases: [平板电脑, ipad, 学习平板]
     runtimeCategory: 平板电脑
+  - canonical: WPS会员
+    aliases: [WPS会员, WPS超级会员, WPS Office会员, WPS Office超级会员]
+    runtimeCategory: 会员服务
+    surfaceTerms: [WPS, WPS Office, 超级会员]
 
 # Qualifiers in this list are hard product-attribute requests. They may only
 # pass when the Java-owned product snapshot contains one of the declared

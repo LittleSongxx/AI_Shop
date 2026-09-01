@@ -284,6 +284,30 @@ def test_dynamic_fact_rejects_matched_false_wrong_source_and_wrong_value():
         assert result.passed is False, ref
 
 
+def test_catalog_no_result_disclaimer_is_not_an_inventory_assertion():
+    result = response_verifier.verify(
+        assistant=(
+            "本次检索暂未返回同时满足条件的商品，"
+            "不能据此断言平台无货。"
+        ),
+        biz_type="shopping_decision_v2",
+        tools_called=["SEARCH_PRODUCTS"],
+        source_refs={
+            "businessSources": [
+                {
+                    "type": "product",
+                    "source": "JAVA_GATEWAY",
+                    "matched": False,
+                    "authoritative": True,
+                }
+            ]
+        },
+        has_pending_action=False,
+    )
+
+    assert result.passed is True
+
+
 def test_every_java_order_status_and_common_negative_alias_need_an_order_ref():
     for status in (*ORDER_STATUS_NAMES.values(), "尚未发货", "未付款"):
         result = response_verifier.verify(

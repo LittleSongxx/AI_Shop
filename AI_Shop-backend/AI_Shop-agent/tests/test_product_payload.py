@@ -23,7 +23,10 @@ from app.services.shopping_decision_service import (
     ShoppingDecisionResult,
     shopping_decision_service,
 )
-from app.services.shopping_mission_service import empty_shopping_mission
+from app.services.shopping_mission_service import (
+    empty_shopping_mission,
+    shopping_mission_service,
+)
 from app.services.shopping_profile_service import empty_profile, shopping_profile_service
 from app.utils.biz_payload import build_order_payload, build_product_payload
 
@@ -37,6 +40,22 @@ def test_filter_known_available_products_keeps_unknown_stock():
     ]
 
     assert [p["product_id"] for p in filter_known_available_products(products)] == ["3", "4"]
+
+
+@pytest.mark.asyncio
+async def test_product_request_persists_worker_refined_mission(monkeypatch):
+    mission = empty_shopping_mission({**empty_profile(), "category": "咖啡机"})
+    capture = AsyncMock(return_value=mission)
+    monkeypatch.setattr(shopping_mission_service, "capture_user_turn", capture)
+
+    resolved = await ProductService()._mission_for_request(
+        user_id="u1",
+        user_text="有没有咖啡机",
+        profile=empty_profile(),
+    )
+
+    assert resolved["category"] == "咖啡机"
+    capture.assert_awaited_once_with("u1", 0, "有没有咖啡机", empty_profile())
 
 
 @pytest.mark.asyncio
@@ -271,6 +290,131 @@ async def test_specific_winter_jacket_query_searches_without_clarification(monke
     assert products == []
     assert source == "none"
     pipeline.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_explicit_hot_sale_bypasses_hybrid_and_old_constraints(monkeypatch):
+    service = ProductService()
+    profile = empty_profile()
+    mission = empty_shopping_mission(profile)
+    product = {
+        "product_id": "hot-1",
+        "product_name": "全站热销商品",
+        "status": 1,
+        "total_stock": 8,
+        "min_price": 99,
+        "max_price": 99,
+    }
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "get_effective_profile",
+        AsyncMock(return_value=profile),
+    )
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "should_clarify",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(service, "_mission_for_request", AsyncMock(return_value=mission))
+    pipeline = AsyncMock()
+    monkeypatch.setattr(product_search_pipeline, "search", pipeline)
+    hot_sale = AsyncMock(return_value=[product])
+    monkeypatch.setattr(search_recommend_service, "load_hot_sale", hot_sale)
+    monkeypatch.setattr(
+        shopping_decision_service,
+        "decide",
+        AsyncMock(
+            return_value=ShoppingDecisionResult(
+                products=[product],
+                source="shopping_decision_v2",
+                request_id="hot-request",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        recommendation_attribution_service,
+        "record_impression",
+        AsyncMock(),
+    )
+
+    _assistant, _biz, _biz_type, products, source = await service.search_products(
+        "u1",
+        "帮我推荐热销商品",
+        user_text="帮我推荐热销商品",
+    )
+
+    assert [item["product_id"] for item in products] == ["hot-1"]
+    assert products[0]["decision_recall_source"] == "hot_sale_explicit"
+    assert source == "hot_sale_explicit"
+    hot_sale.assert_awaited_once_with(8)
+    pipeline.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_category_scoped_hot_sale_keeps_category_retrieval(monkeypatch):
+    service = ProductService()
+    mission = empty_shopping_mission({**empty_profile(), "category": "耳机"})
+    recalled = [
+        {
+            "product_id": "low-sale",
+            "product_name": "耳机 A",
+            "status": 1,
+            "total_stock": 8,
+            "total_sale": 2,
+        },
+        {
+            "product_id": "high-sale",
+            "product_name": "耳机 B",
+            "status": 1,
+            "total_stock": 8,
+            "total_sale": 20,
+        },
+    ]
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "get_effective_profile",
+        AsyncMock(return_value=empty_profile()),
+    )
+    monkeypatch.setattr(
+        shopping_profile_service,
+        "should_clarify",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(service, "_mission_for_request", AsyncMock(return_value=mission))
+    pipeline = AsyncMock(
+        return_value=ProductSearchResult(
+            recalled,
+            ["low-sale", "high-sale"],
+            ProductSearchTrace(query_plan={}, result_source="hybrid"),
+        )
+    )
+    monkeypatch.setattr(product_search_pipeline, "search", pipeline)
+    hot_sale = AsyncMock()
+    monkeypatch.setattr(search_recommend_service, "load_hot_sale", hot_sale)
+    decide = AsyncMock(
+        side_effect=lambda **kwargs: ShoppingDecisionResult(
+            products=kwargs["candidates"],
+            source="shopping_decision_v2",
+            request_id="category-hot-request",
+        )
+    )
+    monkeypatch.setattr(shopping_decision_service, "decide", decide)
+    monkeypatch.setattr(
+        recommendation_attribution_service,
+        "record_impression",
+        AsyncMock(),
+    )
+
+    _assistant, _biz, _biz_type, products, source = await service.search_products(
+        "u1",
+        "推荐热销耳机",
+        user_text="推荐热销耳机",
+    )
+
+    assert source == "category_hot_sale"
+    assert decide.await_args.kwargs["source"] == "category_hot_sale"
+    pipeline.assert_awaited_once()
+    hot_sale.assert_not_awaited()
 
 
 @pytest.mark.asyncio

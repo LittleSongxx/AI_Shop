@@ -23,6 +23,18 @@ def test_unknown_category_is_preserved_for_generic_search():
     assert match_terms_for_query("帮我找露营天幕")[0] == "露营天幕"
 
 
+def test_unknown_availability_query_keeps_only_literal_product_matches():
+    products = [
+        {"product_name": "索尼无线降噪耳机"},
+        {"product_name": "SW SolidWorks软件正版激活码服务"},
+    ]
+
+    assert normalize_product_search_query("有SolidWorks激活码吗") == "SolidWorks激活码"
+    assert filter_products_by_query_relevance(
+        products, "有SolidWorks激活码吗"
+    ) == [products[1]]
+
+
 @pytest.mark.parametrize(
     ("query", "category"),
     (
@@ -35,6 +47,7 @@ def test_unknown_category_is_preserved_for_generic_search():
         ("百瓦多口车载充电器", "车载充电器"),
         ("台式电脑主机", "电脑"),
         ("新生儿衣服礼盒", "服饰"),
+        ("有WPS会员吗", "会员服务"),
     ),
 )
 def test_infer_product_category_prefers_specific_catalog_leaf(query, category):
