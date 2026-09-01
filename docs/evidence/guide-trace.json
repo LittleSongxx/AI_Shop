@@ -1,7 +1,7 @@
 {
   "schemaVersion": "aishop-portfolio-trace/v1",
   "traceType": "SHOPPING_GUIDE_TO_WAIT_PAYMENT",
-  "evaluatedCommit": "10e9e1916dc6fdec73d398fb43e490cf14dad27e",
+  "evaluatedCommit": "b312b0177f03cfff3e2800e2b8c004dbd3cc8bb1",
   "evidenceSource": "LOCAL_FULL_STACK",
   "status": "PASS",
   "test": "real recommendation exposure validates a click and reaches checkout",

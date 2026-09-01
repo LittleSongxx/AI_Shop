@@ -1,15 +1,15 @@
 {
   "schemaVersion": "aishop-portfolio-evidence/v1",
-  "evaluatedCommit": "10e9e1916dc6fdec73d398fb43e490cf14dad27e",
+  "evaluatedCommit": "b312b0177f03cfff3e2800e2b8c004dbd3cc8bb1",
   "bindingMode": "EVIDENCE_ONLY_CHILD_COMMIT",
   "worktreeDirty": false,
-  "generatedAt": "2026-09-01T07:04:16Z",
+  "generatedAt": "2026-09-01T07:47:05Z",
   "artifacts": [
     {
       "path": "docs/evidence/scorecard.json",
       "role": "current visible evaluation and validation scorecard",
       "bytes": 4658,
-      "sha256": "91e0eb8bb5fb25b9af86f31d70ba75bd1a54bb54be547778e903ece9451bffe7"
+      "sha256": "25a1633d9635c48716d9aeeffe5cd2db4400116b3a2bb78e29d26fd35fc9a7e9"
     },
     {
       "path": "docs/evidence/badcases.jsonl",
@@ -21,25 +21,25 @@
       "path": "docs/evidence/guide-trace.json",
       "role": "local shopping-guide to WAIT_PAYMENT browser trace summary",
       "bytes": 938,
-      "sha256": "6450e296b055f372025fc9a8d4c64206508098128bb060ee66a3cc44a24fd970"
+      "sha256": "a87a6a692e9c37605f19b9a5e654ff89ff003d3fe7480a003cd5bb247aed5d3d"
     },
     {
       "path": "docs/evidence/support-trace.json",
       "role": "local controlled customer-support confirmation trace summary",
       "bytes": 985,
-      "sha256": "3b778dc86c3b949211252a51ec906f93317d40ec524dba74e4a6742b8ab8e550"
+      "sha256": "e98de3b5210cc2d84ec0dde080dc3ce5625968737e4756a035119ee0763f05c3"
     },
     {
       "path": "docs/evidence/synthetic-blackbox-report.json",
       "role": "external AI blackbox execution status and declared thresholds",
       "bytes": 1187,
-      "sha256": "12b8a3edd5785d2c7e9350dc1d81e6decb42cc0c28fdfdb5c2bec8c98cf9793b"
+      "sha256": "e5c216d343d667811fb92f7f51eed0c005586278dd17e91babcbff5d8944f469"
     },
     {
       "path": "docs/evidence/SHA256SUMS",
       "role": "artifact checksum inventory",
       "bytes": 427,
-      "sha256": "14041ef2b687a68ed9fcffa43da516b2d840bbc855c35d62e9a60fb2793c6c84"
+      "sha256": "ab272a798e4c3f927e4b38a7ec359139af6f35835b7fb52df55b948bd55acfdb"
     }
   ],
   "boundaries": {
