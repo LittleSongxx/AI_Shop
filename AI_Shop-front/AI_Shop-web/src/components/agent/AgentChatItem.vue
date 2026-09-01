@@ -178,8 +178,9 @@ const sourceHref = (sourceRef: AgentSourceRef) => {
 };
 
 const sourceMeta = (sourceRef: AgentSourceRef) => {
+  const label = sourceLabel(sourceRef, 0);
   const values = [
-    sourceRef.source,
+    sourceRef.source === label ? '' : sourceRef.source,
     sourceRef.version != null ? `版本 ${sourceRef.version}` : '',
     sourceRef.retrieval
   ].filter(Boolean);

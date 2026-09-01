@@ -29,6 +29,22 @@ const renderMessage = (assistantMessage: Record<string, unknown>) =>
   });
 
 describe('agent structured cards', () => {
+  it('does not repeat a technical source as both label and metadata', () => {
+    const view = render(AgentChatItem, {
+      props: {
+        data: {
+          messageId: 17,
+          status: 2,
+          assistantMessage: '已核验实时商品信息',
+          sourceRefs: [{ type: 'product', source: 'JAVA_GATEWAY' }]
+        }
+      },
+      global: { stubs: { ElIcon: true, ProductImage: true } }
+    });
+
+    expect(view.getAllByText('JAVA_GATEWAY')).toHaveLength(1);
+  });
+
   it('renders a real-time product comparison without leaking raw JSON', () => {
     const view = renderMessage({
       type: 'PRODUCT_COMPARISON',
