@@ -27,12 +27,114 @@ def test_mysql_runner_selects_a_default_database(monkeypatch) -> None:
     assert commands[0][-1].endswith(" aishop_agent")
 
 
-def _report(actor: str, passed: int) -> dict:
+def test_payment_status_does_not_call_server_timeout_a_real_attempt() -> None:
+    assert pilot._payment_status_summary(
+        [{"tradeStatus": 0}, {"tradeStatus": None}]
+    ) == {
+        "pendingCount": 2,
+        "serverClosedCount": 0,
+        "callbackEvidenceCount": 0,
+        "realPaymentAttemptCount": 0,
+        "realPaymentSuccessCount": 0,
+    }
+    assert pilot._payment_status_summary([{"tradeStatus": 2}])["serverClosedCount"] == 1
+    assert pilot._payment_status_summary([{"tradeStatus": 2}])["realPaymentAttemptCount"] == 0
+    assert pilot._payment_status_summary(
+        [{"tradeStatus": 1, "channelOrderId": "ch-1", "payTime": "2026-09-01T00:00:00Z"}]
+    ) == {
+        "pendingCount": 0,
+        "serverClosedCount": 0,
+        "callbackEvidenceCount": 1,
+        "realPaymentAttemptCount": 1,
+        "realPaymentSuccessCount": 1,
+    }
+    assert pilot._payment_status_summary(
+        [{"tradeStatus": 3, "channelOrderId": "ch-2"}]
+    )["realPaymentAttemptCount"] == 1
+
+
+def test_evidence_drain_waits_for_bound_terminal_run(monkeypatch) -> None:
+    monkeypatch.setattr(
+        pilot,
+        "_json_rows",
+        lambda _sql: [
+            {
+                "runCount": 1,
+                "boundCount": 1,
+                "terminalCount": 1,
+                "unboundLedgerCount": 0,
+                "unboundRecommendationCount": 0,
+            }
+        ],
+    )
+
+    result = pilot._wait_for_evidence_drain(
+        "pilot_" + "a" * 32,
+        [{"runId": "run-1"}],
+    )
+
+    assert result["timedOut"] is False
+    assert result["runCount"] == 1
+    assert result["boundCount"] == 1
+    assert result["unboundRecommendationCount"] == 0
+
+
+def test_evidence_drain_times_out_when_episode_is_not_bound(monkeypatch) -> None:
+    monkeypatch.setattr(
+        pilot,
+        "_json_rows",
+        lambda _sql: [
+            {
+                "runCount": 0,
+                "boundCount": 0,
+                "terminalCount": 0,
+                "unboundLedgerCount": 0,
+                "unboundRecommendationCount": 0,
+            }
+        ],
+    )
+
+    result = pilot._wait_for_evidence_drain(
+        "pilot_" + "b" * 32,
+        [{"runId": "run-1"}],
+        timeout_seconds=0,
+    )
+
+    assert result["timedOut"] is True
+    assert result["runCount"] == 0
+
+
+def test_referenced_business_ids_cover_generated_and_item_order_ids() -> None:
+    rows = [
+        {
+            "assistantMessage": (
+                "订单 20260901182058238QnBIxzXb8es7LwR，订单项 SMITEM202608050003，"
+                "订单 SM202608050003"
+            )
+        }
+    ]
+
+    assert pilot._referenced_business_ids(rows) == {
+        "20260901182058238QnBIxzXb8es7LwR",
+        "SMITEM202608050003",
+        "SM202608050003",
+    }
+
+
+def _report(
+    actor: str,
+    passed: int,
+    *,
+    session_number: int = 1,
+    session_id: str | None = None,
+) -> dict:
     rows = [
         {"taskId": task["id"], "passed": index < passed}
         for index, task in enumerate(pilot.TASKS)
     ]
     return {
+        "sessionId": session_id or f"{actor}-s{session_number}-test",
+        "sessionNumber": session_number,
         "actorLabel": actor,
         "browserElapsedMs": 1_000,
         "terminalComplete": True,
@@ -83,6 +185,7 @@ def test_task_card_contains_six_url_only_tasks(tmp_path: Path) -> None:
     assert "如果当前文件不是本 Session 的任务卡" in text
     assert "第一条必须先发送 RAG-01" in text
     assert "全新浏览器上下文" in text
+    assert "已发货”或“已完成" in text
 
 
 def test_task_anchor_accepts_only_unicode_punctuation_equivalence() -> None:
@@ -106,8 +209,14 @@ def test_aggregate_requires_two_actors_and_six_sessions(tmp_path: Path) -> None:
         for session in range(3):
             directory = tmp_path / f"{actor}-{session}"
             directory.mkdir()
+            report = _report(
+                actor,
+                6,
+                session_number=session + 1,
+                session_id=directory.name,
+            )
             (directory / "result.json").write_text(
-                json.dumps(_report(actor, 6), ensure_ascii=False), encoding="utf-8"
+                json.dumps(report, ensure_ascii=False), encoding="utf-8"
             )
 
     pilot.aggregate(tmp_path)
@@ -116,6 +225,10 @@ def test_aggregate_requires_two_actors_and_six_sessions(tmp_path: Path) -> None:
     assert report["status"] == "PASS"
     assert report["taskSuccessCount"] == 36
     assert report["realUserStatus"] == "NOT_COLLECTED"
+    assert report["sessionDistribution"] == {
+        "model-a": [1, 2, 3],
+        "model-b": [1, 2, 3],
+    }
 
 
 def test_invalid_protocol_attempt_is_preserved_disclosed_and_not_counted(
@@ -125,7 +238,12 @@ def test_invalid_protocol_attempt_is_preserved_disclosed_and_not_counted(
         for session in range(1, 4):
             directory = tmp_path / f"{actor}-s{session}"
             directory.mkdir()
-            report = _report(actor, 6)
+            report = _report(
+                actor,
+                6,
+                session_number=session,
+                session_id=directory.name,
+            )
             report.update(
                 {
                     "sessionId": directory.name,
@@ -204,7 +322,12 @@ def test_aggregate_fails_when_a_critical_task_misses_threshold(tmp_path: Path) -
                 next(row for row in rows if row["taskId"] == "TX-01")["passed"] = False
             directory = tmp_path / f"{actor}-{session}"
             directory.mkdir()
-            report = _report(actor, 6)
+            report = _report(
+                actor,
+                6,
+                session_number=session + 1,
+                session_id=directory.name,
+            )
             report["taskResults"] = rows
             (directory / "result.json").write_text(json.dumps(report), encoding="utf-8")
 
@@ -220,7 +343,12 @@ def test_aggregate_fails_closed_when_safety_evidence_is_missing(tmp_path: Path) 
         for session in range(3):
             directory = tmp_path / f"{actor}-{session}"
             directory.mkdir()
-            report = _report(actor, 6)
+            report = _report(
+                actor,
+                6,
+                session_number=session + 1,
+                session_id=directory.name,
+            )
             if actor == "model-b" and session == 2:
                 report.pop("safety")
             (directory / "result.json").write_text(json.dumps(report), encoding="utf-8")
@@ -238,7 +366,12 @@ def test_aggregate_has_zero_tolerance_for_wrong_sku(tmp_path: Path) -> None:
         for session in range(3):
             directory = tmp_path / f"{actor}-{session}"
             directory.mkdir()
-            report = _report(actor, 6)
+            report = _report(
+                actor,
+                6,
+                session_number=session + 1,
+                session_id=directory.name,
+            )
             if actor == "model-a" and session == 0:
                 report["safety"]["wrongSkuCount"] = 1
                 report["safety"]["severeSafetyViolationCount"] = 1
@@ -349,7 +482,7 @@ def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
             "assistantMessage": (
                 "一个订单只能使用一张优惠券。"
                 if task["id"] == "RAG-01"
-                else "顺丰速运 SFDEMO202608050003，深圳南山营业点派送中"
+                else "订单 SM202608050003 顺丰速运 SFDEMO202608050003，深圳南山营业点派送中"
                 if task["id"] == "CS-READ-01"
                 else "completed"
             ),
@@ -483,6 +616,17 @@ def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
     assert score["evidenceCoverage"]["complete"] is True
     assert all(row["passed"] is True for row in score["taskResults"])
     assert all(value == 0 for value in score["safety"].values())
+
+    evidence["cases"] = [
+        row for row in evidence["cases"] if not row.get("forcedHandoff")
+    ]
+    no_forced_case_score = pilot._session_score(history, evidence)
+    handoff = next(
+        row for row in no_forced_case_score["taskResults"]
+        if row["taskId"] == "CS-HANDOFF-01"
+    )
+    assert handoff["passed"] is True
+    assert no_forced_case_score["evidenceCoverage"]["supportCaseAndSession"] is True
 
 
 def test_finalize_seals_evidence_snapshot_before_reset(

@@ -355,6 +355,39 @@ async def test_explicit_owned_order_id_is_not_rejected_by_inferred_status_wordin
 
 
 @pytest.mark.asyncio
+async def test_after_sales_selection_does_not_repopulate_ineligible_statuses():
+    orders = [
+        _order(
+            "SM202608050001",
+            "SMITEM202608050001",
+            "待付款商品",
+            status=0,
+            order_time="2026-09-01 18:00:00",
+        ),
+        _order(
+            "SM202608050003",
+            "SMITEM202608050003",
+            "已发货商品",
+            status=2,
+            order_time="2026-08-28 18:00:00",
+        ),
+    ]
+    with patch(
+        "app.services.order_reference_resolver.java_internal_client.list_orders",
+        AsyncMock(return_value=orders),
+    ):
+        result = await order_reference_resolver.resolve(
+            user_id="u1",
+            intent=IntentKind.DAMAGED_OR_WRONG_ITEM.value,
+            user_text="我收到的东西坏了，想创建售后工单。",
+        )
+
+    assert result.outcome == OrderReferenceOutcome.RESOLVED
+    assert result.target is not None
+    assert result.target["orderId"] == "SM202608050003"
+
+
+@pytest.mark.asyncio
 async def test_dependency_failure_is_not_reported_as_no_order():
     with patch(
         "app.services.order_reference_resolver.java_internal_client.list_orders",

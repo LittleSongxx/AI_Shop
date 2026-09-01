@@ -141,9 +141,17 @@ class ActionExecuteService:
                 raise ValueError("取消订单参数缺失，请重新发起提案")
             return await self._bridge.cancel_order(token, order_id, idempotency_key)
         if action_type == "CREATE_SUPPORT_CASE":
+            from app.services.java_internal_client import delegated_user_scope
             from app.services.support_case_service import support_case_service
 
-            case = await support_case_service.create_from_pending(pending, params)
+            delegated_user_id = str(pending.get("userId") or "").strip()
+            if not delegated_user_id:
+                raise ValueError("工单用户身份缺失")
+            # Confirmation runs in the API process, outside the Worker
+            # Episode context. Rebind the persisted owner before the support
+            # service calls Java's authenticated internal order endpoints.
+            with delegated_user_scope(delegated_user_id):
+                case = await support_case_service.create_from_pending(pending, params)
             return f"售后工单 {case['caseNo']} 已创建"
         if action_type == "PRODUCT_REVIEW":
             order_id = params.get("orderId")
