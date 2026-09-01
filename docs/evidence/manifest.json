@@ -1,45 +1,45 @@
 {
   "schemaVersion": "aishop-portfolio-evidence/v1",
-  "evaluatedCommit": "609e3cca7f76d7c53b0553536ce58cf2d9881c13",
+  "evaluatedCommit": "10e9e1916dc6fdec73d398fb43e490cf14dad27e",
   "bindingMode": "EVIDENCE_ONLY_CHILD_COMMIT",
   "worktreeDirty": false,
-  "generatedAt": "2026-08-31T17:52:04Z",
+  "generatedAt": "2026-09-01T07:04:16Z",
   "artifacts": [
     {
       "path": "docs/evidence/scorecard.json",
       "role": "current visible evaluation and validation scorecard",
-      "bytes": 4625,
-      "sha256": "f5584f9577617f3f56318842ed9e477ea9d6e56196a67ae12abf8670e25b670f"
+      "bytes": 4658,
+      "sha256": "91e0eb8bb5fb25b9af86f31d70ba75bd1a54bb54be547778e903ece9451bffe7"
     },
     {
       "path": "docs/evidence/badcases.jsonl",
       "role": "selected visible-run badcase ledger",
       "bytes": 267,
-      "sha256": "4f64ace2217a7e88251e0f1302987a790335433b27068653cc7fbb4f2c284a86"
+      "sha256": "95d83dfd2debe1169b4a7bf2298fd57b4d092e44edd95eac52a01a4388cc855c"
     },
     {
       "path": "docs/evidence/guide-trace.json",
       "role": "local shopping-guide to WAIT_PAYMENT browser trace summary",
       "bytes": 938,
-      "sha256": "d896338a13edae3307e5183868b71c54f66f981bb1b7988ff2daf5bd3e2025aa"
+      "sha256": "6450e296b055f372025fc9a8d4c64206508098128bb060ee66a3cc44a24fd970"
     },
     {
       "path": "docs/evidence/support-trace.json",
       "role": "local controlled customer-support confirmation trace summary",
       "bytes": 985,
-      "sha256": "3f547979879a72e39ac083bbb04ede28f002fd4087c8884b781fec90c1415dff"
+      "sha256": "3b778dc86c3b949211252a51ec906f93317d40ec524dba74e4a6742b8ab8e550"
     },
     {
       "path": "docs/evidence/synthetic-blackbox-report.json",
       "role": "external AI blackbox execution status and declared thresholds",
       "bytes": 1187,
-      "sha256": "d0c6fb8ae86f7dcfa0964245872679f977d5bf432a176279f8cf29e60dffc399"
+      "sha256": "12b8a3edd5785d2c7e9350dc1d81e6decb42cc0c28fdfdb5c2bec8c98cf9793b"
     },
     {
       "path": "docs/evidence/SHA256SUMS",
       "role": "artifact checksum inventory",
       "bytes": 427,
-      "sha256": "3df354fb9e7fceca164c1ea7c391b2fb4cdd84439b9e685f8e3a06d6900fbd5b"
+      "sha256": "14041ef2b687a68ed9fcffa43da516b2d840bbc855c35d62e9a60fb2793c6c84"
     }
   ],
   "boundaries": {

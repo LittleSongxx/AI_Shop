@@ -1,60 +1,60 @@
 {
   "schemaVersion": "aishop-portfolio-scorecard/v1",
-  "evaluatedCommit": "609e3cca7f76d7c53b0553536ce58cf2d9881c13",
-  "generatedAt": "2026-08-31T17:52:04Z",
+  "evaluatedCommit": "10e9e1916dc6fdec73d398fb43e490cf14dad27e",
+  "generatedAt": "2026-09-01T07:04:16Z",
   "worktreeDirty": false,
   "executionMode": "LOCAL_FULL_STACK",
   "status": "PASS_WITH_EXTERNAL_BLACKBOX_NOT_RUN",
   "visibleEvaluation": {
     "development": {
-      "runId": "career-mainline-development-v4-20260901",
-      "completedAt": "2026-08-31T17:46:05.511Z",
+      "runId": "career-mainline-development-v5-20260901",
+      "completedAt": "2026-09-01T06:59:56.473Z",
       "caseCount": 43,
       "domainOutcomes": {"search": true, "rag": true, "agent": true},
       "domains": {
-        "search": {"passed": 18, "total": 18, "recallAt10": 1.0, "ndcgAt10": 0.990322, "noResultAccuracy": 1.0, "constraintViolationCount": 0, "p95Ms": 1609.716202},
-        "rag": {"passed": 18, "total": 18, "retrievalRecallAt5": 1.0, "retrievalNdcgAt5": 0.977428, "generationCorrectness": 1.0, "requiredClaimCompleteness": 1.0, "citationSupport": 1.0, "severeSafetyViolationCount": 0, "p95Ms": 3127.96904},
-        "agent": {"passed": 7, "total": 7, "taskSuccess": 1.0, "toolSelectionAccuracy": 1.0, "toolArgumentAccuracy": 1.0, "retryIdempotency": 1.0, "duplicateSideEffectCount": 0, "severeSafetyViolationCount": 0, "p95Ms": 9630.860715}
+        "search": {"passed": 18, "total": 18, "recallAt10": 1.0, "ndcgAt10": 0.990322, "noResultAccuracy": 1.0, "constraintViolationCount": 0, "p95Ms": 766.675919},
+        "rag": {"passed": 18, "total": 18, "retrievalRecallAt5": 1.0, "retrievalNdcgAt5": 0.977428, "generationCorrectness": 1.0, "requiredClaimCompleteness": 1.0, "citationSupport": 1.0, "queryExpansionFailureCount": 0, "severeSafetyViolationCount": 0, "p95Ms": 2842.202794},
+        "agent": {"passed": 7, "total": 7, "taskSuccess": 1.0, "toolSelectionAccuracy": 1.0, "toolArgumentAccuracy": 1.0, "retryIdempotency": 1.0, "duplicateSideEffectCount": 0, "severeSafetyViolationCount": 0, "p95Ms": 5165.832016}
       },
       "rawRunDigests": {
-        "summarySha256": "5096adbf7448a62865e5ae2aca57af4e65cc00743a6e0560b65a7c29b8510d5a",
+        "summarySha256": "a97b6ab80a5ff35e3362e8793dbb355e4a3047e741c3cc7655e15f9c16db7791",
         "gatesSha256": "2e3fe75abf193c4b118b4b3436511ac83907084edb10f23467131e0ec8095f1e",
-        "manifestSha256": "645a2502293c56e253d8909da1d41258c4f321e987886b96a69c9113305adbf6"
+        "manifestSha256": "202560951a9539c1883d149fc7a57f5547b822de1c2e3044c7e737ec0e5ef1f4"
       },
-      "usage": {"inputTokens": 29577, "outputTokens": 5629, "providerCalls": 82, "missingUsageCalls": 44, "costStatus": "MISSING_USAGE", "costCny": null}
+      "usage": {"inputTokens": 29713, "outputTokens": 5719, "providerCalls": 82, "missingUsageCalls": 44, "costStatus": "MISSING_USAGE", "costCny": null}
     },
     "regression": {
-      "runId": "career-mainline-regression-v2-20260901",
-      "completedAt": "2026-08-31T17:44:14.619Z",
+      "runId": "career-mainline-regression-v3-20260901",
+      "completedAt": "2026-09-01T07:02:02.584Z",
       "caseCount": 51,
       "domainOutcomes": {"search": true, "rag": true, "agent": true},
       "domains": {
-        "search": {"passed": 20, "total": 20, "recallAt10": 0.958333, "ndcgAt10": 0.99311, "noResultAccuracy": 1.0, "constraintViolationCount": 0, "p95Ms": 435.601507},
-        "rag": {"passed": 26, "total": 26, "retrievalRecallAt5": 1.0, "retrievalNdcgAt5": 0.962484, "generationCorrectness": 1.0, "requiredClaimCompleteness": 1.0, "citationSupport": 1.0, "queryExpansionFailureCount": 1, "severeSafetyViolationCount": 0, "p95Ms": 4847.199108},
-        "agent": {"passed": 5, "total": 5, "taskSuccess": 1.0, "toolSelectionAccuracy": 1.0, "toolArgumentAccuracy": 1.0, "retryIdempotency": 1.0, "duplicateSideEffectCount": 0, "severeSafetyViolationCount": 0, "p95Ms": 6910.138485}
+        "search": {"passed": 20, "total": 20, "recallAt10": 0.958333, "ndcgAt10": 0.99311, "noResultAccuracy": 1.0, "constraintViolationCount": 0, "p95Ms": 625.103396},
+        "rag": {"passed": 26, "total": 26, "retrievalRecallAt5": 1.0, "retrievalNdcgAt5": 0.962484, "generationCorrectness": 1.0, "requiredClaimCompleteness": 1.0, "citationSupport": 1.0, "queryExpansionFailureCount": 1, "severeSafetyViolationCount": 0, "p95Ms": 4555.893054},
+        "agent": {"passed": 5, "total": 5, "taskSuccess": 1.0, "toolSelectionAccuracy": 1.0, "toolArgumentAccuracy": 1.0, "retryIdempotency": 1.0, "duplicateSideEffectCount": 0, "severeSafetyViolationCount": 0, "p95Ms": 6642.420987}
       },
       "rawRunDigests": {
-        "summarySha256": "cab734008aeeff3835e3ea54f0cda08fbbfbd4c013b47a6cf1a5173dfc76149b",
+        "summarySha256": "372e99d35f9fb8753ca0308358d59dce535e0d60d21ce7b6b369bb64b552ba21",
         "gatesSha256": "1112574ee85dda07450c0bfd8943040d2ef3046bf38402965682247a6e9f342d",
-        "manifestSha256": "f0fc9e324c3e8895cab35dcd2a224021d17cf76c43c229b69e0303011a03f57b"
+        "manifestSha256": "2712257b20281af47f7fbfbee2a45bd64a8ffe629753da9282f8d5f6cffa68ef"
       },
-      "usage": {"inputTokens": 38543, "outputTokens": 7005, "providerCalls": 99, "missingUsageCalls": 42, "costStatus": "MISSING_USAGE", "costCny": null}
+      "usage": {"inputTokens": 38597, "outputTokens": 6943, "providerCalls": 99, "missingUsageCalls": 42, "costStatus": "MISSING_USAGE", "costCny": null}
     }
   },
   "validation": [
     {"command": "mvn --batch-mode --no-transfer-progress verify", "status": "PASS", "facts": {"reactorModules": 26}},
     {"command": "mvn --batch-mode --no-transfer-progress -Pintegration -pl AI_Shop-common,AI_Shop-order/app -am verify", "status": "PASS", "facts": {"middlewareIT": 7, "rabbitPublishConsumeExecuted": true, "transactionPersistenceIT": 4}},
-    {"command": "pytest -q", "status": "PASS", "facts": {"passed": 1961, "skipped": 8, "deselected": 15}},
+    {"command": "pytest -q", "status": "PASS", "facts": {"passed": 1993, "skipped": 8, "deselected": 15}},
     {"command": "ruff check app tests evaluation", "status": "PASS"},
-    {"command": "AI_Shop-web: lint + test + build + test:e2e", "status": "PASS", "facts": {"unitTests": 45, "mockE2ePassed": 10, "mockE2eSkipped": 12}},
+    {"command": "AI_Shop-web: lint + test + build + test:e2e", "status": "PASS", "facts": {"unitTests": 46, "mockE2ePassed": 10, "mockE2eSkipped": 12}},
     {"command": "AI_Shop-admin: lint + test + build", "status": "PASS", "facts": {"unitTests": 14}},
     {"command": "scripts/test_*.py + evaluation.cli validate", "status": "PASS", "facts": {"scriptTests": 66}},
     {"command": "AISHOP_LIVE_E2E=true AISHOP_LIVE_E2E_ORDER=true playwright live-ai.spec.ts", "status": "PASS", "facts": {"passed": 4, "realPaymentExecuted": false}},
     {"command": "git diff --check", "status": "PASS"}
   ],
   "repository": {
-    "trackedTreeBytes": 106781197,
-    "trackedTreeMiB": 101.83,
+    "trackedTreeBytes": 106819787,
+    "trackedTreeMiB": 101.87,
     "multiAgentDefault": false,
     "dataAnalystDefault": false,
     "text2sqlInDefaultEvaluation": false,
