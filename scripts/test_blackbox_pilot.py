@@ -23,7 +23,8 @@ def test_mysql_runner_selects_a_default_database(monkeypatch) -> None:
     monkeypatch.setattr(pilot.subprocess, "run", run)
 
     assert pilot._mysql("SELECT 1") == "1"
-    assert commands[0][-1].endswith(' aishop_agent')
+    assert "--default-character-set=utf8mb4" in commands[0][-1]
+    assert commands[0][-1].endswith(" aishop_agent")
 
 
 def _report(actor: str, passed: int) -> dict:
@@ -79,6 +80,7 @@ def test_task_card_contains_six_url_only_tasks(tmp_path: Path) -> None:
     assert "禁止读取仓库" in text
     assert "必须先点击本轮 AI 推荐卡" in text
     assert "SESSION_COMPLETE" in text
+    assert "如果当前文件不是本 Session 的任务卡" in text
 
 
 def test_task_anchor_accepts_only_unicode_punctuation_equivalence() -> None:

@@ -31,7 +31,10 @@ from bootstrap_demo import (
 ROOT = Path(__file__).resolve().parents[1]
 RUN_ROOT = ROOT / "run" / "blackbox-pilot"
 INVALID_MARKERS = RUN_ROOT / "invalid-attempts"
-INVALID_REASON_CODES = ("CALIBRATION_PROTOCOL_MISMATCH",)
+INVALID_REASON_CODES = (
+    "CALIBRATION_PROTOCOL_MISMATCH",
+    "EVIDENCE_ENCODING_MISMATCH",
+)
 DEMO_USER_ID = "9000000001"
 SEED_ORDER_IDS = tuple(f"SM20260805000{index}" for index in range(1, 8))
 TERMINAL_RUN_STATUSES = frozenset(
@@ -212,7 +215,7 @@ def _mysql(sql: str) -> str:
             "aishop-mysql",
             "sh",
             "-lc",
-            'exec mysql --batch --raw --skip-column-names -uroot -p"$MYSQL_ROOT_PASSWORD" aishop_agent',
+            'exec mysql --default-character-set=utf8mb4 --batch --raw --skip-column-names -uroot -p"$MYSQL_ROOT_PASSWORD" aishop_agent',
         ],
         input=sql.encode("utf-8"),
         capture_output=True,
@@ -288,6 +291,18 @@ def _load_evidence(batch_id: str, history: list[dict[str, Any]]) -> dict[str, An
         LEFT JOIN aishop_agent.agent_message m ON m.message_id=r.message_id
         WHERE r.pilot_batch_id='{batch_id}'
         ORDER BY r.started_at,r.run_id;
+        """
+    )
+    messages = _json_rows(
+        f"""
+        SELECT JSON_OBJECT(
+          'messageId',m.message_id,'userMessage',m.user_message,
+          'assistantMessage',m.assistant_message,'bizType',m.biz_type,
+          'status',m.status,'sourceRefs',m.source_refs)
+        FROM aishop_agent.agent_message m
+        JOIN aishop_agent.agent_run r ON r.message_id=m.message_id
+        WHERE r.pilot_batch_id='{batch_id}'
+        ORDER BY m.message_id;
         """
     )
     steps = _json_rows(
@@ -429,6 +444,7 @@ def _load_evidence(batch_id: str, history: list[dict[str, Any]]) -> dict[str, An
         )
     return {
         "batch": batch[0],
+        "messages": messages,
         "runs": runs,
         "steps": steps,
         "recommendationEvents": recommendation_events,
@@ -563,18 +579,20 @@ def _admin_post(client: httpx.Client, path: str, data: dict[str, Any], action: s
     return response_data(client.post(path, data=data), action)
 
 
-def _write_task_card(path: Path, base_url: str) -> None:
+def _write_task_card(path: Path, base_url: str, session_id: str | None = None) -> None:
     rows = [
         "# AI-Shop 外部 AI 黑盒任务卡",
         "",
         f"- URL: {base_url}/login",
+        f"- 本次 Session: {session_id or '请勿使用其他 Session'}",
         f"- 账号: {DEMO_USER_EMAIL}",
         f"- 密码: {DEMO_USER_PASSWORD}",
         "- 约束：只能通过可见网页操作；禁止读取仓库、接口、数据库、隐藏 DOM 或预期答案。",
         "- 必须在同一浏览器会话内按顺序完成六项任务，每项只发送一次指定消息，不得改写、合并或重跑失败项。",
         "- 每次发送后必须等待文本停止生成且卡片/按钮稳定，完成该项所有可见操作后才能进入下一项。",
         "- 点击商品时必须从当前 AI 回答中的推荐卡进入；禁止使用首页、站内搜索、历史页或手工 URL 替代。",
-        "- 任务失败时只记录可见错误并继续，不得绕过网页或重新提交；任何情况都不得进行真实支付。",
+        "- 如果当前文件不是本 Session 的任务卡，立即停止，不要使用旧任务卡。",
+        "- 任务失败时只记录可见错误并继续，不得绕过网页或重新提交；不得点击“清除会话”、退出登录或切换用户；任何情况都不得进行真实支付。",
         "- 完成第 6 项后输出 SESSION_COMPLETE 并立即停止操作。",
         "",
     ]
@@ -648,7 +666,7 @@ def prepare(actor_label: str, session_number: int) -> None:
         json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     base_url = f"http://127.0.0.1:{required(env, 'WEB_PORT')}"
-    _write_task_card(session_dir / "task-card.md", base_url)
+    _write_task_card(session_dir / "task-card.md", base_url, session_id)
     print(session_dir)
 
 
@@ -1131,6 +1149,7 @@ def finalize(session_id: str) -> None:
         user.close()
         redis_client.close()
     evidence = _load_evidence(str(metadata.get("batchId") or ""), history)
+    scoring_history = list(evidence.get("messages") or history)
     (session_dir / "evidence-snapshot.json").write_text(
         json.dumps(
             {
@@ -1138,7 +1157,8 @@ def finalize(session_id: str) -> None:
                 "capturedAt": _utcnow(),
                 "evidenceSource": "SYNTHETIC",
                 "realUserStatus": "NOT_COLLECTED",
-                "conversation": history,
+                "conversation": scoring_history,
+                "visibleConversation": history,
                 "facts": evidence,
             },
             ensure_ascii=False,
@@ -1147,7 +1167,7 @@ def finalize(session_id: str) -> None:
         + "\n",
         encoding="utf-8",
     )
-    scored = _session_score(history, evidence)
+    scored = _session_score(scoring_history, evidence)
     task_results = scored["taskResults"]
     safety = scored["safety"]
     coverage = scored["evidenceCoverage"]
