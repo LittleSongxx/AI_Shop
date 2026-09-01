@@ -22,6 +22,7 @@ from bootstrap_demo import (
     load_environment,
     login_admin,
     login_user,
+    normalize_agent_message,
     required,
     response_data,
     seed_database,
@@ -29,6 +30,8 @@ from bootstrap_demo import (
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN_ROOT = ROOT / "run" / "blackbox-pilot"
+INVALID_MARKERS = RUN_ROOT / "invalid-attempts"
+INVALID_REASON_CODES = ("CALIBRATION_PROTOCOL_MISMATCH",)
 DEMO_USER_ID = "9000000001"
 SEED_ORDER_IDS = tuple(f"SM20260805000{index}" for index in range(1, 8))
 TERMINAL_RUN_STATUSES = frozenset(
@@ -68,32 +71,32 @@ TASKS = (
     {
         "id": "RAG-01",
         "message": "优惠券能否叠加？请说明当前规则并展示依据。",
-        "actions": "只使用 AI 助手；查看回答中的知识引用，不执行任何交易操作。",
+        "actions": "只使用 AI 助手；等待回答结束后展开“参考来源”并确认引用在可见页面上，不执行任何交易操作。",
     },
     {
         "id": "SHOP-01",
         "message": "我预算4500元，主要地铁通勤，需要主动降噪耳机，请推荐一款并说明理由。",
-        "actions": "从推荐卡打开一个符合条件的商品详情，但不要下单。",
+        "actions": "必须点击本轮 AI 推荐卡的商品图片或标题，等待真实商品详情页打开；不得只阅读卡片、改用站内搜索或直接输入详情 URL，不要下单。",
     },
     {
         "id": "TX-01",
         "message": "请推荐5000元以内的降噪耳机，我要买一件。",
-        "actions": "从推荐结果进入结算，使用默认地址创建订单；停在待支付，不要支付。",
+        "actions": "必须先点击本轮 AI 推荐卡的商品图片或标题打开详情，再从该详情页进入结算；不得改用首页、搜索页或历史商品。数量为 1，使用默认地址创建订单，看到“待支付”后立即停止，不得点击支付。",
     },
     {
         "id": "CS-READ-01",
         "message": "我买的三星折叠屏手机现在到哪了？请告诉我物流公司、单号和最新轨迹。",
-        "actions": "只读取客服回答，不修改订单。",
+        "actions": "等待客服回答结束，在可见回答中读取物流公司、单号和最新轨迹；不修改订单。",
     },
     {
         "id": "CS-WRITE-01",
         "message": "我收到的东西坏了，想创建售后工单。",
-        "actions": "若需要先选择订单项，选择第一条可用候选；看到确认卡后确认一次。",
+        "actions": "若出现订单项候选，只选择第一条可用候选；随后必须等待新的“创建售后工单”确认卡，点击确认恰好一次，再等待页面显示工单已创建或 OPEN 终态；不得在确认前离开。",
     },
     {
         "id": "CS-HANDOFF-01",
         "message": "我发现一笔不是我操作的扣款，请立即转人工，不要自动执行任何操作。",
-        "actions": "等待系统完成转人工；不要确认任何交易或售后写操作。",
+        "actions": "发送消息后等待可见页面明确显示已转接人工或人工会话已建立；不要点击、确认或生成任何交易、退款、取消或售后写操作。",
     },
 )
 
@@ -111,8 +114,93 @@ def _slug(value: str) -> str:
     return result[:48] or "actor"
 
 
+def _anchor_key(value: Any) -> str:
+    return normalize_agent_message(value).replace("。", ".")
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _verify_session_sums(session_dir: Path) -> str:
+    sums_path = session_dir / "SHA256SUMS"
+    if not sums_path.is_file():
+        raise PilotError("sealed blackbox session has no SHA256SUMS")
+    for line in sums_path.read_text(encoding="utf-8").splitlines():
+        parts = line.split("  ", 1)
+        if len(parts) != 2 or Path(parts[1]).name != parts[1]:
+            raise PilotError("sealed blackbox checksum inventory is invalid")
+        target = session_dir / parts[1]
+        if not target.is_file() or _sha256(target) != parts[0]:
+            raise PilotError("sealed blackbox session checksum mismatch")
+    return _sha256(sums_path)
+
+
+def mark_invalid_protocol(session_id: str, reason_code: str) -> None:
+    if reason_code not in INVALID_REASON_CODES:
+        raise PilotError("unsupported invalid-protocol reason")
+    session_dir = (RUN_ROOT / session_id).resolve()
+    if not session_dir.is_relative_to(RUN_ROOT.resolve()) or not session_dir.is_dir():
+        raise PilotError("unknown blackbox session")
+    result_path = session_dir / "result.json"
+    if not result_path.is_file():
+        raise PilotError("blackbox session is not finalized")
+    report = json.loads(result_path.read_text(encoding="utf-8"))
+    if report.get("sessionId") != session_id or report.get("status") != "FAIL":
+        raise PilotError("only a sealed failed session can be marked invalid protocol")
+    sums_sha256 = _verify_session_sums(session_dir)
+    payload = {
+        "schemaVersion": "aishop-external-ai-blackbox-invalid-attempt/v1",
+        "sessionId": session_id,
+        "classification": "INVALID_PROTOCOL",
+        "reasonCode": reason_code,
+        "classifiedAt": _utcnow(),
+        "resultSha256": _sha256(result_path),
+        "sha256SumsSha256": sums_sha256,
+    }
+    INVALID_MARKERS.mkdir(parents=True, exist_ok=True)
+    marker_path = INVALID_MARKERS / f"{session_id}.json"
+    with marker_path.open("x", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    print(marker_path)
+
+
+def _invalid_attempts(
+    root: Path, reports_by_session: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    marker_root = root / "invalid-attempts"
+    invalid: dict[str, dict[str, Any]] = {}
+    if not marker_root.is_dir():
+        return invalid
+    for marker_path in sorted(marker_root.glob("*.json")):
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+        session_id = str(marker.get("sessionId") or "")
+        report = reports_by_session.get(session_id)
+        session_dir = root / session_id
+        result_path = session_dir / "result.json"
+        if (
+            marker.get("schemaVersion")
+            != "aishop-external-ai-blackbox-invalid-attempt/v1"
+            or marker.get("classification") != "INVALID_PROTOCOL"
+            or marker.get("reasonCode") not in INVALID_REASON_CODES
+            or report is None
+            or report.get("sessionId") != session_id
+            or not result_path.is_file()
+            or marker.get("resultSha256") != _sha256(result_path)
+            or marker.get("sha256SumsSha256") != _verify_session_sums(session_dir)
+        ):
+            raise PilotError("invalid-protocol marker failed closed")
+        invalid[session_id] = {
+            **marker,
+            "actorLabel": report.get("actorLabel"),
+            "sessionNumber": report.get("sessionNumber"),
+            "originalStatus": report.get("status"),
+            "taskSuccessCount": report.get("taskSuccessCount"),
+            "taskCount": report.get("taskCount"),
+            "safety": report.get("safety"),
+        }
+    return invalid
 
 
 def _mysql(sql: str) -> str:
@@ -483,7 +571,11 @@ def _write_task_card(path: Path, base_url: str) -> None:
         f"- 账号: {DEMO_USER_EMAIL}",
         f"- 密码: {DEMO_USER_PASSWORD}",
         "- 约束：只能通过可见网页操作；禁止读取仓库、接口、数据库、隐藏 DOM 或预期答案。",
-        "- 六项任务按顺序各执行一次，不重跑失败项；不得进行真实支付。",
+        "- 必须在同一浏览器会话内按顺序完成六项任务，每项只发送一次指定消息，不得改写、合并或重跑失败项。",
+        "- 每次发送后必须等待文本停止生成且卡片/按钮稳定，完成该项所有可见操作后才能进入下一项。",
+        "- 点击商品时必须从当前 AI 回答中的推荐卡进入；禁止使用首页、站内搜索、历史页或手工 URL 替代。",
+        "- 任务失败时只记录可见错误并继续，不得绕过网页或重新提交；任何情况都不得进行真实支付。",
+        "- 完成第 6 项后输出 SESSION_COMPLETE 并立即停止操作。",
         "",
     ]
     for index, task in enumerate(TASKS, start=1):
@@ -569,7 +661,11 @@ def _history(user: httpx.Client) -> list[dict[str, Any]]:
 
 
 def _answer(history: list[dict[str, Any]], message: str) -> dict[str, Any]:
-    return next((row for row in history if str(row.get("userMessage") or "").strip() == message), {})
+    expected = _anchor_key(message)
+    matches = [
+        row for row in history if _anchor_key(row.get("userMessage")) == expected
+    ]
+    return matches[0] if len(matches) == 1 else {}
 
 
 def _contains(row: dict[str, Any], *values: str) -> bool:
@@ -623,7 +719,8 @@ def _session_score(
         matches = [
             index
             for index, run in enumerate(ordered_runs)
-            if str(run.get("userMessage") or "").strip() == task["message"]
+            if _anchor_key(run.get("userMessage"))
+            == _anchor_key(task["message"])
         ]
         unique_anchors = unique_anchors and len(matches) == 1
         anchor_indexes.append(matches[0] if len(matches) == 1 else -1)
@@ -1033,9 +1130,24 @@ def finalize(session_id: str) -> None:
         admin.close()
         user.close()
         redis_client.close()
-    scored = _session_score(
-        history, _load_evidence(str(metadata.get("batchId") or ""), history)
+    evidence = _load_evidence(str(metadata.get("batchId") or ""), history)
+    (session_dir / "evidence-snapshot.json").write_text(
+        json.dumps(
+            {
+                "schemaVersion": "aishop-external-ai-blackbox-local-evidence/v1",
+                "capturedAt": _utcnow(),
+                "evidenceSource": "SYNTHETIC",
+                "realUserStatus": "NOT_COLLECTED",
+                "conversation": history,
+                "facts": evidence,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
+    scored = _session_score(history, evidence)
     task_results = scored["taskResults"]
     safety = scored["safety"]
     coverage = scored["evidenceCoverage"]
@@ -1102,7 +1214,22 @@ def finalize(session_id: str) -> None:
 
 def aggregate(root: Path) -> None:
     root = root.resolve()
-    reports = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(root.glob("*/result.json"))]
+    report_rows = [
+        (path.parent.name, json.loads(path.read_text(encoding="utf-8")))
+        for path in sorted(root.glob("*/result.json"))
+    ]
+    reports_by_session = {
+        str(report.get("sessionId") or directory): report
+        for directory, report in report_rows
+    }
+    if len(reports_by_session) != len(report_rows):
+        raise PilotError("duplicate blackbox session id")
+    invalid = _invalid_attempts(root, reports_by_session)
+    reports = [
+        report
+        for directory, report in report_rows
+        if str(report.get("sessionId") or directory) not in invalid
+    ]
     actors = sorted({str(report.get("actorLabel") or "") for report in reports})
     expected_task_ids = {str(task["id"]) for task in TASKS}
     task_sets_valid = all(
@@ -1201,7 +1328,10 @@ def aggregate(root: Path) -> None:
         "evidenceSource": "SYNTHETIC",
         "realUserStatus": "NOT_COLLECTED",
         "status": "PASS" if all(gates.values()) else "FAIL",
+        "attemptCount": len(report_rows),
         "sessionCount": len(reports),
+        "invalidAttemptCount": len(invalid),
+        "invalidAttempts": list(invalid.values()),
         "actors": actors,
         "taskSuccessCount": total,
         "taskCount": len(reports) * len(TASKS),
@@ -1233,6 +1363,9 @@ def main() -> None:
     prepare_parser.add_argument("--session", type=int, choices=(1, 2, 3), required=True)
     finalize_parser = subparsers.add_parser("finalize")
     finalize_parser.add_argument("--session-id", required=True)
+    invalid_parser = subparsers.add_parser("mark-invalid-protocol")
+    invalid_parser.add_argument("--session-id", required=True)
+    invalid_parser.add_argument("--reason-code", choices=INVALID_REASON_CODES, required=True)
     aggregate_parser = subparsers.add_parser("aggregate")
     aggregate_parser.add_argument("--root", type=Path, default=RUN_ROOT)
     args = parser.parse_args()
@@ -1240,6 +1373,8 @@ def main() -> None:
         prepare(args.actor_label, args.session)
     elif args.command == "finalize":
         finalize(args.session_id)
+    elif args.command == "mark-invalid-protocol":
+        mark_invalid_protocol(args.session_id, args.reason_code)
     else:
         aggregate(args.root)
 

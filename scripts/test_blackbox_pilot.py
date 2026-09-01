@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -60,6 +61,15 @@ def _report(actor: str, passed: int) -> dict:
     }
 
 
+def _write_sealed_result(directory: Path, report: dict) -> tuple[bytes, bytes]:
+    directory.mkdir(parents=True)
+    result = json.dumps(report, ensure_ascii=False, indent=2).encode()
+    (directory / "result.json").write_bytes(result)
+    sums = f"{hashlib.sha256(result).hexdigest()}  result.json\n".encode()
+    (directory / "SHA256SUMS").write_bytes(sums)
+    return result, sums
+
+
 def test_task_card_contains_six_url_only_tasks(tmp_path: Path) -> None:
     path = tmp_path / "task-card.md"
     pilot._write_task_card(path, "http://127.0.0.1:6101")
@@ -67,6 +77,24 @@ def test_task_card_contains_six_url_only_tasks(tmp_path: Path) -> None:
     assert len(pilot.TASKS) == 6
     assert all(task["id"] in text and task["message"] in text for task in pilot.TASKS)
     assert "禁止读取仓库" in text
+    assert "必须先点击本轮 AI 推荐卡" in text
+    assert "SESSION_COMPLETE" in text
+
+
+def test_task_anchor_accepts_only_unicode_punctuation_equivalence() -> None:
+    punctuation = str.maketrans({"，": ",", "？": "?", "。": "."})
+    for task in pilot.TASKS:
+        variant = task["message"].translate(punctuation)
+        assert pilot._anchor_key(variant) == pilot._anchor_key(task["message"])
+
+    original = pilot.TASKS[1]["message"]
+    assert pilot._anchor_key(original.replace("4500", "5000")) != pilot._anchor_key(original)
+    handoff = pilot.TASKS[-1]["message"]
+    assert pilot._anchor_key(handoff.replace("不要", "")) != pilot._anchor_key(handoff)
+    assert pilot._answer(
+        [{"userMessage": original}, {"userMessage": original.translate(punctuation)}],
+        original,
+    ) == {}
 
 
 def test_aggregate_requires_two_actors_and_six_sessions(tmp_path: Path) -> None:
@@ -84,6 +112,84 @@ def test_aggregate_requires_two_actors_and_six_sessions(tmp_path: Path) -> None:
     assert report["status"] == "PASS"
     assert report["taskSuccessCount"] == 36
     assert report["realUserStatus"] == "NOT_COLLECTED"
+
+
+def test_invalid_protocol_attempt_is_preserved_disclosed_and_not_counted(
+    tmp_path: Path, monkeypatch
+) -> None:
+    for actor in ("model-a", "model-b"):
+        for session in range(1, 4):
+            directory = tmp_path / f"{actor}-s{session}"
+            directory.mkdir()
+            report = _report(actor, 6)
+            report.update(
+                {
+                    "sessionId": directory.name,
+                    "sessionNumber": session,
+                    "status": "PASS",
+                    "taskSuccessCount": 6,
+                    "taskCount": 6,
+                }
+            )
+            (directory / "result.json").write_text(json.dumps(report), encoding="utf-8")
+
+    failed_id = "model-a-calibration"
+    failed = _report("model-a", 0)
+    failed.update(
+        {
+            "sessionId": failed_id,
+            "sessionNumber": 1,
+            "status": "FAIL",
+            "taskSuccessCount": 0,
+            "taskCount": 6,
+        }
+    )
+    result_bytes, sums_bytes = _write_sealed_result(tmp_path / failed_id, failed)
+    monkeypatch.setattr(pilot, "RUN_ROOT", tmp_path)
+    monkeypatch.setattr(pilot, "INVALID_MARKERS", tmp_path / "invalid-attempts")
+
+    pilot.mark_invalid_protocol(failed_id, "CALIBRATION_PROTOCOL_MISMATCH")
+    pilot.aggregate(tmp_path)
+
+    assert (tmp_path / failed_id / "result.json").read_bytes() == result_bytes
+    assert (tmp_path / failed_id / "SHA256SUMS").read_bytes() == sums_bytes
+    report = json.loads((tmp_path / "synthetic-blackbox-report.json").read_text())
+    assert report["status"] == "PASS"
+    assert report["attemptCount"] == 7
+    assert report["sessionCount"] == 6
+    assert report["invalidAttemptCount"] == 1
+    assert report["taskSuccessCount"] == 36
+    assert report["invalidAttempts"][0]["originalStatus"] == "FAIL"
+    assert report["invalidAttempts"][0]["taskSuccessCount"] == 0
+
+
+def test_invalid_protocol_marker_fails_closed_after_seal_tampering(
+    tmp_path: Path, monkeypatch
+) -> None:
+    failed_id = "model-a-calibration"
+    failed = _report("model-a", 0)
+    failed.update(
+        {
+            "sessionId": failed_id,
+            "sessionNumber": 1,
+            "status": "FAIL",
+            "taskSuccessCount": 0,
+            "taskCount": 6,
+        }
+    )
+    directory = tmp_path / failed_id
+    _write_sealed_result(directory, failed)
+    monkeypatch.setattr(pilot, "RUN_ROOT", tmp_path)
+    monkeypatch.setattr(pilot, "INVALID_MARKERS", tmp_path / "invalid-attempts")
+    pilot.mark_invalid_protocol(failed_id, "CALIBRATION_PROTOCOL_MISMATCH")
+    (directory / "result.json").write_text("{}", encoding="utf-8")
+
+    try:
+        pilot.aggregate(tmp_path)
+    except pilot.PilotError:
+        pass
+    else:
+        raise AssertionError("tampered invalid attempt must fail closed")
 
 
 def test_aggregate_fails_when_a_critical_task_misses_threshold(tmp_path: Path) -> None:
@@ -166,9 +272,10 @@ def test_session_score_fails_when_durable_sources_are_missing() -> None:
 
 def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
     run_ids = {task["id"]: f"run-{index}" for index, task in enumerate(pilot.TASKS)}
+    punctuation = str.maketrans({"，": ",", "？": "?", "。": "."})
     history = [
         {
-            "userMessage": task["message"],
+            "userMessage": task["message"].translate(punctuation),
             "assistantMessage": (
                 "一个订单只能使用一张优惠券。"
                 if task["id"] == "RAG-01"
@@ -186,7 +293,7 @@ def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
         {
             "runId": run_ids[task["id"]],
             "userId": pilot.DEMO_USER_ID,
-            "userMessage": task["message"],
+            "userMessage": task["message"].translate(punctuation),
             "status": "HANDOFF" if task["id"] == "CS-HANDOFF-01" else "SUCCEEDED",
             "completedAt": "2026-09-01T00:00:01Z",
             "startedAt": f"2026-09-01T00:00:0{index}Z",
@@ -306,3 +413,100 @@ def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
     assert score["evidenceCoverage"]["complete"] is True
     assert all(row["passed"] is True for row in score["taskResults"])
     assert all(value == 0 for value in score["safety"].values())
+
+
+def test_finalize_seals_evidence_snapshot_before_reset(
+    tmp_path: Path, monkeypatch
+) -> None:
+    session_id = "model-a-s1-20260901000000"
+    session_dir = tmp_path / session_id
+    session_dir.mkdir()
+    metadata = {
+        "schemaVersion": "aishop-external-ai-blackbox-session/v1",
+        "sessionId": session_id,
+        "actorLabel": "model-a",
+        "sessionNumber": 1,
+        "batchId": "pilot_" + "a" * 32,
+        "evidenceSource": "SYNTHETIC",
+        "realUserStatus": "NOT_COLLECTED",
+        "preparedAt": "2026-09-01T00:00:00.000Z",
+        "taskIds": [task["id"] for task in pilot.TASKS],
+    }
+    (session_dir / "session.json").write_text(json.dumps(metadata), encoding="utf-8")
+    history = [{"userMessage": "visible demo turn", "assistantMessage": "answer"}]
+    evidence = {"runs": [{"runId": "run-1"}], "steps": []}
+    performance = _report("model-a", 6)["backendPerformance"]
+
+    class Response:
+        content = json.dumps({"performance": performance}).encode()
+
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+    class Client:
+        @staticmethod
+        def post(*_args, **_kwargs):
+            return Response()
+
+        @staticmethod
+        def close() -> None:
+            return None
+
+    cache = Client()
+    reset_seen = False
+
+    def reset(_env) -> None:
+        nonlocal reset_seen
+        snapshot_path = session_dir / "evidence-snapshot.json"
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        assert snapshot["conversation"] == history
+        assert snapshot["facts"] == evidence
+        digest = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+        assert f"{digest}  evidence-snapshot.json" in (
+            session_dir / "SHA256SUMS"
+        ).read_text(encoding="utf-8")
+        reset_seen = True
+
+    monkeypatch.setattr(pilot, "RUN_ROOT", tmp_path)
+    monkeypatch.setattr(pilot, "load_environment", dict)
+    monkeypatch.setattr(pilot, "_clients", lambda _env: (Client(), Client(), cache))
+    monkeypatch.setattr(pilot, "login_admin", lambda *_args: None)
+    monkeypatch.setattr(pilot, "login_user", lambda *_args: None)
+    monkeypatch.setattr(pilot, "_history", lambda _user: history)
+    monkeypatch.setattr(pilot, "_admin_post", lambda *_args: None)
+    monkeypatch.setattr(pilot, "_load_evidence", lambda *_args: evidence)
+    monkeypatch.setattr(
+        pilot,
+        "_session_score",
+        lambda *_args: {
+            "taskResults": [
+                {"taskId": task["id"], "passed": True} for task in pilot.TASKS
+            ],
+            "safety": {
+                "unauthorizedWriteCount": 0,
+                "crossUserViolationCount": 0,
+                "wrongSkuCount": 0,
+                "attributionMismatchCount": 0,
+                "duplicateSideEffectCount": 0,
+                "realPaymentAttemptCount": 0,
+                "realPaymentSuccessCount": 0,
+                "unexpectedToolCount": 0,
+                "severeSafetyViolationCount": 0,
+            },
+            "evidenceCoverage": {
+                "javaOrderFacts": True,
+                "episodeAndAgentStep": True,
+                "mcpTrace": True,
+                "recommendationEventAndLedger": True,
+                "pendingAction": True,
+                "supportCaseAndSession": True,
+                "complete": True,
+            },
+        },
+    )
+    monkeypatch.setattr(pilot, "_reset_demo", reset)
+
+    pilot.finalize(session_id)
+
+    assert reset_seen is True
