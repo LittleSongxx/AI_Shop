@@ -1805,7 +1805,12 @@ def _action_card_fact_text(text: str) -> str | None:
             ("商品数量", "buyCount", " 件"),
         ):
             if item.get(key) not in (None, ""):
-                facts.append(f"订单项 {item_id} {label} {item[key]}{suffix}")
+                value = (
+                    _fact_property_value(item[key])
+                    if key == "propertyInfo"
+                    else item[key]
+                )
+                facts.append(f"订单项 {item_id} {label} {value}{suffix}")
     for detail in card.get("details") or []:
         if not isinstance(detail, dict) or detail.get("value") in (None, ""):
             continue
@@ -1849,12 +1854,23 @@ def _order_selection_fact_text(text: str) -> str | None:
                 ("订单项金额", "amount", " 元"),
             ):
                 if candidate.get(key) not in (None, ""):
+                    value = (
+                        _fact_property_value(candidate[key])
+                        if key == "propertyInfo"
+                        else candidate[key]
+                    )
                     facts.append(
-                        f"订单项 {item_id} {label} {candidate[key]}{suffix}"
+                        f"订单项 {item_id} {label} {value}{suffix}"
                     )
         elif candidate.get("amount") is not None:
             facts.append(f"订单 {order_id} 订单金额 {candidate['amount']} 元")
     return "。".join(facts) or None
+
+
+def _fact_property_value(value: Any) -> str:
+    """Keep compound SKU properties in one verifier assertion clause."""
+
+    return str(value).replace(";", " ").replace("；", " ")
 
 
 def _capability_case_specific(clause: str) -> bool:

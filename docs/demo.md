@@ -50,7 +50,7 @@ npx playwright test tests/e2e/live-ai.spec.ts --project=mobile --workers=1
 
 ## 外部 AI 黑盒试用
 
-每个会话先运行 `prepare`，从输出目录取出 `task-card.md`，将其交给在空目录启动的外部 AI。AI 只能访问网站。
+每个会话先运行 `prepare`，只把该命令输出目录中的 `task-card.md` 交给在全新浏览器上下文启动的外部 AI。不要复用 IDE 里旧会话的任务卡或已登录标签页；AI 只能访问网站。
 
 ```bash
 AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py prepare --actor-label codex --session 1

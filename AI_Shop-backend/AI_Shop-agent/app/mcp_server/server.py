@@ -18,7 +18,7 @@ from app.db.migrations import run_migrations
 from app.db.pool import close_pool, init_pool
 from app.observability.logging import configure_structured_logging
 from app.services import mcp_tools_service as tools
-from app.services.episode_service import episode_service
+from app.services.episode_service import bind_episode, episode_service
 from app.services.evaluation_fault_service import (
     consume_mcp_fault_capability,
     mcp_fault_capability_from_meta,
@@ -120,12 +120,24 @@ def _text(result) -> str:
 async def _run_as_delegated_user(
     user_id: str,
     operation: Awaitable[Any],
+    *,
+    run_id: str | None = None,
+    request_id: str | None = None,
 ) -> Any:
     # The Agent router replaces model-supplied userId with the authenticated
     # message owner before crossing MCP. Rebind it in this process so calls to
     # Java carry the required X-Agent-User-Id header.
-    with delegated_user_scope(user_id):
-        return await operation
+    # The worker's Episode context does not cross the Streamable HTTP boundary.
+    # Rebind the request identifiers here so recommendation impressions and
+    # their outcome-ledger projections remain attached to the originating run.
+    with bind_episode(
+        run_id,
+        message_id=None,
+        user_id=user_id,
+        request_id=request_id,
+    ):
+        with delegated_user_scope(user_id):
+            return await operation
 
 
 @mcp.tool(name="MCP_CONTRACT", description="[SYSTEM] report the AI_Shop tool contract version")
@@ -179,6 +191,8 @@ async def search_products(
                 run_id=runId,
                 trusted_user_text=(trusted_turn.user_text if trusted_turn else None),
             ),
+            run_id=runId,
+            request_id=requestId,
         )
     )
 

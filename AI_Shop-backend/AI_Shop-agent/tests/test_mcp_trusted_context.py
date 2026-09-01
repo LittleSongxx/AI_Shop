@@ -184,6 +184,45 @@ async def test_mcp_search_reads_trusted_text_from_injected_request_context(
     assert search.await_args.kwargs["trusted_user_text"] == "不要苹果，推荐安卓手机"
 
 
+async def test_mcp_search_rebinds_episode_for_recommendation_attribution(monkeypatch):
+    from app.mcp_server import server
+    from app.services.episode_service import current_episode
+
+    observed: dict[str, object] = {}
+
+    async def search(*_args, **_kwargs):
+        context = current_episode()
+        observed.update(
+            {
+                "run_id": context.run_id if context else None,
+                "request_id": context.request_id if context else None,
+                "user_id": context.user_id if context else None,
+            }
+        )
+        return ToolInvokeResult(content="ok")
+
+    monkeypatch.setattr(server.tools, "tool_search_products", search)
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(meta=_trusted_meta())
+    )
+
+    wire = await server.search_products(
+        "u1",
+        "手机",
+        requestId="req-1",
+        runId="run-1",
+        ctx=ctx,
+    )
+
+    assert parse_tool_wire(wire).content == "ok"
+    assert observed == {
+        "run_id": "run-1",
+        "request_id": "req-1",
+        "user_id": "u1",
+    }
+    assert current_episode() is None
+
+
 def test_mcp_trusted_context_is_not_exposed_in_search_tool_schema() -> None:
     from app.mcp_server.server import mcp
 

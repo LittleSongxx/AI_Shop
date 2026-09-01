@@ -2326,6 +2326,79 @@ def test_order_selection_card_verifies_each_candidate_against_its_order_ref():
     assert tampered.passed is False
 
 
+def test_verified_cards_keep_semicolon_delimited_property_info_in_one_claim():
+    import json
+
+    refs = order_refs(
+        [
+            {
+                "order_id": "O1",
+                "order_status": 2,
+                "order_status_name": "已发货",
+                "order_time": "2026-08-25 10:00:00",
+                "items": [
+                    {
+                        "order_id": "O1",
+                        "order_item_id": "I1",
+                        "product_name": "示例耳机",
+                        "property_info": "颜色:黑色;型号:X1",
+                        "item_amount": 100,
+                    }
+                ],
+            }
+        ],
+        captured="2026-08-26T11:00:00+00:00",
+    )
+    selection = {
+        "type": "ORDER_SELECTION",
+        "selectionId": "sel-semicolon",
+        "candidates": [
+            {
+                "orderId": "O1",
+                "orderItemId": "I1",
+                "orderStatusName": "已发货",
+                "orderTime": "2026-08-25 10:00:00",
+                "productName": "示例耳机",
+                "propertyInfo": "颜色:黑色;型号:X1",
+                "amount": 100,
+            }
+        ],
+    }
+    action = {
+        "type": "ACTION_CONFIRM",
+        "actionType": "CREATE_SUPPORT_CASE",
+        "orderId": "O1",
+        "items": [
+            {
+                "orderItemId": "I1",
+                "productName": "示例耳机",
+                "propertyInfo": "颜色:黑色;型号:X1",
+                "itemAmount": 100,
+            }
+        ],
+    }
+
+    selection_result = response_verifier.verify(
+        assistant=json.dumps(selection, ensure_ascii=False),
+        biz_type="order_selection",
+        tools_called=[],
+        source_refs={"businessSources": refs},
+        order_resolution="AMBIGUOUS",
+        has_pending_action=False,
+    )
+    action_result = response_verifier.verify(
+        assistant=json.dumps(action, ensure_ascii=False),
+        biz_type="action_confirm",
+        tools_called=["PROPOSE_CREATE_SUPPORT_CASE"],
+        source_refs={"businessSources": refs},
+        order_resolution="RESOLVED",
+        has_pending_action=True,
+    )
+
+    assert selection_result.passed is True
+    assert action_result.passed is True
+
+
 def test_rag_citation_is_checked_per_factual_sentence():
     result = response_verifier.verify(
         assistant="每个订单只能使用一张优惠券。[1] 支付失败后优惠券会释放。",

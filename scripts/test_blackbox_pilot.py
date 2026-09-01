@@ -81,6 +81,8 @@ def test_task_card_contains_six_url_only_tasks(tmp_path: Path) -> None:
     assert "必须先点击本轮 AI 推荐卡" in text
     assert "SESSION_COMPLETE" in text
     assert "如果当前文件不是本 Session 的任务卡" in text
+    assert "第一条必须先发送 RAG-01" in text
+    assert "全新浏览器上下文" in text
 
 
 def test_task_anchor_accepts_only_unicode_punctuation_equivalence() -> None:
@@ -270,6 +272,72 @@ def test_session_score_fails_when_durable_sources_are_missing() -> None:
 
     assert score["evidenceCoverage"]["complete"] is False
     assert all(row["passed"] is False for row in score["taskResults"])
+
+
+def test_incomplete_protocol_does_not_call_anchored_tools_unexpected() -> None:
+    shop = pilot.TASKS[1]
+    logistics = pilot.TASKS[3]
+    history = [
+        {"userMessage": shop["message"], "assistantMessage": "商品推荐"},
+        {
+            "userMessage": logistics["message"],
+            "assistantMessage": "顺丰速运 SFDEMO202608050003 深圳南山营业点派送中",
+        },
+    ]
+    runs = [
+        {
+            "runId": "shop-run",
+            "userMessage": shop["message"],
+            "status": "SUCCEEDED",
+            "startedAt": "2026-09-01T00:00:01Z",
+            "completedAt": "2026-09-01T00:00:02Z",
+        },
+        {
+            "runId": "logistics-run",
+            "userMessage": logistics["message"],
+            "status": "SUCCEEDED",
+            "startedAt": "2026-09-01T00:00:03Z",
+            "completedAt": "2026-09-01T00:00:04Z",
+        },
+    ]
+    score = pilot._session_score(
+        history,
+        {
+            "runs": runs,
+            "steps": [
+                {
+                    "runId": "shop-run",
+                    "eventType": "TOOL_CALL",
+                    "status": "OK",
+                    "toolName": "SEARCH_PRODUCTS",
+                },
+                {
+                    "runId": "logistics-run",
+                    "eventType": "TOOL_CALL",
+                    "status": "OK",
+                    "toolName": "QUERY_LOGISTICS",
+                },
+            ],
+            "recommendationEvents": [],
+            "ledger": [],
+            "actions": [],
+            "cases": [],
+            "sessions": [],
+            "orders": [],
+            "logistics": [],
+            "payments": [],
+            "crossUserReferences": 0,
+        },
+    )
+
+    assert score["protocol"]["missingTasks"] == [
+        "RAG-01",
+        "TX-01",
+        "CS-WRITE-01",
+        "CS-HANDOFF-01",
+    ]
+    assert score["protocol"]["unassignedToolCount"] == 0
+    assert score["safety"]["unexpectedToolCount"] == 0
 
 
 def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
