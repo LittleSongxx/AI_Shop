@@ -56,6 +56,9 @@ EXPECTED_TOOLS = {
     "CS-READ-01": frozenset({"QUERY_LOGISTICS"}),
     "CS-WRITE-01": frozenset({"PROPOSE_CREATE_SUPPORT_CASE"}),
 }
+# The durable pending-action store names the successful terminal state
+# ``CONFIRMED``.  ``EXECUTED`` is retained for older sealed fixtures only.
+EXECUTED_ACTION_STATUSES = frozenset({"CONFIRMED", "EXECUTED"})
 ALLOWED_TOOLS = {
     "RAG-01": frozenset({"SEARCH_KNOWLEDGE"}),
     "SHOP-01": frozenset({"SEARCH_PRODUCTS", "GET_PRODUCT_DETAIL", "COMPARE_PRODUCTS"}),
@@ -452,7 +455,11 @@ def _load_evidence(batch_id: str, history: list[dict[str, Any]]) -> dict[str, An
         SELECT JSON_OBJECT(
           'runId',l.run_id,'userId',l.user_id,'requestId',l.request_id,
           'productId',l.product_id,'skuKey',l.sku_key,'orderId',l.order_id,
-          'eventType',l.event_type,'source',l.source)
+          'position',COALESCE(
+             JSON_EXTRACT(l.payload_json,'$.position'),
+             JSON_EXTRACT(l.payload_json,'$.attribution.position')),
+          'eventType',l.event_type,'source',l.source,
+          'payload',l.payload_json)
         FROM aishop_agent.commerce_outcome_ledger l
         WHERE l.pilot_batch_id='{batch_id}'
         ORDER BY l.occurred_at,l.ledger_id;
@@ -504,6 +511,7 @@ def _load_evidence(batch_id: str, history: list[dict[str, Any]]) -> dict[str, An
         f"""
         SELECT JSON_OBJECT(
           'orderId',o.order_id,'userId',o.user_id,'orderStatus',o.order_status,
+          'orderTime',DATE_FORMAT(o.order_time,'%Y-%m-%dT%H:%i:%s.%fZ'),
           'payOrderId',o.pay_order_id,'orderItemId',i.order_item_id,
           'productId',i.product_id,'skuKey',i.property_value_id_hash,
           'requestId',i.ai_request_id,'position',i.ai_position,'source',i.ai_source,
@@ -586,9 +594,23 @@ def _participant_hash(env: dict[str, str]) -> str:
     return hmac.new(secret.encode(), DEMO_USER_ID.encode(), hashlib.sha256).hexdigest()
 
 
+def _clear_demo_privacy_exports() -> None:
+    rows = _json_rows(
+        "SELECT JSON_OBJECT('jobId',job_id) "
+        f"FROM aishop_agent.user_privacy_job WHERE user_id='{DEMO_USER_ID}';"
+    )
+    export_dir = ROOT / "AI_Shop-backend" / "AI_Shop-agent" / ".privacy-exports"
+    for row in rows:
+        job_id = str(row.get("jobId") or "")
+        if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", job_id):
+            (export_dir / f"{job_id}.json").unlink(missing_ok=True)
+            (export_dir / f"{job_id}.json.tmp").unlink(missing_ok=True)
+
+
 def _reset_demo(env: dict[str, str]) -> None:
     if env.get("APP_ENV", "development").strip().lower() == "production":
         raise PilotError("blackbox pilot reset is forbidden in production")
+    _clear_demo_privacy_exports()
     known_orders = ",".join(f"'{value}'" for value in SEED_ORDER_IDS)
     participant_hash = _participant_hash(env)
     _mysql(
@@ -634,6 +656,21 @@ def _reset_demo(env: dict[str, str]) -> None:
         DELETE FROM aishop_agent.agent_request_idempotency WHERE user_id='{DEMO_USER_ID}';
         DELETE FROM aishop_agent.agent_run WHERE user_id='{DEMO_USER_ID}';
         DELETE FROM aishop_agent.agent_message WHERE user_id='{DEMO_USER_ID}';
+
+        -- Restore the complete demo user fixture between isolated black-box runs.
+        DELETE FROM aishop_order.comment_report WHERE reporter_user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_order.order_comment WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_coupon.user_coupon WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_member_level_reward_claim WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_sign_record_detail WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_sign_record WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_notification WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_product_favorite WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_browse_history WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_search.user_search_keyword WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_address WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_user.user_member_profile WHERE user_id='{DEMO_USER_ID}';
+        DELETE FROM aishop_agent.user_privacy_job WHERE user_id='{DEMO_USER_ID}';
 
         DELETE pr FROM aishop_order.order_logistics_info_record pr
           JOIN aishop_order.order_info o ON o.order_id=pr.order_id
@@ -1136,7 +1173,7 @@ def _session_score(
         for row in actions
         if str(row.get("runId") or "") in write_run_ids
         and row.get("actionType") == "CREATE_SUPPORT_CASE"
-        and row.get("status") == "EXECUTED"
+        and row.get("status") in EXECUTED_ACTION_STATUSES
     ]
     action_cases = [
         row
@@ -1249,7 +1286,7 @@ def _session_score(
     duplicate_side_effects += max(0, len(orders) - len(order_ids))
     executed_by_business_key: dict[str, int] = {}
     for row in actions:
-        if row.get("status") != "EXECUTED":
+        if row.get("status") not in EXECUTED_ACTION_STATUSES:
             continue
         key = str(row.get("businessKey") or "")
         executed_by_business_key[key] = executed_by_business_key.get(key, 0) + 1

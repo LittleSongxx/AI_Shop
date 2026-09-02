@@ -50,18 +50,18 @@ npx playwright test tests/e2e/live-ai.spec.ts --project=mobile --workers=1
 
 ## 外部 AI 黑盒试用
 
-每个会话先运行 `prepare`，只把该命令输出目录中的 `task-card.md` 交给在全新浏览器上下文启动的外部 AI。不要复用 IDE 里旧会话的任务卡或已登录标签页；AI 只能访问网站。
+当前扩展协议是 v3：一个模型系列、两个隔离会话，每会话 21 项任务（12 项 AI + 9 项 Java 电商底座，共 42 个任务尝试）。Java 阶段直接操作可见网站；AI 阶段通过助手消息验证 Agent。v3 将待支付建单放在最后一项，避免 15 分钟订单超时影响状态判定。每个会话先运行 `prepare`，只把该命令输出目录中的 `task-card.md` 交给在全新浏览器上下文启动的外部 AI。不要复用 IDE 里旧会话的任务卡或已登录标签页；AI 只能访问网站。
 
 ```bash
-AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py prepare --actor-label codex --session 1
-# 外部 AI 完成六项网页任务
-AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py finalize --session-id <prepare输出的ID>
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot_v3.py prepare --actor-label '<模型系列>' --session 1
+# 外部 AI 按卡片顺序完成 21 项网页任务（Java 阶段不要向助手发送消息）
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot_v3.py finalize --session-id <prepare输出的ID>
 ```
 
-完成两个模型系列、每个三次会话后：
+完成同一模型系列的两次会话后：
 
 ```bash
-AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot.py aggregate --root run/blackbox-pilot
+AI_Shop-backend/AI_Shop-agent/.venv/bin/python scripts/blackbox_pilot_v3.py aggregate
 ```
 
-原始会话保存在 ignored `run/blackbox-pilot/`。只有脱敏聚合摘要可以进入 `docs/evidence/`。
+原始 v3 会话保存在 ignored `run/blackbox-pilot-v3/`；v2/旧 v1 结果仍保存在各自归档目录，不与 v3 混算。只有脱敏聚合摘要可以进入 `docs/evidence/`。

@@ -630,7 +630,54 @@ def deterministic_policy_evidence_fallback(
         kind = "after_sales"
     elif normalized_intent in {"REFUND", "REFUND_STATUS"} or "退款" in normalized_query:
         kind = "refund"
+    elif "优惠券" in normalized_query and any(
+        marker in normalized_query for marker in ("叠加", "多张", "几张")
+    ):
+        kind = "coupon"
     if kind is None:
+        return None
+
+    if kind == "coupon":
+        # ponytail: keep this fallback lexical and narrow; add a typed policy
+        # renderer only when more generic policy families need deterministic answers.
+        fact_id = "coupon.single_per_order_and_revalidate"
+        for index, selected_ref in enumerate(refs, start=1):
+            if fact_id not in _fact_ids_from_item(selected_ref):
+                continue
+            source_text = " ".join(
+                str(selected_ref.get(key) or "")
+                for key in ("snippet", "text", "heading")
+            )
+            has_limit = any(
+                phrase in source_text
+                for phrase in ("只能选择一张", "最多选择一张", "只能使用一张", "不支持多张券叠加")
+            )
+            has_revalidation = (
+                ("重新校验" in source_text or "再次校验" in source_text)
+                and "优惠券" in source_text
+            )
+            if not has_limit or not has_revalidation:
+                continue
+            limit_claim = (
+                "当前一个订单最多选择一张用户优惠券，不支持多张券叠加"
+                if "不支持多张券叠加" in source_text
+                else "当前一个订单只能选择一张用户优惠券"
+            )
+            # Keep the fallback inside the verifier's generic-policy grammar;
+            # detailed user-specific coupon fields still require Java refs.
+            revalidation_claim = "优惠券提交订单时会再次校验"
+            answer = (
+                f"{limit_claim} [{index}]。"
+                f"{revalidation_claim} [{index}]。"
+            )
+            return {
+                "answer": answer,
+                "citation": index,
+                "factId": fact_id,
+                "sourceId": selected_ref.get("id"),
+                "event": "RAG_COUPON_POLICY_DETERMINISTIC_FALLBACK",
+                "reason": "supported_coupon_policy_answer_failed_verifier",
+            }
         return None
 
     fact_id = (

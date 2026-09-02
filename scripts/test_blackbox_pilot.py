@@ -551,7 +551,7 @@ def test_session_score_accepts_only_complete_cross_source_evidence() -> None:
                 "actionToken": "action-1",
                 "actionType": "CREATE_SUPPORT_CASE",
                 "businessKey": "support-case-1",
-                "status": "EXECUTED",
+                "status": "CONFIRMED",
             }
         ],
         "cases": [

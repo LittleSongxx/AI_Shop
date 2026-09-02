@@ -109,7 +109,15 @@ class RecommendationEventStore:
             )
             existing = await cur.fetchone()
             if existing:
-                self._assert_same_identity(existing, event, "idempotencyKey")
+                # runId/modelVersion are server-owned projections.  A legacy
+                # browser retry may carry a request-derived runId after the
+                # first write was canonicalized to the impression's run.
+                self._assert_same_identity(
+                    existing,
+                    event,
+                    "idempotencyKey",
+                    include_server_fields=False,
+                )
                 return self._to_public(existing)
 
             await cur.execute(
@@ -226,7 +234,12 @@ class RecommendationEventStore:
             )
             row = await cur.fetchone()
             if row:
-                self._assert_same_identity(row, event, "idempotencyKey")
+                self._assert_same_identity(
+                    row,
+                    event,
+                    "idempotencyKey",
+                    include_server_fields=False,
+                )
                 return self._to_public(row)
 
             await cur.execute(
@@ -353,23 +366,27 @@ class RecommendationEventStore:
         row: dict,
         event: RecommendationEvent,
         collision_field: str,
+        *,
+        include_server_fields: bool = True,
     ) -> None:
         expected = (
             event.event_type,
             event.request_id,
-            event.run_id,
             event.product_id,
             event.position,
-            event.model_version,
         )
         actual = (
             str(row.get("event_type") or ""),
             str(row.get("request_id") or ""),
-            str(row.get("run_id") or ""),
             str(row.get("product_id") or ""),
             int(row.get("position") or 0),
-            str(row.get("model_version") or ""),
         )
+        if include_server_fields:
+            expected += (event.run_id, event.model_version)
+            actual += (
+                str(row.get("run_id") or ""),
+                str(row.get("model_version") or ""),
+            )
         if actual != expected:
             raise RecommendationEventConflict(
                 f"{collision_field} 已绑定到不同推荐事件"

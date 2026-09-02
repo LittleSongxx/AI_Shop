@@ -1858,6 +1858,42 @@ def test_policy_evidence_fallback_is_conservative_and_cited():
     assert checked.passed is True
 
 
+def test_coupon_policy_fallback_answers_stacking_question_from_faq():
+    refs = [
+        {
+            "id": "faq9002",
+            "factIds": ["coupon.single_per_order_and_revalidate"],
+            "snippet": (
+                "一个订单可以使用几张优惠券？相似问题：优惠券能叠加吗；"
+                "答案：当前一个订单只能选择一张用户优惠券，"
+                "提交订单时会重新校验有效期、门槛和归属。"
+            ),
+        }
+    ]
+    fallback = deterministic_policy_evidence_fallback(
+        "优惠券能否叠加？请说明当前规则并展示依据。",
+        intent="agent",
+        evidence_state="SUPPORTED",
+        source_refs=refs,
+    )
+
+    assert fallback is not None
+    assert fallback["event"] == "RAG_COUPON_POLICY_DETERMINISTIC_FALLBACK"
+    assert fallback["answer"].count("[1]") == 2
+    checked = response_verifier.verify(
+        assistant=fallback["answer"],
+        biz_type="agent",
+        tools_called=[],
+        source_refs={"ragSources": refs, "businessSources": []},
+        rag_source_refs=refs,
+        has_pending_action=False,
+        policy_evidence_required=True,
+        rag_citation_required=True,
+        rag_evidence_state="SUPPORTED",
+    )
+    assert checked.passed is True
+
+
 def test_policy_evidence_fallback_does_not_invent_without_matching_source():
     assert deterministic_policy_evidence_fallback(
         "我要取消订单 SM1",
